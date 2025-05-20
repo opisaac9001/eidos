@@ -38,6 +38,7 @@ WEBAPP_DIR = BASE_DIR / "webapp"
 
 # --- Import other Eidos components AFTER basic setup like logging and paths ---
 from eidos_agent.services.openweathermap import OpenWeatherMapService
+from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry 
 from eidos_agent.services.home_assistant import HomeAssistantService
 from eidos_agent.modules.ethos_core.core import EthosCore
 from eidos_agent.modules.logos_core.handler import LogosCore
@@ -405,6 +406,25 @@ def extract_input_to_eidos_format(body: dict, request_id: str, user_id_from_head
 
 
 # --- API Endpoints ---
+
+@app.get("/v1/user/facts", response_model=List[MemoryEntry], tags=["User"]) # <<< CHECK THIS PATH
+async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    global ethos_core
+    if not ethos_core:
+        raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
+
+    actual_user_id = x_user_id or "unknown_user"
+    if actual_user_id in ["unknown_user", "api_guest_user", "default_user"]:
+        logger.info(f"Request for user facts from a generic user context ('{actual_user_id}'). Returning empty list.")
+        return []
+
+    logger.info(f"API: Request for user facts for user_id: '{actual_user_id}'.")
+    try:
+        user_facts = await ethos_core.get_all_user_facts(user_id=actual_user_id)
+        return user_facts
+    except Exception as e:
+        logger.error(f"API: Error fetching user facts for '{actual_user_id}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error fetching user facts.")
 
 @app.get("/", include_in_schema=False)
 async def get_gui_root():

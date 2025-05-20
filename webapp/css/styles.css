@@ -125,6 +125,83 @@ body {
 
 /* Removed .chat-container.minimized .header-tool-icon styles */
 
+.message-bubble .feedback-buttons-container {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #555; /* Light separator */
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.message-bubble .feedback-button {
+    background-color: #3D3D3D; /* Darker grey */
+    color: #BBBBBB;
+    border: 1px solid #555555;
+    border-radius: 15px; /* Pill shape */
+    padding: 3px 10px; /* Smaller padding */
+    font-size: 13px; /* Smaller font */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1; /* Ensure text fits well */
+}
+
+.message-bubble .feedback-button:hover {
+    background-color: #4A4A4A;
+    color: #FFFFFF;
+    border-color: #F97B65; /* Eidos orange on hover */
+}
+
+.message-bubble .feedback-button.feedback-submitted {
+    background-color: #4CAF50; /* Green for submitted */
+    color: white;
+    border-color: #4CAF50;
+}
+
+/* Styling for the correction textarea (already in styles.css, but verify) */
+.feedback-text-container { 
+    margin-top: 8px; 
+    padding-top: 8px; 
+    border-top: 1px dashed #444444; 
+    display: flex; 
+    gap: 8px; 
+    align-items: flex-end; 
+}
+.feedback-text-container textarea { 
+    flex-grow: 1; 
+    resize: vertical; 
+    min-height: 40px; 
+    max-height: 100px; 
+    padding: 8px; 
+    border: 1px solid #444444; 
+    border-radius: 4px; 
+    background-color: #1A1A1A; 
+    color: #FFFFFF; 
+    font-family: inherit; 
+    font-size: 13px; 
+    box-sizing: border-box; 
+}
+.feedback-text-container textarea:focus { 
+    border-color: #F97B65; 
+    outline: none; 
+    box-shadow: 0 0 0 1px rgba(249, 123, 101, 0.4); 
+}
+.feedback-text-container button { 
+    flex-shrink: 0; 
+    padding: 6px 12px; 
+    background-color: #F97B65; 
+    color: #FFFFFF; 
+    border: none; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-size: 13px; 
+    font-weight: 500; 
+    transition: background-color 0.2s ease; 
+}
+.feedback-text-container button:hover { 
+    background-color: #FF8B75; 
+}
+
 .header-tool-icon:hover {
     background-color: rgba(255, 255, 255, 0.05);
     transform: scale(1.05);

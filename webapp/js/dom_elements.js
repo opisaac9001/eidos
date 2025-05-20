@@ -79,5 +79,10 @@ export const weatherTemperatureDisplay = $('weather-temperature'); // Corrected
 export const weatherUpdateButton = $('weather-update-button');
 export const weatherWindDisplay = $('weather-wind'); // Corrected
 export const ttsToggleButton = $('tts-toggle-button');
+export const userFactsButton = $('user-facts-button');
+export const userFactsPanel = $('user-facts-panel');
+export const userFactsCloseButton = $('user-facts-close-button');
+export const userFactsContentArea = $('user-facts-content-area');
+export const refreshUserFactsButton = $('refresh-user-facts-button');
 
 console.log('✅ dom_elements.js loaded — all DOM hooks wired (with corrections).');

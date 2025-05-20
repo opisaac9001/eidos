@@ -4,12 +4,13 @@ import {
     EIDOS_API_BASE_URL,
     EIDOS_API_KEY_KEY,
     LLM_PROVIDER_URL_KEY,
-    SELECTED_MODEL_KEY
+    SELECTED_MODEL_KEY,
+    WEATHER_LOCATION_KEY // Added for reading weather location
 } from './config.js';
 import {
     userInput, sendButton, modelDisplayName, systemPromptInput,
     modelTemperatureInput, imageInput, contextLengthInput,
-    llmProviderUrlInput, weatherLocationInput,
+    llmProviderUrlInput, weatherLocationInput, // weatherLocationInput is used to get the value
     uploadDocumentButton, uploadImageButton,
     resetChatButton, removeAttachedDocumentButton, forceWebSearchButton,
     microphoneButton,
@@ -189,11 +190,14 @@ export async function sendMessage(forceSearchPrefix = "") {
     if (userMessageContent.length > 0) {
         if (typeof _displayMessageInChatFunc === 'function') _displayMessageInChatFunc("User", userMessageContent);
         conversationHistory.push({ role: "user", content: userMessageContent });
+        window.isFirstMessageInSession = false; // A message has been sent
     } else if (conversationHistory.length > 0 && conversationHistory[conversationHistory.length-1].metadata?.injected_proactive) {
         const placeholderUserContent = "[Acknowledged Pathos's thought]";
         if (typeof _displayMessageInChatFunc === 'function') _displayMessageInChatFunc("User", placeholderUserContent);
         conversationHistory.push({ role: "user", content: placeholderUserContent });
+        window.isFirstMessageInSession = false;
     }
+
 
     if (userInput) userInput.value = '';
     if (typeof autoAdjustTextareaHeight === 'function' && userInput) autoAdjustTextareaHeight(userInput);
@@ -210,14 +214,27 @@ export async function sendMessage(forceSearchPrefix = "") {
 
     try {
         const requestBodyMetadata = {
-            weather_location: weatherLocationInput.value ? weatherLocationInput.value.trim() : null,
             user_id: window.currentUserId
         };
+
+        // Conditionally add weather_location
+        const weatherLoc = localStorage.getItem(WEATHER_LOCATION_KEY); // Read directly from localStorage
+        if (weatherLoc && weatherLoc.trim()) {
+            // window.isFirstMessageInSession and window.weatherLocationChangedThisSession
+            // should be managed by main.js (e.g., set true on new chat/load, or when weather setting changes)
+            if (window.isFirstMessageInSession || window.weatherLocationChangedThisSession) {
+                requestBodyMetadata.weather_location = weatherLoc.trim();
+                if (window.weatherLocationChangedThisSession) {
+                    window.weatherLocationChangedThisSession = false; // Reset flag after sending
+                }
+            }
+        }
+
         if (llmProviderUrlOverrideValue && llmProviderUrlOverrideValue.startsWith('http')) requestBodyMetadata.llm_provider_url_override = llmProviderUrlOverrideValue;
         if (contextLengthOverrideValue && !isNaN(contextLengthOverrideValue) && contextLengthOverrideValue > 0) requestBodyMetadata.max_tokens_override = contextLengthOverrideValue;
         if (selectedModelForAPI) requestBodyMetadata.pathos_model_override = selectedModelForAPI;
 
-        if (conversationHistory.length >= 2) {
+        if (conversationHistory.length >= 2) { // Check if there's enough history for this logic
             const secondLastMessage = conversationHistory[conversationHistory.length - 2];
             const lastMessage = conversationHistory[conversationHistory.length - 1];
             if (secondLastMessage.role === 'assistant' && secondLastMessage.metadata?.injected_proactive === true && secondLastMessage.metadata?.proactive_utterance_id && lastMessage.role === 'user') {

@@ -1,3 +1,5 @@
+// webapp/js/ui_chat.js
+
 import {
     chatMessagesArea,
     userInput,
@@ -16,9 +18,6 @@ import {
 import { conversationHistory } from './persistent_storage.js';
 import { THINK_TAG_PLACEHOLDER_PREFIX, THINK_TAG_PLACEHOLDER_SUFFIX } from './config.js';
 
-// REMOVE this import:
-// import { autoTtsEnabled } from './main.js';
-
 let _expandChatInterfaceFunc = () => console.warn("expandChatInterface function not yet set in ui_chat");
 export function setExpandChatInterfaceFunction(func) {
     _expandChatInterfaceFunc = func;
@@ -29,7 +28,6 @@ export function setDisplayMessageFunctionForProactive(func) {
     _displayMessageFuncForProactive = func;
 }
 
-// Keep a queue for TTS playback
 let ttsPlaybackQueue = [];
 let isPlayingFromQueue = false;
 let currentAudio = null;
@@ -52,7 +50,10 @@ async function playNextInQueue() {
         if (senderDiv && senderDiv.parentNode === messageBubble) {
            senderDiv.appendChild(ttsStatusIndicator);
         } else {
-           messageBubble.appendChild(ttsStatusIndicator);
+           // Fallback: append to messageBubble if senderDiv not found or not child
+           const contentDiv = messageBubble.querySelector('.message-content');
+           if (contentDiv) contentDiv.insertAdjacentElement('afterend', ttsStatusIndicator);
+           else messageBubble.appendChild(ttsStatusIndicator);
         }
     }
     ttsStatusIndicator.textContent = '(Playing...)';
@@ -103,16 +104,16 @@ async function playNextInQueue() {
 export function stopAndClearTTSQueue() {
     if (currentAudio) {
         currentAudio.pause();
-        currentAudio.src = "";
-        const indicators = document.querySelectorAll('.tts-status-indicator'); // Clear all indicators
-        indicators.forEach(ind => ind.textContent = '');
+        currentAudio.src = ""; // Release the audio object
         currentAudio = null;
     }
     ttsPlaybackQueue = [];
     isPlayingFromQueue = false;
+    // Clear any visible TTS status indicators
+    const indicators = document.querySelectorAll('.tts-status-indicator');
+    indicators.forEach(ind => ind.textContent = '');
     console.log("TTS queue cleared and current playback stopped.");
 }
-// window.stopAndClearTTSQueue = stopAndClearTTSQueue; // Expose if needed
 
 export function displayMessage(sender, content, metadata = null) {
     if (!chatMessagesArea) {
@@ -132,7 +133,7 @@ export function displayMessage(sender, content, metadata = null) {
     const contentDiv = document.createElement('div');
     contentDiv.classList.add('message-content');
 
-    let textContentToParse = ""; // Ensure this is populated correctly
+    let textContentToParse = "";
     let imageUrl = null;
     let documentContentForDisplay = null;
 
@@ -157,7 +158,7 @@ export function displayMessage(sender, content, metadata = null) {
     if (documentContentForDisplay) {
         const docDisplayDiv = document.createElement('div');
         docDisplayDiv.classList.add('document-content-display');
-        docDisplayDiv.innerHTML = `<strong>Uploaded Document:</strong><br><pre>${documentContentForDisplay}</pre>`;
+        docDisplayDiv.innerHTML = `<strong>Uploaded Document:</strong><br><pre>${documentContentForDisplay}</pre>`; // Simple pre for now
         contentDiv.appendChild(docDisplayDiv);
     }
 
@@ -175,22 +176,67 @@ export function displayMessage(sender, content, metadata = null) {
 
     messageBubble.appendChild(contentDiv);
 
-    // ... (Feedback button logic, timestamp logic - ensure textContentToParse is used for feedback payload) ...
+    // --- RESTORED/VERIFIED FEEDBACK BUTTON LOGIC ---
     if (isAIMessage && metadata && !metadata.injected_proactive_thought) {
-        // ... (footerInfoDiv logic) ...
-        // ... (feedback button creation logic) ...
-        // Ensure the handleSubmitFeedback uses textContentToParse for last_pathos_response
-    }
+        const footerInfoDiv = document.createElement('div');
+        footerInfoDiv.classList.add('message-footer-info');
 
+        let footerParts = [];
+        if (metadata.usage && (metadata.usage.prompt_tokens || metadata.usage.completion_tokens)) {
+            const pTokens = metadata.usage.prompt_tokens || metadata.usage.estimated_prompt_tokens || 'N/A';
+            const cTokens = metadata.usage.completion_tokens || 'N/A';
+            footerParts.push(`Tokens: P ${pTokens} / C ${cTokens}`);
+        }
+        if (metadata.mood_at_response) {
+            footerParts.push(`Mood: V ${metadata.mood_at_response.valence.toFixed(2)} A ${metadata.mood_at_response.arousal.toFixed(2)}`);
+        }
+        if (metadata.hexus_scores) {
+            const hexusShort = Object.entries(metadata.hexus_scores)
+                                   .map(([k, v]) => `${k.substring(0,1).toUpperCase()}${k.substring(1,3)}:${parseFloat(v).toFixed(1)}`)
+                                   .join(' ');
+            footerParts.push(`Hexus: ${hexusShort}`);
+        }
+        if (metadata.vision_llm_output) {
+            footerParts.push(`Vision: [Output present]`);
+        }
+        if (metadata.tool_calls_from_pathos) {
+            const toolNames = metadata.tool_calls_from_pathos.map(tc => tc.function?.name || 'unknown_tool').join(', ');
+            footerParts.push(`Tools: ${toolNames}`);
+        }
+
+        if (footerParts.length > 0) {
+            footerInfoDiv.innerHTML = footerParts.map(p => `<span>${p}</span>`).join('');
+            messageBubble.appendChild(footerInfoDiv);
+        }
+
+        const feedbackContainer = document.createElement('div');
+        feedbackContainer.classList.add('feedback-buttons-container'); // Add a class for styling if needed
+
+        const feedbackTypes = [
+            { type: 'positive', label: '👍', title: 'Good response' },
+            { type: 'negative', label: '👎', title: 'Bad response' },
+            { type: 'correction', label: '✍️', title: 'Suggest correction' },
+            // { type: 'suggestion', label: '💡', title: 'Offer suggestion' } // Optional
+        ];
+
+        feedbackTypes.forEach(fb => {
+            const button = document.createElement('button');
+            button.classList.add('feedback-button');
+            button.textContent = fb.label;
+            button.title = fb.title;
+            button.dataset.feedbackType = fb.type;
+            button.addEventListener('click', () => handleFeedbackClick(button, messageBubble, textContentToParse, metadata));
+            feedbackContainer.appendChild(button);
+        });
+        messageBubble.appendChild(feedbackContainer); // Append the container of buttons
+    }
+    // --- END RESTORED/VERIFIED FEEDBACK BUTTON LOGIC ---
 
     const timestampDiv = document.createElement('div');
     timestampDiv.classList.add('message-timestamp');
     timestampDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     messageBubble.appendChild(timestampDiv);
 
-
-    // Auto-play TTS for AI messages if enabled
-    // USE window.autoTtsEnabled here
     if (isAIMessage && textContentToParse.trim() && window.autoTtsEnabled) {
         console.log("Auto TTS: Queuing message for playback:", textContentToParse.substring(0,30) + "...");
         ttsPlaybackQueue.push({ text: textContentToParse, messageBubble: messageBubble });
@@ -202,14 +248,93 @@ export function displayMessage(sender, content, metadata = null) {
 }
 
 
+// --- NEW OR UPDATED: Feedback Handling Logic ---
+let activeFeedbackTextarea = null; // Keep track of any open textarea
+
+function handleFeedbackClick(button, messageBubble, lastPathosResponse, messageMetadata) {
+    const feedbackType = button.dataset.feedbackType;
+
+    // Remove any existing feedback textarea
+    if (activeFeedbackTextarea && activeFeedbackTextarea.parentNode) {
+        activeFeedbackTextarea.parentNode.remove(); // Remove the container of the textarea
+        activeFeedbackTextarea = null;
+    }
+
+    if (feedbackType === 'positive' || feedbackType === 'negative') {
+        submitFeedback(feedbackType, null, null, lastPathosResponse, messageMetadata);
+        // Optionally, provide visual feedback on the button or bubble
+        button.classList.add('feedback-submitted');
+        setTimeout(() => button.classList.remove('feedback-submitted'), 1500);
+    } else if (feedbackType === 'correction') {
+        const textareaContainer = document.createElement('div');
+        textareaContainer.classList.add('feedback-text-container');
+
+        const textarea = document.createElement('textarea');
+        textarea.placeholder = "Your corrected version or feedback...";
+        textarea.rows = 2;
+        activeFeedbackTextarea = textarea; // Track the new textarea
+
+        const submitButton = document.createElement('button');
+        submitButton.textContent = 'Send Correction';
+        submitButton.addEventListener('click', () => {
+            const feedbackText = textarea.value.trim();
+            if (feedbackText) {
+                submitFeedback(feedbackType, feedbackText, feedbackText, lastPathosResponse, messageMetadata);
+                textareaContainer.remove();
+                activeFeedbackTextarea = null;
+                button.classList.add('feedback-submitted');
+                setTimeout(() => button.classList.remove('feedback-submitted'), 1500);
+            } else {
+                showNotification("Please enter your correction.", "warning");
+            }
+        });
+
+        textareaContainer.appendChild(textarea);
+        textareaContainer.appendChild(submitButton);
+        messageBubble.appendChild(textareaContainer);
+        textarea.focus();
+    }
+}
+
+async function submitFeedback(feedbackType, feedbackText, suggestedResponse, lastPathosResponse, messageMetadata) {
+    const lastUserMessage = conversationHistory.slice().reverse().find(msg => msg.role === 'user');
+    const lastUserInput = lastUserMessage ? (typeof lastUserMessage.content === 'string' ? lastUserMessage.content : JSON.stringify(lastUserMessage.content)) : "[Could not retrieve last user input]";
+
+    const payload = {
+        interaction_id: messageMetadata?.interaction_id || null, // If you store interaction IDs
+        user_id: window.currentUserId || "unknown_gui_user",
+        last_user_input: lastUserInput,
+        last_pathos_response: lastPathosResponse,
+        feedback_type: feedbackType,
+        rating: feedbackType === 'positive' ? 1 : (feedbackType === 'negative' ? -1 : null),
+        feedback_text: feedbackText,
+        suggested_response: suggestedResponse, // For corrections, this is the user's version
+        // Add any other relevant metadata from messageMetadata if needed
+        // e.g., mood_at_response: messageMetadata?.mood_at_response
+    };
+
+    console.log("Submitting feedback:", payload);
+    try {
+        const response = await fetch(`${window.EIDOS_API_BASE_URL}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-User-Id': window.currentUserId },
+            body: JSON.stringify(payload)
+        });
+        if (response.ok) {
+            showNotification('Feedback submitted. Thank you!', 'success');
+        } else {
+            const errorData = await response.json();
+            showNotification(`Feedback submission failed: ${errorData.detail || response.statusText}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error submitting feedback:', error);
+        showNotification('Error submitting feedback. Check console.', 'error');
+    }
+}
+// --- END NEW OR UPDATED FEEDBACK HANDLING ---
+
+
 export function displayProactiveMessageInPanel(messageContent, metadata = null) {
-    // ... (existing implementation)
-    // If you want proactive panel messages to also auto-play TTS when clicked and injected:
-    // The current logic in displayProactiveMessageInPanel calls _displayMessageFuncForProactive,
-    // which is set to displayMessageInChat (this function). So, the auto-TTS logic above
-    // will apply when the proactive message is injected into the main chat.
-    // No change needed here for that part.
-    // ...
     if (!proactiveMessagesArea || !userInput) {
         console.error("displayProactiveMessageInPanel: proactiveMessagesArea or userInput not found.");
         return;
@@ -220,52 +345,80 @@ export function displayProactiveMessageInPanel(messageContent, metadata = null) 
     const itemDiv = document.createElement('div');
     itemDiv.classList.add('proactive-item');
     itemDiv.dataset.rawMessage = messageContent;
-    if (metadata && metadata.proactive_utterance_id) {
+    if (metadata && metadata.proactive_utterance_id) { // Ensure this ID is passed from backend
         itemDiv.dataset.proactiveId = metadata.proactive_utterance_id;
+    } else if (metadata && metadata.payload && metadata.payload.metadata && metadata.payload.metadata.proactive_utterance_id) {
+        // Handle if metadata is nested under payload (as seen in some WS messages)
+        itemDiv.dataset.proactiveId = metadata.payload.metadata.proactive_utterance_id;
     }
+
 
     const dateDiv = document.createElement('div');
     dateDiv.classList.add('proactive-item-date');
-    dateDiv.textContent = new Date(metadata?.timestamp || Date.now()).toLocaleString();
+    // Adjust timestamp source based on typical metadata structure
+    const timestamp = metadata?.timestamp || metadata?.payload?.metadata?.timestamp || Date.now();
+    dateDiv.textContent = new Date(timestamp).toLocaleString();
     itemDiv.appendChild(dateDiv);
 
-    const contentDivElement = document.createElement('div'); // Renamed to avoid conflict
+    const contentDivElement = document.createElement('div');
     if (typeof marked !== 'undefined') contentDivElement.innerHTML = marked.parse(messageContent);
     else contentDivElement.textContent = messageContent;
     itemDiv.appendChild(contentDivElement);
 
-    if (metadata) {
+    // Adjust metadata display based on typical structure
+    const effectiveMetadata = metadata?.payload?.metadata || metadata || {};
+    if (Object.keys(effectiveMetadata).length > 0) {
         const metaDiv = document.createElement('div');
         metaDiv.style.fontSize = '0.8em'; metaDiv.style.color = '#AAAAAA'; metaDiv.style.marginTop = '5px';
         let metaParts = [];
-        if (metadata.proactive_type) metaParts.push(`Type: ${metadata.proactive_type}`);
+        if (effectiveMetadata.proactive_type) metaParts.push(`Type: ${effectiveMetadata.proactive_type}`);
+        // Add other metadata parts if needed, e.g., source_dream_id
+        if (effectiveMetadata.source_dream_id) metaParts.push(`Dream ID: ${effectiveMetadata.source_dream_id.substring(0,8)}`);
+
         if (metaParts.length > 0) { metaDiv.innerHTML = metaParts.join(' | '); itemDiv.appendChild(metaDiv); }
     }
 
     itemDiv.addEventListener('click', () => {
         const clickedRawMessage = itemDiv.dataset.rawMessage;
-        const proactiveId = itemDiv.dataset.proactiveId;
+        const proactiveId = itemDiv.dataset.proactiveId; // This is the proactive_utterance_id
         if (userInput && clickedRawMessage) {
-            const proactiveDisplayMetadata = { injected_proactive_thought: true, proactive_utterance_id: proactiveId };
-            _displayMessageFuncForProactive("AI", clickedRawMessage, proactiveDisplayMetadata);
+            // This metadata is for the *display* of the AI's proactive message in chat
+            const displayMetadataForChat = { 
+                injected_proactive_thought: true, 
+                proactive_utterance_id: proactiveId // Pass the ID
+            };
+            _displayMessageFuncForProactive("AI", clickedRawMessage, displayMetadataForChat);
 
+            // This is the metadata for the *next user message* that Pathos will receive
+            // It indicates that the user is responding to this specific proactive message.
+            // This should be handled in api_comms.js when constructing the request to Pathos.
+            // For now, we can set a global flag or store it to be picked up.
+            // A better way is to pass it through the sendMessage call.
+            // Let's assume main.js or api_comms.js will handle adding `engaged_proactive_id`
+            // to the *next* API call's metadata.
+            
+            // Update conversationHistory to reflect the AI's proactive message being part of the chat
             conversationHistory.push({
                 role: "assistant",
                 content: clickedRawMessage,
-                metadata: { proactive_utterance_id: proactiveId, injected_proactive: true }
+                metadata: { 
+                    proactive_utterance_id: proactiveId, 
+                    injected_proactive: true, // Mark it as injected
+                    proactive_type: effectiveMetadata.proactive_type || "unknown"
+                }
             });
 
-            userInput.value = "";
-            userInput.placeholder = "Your response to Pathos...";
+            userInput.value = ""; // Clear user input
+            userInput.placeholder = "Your response to Pathos..."; // Change placeholder
             userInput.focus();
             autoAdjustTextareaHeight(userInput);
-            itemDiv.remove();
+            itemDiv.remove(); // Remove from proactive panel
             if (proactiveMessagesArea.children.length === 0 || (proactiveMessagesArea.children.length === 1 && proactiveMessagesArea.firstChild.tagName === 'P')) {
                 proactiveMessagesArea.innerHTML = '<p style="color: #888;">No proactive messages yet.</p>';
             }
             if(typeof _expandChatInterfaceFunc === 'function') _expandChatInterfaceFunc();
-            if (proactiveReplyContextDisplay) proactiveReplyContextDisplay.style.display = 'none';
-            if (proactivePanel) proactivePanel.classList.remove('open');
+            if (proactiveReplyContextDisplay) proactiveReplyContextDisplay.style.display = 'none'; // Hide context display
+            if (proactivePanel) proactivePanel.classList.remove('open'); // Close panel
         }
     });
     proactiveMessagesArea.appendChild(itemDiv);
