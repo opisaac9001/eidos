@@ -88,13 +88,13 @@ window.autoTtsEnabled = autoTtsEnabled; // Expose to window
 // --- Global State Setters ---
 function setCurrentUserIdGlobal(newId) {
     if (newId && typeof newId === 'string' && newId.trim() !== "") {
-        const trimmedNewId = newId.trim();
+        const trimmedNewId = newId.trim().toLowerCase().replace(/ /g, "_"); 
         currentUserId = trimmedNewId;
         localStorage.setItem(USER_ID_KEY, trimmedNewId);
-        window.currentUserId = trimmedNewId;
-        console.log("Main.js: currentUserId updated to:", trimmedNewId, "and saved to localStorage.");
+        window.currentUserId = trimmedNewId; // This is what ui_panels.js will use for X-User-Id
+        console.log("Main.js: currentUserId updated to (normalized):", trimmedNewId, "and saved to localStorage. Raw was:", newId);
         if (DOM.userIdInput) {
-            DOM.userIdInput.value = trimmedNewId;
+            DOM.userIdInput.value = trimmedNewId; // Reflect normalized ID back in input
         }
     } else {
         console.warn("Main.js: setCurrentUserIdGlobal - Attempted to set invalid or empty User ID:", newId);

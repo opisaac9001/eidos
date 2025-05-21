@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Literal, Union 
+from typing import List, Optional, Dict, Any, Literal, Union
 import uuid
 import time
 
@@ -14,8 +14,7 @@ class ToolCall(BaseModel):
 
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
-    content: Optional[Union[str, List[Dict[str, Any]]]] = None 
-
+    content: Optional[Union[str, List[Dict[str, Any]]]] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
     name: Optional[str] = None
@@ -23,12 +22,12 @@ class ChatMessage(BaseModel):
 
 class UserSettingItem(BaseModel):
     attribute_name: str
-    attribute_value: Any 
+    attribute_value: Any
     user_statement_context: Optional[str] = "User updated setting via GUI."
 
 class UserSettingsRequest(BaseModel):
-    user_id: str 
-    settings: List[UserSettingItem]    
+    user_id: str
+    settings: List[UserSettingItem]
 
 class ChatCompletionRequest(BaseModel):
     model: Optional[str] = None
@@ -62,12 +61,53 @@ class ModelCard(BaseModel):
     created: int = Field(default_factory=lambda: int(time.time()))
     owned_by: str = "eidos-project"
 
+# --- THIS IS THE IMPORTANT MODEL FOR THE /agent/learnings ENDPOINT ---
+class MemoryEntry(BaseModel): # Ensure this is a Pydantic BaseModel
+    id: str
+    timestamp: str
+    type: Literal[
+        'interaction', 
+        'context_summary', 
+        'ambient_log', 
+        'presence',
+        'dream', 
+        'reflection', 
+        'feedback', 
+        'system', 
+        'task_outcome',
+        'ha_interaction', 
+        'info_query_time', 
+        'info_query_math',
+        'info_query_weather', 
+        'info_query_wolfram_query', 
+        'info_query_other',
+        'task_failure', 
+        'task_fallback_wa', 
+        'document_chunk', 
+        'vision_analysis',
+        'sensor_reading', 
+        'motion_event', 
+        'daily_briefing',
+        'pending_context_document',
+        'user_fact', 
+        'world_knowledge', 
+        'learned_correction',       # This was present
+        'proactive_action_record', 
+        'queued_discussion_point',
+        'learned_feedback_insight',   
+        'suggestion_reflection'  
+    ]
+    content: str
+    embedding: Optional[List[float]] = None 
+    metadata: Dict[str, Any] = Field(default_factory=dict) 
+    salience: Optional[float] = None
+# --- END IMPORTANT MODEL ---
+
 class DreamEntryResponse(BaseModel):
     id: str
     timestamp: str
     content: str
-    dream_image_url: Optional[str] = None # This will be the web-accessible URL
-    # Add any other metadata you want to expose, e.g., seed memory summary
+    dream_image_url: Optional[str] = None
     dream_seed_summary: Optional[str] = None
 
 class ModelList(BaseModel):
@@ -77,7 +117,6 @@ class ModelList(BaseModel):
 class ClearUserMemoryRequest(BaseModel):
     user_id: str
 
-# --- Ensure FeedbackRequest is defined ---
 class FeedbackRequest(BaseModel):
     interaction_id: Optional[str] = None
     user_id: str
@@ -87,9 +126,7 @@ class FeedbackRequest(BaseModel):
     rating: Optional[int] = None
     feedback_text: Optional[str] = None
     suggested_response: Optional[str] = None
-# --- END FeedbackRequest Definition ---
 
-# --- Streaming Response Models (Placeholders) ---
 class DeltaMessage(BaseModel):
     role: Optional[Literal["system", "user", "assistant", "tool"]] = None
     content: Optional[str] = None
@@ -110,7 +147,7 @@ class KnowledgeVerificationLogEntry(BaseModel):
     fact_id: Optional[str] = None
     original_statement_snippet: str
     verification_timestamp: str
-    verification_status: str 
+    verification_status: str
     new_statement: Optional[str] = None
     superseded_by_fact_id: Optional[str] = None
-    verification_details: Optional[str] = None    
+    verification_details: Optional[str] = None

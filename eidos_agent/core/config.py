@@ -52,8 +52,7 @@ class EthosConfig(TypedDict, total=False):
     hexus_decay_rate_per_cycle: float
     hexus_activation_threshold: float
     hexus_curve_k: float
-    hexus_feedback_adjustment_step: float # New: How much feedback adjusts Hexus scores
-    # Proactive behavior tuning
+    hexus_feedback_adjustment_step: float
     proactive_greeting_interval_hours: int
     proactive_topic_interval_hours: int
     proactive_engagement_threshold: float
@@ -66,18 +65,23 @@ class EthosConfig(TypedDict, total=False):
     proactive_queued_point_chance: float
     # Memory Summarization
     enable_memory_summarization: bool
-    summarization_llm_role: str # e.g., "LOGOS_TECHNE"
+    summarization_llm_role: str
     summarization_cluster_min_memories: int
     summarization_max_memories_per_cluster: int
     summarization_max_text_length_for_prompt: int
     summarization_max_days_to_consider: int
     # Knowledge Upkeep
     knowledge_upkeep_interval_seconds: int
-    knowledge_upkeep_llm_role: str # e.g., "LOGOS_TECHNE"
+    knowledge_upkeep_llm_role: str 
     knowledge_upkeep_volatile_tags: List[str] # List of tags that mark facts as needing re-verification
     # Proactive immediate greeting (e.g., on user connect)
     proactive_immediate_greeting_grace_minutes: int
     proactive_immediate_greeting_chance: float
+    enable_interaction_log_analysis: bool
+    interaction_log_analysis_interval_seconds: int
+    interaction_log_analysis_llm_role: str # e.g., "LOGOS_TECHNE"
+    interaction_log_analysis_batch_size: int # How many interactions to process at once
+    interaction_log_analysis_max_days_lookback: int # How far back to look for unanalyzed interactions
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -272,6 +276,11 @@ class Config:
         "knowledge_upkeep_volatile_tags": json.loads(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_VOLATILE_TAGS", '[]')),
         "proactive_immediate_greeting_grace_minutes": int(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_GRACE_MINUTES", 15)),
         "proactive_immediate_greeting_chance": float(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_CHANCE", 0.75)),
+        "enable_interaction_log_analysis": os.getenv("ETHOS_ENABLE_INTERACTION_LOG_ANALYSIS", "True").lower() == "true",
+        "interaction_log_analysis_interval_seconds": int(os.getenv("ETHOS_INTERACTION_LOG_ANALYSIS_INTERVAL_SECONDS", 86400)), # e.g., daily
+        "interaction_log_analysis_llm_role": os.getenv("ETHOS_INTERACTION_LOG_ANALYSIS_LLM_ROLE", "LOGOS_TECHNE"),
+        "interaction_log_analysis_batch_size": int(os.getenv("ETHOS_INTERACTION_LOG_ANALYSIS_BATCH_SIZE", 20)),
+        "interaction_log_analysis_max_days_lookback": int(os.getenv("ETHOS_INTERACTION_LOG_ANALYSIS_MAX_DAYS_LOOKBACK", 7)),
     }
 
     # Home Assistant Configuration

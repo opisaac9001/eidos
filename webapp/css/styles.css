@@ -186,6 +186,68 @@ body {
     outline: none; 
     box-shadow: 0 0 0 1px rgba(249, 123, 101, 0.4); 
 }
+
+.user-fact-list-item {
+    display: flex; /* Make li a flex container */
+    justify-content: space-between; /* Pushes button to the right */
+    align-items: center; /* Align items vertically */
+    padding-right: 5px; /* Add some padding so button isn't flush */
+}
+
+.user-fact-display {
+    flex-grow: 1; /* Allow fact display to take available space */
+     /* display: flex; flex-direction: column; gap: 4px; /* Already defined */
+}
+
+.forget-fact-button {
+    background-color: #553c37; /* A muted red/brown */
+    color: #ddd;
+    border: 1px solid #77554f;
+    padding: 4px 8px;
+    font-size: 0.8em;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px; /* Space between fact and button */
+    flex-shrink: 0; /* Prevent button from shrinking */
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.forget-fact-button:hover {
+    background-color: #70403A;
+    border-color: #F97B65; /* Eidos orange on hover */
+    color: #fff;
+}
+
+.user-fact-display {
+    display: flex;
+    flex-direction: column; /* Stack attribute, value, context vertically */
+    gap: 4px; /* Space between elements */
+}
+
+.user-fact-attribute strong {
+    color: #F97B65; /* Eidos Orange for the attribute name */
+}
+
+.user-fact-value {
+    color: #FFFFFF; /* White for the value */
+    word-break: break-word; /* Ensure long values wrap */
+}
+
+.user-fact-context {
+    font-size: 0.8em;
+    color: #AAAAAA;
+    font-style: italic;
+    margin-top: 2px;
+}
+
+/* Re-using .history-item for the list item container */
+#user-facts-content-area .history-item {
+    padding: 12px; /* Slightly more padding */
+    margin-bottom: 10px;
+    background-color: #252525; /* Slightly different background for distinction if needed */
+    border-left: 3px solid #5A9BFF; /* A different accent color */
+}
+
 .feedback-text-container button { 
     flex-shrink: 0; 
     padding: 6px 12px; 

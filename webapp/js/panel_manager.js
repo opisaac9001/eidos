@@ -69,19 +69,16 @@ function togglePanel(panelElement, fetchFunction, panelSide) {
 }
 
 export function setupPanelEventListeners() {
-    if (allPanelConfigurations.length === 0) {
-        console.warn("PanelManager: Panel configurations not initialized. Cannot set up panel event listeners.");
-        return;
+    if (allPanelConfigurations.length === 0 && !(DOM.dropdownButton && DOM.dropdownContent)) { // Adjusted condition
+        console.warn("PanelManager: Panel configurations not initialized and/or dropdown elements missing. Cannot set up all event listeners.");
+        // return; // Don't return if only dropdown is present
     }
     console.log("PanelManager: Setting up panel event listeners...");
 
     allPanelConfigurations.forEach(item => {
-        // Use item.isMainButton to determine the correct trigger.
-        // If item.isMainButton is true, item.button is the actual button element.
-        // If item.isMainButton is false or undefined, item.button is also the trigger.
-        const triggerButton = item.button; // Simplified: item.button should always be the trigger if defined
+        const triggerButton = item.button; 
 
-        if (item.panel && item.button) { // Ensure both panel and its primary toggle button exist
+        if (item.panel && item.button) { 
              console.log(`PanelManager: Attempting to add listener to button: ${item.button.id} for panel: ${item.panel.id}`);
             if (!item.panel.classList.contains(item.side)) {
                 item.panel.classList.add(item.side);
@@ -92,12 +89,8 @@ export function setupPanelEventListeners() {
                 togglePanel(item.panel, item.fetchFunc, item.side);
             });
         } else if (item.panel && item.isMainButton && !item.button) {
-            // This case was for when the button in config was null but isMainButton was true.
-            // The getDailyBriefingButton is handled in event_handlers.js now to also open the panel.
-            // So, this specific branch might not be strictly needed if all panel toggles are header icons.
             console.warn(`PanelManager: Panel ${item.panel.id} configured with isMainButton but no direct button in config. Ensure its trigger is handled elsewhere.`);
         }
-
 
         if (item.closeButton && item.panel) {
             item.closeButton.addEventListener('click', (e) => {
@@ -108,11 +101,58 @@ export function setupPanelEventListeners() {
         }
     });
 
-    // Global click listener (remains the same)
-    document.addEventListener('click', (event) => { /* ... */ });
-    document.addEventListener('keydown', (event) => { /* ... */ });
-    if (DOM.dropdownButton && DOM.dropdownContent) { /* ... */ }
+    // --- ADDED/MODIFIED DROPDOWN TOGGLE LOGIC ---
+    if (DOM.dropdownButton && DOM.dropdownContent) {
+        console.log("PanelManager: Setting up model dropdown toggle listener.");
+        DOM.dropdownButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent global click listener from immediately closing it
+            const isVisible = DOM.dropdownContent.style.display === 'block';
+            DOM.dropdownContent.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                // Optional: Call fetchModels if you want to refresh models every time it opens
+                // if (typeof window.fetchModelsApiComms === 'function') window.fetchModelsApiComms();
+            }
+        });
+    } else {
+        console.warn("PanelManager: Model dropdown button or content not found. Toggle not set up.");
+    }
 
+    // Global click listener to close dropdowns/panels when clicking outside
+    document.addEventListener('click', (event) => {
+        let clickedInsidePanel = false;
+        allPanelConfigurations.forEach(item => {
+            if (item.panel && item.panel.contains(event.target)) {
+                clickedInsidePanel = true;
+            }
+        });
+        // Close model dropdown if click is outside
+        if (DOM.dropdownContent && DOM.dropdownContent.style.display === 'block') {
+            if (DOM.dropdownButton && !DOM.dropdownButton.contains(event.target) && !DOM.dropdownContent.contains(event.target)) {
+                DOM.dropdownContent.style.display = 'none';
+            }
+        }
+        // Close side panels if click is outside
+        if (!clickedInsidePanel) {
+            let shouldClose = true;
+            // Check if the click was on any of the panel trigger buttons
+            allPanelConfigurations.forEach(item => {
+                if (item.button && item.button.contains(event.target)) {
+                    shouldClose = false; // Don't close if a panel button was clicked (it will toggle)
+                }
+            });
+            if (shouldClose) {
+                closeAllSidePanels();
+            }
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeAllSidePanels();
+            if (DOM.dropdownContent) DOM.dropdownContent.style.display = 'none';
+        }
+    });
+    
     console.log("PanelManager: Panel event listeners setup complete.");
 }
 

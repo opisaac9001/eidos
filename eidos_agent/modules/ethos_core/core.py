@@ -62,7 +62,7 @@ class EthosCore:
     def __init__(self, config: Config):
         self.config = config
         self.ethos_config: EthosConfig = config.get_ethos_config()
-        self.memory_storage = MemoryStorage(config) # MemoryStorage now handles its own DB connection
+        self.memory_storage = MemoryStorage(config)
         self.hexus_state_file_path = self.memory_storage.memory_db_path.parent / HEXUS_STATE_FILENAME
 
         self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE}
@@ -75,12 +75,18 @@ class EthosCore:
         forgetting_interval_seconds = self.ethos_config.get('forgetting_interval_seconds', reflection_interval * 0.5 if reflection_interval > 0 else 0)
         hexus_decay_interval_seconds = self.ethos_config.get('hexus_decay_interval_seconds', 3600)
         knowledge_upkeep_interval_seconds = self.ethos_config.get('knowledge_upkeep_interval_seconds', 86400)
+        # Correctly get the interval for interaction log analysis
+        interaction_log_analysis_interval_seconds = self.ethos_config.get('interaction_log_analysis_interval_seconds', 86400)
+
 
         now_utc_init = datetime.now(timezone.utc)
         self.last_reflection_time = now_utc_init - timedelta(seconds=reflection_interval + 60) if reflection_interval > 0 else now_utc_init
         self.last_forgetting_time = now_utc_init - timedelta(seconds=forgetting_interval_seconds + 60) if forgetting_interval_seconds > 0 else now_utc_init
         self.last_hexus_decay_time: datetime = now_utc_init - timedelta(seconds=hexus_decay_interval_seconds + 60) if hexus_decay_interval_seconds > 0 else now_utc_init
         self.last_knowledge_upkeep_time: datetime = now_utc_init - timedelta(seconds=knowledge_upkeep_interval_seconds + 60) if knowledge_upkeep_interval_seconds > 0 else now_utc_init
+        # Correctly initialize last_interaction_log_analysis_time
+        self.last_interaction_log_analysis_time: datetime = now_utc_init - timedelta(seconds=interaction_log_analysis_interval_seconds + 60) if interaction_log_analysis_interval_seconds > 0 else now_utc_init
+
 
         self.oneiros_module: Optional['OneirosModule'] = None
         self.connection_manager: Optional['ConnectionManager'] = None
@@ -142,19 +148,18 @@ class EthosCore:
                     return defaults
                 else:
                     logger.warning(f"Hexus state file {self.hexus_state_file_path} has invalid format or keys. Using defaults/valid values.")
-                    # Ensure all default keys are present, using loaded values if valid, else default
                     final_scores = defaults.copy()
                     if isinstance(loaded_scores, dict):
                         for key in final_scores:
                             if key in loaded_scores and isinstance(loaded_scores[key], (int, float)):
                                 final_scores[key] = float(loaded_scores[key])
                     return final_scores
-            except (json.JSONDecodeError, IOError) as e: # Removed generic Exception
+            except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Error loading Hexus state from {self.hexus_state_file_path}: {e}. Using defaults.", exc_info=True)
         else:
             logger.info(f"Hexus state file not found at {self.hexus_state_file_path}. Using default scores and creating file.")
         try:
-            self._save_hexus_scores(defaults) # Save defaults if file not found or error
+            self._save_hexus_scores(defaults)
         except Exception as e_save:
             logger.error(f"Failed to save initial/default Hexus scores: {e_save}", exc_info=True)
         return defaults
@@ -167,11 +172,10 @@ class EthosCore:
                 float_scores = {k: float(v) for k, v in scores.items()}
                 json.dump(float_scores, f, indent=4)
             logger.info(f"Hexus scores saved successfully to {self.hexus_state_file_path}")
-        except (IOError, TypeError) as e: # Removed generic Exception
+        except (IOError, TypeError) as e:
             logger.error(f"Failed to save Hexus scores to {self.hexus_state_file_path}: {e}", exc_info=True)
 
     async def get_user_fact_by_key(self, user_id: str, attribute_key: str) -> Optional[MemoryEntry]:
-        """Helper to get a specific user_fact by user_id and attribute_key, most recent."""
         if not user_id or not attribute_key: return None
         logger.debug(f"EthosCore: Getting user_fact by key='{attribute_key}' for user_id='{user_id}'")
         conn = self.memory_storage._get_connection()
@@ -184,14 +188,14 @@ class EthosCore:
         try:
             cursor.execute(sql, (user_id, attribute_key))
             row = cursor.fetchone()
-            return self.memory_storage._row_to_entry(row) if row else None # Corrected
+            return self.memory_storage._row_to_entry(row) if row else None
         except sqlite3.OperationalError as oe:
             if "no such function: json_extract" in str(oe).lower():
                 logger.warning("json_extract not available for get_user_fact_by_key. Falling back to Python filter.")
                 cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' ORDER BY timestamp DESC")
                 for r_row in cursor.fetchall():
                     try:
-                        entry = self.memory_storage._row_to_entry(r_row) # Corrected
+                        entry = self.memory_storage._row_to_entry(r_row)
                         meta = entry.get('metadata', {})
                         if meta.get('user_id') == user_id and meta.get('fact_attribute_key') == attribute_key:
                             return entry
@@ -208,7 +212,7 @@ class EthosCore:
             raise ValueError("Memory entry must contain 'content' and 'type'")
 
         entry_type = str(entry_data['type'])
-        metadata = entry_data.get('metadata', {}).copy() # Work with a copy
+        metadata = entry_data.get('metadata', {}).copy() 
 
         system_user_ids_for_metadata = ["system_document", "system_briefing", "world_knowledge_store", "system_oneiros", "system_reflection", "api_guest_user", "unknown_user", "system_knowledge_upkeep", "system_curiosity", "system_admin"]
         if user_id_context is not None:
@@ -230,32 +234,37 @@ class EthosCore:
         if entry_type == 'user_fact' and \
            metadata.get('user_id') and metadata.get('user_id') not in system_user_ids_for_metadata and \
            metadata.get('fact_attribute_key'):
+
             target_user_id = metadata['user_id']
             attribute_key = metadata['fact_attribute_key']
             new_content_str = str(entry_data['content'])
             new_value_parsed = None
+            
             try:
                 new_content_data = json.loads(new_content_str)
                 new_value_parsed = new_content_data.get('value')
             except json.JSONDecodeError:
                 logger.warning(f"Could not parse new user_fact content for comparison: {new_content_str}")
+
             existing_fact_entry = await self.get_user_fact_by_key(target_user_id, attribute_key)
+
             if existing_fact_entry:
                 logger.debug(f"Found existing user_fact for user '{target_user_id}', key '{attribute_key}'. ID: {existing_fact_entry['id']}")
                 try:
                     existing_content_data = json.loads(existing_fact_entry['content'])
                     existing_value = existing_content_data.get('value')
+
                     if new_value_parsed is not None and new_value_parsed != existing_value:
                         logger.info(f"Updating existing user_fact {existing_fact_entry['id']} for key '{attribute_key}' as value changed from '{existing_value}' to '{new_value_parsed}'.")
                         updated_data_for_storage = {
                             'content': new_content_str,
                             'timestamp': entry_data.get('timestamp', datetime.now(timezone.utc).isoformat()),
-                            'metadata': metadata,
-                            'salience': entry_data.get('salience', 1.5)
+                            'metadata': metadata, 
+                            'salience': entry_data.get('salience', 1.5) 
                         }
                         self.memory_storage.update_entry(existing_fact_entry['id'], updated_data_for_storage)
                         updated_entry_dict = existing_fact_entry.copy()
-                        updated_entry_dict.update(updated_data_for_storage)
+                        updated_entry_dict.update(updated_data_for_storage) 
                         if self.memory_storage.embedder:
                             max_embed_len = self.ethos_config.get('embedding_max_text_length', 2560)
                             updated_entry_dict['embedding'] = self.memory_storage.embedder.encode(new_content_str[:max_embed_len]).tolist()
@@ -266,11 +275,12 @@ class EthosCore:
                 except json.JSONDecodeError:
                     logger.warning(f"Could not parse existing user_fact content for comparison: {existing_fact_entry['content']}. Will insert new fact.")
         return self.memory_storage.add_entry(entry_data)
-
+    
     async def get_local_datetime_for_user(self, user_id: str, location_override: Optional[str] = None) -> datetime:
         system_user_ids = ["unknown_user", "default_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing", "world_knowledge_store", "system_reflection", "system_knowledge_upkeep", "system_curiosity"]
         if not user_id or user_id in system_user_ids:
             return datetime.now(timezone.utc)
+
         iana_timezone_str: Optional[str] = None
         derived_tz_fact = await self.get_user_fact('derived_iana_timezone', user_id)
         if derived_tz_fact and derived_tz_fact.get('content'):
@@ -281,6 +291,7 @@ class EthosCore:
                     logger.debug(f"Using 'derived_iana_timezone': '{iana_timezone_str}' for user '{user_id}'.")
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse JSON for 'derived_iana_timezone' fact for user '{user_id}'.")
+
         if not iana_timezone_str:
             location_input_str = location_override
             if not location_input_str:
@@ -294,6 +305,7 @@ class EthosCore:
                         location_input_str = None
             if location_input_str:
                 iana_timezone_str = location_input_str
+
         if iana_timezone_str and ZoneInfo:
             try:
                 target_tz = ZoneInfo(iana_timezone_str)
@@ -311,7 +323,7 @@ class EthosCore:
         else:
             logger.debug(f"No IANA timezone string available or resolvable for user '{user_id}'. Falling back to UTC for timestamp.")
             return datetime.now(timezone.utc)
-
+    
     async def retrieve_relevant_memories(
         self, query: str, top_k: int = 5, min_salience: float = 0.1,
         allowed_types: Optional[List[str]] = None, user_id_context: Optional[str] = None
@@ -322,44 +334,50 @@ class EthosCore:
             return []
         try:
             similar_results_tuples = self.memory_storage.find_similar(
-                query_text=query, top_k=top_k * 5,
-                allowed_types=allowed_types, threshold=0.3
+                query_text=query, top_k=top_k * 5, 
+                allowed_types=allowed_types, threshold=0.3 
             )
             all_candidate_entries = [entry for score, entry in similar_results_tuples]
             system_user_ids = ["system_document", "system_briefing", "world_knowledge_store", "system_oneiros", "system_reflection", "system_knowledge_upkeep", "system_curiosity", "api_guest_user", "unknown_user", None]
+
             if user_id_context and user_id_context not in ["default_user"] + system_user_ids:
                 current_user_candidates = []
                 other_candidates = []
                 for entry in all_candidate_entries:
                     entry_user_id = entry.get('metadata', {}).get('user_id')
-                    if entry_user_id == user_id_context or entry_user_id in system_user_ids:
+                    if entry_user_id == user_id_context or entry_user_id in system_user_ids: 
                         current_user_candidates.append(entry)
                     else:
                         other_candidates.append(entry)
                 combined_candidates = current_user_candidates + other_candidates
             else:
                 combined_candidates = all_candidate_entries
+
             filtered_by_salience = [e for e in combined_candidates if (e.get('salience') if e.get('salience') is not None else 0) >= min_salience]
+
             def sort_key(entry: MemoryEntry):
                 entry_type = entry.get('type')
                 entry_user_id = entry.get('metadata', {}).get('user_id')
                 is_current_user_fact = (entry_type == 'user_fact' and entry_user_id == user_id_context)
                 is_world_knowledge = (entry_type == 'world_knowledge')
-                is_context_summary = (entry_type == 'context_summary' and (entry_user_id == user_id_context or entry_user_id in ["system_oneiros", "system_reflection"]))
+                is_context_summary = (entry_type == 'context_summary' and (entry_user_id == user_id_context or entry_user_id in ["system_oneiros", "system_reflection"])) 
                 is_current_user_interaction = (entry_user_id == user_id_context and entry_type != 'user_fact')
                 is_document_chunk = (entry_type == 'document_chunk')
                 is_learned_correction = (entry_type == 'learned_correction' or entry_type == 'learned_feedback_insight' or entry_type == 'suggestion_reflection')
-                is_feedback = (entry_type == 'feedback')
+                is_feedback = (entry_type == 'feedback') 
+
                 priority_score = 0
-                if is_current_user_fact: priority_score = 7
-                elif is_learned_correction: priority_score = 6
-                elif is_feedback: priority_score = 5
+                if is_current_user_fact: priority_score = 7 
+                elif is_learned_correction: priority_score = 6 
+                elif is_feedback: priority_score = 5 
                 elif is_context_summary: priority_score = 4
                 elif is_world_knowledge: priority_score = 3
                 elif is_document_chunk: priority_score = 2
                 elif is_current_user_interaction: priority_score = 1
+                
                 salience_for_sort = entry.get('salience') if entry.get('salience') is not None else 0.0
                 return (priority_score, salience_for_sort, entry.get('timestamp', ''))
+
             ranked_memories = sorted(filtered_by_salience, key=sort_key, reverse=True)[:top_k]
             logger.debug(f"Retrieved {len(ranked_memories)} relevant memories for user '{user_id_context}'.")
             return ranked_memories
@@ -370,25 +388,28 @@ class EthosCore:
     async def get_user_fact(self, attribute_key: str, user_id: str) -> Optional[MemoryEntry]:
         normalized_key = attribute_key.lower().replace(" ", "_").strip()
         system_user_ids = ["unknown_user", "default_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing", "world_knowledge_store", "system_reflection", "system_knowledge_upkeep", "system_curiosity"]
-        if not user_id or user_id in system_user_ids:
+        if not user_id or user_id in system_user_ids: 
             return None
         if not normalized_key:
              logger.warning(f"Attempted to retrieve user_fact with empty key for user '{user_id}'.")
              return None
+
         logger.debug(f"EthosCore retrieving user_fact: key='{normalized_key}', user_id='{user_id}'")
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') = ? ORDER BY timestamp DESC LIMIT 1"
+            oe_message_check = "" 
             try:
                 cursor.execute(sql, (user_id, normalized_key))
                 row = cursor.fetchone()
-                if row: return self.memory_storage._row_to_entry(row) # Corrected
+                if row: return self.memory_storage._row_to_entry(row)
             except sqlite3.OperationalError as oe:
-                if "no such function: json_extract" in str(oe).lower():
+                oe_message_check = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check:
                     logger.warning("json_extract not available. Falling back to Python filter for get_user_fact.")
                     cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' ORDER BY timestamp DESC")
                     for r_row in cursor.fetchall():
-                        entry = self.memory_storage._row_to_entry(r_row) # Corrected
+                        entry = self.memory_storage._row_to_entry(r_row) 
                         meta = entry.get('metadata', {})
                         if meta.get('user_id') == user_id and meta.get('fact_attribute_key') == normalized_key:
                             return entry
@@ -409,37 +430,41 @@ class EthosCore:
             await self.add_memory_entry(
                 entry_data={
                     "type": "document_chunk", "content": chunk_text, "id": f"{doc_id}_chunk_{i}",
-                    "metadata": {"source_document_id": doc_id, "source_document_name": filename, "chunk_index": i, "total_chunks": len(chunks), "user_id": user_id_context_for_docs},
+                    "metadata": {"source_document_id": doc_id, "source_document_name": filename, "chunk_index": i, "total_chunks": len(chunks), "user_id": user_id_context_for_docs}, 
                     "salience": 0.4
                 },
-                user_id_context=user_id_context_for_docs
+                user_id_context=user_id_context_for_docs 
             )
         logger.info(f"Finished adding chunks for document '{filename}'.")
 
     async def _call_summarization_llm(self, messages: List[Dict[str, Any]]) -> Optional[str]:
-        llm_role_str = self.ethos_config.get('summarization_llm_role', 'LOGOS_TECHNE')
+        llm_role_str = self.ethos_config.get('summarization_llm_role', 'LOGOS_TECHNE') 
         llm_config = self.config.get_llm_config(llm_role_str) # type: ignore
+
         if not llm_config or not llm_config.get('url'):
             logger.error(f"Utility LLM call (role: {llm_role_str}): URL not configured.")
-            return f"[LLM URL for role '{llm_role_str}' not configured]"
+            return f"[LLM URL for role '{llm_role_str}' not configured]" 
+
         try:
-            timeout_s = llm_config.get('timeout', 120)
+            timeout_s = llm_config.get('timeout', 120) 
             async with httpx.AsyncClient(timeout=float(timeout_s)) as client:
                 api_url = f"{llm_config['url']}/chat/completions"
                 headers = {"Content-Type": "application/json"}
                 api_key = llm_config.get('api_key')
                 if api_key and api_key.lower() not in ['lm-studio', 'ollama', '']:
                     headers["Authorization"] = f"Bearer {api_key}"
-                try:
-                    default_max_tokens = 512 if "summarize" in messages[0].get("content","").lower() else 256
+
+                try: 
+                    default_max_tokens = 512 if "summarize" in messages[0].get("content","").lower() else 256 
                     max_tokens_val = int(llm_config.get('max_tokens', default_max_tokens))
-                except (ValueError, TypeError):
+                except (ValueError, TypeError): 
                     max_tokens_val = default_max_tokens
                     logger.warning(f"Invalid max_tokens for utility LLM, using {max_tokens_val}.")
+
                 payload: Dict[str, Any] = {
-                    "model": llm_config.get('model'),
-                    "messages": messages,
-                    "temperature": llm_config.get('temperature', 0.3),
+                    "model": llm_config.get('model'), 
+                    "messages": messages, 
+                    "temperature": llm_config.get('temperature', 0.3), 
                     "max_tokens": max_tokens_val
                 }
                 for param in ['top_p', 'presence_penalty', 'frequency_penalty']:
@@ -447,19 +472,23 @@ class EthosCore:
                         payload[param] = param_val
                 if not payload.get('model'):
                     del payload['model']
+
                 llm_name_for_log = llm_config.get('model', f'Utility LLM ({llm_role_str})')
                 sys_prompt_log = messages[0]['content'][:100] + "..." if len(messages) > 0 and messages[0].get('content') and len(messages[0]['content']) > 100 else messages[0].get('content','') if len(messages) > 0 else "N/A"
                 user_prompt_log = messages[1]['content'][:100] + "..." if len(messages) > 1 and messages[1].get('content') and len(messages[1]['content']) > 100 else messages[1].get('content','') if len(messages) > 1 else "N/A"
                 logger.debug(f"Calling LLM '{llm_name_for_log}' at {api_url} for internal task. System Prompt: {sys_prompt_log} User Prompt: {user_prompt_log}")
+
                 response = await client.post(api_url, headers=headers, json=payload)
-                response.raise_for_status()
+                response.raise_for_status() 
                 result_json = response.json()
+
                 if result_json.get("choices") and len(result_json["choices"]) > 0:
-                     if message_data := result_json["choices"][0].get("message"):
-                         if llm_response_content := message_data.get("content"):
+                     if message_data := result_json["choices"][0].get("message"): 
+                         if llm_response_content := message_data.get("content"): 
                              if isinstance(llm_response_content, str):
                                  logger.debug(f"LLM '{llm_name_for_log}' raw response: {llm_response_content[:100]}...")
                                  return llm_response_content.strip()
+
                 logger.warning(f"Unexpected LLM response format from '{llm_name_for_log}': {result_json}")
                 return f"[Received unexpected response format from {llm_name_for_log}]"
         except httpx.TimeoutException as e:
@@ -489,42 +518,53 @@ class EthosCore:
             max_mem_cluster = self.ethos_config.get('summarization_max_memories_per_cluster', 15)
             max_text_len = self.ethos_config.get('summarization_max_text_length_for_prompt', 10000)
             max_days = self.ethos_config.get('summarization_max_days_to_consider', 30)
+
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             since_timestamp = (datetime.now(timezone.utc) - timedelta(days=max_days)).isoformat()
+
             summarizable_types = ['interaction', 'world_knowledge', 'document_chunk', 'user_fact', 'learned_correction', 'feedback', 'learned_feedback_insight', 'suggestion_reflection']
-            sql_memories = f"SELECT * FROM memories WHERE type IN ({','.join('?' for _ in summarizable_types)}) AND timestamp >= ? AND (json_extract(metadata, '$.summarized_by_reflection') IS NULL OR json_extract(metadata, '$.summarized_by_reflection') = 0) ORDER BY json_extract(metadata, '$.user_id'), timestamp ASC"
+
+            sql_memories = f"SELECT * FROM memories WHERE type IN ({','.join('?' for _ in summarizable_types)}) AND timestamp >= ? AND (json_extract(metadata, '$.summarized_by_reflection') IS NULL OR json_extract(metadata, '$.summarized_by_reflection') = 0) ORDER BY json_extract(metadata, '$.user_id'), timestamp ASC" 
             try:
                 cursor.execute(sql_memories, tuple(summarizable_types + [since_timestamp]))
             except sqlite3.OperationalError:
                  logger.warning("json_extract not available for summarization query. Fetching more and filtering.")
-                 sql_fallback = f"SELECT * FROM memories WHERE type IN ({','.join('?' for _ in summarizable_types)}) AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1000"
+                 sql_fallback = f"SELECT * FROM memories WHERE type IN ({','.join('?' for _ in summarizable_types)}) AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1000" 
                  cursor.execute(sql_fallback, tuple(summarizable_types + [since_timestamp]))
+
             all_relevant_rows = cursor.fetchall()
-            memories_by_key: Dict[str, List[MemoryEntry]] = {}
+            memories_by_key: Dict[str, List[MemoryEntry]] = {} 
+
             for row in all_relevant_rows:
-                entry = self.memory_storage._row_to_entry(row) # Corrected
+                entry = self.memory_storage._row_to_entry(row)
                 if entry.get('metadata',{}).get('summarized_by_reflection'): continue
-                key = "general_knowledge"
+
+                key = "general_knowledge" 
                 entry_type = entry.get('type')
-                if entry_type in ['interaction', 'user_fact', 'feedback', 'learned_correction', 'learned_feedback_insight', 'suggestion_reflection']:
+                if entry_type in ['interaction', 'user_fact', 'feedback', 'learned_correction', 'learned_feedback_insight', 'suggestion_reflection']: 
                     user_id = entry.get('metadata', {}).get('user_id')
-                    if user_id and user_id not in ["unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing", "system_reflection", "world_knowledge_store", "system_knowledge_upkeep", "system_curiosity", None]:
+                    if user_id and user_id not in ["unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing", "system_reflection", "world_knowledge_store", "system_knowledge_upkeep", "system_curiosity", None]: 
                         key = f"user_{user_id}"
-                    elif user_id in ["system_document", "system_briefing", "world_knowledge_store", "system_reflection", "system_knowledge_upkeep", "system_curiosity", None]:
+                    elif user_id in ["system_document", "system_briefing", "world_knowledge_store", "system_reflection", "system_knowledge_upkeep", "system_curiosity", None]: 
                          key = "general_knowledge"
+                    
                 if key not in memories_by_key: memories_by_key[key] = []
                 memories_by_key[key].append(entry)
+
             for key, memories_list in memories_by_key.items():
                 if len(memories_list) < min_mem_cluster:
                     logger.debug(f"Skipping summarization for key '{key}': only {len(memories_list)} memories found (min required: {min_mem_cluster}).")
                     continue
+
                 logger.info(f"Attempting to summarize {len(memories_list)} memories for key '{key}'.")
-                memories_list.sort(key=lambda x: x.get('timestamp', ''))
+                memories_list.sort(key=lambda x: x.get('timestamp', '')) 
+
                 for i in range(0, len(memories_list), max_mem_cluster):
                     chunk_to_summarize = memories_list[i:i+max_mem_cluster]
                     if len(chunk_to_summarize) < min_mem_cluster :
                          logger.debug(f"Skipping small trailing chunk ({len(chunk_to_summarize)} memories) for key '{key}'.")
-                         continue
+                         continue 
+
                     summarization_prompt_content = ""
                     source_memory_ids_chunk = []
                     current_len = 0
@@ -540,16 +580,20 @@ class EthosCore:
                                     content_to_add = f"Feedback Type: {fb_type_prev}, Rating: {rating_prev}, Text: '{fb_text_prev}'"
                             except json.JSONDecodeError:
                                 pass
+                        
                         content_part = f"Type: {mem.get('type')}, Time: {mem.get('timestamp')}, User: {mem.get('metadata',{}).get('user_id','unknown')}\nContent: {content_to_add}\n---\n"
+
                         if current_len + len(content_part) > max_text_len:
                              logger.debug(f"Truncating memory chunk for key '{key}' due to max_text_len ({max_text_len}).")
-                             break
+                             break 
                         summarization_prompt_content += content_part
                         current_len += len(content_part)
                         if mem_id := mem.get('id'): source_memory_ids_chunk.append(mem_id)
+
                     if not summarization_prompt_content:
                          logger.warning(f"No content generated for summarization prompt for key '{key}', chunk starting at index {i}.")
                          continue
+
                     system_s_prompt = (
                         "You are a summarization assistant. Based on the following collection of memories (interactions, facts, document excerpts, feedback, learned lessons), "
                         "provide a concise summary of the main themes, key information, significant feedback points, or important topics. "
@@ -558,10 +602,11 @@ class EthosCore:
                     user_s_prompt = f"Please summarize these memories related to '{key}':\n\n{summarization_prompt_content}"
                     summary_messages = [{"role": "system", "content": system_s_prompt}, {"role": "user", "content": user_s_prompt}]
                     generated_summary = await self._call_summarization_llm(summary_messages)
-                    if generated_summary and not generated_summary.startswith("["):
+
+                    if generated_summary and not generated_summary.startswith("["): 
                         logger.info(f"Generated summary for key '{key}': {generated_summary[:100]}...")
                         summary_user_id = key.split("user_")[-1] if key.startswith("user_") else "system_reflection"
-                        await self.add_memory_entry({
+                        await self.add_memory_entry({ 
                             "type": "context_summary", "content": generated_summary,
                             "metadata": {
                                 "user_id": summary_user_id, "source": "ethos_reflection_summarization",
@@ -569,14 +614,14 @@ class EthosCore:
                                 "summarization_key": key,
                                 "summarization_timestamp": datetime.now(timezone.utc).isoformat()
                             }, "salience": 0.85
-                        }, user_id_context=summary_user_id)
+                        }, user_id_context=summary_user_id) 
                         for mem_id_to_mark in source_memory_ids_chunk:
                             original_entry = self.memory_storage.get_entry(mem_id_to_mark)
                             if original_entry:
-                                meta_to_update = original_entry.get('metadata', {}).copy()
+                                meta_to_update = original_entry.get('metadata', {}).copy() 
                                 meta_to_update['summarized_by_reflection'] = True
                                 self.memory_storage.update_entry(mem_id_to_mark, {'metadata': meta_to_update})
-                    elif generated_summary:
+                    elif generated_summary: 
                          logger.warning(f"Summarization LLM returned error for key '{key}': {generated_summary}")
                     else: logger.warning(f"Failed to generate summary (empty response) for key '{key}', chunk starting with ID {source_memory_ids_chunk[0] if source_memory_ids_chunk else 'N/A'}.")
         except Exception as e:
@@ -589,32 +634,31 @@ class EthosCore:
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql_query = """
-                SELECT * FROM memories
-                WHERE type = ?
+                SELECT * FROM memories 
+                WHERE type = ? 
                   AND json_extract(metadata, '$.source') = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
+                ORDER BY timestamp DESC 
+                LIMIT ? 
             """
             fetch_limit = limit * 3 if user_id_context and user_id_context not in ["system_oneiros", None] else limit
-            oe = None # Initialize oe to handle potential NameError in except block
+            oe_message_check = "" 
             try:
                 cursor.execute(sql_query, (dream_type, dream_source, fetch_limit))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the operational error
-                if "no such function: json_extract" in str(oe).lower():
+            except sqlite3.OperationalError as oe:
+                oe_message_check = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check:
                     logger.warning("json_extract not available for get_recent_dreams query. Fetching more and filtering in Python.")
                     sql_query_fallback = "SELECT * FROM memories WHERE type = ? ORDER BY timestamp DESC LIMIT ?"
                     cursor.execute(sql_query_fallback, (dream_type, fetch_limit * 2))
-                else:
-                    raise
+                else: raise 
+
             rows = cursor.fetchall()
             processed_dreams: List[MemoryEntry] = []
             for row in rows:
-                entry = self.memory_storage._row_to_entry(row) # Corrected
+                entry = self.memory_storage._row_to_entry(row)
                 metadata = entry.get('metadata', {})
                 if 'source' not in metadata or metadata.get('source') != dream_source:
-                    if oe and "no such function: json_extract" in str(oe).lower():
-                        continue
+                    if "no such function: json_extract" in oe_message_check: continue
                 entry_user_id = metadata.get('user_id')
                 if user_id_context and user_id_context not in ["system_oneiros", "unknown_user", "api_guest_user", None]:
                     if entry_user_id == user_id_context or entry_user_id == "system_oneiros":
@@ -628,24 +672,28 @@ class EthosCore:
         except Exception as e:
             logger.error(f"Error retrieving recent dreams: {e}", exc_info=True)
             return []
-
+    
     async def run_reflection_cycle(self):
         if not any([self.config.ENABLE_LEARNING_FROM_FEEDBACK,
-                    self.config.ENABLE_CURIOUSITY,
+                    self.config.ENABLE_CURIOUSITY, 
                     self.ethos_config.get('enable_memory_summarization', False)]):
             logger.debug("Reflection cycle skipped: relevant features (feedback, curiosity, summarization) disabled.")
             return
+
         reflection_interval = self.ethos_config.get('reflection_interval_seconds', 86400)
         if reflection_interval <= 0:
             logger.debug("Reflection cycle skipped: interval is zero or negative.")
             return
+
         now = datetime.now(timezone.utc)
         if now - self.last_reflection_time < timedelta(seconds=reflection_interval):
             logger.debug("Reflection cycle skipped: not enough time passed since last run.")
             return
+
         logger.info("--- Ethos: Starting Reflection Cycle ---")
         self.last_reflection_time = now
-        self.hexus_scores_changed_during_reflection = False
+        self.hexus_scores_changed_during_reflection = False 
+
         if self.config.ENABLE_LEARNING_FROM_FEEDBACK:
             logger.info("Reflection: Processing user feedback...")
             try:
@@ -654,12 +702,15 @@ class EthosCore:
                 try: cursor.execute(sql_feedback)
                 except sqlite3.OperationalError:
                     logger.warning("json_extract not available for feedback query. Fetching all feedback and filtering.")
-                    sql_fallback = "SELECT * FROM memories WHERE type = 'feedback' ORDER BY timestamp DESC LIMIT 500"
+                    sql_fallback = "SELECT * FROM memories WHERE type = 'feedback' ORDER BY timestamp DESC LIMIT 500" 
                     cursor.execute(sql_fallback)
+
                 feedback_rows = cursor.fetchall()
-                feedback_entries_to_process = [self.memory_storage._row_to_entry(row) for row in feedback_rows if not row['metadata'] or not json.loads(row['metadata']).get('processed_by_reflection')] # Corrected
+                feedback_entries_to_process = [self.memory_storage._row_to_entry(row) for row in feedback_rows if not row['metadata'] or not json.loads(row['metadata']).get('processed_by_reflection')]
+
                 logger.debug(f"Found {len(feedback_entries_to_process)} unprocessed feedback entries for reflection.")
-                HEXUS_ADJUST_STEP = self.ethos_config.get('hexus_feedback_adjustment_step', 0.05)
+                HEXUS_ADJUST_STEP = self.ethos_config.get('hexus_feedback_adjustment_step', 0.05) 
+                
                 keywords = {
                     'brevity_inc': [r'\btoo\s+long\b', r'\btoo\s+wordy\b', r'\bshorter\b', r'\bconcise\b', r'\bto\s+the\s+point\b'],
                     'brevity_dec': [r'\btoo\s+short\b', r'\bmore\s+detail\b', r'\belaborate\b'],
@@ -670,47 +721,64 @@ class EthosCore:
                     'positive_sentiment': [r'\bhelpful\b', r'\bgood\s+job\b', r'\bnice\b', r'\bthank\s+you\b'],
                     'negative_sentiment': [r'\bfail(ed)?\b', r'\berror\b', r'\bbad\b'],
                 }
+
                 for fb_entry in feedback_entries_to_process:
                     fb_id = fb_entry['id']; metadata_update = fb_entry.get('metadata', {}).copy()
                     try:
                         fb_payload = json.loads(fb_entry['content'])
                         fb_user_id = metadata_update.get('user_id', fb_payload.get('user_id', 'unknown_user'))
-                        fb_text = fb_payload.get('feedback_text', '').strip()
-                        sugg_resp = fb_payload.get('suggested_response', '').strip()
+                        
+                        raw_fb_text = fb_payload.get('feedback_text')
+                        fb_text = raw_fb_text.strip() if isinstance(raw_fb_text, str) else ''
+                        
+                        raw_sugg_resp = fb_payload.get('suggested_response')
+                        sugg_resp = raw_sugg_resp.strip() if isinstance(raw_sugg_resp, str) else ''
+                        
                         fb_type = fb_payload.get('feedback_type'); fb_rating = fb_payload.get('rating')
-                        analysis_text = (fb_text + " " + sugg_resp).lower() if fb_text or sugg_resp else None
+                        
+                        analysis_text_parts = []
+                        if fb_text: analysis_text_parts.append(fb_text)
+                        if sugg_resp: analysis_text_parts.append(sugg_resp)
+                        analysis_text = " ".join(analysis_text_parts).strip().lower() if analysis_text_parts else None
+
                         adj_brevity = 0; adj_caution = 0; adj_proactivity = 0
+
                         if fb_type == 'positive' or (fb_rating is not None and fb_rating > 0):
-                             adj_caution -= HEXUS_ADJUST_STEP * 0.5
-                             adj_proactivity += HEXUS_ADJUST_STEP * 0.5
+                             adj_caution -= HEXUS_ADJUST_STEP * 0.5 
+                             adj_proactivity += HEXUS_ADJUST_STEP * 0.5 
                         elif fb_type == 'negative' or (fb_rating is not None and fb_rating < 0):
-                             adj_caution += HEXUS_ADJUST_STEP * 0.7
-                             adj_proactivity -= HEXUS_ADJUST_STEP * 0.5
+                             adj_caution += HEXUS_ADJUST_STEP * 0.7 
+                             adj_proactivity -= HEXUS_ADJUST_STEP * 0.5 
                         elif fb_type == 'correction':
                              adj_caution += HEXUS_ADJUST_STEP * 1.0
+
                         if analysis_text:
-                            if any(re.search(pattern, analysis_text) for pattern in keywords['brevity_inc']): adj_brevity += HEXUS_ADJUST_STEP * 1.5
+                            if any(re.search(pattern, analysis_text) for pattern in keywords['brevity_inc']): adj_brevity += HEXUS_ADJUST_STEP * 1.5 
                             elif any(re.search(pattern, analysis_text) for pattern in keywords['brevity_dec']): adj_brevity -= HEXUS_ADJUST_STEP * 1.5
                             if any(re.search(pattern, analysis_text) for pattern in keywords['caution_inc']): adj_caution += HEXUS_ADJUST_STEP * 1.5
-                            elif any(re.search(pattern, analysis_text) for pattern in keywords['caution_dec']): adj_caution -= HEXUS_ADJUST_STEP * 1.0
+                            elif any(re.search(pattern, analysis_text) for pattern in keywords['caution_dec']): adj_caution -= HEXUS_ADJUST_STEP * 1.0 
                             if any(re.search(pattern, analysis_text) for pattern in keywords['proactivity_inc']): adj_proactivity += HEXUS_ADJUST_STEP * 1.0
-                            elif any(re.search(pattern, analysis_text) for pattern in keywords['proactivity_dec']): adj_proactivity -= HEXUS_ADJUST_STEP * 2.0
+                            elif any(re.search(pattern, analysis_text) for pattern in keywords['proactivity_dec']): adj_proactivity -= HEXUS_ADJUST_STEP * 2.0 
                             if adj_brevity == 0 and adj_caution == 0 and adj_proactivity == 0:
                                 if any(re.search(pattern, analysis_text) for pattern in keywords['positive_sentiment']):
                                      adj_caution -= HEXUS_ADJUST_STEP * 0.3; adj_proactivity += HEXUS_ADJUST_STEP * 0.3
                                 elif any(re.search(pattern, analysis_text) for pattern in keywords['negative_sentiment']):
                                      adj_caution += HEXUS_ADJUST_STEP * 0.5; adj_proactivity -= HEXUS_ADJUST_STEP * 0.3
-                        initial_hexus = self.hexus_scores.copy()
+
+                        initial_hexus = self.hexus_scores.copy() 
                         self.hexus_scores['brevity_preference'] = max(HEXUS_MIN, min(HEXUS_MAX, self.hexus_scores.get('brevity_preference', 0.0) + adj_brevity))
                         self.hexus_scores['general_caution'] = max(HEXUS_MIN, min(HEXUS_MAX, self.hexus_scores.get('general_caution', 0.0) + adj_caution))
                         self.hexus_scores['user_engagement_proactivity'] = max(HEXUS_MIN, min(HEXUS_MAX, self.hexus_scores.get('user_engagement_proactivity', 0.0) + adj_proactivity))
+
                         if any(abs(self.hexus_scores[k] - initial_hexus[k]) > 1e-5 for k in initial_hexus.keys()):
                              self.hexus_scores_changed_during_reflection = True
                              logger.info(f"Hexus adjusted by feedback {fb_id} (Type: {fb_type}, Rating: {fb_rating}, Text: '{fb_text[:50]}...'). Initial: {initial_hexus}, New: {self.hexus_scores}")
+                        
                         should_generate_monologue = False
                         monologue_prompt_context = ""
                         monologue_system_prompt = "You are Pathos, reflecting on user feedback to improve."
-                        memory_type_for_reflection = "learned_feedback_insight"
+                        memory_type_for_reflection = "learned_feedback_insight" 
+
                         if fb_type == 'correction':
                             should_generate_monologue = True
                             memory_type_for_reflection = "learned_correction"
@@ -722,6 +790,7 @@ class EthosCore:
                             should_generate_monologue = True
                             memory_type_for_reflection = "suggestion_reflection"
                             monologue_prompt_context = f"""User's Suggestion: "{sugg_resp if sugg_resp else fb_text}"\n\nBased on this suggestion, formulate a concise "note to self". Is this a good idea? How might you consider incorporating it? Aim for 1-2 sentences."""
+                        
                         if should_generate_monologue:
                             monologue_user_prompt = f"User Feedback Context:\n{monologue_prompt_context}\n\nYour concise reflection/note to self:"
                             monologue_messages = [{"role": "system", "content": monologue_system_prompt}, {"role": "user", "content": monologue_user_prompt}]
@@ -733,6 +802,7 @@ class EthosCore:
                             else:
                                 logger.warning(f"Failed to generate LLM reflection for feedback {fb_id} (type: {fb_type}). Using raw details. LLM response: {llm_generated_reflection}")
                                 final_reflection_content = f"Reflection on feedback (type: {fb_type}): User provided feedback: '{fb_text}'. Suggestion: '{sugg_resp}'. Regarding interaction about: '{fb_payload.get('last_user_input','N/A')[:50]}...' where I said: '{fb_payload.get('last_pathos_response','N/A')[:50]}...'."
+                            
                             reflection_metadata = {
                                 "source_feedback_id": fb_id, "user_id": fb_user_id,
                                 "reflection_timestamp": now.isoformat(), "original_feedback_type": fb_type,
@@ -742,105 +812,121 @@ class EthosCore:
                                 "llm_generated_reflection_attempted": bool(llm_generated_reflection and not llm_generated_reflection.startswith("["))
                             }
                             await self.add_memory_entry(
-                                {"type": memory_type_for_reflection, "content": final_reflection_content,
+                                {"type": memory_type_for_reflection, "content": final_reflection_content, 
                                  "salience": 1.25, "metadata": reflection_metadata},
                                 user_id_context=fb_user_id
                             )
                             logger.info(f"Stored '{memory_type_for_reflection}' from feedback {fb_id} (Content: '{final_reflection_content[:100]}...').")
+
                         metadata_update['processed_by_reflection'] = True
                         metadata_update['reflection_processing_timestamp'] = now.isoformat()
                         self.memory_storage.update_entry(fb_id, {'metadata': metadata_update})
+
                     except json.JSONDecodeError:
                         logger.error(f"Could not parse JSON content for feedback entry {fb_id}. Content: {fb_entry.get('content','')[:100]}")
                         metadata_update['processed_by_reflection'] = True; metadata_update['reflection_error'] = "JSONDecodeError"
                         self.memory_storage.update_entry(fb_id, {'metadata': metadata_update})
                     except Exception as e_fb_proc: logger.error(f"Error processing feedback entry {fb_id}: {e_fb_proc}", exc_info=True)
-            except Exception as e_cycle_fb:
+            except Exception as e_cycle_fb: 
                 logger.error(f"Error during feedback processing part of reflection cycle: {e_cycle_fb}", exc_info=True)
+
         if self.ethos_config.get('enable_memory_summarization', False):
             await self._run_memory_summarization()
+
         if self.config.ENABLE_CURIOUSITY and self.config.ENABLE_ONEIROS:
             logger.info("Reflection: Pathos reflecting on recent dreams for curiosity...")
             try:
                 conn = self.memory_storage._get_connection(); cursor = conn.cursor()
                 sql_dreams = """
-                    SELECT * FROM memories
-                    WHERE type = 'queued_discussion_point'
+                    SELECT * FROM memories 
+                    WHERE type = 'queued_discussion_point' 
                       AND json_extract(metadata, '$.source') = 'oneiros_dream_cycle'
                       AND (json_extract(metadata, '$.reflected_for_curiosity') IS NULL OR json_extract(metadata, '$.reflected_for_curiosity') = 0)
-                    ORDER BY timestamp DESC
-                    LIMIT 5
+                    ORDER BY timestamp DESC 
+                    LIMIT 5 
                 """
-                oe_dream_query = None # Initialize
+                oe_dream_query_message = ""
                 try: cursor.execute(sql_dreams)
-                except sqlite3.OperationalError as op_err:
-                    oe_dream_query = op_err # Store the error
-                    if "no such function: json_extract" in str(oe_dream_query).lower():
+                except sqlite3.OperationalError as oe_dream_query:
+                    oe_dream_query_message = str(oe_dream_query).lower()
+                    if "no such function: json_extract" in oe_dream_query_message:
                         logger.warning("json_extract not available for dream reflection query. This part of reflection might be skipped or less efficient.")
                         sql_dreams_fallback = "SELECT * FROM memories WHERE type = 'queued_discussion_point' ORDER BY timestamp DESC LIMIT 20"
                         cursor.execute(sql_dreams_fallback)
-                    else:
-                        raise
+                    else: raise 
+
                 dream_rows = cursor.fetchall()
                 dreams_to_reflect_on: List[MemoryEntry] = []
                 for row in dream_rows:
-                    entry = self.memory_storage._row_to_entry(row) # Corrected
+                    entry = self.memory_storage._row_to_entry(row)
                     meta = entry.get('metadata', {})
                     if meta.get('source') == 'oneiros_dream_cycle' and not meta.get('reflected_for_curiosity'):
                         dreams_to_reflect_on.append(entry)
+                
                 if not dreams_to_reflect_on:
                     logger.info("Reflection: No new dreams from Oneiros to reflect on for curiosity.")
+                
                 dreams_to_process_this_cycle = dreams_to_reflect_on[:5]
+
                 for dream_entry in dreams_to_process_this_cycle:
                     dream_id = dream_entry.get('id')
                     dream_content = dream_entry.get('content', "An abstract dream fragment.")
                     dream_image_path = dream_entry.get('metadata', {}).get('dream_image_path')
+                    
                     logger.info(f"Reflection: Pathos considering dream ID {dream_id} for curiosity: '{dream_content[:100]}...'")
+
                     curiosity_system_prompt = ("You are Pathos, an AI with a curious and reflective nature. You've had an 'insight' or 'dream fragment' generated by your Oneiros module. Consider it thoughtfully.")
                     curiosity_user_prompt_parts = [f"Here is a recent dream/insight you had:\nDream Content: \"{dream_content}\""]
                     if dream_image_path: curiosity_user_prompt_parts.append(f"(An image was also generated for this dream at: {dream_image_path})")
                     curiosity_user_prompt_parts.append("\n\nBased on this, does it spark any genuine curiosity in you? Does it make you want to understand something better about the world, a concept, or how it might relate to your experiences or users? If yes, formulate a specific research question or a topic you'd like to explore further using research tools. Make the question clear and investigable. If no strong curiosity or actionable research question arises, respond with ONLY the exact phrase: 'No further inquiry needed for this insight.'\n\nYour research question/topic (or 'No further inquiry needed for this insight.'):")
                     curiosity_user_prompt = "\n".join(curiosity_user_prompt_parts)
                     curiosity_messages = [{"role": "system", "content": curiosity_system_prompt}, {"role": "user", "content": curiosity_user_prompt}]
+                    
                     llm_response_for_curiosity = await self._call_summarization_llm(curiosity_messages)
+
                     if llm_response_for_curiosity and not llm_response_for_curiosity.startswith("[") and llm_response_for_curiosity.strip().lower() != "no further inquiry needed for this insight.":
                         research_query = llm_response_for_curiosity.strip()
                         logger.info(f"Pathos generated research query from dream ID {dream_id}: '{research_query}'")
                         if self.logos_core and self.config.ENABLE_WEB_SEARCH:
                             try:
-                                research_result_content = await self.logos_core.execute_deep_research(research_query)
+                                research_result_content = await self.logos_core.execute_deep_research(research_query) 
+                                
                                 if research_result_content and not research_result_content.startswith('{"error":'):
                                     knowledge_id = str(uuid.uuid4())
                                     original_dream_user_id = dream_entry.get('metadata', {}).get('user_id', 'system_oneiros')
                                     new_knowledge_content = f"Following a train of thought (from dream ID: {dream_id[:8]}...), I looked into: '{research_query}'.\n\nHere's a summary of what I found:\n{research_result_content}"
+                                    
                                     await self.add_memory_entry({
                                         "id": knowledge_id, "type": "world_knowledge",
-                                        "content": new_knowledge_content,
+                                        "content": new_knowledge_content, 
                                         "metadata": {"user_id": "system_curiosity", "source": "curiosity_driven_research",
-                                                     "original_dream_id": dream_id, "original_dream_user_id_context": original_dream_user_id,
+                                                     "original_dream_id": dream_id, "original_dream_user_id_context": original_dream_user_id, 
                                                      "dream_content_seed": dream_entry.get('content', '')[:200] + "...",
                                                      "research_query_by_pathos": research_query, "timestamp": datetime.now(timezone.utc).isoformat()},
                                         "salience": 0.8 }, user_id_context="world_knowledge_store")
                                     logger.info(f"Stored new world knowledge (ID: {knowledge_id}) from curiosity-driven research on '{research_query[:50]}...'.")
+
                                     if self.connection_manager and self.pathos_interface:
                                         user_to_notify = None
                                         if original_dream_user_id and original_dream_user_id not in ["system_oneiros", "system_reflection", "system_curiosity", "unknown_user", "api_guest_user", "system_document", "system_briefing", "world_knowledge_store"]:
                                             user_to_notify = original_dream_user_id
+                                        
                                         if user_to_notify:
                                             notification_prompt_system = "You are Pathos. You've just learned something new based on a previous reflection or 'dream'. Formulate a very brief and casual message to share this new insight or piece of knowledge with the user who might find it interesting."
                                             notification_prompt_user = f"You just learned the following after researching '{research_query}':\n\nSummary: \"{research_result_content[:300]}...\"\n\nCraft a short, proactive message for user '{user_to_notify}' to share this, perhaps mentioning it stemmed from a thought you had. Example: 'Hey, I was thinking about [related topic from dream] and ended up learning that [brief new knowledge]! Thought you might find that interesting.'"
                                             notification_messages = [{"role": "system", "content": notification_prompt_system}, {"role": "user", "content": notification_prompt_user}]
                                             formatted_notification_content = await self._call_summarization_llm(notification_messages)
+
                                             if formatted_notification_content and not formatted_notification_content.startswith("["):
                                                 ws_message_payload = {
-                                                    "type": "unsolicited_message",
+                                                    "type": "unsolicited_message", 
                                                     "payload": {
                                                         "content": formatted_notification_content,
                                                         "metadata": {
-                                                            "proactive_type": "newly_learned_knowledge",
+                                                            "proactive_type": "newly_learned_knowledge", 
                                                             "source_dream_id": dream_id,
                                                             "research_query": research_query,
-                                                            "knowledge_snippet": research_result_content[:150] + "...",
+                                                            "knowledge_snippet": research_result_content[:150] + "...", 
                                                             "timestamp": datetime.now(timezone.utc).isoformat(),
                                                             "mood_at_generation": self.get_current_mood(),
                                                             "hexus_at_generation": self.get_hexus_scores()
@@ -856,23 +942,27 @@ class EthosCore:
                                             logger.info(f"New knowledge from dream ID {dream_id} was system-generated or original user unknown; no specific user notification sent via WebSocket.")
                                 else:
                                     logger.warning(f"Deep research for query '{research_query}' (from dream {dream_id}) did not yield usable results or had an error: {research_result_content}")
-                            except Exception as e_research:
+                            except Exception as e_research: 
                                 logger.error(f"Error during curiosity-driven deep research for query '{research_query}': {e_research}", exc_info=True)
                         else:
                             logger.warning(f"Cannot perform curiosity-driven research for dream {dream_id}: LogosCore or WebSearch not available.")
+                    
                     elif llm_response_for_curiosity and llm_response_for_curiosity.strip().lower() == "no further inquiry needed for this insight.":
                         logger.info(f"Pathos indicated no further inquiry needed for dream ID {dream_id}.")
-                    else:
+                    else: 
                         logger.warning(f"Could not determine research query from Pathos's reflection on dream ID {dream_id}. LLM response: {llm_response_for_curiosity}")
+
                     dream_meta_update = dream_entry.get('metadata', {}).copy()
                     dream_meta_update['reflected_for_curiosity'] = True
                     dream_meta_update['curiosity_reflection_timestamp'] = now.isoformat()
                     self.memory_storage.update_entry(dream_id, {'metadata': dream_meta_update})
-                    await asyncio.sleep(random.uniform(2,5))
+                    await asyncio.sleep(random.uniform(2,5)) 
             except Exception as e_curiosity_cycle:
                 logger.error(f"Error during Pathos reflects on dreams (curiosity) part of reflection cycle: {e_curiosity_cycle}", exc_info=True)
-        if self.hexus_scores_changed_during_reflection:
+
+        if self.hexus_scores_changed_during_reflection: 
             self._save_hexus_scores()
+
         logger.info("--- Ethos: Reflection Cycle Finished ---")
         if self.config.ENABLE_PROACTIVE_BEHAVIOR:
              logger.debug("Reflection cycle finished, triggering proactive check.")
@@ -893,20 +983,29 @@ class EthosCore:
             user_fact_floor = self.ethos_config.get('user_fact_salience_floor', 1.0)
             if not (0 < decay_rate_per_day < 1): decay_rate_per_day = 0.0
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-            sql_select_decay_candidates = "SELECT id, timestamp, salience, type FROM memories WHERE salience IS NOT NULL AND salience > ? AND type != 'user_fact'"
+            sql_select_decay_candidates = """
+                SELECT id, timestamp, salience, type FROM memories
+                WHERE salience IS NOT NULL AND salience > ? AND type != 'user_fact'
+            """
             cursor.execute(sql_select_decay_candidates, (min_salience_threshold,))
             entries_to_check = cursor.fetchall()
-            sql_select_user_facts = "SELECT id, timestamp, salience, type FROM memories WHERE type = 'user_fact' AND salience IS NOT NULL AND salience > ?"
-            cursor.execute(sql_select_user_facts, (user_fact_floor,))
+
+            sql_select_user_facts = """
+                SELECT id, timestamp, salience, type FROM memories
+                WHERE type = 'user_fact' AND salience IS NOT NULL AND salience > ?
+            """
+            cursor.execute(sql_select_user_facts, (user_fact_floor,)) 
             user_facts_above_floor = cursor.fetchall()
+
             if not entries_to_check and not user_facts_above_floor: logger.info("Managed Forgetting: No entries requiring decay or user fact floor adjustment."); return
+
             updates_to_make = []
             for row_data in entries_to_check:
                 entry_id, ts_str, current_salience, entry_type = row_data['id'], row_data['timestamp'], row_data['salience'], row_data['type']
                 try: entry_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
-                except ValueError: continue
+                except ValueError: continue 
                 days_elapsed = (now - entry_time).total_seconds() / (24 * 3600.0)
-                if days_elapsed <= 0: continue
+                if days_elapsed <= 0: continue 
                 new_salience = current_salience * (math.pow(1.0 - decay_rate_per_day, days_elapsed)) if decay_rate_per_day > 0 else current_salience
                 new_salience = max(min_salience_threshold, new_salience)
                 if new_salience < current_salience and not math.isclose(new_salience, current_salience, rel_tol=1e-5):
@@ -916,6 +1015,7 @@ class EthosCore:
                 if current_salience > user_fact_floor and not math.isclose(current_salience, user_fact_floor, rel_tol=1e-5):
                      updates_to_make.append((user_fact_floor, entry_id))
                      logger.debug(f"Adjusting user_fact {entry_id} salience from {current_salience:.2f} down to floor {user_fact_floor:.2f}.")
+
             if updates_to_make:
                 cursor.executemany("UPDATE memories SET salience = ? WHERE id = ?", updates_to_make)
                 conn.commit()
@@ -931,66 +1031,53 @@ class EthosCore:
         now = datetime.now(timezone.utc)
         if now - self.last_hexus_decay_time < timedelta(seconds=decay_interval): logger.debug("Hexus decay skipped."); return
         logger.info("Running Hexus Score Decay..."); self.last_hexus_decay_time = now
-        decay_rate = self.ethos_config.get('hexus_decay_rate_per_cycle', 0.005)
+        decay_rate = self.ethos_config.get('hexus_decay_rate_per_cycle', 0.005) 
         if not isinstance(decay_rate, (int, float)) or decay_rate < 0 or decay_rate >= 1:
-             logger.warning(f"Invalid or non-positive hexus_decay_rate {decay_rate}. Using default 0.005.")
-             decay_rate = 0.005
-        updated = False
-        initial_hexus = self.hexus_scores.copy()
-        for key in DEFAULT_HEXUS_SCORES.keys():
-             current_val = self.hexus_scores.get(key, 0.0)
+             logger.warning(f"Invalid or non-positive hexus_decay_rate {decay_rate}. Using default 0.005."); decay_rate = 0.005
+        updated = False; initial_hexus = self.hexus_scores.copy() 
+        for key in DEFAULT_HEXUS_SCORES.keys(): 
+             current_val = self.hexus_scores.get(key, 0.0) 
              distance_to_baseline = current_val - 0.0
              decay_amount = distance_to_baseline * decay_rate
              new_val = current_val - decay_amount
              new_val = max(HEXUS_MIN, min(HEXUS_MAX, new_val))
              if not math.isclose(new_val, current_val, rel_tol=1e-5):
-                  self.hexus_scores[key] = new_val
-                  updated = True
-        if updated:
-            self._save_hexus_scores();
-            logger.info(f"Hexus scores decayed and saved. Initial: {initial_hexus}, New: {self.hexus_scores}")
+                  self.hexus_scores[key] = new_val; updated = True
+        if updated: self._save_hexus_scores(); logger.info(f"Hexus scores decayed and saved. Initial: {initial_hexus}, New: {self.hexus_scores}")
         else: logger.debug("No significant Hexus score decay.")
 
     async def update_mood_state(self, event_type: str, data: Any):
         if not self.config.ENABLE_MOOD_SIMULATION: return
         logger.debug(f"Updating mood: event={event_type}, data={str(data)[:100]}")
-        current_mood_decayed = self.get_current_mood()
-        self.current_mood['valence'] = current_mood_decayed['valence']
-        self.current_mood['arousal'] = current_mood_decayed['arousal']
+        current_mood_decayed = self.get_current_mood() 
+        self.current_mood['valence'] = current_mood_decayed['valence'] 
+        self.current_mood['arousal'] = current_mood_decayed['arousal'] 
         v_change, a_change = 0.0, 0.0
         if event_type == 'task_outcome':
             success = data.get('success', False) if isinstance(data, dict) else bool(data)
             v_change, a_change = (MOOD_SHIFT_VALENCE_SUCCESS, MOOD_SHIFT_AROUSAL_SUCCESS) if success else (MOOD_SHIFT_VALENCE_FAILURE, MOOD_SHIFT_AROUSAL_FAILURE)
         elif event_type == 'feedback' and isinstance(data, dict):
             fb_type, rating = data.get('feedback_type'), data.get('rating')
-            if fb_type == 'positive' or (rating is not None and rating > 0):
-                 v_change, a_change = MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE, MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
-            elif fb_type == 'negative' or (rating is not None and rating < 0):
-                 v_change, a_change = MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE, MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            elif fb_type in ['correction', 'suggestion']:
-                 v_change, a_change = -0.05, 0.1
+            if fb_type == 'positive' or (rating is not None and rating > 0): v_change, a_change = MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE, MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
+            elif fb_type == 'negative' or (rating is not None and rating < 0): v_change, a_change = MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE, MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
+            elif fb_type in ['correction', 'suggestion']: v_change, a_change = -0.05, 0.1
         if v_change != 0.0 or a_change != 0.0:
             self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['valence'] + v_change))
             self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + a_change))
             self.last_mood_update_time = datetime.now(timezone.utc)
             logger.info(f"Mood updated by event '{event_type}'. New: V={self.current_mood['valence']:.2f}, A={self.current_mood['arousal']:.2f}")
-        else:
-             logger.debug(f"Mood update for event '{event_type}' resulted in no change.")
+        else: logger.debug(f"Mood update for event '{event_type}' resulted in no change.")
 
     def get_current_mood(self) -> Dict[str, float]:
         if not self.config.ENABLE_MOOD_SIMULATION: return {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE}.copy()
         now = datetime.now(timezone.utc); hours_elapsed = (now - self.last_mood_update_time).total_seconds() / 3600.0
         decay_rate = self.ethos_config.get('mood_decay_rate_per_hour', 0.05)
         if not isinstance(decay_rate, (int, float)) or decay_rate < 0 or decay_rate >= 1:
-             logger.warning(f"Invalid or non-positive mood_decay_rate {decay_rate}. Using default 0.05.")
-             decay_rate = 0.05
-        multiplier = math.pow(1.0 - decay_rate, max(0, hours_elapsed))
-        v_offset = self.current_mood['valence'] - MOOD_VALENCE_BASELINE
-        a_offset = self.current_mood['arousal'] - MOOD_AROUSAL_BASELINE
-        decayed_valence = MOOD_VALENCE_BASELINE + (v_offset * multiplier)
-        decayed_arousal = MOOD_AROUSAL_BASELINE + (a_offset * multiplier)
-        decayed_valence = max(MOOD_MIN, min(MOOD_MAX, decayed_valence))
-        decayed_arousal = max(MOOD_MIN, min(MOOD_MAX, decayed_arousal))
+             logger.warning(f"Invalid or non-positive mood_decay_rate {decay_rate}. Using default 0.05."); decay_rate = 0.05
+        multiplier = math.pow(1.0 - decay_rate, max(0, hours_elapsed)) 
+        v_offset = self.current_mood['valence'] - MOOD_VALENCE_BASELINE; a_offset = self.current_mood['arousal'] - MOOD_AROUSAL_BASELINE
+        decayed_valence = MOOD_VALENCE_BASELINE + (v_offset * multiplier); decayed_arousal = MOOD_AROUSAL_BASELINE + (a_offset * multiplier)
+        decayed_valence = max(MOOD_MIN, min(MOOD_MAX, decayed_valence)); decayed_arousal = max(MOOD_MIN, min(MOOD_MAX, decayed_arousal))
         return {"valence": decayed_valence, "arousal": decayed_arousal}
 
     def get_persona_directives(self) -> List[str]: return self.persona_directives[:]
@@ -1004,11 +1091,8 @@ class EthosCore:
             sql_briefing = "SELECT content, timestamp FROM memories WHERE type = 'daily_briefing' AND date(timestamp) = date(?) ORDER BY timestamp DESC LIMIT 1"
             cursor.execute(sql_briefing, (today_date_str,))
             row = cursor.fetchone()
-            if row:
-                 logger.info(f"Found existing daily briefing from {row['timestamp'][:16]}.")
-                 return row['content']
-            logger.debug("No existing daily briefing found for today.")
-            return None
+            if row: logger.info(f"Found existing daily briefing from {row['timestamp'][:16]}."); return row['content']
+            logger.debug("No existing daily briefing found for today."); return None
         except Exception as e: logger.error(f"Error retrieving daily briefing: {e}", exc_info=True); return None
 
     async def update_persona_directives(self, new_directives: List[str]):
@@ -1016,375 +1100,499 @@ class EthosCore:
         self.persona_directives = new_directives
         try:
             PERSONA_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(PERSONA_FILE_PATH, 'w', encoding='utf-8') as f:
-                f.write("\n".join(new_directives))
+            with open(PERSONA_FILE_PATH, 'w', encoding='utf-8') as f: f.write("\n".join(new_directives))
             logger.info(f"Saved updated persona directives to {PERSONA_FILE_PATH}")
         except Exception as e: logger.error(f"Failed to save updated persona directives: {e}", exc_info=True)
 
-    async def run_knowledge_upkeep_cycle(self):
-        if not self.config.ENABLE_KNOWLEDGE_UPKEEP:
-            logger.debug("Knowledge Upkeep cycle skipped: Disabled in config.")
-            return
+    async def run_knowledge_upkeep_cycle(self): 
+        if not self.config.ENABLE_KNOWLEDGE_UPKEEP: logger.debug("Knowledge Upkeep cycle skipped: Disabled in config."); return
         upkeep_interval = self.ethos_config.get('knowledge_upkeep_interval_seconds', 0)
-        if upkeep_interval <= 0:
-            logger.debug("Knowledge Upkeep cycle skipped: Interval is zero or negative.")
-            return
+        if upkeep_interval <= 0: logger.debug("Knowledge Upkeep cycle skipped: Interval is zero or negative."); return
         now = datetime.now(timezone.utc)
-        if now - self.last_knowledge_upkeep_time < timedelta(seconds=upkeep_interval):
-            logger.debug("Knowledge Upkeep cycle skipped: Not enough time passed since last run.")
-            return
-        logger.info("--- Ethos: Starting Knowledge Upkeep Cycle ---")
-        self.last_knowledge_upkeep_time = now
+        if now - self.last_knowledge_upkeep_time < timedelta(seconds=upkeep_interval): logger.debug("Knowledge Upkeep cycle skipped: Not enough time passed since last run."); return
+        logger.info("--- Ethos: Starting Knowledge Upkeep Cycle ---"); self.last_knowledge_upkeep_time = now
         volatile_tags = self.ethos_config.get('knowledge_upkeep_volatile_tags', [])
-        if not volatile_tags:
-            logger.warning("Knowledge Upkeep: No volatile tags configured. Skipping fact verification.")
-            logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (No tags) ---")
-            return
+        if not volatile_tags: logger.warning("Knowledge Upkeep: No volatile tags configured. Skipping fact verification."); logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (No tags) ---"); return
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-            sql_select_candidates = "SELECT * FROM memories WHERE type = 'world_knowledge' AND metadata IS NOT NULL ORDER BY RANDOM() LIMIT 50"
-            cursor.execute(sql_select_candidates)
-            candidate_rows = cursor.fetchall()
-            facts_to_verify: List[MemoryEntry] = []
-            volatile_tags_lower = [tag.lower() for tag in volatile_tags]
+            sql_select_candidates = "SELECT * FROM memories WHERE type = 'world_knowledge' AND metadata IS NOT NULL ORDER BY RANDOM() LIMIT 50" 
+            cursor.execute(sql_select_candidates); candidate_rows = cursor.fetchall()
+            facts_to_verify: List[MemoryEntry] = []; volatile_tags_lower = [tag.lower() for tag in volatile_tags]
             for row in candidate_rows:
-                entry = self.memory_storage._row_to_entry(row) # Corrected
+                entry = self.memory_storage._row_to_entry(row)
                 entry_tags_raw = entry.get('metadata', {}).get('topic_tags', [])
                 entry_tags_lower = [str(tag).lower() for tag in entry_tags_raw if isinstance(tag, str)]
                 if any(tag_l in volatile_tags_lower for tag_l in entry_tags_lower):
                     facts_to_verify.append(entry)
-                    if len(facts_to_verify) >= 5:
-                        break
-            if not facts_to_verify:
-                logger.info("Knowledge Upkeep: No world_knowledge facts with volatile tags found for verification in this cycle.")
-                logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (No facts to verify) ---")
-                return
+                    if len(facts_to_verify) >= 5: break
+            if not facts_to_verify: logger.info("Knowledge Upkeep: No world_knowledge facts with volatile tags found for verification in this cycle."); logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (No facts to verify) ---"); return
             logger.info(f"Knowledge Upkeep: Found {len(facts_to_verify)} facts to potentially verify.")
-            if not self.logos_core:
-                logger.error("Knowledge Upkeep: LogosCore is not available. Cannot verify facts.")
-                logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (LogosCore missing) ---")
-                return
+            if not self.logos_core: logger.error("Knowledge Upkeep: LogosCore is not available. Cannot verify facts."); logger.info("--- Ethos: Knowledge Upkeep Cycle Finished (LogosCore missing) ---"); return
             for fact_entry in facts_to_verify:
-                fact_id = fact_entry.get('id')
-                fact_content = fact_entry.get('content')
+                fact_id = fact_entry.get('id'); fact_content = fact_entry.get('content')
                 logger.info(f"Knowledge Upkeep: Attempting to verify fact ID {fact_id}: '{fact_content[:100]}...'")
                 verification_result = await self.logos_core.verify_world_fact(fact_entry)
                 current_fact_meta = fact_entry.get('metadata', {}).copy()
                 current_fact_meta['last_verified_timestamp'] = datetime.now(timezone.utc).isoformat()
                 current_fact_meta['verification_reason'] = verification_result.get('reason', 'No specific reason provided.')
                 if verification_result.get("status") == "updated":
-                    new_fact_content = verification_result.get("new_fact_statement")
-                    new_fact_confidence = verification_result.get("confidence", 0.85)
+                    new_fact_content = verification_result.get("new_fact_statement"); new_fact_confidence = verification_result.get("confidence", 0.85) 
                     logger.info(f"Fact ID {fact_id} was updated. New content: '{new_fact_content[:100]}...' Confidence: {new_fact_confidence}")
                     new_fact_id = str(uuid.uuid4())
-                    await self.add_memory_entry({
-                        "id": new_fact_id,
-                        "type": "world_knowledge",
-                        "content": new_fact_content,
-                        "metadata": {
-                            "user_id": "system_knowledge_upkeep",
-                            "source_description": f"Auto-updated from fact ID {fact_id} via knowledge upkeep ({datetime.now(timezone.utc).isoformat()}). Original source: {fact_entry.get('metadata',{}).get('source_description','unknown')}",
-                            "topic_tags": fact_entry.get('metadata',{}).get('topic_tags',[]),
-                            "confidence_level": new_fact_confidence,
-                            "original_fact_id_verified": fact_id,
-                            "last_verified_timestamp": datetime.now(timezone.utc).isoformat()
-                        },
-                        "salience": (fact_entry.get('salience') or 0.7) + 0.1
-                    }, user_id_context="world_knowledge_store")
-                    current_fact_meta['status'] = 'outdated_by_upkeep'
-                    current_fact_meta['superseded_by_fact_id'] = new_fact_id
+                    await self.add_memory_entry({"id": new_fact_id, "type": "world_knowledge", "content": new_fact_content, "metadata": {"user_id": "system_knowledge_upkeep", "source_description": f"Auto-updated from fact ID {fact_id} via knowledge upkeep ({datetime.now(timezone.utc).isoformat()}). Original source: {fact_entry.get('metadata',{}).get('source_description','unknown')}", "topic_tags": fact_entry.get('metadata',{}).get('topic_tags',[]), "confidence_level": new_fact_confidence, "original_fact_id_verified": fact_id, "last_verified_timestamp": datetime.now(timezone.utc).isoformat()}, "salience": (fact_entry.get('salience') or 0.7) + 0.1 }, user_id_context="world_knowledge_store")
+                    current_fact_meta['status'] = 'outdated_by_upkeep'; current_fact_meta['superseded_by_fact_id'] = new_fact_id 
                     self.memory_storage.update_entry(fact_id, {"metadata": current_fact_meta, "salience": (fact_entry.get('salience') or 0.5) * 0.5})
                 elif verification_result.get("status") == "accurate":
                     logger.info(f"Fact ID {fact_id} confirmed accurate. Reason: {verification_result.get('reason')}")
-                    current_fact_meta.pop('verification_attempt_failed', None)
+                    current_fact_meta.pop('verification_attempt_failed', None) 
                     self.memory_storage.update_entry(fact_id, {"metadata": current_fact_meta})
-                elif verification_result.get("status") == "unverifiable":
+                elif verification_result.get("status") == "unverifiable": 
                     logger.warning(f"Fact ID {fact_id} could not be verified: {verification_result.get('reason')}")
                     current_fact_meta['verification_attempt_failed'] = True
                     self.memory_storage.update_entry(fact_id, {"metadata": current_fact_meta})
-                await asyncio.sleep(random.uniform(5, 10))
-        except Exception as e:
-            logger.error(f"Error during Knowledge Upkeep cycle: {e}", exc_info=True)
+                await asyncio.sleep(random.uniform(5, 10)) 
+        except Exception as e: logger.error(f"Error during Knowledge Upkeep cycle: {e}", exc_info=True)
         logger.info("--- Ethos: Knowledge Upkeep Cycle Finished ---")
+
+    async def run_interaction_log_analysis(self):
+        if not self.ethos_config.get('enable_interaction_log_analysis', False):
+            logger.debug("Interaction Log Analysis cycle skipped: Disabled in config.")
+            return
+
+        analysis_interval = self.ethos_config.get('interaction_log_analysis_interval_seconds', 0)
+        if analysis_interval <= 0:
+            logger.debug("Interaction Log Analysis cycle skipped: Interval is zero or negative.")
+            return
+
+        now = datetime.now(timezone.utc)
+        if now - self.last_interaction_log_analysis_time < timedelta(seconds=analysis_interval):
+            logger.debug("Interaction Log Analysis cycle skipped: Not enough time passed since last run.")
+            return
+
+        logger.info("--- Ethos: Starting Interaction Log Analysis for Fact Extraction ---")
+        self.last_interaction_log_analysis_time = now
+
+        llm_role_str = self.ethos_config.get('interaction_log_analysis_llm_role', 'LOGOS_TECHNE')
+        analysis_llm_config = self.config.get_llm_config(llm_role_str) # type: ignore
+
+        if not analysis_llm_config or not analysis_llm_config.get('url'):
+            logger.error(f"Interaction Log Analysis: LLM for role '{llm_role_str}' is not configured. Skipping cycle.")
+            logger.info("--- Ethos: Interaction Log Analysis Cycle Finished (LLM Misconfiguration) ---")
+            return
+
+        batch_size = self.ethos_config.get('interaction_log_analysis_batch_size', 20)
+        max_days_lookback = self.ethos_config.get('interaction_log_analysis_max_days_lookback', 7)
+        since_timestamp = (now - timedelta(days=max_days_lookback)).isoformat()
+
+        try:
+            conn = self.memory_storage._get_connection()
+            cursor = conn.cursor()
+            
+            sql_interactions = """
+                SELECT * FROM memories
+                WHERE type = 'interaction'
+                  AND timestamp >= ?
+                  AND (json_extract(metadata, '$.analyzed_for_facts') IS NULL OR json_extract(metadata, '$.analyzed_for_facts') = 0)
+                ORDER BY json_extract(metadata, '$.user_id'), timestamp ASC
+                LIMIT ?
+            """
+            oe_message_check_log_analysis = ""
+            try:
+                cursor.execute(sql_interactions, (since_timestamp, batch_size * 5)) 
+            except sqlite3.OperationalError as oe:
+                oe_message_check_log_analysis = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_log_analysis:
+                    logger.warning("json_extract not available for interaction log analysis query. Fetching more and filtering.")
+                    sql_fallback = "SELECT * FROM memories WHERE type = 'interaction' AND timestamp >= ? ORDER BY timestamp ASC LIMIT ?"
+                    cursor.execute(sql_fallback, (since_timestamp, batch_size * 10))
+                else:
+                    raise
+
+            all_unanalyzed_rows = cursor.fetchall()
+            
+            interactions_by_user: Dict[str, List[MemoryEntry]] = {}
+            for row in all_unanalyzed_rows:
+                entry = self.memory_storage._row_to_entry(row)
+                metadata = entry.get('metadata', {})
+                if "no such function: json_extract" in oe_message_check_log_analysis: 
+                    if metadata.get('analyzed_for_facts') == True:
+                        continue
+                
+                user_id = metadata.get('user_id')
+                if user_id and user_id not in ["unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing", "system_reflection", "world_knowledge_store", "system_knowledge_upkeep", "system_curiosity", None]:
+                    if user_id not in interactions_by_user:
+                        interactions_by_user[user_id] = []
+                    if len(interactions_by_user[user_id]) < batch_size: 
+                         interactions_by_user[user_id].append(entry)
+
+            if not interactions_by_user:
+                logger.info("Interaction Log Analysis: No unanalyzed interactions found for processing in this cycle.")
+                logger.info("--- Ethos: Interaction Log Analysis Cycle Finished (No interactions) ---")
+                return
+
+            for user_id, interactions in interactions_by_user.items():
+                if not interactions: continue
+                logger.info(f"Analyzing {len(interactions)} interactions for user '{user_id}' to extract facts.")
+                
+                transcript_parts = []
+                interaction_ids_processed = []
+                for interaction_entry in interactions:
+                    transcript_parts.append(f"Timestamp: {interaction_entry.get('timestamp')}\n{interaction_entry.get('content')}\n---")
+                    if entry_id := interaction_entry.get('id'):
+                        interaction_ids_processed.append(entry_id)
+                
+                full_transcript = "\n".join(transcript_parts)
+                max_transcript_len_for_llm = (analysis_llm_config.get('max_tokens', 4096) if analysis_llm_config else 4096) * 2 
+                if len(full_transcript) > max_transcript_len_for_llm:
+                    full_transcript = full_transcript[:max_transcript_len_for_llm] + "\n[Transcript Truncated]"
+                    logger.warning(f"Transcript for user '{user_id}' was truncated for LLM analysis.")
+
+                system_prompt_fact_extraction = (
+    "You are an analytical AI. Your task is to carefully read the provided conversation transcript "
+    "between a user and an AI assistant (Pathos). Identify and extract the following types of information:\n"
+    "1. Explicit User Facts: Specific, direct statements the user made about themselves (e.g., name, location, preferences, possessions, relationships).\n"
+    "2. Strongly Implied User Facts: Reasonable inferences about the user based on their statements (e.g., if they mention 'my sermon', they might be clergy; if they mention 'debugging Python', they might be a programmer; if they say 'my cat Fluffy', they have a cat named Fluffy).\n"
+    "3. Potential World Facts: General knowledge shared or discussed that might be useful for the AI to remember.\n"
+    "4. AI Self-Corrections/Learnings: Instances where the AI's previous mistake was pointed out or where a better way of responding/acting was suggested for the AI.\n\n"
+    "For each identified piece of information, determine a **specific and descriptive `attribute_name`** and the corresponding `attribute_value`. "
+    "The `attribute_name` should clearly categorize the fact. **Be precise and vary the `attribute_name` based on the semantic content of the fact.**\n"
+    "Examples for `attribute_name`:\n"
+    "  - For a pet: 'PetCatName', 'PetDogType', 'NumberOfPets'\n"
+    "  - For occupation/role: 'StatedOccupation', 'ImpliedRole_Clergy', 'Hobby_Musician'\n"
+    "  - For preferences: 'FavoriteColor', 'DislikedFood_Broccoli', 'PreferredCommunicationStyle'\n"
+    "  - For possessions: 'OwnsVehicle_Car', 'HasComputer_Laptop'\n"
+    "  - For personal details: 'UserName', 'CityOfResidence', 'FamilyMember_SpouseName'\n"
+    "**Avoid generic `attribute_name`s like 'User Detail' or 'Information'.** "
+    "Also, provide the `supporting_statement` (snippet from the conversation that supports your finding).\n"
+    "Respond ONLY with a JSON list of objects. Each object must have 'type' (one of: 'user_fact', 'strongly_implied_user_fact', 'world_fact', 'ai_learning'), "
+    "'attribute_name', 'attribute_value', and 'supporting_statement'. If no facts/learnings are found, return an empty list []."
+)
+                user_prompt_fact_extraction = f"""Conversation Transcript for User '{user_id}':
+--- START TRANSCRIPT ---
+{full_transcript}
+--- END TRANSCRIPT ---
+
+Extract facts and learnings based on the instructions. JSON Output:
+"""
+                extraction_messages = [
+                    {"role": "system", "content": system_prompt_fact_extraction},
+                    {"role": "user", "content": user_prompt_fact_extraction}
+                ]
+
+                llm_response_str = await self._call_summarization_llm(extraction_messages)
+                extracted_items_parsed_successfully = False 
+
+                if llm_response_str and not llm_response_str.startswith("[LLM"):
+                    try:
+                        cleaned_llm_response_str = llm_response_str.strip()
+                        if cleaned_llm_response_str.startswith("```json"):
+                            cleaned_llm_response_str = cleaned_llm_response_str[len("```json"):].strip()
+                        elif cleaned_llm_response_str.startswith("```"):
+                             cleaned_llm_response_str = cleaned_llm_response_str[len("```"):].strip()
+                        if cleaned_llm_response_str.endswith("```"):
+                            cleaned_llm_response_str = cleaned_llm_response_str[:-len("```")].strip()
+                        
+                        extracted_items = json.loads(cleaned_llm_response_str)
+                        extracted_items_parsed_successfully = True
+
+                        if not isinstance(extracted_items, list):
+                            logger.warning(f"LLM fact extraction for user '{user_id}' did not return a list: {cleaned_llm_response_str}")
+                            extracted_items = []
+                            
+                        facts_stored_count = 0
+                        for item in extracted_items:
+                            if not isinstance(item, dict): continue
+                            item_type = item.get('type')
+                            attr_name_from_llm = item.get('attribute_name') # This is the "pretty" name from LLM
+                            attr_value = item.get('attribute_value')
+                            support_stmt = item.get('supporting_statement', 'From conversation analysis.')
+
+                            if not item_type or not attr_name_from_llm or not attr_value:
+                                logger.debug(f"Skipping incomplete extracted item for user '{user_id}': {item}")
+                                continue
+                            
+                            # Normalize the attribute name from LLM to create the key for storage
+                            normalized_fact_key = attr_name_from_llm.lower().replace(" ", "_").replace("/", "_").strip()
+                            if not normalized_fact_key: # Should not happen if attr_name_from_llm is present
+                                logger.warning(f"Could not normalize attribute name '{attr_name_from_llm}' for user '{user_id}'. Skipping item.")
+                                continue
+
+                            if item_type == 'user_fact' or item_type == 'strongly_implied_user_fact':
+                                fact_type_to_store = 'user_fact'
+                                item_metadata_source = "interaction_log_analysis"
+                                if item_type == 'strongly_implied_user_fact':
+                                    item_metadata_source += "_inferred"
+                                await self.add_memory_entry({
+                                    "type": fact_type_to_store,
+                                    "content": json.dumps({"attribute": attr_name_from_llm, # Store pretty name for display
+                                                           "value": attr_value, 
+                                                           "original_user_statement": support_stmt}),
+                                    "metadata": {"user_id": user_id, 
+                                                 "fact_attribute_key": normalized_fact_key, # Use NORMALIZED KEY
+                                                 "source": item_metadata_source},
+                                    "salience": 1.3 
+                                }, user_id_context=user_id)
+                                facts_stored_count += 1
+                            elif item_type == 'world_fact':
+                                await self.add_memory_entry({
+                                    "type": "world_knowledge",
+                                    "content": f"{attr_name_from_llm}: {attr_value}", 
+                                    "metadata": {"user_id": "system_reflection", 
+                                                 "source_description": f"Derived from conversation with {user_id}: {support_stmt}", 
+                                                 "topic_tags": [normalized_fact_key], # Use normalized key for tags
+                                                 "source": "interaction_log_analysis"},
+                                    "salience": 0.75
+                                }, user_id_context="world_knowledge_store")
+                                facts_stored_count += 1
+                            elif item_type == 'ai_learning':
+                                await self.add_memory_entry({
+                                    "type": "learned_correction", 
+                                    "content": f"Learning point regarding '{attr_name_from_llm}': {attr_value}",
+                                    "metadata": {"user_id": user_id, 
+                                                 "source_interaction_snippet": support_stmt, 
+                                                 "source": "interaction_log_analysis"},
+                                    "salience": 1.1
+                                }, user_id_context=user_id)
+                                facts_stored_count += 1
+                        
+                        if facts_stored_count > 0:
+                            logger.info(f"Stored {facts_stored_count} facts/learnings from analyzing interactions for user '{user_id}'.")
+
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse cleaned JSON response from fact extraction LLM for user '{user_id}'. Cleaned Response: {cleaned_llm_response_str}")
+                    except Exception as e_store:
+                        logger.error(f"Error storing extracted facts for user '{user_id}': {e_store}", exc_info=True)
+                
+                if llm_response_str and not llm_response_str.startswith("[LLM"): 
+                    for entry_id_to_mark in interaction_ids_processed:
+                        original_entry = self.memory_storage.get_entry(entry_id_to_mark)
+                        if original_entry:
+                            meta_to_update = original_entry.get('metadata', {}).copy()
+                            meta_to_update['analyzed_for_facts'] = True
+                            meta_to_update['analyzed_for_facts_timestamp'] = now.isoformat()
+                            if not extracted_items_parsed_successfully:
+                                meta_to_update['analyzed_for_facts_error'] = "LLM_response_parsing_failed"
+                            self.memory_storage.update_entry(entry_id_to_mark, {'metadata': meta_to_update})
+                else:
+                    logger.warning(f"Skipping marking interactions as analyzed for user '{user_id}' due to LLM call failure or error response.")
+                
+                await asyncio.sleep(random.uniform(2,5)) 
+        except Exception as e:
+            logger.error(f"Error during Interaction Log Analysis cycle: {e}", exc_info=True)
+        
+        logger.info("--- Ethos: Interaction Log Analysis Cycle Finished ---")
 
     async def get_background_tasks(self) -> List[asyncio.Task]:
         tasks = []
         async def _run_periodically(coro_func: Any, interval_seconds: float, task_name: str):
-            if interval_seconds <= 0: logger.warning(f"Interval for '{task_name}' is {interval_seconds}s. Task disabled."); return
-            await asyncio.sleep(random.uniform(5, 15))
+            if interval_seconds <= 0: 
+                logger.warning(f"Interval for '{task_name}' is {interval_seconds}s. Task disabled.")
+                return
+            await asyncio.sleep(random.uniform(5, 15)) 
             logger.info(f"Starting periodic task '{task_name}' (interval {interval_seconds}s)...")
             while True:
                 try:
                     logger.debug(f"Executing periodic task: {task_name}")
                     await coro_func()
-                except asyncio.CancelledError: logger.info(f"Periodic task '{task_name}' cancelled."); break
-                except Exception as e: logger.error(f"Error in background task {task_name}: {e}", exc_info=True)
+                except asyncio.CancelledError:
+                    logger.info(f"Periodic task '{task_name}' cancelled.")
+                    break
+                except Exception as e:
+                    logger.error(f"Error in background task {task_name}: {e}", exc_info=True)
                 await asyncio.sleep(interval_seconds)
+
         reflection_interval = float(self.ethos_config.get('reflection_interval_seconds', 86400.0))
         forgetting_interval = float(self.ethos_config.get('forgetting_interval_seconds', 43200.0))
         hexus_decay_interval = float(self.ethos_config.get('hexus_decay_interval_seconds', 3600.0))
         oneiros_interval = float(self.config.ONEIROS.get('dream_interval_seconds', 21600.0))
         knowledge_upkeep_interval = float(self.ethos_config.get('knowledge_upkeep_interval_seconds', 86400.0))
+        interaction_log_analysis_interval = float(self.ethos_config.get('interaction_log_analysis_interval_seconds', 0))
+
         if any([self.config.ENABLE_LEARNING_FROM_FEEDBACK, self.config.ENABLE_CURIOUSITY, self.ethos_config.get('enable_memory_summarization', False)]):
-             if reflection_interval > 0:
-                tasks.append(asyncio.create_task(_run_periodically(self.run_reflection_cycle, reflection_interval, "EthosReflection"), name="EthosReflection"))
-             else:
-                 logger.warning(f"Reflection features are enabled but ETHOS_REFLECTION_INTERVAL_SECONDS is {reflection_interval}s. Reflection task disabled.")
+            if reflection_interval > 0: tasks.append(asyncio.create_task(_run_periodically(self.run_reflection_cycle, reflection_interval, "EthosReflection"), name="EthosReflection"))
+            else: logger.warning(f"Reflection features are enabled but ETHOS_REFLECTION_INTERVAL_SECONDS is {reflection_interval}s. Reflection task disabled.")
         if self.config.ENABLE_MANAGED_FORGETTING:
-             if forgetting_interval > 0:
-                tasks.append(asyncio.create_task(_run_periodically(self.run_managed_forgetting, forgetting_interval, "EthosForgetting"), name="EthosForgetting"))
-             else:
-                 logger.warning(f"Managed forgetting is enabled but ETHOS_FORGETTING_INTERVAL_SECONDS is {forgetting_interval}s. Forgetting task disabled.")
-        if hexus_decay_interval > 0:
-            tasks.append(asyncio.create_task(_run_periodically(self.run_hexus_decay, hexus_decay_interval, "HexusDecay"), name="HexusDecay"))
-        elif hexus_decay_interval <= 0:
-             logger.warning(f"ETHOS_HEXUS_DECAY_INTERVAL_SECONDS is {hexus_decay_interval}s. Hexus decay task disabled.")
+            if forgetting_interval > 0: tasks.append(asyncio.create_task(_run_periodically(self.run_managed_forgetting, forgetting_interval, "EthosForgetting"), name="EthosForgetting"))
+            else: logger.warning(f"Managed forgetting is enabled but ETHOS_FORGETTING_INTERVAL_SECONDS is {forgetting_interval}s. Forgetting task disabled.")
+        if hexus_decay_interval > 0: tasks.append(asyncio.create_task(_run_periodically(self.run_hexus_decay, hexus_decay_interval, "HexusDecay"), name="HexusDecay"))
+        else: logger.warning(f"ETHOS_HEXUS_DECAY_INTERVAL_SECONDS is {hexus_decay_interval}s. Hexus decay task disabled.")
         if self.config.ENABLE_ONEIROS and self.oneiros_module:
-             if oneiros_interval > 0:
-                tasks.append(asyncio.create_task(_run_periodically(self.oneiros_module.run_dream_cycle, oneiros_interval, "OneirosDreamCycle"), name="OneirosDreamCycle"))
-             else:
-                 logger.warning(f"Oneiros is enabled but ONEIROS_DREAM_INTERVAL_SECONDS is {oneiros_interval}s. Dream cycle task disabled.")
-        elif self.config.ENABLE_ONEIROS and not self.oneiros_module:
-            logger.warning("Oneiros is enabled but module instance not set in EthosCore. Dream cycle won't run.")
-        if self.config.ENABLE_KNOWLEDGE_UPKEEP:
-            if knowledge_upkeep_interval > 0:
-                tasks.append(asyncio.create_task(_run_periodically(self.run_knowledge_upkeep_cycle, knowledge_upkeep_interval, "KnowledgeUpkeep"), name="KnowledgeUpkeep"))
+            if oneiros_interval > 0: tasks.append(asyncio.create_task(_run_periodically(self.oneiros_module.run_dream_cycle, oneiros_interval, "OneirosDreamCycle"), name="OneirosDreamCycle"))
+            else: logger.warning(f"Oneiros is enabled but ONEIROS_DREAM_INTERVAL_SECONDS is {oneiros_interval}s. Dream cycle task disabled.")
+        elif self.config.ENABLE_ONEIROS and not self.oneiros_module: logger.warning("Oneiros is enabled but module instance not set in EthosCore. Dream cycle won't run.")
+        if self.config.ENABLE_KNOWLEDGE_UPKEEP: 
+            if knowledge_upkeep_interval > 0: tasks.append(asyncio.create_task(_run_periodically(self.run_knowledge_upkeep_cycle, knowledge_upkeep_interval, "KnowledgeUpkeep"), name="KnowledgeUpkeep"))
+            else: logger.warning(f"Knowledge Upkeep is enabled but ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS is {knowledge_upkeep_interval}s. Task disabled.")
+        
+        logger.info(f"[DEBUG_TASK] Interaction Log Analysis Config: Enabled={self.ethos_config.get('enable_interaction_log_analysis', False)}, Interval={interaction_log_analysis_interval}, LLM_Role={self.ethos_config.get('interaction_log_analysis_llm_role')}")
+        if self.ethos_config.get('enable_interaction_log_analysis', False):
+            if interaction_log_analysis_interval > 0:
+                tasks.append(asyncio.create_task(_run_periodically(self.run_interaction_log_analysis, interaction_log_analysis_interval, "InteractionLogAnalysis"), name="InteractionLogAnalysis"))
+                logger.info("[DEBUG_TASK] InteractionLogAnalysis task CREATED.")
             else:
-                logger.warning(f"Knowledge Upkeep is enabled but ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS is {knowledge_upkeep_interval}s. Task disabled.")
-        logger.info(f"EthosCore providing {len(tasks)} background tasks.")
-        return tasks
+                logger.warning(f"Interaction Log Analysis is enabled but interval is {interaction_log_analysis_interval}s. Task disabled.")
+        else:
+            logger.info("[DEBUG_TASK] Interaction Log Analysis is NOT enabled in config.")
+        
+        logger.info(f"EthosCore providing {len(tasks)} background tasks."); return tasks
 
     async def run_proactive_check(self, trigger_source: str = "Manual"):
         if not self.config.ENABLE_PROACTIVE_BEHAVIOR or not self.connection_manager or not self.pathos_interface:
-            if not self.config.ENABLE_PROACTIVE_BEHAVIOR:
-                 logger.debug("Proactive check skipped: ENABLE_PROACTIVE_BEHAVIOR is False.")
-            elif not self.connection_manager:
-                 logger.debug("Proactive check skipped: ConnectionManager not set in EthosCore.")
-            elif not self.pathos_interface:
-                 logger.debug("Proactive check skipped: PathosInterface not set in EthosCore.")
-            else:
-                 logger.debug("Proactive check skipped: Unknown reason.")
+            if not self.config.ENABLE_PROACTIVE_BEHAVIOR: logger.debug("Proactive check skipped: ENABLE_PROACTIVE_BEHAVIOR is False.")
+            elif not self.connection_manager: logger.debug("Proactive check skipped: ConnectionManager not set in EthosCore.")
+            elif not self.pathos_interface: logger.debug("Proactive check skipped: PathosInterface not set in EthosCore.")
+            else: logger.debug("Proactive check skipped: Unknown reason.") 
             return
-        logger.debug(f"Ethos: Running proactive check (Triggered by: {trigger_source})...")
-        now_utc = datetime.now(timezone.utc)
+        logger.debug(f"Ethos: Running proactive check (Triggered by: {trigger_source})..."); now_utc = datetime.now(timezone.utc)
         users_to_check = list(self.connection_manager.active_connections.keys())
-        if not users_to_check:
-             logger.debug("Proactive check: No active users with WebSocket connections.")
-             return
+        if not users_to_check: logger.debug("Proactive check: No active users with WebSocket connections."); return
         for user_id in users_to_check:
-            logger.debug(f"Proactive check for user: {user_id}")
-            now_local = await self.get_local_datetime_for_user(user_id)
-            current_hour_local = now_local.hour
-            current_time_of_day = "morning" if 5 <= current_hour_local < 12 else "afternoon" if 12 <= current_hour_local < 18 else "evening"
+            logger.debug(f"Proactive check for user: {user_id}"); now_local = await self.get_local_datetime_for_user(user_id)
+            current_hour_local = now_local.hour; current_time_of_day = "morning" if 5 <= current_hour_local < 12 else "afternoon" if 12 <= current_hour_local < 18 else "evening"
             logger.debug(f"Proactive check for user {user_id}: Current local time is {now_local.isoformat()}, Time of day: {current_time_of_day}")
-            proactive_opportunity_type: Optional[str] = None
-            selected_opportunity_details: Optional[Dict[str, Any]] = None
+            proactive_opportunity_type: Optional[str] = None; selected_opportunity_details: Optional[Dict[str, Any]] = None 
+            
             queued_points = await self.get_queued_discussion_points(user_id, limit=1)
+            
             if queued_points:
-                point = queued_points[0]
-                point_id = point.get('id')
-                point_content = point.get('content')
-                point_reason = point.get('metadata', {}).get('reason_for_queueing', 'some earlier thoughts')
-                action_type_queued = f"offered_queued_discussion_{point_id}"
-                last_offer_time = await self.get_last_proactive_action_time(user_id, action_type_queued)
+                point = queued_points[0]; point_id = point.get('id'); point_content = point.get('content'); point_reason = point.get('metadata', {}).get('reason_for_queueing', 'some earlier thoughts')
+                action_type_queued = f"offered_queued_discussion_{point_id}"; last_offer_time = await self.get_last_proactive_action_time(user_id, action_type_queued)
                 queued_point_offer_interval_hours = self.ethos_config.get('proactive_queued_point_offer_interval_hours', 24)
                 queued_point_chance = float(self.ethos_config.get('proactive_queued_point_chance', 0.5)) # type: ignore
                 if (not last_offer_time or (now_utc - last_offer_time > timedelta(hours=queued_point_offer_interval_hours))) and random.random() < queued_point_chance:
-                    proactive_opportunity_type = "queued_discussion"
-                    selected_opportunity_details = {"point_id": point_id, "topic_content": point_content, "reason": point_reason}
-                    logger.debug(f"Proactive opportunity found for user {user_id}: Queued Discussion Point '{point_id[:8]}'")
+                    proactive_opportunity_type = "queued_discussion"; selected_opportunity_details = {"point_id": point_id, "topic_content": point_content, "reason": point_reason}
+                    logger.debug(f"Proactive opportunity found for user {user_id}: Queued Discussion Point '{point_id[:8] if point_id else 'N/A'}'")
             if not proactive_opportunity_type:
                 last_greeting_time = await self.get_last_proactive_action_time(user_id, "greeting")
-                greeting_interval_hours = self.ethos_config.get('proactive_greeting_interval_hours', 4)
-                significant_time_for_greeting = timedelta(hours=greeting_interval_hours)
+                greeting_interval_hours = self.ethos_config.get('proactive_greeting_interval_hours', 4); significant_time_for_greeting = timedelta(hours=greeting_interval_hours)
                 last_greeting_hour = last_greeting_time.hour if last_greeting_time else -1
                 last_time_of_day = "morning" if 5 <= last_greeting_hour < 12 else "afternoon" if 12 <= last_greeting_hour < 18 else "evening" if last_greeting_time else "none"
                 needs_greeting = False
-                if not last_greeting_time:
-                     needs_greeting = True
-                     logger.debug(f"User {user_id}: Needs greeting - No last greeting found.")
+                if not last_greeting_time: needs_greeting = True; logger.debug(f"User {user_id}: Needs greeting - No last greeting found.")
                 else:
-                     is_new_time_of_day_period = (last_time_of_day != current_time_of_day)
-                     interval_passed = (now_utc - last_greeting_time > significant_time_for_greeting)
-                     if is_new_time_of_day_period:
-                          needs_greeting = True
-                          logger.debug(f"User {user_id}: Needs greeting - New time of day period ({current_time_of_day}).")
-                     elif interval_passed:
-                          needs_greeting = True
-                          logger.debug(f"User {user_id}: Needs greeting - Interval ({greeting_interval_hours}h) passed since last greeting.")
-                     else:
-                          logger.debug(f"User {user_id}: Does not need greeting - Same time of day period ({current_time_of_day}) and interval not passed.")
+                     is_new_time_of_day_period = (last_time_of_day != current_time_of_day); interval_passed = (now_utc - last_greeting_time > significant_time_for_greeting)
+                     if is_new_time_of_day_period: needs_greeting = True; logger.debug(f"User {user_id}: Needs greeting - New time of day period ({current_time_of_day}).")
+                     elif interval_passed: needs_greeting = True; logger.debug(f"User {user_id}: Needs greeting - Interval ({greeting_interval_hours}h) passed since last greeting.")
+                     else: logger.debug(f"User {user_id}: Does not need greeting - Same time of day period ({current_time_of_day}) and interval not passed.")
                 greeting_chance = float(self.ethos_config.get('proactive_greeting_chance', 0.3)) # type: ignore
                 if needs_greeting and random.random() < greeting_chance:
-                    proactive_opportunity_type = "greeting"
-                    selected_opportunity_details = {"time_of_day": current_time_of_day}
+                    proactive_opportunity_type = "greeting"; selected_opportunity_details = {"time_of_day": current_time_of_day}
                     logger.debug(f"Proactive opportunity found for user {user_id}: Greeting")
             if not proactive_opportunity_type and self.config.ENABLE_DAILY_CONTEXT:
-                briefing_content_for_panel = await self.get_todays_briefing()
-                if briefing_content_for_panel is None:
+                briefing_content_for_panel = await self.get_todays_briefing() 
+                if briefing_content_for_panel is None: 
                     logger.info(f"Proactive check for user {user_id}: Daily briefing missing. Triggering generation.")
-                    if hasattr(self, 'logos_core') and self.logos_core:
-                         asyncio.create_task(
-                             self.logos_core.generate_daily_briefing(user_id_context=user_id),
-                             name=f"GenerateDailyBriefing_{now_utc.strftime('%Y%m%d')}_{user_id}"
-                         )
-                    else:
-                         logger.error("LogosCore not accessible in EthosCore to trigger briefing generation.")
-                else:
-                    last_briefing_discussion_offer_time = await self.get_last_proactive_action_time(user_id, "offer_briefing_discussion")
+                    if hasattr(self, 'logos_core') and self.logos_core: asyncio.create_task(self.logos_core.generate_daily_briefing(user_id_context=user_id), name=f"GenerateDailyBriefing_{now_utc.strftime('%Y%m%d')}_{user_id}")
+                    else: logger.error("LogosCore not accessible in EthosCore to trigger briefing generation.")
+                else: 
+                    last_briefing_discussion_offer_time = await self.get_last_proactive_action_time(user_id, "offer_briefing_discussion") 
                     briefing_is_stale_for_offer = not last_briefing_discussion_offer_time or last_briefing_discussion_offer_time.date() < now_utc.date()
                     briefing_offer_chance = float(self.ethos_config.get('proactive_briefing_chance', 0.4)) # type: ignore
                     if briefing_is_stale_for_offer and random.random() < briefing_offer_chance:
-                        proactive_opportunity_type = "offer_briefing_discussion"
-                        selected_opportunity_details = {
-                            "briefing_date": now_utc.strftime('%Y%m%d'),
-                            "full_briefing_content": briefing_content_for_panel
-                        }
+                        proactive_opportunity_type = "offer_briefing_discussion" 
+                        selected_opportunity_details = {"briefing_date": now_utc.strftime('%Y%m%d'), "full_briefing_content": briefing_content_for_panel }
                         logger.debug(f"Proactive opportunity found for user {user_id}: Offer Briefing Discussion")
             if not proactive_opportunity_type:
                  recent_topics = await self.get_recent_interaction_topics(user_id, num_interactions=1)
                  if recent_topics:
-                     topic = recent_topics[0]
-                     topic_key = re.sub(r'\W+', '_', topic[:50].lower()).strip('_')
+                     topic = recent_topics[0]; topic_key = re.sub(r'\W+', '_', topic[:50].lower()).strip('_')
                      if not topic_key: topic_key = "generic"
                      action_type_topic = f"offer_topic_continuation_{topic_key}"
                      last_offer_time = await self.get_last_proactive_action_time(user_id, action_type_topic)
                      topic_interval_hours = self.ethos_config.get('proactive_topic_interval_hours', 12)
                      topic_continuation_chance = float(self.ethos_config.get('proactive_topic_chance', 0.2)) # type: ignore
                      if (not last_offer_time or (now_utc - last_offer_time > timedelta(hours=topic_interval_hours))) and random.random() < topic_continuation_chance:
-                         proactive_opportunity_type = "offer_topic_continuation"
-                         selected_opportunity_details = {"topic": topic}
+                         proactive_opportunity_type = "offer_topic_continuation"; selected_opportunity_details = {"topic": topic}
                          logger.debug(f"Proactive opportunity found for user {user_id}: Topic Continuation ('{topic_key}')")
-                     else:
-                          logger.debug(f"User {user_id}: Topic continuation opportunity found but conditions not met (offered recently or chance failed).")
+                     else: logger.debug(f"User {user_id}: Topic continuation opportunity found but conditions not met (offered recently or chance failed).")
             if proactive_opportunity_type and self.connection_manager and self.pathos_interface:
                 logger.info(f"Generating and sending proactive message for user {user_id}, type: {proactive_opportunity_type}")
-                proactive_message_content = await self.pathos_interface._generate_proactive_message(
-                    user_id, proactive_opportunity_type, selected_opportunity_details
-                )
+                proactive_message_content = await self.pathos_interface._generate_proactive_message(user_id, proactive_opportunity_type, selected_opportunity_details )
                 if proactive_message_content:
-                    ws_message_payload = {
-                        "type": "unsolicited_message",
-                        "payload": {
-                            "content": proactive_message_content,
-                            "metadata": {
-                                "proactive_type": proactive_opportunity_type,
-                                "timestamp": now_utc.isoformat(),
-                                "mood_at_generation": self.get_current_mood(),
-                                "hexus_at_generation": self.get_hexus_scores()
-                            }
-                        }
-                    }
+                    ws_message_payload = {"type": "unsolicited_message", "payload": {"content": proactive_message_content, "metadata": {"proactive_type": proactive_opportunity_type, "timestamp": now_utc.isoformat(), "mood_at_generation": self.get_current_mood(), "hexus_at_generation": self.get_hexus_scores() }}}
                     await self.connection_manager.send_personal_message(ws_message_payload, user_id)
                     action_type_to_record = action_type_queued if proactive_opportunity_type == "queued_discussion" and selected_opportunity_details and "point_id" in selected_opportunity_details else proactive_opportunity_type
-                    await self.record_proactive_action(user_id, action_type_to_record, selected_opportunity_details)
+                    await self.record_proactive_action(user_id, action_type_to_record, selected_opportunity_details) 
                     if proactive_opportunity_type == "queued_discussion" and selected_opportunity_details and "point_id" in selected_opportunity_details:
                          await self.mark_queued_point_offered(selected_opportunity_details["point_id"], user_id)
-                elif not proactive_message_content:
-                    logger.warning(f"Failed to generate proactive message content for user {user_id}, type: {proactive_opportunity_type}")
-            else:
-                 logger.debug(f"User {user_id}: No proactive opportunity selected in this check cycle.")
+                elif not proactive_message_content: logger.warning(f"Failed to generate proactive message content for user {user_id}, type: {proactive_opportunity_type}")
+            else: logger.debug(f"User {user_id}: No proactive opportunity selected in this check cycle.")
         logger.debug(f"Ethos: Proactive check finished (Triggered by: {trigger_source}).")
 
     async def trigger_proactive_check_after_event(self, event_source: str):
-        if not self.config.ENABLE_PROACTIVE_BEHAVIOR:
-            logger.debug(f"Proactive check trigger ignored from '{event_source}': Proactive behavior disabled.")
-            return
+        if not self.config.ENABLE_PROACTIVE_BEHAVIOR: logger.debug(f"Proactive check trigger ignored from '{event_source}': Proactive behavior disabled."); return
         logger.info(f"Proactive check triggered by event source: '{event_source}'.")
         task_name = f"ProactiveCheckTriggeredBy{event_source}_{uuid.uuid4().hex[:8]}"
         asyncio.create_task(self.run_proactive_check(trigger_source=event_source), name=task_name)
         logger.debug(f"Proactive check task '{task_name}' created.")
-
+    
     async def get_and_clear_pending_document_context(self, user_id: str) -> Optional[Dict[str, str]]:
         if not user_id: return None
         if not hasattr(self.memory_storage, 'get_and_clear_pending_document_context'):
-             logger.error("MemoryStorage instance does not have the 'get_and_clear_pending_document_context' method.")
-             return None
+             logger.error("MemoryStorage instance does not have the 'get_and_clear_pending_document_context' method."); return None
         return self.memory_storage.get_and_clear_pending_document_context(user_id)
-
+    
     async def get_all_user_facts(self, user_id: str) -> List[MemoryEntry]:
         if not user_id or user_id in ["unknown_user", "api_guest_user", "default_user", "system_oneiros", "system_document", "system_briefing", "world_knowledge_store", "system_reflection", "system_knowledge_upkeep", "system_curiosity", "system_admin", None]:
-            logger.debug(f"get_all_user_facts called for generic/system user '{user_id}', returning empty list.")
-            return []
+            logger.debug(f"get_all_user_facts called for generic/system user '{user_id}', returning empty list."); return []
         logger.debug(f"EthosCore: Retrieving all user_facts for user_id: '{user_id}'")
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql_query = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') IS NOT NULL ORDER BY timestamp DESC"
-            oe = None # Initialize oe
-            try:
-                cursor.execute(sql_query, (user_id,))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the error
-                if "no such function: json_extract" in str(oe).lower():
+            oe_message_check_facts = ""
+            try: cursor.execute(sql_query, (user_id,))
+            except sqlite3.OperationalError as oe:
+                oe_message_check_facts = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_facts:
                     logger.warning("json_extract not available for get_all_user_facts. Falling back to Python filtering.")
                     cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' ORDER BY timestamp DESC")
-                    all_user_facts_rows = cursor.fetchall()
-                    user_specific_facts_rows = []
-                    for row_data_fb in all_user_facts_rows:
-                        try:
-                            metadata_fb = json.loads(row_data_fb['metadata'])
-                            if metadata_fb.get('user_id') == user_id and metadata_fb.get('fact_attribute_key') is not None:
-                                user_specific_facts_rows.append(row_data_fb)
-                        except (json.JSONDecodeError, TypeError): continue
-                    rows = user_specific_facts_rows
                 else: raise
-            else:
-                rows = cursor.fetchall()
-            facts = [self.memory_storage._row_to_entry(row) for row in rows] # Corrected
+            all_user_facts_rows = cursor.fetchall()
+            user_specific_facts_rows = []
+            if "no such function: json_extract" in oe_message_check_facts:
+                for row_data_fb in all_user_facts_rows:
+                    try:
+                        metadata_fb = json.loads(row_data_fb['metadata'])
+                        if metadata_fb.get('user_id') == user_id and metadata_fb.get('fact_attribute_key') is not None:
+                            user_specific_facts_rows.append(row_data_fb)
+                    except (json.JSONDecodeError, TypeError): continue
+                rows = user_specific_facts_rows
+            else: rows = all_user_facts_rows
+            facts = [self.memory_storage._row_to_entry(row) for row in rows]
             logger.info(f"EthosCore: Retrieved {len(facts)} user_facts for user_id: '{user_id}'.")
             return facts
-        except Exception as e:
-            logger.error(f"EthosCore: Error retrieving user_facts for user_id '{user_id}': {e}", exc_info=True)
-            return []
-
+        except Exception as e: logger.error(f"EthosCore: Error retrieving user_facts for user_id '{user_id}': {e}", exc_info=True); return []
+    
     async def clear_memory_for_user(self, user_id: str) -> bool:
-        if not user_id or not user_id.strip():
-            logger.warning("Attempted to clear memory for an empty or invalid user_id.")
-            return False
+        if not user_id or not user_id.strip(): logger.warning("Attempted to clear memory for an empty or invalid user_id."); return False
         logger.warning(f"EthosCore: Attempting to clear ALL memory entries for user_id: '{user_id}'.")
         try:
             success = self.memory_storage.delete_entries_by_user_id(user_id)
-            if success:
-                logger.info(f"Successfully cleared memory entries for user_id: '{user_id}'.")
-            else:
-                logger.warning(f"Memory clearing for user_id '{user_id}' reported no entries deleted or an issue occurred at storage level.")
+            if success: logger.info(f"Successfully cleared memory entries for user_id: '{user_id}'.")
+            else: logger.warning(f"Memory clearing for user_id '{user_id}' reported no entries deleted or an issue occurred at storage level.")
             return success
-        except Exception as e:
-            logger.error(f"Error during clear_memory_for_user (user: '{user_id}'): {e}", exc_info=True)
-            return False
+        except Exception as e: logger.error(f"Error during clear_memory_for_user (user: '{user_id}'): {e}", exc_info=True); return False
 
     async def get_recent_learnings(self, learning_types: List[str], user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         logger.debug(f"Fetching recent learnings. Types: {learning_types}, User: {user_id_context}, Limit: {limit}")
-        if not learning_types:
-            return []
+        if not learning_types: return []
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-            placeholders = ','.join('?' * len(learning_types))
-            sql_query = f"SELECT * FROM memories WHERE type IN ({placeholders})"
-            params: List[Any] = list(learning_types)
-            sql_query += " ORDER BY timestamp DESC LIMIT ?"
-            params.append(limit * 5)
-            cursor.execute(sql_query, tuple(params))
-            rows = cursor.fetchall()
-            learnings: List[MemoryEntry] = []
-            system_learning_user_ids = ["system_reflection", "system_curiosity", "system_knowledge_upkeep"]
+            placeholders = ','.join('?' * len(learning_types)); sql_query = f"SELECT * FROM memories WHERE type IN ({placeholders})"
+            params: List[Any] = list(learning_types); sql_query += " ORDER BY timestamp DESC LIMIT ?"; params.append(limit * 5)
+            cursor.execute(sql_query, tuple(params)); rows = cursor.fetchall()
+            learnings: List[MemoryEntry] = []; system_learning_user_ids = ["system_reflection", "system_curiosity", "system_knowledge_upkeep"] 
             for row in rows:
-                entry = self.memory_storage._row_to_entry(row) # Corrected
-                entry_user_id = entry.get('metadata', {}).get('user_id')
+                entry = self.memory_storage._row_to_entry(row); entry_user_id = entry.get('metadata', {}).get('user_id')
                 if user_id_context and user_id_context not in ["unknown_user", "api_guest_user", "default_user"] + system_learning_user_ids:
-                    if entry_user_id == user_id_context or entry_user_id in system_learning_user_ids:
-                        learnings.append(entry)
-                elif not user_id_context:
-                    learnings.append(entry)
+                    if entry_user_id == user_id_context or entry_user_id in system_learning_user_ids: learnings.append(entry)
+                elif not user_id_context: learnings.append(entry)
                 elif user_id_context in ["unknown_user", "api_guest_user", "default_user"]:
-                    if entry_user_id in system_learning_user_ids:
-                        learnings.append(entry)
+                    if entry_user_id in system_learning_user_ids: learnings.append(entry)
             learnings.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             logger.info(f"Retrieved {len(learnings[:limit])} learnings for context '{user_id_context}'.")
             return learnings[:limit]
-        except Exception as e:
-            logger.error(f"Error retrieving recent learnings: {e}", exc_info=True)
-            return []
+        except Exception as e: logger.error(f"Error retrieving recent learnings: {e}", exc_info=True); return []
 
     async def get_queued_discussion_points(self, user_id: str, limit: int = 1) -> List[MemoryEntry]:
         if not user_id:
@@ -1394,79 +1602,60 @@ class EthosCore:
         recently_offered_threshold_hours = self.ethos_config.get('proactive_queued_point_offer_interval_hours', 24)
         recently_offered_delta = timedelta(hours=recently_offered_threshold_hours)
         candidate_points: List[MemoryEntry] = []
-        oe = None # Initialize oe
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql_query = """
                 SELECT * FROM memories
                 WHERE type = 'queued_discussion_point'
-                  AND (
-                        json_extract(metadata, '$.user_id') = ?
-                        OR
-                        json_extract(metadata, '$.user_id') = 'system_oneiros'
-                      )
+                  AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = 'system_oneiros')
                   AND (json_extract(metadata, '$.status') IS NULL OR json_extract(metadata, '$.status') = 'pending')
-                ORDER BY salience DESC, timestamp ASC
-                LIMIT ?
+                ORDER BY salience DESC, timestamp ASC 
+                LIMIT ? 
             """
-            fetch_limit_for_candidates = limit * 10
+            fetch_limit_for_candidates = limit * 10 
+            oe_message_check_queued = ""
             try:
                 cursor.execute(sql_query, (user_id, fetch_limit_for_candidates))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the error
-                if "no such function: json_extract" in str(oe).lower():
+            except sqlite3.OperationalError as oe:
+                oe_message_check_queued = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_queued:
                     logger.warning("json_extract not available for get_queued_discussion_points. Falling back to broader fetch.")
                     sql_fallback = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (json_extract(metadata, '$.status') IS NULL OR json_extract(metadata, '$.status') = 'pending') ORDER BY salience DESC, timestamp ASC LIMIT ?"
-                    try:
-                        cursor.execute(sql_fallback, (fetch_limit_for_candidates * 2,))
+                    try: cursor.execute(sql_fallback, (fetch_limit_for_candidates * 2,))
                     except sqlite3.OperationalError:
                         logger.warning("json_extract for status also failed in get_queued_discussion_points. Fetching all pending points.")
                         sql_fallback_no_status = "SELECT * FROM memories WHERE type = 'queued_discussion_point' ORDER BY salience DESC, timestamp ASC LIMIT ?"
                         cursor.execute(sql_fallback_no_status, (fetch_limit_for_candidates * 3,))
-                else:
-                    raise
+                else: raise 
             rows = cursor.fetchall()
-            now_utc = datetime.now(timezone.utc)
-            valid_points_for_user = []
+            now_utc = datetime.now(timezone.utc); valid_points_for_user = []
             for row in rows:
-                entry = self.memory_storage._row_to_entry(row) # Corrected
-                metadata = entry.get('metadata', {})
-                entry_user_id = metadata.get('user_id')
-                entry_status = metadata.get('status', 'pending')
-                if entry_status != 'pending':
-                    continue
-                if oe and "no such function: json_extract" in str(oe).lower(): # Check if fallback was used
-                    if entry_user_id != user_id and entry_user_id != 'system_oneiros':
-                        continue
-                point_id = entry.get('id')
-                action_type_for_this_point = f"offered_queued_discussion_{point_id}"
+                entry = self.memory_storage._row_to_entry(row)
+                metadata = entry.get('metadata', {}); entry_user_id = metadata.get('user_id'); entry_status = metadata.get('status', 'pending')
+                if entry_status != 'pending': continue
+                if entry_user_id != user_id and entry_user_id != 'system_oneiros':
+                    if "no such function: json_extract" in oe_message_check_queued: continue
+                point_id = entry.get('id'); action_type_for_this_point = f"offered_queued_discussion_{point_id}"
                 last_offered_time_to_this_user = await self.get_last_proactive_action_time(user_id, action_type_for_this_point)
                 if last_offered_time_to_this_user and (now_utc - last_offered_time_to_this_user < recently_offered_delta):
-                    logger.debug(f"Queued point {point_id} was recently offered to user {user_id}. Skipping.")
-                    continue
+                    logger.debug(f"Queued point {point_id} was recently offered to user {user_id}. Skipping."); continue
                 valid_points_for_user.append(entry)
-            valid_points_for_user.sort(key=lambda p: (
-                0 if p.get('metadata', {}).get('user_id') == user_id else 1,
-                -(p.get('salience') or 0.0),
-                p.get('timestamp', '')
-            ))
+            valid_points_for_user.sort(key=lambda p: (0 if p.get('metadata', {}).get('user_id') == user_id else 1, -(p.get('salience') or 0.0), p.get('timestamp', '')))
             candidate_points = valid_points_for_user[:limit]
             logger.info(f"Found {len(candidate_points)} suitable queued discussion points for user '{user_id}'.")
-        except Exception as e:
-            logger.error(f"Error fetching queued discussion points for user '{user_id}': {e}", exc_info=True)
+        except Exception as e: logger.error(f"Error fetching queued discussion points for user '{user_id}': {e}", exc_info=True)
         return candidate_points
 
     async def get_last_proactive_action_time(self, user_id: str, action_type: str) -> Optional[datetime]:
         logger.debug(f"EthosCore: Getting last proactive action time for user '{user_id}', action_type '{action_type}'.")
-        oe = None # Initialize oe
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql = "SELECT timestamp FROM memories WHERE type = 'proactive_action_record' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.action_type') = ? ORDER BY timestamp DESC LIMIT 1"
-            try:
-                cursor.execute(sql, (user_id, action_type))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the error
-                if "no such function: json_extract" in str(oe).lower():
+            oe_message_check_action = ""
+            try: cursor.execute(sql, (user_id, action_type))
+            except sqlite3.OperationalError as oe:
+                oe_message_check_action = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_action:
                     logger.warning("json_extract not available for get_last_proactive_action_time. Falling back to Python filter.")
                     cursor.execute("SELECT timestamp, metadata FROM memories WHERE type = 'proactive_action_record' ORDER BY timestamp DESC")
                     for r_row in cursor.fetchall():
@@ -1474,28 +1663,18 @@ class EthosCore:
                             meta = json.loads(r_row['metadata'])
                             if meta.get('user_id') == user_id and meta.get('action_type') == action_type:
                                 return datetime.fromisoformat(r_row['timestamp'].replace("Z", "+00:00"))
-                        except (json.JSONDecodeError, TypeError, ValueError):
-                            continue
+                        except (json.JSONDecodeError, TypeError, ValueError): continue
                     return None
-                else:
-                    raise
+                else: raise
             row = cursor.fetchone()
-            if row and row['timestamp']:
-                return datetime.fromisoformat(row['timestamp'].replace("Z", "+00:00"))
+            if row and row['timestamp']: return datetime.fromisoformat(row['timestamp'].replace("Z", "+00:00"))
             return None
-        except Exception as e:
-            logger.error(f"Error getting last proactive action time for user '{user_id}', type '{action_type}': {e}", exc_info=True)
-            return None
+        except Exception as e: logger.error(f"Error getting last proactive action time for user '{user_id}', type '{action_type}': {e}", exc_info=True); return None
 
     async def record_proactive_action(self, user_id: str, action_type: str, details: Optional[Dict] = None):
         logger.info(f"EthosCore: Recording proactive action for user '{user_id}', type '{action_type}'. Details: {details}")
         metadata = {"user_id": user_id, "action_type": action_type, "action_details": details or {}}
-        await self.add_memory_entry({
-            "type": "proactive_action_record",
-            "content": f"Proactive action '{action_type}' taken for user '{user_id}'.",
-            "metadata": metadata,
-            "salience": 0.1
-        }, user_id_context=user_id)
+        await self.add_memory_entry({"type": "proactive_action_record", "content": f"Proactive action '{action_type}' taken for user '{user_id}'.", "metadata": metadata, "salience": 0.1 }, user_id_context=user_id)
 
     async def mark_queued_point_offered(self, point_id: str, user_id_offered_to: str):
         logger.info(f"EthosCore: Marking queued point ID '{point_id}' as offered to user '{user_id_offered_to}'.")
@@ -1503,84 +1682,69 @@ class EthosCore:
         if entry and entry.get('type') == 'queued_discussion_point':
             metadata = entry.get('metadata', {}).copy()
             offered_to_users = metadata.get('offered_to_user_ids', [])
-            if user_id_offered_to not in offered_to_users:
-                offered_to_users.append(user_id_offered_to)
+            if user_id_offered_to not in offered_to_users: offered_to_users.append(user_id_offered_to)
             metadata['offered_to_user_ids'] = offered_to_users
             metadata['last_offered_timestamp_to_any_user'] = datetime.now(timezone.utc).isoformat()
+            # No direct status change on the queued_discussion_point itself here,
+            # relying on get_last_proactive_action_time for recency check.
+            # self.memory_storage.update_entry(point_id, {'metadata': metadata}) # Uncomment if you want to update the point's metadata
             logger.debug(f"Queued point {point_id} offering recorded via proactive_action_record for user {user_id_offered_to}.")
-        else:
-            logger.warning(f"Could not find queued_discussion_point with ID '{point_id}' to mark as offered.")
+        else: logger.warning(f"Could not find queued_discussion_point with ID '{point_id}' to mark as offered.")
 
     async def get_recent_interaction_topics(self, user_id: str, num_interactions: int = 3) -> List[str]:
         logger.debug(f"EthosCore: Getting recent interaction topics for user '{user_id}'.")
-        oe = None # Initialize oe
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql = "SELECT content, metadata FROM memories WHERE type = 'interaction' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.is_proactive_turn') IS NOT TRUE ORDER BY timestamp DESC LIMIT ?"
-            fetch_limit = num_interactions * 3
-            try:
-                cursor.execute(sql, (user_id, fetch_limit))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the error
-                if "no such function: json_extract" in str(oe).lower():
+            fetch_limit = num_interactions * 3; oe_message_check_topics = ""
+            try: cursor.execute(sql, (user_id, fetch_limit))
+            except sqlite3.OperationalError as oe:
+                oe_message_check_topics = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_topics:
                     logger.warning("json_extract not available for get_recent_interaction_topics. Falling back.")
                     sql_fallback = "SELECT content, metadata FROM memories WHERE type = 'interaction' ORDER BY timestamp DESC LIMIT ?"
                     cursor.execute(sql_fallback, (fetch_limit * 2,))
-                else:
-                    raise
-            rows = cursor.fetchall()
-            topics = []
+                else: raise
+            rows = cursor.fetchall(); topics = []
             for row in rows:
                 metadata = json.loads(row['metadata']) if row['metadata'] else {}
-                if oe and "no such function: json_extract" in str(oe).lower():
-                    if metadata.get('user_id') != user_id or metadata.get('is_proactive_turn') == True:
-                        continue
+                if "no such function: json_extract" in oe_message_check_topics:
+                    if metadata.get('user_id') != user_id or metadata.get('is_proactive_turn') == True: continue
                 content_summary = row['content']
                 match = re.match(r"User \([^)]+\, original text\): (.*?)\nPathos:", content_summary, re.DOTALL)
                 if match:
                     user_original_text = match.group(1).strip()
-                    topic_candidate = " ".join(user_original_text.split()[:7])
-                    if len(topic_candidate) > 50:
-                        topic_candidate = topic_candidate[:47] + "..."
-                    if topic_candidate:
-                        topics.append(topic_candidate)
-                if len(topics) >= num_interactions:
-                    break
+                    topic_candidate = " ".join(user_original_text.split()[:7]) 
+                    if len(topic_candidate) > 50: topic_candidate = topic_candidate[:47] + "..."
+                    if topic_candidate: topics.append(topic_candidate)
+                if len(topics) >= num_interactions: break
             logger.info(f"Retrieved {len(topics)} recent interaction topic snippets for user '{user_id}'.")
             return topics
-        except Exception as e:
-            logger.error(f"Error getting recent interaction topics for user '{user_id}': {e}", exc_info=True)
-            return []
-
+        except Exception as e: logger.error(f"Error getting recent interaction topics for user '{user_id}': {e}", exc_info=True); return []
+            
     async def get_recent_knowledge_verifications(self, limit: int = 20) -> List[MemoryEntry]:
         logger.debug(f"Fetching recent knowledge verifications. Limit: {limit}")
-        oe = None # Initialize oe
         try:
             conn = self.memory_storage._get_connection(); cursor = conn.cursor()
             sql_query = "SELECT * FROM memories WHERE type = 'world_knowledge' AND json_extract(metadata, '$.last_verified_timestamp') IS NOT NULL ORDER BY json_extract(metadata, '$.last_verified_timestamp') DESC LIMIT ?"
-            try:
-                cursor.execute(sql_query, (limit,))
-            except sqlite3.OperationalError as op_err:
-                oe = op_err # Store the error
-                if "no such function: json_extract" in str(oe).lower():
+            oe_message_check_kv = ""
+            try: cursor.execute(sql_query, (limit,))
+            except sqlite3.OperationalError as oe:
+                oe_message_check_kv = str(oe).lower()
+                if "no such function: json_extract" in oe_message_check_kv:
                     logger.warning("json_extract not available for get_recent_knowledge_verifications. Falling back.")
                     sql_fallback = "SELECT * FROM memories WHERE type = 'world_knowledge' ORDER BY timestamp DESC LIMIT ?"
                     cursor.execute(sql_fallback, (limit * 5,))
-                else:
-                    raise
-            rows = cursor.fetchall()
-            verifications: List[MemoryEntry] = []
+                else: raise
+            rows = cursor.fetchall(); verifications: List[MemoryEntry] = []
             for row_data in rows:
-                entry = self.memory_storage._row_to_entry(row_data) # Corrected
+                entry = self.memory_storage._row_to_entry(row_data)
                 metadata = entry.get('metadata', {})
-                if oe and "no such function: json_extract" in str(oe).lower():
-                    if metadata.get('last_verified_timestamp') is None:
-                        continue
+                if "no such function: json_extract" in oe_message_check_kv:
+                    if metadata.get('last_verified_timestamp') is None: continue
                 verifications.append(entry)
-            if oe and "no such function: json_extract" in str(oe).lower():
+            if "no such function: json_extract" in oe_message_check_kv:
                 verifications.sort(key=lambda x: x.get('metadata', {}).get('last_verified_timestamp', ''), reverse=True)
             logger.info(f"Retrieved {len(verifications[:limit])} knowledge verification log entries.")
             return verifications[:limit]
-        except Exception as e:
-            logger.error(f"Error retrieving recent knowledge verifications: {e}", exc_info=True)
-            return []
+        except Exception as e: logger.error(f"Error retrieving recent knowledge verifications: {e}", exc_info=True); return []

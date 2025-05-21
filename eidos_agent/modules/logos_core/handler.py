@@ -298,17 +298,31 @@ class LogosCore:
              owm_result = await self.owm_service.get_current_weather(location)
              if owm_result.get("success"):
                   logger.info(f"Successfully retrieved weather from OpenWeatherMap for '{location}'.")
+                  
                   if self.ethos_core and user_id_context and user_id_context not in ["system_briefing", "unknown_user", "api_guest_user", None, "system_oneiros", "system_document", "world_knowledge_store", "system_reflection"]:
                       weather_data_from_owm = owm_result.get("weather_data", {})
                       derived_iana_tz = weather_data_from_owm.get("iana_timezone")
                       if derived_iana_tz:
-                          logger.debug(f"OWM provided IANA timezone '{derived_iana_tz}' for location '{location}'. Storing for user '{user_id_context}'.")
-                          await self.execute_store_user_fact(
-                              attribute_name="derived_iana_timezone",
-                              attribute_value=derived_iana_tz,
-                              user_statement_context=f"IANA timezone derived from OWM for location '{location}'.",
-                              user_id=user_id_context
-                          )
+                          # Check if this fact already exists and is the same
+                          existing_tz_fact = await self.ethos_core.get_user_fact('derived_iana_timezone', user_id_context)
+                          should_store_tz = True
+                          if existing_tz_fact and existing_tz_fact.get('content'):
+                              try:
+                                  existing_content_data = json.loads(existing_tz_fact['content'])
+                                  if existing_content_data.get('value') == derived_iana_tz:
+                                      should_store_tz = False
+                                      logger.debug(f"Derived IANA timezone '{derived_iana_tz}' for user '{user_id_context}' already stored and matches. Skipping re-storage.")
+                              except json.JSONDecodeError:
+                                  logger.warning(f"Could not parse existing derived_iana_timezone fact for user '{user_id_context}'. Will attempt to store new one.")
+                          
+                          if should_store_tz:
+                              logger.debug(f"OWM provided IANA timezone '{derived_iana_tz}' for location '{location}'. Storing for user '{user_id_context}'.")
+                              await self.execute_store_user_fact(
+                                  attribute_name="derived_iana_timezone",
+                                  attribute_value=derived_iana_tz,
+                                  user_statement_context=f"IANA timezone derived from OWM for location '{location}'.",
+                                  user_id=user_id_context
+                              )
                   return owm_result
              else:
                   logger.warning(f"OpenWeatherMap fetch failed for '{location}': {owm_result.get('error')}. Falling back.")

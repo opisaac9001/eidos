@@ -17,12 +17,13 @@ import uvicorn
 import os # For joining paths
 from pathlib import Path # For path operations
 
-from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Header, WebSocket, WebSocketDisconnect # Ensure all are here
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Header, WebSocket, WebSocketDisconnect, Path as FastApiPath
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.encoders import jsonable_encoder
 
-from pydantic import BaseModel, Field # Ensure all are here
+from pydantic import BaseModel, ValidationError, Field # Ensure all are here
 
 # Eidos Agent imports
 from eidos_agent.core.config import Config # Config.setup() is called on import
@@ -318,8 +319,12 @@ async def check_critical_llm_availability():
 
 
 def extract_input_to_eidos_format(body: dict, request_id: str, user_id_from_header: Optional[str]) -> dict:
-    final_user_id = user_id_from_header or body.get('user') or 'api_guest_user'
-    logger.debug(f"Request {request_id}: User ID for this request set to: '{final_user_id}'")
+    raw_user_id = user_id_from_header or body.get('user') or 'api_guest_user'
+    final_user_id = raw_user_id.lower().strip().replace(" ", "_") if raw_user_id else 'api_guest_user'
+    if not final_user_id:
+        final_user_id = 'api_guest_user'
+
+    logger.debug(f"Request {request_id}: User ID for this request set to (normalized): '{final_user_id}' (Raw was: '{raw_user_id}')")
     temperature_from_body = body.get('temperature'); model_from_body = body.get('model')
     max_tokens_override, llm_provider_url_override = None, None
     if body_metadata := body.get('metadata'):
@@ -407,20 +412,106 @@ def extract_input_to_eidos_format(body: dict, request_id: str, user_id_from_head
 
 # --- API Endpoints ---
 
-@app.get("/v1/user/facts", response_model=List[MemoryEntry], tags=["User"]) # <<< CHECK THIS PATH
-async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+@app.delete("/v1/memory/entry/{memory_id}", status_code=200)
+async def delete_memory_entry_endpoint(
+    memory_id: str = FastApiPath(..., title="The ID of the memory entry to delete", min_length=36, max_length=36),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")
+):
     global ethos_core
     if not ethos_core:
         raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
 
-    actual_user_id = x_user_id or "unknown_user"
+    # --- Normalize the requesting user ID ---
+    requesting_user_raw: Optional[str] = x_user_id
+    requesting_user_normalized: str = "unknown_api_caller" # Default if all else fails
+
+    if requesting_user_raw and isinstance(requesting_user_raw, str):
+        normalized = requesting_user_raw.lower().strip().replace(" ", "_")
+        if normalized: # Ensure not empty after normalization
+            requesting_user_normalized = normalized
+    
+    logger.info(
+        f"API: Request to delete memory entry ID '{memory_id}'. "
+        f"Requesting user (normalized): '{requesting_user_normalized}' (Raw X-User-Id: '{requesting_user_raw}')."
+    )
+    # --- End User ID Normalization ---
+
+    entry_to_delete = ethos_core.memory_storage.get_entry(memory_id)
+    if not entry_to_delete:
+        raise HTTPException(status_code=404, detail=f"Memory entry with ID '{memory_id}' not found.")
+
+    # The entry_owner_id from the database metadata should already be normalized (e.g., "isaac")
+    # if it was stored correctly after our previous normalization changes.
+    entry_owner_id = entry_to_delete.get('metadata', {}).get('user_id') 
+    
+    is_admin_attempt = False
+    admin_pw_cfg = Config.get_admin_password()
+
+    if admin_pw_cfg and x_admin_password:
+        if secrets.compare_digest(x_admin_password, admin_pw_cfg):
+            is_admin_attempt = True
+            logger.info(f"Admin authenticated for deleting memory entry '{memory_id}'.")
+        else:
+            logger.warning(f"Admin password provided but incorrect for deleting memory entry '{memory_id}'.")
+
+    can_delete = False
+    if is_admin_attempt:
+        can_delete = True
+    # Compare the NORMALIZED requesting user ID with the (expectedly normalized) owner ID from DB
+    elif entry_owner_id == requesting_user_normalized and entry_to_delete.get('type') == 'user_fact':
+        can_delete = True
+    elif entry_to_delete.get('type') != 'user_fact':
+        logger.warning(
+            f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) attempted to delete non-user_fact entry '{memory_id}' without admin rights."
+        )
+    else: 
+        logger.warning(
+            f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) does not own user_fact '{memory_id}' (owner: '{entry_owner_id}')."
+        )
+
+    if not can_delete:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to delete this memory entry.")
+
+    try:
+        if ethos_core.memory_storage.delete_entry(memory_id):
+            logger.info(f"Successfully deleted memory entry '{memory_id}'.")
+            await ethos_core.add_memory_entry({
+                "type": "system",
+                "content": f"Memory entry '{memory_id}' (type: {entry_to_delete.get('type')}, owner: {entry_owner_id or 'N/A'}) deleted by '{requesting_user_normalized}' (Admin: {is_admin_attempt}). Raw request user: '{requesting_user_raw}'.",
+                "metadata": {
+                    "user_id": "system_admin",
+                    "action": "memory_entry_delete",
+                    "deleted_entry_id": memory_id,
+                    "deleted_entry_type": entry_to_delete.get('type'),
+                    "deleted_entry_owner": entry_owner_id,
+                    "requesting_user_normalized": requesting_user_normalized,
+                    "requesting_user_raw": requesting_user_raw,
+                    "is_admin_action": is_admin_attempt,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            }, user_id_context="system_admin")
+            return JSONResponse(content={"message": f"Memory entry '{memory_id}' deleted successfully."})
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to delete memory entry '{memory_id}', or it was already deleted.")
+    except Exception as e:
+        logger.error(f"Error during deletion of memory entry '{memory_id}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error during memory deletion: {str(e)}")
+
+@app.get("/v1/user/facts", response_model=List[MemoryEntry], tags=["User"])
+async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    raw_actual_user_id = x_user_id or "unknown_user"
+    actual_user_id = raw_actual_user_id.lower().strip().replace(" ", "_") if raw_actual_user_id else "unknown_user"
+    if not actual_user_id:
+         actual_user_id = "unknown_user"
+
     if actual_user_id in ["unknown_user", "api_guest_user", "default_user"]:
         logger.info(f"Request for user facts from a generic user context ('{actual_user_id}'). Returning empty list.")
         return []
 
-    logger.info(f"API: Request for user facts for user_id: '{actual_user_id}'.")
+    logger.info(f"API: Request for user facts for user_id (normalized): '{actual_user_id}' (Raw was: '{raw_actual_user_id}').")
     try:
-        user_facts = await ethos_core.get_all_user_facts(user_id=actual_user_id)
+        user_facts = await ethos_core.get_all_user_facts(user_id=actual_user_id) # Pass normalized ID
         return user_facts
     except Exception as e:
         logger.error(f"API: Error fetching user facts for '{actual_user_id}': {e}", exc_info=True)
@@ -498,22 +589,93 @@ async def get_weather_endpoint(location: str, x_user_id: Optional[str] = Header(
     except Exception as e: logger.error(f"Unexpected error in /v1/weather for '{location}': {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.post("/v1/user/settings", status_code=200)
-async def update_user_settings(settings_request: UserSettingsRequest, x_user_id_header: Optional[str] = Header(None, alias="X-User-Id")):
-    global logos_core, ethos_core; request_id = str(uuid.uuid4())
-    user_id = settings_request.user_id or x_user_id_header or "api_guest_user"
-    logger.info(f"Request {request_id}: /v1/user/settings for user '{user_id}'. Settings: {len(settings_request.settings)}")
-    if not ethos_core or not logos_core: logger.error(f"Request {request_id}: User settings but core not ready."); raise HTTPException(status_code=503, detail="Eidos system not ready.")
-    results = []; all_ok = True
+async def update_user_settings(
+    settings_request: UserSettingsRequest, 
+    x_user_id_header: Optional[str] = Header(None, alias="X-User-Id")
+):
+    global logos_core, ethos_core 
+    request_id = str(uuid.uuid4()) 
+
+    # --- Determine and Normalize the User ID ---
+    raw_user_id_from_payload = settings_request.user_id
+    raw_user_id_from_header = x_user_id_header
+
+    # Prioritize payload, then header, then default
+    effective_raw_user_id: Optional[str] = raw_user_id_from_payload
+    if not effective_raw_user_id and raw_user_id_from_header:
+        effective_raw_user_id = raw_user_id_from_header
+    if not effective_raw_user_id: 
+        effective_raw_user_id = "api_guest_user" 
+
+
+    user_id_for_storage: str = "api_guest_user"
+    if effective_raw_user_id and isinstance(effective_raw_user_id, str):
+        normalized = effective_raw_user_id.lower().strip().replace(" ", "_")
+        if normalized:
+            user_id_for_storage = normalized
+    
+    logger.info(
+        f"Request {request_id}: /v1/user/settings. "
+        f"User ID for storage (normalized): '{user_id_for_storage}'. "
+        f"(Raw payload ID: '{raw_user_id_from_payload}', Raw header ID: '{raw_user_id_from_header}'). "
+        f"Settings count: {len(settings_request.settings)}"
+    )
+
+
+    if not ethos_core or not logos_core:
+        logger.error(f"Request {request_id}: User settings endpoint called but core components (Ethos/Logos) not ready.")
+        raise HTTPException(status_code=503, detail="Eidos system not ready.")
+
+    results = []
+    all_ok = True
+
     for item in settings_request.settings:
         try:
-            logger.debug(f"Request {request_id}: Storing setting for '{user_id}': {item.attribute_name} = {str(item.attribute_value)[:50]}")
-            fact_res_str = await logos_core.execute_store_user_fact(attribute_name=item.attribute_name, attribute_value=str(item.attribute_value), user_statement_context=item.user_statement_context or f"User set {item.attribute_name} via GUI.", user_id=user_id)
-            fact_res = json.loads(fact_res_str)
-            if fact_res.get("status") == "success": results.append({"attribute_name": item.attribute_name, "status": "success", "message": fact_res.get("message")})
-            else: all_ok = False; results.append({"attribute_name": item.attribute_name, "status": "failed", "message": fact_res.get("error", "Failed.")}); logger.warning(f"Request {request_id}: Failed to store setting '{item.attribute_name}' for '{user_id}': {fact_res.get('error')}")
-        except Exception as e: all_ok = False; logger.error(f"Request {request_id}: Error processing setting '{item.attribute_name}' for '{user_id}': {e}", exc_info=True); results.append({"attribute_name": item.attribute_name, "status": "error", "message": str(e)})
-    if all_ok: return {"status": "success", "message": "All settings processed.", "details": results}
-    else: return {"status": "partial_success", "message": "Some settings failed.", "details": results}
+            logger.debug(
+                f"Request {request_id}: Processing setting for user '{user_id_for_storage}': "
+                f"Attribute '{item.attribute_name}', Value: '{str(item.attribute_value)[:50]}...'"
+            )
+            
+            fact_result_str = await logos_core.execute_store_user_fact(
+                attribute_name=item.attribute_name,
+                attribute_value=str(item.attribute_value),
+                user_statement_context=item.user_statement_context or f"User set {item.attribute_name} via GUI settings.",
+                user_id=user_id_for_storage 
+            )
+            
+            fact_res = json.loads(fact_result_str)
+
+            if fact_res.get("status") == "success":
+                results.append({
+                    "attribute_name": item.attribute_name,
+                    "status": "success",
+                    "message": fact_res.get("message", "Setting stored successfully.")
+                })
+            else:
+                all_ok = False
+                error_msg = fact_res.get("error", "Failed to store setting.")
+                results.append({
+                    "attribute_name": item.attribute_name,
+                    "status": "failed",
+                    "message": error_msg
+                })
+                logger.warning(f"Request {request_id}: Failed to store setting '{item.attribute_name}' for user '{user_id_for_storage}': {error_msg}")
+        
+        except json.JSONDecodeError as json_e:
+            all_ok = False
+            error_msg = f"Error parsing result from fact storage for '{item.attribute_name}': {json_e}"
+            logger.error(f"Request {request_id}: {error_msg}", exc_info=True)
+            results.append({"attribute_name": item.attribute_name, "status": "error", "message": error_msg})
+        except Exception as e:
+            all_ok = False
+            error_msg = f"Error processing setting '{item.attribute_name}' for user '{user_id_for_storage}': {str(e)}"
+            logger.error(f"Request {request_id}: {error_msg}", exc_info=True)
+            results.append({"attribute_name": item.attribute_name, "status": "error", "message": error_msg})
+
+    if all_ok:
+        return {"status": "success", "message": "All settings processed successfully.", "details": results}
+    else:
+        return {"status": "partial_success", "message": "Some settings could not be processed. See details.", "details": results}
 
 @app.get("/v1/briefing", status_code=200)
 async def get_daily_briefing_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
@@ -645,34 +807,79 @@ async def clear_user_memory(request_data: ClearUserMemoryRequest, x_user_id_head
     except Exception as e: logger.error(f"Error during clear_memory_for_user (user: '{user_to_clear}'): {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 # --- Agent Specific Endpoints ---
-@app.get("/v1/agent/learnings", response_model=List[MemoryEntry])
-async def get_agent_learnings(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
-    global ethos_core
-    if not ethos_core: raise HTTPException(status_code=503, detail="Eidos system not ready.")
-    user_id_filter = x_user_id; logger.info(f"Request for /v1/agent/learnings. User: {user_id_filter}, Limit: {limit}")
-    try:
-        learning_types = ["learned_correction", "learned_feedback_insight", "suggestion_reflection"]
-        learnings = await ethos_core.get_recent_learnings(learning_types=learning_types, user_id_context=user_id_filter, limit=limit)
-        return learnings
-    except Exception as e: logger.error(f"Error fetching agent learnings: {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching agent learnings.")
-
 @app.get("/v1/agent/dreams", response_model=List[DreamEntryResponse])
 async def get_agent_dreams(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
     global ethos_core
-    if not ethos_core: raise HTTPException(status_code=503, detail="Eidos system not ready.")
-    logger.info(f"Request for /v1/agent/dreams. User: {x_user_id}, Limit: {limit}")
+    if not ethos_core: 
+        raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
+    
+    logger.info(f"API: Request for /v1/agent/dreams. User: {x_user_id}, Limit: {limit}")
+    
     try:
+        # Get raw dream entries (which are 'queued_discussion_point' with specific metadata)
+        # EthosCore's get_recent_dreams should handle filtering by user_id_context appropriately
         raw_dreams = await ethos_core.get_recent_dreams(user_id_context=x_user_id, limit=limit)
+        
         response_dreams: List[DreamEntryResponse] = []
         for entry in raw_dreams:
-            img_url = None; metadata = entry.get('metadata', {}); local_img_path_str = metadata.get('dream_image_path')
-            if local_img_path_str:
-                try: img_filename = Path(local_img_path_str).name; img_url = f"/dream_images/{img_filename}"
-                except Exception as e_path: logger.error(f"Error constructing image URL from '{local_img_path_str}': {e_path}")
-            response_dreams.append(DreamEntryResponse(id=entry.get('id', 'unknown_id'), timestamp=entry.get('timestamp', ''), content=entry.get('content', '[No dream content]'), dream_image_url=img_url, dream_seed_summary=metadata.get('dream_seed_summary')))
-        return response_dreams
-    except Exception as e: logger.error(f"Error fetching agent dreams: {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching agent dreams.")
+            img_url = None
+            metadata = entry.get('metadata', {})
+            local_img_path_str = metadata.get('dream_image_path')
 
+            if local_img_path_str:
+                try:
+                    # Ensure the path is valid and construct the web-accessible URL
+                    img_filename = Path(local_img_path_str).name
+                    # This assumes your /dream_images static mount is working correctly
+                    img_url = f"/dream_images/{img_filename}" 
+                except Exception as e_path:
+                    logger.error(f"Error constructing image URL from dream_image_path '{local_img_path_str}': {e_path}")
+            
+            response_dreams.append(
+                DreamEntryResponse(
+                    id=entry.get('id', str(uuid.uuid4())), # Provide a fallback ID if missing
+                    timestamp=entry.get('timestamp', datetime.now(timezone.utc).isoformat()), # Fallback timestamp
+                    content=entry.get('content', '[No dream content]'),
+                    dream_image_url=img_url,
+                    dream_seed_summary=metadata.get('dream_seed_summary')
+                )
+            )
+        return response_dreams
+    except Exception as e:
+        logger.error(f"API: Error fetching agent dreams: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error fetching agent dreams.")
+
+@app.get("/v1/agent/learnings", response_model=List[MemoryEntry])
+async def get_agent_learnings(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    global ethos_core
+    if not ethos_core:
+        raise HTTPException(status_code=503, detail="Eidos system not ready.")
+    
+    user_id_filter = x_user_id
+    logger.info(f"Request for /v1/agent/learnings. User: {user_id_filter}, Limit: {limit}")
+
+    try:
+        learning_types = ["learned_correction", "learned_feedback_insight", "suggestion_reflection"]
+        learnings = await ethos_core.get_recent_learnings(
+            learning_types=learning_types,
+            user_id_context=user_id_filter,
+            limit=limit
+        )
+
+        # ✅ Validate entries without using isinstance
+        for i, entry in enumerate(learnings):
+            try:
+                entry_dict = dict(entry)
+                MemoryEntry(**entry_dict)
+            except ValidationError as e:
+                logger.error(f"\n❌ MemoryEntry validation failed at index {i}:\n{e.json(indent=2)}\nEntry data:\n{entry_dict}\n")
+
+        return JSONResponse(content=jsonable_encoder(learnings))
+
+    except Exception as e:
+        logger.error(f"Error fetching agent learnings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error fetching agent learnings.")
+    
 @app.get("/v1/agent/knowledge_verifications", response_model=List[MemoryEntry])
 async def get_agent_knowledge_verifications(limit: int = 20, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
     global ethos_core
@@ -697,18 +904,13 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.debug(f"WS received: {data}")
 
             if data.get("type") == "auth" and data.get("payload", {}).get("userId"):
-                temp_uid = data["payload"]["userId"]
+                raw_temp_uid = data["payload"]["userId"]
+                temp_uid = raw_temp_uid.lower().strip().replace(" ", "_") if isinstance(raw_temp_uid, str) and raw_temp_uid else None
 
-                if not temp_uid or not isinstance(temp_uid, str):
-                    logger.warning(f"WS: Invalid user_id '{temp_uid}'. Closing.")
-                    await websocket.send_json({
-                        "type": "error",
-                        "payload": {"message": "Invalid user ID."}
-                    })
-                    await websocket.close(code=1008)
+                if not temp_uid: 
+                    logger.warning(f"WS: Invalid user_id '{raw_temp_uid}'. Closing.")
                     break
-
-                user_id = temp_uid
+                user_id = temp_uid 
                 if await manager.connect(websocket, user_id):
                     connection_ok = True
                     logger.info(f"WS connected for user: {user_id}")
