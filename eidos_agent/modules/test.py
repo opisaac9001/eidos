@@ -1,10 +1,12 @@
+# main.py
+
 import asyncio
 import logging
 import sys
 import time
 import uuid
 import httpx
-import io 
+import io # For BytesIO in StreamingResponse
 import re
 from datetime import datetime, timezone
 import json
@@ -16,28 +18,32 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Header, WebSocket, WebSocketDisconnect, Path as FastApiPath
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse # Ensure StreamingResponse is here
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 
 from pydantic import BaseModel, ValidationError, Field
 
-from eidos_agent.core.config import Config
+# Eidos Agent imports
+from eidos_agent.core.config import Config # Config.setup() is called on import
 from eidos_agent.utils.logger import get_logger, configure_logging
 
+# --- Configure logging at the very start ---
 configure_logging()
 logger = get_logger(__name__)
 
+# --- Define BASE_DIR and WEBAPP_DIR at module level ---
 BASE_DIR = Path(__file__).resolve().parent
 WEBAPP_DIR = BASE_DIR / "webapp"
 
+# --- Import other Eidos components AFTER basic setup ---
 from eidos_agent.services.openweathermap import OpenWeatherMapService
 from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.services.home_assistant import HomeAssistantService
 from eidos_agent.modules.ethos_core.core import EthosCore
 from eidos_agent.modules.logos_core.handler import LogosCore
-from eidos_agent.modules.pathos_interface import PathosInterface
+from eidos_agent.modules.pathos_interface import PathosInterface # PathosInterface will be modified
 from eidos_agent.modules.oneiros_module import OneirosModule
 from eidos_agent.core.input_router import InputRouter, RoutingResult
 from eidos_agent.core.api_models import (
@@ -46,125 +52,211 @@ from eidos_agent.core.api_models import (
     UserSettingItem, UserSettingsRequest, ClearUserMemoryRequest,
     FeedbackRequest, DreamEntryResponse
 )
+# MemoryEntry is already imported from ethos_core.memory_storage
 from eidos_agent.core.connection_manager import ConnectionManager
 from eidos_agent.services.external_tts_service import ExternalTTSService
+
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
 logos_core: Optional[LogosCore] = None
-pathos_interface: Optional[PathosInterface] = None
+pathos_interface: Optional[PathosInterface] = None # Will be instantiated in lifespan
 oneiros_module: Optional[OneirosModule] = None
 router: Optional[InputRouter] = None
 background_tasks: List[asyncio.Task] = []
 manager = ConnectionManager()
-eidos_tts_service_instance: Optional[ExternalTTSService] = None
+eidos_tts_service_instance: Optional[ExternalTTSService] = None # For TTS synthesis
 
+# NEW: Global cache for temporary audio chunks for TTS streaming
 TEMP_AUDIO_CACHE: Dict[str, bytes] = {}
-logger.info(f"MAIN.PY GLOBAL: TEMP_AUDIO_CACHE initialized. ID: {id(TEMP_AUDIO_CACHE)}")
-TEMP_AUDIO_CACHE_LOCK = asyncio.Lock()
-logger.info(f"MAIN.PY GLOBAL: TEMP_AUDIO_CACHE_LOCK initialized. ID: {id(TEMP_AUDIO_CACHE_LOCK)}")
+# Optional: Add a lock if you anticipate highly concurrent access modifying this dict,
+# though FastAPI's event loop usually serializes access to globals within handlers.
+# TEMP_AUDIO_CACHE_LOCK = asyncio.Lock()
 
+
+# --- Helper for VLLM Cache Warming ---
 async def warm_vllm_cache(pathos_if: PathosInterface, static_system_prompt: str):
     if not pathos_if.pathos_llm_config or \
        not pathos_if.pathos_llm_config.get('url') or \
        not static_system_prompt:
         logger.warning("VLLM Cache Warming: LLM config or static prompt content missing. Skipping.")
         return
+
     logger.info("Attempting to warm VLLM cache with the static system prompt...")
     try:
-        warmup_messages = [{"role": "system", "content": static_system_prompt}, {"role": "user", "content": "Hello."}]
+        warmup_messages = [
+            {"role": "system", "content": static_system_prompt},
+            {"role": "user", "content": "Hello."}
+        ]
+        
+        # Use a simplified, non-streaming call via PathosInterface's http_client
+        # or directly construct the call here.
+        # This reuses some logic from PathosInterface._prepare_llm_call_params
+        # but for a one-off, non-streaming call.
+
         llm_config = pathos_if.pathos_llm_config
         final_api_url, final_model_name, headers, _, _ = pathos_if._prepare_llm_call_params(
-            temperature=0.1, max_tokens_override=5, llm_provider_url_override=None, pathos_model_override=None)
+            temperature=0.1, # Low temp for warming
+            max_tokens_override=5, # Minimal tokens needed
+            llm_provider_url_override=None, # Use configured URL
+            pathos_model_override=None # Use configured model
+        )
+
         if not final_api_url or not final_model_name:
             logger.error("VLLM Cache Warming: Could not determine API URL or model name. Skipping.")
             return
-        payload = {"model": final_model_name, "messages": warmup_messages, "max_tokens": 5, "temperature": 0.1, "stream": False}
-        async with httpx.AsyncClient(timeout=30.0) as client:
+
+        payload = {
+            "model": final_model_name,
+            "messages": warmup_messages,
+            "max_tokens": 5,
+            "temperature": 0.1,
+            "stream": False # Non-streaming for warming
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client: # Dedicated client for warming
             response = await client.post(final_api_url, headers=headers, json=payload)
             response.raise_for_status()
-        logger.info(f"VLLM cache warming request sent successfully for model '{final_model_name}'.")
+        
+        logger.info(f"VLLM cache warming request sent successfully for model '{final_model_name}'. "
+                    f"Prefix for static system prompt (length: {len(static_system_prompt)}) should now be in vLLM's KV cache.")
+
     except Exception as e:
         logger.error(f"Failed to warm VLLM cache: {e}", exc_info=True)
 
+
+# --- FastAPI Lifecycle Events ---
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance
+    
     ha_service: Optional[HomeAssistantService] = None
     owm_service: Optional[OpenWeatherMapService] = None
+
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
-        ethos_core = EthosCore(Config); ethos_core.set_connection_manager(manager)
+        logger.info("Lifespan: Starting core component initialization...")
+        # ... (EthosCore, HA, OWM, Oneiros, LogosCore initialization as before) ...
+        ethos_core = EthosCore(Config)
+        ethos_core.set_connection_manager(manager)
+
         if Config.get_ha_config():
              ha_service = HomeAssistantService(Config, ethos_core.memory_storage)
              try: await ha_service.connect()
              except Exception as ha_e: logger.error(f"Lifespan: Failed to connect HomeAssistantService: {ha_e}", exc_info=True); ha_service = None
+        
         if Config.get_openweathermap_config() and Config.get_openweathermap_config().get('api_key'):
              owm_service = OpenWeatherMapService(Config)
-             if not owm_service.is_available: logger.warning("Lifespan: OWMService not available.")
-        if Config.ENABLE_ONEIROS and ethos_core:
-            oneiros_module = OneirosModule(Config, ethos_core); ethos_core.oneiros_module = oneiros_module
-        logos_core = LogosCore(Config, ethos_core, ha_service, owm_service); await logos_core.initialize_services()
-        if ethos_core: ethos_core.logos_core = logos_core
+             if not owm_service.is_available: logger.warning("Lifespan: OWMService not available (e.g., API key missing).")
         
-        pathos_interface = PathosInterface(Config, ethos_core, logos_core, manager)
-        pathos_interface.set_audio_cache(TEMP_AUDIO_CACHE, TEMP_AUDIO_CACHE_LOCK) # Pass global cache and lock
-        logger.info(f"MAIN.PY LIFESPAN: PathosInterface audio_cache ID: {id(pathos_interface.audio_cache) if pathos_interface.audio_cache is not None else 'None'}")
-        logger.info(f"MAIN.PY LIFESPAN: PathosInterface audio_cache_lock ID: {id(pathos_interface.audio_cache_lock) if pathos_interface.audio_cache_lock is not None else 'None'}")
-        logger.info(f"MAIN.PY LIFESPAN: Main's TEMP_AUDIO_CACHE ID: {id(TEMP_AUDIO_CACHE)}")
-        logger.info(f"MAIN.PY LIFESPAN: Main's TEMP_AUDIO_CACHE_LOCK ID: {id(TEMP_AUDIO_CACHE_LOCK)}")
-        if ethos_core: ethos_core.set_pathos_interface(pathos_interface)
+        if Config.ENABLE_ONEIROS and ethos_core:
+            oneiros_module = OneirosModule(Config, ethos_core)
+            ethos_core.oneiros_module = oneiros_module
+        
+        logos_core = LogosCore(Config, ethos_core, ha_service, owm_service)
+        await logos_core.initialize_services()
+        if ethos_core: ethos_core.logos_core = logos_core
 
+
+        # Initialize PathosInterface
+        logger.info("Lifespan: Initializing PathosInterface...")
+        pathos_interface = PathosInterface(Config, ethos_core, logos_core, manager)
+        logger.info("Lifespan: PathosInterface initialized.")
+        if ethos_core:
+            ethos_core.set_pathos_interface(pathos_interface) # Ethos needs Pathos for proactive message generation
+            logger.info("Lifespan: PathosInterface set in EthosCore.")
+
+        # Initialize InputRouter
+        logger.info("Lifespan: Initializing InputRouter...")
         if ethos_core and logos_core and pathos_interface:
             router = InputRouter(config=Config, ethos_core=ethos_core, logos_core=logos_core, pathos_interface=pathos_interface)
-        else: raise RuntimeError("Failed to initialize InputRouter due to missing core components.")
+            logger.info("Lifespan: InputRouter initialized.")
+        else:
+            logger.error("Lifespan: InputRouter NOT initialized due to missing core components.")
+            raise RuntimeError("Failed to initialize InputRouter due to missing core components.")
 
+        # Initialize ExternalTTSService
         if Config.EIDOS_TTS and isinstance(Config.EIDOS_TTS, dict) and Config.EIDOS_TTS.get('api_url'):
+            logger.info("Lifespan: Initializing ExternalTTSService...")
             try:
                 eidos_tts_service_instance = ExternalTTSService(config=Config)
                 if eidos_tts_service_instance.is_available():
-                    if pathos_interface: pathos_interface.set_tts_service(eidos_tts_service_instance)
-                else: eidos_tts_service_instance = None
-            except Exception as e_tts_init: logger.error(f"Lifespan: Failed to initialize ExternalTTSService: {e_tts_init}", exc_info=True); eidos_tts_service_instance = None
-        else: eidos_tts_service_instance = None
+                    logger.info("Lifespan: ExternalTTSService initialized successfully and is available.")
+                    if pathos_interface: # Pass TTS service to PathosInterface
+                        pathos_interface.set_tts_service(eidos_tts_service_instance)
+                else:
+                    logger.error("Lifespan: ExternalTTSService initialized BUT IS NOT AVAILABLE.")
+                    eidos_tts_service_instance = None
+            except Exception as e_tts_init:
+                logger.error(f"Lifespan: Failed to initialize ExternalTTSService: {e_tts_init}", exc_info=True)
+                eidos_tts_service_instance = None
+        else:
+            logger.warning(f"Lifespan: ExternalTTSService initialization SKIPPED (Config missing or api_url not set).")
+            eidos_tts_service_instance = None
         
+        # LLM Availability Check
         await check_critical_llm_availability()
-        if pathos_interface and Config.LLM.get("PATHOS", {}).get("url"):
+
+        # NEW: VLLM Cache Warming
+        if pathos_interface and Config.LLM.get("PATHOS", {}).get("url"): # Check if Pathos LLM is configured
+            logger.info("Lifespan: Attempting to warm vLLM cache for Pathos static system prompt...")
             static_prompt_for_vllm = pathos_interface.get_static_system_prompt_content()
-            if static_prompt_for_vllm: await warm_vllm_cache(pathos_interface, static_prompt_for_vllm)
-        if ethos_core: background_tasks = await ethos_core.get_background_tasks()
+            if static_prompt_for_vllm:
+                await warm_vllm_cache(pathos_interface, static_prompt_for_vllm)
+            else:
+                logger.warning("Lifespan: Could not get static system prompt for vLLM cache warming.")
+        else:
+            logger.info("Lifespan: Skipping vLLM cache warming (PathosInterface or Pathos LLM URL not available).")
+
+
+        # Background tasks from EthosCore
+        if ethos_core:
+            background_tasks = await ethos_core.get_background_tasks()
+            for task in background_tasks: logger.info(f"Lifespan: Created background task: {task.get_name()}")
         
-        logger.info("--- Eidos System Initialized Successfully ---")
+        logger.info("--- Eidos System Initialized Successfully (End of Lifespan Startup Try Block) ---")
         yield
-        logger.info("--- Shutting Down Eidos System ---")
+        logger.info("--- Shutting Down Eidos System (Lifespan Shutdown) ---")
+        # ... (Shutdown logic as before: cancel tasks, close connections) ...
         active_bg_tasks = [task for task in background_tasks if not task.done()]
         if active_bg_tasks:
+            logger.info(f"Lifespan: Cancelling {len(active_bg_tasks)} background tasks...")
             for task in active_bg_tasks: task.cancel()
             try: await asyncio.wait(active_bg_tasks, timeout=5.0)
-            except asyncio.TimeoutError: logger.warning("Timeout waiting for background tasks to cancel.")
+            except asyncio.TimeoutError: logger.warning("Lifespan: Timeout waiting for some background tasks to cancel.")
+            except asyncio.CancelledError: logger.debug("Lifespan: Background task group cancellation processed.")
         if manager: await manager.disconnect_all()
         if pathos_interface: await pathos_interface.close()
         if logos_core: await logos_core.close()
         if ha_service: await ha_service.disconnect()
-        if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
+        if owm_service and hasattr(owm_service, 'close'): await owm_service.close()
         if oneiros_module: await oneiros_module.close()
         if ethos_core: await ethos_core.close_memory_connection()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()
-        TEMP_AUDIO_CACHE.clear()
+        TEMP_AUDIO_CACHE.clear() # Clear in-memory audio cache on shutdown
         logger.info("--- Eidos System Shutdown Complete ---")
+
     except Exception as e_lifespan_main:
         logger.critical(f"--- System Initialization Failed Critically in Lifespan ---: {str(e_lifespan_main)}", exc_info=True)
+        # Attempt to clean up any partially initialized components if possible
         if 'pathos_interface' in locals() and pathos_interface and hasattr(pathos_interface, 'close'): await pathos_interface.close()
         if 'logos_core' in locals() and logos_core and hasattr(logos_core, 'close'): await logos_core.close()
+        # ... other cleanup ...
         raise RuntimeError("Eidos system failed to initialize during lifespan startup.") from e_lifespan_main
+
 
 app = FastAPI(title="Eidos Agent API", version="1.0", lifespan=lifespan)
 
-# Static files and CORS (as before)
+# --- Mount static files (as before) ---
+# ... (Static file mounting logic for webapp and dream_images) ...
 if WEBAPP_DIR.is_dir():
     js_dir = WEBAPP_DIR / "js"; css_dir = WEBAPP_DIR / "css"
     if js_dir.is_dir(): app.mount("/js", StaticFiles(directory=js_dir), name="js")
+    else: logger.warning(f"JS directory not found at {js_dir}.")
     if css_dir.is_dir(): app.mount("/css", StaticFiles(directory=css_dir), name="css")
+    else: logger.warning(f"CSS directory not found at {css_dir}.")
+else: logger.error(f"WebApp directory '{WEBAPP_DIR}' not found.")
+
 if Config.ENABLE_ONEIROS and Config.ONEIROS and Config.ONEIROS.get('enable_image_dreams') and Config.IMAGE_OUTPUT_DIR:
     try:
         image_output_path_static = Path(Config.IMAGE_OUTPUT_DIR)
@@ -172,255 +264,175 @@ if Config.ENABLE_ONEIROS and Config.ONEIROS and Config.ONEIROS.get('enable_image
         image_output_path_static.mkdir(parents=True, exist_ok=True)
         if image_output_path_static.is_dir():
             app.mount("/dream_images", StaticFiles(directory=str(image_output_path_static.resolve())), name="dream_images")
+            logger.info(f"Mounted dream images directory at /dream_images from {str(image_output_path_static.resolve())}")
     except Exception as e_mount_static: logger.error(f"Error mounting dream image directory: {e_mount_static}", exc_info=True)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*", "X-User-Id", "X-Admin-Password"])
 
-# LLM Availability Checks (as before)
+
+# --- CORS Middleware (as before) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*", "X-User-Id", "X-Admin-Password"],
+)
+
+# --- LLM Availability Check Functions (as before, ensure vLLM API key handling is included) ---
 async def check_llm_role_availability(role_name: str, llm_config: Optional[Dict[str, Any]]):
-    if not llm_config or not llm_config.get('url') or not llm_config.get('model'): return True
-    api_url = f"{llm_config['url'].rstrip('/')}/chat/completions"; model_name = llm_config['model']
-    headers = {"Content-Type": "application/json"}; api_key = llm_config.get('api_key')
-    if api_key and api_key.lower() not in ['lm-studio', 'ollama', 'vllm', 'none', '']: headers["Authorization"] = f"Bearer {api_key}"
+    if not llm_config or not llm_config.get('url') or not llm_config.get('model'):
+        logger.warning(f"LLM Check: Role '{role_name}' is not configured with a URL and model. Skipping.")
+        return True # Not configured is not a "failure" for this check, just a skip.
+    
+    api_url = f"{llm_config['url'].rstrip('/')}/chat/completions"
+    model_name = llm_config['model']
+    headers = {"Content-Type": "application/json"}
+    api_key = llm_config.get('api_key')
+    # MODIFIED: Added 'vllm', 'none' to keys that don't need Bearer token
+    if api_key and api_key.lower() not in ['lm-studio', 'ollama', 'vllm', 'none', '']:
+        headers["Authorization"] = f"Bearer {api_key}"
+    
     payload = {"model": model_name, "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 5, "temperature": 0.1}
     try:
-        timeout_val = float(llm_config.get('timeout', 15))
+        timeout_val = float(llm_config.get('timeout', 15)) # Use configured timeout or default
         async with httpx.AsyncClient(timeout=timeout_val) as client:
+            logger.info(f"LLM Check: Pinging model '{model_name}' for role '{role_name}' at {api_url}...")
             response = await client.post(api_url, headers=headers, json=payload)
-            if response.status_code == 200: logger.info(f"LLM Check: SUCCESS - Role '{role_name}' (Model: {model_name}) is responding."); return True
-            logger.error(f"LLM Check: FAILED - Role '{role_name}' (Model: {model_name}) returned {response.status_code}. Resp: {response.text[:200]}"); return False
-    except httpx.ConnectError: logger.error(f"LLM Check: FAILED - Connection refused for role '{role_name}' (Model: {model_name})."); return False
-    except Exception as e: logger.error(f"LLM Check: FAILED - Error checking role '{role_name}' (Model: {model_name}): {e}", exc_info=True); return False
+            # ... (rest of check_llm_role_availability logic as before) ...
+            if response.status_code == 200:
+                logger.info(f"LLM Check: SUCCESS - Role '{role_name}' (Model: {model_name}) is responding at {llm_config['url']}.")
+                return True
+            # ... (error handling for 404, etc.)
+            logger.error(f"LLM Check: FAILED - Role '{role_name}' (Model: {model_name}) at {llm_config['url']} returned {response.status_code}. Resp: {response.text[:200]}")
+            return False
+    except httpx.ConnectError: logger.error(f"LLM Check: FAILED - Connection refused for role '{role_name}' (Model: {model_name}) at {llm_config['url']}. Ensure LLM provider is running."); return False
+    except Exception as e: logger.error(f"LLM Check: FAILED - Error checking role '{role_name}' (Model: {model_name}) at {llm_config['url']}: {e}", exc_info=True); return False
+
 
 async def check_critical_llm_availability():
-    all_critical_llms_ok = True; critical_roles_map = { "PATHOS": Config.LLM.get('PATHOS'), "LOGOS_TECHNE (Summarization/Reflection/Upkeep)": Config.get_llm_config(Config.ETHOS.get('summarization_llm_role', 'LOGOS_TECHNE')), "ONEIROS_DREAM_LLM": Config.get_llm_config(Config.ONEIROS.get('dream_llm_role', 'PATHOS')) if Config.ONEIROS else None }
+    # ... (as before) ...
+    logger.info("--- Performing Critical LLM Availability Checks ---"); all_critical_llms_ok = True
+    critical_roles_map = {
+        "PATHOS": Config.LLM.get('PATHOS'),
+        "LOGOS_TECHNE (Summarization/Reflection/Upkeep)": Config.get_llm_config(Config.ETHOS.get('summarization_llm_role', 'LOGOS_TECHNE')),
+        "ONEIROS_DREAM_LLM": Config.get_llm_config(Config.ONEIROS.get('dream_llm_role', 'PATHOS')) if Config.ONEIROS else None
+    }
     if Config.ENABLE_VISION_PROCESSING: critical_roles_map["LOGOS_VISION_CONTEXT"] = Config.LLM.get('LOGOS_VISION_CONTEXT')
     if Config.ENABLE_KNOWLEDGE_UPKEEP: critical_roles_map["KNOWLEDGE_UPKEEP_LLM"] = Config.get_llm_config(Config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE'))
+
     for role_description, llm_config_to_check in critical_roles_map.items():
         if llm_config_to_check:
             if not await check_llm_role_availability(role_description, llm_config_to_check): all_critical_llms_ok = False
-    if not all_critical_llms_ok: logger.critical("!!! WARNING: One or more critical LLMs are not available or not configured. !!!")
+        else: logger.warning(f"LLM Check: Config for critical role '{role_description}' not found/incomplete. Skipping check.")
+    if not all_critical_llms_ok:
+        logger.critical("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.critical("!!! WARNING: One or more critical LLMs are not available or not configured. !!!"); logger.critical("!!! Eidos functionality will be significantly impaired.                   !!!"); logger.critical("!!! Please check logs and ensure LLM provider is running with models loaded.!!!"); logger.critical("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    else: logger.info("--- All checked critical LLMs appear to be available. ---")
 
-# Input Parsing (extract_input_to_eidos_format - ensure it's the corrected version from previous steps)
+
+# --- Input Parsing (MODIFIED to include auto_tts_enabled_for_response) ---
 def extract_input_to_eidos_format(body: dict, request_id: str, user_id_from_header: Optional[str]) -> dict:
-    # 1. Determine and Normalize User ID
-    raw_user_id_from_payload = body.get('user') # User ID from main body (OpenAI compatible)
-    raw_user_id_from_header_val = user_id_from_header # User ID from X-User-Id header
-
-    # Prioritize header, then payload, then default
-    effective_raw_user_id: Optional[str] = raw_user_id_from_header_val
-    if not effective_raw_user_id:
-        effective_raw_user_id = raw_user_id_from_payload
-    if not effective_raw_user_id:
-        effective_raw_user_id = 'api_guest_user'
-
-    final_user_id: str = 'api_guest_user' # Default if all normalization fails
-    if effective_raw_user_id and isinstance(effective_raw_user_id, str):
-        normalized = effective_raw_user_id.lower().strip().replace(" ", "_")
-        if normalized: # Ensure not empty after normalization
-            final_user_id = normalized
+    raw_user_id = user_id_from_header or body.get('user') or 'api_guest_user'
+    final_user_id = raw_user_id.lower().strip().replace(" ", "_") if raw_user_id else 'api_guest_user'
+    if not final_user_id: final_user_id = 'api_guest_user'
+    logger.debug(f"Request {request_id}: User ID for this request set to (normalized): '{final_user_id}' (Raw was: '{raw_user_id}')")
     
-    # This initial log is helpful for seeing raw vs. normalized early
-    logger.debug(
-        f"Request {request_id}: User ID determination. Header: '{raw_user_id_from_header_val}', "
-        f"Payload 'user': '{raw_user_id_from_payload}'. Effective Raw: '{effective_raw_user_id}'. "
-        f"Normalized Final User ID: '{final_user_id}'."
-    )
-
-    # 2. Extract Basic Parameters from Top Level of Request Body
     temperature_from_body = body.get('temperature')
-    # model_from_body is the model selected in the GUI dropdown, passed at the top level of the request
-    model_from_body = body.get('model') 
+    model_from_body = body.get('model') # This is the model selected in GUI dropdown
+    max_tokens_override, llm_provider_url_override = None, None
+    auto_tts_enabled = False # Default
 
-    # 3. Extract Eidos-Specific Metadata (including overrides and TTS flag)
-    max_tokens_override: Optional[int] = None
-    llm_provider_url_override: Optional[str] = None
-    auto_tts_enabled: bool = False # Default
-    engaged_proactive_id_from_meta: Optional[str] = None
-    # force_web_search_from_meta is not typically expected here, usually from text prefix
-    # but we can initialize it if we ever decide to support it via metadata.
-    # force_web_search_from_meta: bool = False
+    if body_metadata := body.get('metadata'): # Eidos-specific metadata from client
+        if isinstance(body_metadata, dict):
+            max_tokens_override = body_metadata.get('max_tokens_override')
+            llm_provider_url_override = body_metadata.get('llm_provider_url_override')
+            # NEW: Extract auto_tts_enabled_for_response
+            auto_tts_enabled = body_metadata.get('auto_tts_enabled_for_response', False)
+            if max_tokens_override: logger.debug(f"Request {request_id}: Found max_tokens_override in metadata: {max_tokens_override}")
+            if llm_provider_url_override: logger.debug(f"Request {request_id}: Found llm_provider_url_override in metadata: {llm_provider_url_override}")
+            logger.debug(f"Request {request_id}: auto_tts_enabled_for_response from metadata: {auto_tts_enabled}")
 
-    body_metadata_dict = body.get('metadata') # This is the Eidos-specific nested 'metadata' object
-    if body_metadata_dict and isinstance(body_metadata_dict, dict):
-        logger.debug(f"Request {request_id}: Processing Eidos-specific 'metadata' block: {body_metadata_dict}")
-        
-        max_tokens_override_raw = body_metadata_dict.get('max_tokens_override')
-        if max_tokens_override_raw is not None:
-            try:
-                max_tokens_override = int(max_tokens_override_raw)
-                logger.debug(f"Request {request_id}: Extracted max_tokens_override: {max_tokens_override}")
-            except ValueError:
-                logger.warning(f"Request {request_id}: Invalid max_tokens_override value '{max_tokens_override_raw}', ignoring.")
-        
-        llm_provider_url_override = body_metadata_dict.get('llm_provider_url_override')
-        if llm_provider_url_override:
-             logger.debug(f"Request {request_id}: Extracted llm_provider_url_override: {llm_provider_url_override}")
 
-        auto_tts_enabled_raw = body_metadata_dict.get('auto_tts_enabled_for_response')
-        if isinstance(auto_tts_enabled_raw, bool):
-            auto_tts_enabled = auto_tts_enabled_raw
-        elif auto_tts_enabled_raw is not None: # If present but not bool, log warning
-            logger.warning(f"Request {request_id}: Invalid type for 'auto_tts_enabled_for_response' ('{auto_tts_enabled_raw}'), defaulting to False.")
-        logger.debug(f"Request {request_id}: Extracted auto_tts_enabled_for_response: {auto_tts_enabled}")
-        
-        engaged_proactive_id_from_meta = body_metadata_dict.get('engaged_proactive_id')
-        if engaged_proactive_id_from_meta:
-            logger.debug(f"Request {request_id}: Extracted engaged_proactive_id: {engaged_proactive_id_from_meta}")
-
-        # pathos_model_override from metadata is also possible if client sends it nested
-        # but model_from_body (top-level) usually takes precedence for GUI selection.
-        # If you want metadata to override top-level, you'd add logic here.
-        # For now, model_from_body (top-level) is used for pathos_model_override.
-
-    else:
-        logger.debug(f"Request {request_id}: No Eidos-specific 'metadata' block found in request body.")
-
-    # 4. Initialize input_data structure
-    input_data: Dict[str, Any] = {
-        "type": "text", # Default, will be changed to 'multimodal_input' if image/doc parts found
-        "text_content": "",
-        "image_content_b64": None,
-        "document_text": None,
+    input_data = {
+        "type": "text", "text_content": "", "image_content_b64": None, "document_text": None,
         "metadata": {
-            "conversation_history": [],
-            "source": "api_openai_compat_new_parser", # Or a more generic name
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user_id": final_user_id,
-            "temperature": temperature_from_body, # Can be None
-            "max_tokens_override": max_tokens_override, # Can be None
-            "llm_provider_url_override": llm_provider_url_override, # Can be None
-            "pathos_model_override": model_from_body, # From top-level 'model' key, can be None
-            "engaged_proactive_id": engaged_proactive_id_from_meta, # Can be None
-            "force_web_search_requested": False, # Initialize, will be updated by text content parsing
-            "auto_tts_enabled_for_response": auto_tts_enabled # Correctly assigned
+            "conversation_history": [], "source": "api_openai_compat_new_parser",
+            "timestamp": datetime.now(timezone.utc).isoformat(), "user_id": final_user_id,
+            "temperature": temperature_from_body,
+            "max_tokens_override": max_tokens_override,
+            "llm_provider_url_override": llm_provider_url_override,
+            "pathos_model_override": model_from_body, # This is the GUI selected model
+            "engaged_proactive_id": body.get('metadata', {}).get('engaged_proactive_id'),
+            "force_web_search_requested": False,
+            "auto_tts_enabled_for_response": auto_tts_enabled # Store the flag
         }
     }
-
-    # 5. Parse Messages (History and Current User Input)
+    # ... (rest of message parsing logic as before, including FORCE_SEARCH_PREFIX) ...
     messages = body.get("messages", [])
-    if not messages:
-        logger.warning(f"Request {request_id}: No 'messages' array found in request body.")
-        # Log final structure before returning for an empty messages case
-        _log_final_parsed_input(request_id, final_user_id, input_data)
-        return input_data
-
-    # Populate conversation_history (all messages except the last one)
+    if not messages: logger.warning(f"Request {request_id}: No messages found in body."); return input_data
     if len(messages) > 1:
-        for msg_dict in messages[:-1]:
-            role = msg_dict.get("role")
-            content = msg_dict.get("content")
-            tool_calls = msg_dict.get("tool_calls")
-            tool_call_id = msg_dict.get("tool_call_id") # For tool role messages
-
-            if role not in ["system", "user", "assistant", "tool"]:
-                logger.warning(f"Request {request_id}: Skipping history message with invalid role: {role}")
-                continue
-
+        for msg_dict in messages[:-1]: # History messages
+            role, content = msg_dict.get("role"), msg_dict.get("content")
+            tool_calls, tool_id = msg_dict.get("tool_calls"), msg_dict.get("tool_call_id")
+            if role not in ["system", "user", "assistant", "tool"]: continue
             entry: Dict[str, Any] = {"role": role}
-
-            if isinstance(content, str):
-                entry["content"] = content
-            elif isinstance(content, list): # Handle multimodal history content (e.g., from a previous turn)
-                text_parts_hist, image_present_in_hist = [], False
+            if isinstance(content, str): entry["content"] = content
+            elif isinstance(content, list): # Handle multimodal history content
+                txt_parts, img_hist = [], False
                 for part in content:
-                    if isinstance(part, dict) and part.get("type") == "text":
-                        text_parts_hist.append(part.get("text", ""))
-                    elif isinstance(part, dict) and part.get("type") == "image_url":
-                        image_present_in_hist = True
-                final_history_text = " ".join(text_parts_hist).strip()
-                if image_present_in_hist:
-                    final_history_text += " [Image was present in history]" if final_history_text else "[Image was present in history]"
-                entry["content"] = final_history_text.strip() or None # Ensure None if empty
-            elif content is not None: # Fallback for other unexpected content types
-                entry["content"] = str(content)
-            
-            if tool_calls:
-                entry["tool_calls"] = tool_calls
-            if role == "tool" and tool_call_id: # Tool results must have tool_call_id
-                entry["tool_call_id"] = tool_call_id
-            
-            # Add to history only if it has some substance
-            if entry.get("content") or entry.get("tool_calls"): # Tool role might only have tool_call_id and content
+                    if isinstance(part, dict) and part.get("type") == "text": txt_parts.append(part.get("text", ""))
+                    elif isinstance(part, dict) and part.get("type") == "image_url": img_hist = True
+                final_txt = " ".join(txt_parts).strip()
+                if img_hist: final_txt += " [Image was present in history]"
+                entry["content"] = final_txt.strip() or None
+            elif content is not None: entry["content"] = str(content) # Fallback for other types
+            if tool_calls: entry["tool_calls"] = tool_calls
+            if role == "tool" and tool_id: entry["tool_call_id"] = tool_id
+            if entry.get("content") or entry.get("tool_calls") or entry.get("tool_call_id"):
                 input_data["metadata"]["conversation_history"].append(entry)
 
-    # Process the last message (current user input)
-    last_msg = messages[-1]
-    if last_msg.get("role") != "user":
-        logger.warning(f"Request {request_id}: Last message in 'messages' array is not from 'user'. Role: {last_msg.get('role')}. Processing as user input anyway.")
-        # Potentially handle this as an error or adapt, depending on strictness
-
-    last_content_from_request = last_msg.get("content", "")
-    current_input_text_parts = []
-
-    if isinstance(last_content_from_request, str):
-        current_input_text_parts.append(last_content_from_request)
-    elif isinstance(last_content_from_request, list): # OpenAI multimodal format for current input
-        input_data["type"] = "multimodal_input" # Mark as multimodal
-        for part_item in last_content_from_request:
+    last_msg = messages[-1] # Current user message
+    if last_msg.get("role") != "user": logger.warning(f"Request {request_id}: Last message not from 'user', role: {last_msg.get('role')}.")
+    last_content = last_msg.get("content", ""); text_parts_concat = []
+    if isinstance(last_content, str): text_parts_concat.append(last_content)
+    elif isinstance(last_content, list): # Multimodal input
+        input_data["type"] = "multimodal_input"
+        for part_item in last_content:
             if isinstance(part_item, dict):
-                part_type = part_item.get("type")
-                if part_type == "text":
-                    text_part_content = part_item.get("text", "")
-                    # Check for embedded document text
-                    doc_match = re.search(r"--- Uploaded Document Content ---\n([\s\S]*?)\n--- End Uploaded Document Content ---", text_part_content)
+                if part_item.get("type") == "text":
+                    text_part = part_item.get("text", "")
+                    doc_match = re.search(r"--- Uploaded Document Content ---\n([\s\S]*?)\n--- End Uploaded Document Content ---", text_part)
                     if doc_match:
-                        input_data["document_text"] = doc_match.group(1).strip()
-                        logger.info(f"Request {request_id}: Extracted document text from user message. Length: {len(input_data['document_text'])}")
-                        # Add text before and after the document block
-                        current_input_text_parts.append(text_part_content.split("--- Uploaded Document Content ---")[0].strip())
-                        current_input_text_parts.append(text_part_content.split("--- End Uploaded Document Content ---")[-1].strip())
-                    else:
-                        current_input_text_parts.append(text_part_content)
-                elif part_type == "image_url":
-                    image_url_data = part_item.get("image_url", {})
-                    if isinstance(image_url_data, dict):
-                        url_str = image_url_data.get("url")
-                        if url_str and url_str.startswith("data:image"): # Expecting base64 data URI
-                            try:
-                                input_data["image_content_b64"] = url_str.split(",", 1)[1]
-                                logger.info(f"Request {request_id}: Extracted base64 image data from user message. Length: {len(input_data['image_content_b64'])}")
-                            except IndexError:
-                                logger.error(f"Request {request_id}: Malformed base64 image data URI in user message: {url_str[:60]}...")
-            else: # If a part is not a dict, treat its string representation as text
-                current_input_text_parts.append(str(part_item))
-    
-    # Consolidate text parts for text_content
-    raw_text_content_for_processing = " ".join(filter(None, current_input_text_parts)).strip()
-
-    # Handle [FORCE_WEB_SEARCH] prefix
+                         input_data["document_text"] = doc_match.group(1).strip()
+                         text_parts_concat.append(text_part.split("--- Uploaded Document Content ---")[0].strip())
+                         text_parts_concat.append(text_part.split("--- End Uploaded Document Content ---")[-1].strip())
+                    else: text_parts_concat.append(text_part)
+                elif part_item.get("type") == "image_url":
+                    img_url_data = part_item.get("image_url", {})
+                    if isinstance(img_url_data, dict) and (img_url_str := img_url_data.get("url")) and img_url_str.startswith("data:image"):
+                        try: input_data["image_content_b64"] = img_url_str.split(",", 1)[1]
+                        except IndexError: logger.error(f"Request {request_id}: Malformed base64 image URL.")
+            else: text_parts_concat.append(str(part_item)) # Non-dict items in list, treat as text
+    raw_text_content = " ".join(filter(None, text_parts_concat)).strip()
     FORCE_SEARCH_PREFIX_PY = "[FORCE_WEB_SEARCH] "
-    if raw_text_content_for_processing.startswith(FORCE_SEARCH_PREFIX_PY):
-        input_data["metadata"]["force_web_search_requested"] = True # Set flag
-        input_data["text_content"] = raw_text_content_for_processing[len(FORCE_SEARCH_PREFIX_PY):].strip()
-        logger.info(f"Request {request_id}: Force web search detected via text prefix. Query: '{input_data['text_content']}'")
-    else:
-        input_data["text_content"] = raw_text_content_for_processing
-        # force_web_search_requested remains as set from metadata (or False if not in metadata)
-
-    # Remove "Tools Available" boilerplate if present (often added by clients like Open WebUI)
+    if raw_text_content.startswith(FORCE_SEARCH_PREFIX_PY):
+        input_data["metadata"]["force_web_search_requested"] = True
+        input_data["text_content"] = raw_text_content[len(FORCE_SEARCH_PREFIX_PY):].strip()
+    else: input_data["text_content"] = raw_text_content
     if isinstance(input_data["text_content"], str) and "#### Tools Available" in input_data["text_content"]:
         input_data["text_content"] = input_data["text_content"].split("#### Tools Available")[0].strip()
-        logger.debug(f"Request {request_id}: Removed 'Tools Available' boilerplate from text_content.")
-
-    # 6. Final Log and Return
-    _log_final_parsed_input(request_id, final_user_id, input_data)
-    return input_data
-
-def _log_final_parsed_input(request_id: str, final_user_id: str, input_data: Dict[str, Any]):
-    """Helper function to log the final parsed input_data structure."""
-    metadata = input_data.get("metadata", {})
+    
     logger.info(
-        f"Request {request_id}: Parsed Input Data Summary. User: '{final_user_id}'. Type: {input_data['type']}. "
-        f"TTS Enabled for Resp: {metadata.get('auto_tts_enabled_for_response')}. "
-        f"ForceSearch: {metadata.get('force_web_search_requested')}. "
-        f"Image Provided: {bool(input_data['image_content_b64'])}. Document Provided: {bool(input_data['document_text'])}. "
-        f"Temperature: {metadata.get('temperature')}. MaxTokensOverride: {metadata.get('max_tokens_override')}. "
-        f"LLMProviderOverride: {metadata.get('llm_provider_url_override')}. "
-        f"PathosModel(Dropdown): {metadata.get('pathos_model_override')}. "
-        f"EngagedProactiveID: {metadata.get('engaged_proactive_id')}. "
-        f"History items: {len(metadata.get('conversation_history', []))}. "
-        f"Text Content Preview: '{str(input_data.get('text_content', ''))[:70]}...'"
+        f"Request {request_id}: Input parser. Type: {input_data['type']}. "
+        f"ForceSearch: {input_data['metadata']['force_web_search_requested']}. "
+        f"TTS Enabled for Resp: {input_data['metadata']['auto_tts_enabled_for_response']}. " # Log new flag
+        f"Img: {bool(input_data['image_content_b64'])}. Doc: {bool(input_data['document_text'])}. "
+        f"Temp: {input_data['metadata'].get('temperature')}. MaxTokOverride: {input_data['metadata'].get('max_tokens_override')}. "
+        f"LLMProviderOverride: {input_data['metadata'].get('llm_provider_url_override')}. "
+        f"PathosModel(Dropdown): {input_data['metadata'].get('pathos_model_override')}. "
+        f"EngagedProactiveID: {input_data['metadata'].get('engaged_proactive_id')}. "
+        f"Text: '{str(input_data['text_content'])[:50]}...'"
     )
+    return input_data
 
 
 # --- API Endpoints ---
@@ -533,11 +545,8 @@ async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias=
 @app.get("/", include_in_schema=False)
 async def get_gui_root():
     gui_html_path = WEBAPP_DIR / "gui.html"
-    if gui_html_path.is_file():
-        return FileResponse(str(gui_html_path))
-    else:
-        logger.error(f"GUI HTML file not found at {gui_html_path}")
-        return JSONResponse(content={"error": "Eidos GUI not found. Ensure 'webapp/gui.html' exists."}, status_code=404)
+    if gui_html_path.is_file(): return FileResponse(str(gui_html_path))
+    else: return JSONResponse(content={"error": "Eidos GUI not found."}, status_code=404)
 
 @app.get("/v1/models", response_model=ModelList)
 async def list_models_endpoint():
@@ -645,11 +654,11 @@ async def chat_completions(fastapi_request: Request, x_user_id: Optional[str] = 
 @app.get("/v1/tts/audio_chunk/{chunk_id}")
 async def get_tts_audio_chunk(chunk_id: str):
     global TEMP_AUDIO_CACHE
-    logger.debug(f"GET_CHUNK_DEBUG: Request for chunk ID: {chunk_id}. ID of global TEMP_AUDIO_CACHE: {id(TEMP_AUDIO_CACHE)}. Cache size: {len(TEMP_AUDIO_CACHE)}")
-    if chunk_id in TEMP_AUDIO_CACHE:
-        logger.debug(f"GET_CHUNK_DEBUG: Chunk {chunk_id} FOUND in cache before pop.")
-    else:
-        logger.warning(f"GET_CHUNK_DEBUG: Chunk {chunk_id} NOT FOUND in cache before pop. Current keys: {list(TEMP_AUDIO_CACHE.keys())}")
+    logger.debug(f"Request received for TTS audio chunk ID: {chunk_id}")
+    # Optional: Use lock if modifying cache concurrently, though get is usually safe.
+    # async with TEMP_AUDIO_CACHE_LOCK:
+    # audio_bytes = TEMP_AUDIO_CACHE.get(chunk_id)
+    # For simplicity, direct access if main event loop handles it:
     audio_bytes = TEMP_AUDIO_CACHE.pop(chunk_id, None) # Pop to remove after first fetch (single use)
 
     if audio_bytes:
@@ -959,34 +968,77 @@ async def get_agent_knowledge_verifications(limit: int = 20, x_user_id: Optional
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    user_id = None; connection_ok = False
+    user_id = None
+    connection_ok = False
+
     try:
         while True:
-            data = await websocket.receive_json(); logger.debug(f"WS received: {data}")
+            data = await websocket.receive_json()
+            logger.debug(f"WS received: {data}")
+
             if data.get("type") == "auth" and data.get("payload", {}).get("userId"):
                 raw_temp_uid = data["payload"]["userId"]
                 temp_uid = raw_temp_uid.lower().strip().replace(" ", "_") if isinstance(raw_temp_uid, str) and raw_temp_uid else None
-                if not temp_uid: logger.warning(f"WS: Invalid user_id '{raw_temp_uid}'. Closing."); break
+
+                if not temp_uid: 
+                    logger.warning(f"WS: Invalid user_id '{raw_temp_uid}'. Closing.")
+                    break
                 user_id = temp_uid 
                 if await manager.connect(websocket, user_id):
-                    connection_ok = True; logger.info(f"WS connected for user: {user_id}")
-                    await manager.send_personal_message({"type": "status", "payload": {"message": "Connected to Eidos WS."}}, user_id)
-                else: logger.error(f"WS: ConnectionManager failed for user {user_id}. Closing."); await websocket.send_json({"type": "error", "payload": {"message": "Failed to register."}}); await websocket.close(code=1011); break
-            elif user_id is None: logger.warning("WS: Message before auth. Closing."); await websocket.send_json({"type": "error", "payload": {"message": "Auth required."}}); await websocket.close(code=1008); break
-            else: logger.warning(f"WS: Unhandled message type '{data.get('type')}' from user {user_id}.")
-    except WebSocketDisconnect: logger.info(f"WS: Disconnected user: {user_id if user_id else 'unauthenticated'}.")
+                    connection_ok = True
+                    logger.info(f"WS connected for user: {user_id}")
+                    await manager.send_personal_message({
+                        "type": "status",
+                        "payload": {"message": "Connected to Eidos WS."}
+                    }, user_id)
+                else:
+                    logger.error(f"WS: ConnectionManager failed for user {user_id}. Closing.")
+                    await websocket.send_json({
+                        "type": "error",
+                        "payload": {"message": "Failed to register."}
+                    })
+                    await websocket.close(code=1011)
+                    break
+
+            elif user_id is None:
+                logger.warning("WS: Message before auth. Closing.")
+                await websocket.send_json({
+                    "type": "error",
+                    "payload": {"message": "Auth required."}
+                })
+                await websocket.close(code=1008)
+                break
+
+            else:
+                logger.warning(f"WS: Unhandled message type '{data.get('type')}' from user {user_id}.")
+
+    except WebSocketDisconnect:
+        logger.info(f"WS: Disconnected user: {user_id if user_id else 'unauthenticated'}.")
+
     except Exception as e:
         logger.error(f"WS: Error for user {user_id if user_id else 'unknown'}: {e}", exc_info=True)
         try:
-            if websocket.client_state == websocket.client_state.CONNECTED: await websocket.send_json({"type": "error", "payload": {"message": f"Error: {str(e)}"}})
-        except Exception as e_send: logger.error(f"WS: Could not send error to user {user_id if user_id else 'unknown'}: {e_send}")
+            if websocket.client_state == websocket.client_state.CONNECTED:
+                await websocket.send_json({
+                    "type": "error",
+                    "payload": {"message": f"Error: {str(e)}"}
+                })
+        except Exception as e_send:
+            logger.error(f"WS: Could not send error to user {user_id if user_id else 'unknown'}: {e_send}")
         try:
-            if websocket.client_state != websocket.client_state.DISCONNECTED: await websocket.close(code=1011)
-        except Exception as e_close: logger.error(f"WS: Error during forced close for user {user_id if user_id else 'unknown'}: {e_close}")
+            if websocket.client_state != websocket.client_state.DISCONNECTED:
+                await websocket.close(code=1011)
+        except Exception as e_close:
+            logger.error(f"WS: Error during forced close for user {user_id if user_id else 'unknown'}: {e_close}")
+
     finally:
-        if user_id and connection_ok: manager.disconnect(websocket, user_id); logger.info(f"WS: Ensured user {user_id} disconnected from ConnectionManager.")
-        elif user_id: logger.info(f"WS: User {user_id} (not fully registered) closing.")
-        else: logger.info("WS: Unauthenticated client closing.")
+        if user_id and connection_ok:
+            manager.disconnect(websocket, user_id)
+            logger.info(f"WS: Ensured user {user_id} disconnected from ConnectionManager.")
+        elif user_id:
+            logger.info(f"WS: User {user_id} (not fully registered) closing.")
+        else:
+            logger.info("WS: Unauthenticated client closing.")
 
 if __name__ == "__main__":
     try:

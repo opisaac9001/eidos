@@ -121,28 +121,82 @@ export function setupGlobalEventListeners() {
 
     if (DOM.systemPromptSave) {
         DOM.systemPromptSave.addEventListener('click', async () => {
-            if (DOM.systemPromptInput && typeof _setSystemPrompt === 'function') _setSystemPrompt(DOM.systemPromptInput.value.trim());
-            if (DOM.modelTemperatureInput && typeof _setModelTemp === 'function') { /* ... */ }
-            let llmChanged = false; if (DOM.llmProviderUrlInput && typeof _setLLMProviderUrl === 'function') { /* ... */ }
-            let apiChanged = false; if (DOM.apiUrlInput && typeof _setGlobalApiBaseUrl === 'function' && typeof _EIDOS_API_BASE_URL_GLOBAL === 'function') { /* ... */ }
-            if (DOM.apiKeyInput && typeof _setAPIKey === 'function') _setAPIKey(DOM.apiKeyInput.value.trim());
-            let userChanged = false; if (DOM.userIdInput && typeof _setCurrentUserId === 'function' && typeof _currentUserId === 'function') { /* ... */ }
-            let weatherChanged = false; if (DOM.weatherLocationInput && typeof _setWeatherLoc === 'function') { /* ... */ }
-            if (DOM.contextLengthInput && typeof _setContextLen === 'function') { /* ... */ }
-
+            if (DOM.systemPromptInput && typeof _setSystemPrompt === 'function') {
+                _setSystemPrompt(DOM.systemPromptInput.value.trim());
+            }
+    
+            if (DOM.modelTemperatureInput && typeof _setModelTemp === 'function') {
+                const temp = parseFloat(DOM.modelTemperatureInput.value);
+                if (!isNaN(temp)) _setModelTemp(temp);
+            }
+    
+            let llmChanged = false;
+            if (DOM.llmProviderUrlInput && typeof _setLLMProviderUrl === 'function') {
+                _setLLMProviderUrl(DOM.llmProviderUrlInput.value.trim());
+                llmChanged = true;
+            }
+    
+            let apiChanged = false;
+            if (DOM.apiUrlInput && typeof _setGlobalApiBaseUrl === 'function') {
+                _setGlobalApiBaseUrl(DOM.apiUrlInput.value.trim());
+                apiChanged = true;
+            }
+    
+            if (DOM.apiKeyInput && typeof _setAPIKey === 'function') {
+                _setAPIKey(DOM.apiKeyInput.value.trim());
+            }
+    
+            let userChanged = false;
+            if (DOM.userIdInput && typeof _setCurrentUserId === 'function') {
+                _setCurrentUserId(DOM.userIdInput.value.trim());
+                userChanged = true;
+            }
+    
+            let weatherChanged = false;
+            if (DOM.weatherLocationInput && typeof _setWeatherLoc === 'function') {
+                _setWeatherLoc(DOM.weatherLocationInput.value.trim());
+                weatherChanged = true;
+                window.weatherLocationChangedThisSession = true;
+            }
+    
+            if (DOM.contextLengthInput && typeof _setContextLen === 'function') {
+                const len = parseInt(DOM.contextLengthInput.value, 10);
+                if (!isNaN(len)) _setContextLen(len);
+            }
+    
             const settingsToSyncForBackend = [];
-            if (DOM.weatherLocationInput && DOM.weatherLocationInput.value.trim()) { settingsToSyncForBackend.push({ attribute_name: "preferred_location", attribute_value: DOM.weatherLocationInput.value.trim(), user_statement_context: "User set default weather location via GUI settings." }); }
-            if (DOM.systemPromptInput && DOM.systemPromptInput.value.trim()) { settingsToSyncForBackend.push({ attribute_name: "system_prompt_preference", attribute_value: DOM.systemPromptInput.value.trim(), user_statement_context: "User set system prompt preference via GUI settings." }); }
-
+            if (DOM.weatherLocationInput && DOM.weatherLocationInput.value.trim()) {
+                settingsToSyncForBackend.push({
+                    attribute_name: "preferred_location",
+                    attribute_value: DOM.weatherLocationInput.value.trim(),
+                    user_statement_context: "User set default weather location via GUI settings."
+                });
+            }
+            if (DOM.systemPromptInput && DOM.systemPromptInput.value.trim()) {
+                settingsToSyncForBackend.push({
+                    attribute_name: "system_prompt_preference",
+                    attribute_value: DOM.systemPromptInput.value.trim(),
+                    user_statement_context: "User set system prompt preference via GUI settings."
+                });
+            }
+    
             if (settingsToSyncForBackend.length > 0 && typeof _saveSettingsToBackend === 'function') {
                 const payload = { settings: settingsToSyncForBackend };
                 await _saveSettingsToBackend(payload);
             }
-
-            if (apiChanged || userChanged) { /* ... WebSocket reconnect logic ... */ }
-            if (llmChanged && typeof _fetchModels === 'function') _fetchModels();
-            if (weatherChanged && typeof _setupWeather === 'function') _setupWeather();
-
+    
+            if (apiChanged || userChanged) {
+                // TODO: Reconnect WebSocket if needed
+            }
+    
+            if (llmChanged && typeof _fetchModels === 'function') {
+                _fetchModels();
+            }
+    
+            if (weatherChanged && typeof _setupWeather === 'function') {
+                _setupWeather();
+            }
+    
             if (DOM.systemPromptPanel) DOM.systemPromptPanel.classList.remove('open');
             showNotification('Settings saved to browser. Backend sync initiated where applicable.', 'success');
         });

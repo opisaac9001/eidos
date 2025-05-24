@@ -159,11 +159,15 @@ VALID_PITCH_SPEED_VALUES = ["very_low", "low", "moderate", "high", "very_high"]
 VALID_GENDER_VALUES = ["female", "male"]
 
 class EidosTTSConfig(TypedDict, total=False):
-    api_url: str # URL of the SparkTTS API server (e.g., http://localhost:8000)
-    default_gender: Literal["female", "male"]
-    default_pitch_str: Literal["very_low", "low", "moderate", "high", "very_high"]
-    default_speed_str: Literal["very_low", "low", "moderate", "high", "very_high"]
+    api_url: str
+    api_key: Optional[str]
+    model_id: Optional[str]
+    voice_id: str
+    response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]
+    speed: Optional[float]
     timeout: int
+    lang_code: Optional[str] # New
+    normalization_options: Optional[Dict[str, bool]] # New
 
 
 # --- Main Config Class ---
@@ -403,30 +407,55 @@ class Config:
 
     # Eidos TTS Configuration (for external SparkTTS API server)
     EIDOS_TTS: Optional[EidosTTSConfig] = None
-    if os.getenv("SPARK_TTS_API_URL"):
-        default_gender = os.getenv("EIDOS_TTS_DEFAULT_GENDER", "female").lower()
-        default_pitch = os.getenv("EIDOS_TTS_DEFAULT_PITCH_STR", "moderate").lower()
-        default_speed = os.getenv("EIDOS_TTS_DEFAULT_SPEED_STR", "moderate").lower()
+    if os.getenv("KOKORO_TTS_API_URL"): # Check for new Kokoro URL
+        tts_speed_str = os.getenv("KOKORO_TTS_SPEED", "1.0")
+        try:
+            tts_speed = float(tts_speed_str)
+            if not (0.25 <= tts_speed <= 4.0):
+                print(f"Warning: KOKORO_TTS_SPEED '{tts_speed_str}' out of range (0.25-4.0). Defaulting to 1.0.")
+                tts_speed = 1.0
+        except ValueError:
+            print(f"Warning: Invalid KOKORO_TTS_SPEED '{tts_speed_str}'. Defaulting to 1.0.")
+            tts_speed = 1.0
 
-        if default_gender not in VALID_GENDER_VALUES:
-            print(f"Warning: Invalid EIDOS_TTS_DEFAULT_GENDER '{default_gender}'. Defaulting to 'female'. Valid: {VALID_GENDER_VALUES}")
-            default_gender = "female"
-        if default_pitch not in VALID_PITCH_SPEED_VALUES:
-            print(f"Warning: Invalid EIDOS_TTS_DEFAULT_PITCH_STR '{default_pitch}'. Defaulting to 'moderate'. Valid: {VALID_PITCH_SPEED_VALUES}")
-            default_pitch = "moderate"
-        if default_speed not in VALID_PITCH_SPEED_VALUES:
-            print(f"Warning: Invalid EIDOS_TTS_DEFAULT_SPEED_STR '{default_speed}'. Defaulting to 'moderate'. Valid: {VALID_PITCH_SPEED_VALUES}")
-            default_speed = "moderate"
+        response_format_val = os.getenv("KOKORO_TTS_RESPONSE_FORMAT", "wav").lower()
+        if response_format_val not in ["mp3", "opus", "aac", "flac", "wav", "pcm"]:
+            print(f"Warning: Invalid KOKORO_TTS_RESPONSE_FORMAT '{response_format_val}'. Defaulting to 'wav'.")
+            response_format_val = "wav"
+
+        normalization_options_json = os.getenv("KOKORO_TTS_NORMALIZATION_OPTIONS")
+        normalization_options_dict = { # <<< START WITH THE DEFAULT OBJECT
+            "normalize": True,
+            "unit_normalization": False,
+            "url_normalization": True,
+            "email_normalization": True,
+            "optional_pluralization_normalization": True,
+            "phone_normalization": True
+        }
+        if normalization_options_json:
+            try:
+                loaded_options = json.loads(normalization_options_json)
+                if isinstance(loaded_options, dict): # Basic check
+                    normalization_options_dict = loaded_options # Override with .env if valid
+                else:
+                    print(f"Warning: KOKORO_TTS_NORMALIZATION_OPTIONS in .env is not a valid JSON object. Using defaults.")
+            except json.JSONDecodeError:
+                print(f"Warning: Invalid JSON for KOKORO_TTS_NORMALIZATION_OPTIONS. Using defaults.")
 
         EIDOS_TTS = {
-            "api_url": os.environ["SPARK_TTS_API_URL"],
-            "default_gender": default_gender, # type: ignore
-            "default_pitch_str": default_pitch, # type: ignore
-            "default_speed_str": default_speed, # type: ignore
-            "timeout": int(os.getenv("EIDOS_TTS_TIMEOUT", 90))
+            "api_url": os.environ["KOKORO_TTS_API_URL"],
+            "api_key": os.getenv("KOKORO_TTS_API_KEY"),
+            "model_id": os.getenv("KOKORO_TTS_MODEL_ID", "kokoro"),
+            "voice_id": os.getenv("KOKORO_TTS_VOICE_ID"), 
+            "response_format": response_format_val, # type: ignore
+            "speed": tts_speed,
+            "timeout": int(os.getenv("KOKORO_TTS_TIMEOUT", 60)),
+            "lang_code": os.getenv("KOKORO_TTS_LANG_CODE", "en-US"),
+            "normalization_options": normalization_options_dict # <<< NOW SENDS THE OBJECT
         }
-    else:
-        print("Info: SPARK_TTS_API_URL not set. External TTS service will be unavailable.")
+        if not EIDOS_TTS.get("voice_id"):
+            print("CRITICAL WARNING: KOKORO_TTS_VOICE_ID is not set in .env. TTS will likely fail.")
+        print(f"Kokoro TTS Service Configured: URL='{EIDOS_TTS['api_url']}', Model='{EIDOS_TTS.get('model_id')}', Voice='{EIDOS_TTS.get('voice_id')}'")
 
 
     # System Behavior
