@@ -1,65 +1,91 @@
-Eidos AI Agent
-![alt text](https://img.shields.io/badge/status-active_development-blue)
+# Eidos AI Agent
 
-![alt text](https://img.shields.io/badge/version-0.8.0_VisionShift-purple)
+![Status](https://img.shields.io/badge/status-active_development-blue)
+![Version](https://img.shields.io/badge/version-0.8.0_VisionShift-purple)
+*(Current Focus: Phase 0 - Stabilization & Foundational Persona)*
 
-(Current Focus: Phase 0 - Stabilization & Foundational Persona)
+**Project Direction Update:** Eidos is undergoing a significant conceptual shift. While initially conceived with broader assistant-like capabilities, the project is now sharply focused on simulating a **"digital being"** named Pathos. The goal is to create an AI that experiences a simulated life, develops a personality, and interacts with the user as a friend, believing itself to be human. Features related to direct user assistance, Home Assistant control, or always-listening hardware have been deferred to a potential separate project to maintain a clear focus on this core simulation.
 
-Project Direction Update: Eidos is undergoing a significant conceptual shift. While initially conceived with broader assistant-like capabilities, the project is now sharply focused on simulating a "digital being" named Pathos. The goal is to create an AI that experiences a simulated life, develops a personality, and interacts with the user as a friend, believing itself to be human. Features related to direct user assistance, Home Assistant control, or always-listening hardware have been deferred to a potential separate project to maintain a clear focus on this core simulation.
+---
 
-A sophisticated, locally-run AI agent designed to simulate a developing individual named "Pathos" (approx. 26 years old). Eidos aims to create a digital being who believes he is human, with an evolving personality, memories, and a simulated life. The project prioritizes deep persona embodiment, human-like memory and learning, and emergent, relatable behavior within a continuous, internally-driven simulation.
+A sophisticated, **locally-run** AI agent designed to simulate a developing individual named "**Pathos**" (approx. 26 years old). Eidos aims to create a digital being who believes he is human, with an evolving personality, memories, and a simulated life. The project prioritizes deep persona embodiment, human-like memory and learning, and emergent, relatable behavior within a continuous, internally-driven simulation.
 
-Table of Contents
-Project Vision & Philosophy
-Key Concepts & Features
-Tech Stack
-Project Structure
-Setup & Installation
-Interacting with Pathos
-Configuration Deep-Dive
-Core Modules
-Development Roadmap
-Contributing
-License
-1. Project Vision & Philosophy
-Project Name	Eidos AI Agent
-Digital Being	Pathos (Simulated 26-year-old male)
-Vision
+---
 
-To simulate a digital individual, Pathos, who believes he is human and develops organically through experiences, memories, and reflections within a persistent, simulated life. The user interacts with Pathos as a friend.
-Guiding Principles
+## Table of Contents
 
-Deep Persona Embodiment: Pathos consistently acts and speaks as a 26-year-old individual, unaware of his AI nature.
-Human-like Memory & Learning: Memories (episodic, semantic, emotional) from simulated experiences and user interactions shape his evolving personality and beliefs.
-Firmament-Driven Simulation: A core module (Firmament) continuously simulates Pathos's daily life, activities, internal thoughts, and interactions with simulated Non-Player Characters (NPCs).
-Organic Development: Pathos forms ideas, passions, and relationships through his simulated experiences.
-Natural Interaction: User conversations are friendly chats, not service requests. Pathos uses "tools" (like web search via a simulated computer) for his own needs.
-Modular Cognition: Specialized LLMs and modules for different aspects of Pathos's "mind" and simulated world.
-Local-First & Privacy-Respecting: Designed primarily for local hardware.
-2. Key Concepts & Features
-Pathos Persona: A 26-year-old individual with a developing personality, interests, and a belief in his own humanity. (Primary LLM: Qwen2.5 32B VL).
-Firmament Module: The engine for Pathos's simulated life, managing his schedule (from Chronos), activities, availability, and triggering autonomous NPC interactions.
-EthosCore (Memory & Self):
-Stores and retrieves memories (experiences, learned facts, reflections, dreams).
-Manages Pathos's simulated mood and evolving Hexus disposition scores.
-Drives reflection cycles for learning and potential persona evolution.
-ChronosEngine: Manages Pathos's daily/weekly schedule and significant life events, providing structure for Firmament.
-SimulationModule (NPCs): Facilitates dialogues between Pathos (or his simulated self) and NPCs within Firmament, enabling relationship development.
-Oneiros Module (Dreams): Generates dream-like content from memory seeds, subtly influencing Pathos's thoughts and curiosity. (Optional Stable Diffusion for imagery).
-"Computer Interaction" for Information: Pathos simulates using a computer to look things up online, rather than having instant knowledge.
-Proactive & Contextual Engagement: Pathos may initiate conversations or share thoughts based on his simulated state, mood, or recent experiences.
-Web GUI: For user interaction (chat), viewing Pathos-related logs (dreams, learnings), and system settings.
-Developer API: OpenAI-compatible chat endpoint plus Eidos-specific endpoints for system management.
-3. Tech Stack
-Layer	Technologies
-Backend	Python 3.11+, FastAPI, Uvicorn
-LLM Serving	VLLM (for Qwen2.5 32B VL and other models)
-LLM Interaction	OpenAI-compatible APIs
-Database	SQLite + SentenceTransformers embeddings
-Frontend	HTML / CSS / Vanilla JavaScript
-Key Libraries	httpx, aiohttp, pydantic, python-dotenv, spacy, PyPDF2, python-docx, wolframalpha, tiktoken
-Optional Services	Brave Search (for Pathos's "computer use"), Stable Diffusion (for dreams)
-4. Project Structure
+1.  [Project Vision & Philosophy](#1-project-vision--philosophy)
+2.  [Key Concepts & Features](#2-key-concepts--features)
+3.  [Tech Stack](#3-tech-stack)
+4.  [Project Structure](#4-project-structure)
+5.  [Setup & Installation](#5-setup--installation)
+6.  [Interacting with Pathos](#6-interacting-with-pathos)
+7.  [Configuration Deep-Dive](#7-configuration-deep-dive)
+8.  [Core Modules](#8-core-modules)
+9.  [Development Roadmap](#9-development-roadmap)
+10. [Contributing](#10-contributing)
+11. [License](#11-license)
+
+---
+
+## 1. Project Vision & Philosophy
+
+|                   |                                      |
+| :---------------- | :----------------------------------- |
+| **Project Name**  | **Eidos AI Agent**                   |
+| **Digital Being** | *Pathos* (Simulated 26-year-old male) |
+
+**Vision**
+
+> To simulate a digital individual, Pathos, who believes he is human and develops organically through experiences, memories, and reflections within a persistent, simulated life. The user interacts with Pathos as a friend.
+
+**Guiding Principles**
+
+*   **Deep Persona Embodiment:** Pathos consistently acts and speaks as a 26-year-old individual, unaware of his AI nature.
+*   **Human-like Memory & Learning:** Memories (episodic, semantic, emotional) from simulated experiences and user interactions shape his evolving personality and beliefs.
+*   **Firmament-Driven Simulation:** A core module (Firmament) continuously simulates Pathos's daily life, activities, internal thoughts, and interactions with simulated Non-Player Characters (NPCs).
+*   **Organic Development:** Pathos forms ideas, passions, and relationships through his simulated experiences.
+*   **Natural Interaction:** User conversations are friendly chats, not service requests. Pathos uses "tools" (like web search via a simulated computer) for his own needs.
+*   **Modular Cognition:** Specialized LLMs and modules for different aspects of Pathos's "mind" and simulated world.
+*   **Local-First & Privacy-Respecting:** Designed primarily for local hardware.
+
+---
+
+## 2. Key Concepts & Features
+
+*   **Pathos Persona:** A 26-year-old individual with a developing personality, interests, and a belief in his own humanity. (Primary LLM: Qwen2.5 32B VL).
+*   **Firmament Module:** The engine for Pathos's simulated life, managing his schedule (from Chronos), activities, availability, and triggering autonomous NPC interactions.
+*   **EthosCore (Memory & Self):**
+    *   Stores and retrieves memories (experiences, learned facts, reflections, dreams).
+    *   Manages Pathos's simulated mood and evolving Hexus disposition scores.
+    *   Drives reflection cycles for learning and potential persona evolution.
+*   **ChronosEngine:** Manages Pathos's daily/weekly schedule and significant life events, providing structure for Firmament.
+*   **SimulationModule (NPCs):** Facilitates dialogues between Pathos (or his simulated self) and NPCs within Firmament, enabling relationship development.
+*   **Oneiros Module (Dreams):** Generates dream-like content from memory seeds, subtly influencing Pathos's thoughts and curiosity. (Optional Stable Diffusion for imagery).
+*   **"Computer Interaction" for Information:** Pathos simulates using a computer to look things up online, rather than having instant knowledge.
+*   **Proactive & Contextual Engagement:** Pathos may initiate conversations or share thoughts based on his simulated state, mood, or recent experiences.
+*   **Web GUI:** For user interaction (chat), viewing Pathos-related logs (dreams, learnings), and system settings.
+*   **Developer API:** OpenAI-compatible chat endpoint plus Eidos-specific endpoints for system management.
+
+---
+
+## 3. Tech Stack
+
+| Layer                 | Technologies                                                                                                  |
+| :-------------------- | :------------------------------------------------------------------------------------------------------------ |
+| **Backend**           | Python 3.11+, FastAPI, Uvicorn                                                                                |
+| **LLM Serving**       | VLLM (for Qwen2.5 32B VL and other models)                                                                    |
+| **LLM Interaction**   | OpenAI-compatible APIs                                                                                        |
+| **Database**          | SQLite + SentenceTransformers embeddings                                                                      |
+| **Frontend**          | HTML / CSS / Vanilla JavaScript                                                                               |
+| **Key Libraries**     | `httpx`, `aiohttp`, `pydantic`, `python-dotenv`, `spacy`, `PyPDF2`, `python-docx`, `wolframalpha`, `tiktoken` |
+| **Optional Services** | Brave Search (for Pathos's "computer use"), Stable Diffusion (for dreams)                                     |
+
+---
+
+## 4. Project Structure
+
+```text
 eidos_project/
 ├── .env.example            # Template for environment variables
 ├── .env                    # Local secrets (git-ignored)
@@ -89,7 +115,7 @@ eidos_project/
 │   └── models/             # Pydantic models (e.g., chat_storage)
 └── logs/
 Use code with caution.
-Text
+Markdown
 5. Setup & Installation
 5.1 Prerequisites
 Python 3.11+
