@@ -34,6 +34,14 @@ let isPlayingFromQueue = false;
 let currentAudio = null; // Holds the current Audio object
 let currentPlayingMessageBubble = null; // Tracks the bubble for the current audio's indicator
 
+// --- Encapsulated TTS State ---
+let currentlyPlayingMainChatTTS = false; // MODULE-SCOPED VARIABLE
+
+export function isCurrentlyPlayingMainChatTTS() { 
+    return currentlyPlayingMainChatTTS; 
+}
+// --- End Encapsulated TTS State ---
+
 export function getLatestAIMessageBubbleForTTS() {
     if (!chatMessagesArea) return null;
     const aiMessages = chatMessagesArea.querySelectorAll('.message-bubble.ai-message');
@@ -65,39 +73,36 @@ export function addAudioUrlToTTSQueue(audioUrl, sequence, textForIndicator, mess
 }
 
 export function playNextInTTSQueueIfIdle() {
+    console.log(`DEBUG: playNextInTTSQueueIfIdle called. isPlayingFromQueue: ${isPlayingFromQueue}, queueLength: ${ttsPlaybackQueue.length}, currentlyPlayingMainChatTTS: ${currentlyPlayingMainChatTTS}`);
     if (!isPlayingFromQueue && ttsPlaybackQueue.length > 0) {
-        console.log("playNextInTTSQueueIfIdle: Queue is idle and has items. Starting playback.");
+        console.log("DEBUG: playNextInTTSQueueIfIdle: Conditions met, calling playNextInQueue().");
         playNextInQueue();
     } else if (isPlayingFromQueue) {
-        console.log("playNextInTTSQueueIfIdle: Queue is already playing.");
+        console.log("DEBUG: playNextInTTSQueueIfIdle: Already playing or about to start.");
     } else {
-        console.log("playNextInTTSQueueIfIdle: Queue is empty.");
-        window.currentlyPlayingMainChatTTS = false; // Ensure flag is reset if queue is empty when checked
+        console.log("DEBUG: playNextInTTSQueueIfIdle: Queue is empty and not playing. (No change to currentlyPlayingMainChatTTS here)");
     }
 }
 
 async function playNextInQueue() {
     if (isPlayingFromQueue || ttsPlaybackQueue.length === 0) {
-        if (ttsPlaybackQueue.length === 0) {
-            isPlayingFromQueue = false;
-            window.currentlyPlayingMainChatTTS = false;
-            console.log("playNextInQueue: Queue empty, isPlayingFromQueue=false, currentlyPlayingMainChatTTS=false");
+        if (ttsPlaybackQueue.length === 0 && !isPlayingFromQueue) {
+            console.log("DEBUG: playNextInQueue: Queue empty AND not playing. Setting currentlyPlayingMainChatTTS = false.");
+            currentlyPlayingMainChatTTS = false; 
         }
         return;
     }
     isPlayingFromQueue = true;
-    // Set global flag if this item is for main chat
-    if (ttsPlaybackQueue[0] && ttsPlaybackQueue[0].audioSrc && ttsPlaybackQueue[0].audioSrc.includes("/chat_tts_")) {
-        window.currentlyPlayingMainChatTTS = true;
-    }
-
-
     const itemToPlay = ttsPlaybackQueue.shift();
+
+    if (itemToPlay && itemToPlay.audioSrc && (itemToPlay.audioSrc.includes("/chat_tts_") || itemToPlay.audioSrc.includes("/proactive_tts_"))) {
+        console.log("DEBUG: playNextInQueue: Starting a MAIN/PROACTIVE audio item. Setting currentlyPlayingMainChatTTS = true.");
+        currentlyPlayingMainChatTTS = true;
+    }
 
     if (!itemToPlay || !itemToPlay.audioSrc || typeof itemToPlay.text === 'undefined') {
         console.error("playNextInQueue: Invalid item in TTS queue.", itemToPlay);
         isPlayingFromQueue = false;
-        if (ttsPlaybackQueue.length === 0) window.currentlyPlayingMainChatTTS = false;
         playNextInTTSQueueIfIdle(); // Try next item or reset state
         return;
     }
@@ -105,7 +110,6 @@ async function playNextInQueue() {
     const { audioSrc, text, messageBubble, sequence } = itemToPlay;
     
     currentPlayingMessageBubble = (messageBubble && document.body.contains(messageBubble)) ? messageBubble : null;
-    // Attempt to find a suitable bubble if the one passed is invalid, especially for main chat audio
     if (!currentPlayingMessageBubble && audioSrc.includes("/chat_tts_")) { 
         const latestAiBubble = getLatestAIMessageBubbleForTTS ? getLatestAIMessageBubbleForTTS() : null;
         if (latestAiBubble && latestAiBubble.dataset.ttsExpected === 'true') {
@@ -157,7 +161,15 @@ async function playNextInQueue() {
                 if (currentPlayingMessageBubble) currentPlayingMessageBubble.classList.remove('currently-streaming-tts');
                 currentPlayingMessageBubble = null;
                 isPlayingFromQueue = false;
-                if (ttsPlaybackQueue.length === 0) window.currentlyPlayingMainChatTTS = false;
+                if (audioSrc && (audioSrc.includes("/chat_tts_") || audioSrc.includes("/proactive_tts_"))) {
+                    const hasMoreMainOrProactiveAudio = ttsPlaybackQueue.some(
+                        item => item.audioSrc.includes("/chat_tts_") || item.audioSrc.includes("/proactive_tts_")
+                    );
+                    if (!hasMoreMainOrProactiveAudio) {
+                        console.log("DEBUG: playNextInQueue.onerror/catch: No more main/proactive chat items in queue. Setting currentlyPlayingMainChatTTS = false.");
+                        currentlyPlayingMainChatTTS = false;
+                    }
+                }
                 currentAudio = null; 
                 playNextInTTSQueueIfIdle(); 
             });
@@ -170,6 +182,18 @@ async function playNextInQueue() {
             if (currentPlayingMessageBubble) currentPlayingMessageBubble.classList.remove('currently-streaming-tts');
             currentPlayingMessageBubble = null;
             isPlayingFromQueue = false;
+
+            if (audioSrc.includes("/chat_tts_") || audioSrc.includes("/proactive_tts_")) {
+                const hasMoreMainOrProactiveAudio = ttsPlaybackQueue.some(
+                    item => item.audioSrc.includes("/chat_tts_") || item.audioSrc.includes("/proactive_tts_")
+                );
+                if (!hasMoreMainOrProactiveAudio) {
+                    console.log("DEBUG: playNextInQueue.onended: No more main/proactive chat items in queue. Setting currentlyPlayingMainChatTTS = false.");
+                    currentlyPlayingMainChatTTS = false;
+                } else {
+                    console.log("DEBUG: playNextInQueue.onended: More main/proactive chat items in queue. currentlyPlayingMainChatTTS remains true.");
+                }
+            }
             playNextInTTSQueueIfIdle(); 
         };
         currentAudio.onerror = (e) => {
@@ -181,7 +205,15 @@ async function playNextInQueue() {
             if (currentPlayingMessageBubble) currentPlayingMessageBubble.classList.remove('currently-streaming-tts');
             currentPlayingMessageBubble = null;
             isPlayingFromQueue = false;
-            if (ttsPlaybackQueue.length === 0) window.currentlyPlayingMainChatTTS = false;
+            if (audioSrc && (audioSrc.includes("/chat_tts_") || audioSrc.includes("/proactive_tts_"))) {
+                const hasMoreMainOrProactiveAudio = ttsPlaybackQueue.some(
+                    item => item.audioSrc.includes("/chat_tts_") || item.audioSrc.includes("/proactive_tts_")
+                );
+                if (!hasMoreMainOrProactiveAudio) {
+                    console.log("DEBUG: playNextInQueue.onerror: No more main/proactive chat items in queue. Setting currentlyPlayingMainChatTTS = false.");
+                    currentlyPlayingMainChatTTS = false;
+                }
+            }
             playNextInTTSQueueIfIdle();
         };
     } catch (error) { 
@@ -191,13 +223,21 @@ async function playNextInQueue() {
         if (currentPlayingMessageBubble) currentPlayingMessageBubble.classList.remove('currently-streaming-tts');
         currentPlayingMessageBubble = null;
         isPlayingFromQueue = false;
-        if (ttsPlaybackQueue.length === 0) window.currentlyPlayingMainChatTTS = false;
+        if (audioSrc && (audioSrc.includes("/chat_tts_") || audioSrc.includes("/proactive_tts_"))) {
+            const hasMoreMainOrProactiveAudio = ttsPlaybackQueue.some(
+                item => item.audioSrc.includes("/chat_tts_") || item.audioSrc.includes("/proactive_tts_")
+            );
+            if (!hasMoreMainOrProactiveAudio) {
+                console.log("DEBUG: playNextInQueue.catch: No more main/proactive chat items in queue. Setting currentlyPlayingMainChatTTS = false.");
+                currentlyPlayingMainChatTTS = false;
+            }
+        }
         playNextInTTSQueueIfIdle();
     }
 }
 
 export function stopAndClearTTSQueue() {
-    console.log("stopAndClearTTSQueue called.");
+    console.log("DEBUG: stopAndClearTTSQueue CALLED.");
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.onended = null; 
@@ -210,14 +250,14 @@ export function stopAndClearTTSQueue() {
     }
     ttsPlaybackQueue = [];
     isPlayingFromQueue = false;
-    window.currentlyPlayingMainChatTTS = false; 
+    currentlyPlayingMainChatTTS = false; 
     if (currentPlayingMessageBubble) {
         const indicator = currentPlayingMessageBubble.querySelector('.tts-status-indicator');
         if (indicator) indicator.textContent = '';
         currentPlayingMessageBubble.classList.remove('currently-streaming-tts');
     }
     currentPlayingMessageBubble = null;
-    console.log("TTS queue cleared and current playback stopped.");
+    console.log("DEBUG: TTS queue cleared and current playback stopped. currentlyPlayingMainChatTTS is now false.");
 }
 
 export function displayMessage(sender, content, metadata = null) {
@@ -316,7 +356,7 @@ export function displayMessage(sender, content, metadata = null) {
         footerInfoDiv.classList.add('message-footer-info');
         let footerParts = [];
         if (metadata.usage && (metadata.usage.prompt_tokens || metadata.usage.completion_tokens || metadata.usage.estimated_prompt_tokens)) {
-            const pTokens = metadata.usage.prompt_tokens || metadata.usage.estimated_prompt_tokens || 'N/A';
+            const pTokens = metadata.usage.prompt_tokens || metadata.estimated_prompt_tokens || 'N/A';
             const cTokens = metadata.usage.completion_tokens || 'N/A';
             footerParts.push(`Tokens: P ${pTokens} / C ${cTokens}`);
         }
@@ -363,8 +403,8 @@ export function displayMessage(sender, content, metadata = null) {
     }
 
     if (shouldStartTTSForThisBubble && typeof playNextInTTSQueueIfIdle === 'function') {
-        console.log("displayMessage: AI message bubble added, autoTtsEnabled. Triggering playNextInTTSQueueIfIdle.");
-        window.currentlyPlayingMainChatTTS = true; // Set flag as we are initiating for main chat
+        console.log("DEBUG: displayMessage: AI message bubble added, autoTtsEnabled. Setting currentlyPlayingMainChatTTS=true and triggering playNextInTTSQueueIfIdle.");
+        currentlyPlayingMainChatTTS = true;
         setTimeout(() => playNextInTTSQueueIfIdle(), 50); 
     }
     return messageBubble;
@@ -510,8 +550,8 @@ export function displayProactiveMessageInPanel(messageContent, metadata = null) 
                             }
                         });
                         if (window.autoTtsEnabled && typeof playNextInTTSQueueIfIdle === 'function') {
-                            console.log("Proactive Click: Triggering playback from queue because autoTtsEnabled is true.");
-                            window.currentlyPlayingMainChatTTS = true; // Proactive audio is now main focus
+                            console.log("Proactive Click: Setting currentlyPlayingMainChatTTS=true and calling playNextInTTSQueueIfIdle.");
+                            currentlyPlayingMainChatTTS = true;
                             playNextInTTSQueueIfIdle();
                         }
                     }

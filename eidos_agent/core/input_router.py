@@ -53,13 +53,18 @@ class InputRouter:
         try:
             if input_type == 'text' or input_type == 'multimodal_input':
                 logger.debug(f"--> Routing '{input_type}' input to PathosInterface.")
-                conversation_history = metadata_from_extraction.get('conversation_history', [])
+                # conversation_history is already part of metadata_from_extraction
+                # Ensure it's passed within request_metadata
+                
+                # The metadata_from_extraction already contains 'conversation_history'
+                # from the extract_input_to_eidos_format function.
+                # We just need to pass this directly.
+                
                 response_from_pathos = await self.pathos_interface.generate_response(
                     user_input=text_content,
-                    conversation_history=conversation_history,
                     image_data_b64=image_content_b64,
                     document_text=document_text,
-                    request_metadata=metadata_from_extraction # This contains the overrides
+                    request_metadata=metadata_from_extraction # This already contains conversation_history
                 )
 
                 logger.debug("<-- Exiting Pathos routing block.")

@@ -4,7 +4,8 @@ import {
     EIDOS_API_KEY_KEY,
     LLM_PROVIDER_URL_KEY,
     SELECTED_MODEL_KEY,
-    WEATHER_LOCATION_KEY
+    WEATHER_LOCATION_KEY,
+    EIDOS_ADMIN_PASSWORD_KEY // NEW: Import admin password key
 } from './config.js';
 
 import * as DOM from './dom_elements.js'; 
@@ -26,6 +27,7 @@ let _hideAttachedDocumentIndicatorFunc;
 let _expandChatInterfaceFunc;
 let _scrollToBottomFunc;
 let _chatMessagesAreaFromMain; // This is the actual DOM element from main.js
+let _fetchPathosChronosDataFunc; // To refresh Chronos panel
 
 export function setApiCommsDependencies(dependencies) {
     _displayMessageInChatFunc = dependencies.displayMessageInChat;
@@ -34,6 +36,7 @@ export function setApiCommsDependencies(dependencies) {
     _expandChatInterfaceFunc = dependencies.expandChatInterface;
     _scrollToBottomFunc = dependencies.scrollToBottom;
     _chatMessagesAreaFromMain = dependencies.chatMessagesArea;
+    _fetchPathosChronosDataFunc = dependencies.fetchPathosChronosData; // Get the function
 }
 
 // --- Model Fetching and Selection ---
@@ -339,34 +342,196 @@ export async function sendMessage(forceSearchPrefix = "") {
 
 // --- Document and Image Upload API Calls ---
 export async function handleDocumentUploadAPI(file) {
-    // ... (implementation as before, ensure window.EIDOS_API_BASE_URL and window.currentUserId are used)
-    if (!DOM.uploadDocumentButton || !DOM.documentInput) return;
-    const maxSizeInMB = 50; const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
-    if (file.size > maxSizeInBytes) { showNotification(`File too large: ${maxSizeInMB}MB max`, 'error'); DOM.documentInput.value = ''; return; }
-    const formData = new FormData(); formData.append('file', file);
-    DOM.uploadDocumentButton.disabled = true; showNotification(`Uploading "${file.name}"...`, 'info');
+    console.log(`Processing document upload for: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    
+    // Validate required DOM elements
+    if (!DOM.uploadDocumentButton) {
+        console.error('uploadDocumentButton DOM element not found');
+        showNotification('Error: Document upload button not found', 'error');
+        return;
+    }
+    
+    // Check if we have a user ID
+    if (!window.currentUserId) {
+        console.error('No user ID available for document upload');
+        showNotification('Error: User ID not available for upload', 'error');
+        return;
+    }
+    
+    // Check file size
+    const maxSizeInMB = 50;
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+        showNotification(`File too large: ${maxSizeInMB}MB max`, 'error');
+        if (DOM.documentInput) DOM.documentInput.value = '';
+        return;
+    }
+    
+    // Validate file type
+    const validDocTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    let isValidDoc = validDocTypes.includes(file.type);
+    
+    // If MIME type check fails, check extension as fallback
+    if (!isValidDoc && /\.(pdf|docx|txt)$/i.test(file.name)) {
+        console.log(`Document MIME type not recognized (${file.type}), but extension looks valid`);
+        isValidDoc = true;
+    }
+    
+    if (!isValidDoc) {
+        showNotification('Unsupported document format. Please use PDF, DOCX, or TXT.', 'error');
+        if (DOM.documentInput) DOM.documentInput.value = '';
+        return;
+    }
+    
+    // Prepare form data and start upload
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Disable button and show loading state
+    DOM.uploadDocumentButton.disabled = true;
+    showNotification(`Uploading "${file.name}"...`, 'info');
+    
     try {
-        const response = await fetch(`${window.EIDOS_API_BASE_URL}/documents/upload`, { method: 'POST', headers: { 'X-User-Id': window.currentUserId }, body: formData });
+        console.log(`Sending document to ${window.EIDOS_API_BASE_URL}/documents/upload with user ID: ${window.currentUserId}`);
+        
+        const response = await fetch(`${window.EIDOS_API_BASE_URL}/documents/upload`, {
+            method: 'POST',
+            headers: {
+                'X-User-Id': window.currentUserId
+            },
+            body: formData
+        });
+        
+        console.log(`Upload response status: ${response.status}`);
+        
+        if (!response.ok) {
+            console.error(`API returned error status: ${response.status}`);
+            showNotification(`Upload failed with status ${response.status}`, 'error');
+            return;
+        }
+        
         const result = await response.json();
-        if (response.ok && result.success && result.extracted_text) {
-            window.attachedDocumentText = result.extracted_text; window.attachedDocumentName = file.name;
-            if (typeof window.showAttachedDocumentIndicator === 'function') window.showAttachedDocumentIndicator(file.name);
+        console.log('Upload response:', result);
+        
+        if (result.success && result.extracted_text) {
+            // Store document info in window for use in the next message
+            window.attachedDocumentText = result.extracted_text;
+            window.attachedDocumentName = file.name;
+            
+            // Show visual indicator in the UI
+            if (typeof window.showAttachedDocumentIndicator === 'function') {
+                window.showAttachedDocumentIndicator(file.name);
+            } else {
+                console.warn('showAttachedDocumentIndicator function not available');
+            }
+            
             showNotification(`"${file.name}" processed. Attached to next message.`, 'success');
-        } else { showNotification(`Upload failed: ${result.message || result.detail || "Unknown error"}`, 'error'); console.error("Doc Upload Error:", result); }
-    } catch (e) { console.error("Error uploading doc:", e); showNotification(`Error uploading: ${e.message}`, 'error');
-    } finally { DOM.documentInput.value = ''; DOM.uploadDocumentButton.disabled = false; }
+        } else {
+            showNotification(`Upload failed: ${result.message || result.detail || "Unknown error"}`, 'error');
+            console.error("Document Upload Error:", result);
+        }
+    } catch (error) {
+        console.error("Error uploading document:", error);
+        showNotification(`Error uploading: ${error.message || "Network or server error"}`, 'error');
+    } finally {
+        // Reset input and button state
+        if (DOM.documentInput) DOM.documentInput.value = '';
+        DOM.uploadDocumentButton.disabled = false;
+    }
 }
 
 export function handleImageUploadClientSide(file) {
-    // ... (implementation as before)
-     if (!DOM.imageInput) return;
-     const reader = new FileReader();
-     reader.onload = function(e) {
-         DOM.imageInput.dataset.attachedImageBase64 = e.target.result.split(',')[1];
-         showNotification(`Image "${file.name}" attached.`, 'info');
-     };
-     reader.onerror = function() { showNotification('Error reading image.', 'error'); };
-     reader.readAsDataURL(file);
+    console.log(`Processing image upload for: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    
+    if (!DOM.imageInput) {
+        console.error('imageInput DOM element not found');
+        showNotification('Error: Image upload component not found', 'error');
+        return;
+    }
+    
+    // Check file size (limit to 10MB)
+    const maxSizeMB = 10;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+        showNotification(`Image too large (max ${maxSizeMB}MB). Please use a smaller image.`, 'error');
+        return;
+    }
+    
+    // Validate image type
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+    let isValidImage = validImageTypes.includes(file.type);
+    
+    // If MIME type check fails, check extension as fallback
+    if (!isValidImage && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(file.name)) {
+        console.log(`Image MIME type not recognized (${file.type}), but extension looks valid`);
+        isValidImage = true;
+    }
+    
+    if (!isValidImage) {
+        showNotification('Unsupported image format. Please use JPG, PNG, GIF, BMP, or WebP.', 'error');
+        return;
+    }
+    
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            // Store the base64 data (without the data URL prefix)
+            const base64Data = e.target.result.split(',')[1];
+            DOM.imageInput.dataset.attachedImageBase64 = base64Data;
+            console.log(`Image loaded successfully: ${file.name} (${Math.round(base64Data.length / 1024)} KB in base64)`);
+            
+            showNotification(`Image "${file.name}" attached. It will be sent with your next message.`, 'info');
+            
+            // Create or update preview
+            let preview = document.getElementById('image-upload-preview');
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.id = 'image-upload-preview';
+                preview.style.margin = '10px 0';
+                preview.style.textAlign = 'center';
+                
+                // Find the right place to insert the preview
+                if (DOM.inputContainer && DOM.inputContainer.parentNode) {
+                    DOM.inputContainer.parentNode.insertBefore(preview, DOM.inputContainer.nextSibling);
+                } else {
+                    console.warn('Could not find optimal position for image preview, appending to body');
+                    document.body.appendChild(preview);
+                }
+            }
+            
+            // Add a remove button to the preview
+            preview.innerHTML = `
+                <div style="position: relative; display: inline-block;">
+                    <img src="${e.target.result}" alt="Image preview" 
+                         style="max-width: 200px; max-height: 120px; border-radius: 6px; box-shadow: 0 2px 8px #0003; margin-bottom: 4px; display: block;" />
+                    <button class="remove-image-button" style="position: absolute; top: -8px; right: -8px; background: #ff4757; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">×</button>
+                </div>
+                <div style='color:#aaa;font-size:0.9em;'>Image will be sent with your next message.</div>
+            `;
+            
+            // Add click handler to remove button
+            const removeButton = preview.querySelector('.remove-image-button');
+            if (removeButton) {
+                removeButton.addEventListener('click', function() {
+                    delete DOM.imageInput.dataset.attachedImageBase64;
+                    preview.remove();
+                    showNotification('Image attachment removed', 'info');
+                });
+            }
+        } catch (error) {
+            console.error('Error processing image:', error);
+            showNotification('Error processing image. Please try again.', 'error');
+        }
+    };
+    
+    reader.onerror = function(error) {
+        console.error('FileReader error:', error);
+        showNotification('Error reading image file. Please try again.', 'error');
+    };
+    
+    // Start reading the file
+    reader.readAsDataURL(file);
 }
 
 // --- Other API Calls (Settings, Memory Clear, Weather) ---
@@ -427,7 +592,6 @@ export async function fetchWeatherAPI(location) {
 }
 
 // --- WebSocket Connection ---
-// connectWebSocket is now more robust and handles deriving URL from window.EIDOS_API_BASE_URL
 export function connectWebSocket() {
     const currentApiBaseUrl = window.EIDOS_API_BASE_URL; // From main.js global
     if (!currentApiBaseUrl) {
@@ -513,4 +677,63 @@ export function connectWebSocket() {
     }
 }
 
-console.log("api_comms.js loaded.");
+// NEW FUNCTION to add Pathos event
+export async function addPathosEventAPI(eventData) {
+    const currentApiBaseUrl = window.EIDOS_API_BASE_URL;
+    if (!currentApiBaseUrl) {
+        showNotification("Eidos API Base URL is not set. Cannot save event.", "error");
+        return false;
+    }
+
+    const adminPassword = localStorage.getItem(EIDOS_ADMIN_PASSWORD_KEY) || ""; // Get from localStorage
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-User-Id': window.currentUserId || "gui_user_scheduling_for_pathos",
+    };
+
+    if (adminPassword) { // Only add header if password exists
+        headers['X-Admin-Password'] = adminPassword;
+    } else {
+        console.warn("addPathosEventAPI: Admin password not found in localStorage. Sending request without X-Admin-Password header. This might fail if the backend requires it.");
+    }
+
+    try {
+        showNotification("Saving event for Pathos...", "info");
+        const response = await fetch(`${currentApiBaseUrl}/pathos/events/add`, {
+            method: 'POST',
+            headers: headers, // Updated headers
+            body: JSON.stringify(eventData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(`Event "${result.title || eventData.title}" saved successfully for Pathos!`, "success");
+            if (typeof _fetchPathosChronosDataFunc === 'function') {
+                _fetchPathosChronosDataFunc(); // Refresh Chronos panel
+            }
+            return true;
+        } else {
+            let errorDetail = "Unknown error saving event.";
+            try {
+                const errorData = await response.json();
+                errorDetail = errorData.detail || response.statusText;
+                if (response.status === 403 && errorDetail.toLowerCase().includes("admin credentials required")) {
+                    errorDetail = "Forbidden: Admin credentials required or incorrect. Please set the correct Eidos Admin Password in Settings.";
+                } else if (response.status === 401) {
+                     errorDetail = "Unauthorized: Admin credentials may be required. Please set the Eidos Admin Password in Settings.";
+                }
+            } catch (e) { /* ignore if response is not json */ }
+            
+            showNotification(`Failed to save event: ${errorDetail}`, 'error');
+            console.error("Add Pathos Event API Error:", response.status, errorDetail);
+            return false;
+        }
+    } catch (error) {
+        console.error("Error calling Add Pathos Event API:", error);
+        showNotification(`Error saving event: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+console.log("api_comms.js loaded (with addPathosEventAPI).");

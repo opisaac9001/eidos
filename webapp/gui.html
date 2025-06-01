@@ -38,6 +38,13 @@
                 <div id="user-facts-button" class="header-tool-icon" title="View Facts About You" style="right: 240px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 </div>
+                <div id="chronos-panel-button" class="header-tool-icon" title="View Pathos's Day" style="right: 285px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path><path d="M16 18h.01"></path></svg>
+                </div>
+                <!-- NEW BUTTON for Add Pathos Event Panel -->
+                <div id="add-pathos-event-panel-button" class="header-tool-icon" title="Add Event for Pathos" style="right: 330px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path><path d="M16 18h.01"></path><line x1="12" y1="10" x2="12" y2="22" stroke-dasharray="2 2"></line><line x1="12" y1="16" x2="18" y2="16"></line><line x1="15" y1="13" x2="15" y2="19"></line></svg>
+                </div>
             </div>
 
             <div class="claude-header">
@@ -46,11 +53,23 @@
             </div>
 
             <div class="chat-messages" id="chat-messages-area">
+                <div id="drop-zone-overlay" class="drop-zone-overlay">
+                    <div class="drop-zone-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Drag & drop files here</p>
+                        <span>Supports images, PDFs, DOCX and TXT files</span>
+                    </div>
+                </div>
             </div>
 
             <div class="chat-input-area">
                  <div class="action-buttons-row">
                     <input type="file" id="document-input" style="display: none;" accept=".pdf,.docx,.txt">
+                    <input type="file" id="file-input" style="display: none;" accept=".pdf,.docx,.txt,image/*">
                     <button id="upload-document-button" class="icon-button" title="Upload a document (PDF, DOCX, TXT)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: scale(1.1);"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="17" x2="12" y2="11"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
                     </button>
@@ -73,7 +92,7 @@
                     <button id="reset-chat-button" class="icon-button" title="New chat (archives current)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: scale(1.1);"><path d="M3.5 19.5L7 16"></path><path d="M14 8.5c1-1 2.5-1.5 4-1"></path><path d="M20.5 13c.5-1.5.5-3 0-4.5"></path><path d="M20 6.5c-1-.5-2.5-.5-4 0"></path><path d="M15.5 20.5c-1.5-1-3-2-4.5-4.5"></path><path d="M4 19l3.5-3.5"></path><path d="M13 8l7-4"></path><path d="M16 19c0-4 1.5-8 4-11"></path></svg>
                     </button>
-                </div> <!-- This closes action-buttons-row -->
+                </div> 
                 <div class="proactive-reply-context-display" id="proactive-reply-context-display" style="display:none;"></div>
                 <div class="input-row">
                     <div class="input-container" id="input-container">
@@ -81,23 +100,25 @@
                             <span id="model-display-name">Eidos</span><span class="dropdown-arrow">▾</span>
                         </div>
                         <div id="model-dropdown-content"><div>Loading models...</div></div>
-                        <!-- The model-dropdown-content is positioned absolutely by CSS, so it doesn't need to "contain" the textarea -->
                         <textarea id="user-input" placeholder="How can I help you today?" rows="1"></textarea>
+                        <button id="file-upload-button" class="icon-button" title="Upload File (Image or Document)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </button>
                         <button id="microphone-button" class="icon-button" title="Start/Stop Voice Input">
                             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                         </button>
                         <button id="send-button">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                         </button>
-                    </div> <!-- This correctly closes input-container -->
-                </div> <!-- This correctly closes input-row -->
+                    </div> 
+                </div> 
                 <div id="attached-document-indicator" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                     <span id="attached-document-name"></span>
                     <button id="remove-attached-document">×</button>
                 </div>
-            </div> <!-- This closes chat-input-area -->
-        </div> <!-- This closes chat-container -->
+            </div> 
+        </div> 
 
         <div id="proactive-panel" class="side-panel right-sliding">
             <div class="panel-header"><span>Proactive Thoughts</span><button id="proactive-close-button">×</button></div>
@@ -135,6 +156,10 @@
                 <div class="settings-section"><label for="model-temperature-input">Model Temperature (0.0 - 2.0):</label><input type="number" id="model-temperature-input" min="0.0" max="2.0" step="0.1" value="0.7"></div>
                 <div class="settings-section"><label for="context-length-input">Context Length (Max Tokens Override):</label><input type="number" id="context-length-input" min="256" max="32000" step="128" placeholder="e.g., 4096"></div>
                 <div class="settings-section"><label for="system-prompt-input">System Prompt:</label><textarea id="system-prompt-input" placeholder="e.g., You are a helpful assistant..." rows="5"></textarea></div>
+                <div class="settings-section">
+                    <label for="admin-password-input">Eidos Admin Password (for privileged actions):</label>
+                    <input type="password" id="admin-password-input" placeholder="Enter Admin Password if set">
+                </div>
             </div>
             <div class="panel-actions"><button id="system-prompt-save">Save All Settings</button></div>
         </div>
@@ -173,6 +198,80 @@
             </div>
             <div class="panel-actions">
                 <button id="refresh-user-facts-button">Refresh Facts</button>
+            </div>
+        </div>
+
+        <div id="chronos-panel" class="side-panel right-sliding">
+            <div class="panel-header">
+                <span>Pathos's Day</span>
+                <button id="chronos-panel-close-button">×</button>
+            </div>
+            <div class="panel-content" id="chronos-panel-content-area">
+                <div id="chronos-current-activity-section">
+                    <h4>Current Activity</h4>
+                    <p id="chronos-current-activity-display" style="color: #888;">Loading current activity...</p>
+                </div>
+                <hr style="border-color: #444; margin: 15px 0;">
+                <div id="chronos-todays-schedule-section">
+                    <h4>Today's Schedule</h4>
+                    <div id="chronos-todays-schedule-list" style="color: #888;">Loading schedule...</div>
+                </div>
+                <hr style="border-color: #444; margin: 15px 0;">
+                <div id="chronos-upcoming-events-section">
+                    <h4>Upcoming Events</h4>
+                    <div id="chronos-upcoming-events-list" style="color: #888;">Loading events...</div>
+                </div>
+            </div>
+            <div class="panel-actions">
+                <button id="refresh-chronos-panel-button">Refresh View</button>
+            </div>
+        </div>
+
+        <!-- NEW PANEL for Adding Pathos Event -->
+        <div id="add-pathos-event-panel" class="side-panel right-sliding">
+            <div class="panel-header">
+                <span>Schedule Event for Pathos</span>
+                <button id="add-pathos-event-close-button">×</button>
+            </div>
+            <div class="panel-content" id="add-pathos-event-content-area">
+                <div class="settings-section">
+                    <label for="pathos-event-title-input">Event Title:</label>
+                    <input type="text" id="pathos-event-title-input" placeholder="e.g., Pathos's Vacation in Kyoto">
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-start-date-input">Start Date:</label>
+                    <input type="date" id="pathos-event-start-date-input">
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-end-date-input">End Date:</label>
+                    <input type="date" id="pathos-event-end-date-input">
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-type-select">Event Type:</label>
+                    <select id="pathos-event-type-select">
+                        <!-- Options will be populated by JS -->
+                        <option value="">Select type...</option>
+                    </select>
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-description-input">Description (Optional):</label>
+                    <textarea id="pathos-event-description-input" rows="3" placeholder="Brief description of the event"></textarea>
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-location-input">Location (Optional):</label>
+                    <input type="text" id="pathos-event-location-input" placeholder="e.g., Kyoto, Japan">
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-theme-input">Activity Theme (Optional):</label>
+                    <input type="text" id="pathos-event-theme-input" placeholder="e.g., Relaxation and Sightseeing">
+                </div>
+                <div class="settings-section">
+                    <label for="pathos-event-tasks-input">Planned Sites/Tasks (Optional, one per line):</label>
+                    <textarea id="pathos-event-tasks-input" rows="3" placeholder="e.g., Visit Kinkaku-ji Temple\nTry local ramen"></textarea>
+                </div>
+            </div>
+            <div class="panel-actions">
+                <button id="save-pathos-event-button">Save Event</button>
             </div>
         </div>
 

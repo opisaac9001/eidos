@@ -15,6 +15,7 @@ import {
 } from './dom_elements.js';
 import { showNotification } from './utils.js';
 import { loadChatFromHistory, loadArchivedHistories } from './persistent_storage.js';
+import * as DOM from './dom_elements.js'; // Ensure DOM is imported if not already
 
 // --- "Facts About You" Panel Functions (Corrected with Forget Button) ---
 export async function fetchAndDisplayUserFacts() {
@@ -168,55 +169,67 @@ async function forgetUserFactAPI(memoryId) {
 }
 
 
-// --- (Make sure other panel functions like renderHistoryPanel, fetchAndDisplayLearnings, etc. are present here) ---
 // --- History Panel Functions ---
-export function renderHistoryPanel() {
+export async function renderHistoryPanel() { // Make the function async
     if (!historyContentArea) {
         console.error("History content area element not found.");
         return;
     }
-    const histories = loadArchivedHistories(); // Use the function from persistent_storage
-    historyContentArea.innerHTML = ''; // Clear previous content
+    try {
+        historyContentArea.innerHTML = '<p style="color: #BBBBBB;">Loading history...</p>'; // Add a loading message
+        const histories = await loadArchivedHistories(); // Await the promise
+        historyContentArea.innerHTML = ''; // Clear previous content/loading message
 
-    if (histories.length === 0) {
-        historyContentArea.innerHTML = '<p style="color: #888;">No archived chats yet. Chats are archived when you start a new chat or load another.</p>';
-        return;
-    }
+        if (!Array.isArray(histories)) {
+            console.error("loadArchivedHistories did not return an array:", histories);
+            historyContentArea.innerHTML = '<p style="color: #F44336;">Error: Could not load history data correctly.</p>';
+            return;
+        }
 
-    histories.forEach((entry, index) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.classList.add('history-item');
-        itemDiv.dataset.historyIndex = index; // Keep index if needed, though entry itself is better
+        if (histories.length === 0) {
+            historyContentArea.innerHTML = '<p style="color: #888;">No archived chats yet. Chats are archived when you start a new chat or load another.</p>';
+            return;
+        }
 
-        const dateDiv = document.createElement('div');
-        dateDiv.classList.add('history-item-date');
-        dateDiv.textContent = new Date(entry.timestamp).toLocaleString();
+        histories.forEach((entry, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('history-item');
+            itemDiv.dataset.historyIndex = index; // Keep index if needed, though entry itself is better
 
-        const titleDiv = document.createElement('div');
-        let titleText = entry.title || "Archived Chat"; // Use pre-calculated title if available
-        if (!entry.title) { // Fallback to derive title if not present
-            const firstUserMsg = entry.conversation.find(msg => msg.role === 'user');
-            if (firstUserMsg && firstUserMsg.content) {
-                if (typeof firstUserMsg.content === 'string') {
-                    titleText = firstUserMsg.content.substring(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '');
-                } else if (Array.isArray(firstUserMsg.content) && firstUserMsg.content[0]?.type === 'text' && typeof firstUserMsg.content[0].text === 'string') {
-                    titleText = firstUserMsg.content[0].text.substring(0, 50) + (firstUserMsg.content[0].text.length > 50 ? '...' : '');
-                } else {
-                    titleText = "Chat Entry";
+            const dateDiv = document.createElement('div');
+            dateDiv.classList.add('history-item-date');
+            dateDiv.textContent = new Date(entry.timestamp).toLocaleString();
+
+            const titleDiv = document.createElement('div');
+            let titleText = entry.title || "Archived Chat"; // Use pre-calculated title if available
+            if (!entry.title) { // Fallback to derive title if not present
+                const firstUserMsg = entry.conversation.find(msg => msg.role === 'user');
+                if (firstUserMsg && firstUserMsg.content) {
+                    if (typeof firstUserMsg.content === 'string') {
+                        titleText = firstUserMsg.content.substring(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '');
+                    } else if (Array.isArray(firstUserMsg.content) && firstUserMsg.content[0]?.type === 'text' && typeof firstUserMsg.content[0].text === 'string') {
+                        titleText = firstUserMsg.content[0].text.substring(0, 50) + (firstUserMsg.content[0].text.length > 50 ? '...' : '');
+                    } else {
+                        titleText = "Chat Entry";
+                    }
                 }
             }
-        }
-        titleDiv.textContent = titleText;
+            titleDiv.textContent = titleText;
 
-        itemDiv.appendChild(dateDiv);
-        itemDiv.appendChild(titleDiv);
+            itemDiv.appendChild(dateDiv);
+            itemDiv.appendChild(titleDiv);
 
-        itemDiv.addEventListener('click', () => {
-            loadChatFromHistory(entry); // Pass the full entry object
-            if (historyPanel) historyPanel.classList.remove('open');
+            itemDiv.addEventListener('click', () => {
+                loadChatFromHistory(entry); // Pass the full entry object
+                if (historyPanel) historyPanel.classList.remove('open');
+            });
+            historyContentArea.appendChild(itemDiv);
         });
-        historyContentArea.appendChild(itemDiv);
-    });
+    } catch (error) {
+        console.error("Error rendering history panel:", error);
+        historyContentArea.innerHTML = `<p style="color: #F44336;">Error: ${error.message}</p>`;
+        showNotification(`Error loading history: ${error.message}`, "error");
+    }
 }
 
 // --- Learning Log Panel Functions ---
@@ -504,4 +517,205 @@ export async function fetchAndDisplayDailyBriefingGUI() {
     }
 }
 
-console.log("ui_panels.js loaded (user facts display refined with forget button logic).");
+// --- Pathos Chronos Panel Functions ---
+export async function fetchAndDisplayPathosChronosData() {
+    console.log("DEBUG: fetchAndDisplayPathosChronosData CALLED (B.1 update)");
+
+    if (!DOM.chronosCurrentActivityDisplay || !DOM.chronosTodaysScheduleList || !DOM.chronosUpcomingEventsList) {
+        console.error("Chronos panel DOM elements not found in fetchAndDisplayPathosChronosData.");
+        if (DOM.chronosPanelContentArea) { 
+            DOM.chronosPanelContentArea.innerHTML = '<p style="color: #F44336;">Error: Panel components missing. Cannot load Pathos\'s day.</p>';
+        }
+        return;
+    }
+
+    DOM.chronosCurrentActivityDisplay.innerHTML = '<p style="color: #BBBBBB;">Loading current activity...</p>';
+    DOM.chronosTodaysScheduleList.innerHTML = '<p style="color: #BBBBBB;">Loading today\'s schedule...</p>';
+    DOM.chronosUpcomingEventsList.innerHTML = '<p style="color: #BBBBBB;">Loading upcoming events...</p>';
+
+    const currentApiBaseUrl = window.EIDOS_API_BASE_URL;
+    if (!currentApiBaseUrl) {
+        const errorMsg = '<p style="color: #F44336;">Error: Eidos API Base URL not set. Cannot load Pathos\'s day.</p>';
+        DOM.chronosCurrentActivityDisplay.innerHTML = errorMsg;
+        DOM.chronosTodaysScheduleList.innerHTML = errorMsg;
+        DOM.chronosUpcomingEventsList.innerHTML = errorMsg;
+        showNotification("Eidos API Base URL is not set in Settings.", "error");
+        return;
+    }
+
+    let scheduleFetched = false;
+    let eventsFetched = false;
+
+    // Fetch Today's Schedule
+    try {
+        console.log("DEBUG: Chronos - Fetching today's schedule from:", `${currentApiBaseUrl}/pathos/schedule/today`);
+        const scheduleResponse = await fetch(`${currentApiBaseUrl}/pathos/schedule/today`, {
+            headers: { 'X-User-Id': window.currentUserId || "pathos_agent_internal" } 
+        });
+        console.log("DEBUG: Chronos - Schedule Response Status:", scheduleResponse.status);
+        if (!scheduleResponse.ok) {
+            const errText = await scheduleResponse.text();
+            console.error("DEBUG: Chronos - Schedule Fetch Error Text:", errText);
+            throw new Error(`Failed to fetch today's schedule: ${scheduleResponse.status} ${errText}`);
+        }
+        const scheduleSlots = await scheduleResponse.json();
+        console.log("DEBUG: Chronos - Received scheduleSlots:", JSON.stringify(scheduleSlots, null, 2).substring(0, 500) + "...");
+        renderTodaysSchedule(scheduleSlots);
+        determineAndRenderCurrentActivity(scheduleSlots);
+        scheduleFetched = true;
+    } catch (error) {
+        console.error("DEBUG: Chronos - Error fetching today's schedule (in catch block):", error);
+        if (DOM.chronosTodaysScheduleList) DOM.chronosTodaysScheduleList.innerHTML = `<p style="color: #F44336;">Error loading schedule: ${error.message}</p>`;
+        if (DOM.chronosCurrentActivityDisplay) DOM.chronosCurrentActivityDisplay.innerHTML = `<p style="color: #F44336;">Error determining current activity.</p>`;
+    }
+
+    // Fetch Upcoming Events
+    try {
+        const daysAheadForEvents = 14; 
+        console.log("DEBUG: Chronos - Fetching upcoming events from:", `${currentApiBaseUrl}/pathos/events/upcoming?days_ahead=${daysAheadForEvents}`);
+        const eventsResponse = await fetch(`${currentApiBaseUrl}/pathos/events/upcoming?days_ahead=${daysAheadForEvents}`, {
+             headers: { 'X-User-Id': window.currentUserId || "pathos_agent_internal" } 
+        });
+        console.log("DEBUG: Chronos - Events Response Status:", eventsResponse.status);
+        if (!eventsResponse.ok) {
+            const errText = await eventsResponse.text();
+            console.error("DEBUG: Chronos - Events Fetch Error Text:", errText);
+            throw new Error(`Failed to fetch upcoming events: ${eventsResponse.status} ${errText}`);
+        }
+        const upcomingEvents = await eventsResponse.json();
+        console.log("DEBUG: Chronos - Received upcomingEvents:", JSON.stringify(upcomingEvents, null, 2).substring(0, 500) + "...");
+        renderUpcomingEvents(upcomingEvents); 
+        eventsFetched = true;
+    } catch (error) {
+        console.error("DEBUG: Chronos - Error fetching upcoming events (in catch block):", error);
+        if (DOM.chronosUpcomingEventsList) DOM.chronosUpcomingEventsList.innerHTML = `<p style="color: #F44336;">Error loading events: ${error.message}</p>`;
+    }
+
+    if (scheduleFetched && eventsFetched) {
+        // showNotification("Pathos's day view updated.", "info"); // Can be noisy if called often
+    } else if (scheduleFetched) {
+        showNotification("Pathos's schedule updated, but events failed to load.", "warning");
+    } else if (eventsFetched) {
+        showNotification("Pathos's upcoming events updated, but schedule failed to load.", "warning");
+    } else {
+        // Both failed, error messages already shown in respective divs
+    }
+}
+
+function determineAndRenderCurrentActivity(scheduleSlots) {
+    console.log("DEBUG: determineAndRenderCurrentActivity called with:", JSON.stringify(scheduleSlots, null, 2).substring(0, 500) + "...");
+    if (!DOM.chronosCurrentActivityDisplay) return;
+    if (!scheduleSlots || !Array.isArray(scheduleSlots) || scheduleSlots.length === 0) {
+        DOM.chronosCurrentActivityDisplay.innerHTML = '<p style="color: #888;">No schedule available to determine current activity.</p>';
+        return;
+    }
+
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    let currentActivity = null;
+    for (const slot of scheduleSlots) {
+        try {
+            if (!slot || typeof slot.start_time !== 'string' || typeof slot.end_time !== 'string') {
+                console.warn("Skipping invalid slot in determineAndRenderCurrentActivity:", slot);
+                continue;
+            }
+            const [startH, startM] = slot.start_time.split(':').map(Number);
+            const [endH, endM] = slot.end_time.split(':').map(Number);
+            const slotStartTimeMinutes = startH * 60 + startM;
+            const slotEndTimeMinutes = endH * 60 + endM;
+
+            if (currentTime >= slotStartTimeMinutes && currentTime < slotEndTimeMinutes) {
+                currentActivity = slot;
+                break;
+            }
+        } catch (e) {
+            console.error("Error parsing time for activity slot:", slot, e);
+        }
+    }
+
+    if (currentActivity) {
+        const title = currentActivity.activity_title || "Unnamed Activity";
+        const startTime = currentActivity.start_time || "N/A";
+        const endTime = currentActivity.end_time || "N/A";
+        const description = currentActivity.activity_details && currentActivity.activity_details.description ? currentActivity.activity_details.description : "No details.";
+        const subFocus = currentActivity.activity_details && currentActivity.activity_details.sub_focus ? currentActivity.activity_details.sub_focus : "";
+
+        DOM.chronosCurrentActivityDisplay.innerHTML = `
+            <p><strong>${title}</strong> (${startTime} - ${endTime})</p>
+            <p style="font-size: 0.9em; color: #B0B0B0;"><em>${description}</em></p>
+            ${subFocus ? `<p style="font-size: 0.8em; color: #999;">Focus: ${subFocus}</p>` : ''}
+        `;
+    } else {
+        DOM.chronosCurrentActivityDisplay.innerHTML = '<p style="color: #888;">Pathos is currently between scheduled activities.</p>';
+    }
+}
+
+function renderTodaysSchedule(scheduleSlots) {
+    console.log("DEBUG: renderTodaysSchedule called with:", JSON.stringify(scheduleSlots, null, 2).substring(0, 500) + "...");
+    if (!DOM.chronosTodaysScheduleList) return;
+    if (!scheduleSlots || !Array.isArray(scheduleSlots) || scheduleSlots.length === 0) {
+        DOM.chronosTodaysScheduleList.innerHTML = '<p style="color: #888;">No schedule planned for today yet, or an error occurred.</p>';
+        return;
+    }
+
+    let html = '<ul class="chronos-list">';
+    scheduleSlots.forEach(slot => {
+        const startTime = slot.start_time || "N/A";
+        const endTime = slot.end_time || "N/A";
+        const title = slot.activity_title || "Unnamed Activity";
+        const type = slot.activity_type || "Unknown";
+        const description = slot.activity_details && slot.activity_details.description ? slot.activity_details.description : "No details.";
+        const subFocus = slot.activity_details && slot.activity_details.sub_focus ? slot.activity_details.sub_focus : "";
+
+        html += `
+            <li class="chronos-list-item schedule-item">
+                <div class="chronos-time">${startTime} - ${endTime}</div>
+                <div class="chronos-title">${title} <span class="chronos-type">(${type})</span></div>
+                <div class="chronos-description">${description}</div>
+                ${subFocus ? `<div class="chronos-subfocus">Focus: ${subFocus}</div>` : ''}
+            </li>
+        `;
+    });
+    html += '</ul>';
+    DOM.chronosTodaysScheduleList.innerHTML = html;
+}
+
+function renderUpcomingEvents(events) {
+    console.log("DEBUG: renderUpcomingEvents called with:", JSON.stringify(events, null, 2).substring(0, 500) + "...");
+    if (!DOM.chronosUpcomingEventsList) {
+        console.error("renderUpcomingEvents: chronosUpcomingEventsList DOM element not found.");
+        return;
+    }
+    if (!events || !Array.isArray(events) || events.length === 0) {
+        DOM.chronosUpcomingEventsList.innerHTML = '<p style="color: #888;">No upcoming special events planned for Pathos in the near future.</p>';
+        return;
+    }
+
+    let html = '<ul class="chronos-list">';
+    events.forEach(event => {
+        const title = event.title || "Untitled Event";
+        const startDate = event.start_date || "N/A";
+        const endDate = event.end_date || "N/A";
+        const eventType = event.event_type || "Unknown Type";
+        const description = event.description || "";
+        const location = event.location || "";
+        const activityTheme = event.details && event.details.activity_theme ? event.details.activity_theme : "";
+        const plannedSites = event.details && Array.isArray(event.details.planned_sites_or_tasks) ? event.details.planned_sites_or_tasks.join(', ') : "";
+
+        html += `
+            <li class="chronos-list-item event-item">
+                <div class="chronos-time">${startDate} to ${endDate}</div>
+                <div class="chronos-title">${title} <span class="chronos-type">(${eventType})</span></div>
+                ${description ? `<div class="chronos-description">${description}</div>` : ''}
+                ${location ? `<div class="chronos-location">Location: ${location}</div>` : ''}
+                ${activityTheme ? `<div class="chronos-subfocus">Theme: ${activityTheme}</div>` : ''}
+                ${plannedSites ? `<div class="chronos-subfocus">Activities/Sites: ${plannedSites}</div>` : ''}
+            </li>
+        `;
+    });
+    html += '</ul>';
+    DOM.chronosUpcomingEventsList.innerHTML = html;
+}
+
+console.log("ui_panels.js loaded (Chronos panel updated).");

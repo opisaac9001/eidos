@@ -1,0 +1,8 @@
+.env
+eidos_memories/
+logs/
+eidos_dream_images/
+*.sqlite
+*.log
+__pycache__/
+*.pyc

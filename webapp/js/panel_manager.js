@@ -5,7 +5,8 @@ import * as DOM from './dom_elements.js';
 const allPanelConfigurations = [];
 
 let _renderHistoryPanelFunc, _fetchLearningsFunc, _fetchDreamsFunc,
-    _fetchKnowledgeVerificationsFunc, _fetchDailyBriefingFunc, _fetchUserFactsFunc;
+    _fetchKnowledgeVerificationsFunc, _fetchDailyBriefingFunc, _fetchUserFactsFunc, _fetchPathosChronosDataFunc,
+    _populatePathosEventFormFunc; // Added _populatePathosEventFormFunc
 
 export function initializePanelConfigurations(panelFuncs) {
     allPanelConfigurations.length = 0;
@@ -15,6 +16,8 @@ export function initializePanelConfigurations(panelFuncs) {
     _fetchKnowledgeVerificationsFunc = panelFuncs.fetchKnowledgeVerifications;
     _fetchDailyBriefingFunc = panelFuncs.fetchDailyBriefing;
     _fetchUserFactsFunc = panelFuncs.fetchUserFacts;
+    _fetchPathosChronosDataFunc = panelFuncs.fetchPathosChronosData;
+    _populatePathosEventFormFunc = panelFuncs.populatePathosEventForm; // Get the new function
 
     const panelConfigs = [ // Changed to panelConfigs to avoid confusion
         { id: 'systemPrompt', button: DOM.systemPromptButton, panel: DOM.systemPromptPanel, fetchFunc: null, side: 'right-sliding', closeButton: DOM.systemPromptClose },
@@ -24,7 +27,16 @@ export function initializePanelConfigurations(panelFuncs) {
         { id: 'dreamJournal', button: DOM.dreamJournalButton, panel: DOM.dreamJournalPanel, fetchFunc: _fetchDreamsFunc, side: 'right-sliding', closeButton: DOM.dreamJournalCloseButton },
         { id: 'knowledgeLog', button: DOM.knowledgeLogButton, panel: DOM.knowledgeLogPanel, fetchFunc: _fetchKnowledgeVerificationsFunc, side: 'right-sliding', closeButton: DOM.knowledgeLogCloseButton },
         { id: 'userFacts', button: DOM.userFactsButton, panel: DOM.userFactsPanel, fetchFunc: _fetchUserFactsFunc, side: 'right-sliding', closeButton: DOM.userFactsCloseButton },
-        { id: 'dailyBriefing', button: DOM.getDailyBriefingButton, panel: DOM.dailyBriefingPanel, fetchFunc: _fetchDailyBriefingFunc, side: 'right-sliding', isMainButton: true, closeButton: DOM.dailyBriefingCloseButton }
+        { id: 'chronos', button: DOM.chronosPanelButton, panel: DOM.chronosPanel, fetchFunc: _fetchPathosChronosDataFunc, side: 'right-sliding', closeButton: DOM.chronosPanelCloseButton },
+        { id: 'dailyBriefing', button: DOM.getDailyBriefingButton, panel: DOM.dailyBriefingPanel, fetchFunc: _fetchDailyBriefingFunc, side: 'right-sliding', isMainButton: true, closeButton: DOM.dailyBriefingCloseButton },
+        { 
+            id: 'addPathosEvent', 
+            button: DOM.addPathosEventPanelButton, 
+            panel: DOM.addPathosEventPanel, 
+            fetchFunc: _populatePathosEventFormFunc, // Call function to populate dropdown on open
+            side: 'right-sliding', 
+            closeButton: DOM.addPathosEventCloseButton 
+        }
     ];
 
     panelConfigs.forEach(config => {
@@ -56,12 +68,17 @@ function togglePanel(panelElement, fetchFunction, panelSide) {
         if (fetchFunction && typeof fetchFunction === 'function') {
             try {
                 console.log(`PanelManager: Calling fetchFunction for ${panelElement.id}`);
-                fetchFunction();
+                fetchFunction(); // This will now call populatePathosEventForm for the new panel
             } catch (e) { console.error(`PanelManager: Error in fetchFunction for ${panelElement.id}:`, e); }
+        } else {
+            console.warn(`PanelManager: No valid fetchFunction provided for panel ${panelElement?.id}. Type was: ${typeof fetchFunction}`);
         }
         if (panelElement.id === 'system-prompt-panel' && DOM.systemPromptPanel) {
             const firstInput = DOM.systemPromptPanel.querySelector('input[type="text"], textarea');
             if (firstInput) setTimeout(() => firstInput.focus(), 300);
+        } else if (panelElement.id === 'add-pathos-event-panel' && DOM.addPathosEventPanel) {
+            // Focus the title input when the add event panel opens
+            if (DOM.pathosEventTitleInput) setTimeout(() => DOM.pathosEventTitleInput.focus(), 300);
         }
     } else {
         console.log(`PanelManager: Panel ${panelElement.id} was already open, now closed (or re-closed by closeAllSidePanels).`);

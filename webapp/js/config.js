@@ -13,6 +13,7 @@ export const EIDOS_CONTEXT_LENGTH_KEY = 'eidosContextLength';
 export const LLM_PROVIDER_URL_KEY = 'eidosLlmProviderUrl';
 export const SELECTED_MODEL_KEY = 'eidosSelectedModel';
 export const AUTO_TTS_ENABLED_KEY = 'eidosAutoTtsEnabled'; // For TTS toggle persistence
+export const EIDOS_ADMIN_PASSWORD_KEY = 'eidosAdminPassword'; // NEW KEY
 
 // --- Initial Configuration Values ---
 

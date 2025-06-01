@@ -1,55 +1,37 @@
 // webapp/js/event_handlers.js
 
 import * as DOM from './dom_elements.js';
-import { EIDOS_API_BASE_URL_KEY, USER_ID_KEY, SYSTEM_PROMPT_KEY, WEATHER_LOCATION_KEY, EIDOS_API_KEY_KEY, MODEL_TEMPERATURE_KEY, EIDOS_CONTEXT_LENGTH_KEY, LLM_PROVIDER_URL_KEY } from './config.js';
-import { showNotification, autoAdjustTextareaHeight } from './utils.js';
+import { showNotification } from './utils.js'; // Import showNotification
 
-// --- Injected Dependencies (set by main.js) ---
-let _sendMessageUI;
-let _handleDocUpload;
-let _handleImgUpload;
-let _removeAttachedDoc;
-let _toggleListening;
-let _resetChat;
-let _clearAllLocalHistory;
-let _saveSettingsToBackend;
-let _clearUserMemoryBE;
-let _clearEidosMemoryBE;
-let _fetchModels;
-let _fetchWeather;
-let _setupWeather;
-let _fetchDailyBriefing;
-let _fetchLearnings;
-let _fetchDreams;
-let _fetchKnowledgeVerifications;
-let _fetchUserFacts; // New
-
-// State accessors/mutators injected from main.js
-let _currentUserId, _EIDOS_API_BASE_URL_GLOBAL;
-let _setCurrentUserId, _setGlobalApiBaseUrl, _setAPIKey, _setLLMProviderUrl,
-    _setWeatherLoc, _setSystemPrompt, _setModelTemp, _setContextLen;
-
+let _sendMessage, _handleDocumentUploadAPI, _handleImageUploadClientSide, _removeAttachedDocument,
+    _toggleListening, _resetChat, _clearAllLocalHistory, _saveSettingsToBackendAPI,
+    _clearUserMemoryBE, _clearEidosMemoryBE, _fetchModels, _fetchWeatherAPI, _setupWeatherUpdates,
+    _fetchAndDisplayDailyBriefingGUI, _fetchAndDisplayLearnings, _fetchAndDisplayDreams,
+    _fetchAndDisplayKnowledgeVerifications, _fetchAndDisplayUserFacts, _fetchUserFacts, _currentUserId,
+    _EIDOS_API_BASE_URL_GLOBAL, _setCurrentUserId, _setGlobalApiBaseUrl, _setAPIKey,
+    _setLLMProviderUrl, _setWeatherLoc, _setSystemPrompt, _setModelTemp, _setContextLen,
+    _addPathosEventAPI, _setAdminPassword; // NEW: For setting admin password
 
 export function injectDependencies(dependencies) {
-    _sendMessageUI = dependencies.sendMessage;
-    _handleDocUpload = dependencies.handleDocumentUploadAPI;
-    _handleImgUpload = dependencies.handleImageUploadClientSide;
-    _removeAttachedDoc = dependencies.removeAttachedDocument;
+    _sendMessage = dependencies.sendMessage;
+    _handleDocumentUploadAPI = dependencies.handleDocumentUploadAPI;
+    _handleImageUploadClientSide = dependencies.handleImageUploadClientSide;
+    _removeAttachedDocument = dependencies.removeAttachedDocument;
     _toggleListening = dependencies.toggleListening;
     _resetChat = dependencies.resetChat;
     _clearAllLocalHistory = dependencies.clearAllLocalChatHistory;
-    _saveSettingsToBackend = dependencies.saveSettingsToBackendAPI;
+    _saveSettingsToBackendAPI = dependencies.saveSettingsToBackendAPI;
     _clearUserMemoryBE = dependencies.clearUserBackendMemoryAPI;
     _clearEidosMemoryBE = dependencies.clearEidosBackendMemoryAPI;
     _fetchModels = dependencies.fetchModels;
-    _fetchWeather = dependencies.fetchWeatherAPI;
-    _setupWeather = dependencies.setupWeatherUpdates;
-    _fetchDailyBriefing = dependencies.fetchAndDisplayDailyBriefingGUI;
-    _fetchLearnings = dependencies.fetchAndDisplayLearnings;
-    _fetchDreams = dependencies.fetchAndDisplayDreams;
-    _fetchKnowledgeVerifications = dependencies.fetchAndDisplayKnowledgeVerifications;
+    _fetchWeatherAPI = dependencies.fetchWeatherAPI;
+    _setupWeatherUpdates = dependencies.setupWeatherUpdates;
+    _fetchAndDisplayDailyBriefingGUI = dependencies.fetchAndDisplayDailyBriefingGUI;
+    _fetchAndDisplayLearnings = dependencies.fetchAndDisplayLearnings;
+    _fetchAndDisplayDreams = dependencies.fetchAndDisplayDreams;
+    _fetchAndDisplayKnowledgeVerifications = dependencies.fetchAndDisplayKnowledgeVerifications;
+    _fetchAndDisplayUserFacts = dependencies.fetchAndDisplayUserFacts;
     _fetchUserFacts = dependencies.fetchAndDisplayUserFacts; // Inject new function
-
     _currentUserId = dependencies.currentUserId;
     _EIDOS_API_BASE_URL_GLOBAL = dependencies.EIDOS_API_BASE_URL_GLOBAL;
     _setCurrentUserId = dependencies.setCurrentUserId;
@@ -60,169 +42,283 @@ export function injectDependencies(dependencies) {
     _setSystemPrompt = dependencies.setSystemPrompt;
     _setModelTemp = dependencies.setModelTemp;
     _setContextLen = dependencies.setContextLen;
+    _addPathosEventAPI = dependencies.addPathosEventAPI; // NEW: Get the injected function
+    _setAdminPassword = dependencies.setAdminPassword; // NEW: Get the injected function
 }
 
-
 export function setupGlobalEventListeners() {
-    if (!DOM.sendButton) { console.error("setupGlobalEventListeners: DOM not ready."); return; }
+    if (DOM.sendButton && typeof _sendMessage === 'function') {
+        DOM.sendButton.addEventListener('click', () => _sendMessage());
+    }
 
-    DOM.sendButton.addEventListener('click', () => {
-        if (typeof _sendMessageUI === 'function') _sendMessageUI();
-        else console.error("Send message function not injected.");
-    });
-
-    if (DOM.userInput) {
-        DOM.userInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                if (typeof _sendMessageUI === 'function') _sendMessageUI();
-                else console.error("Send message function not injected.");
-            }
+    if (DOM.uploadDocumentButton && typeof _handleDocumentUploadAPI === 'function') {
+        DOM.uploadDocumentButton.addEventListener('click', () => {
+            if (DOM.documentInput) DOM.documentInput.click();
         });
+        if (DOM.documentInput) {
+            DOM.documentInput.addEventListener('change', () => _handleDocumentUploadAPI(DOM.documentInput.files[0]));
+        }
+    }    if (DOM.uploadImageButton && typeof _handleImageUploadClientSide === 'function') {
+        DOM.uploadImageButton.addEventListener('click', () => {
+            if (DOM.imageInput) DOM.imageInput.click();
+        });
+        if (DOM.imageInput) {
+            DOM.imageInput.addEventListener('change', () => _handleImageUploadClientSide(DOM.imageInput.files[0]));
+        }
+    }
+    
+    // Handle the new file upload button in chat input area
+    if (DOM.fileUploadButton && DOM.fileInput) {
+        DOM.fileUploadButton.addEventListener('click', () => {
+            if (DOM.fileInput) DOM.fileInput.click();
+        });
+        
+        if (DOM.fileInput) {
+            DOM.fileInput.addEventListener('change', () => {
+                const file = DOM.fileInput.files[0];
+                if (!file) return;
+                
+                console.log(`File selected via button: ${file.name}, type: ${file.type}`);
+                
+                // Process based on file type
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                
+                if (
+                    file.type === 'application/pdf' || 
+                    fileExt === 'pdf' ||
+                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                    fileExt === 'docx' ||
+                    file.type === 'text/plain' || 
+                    fileExt === 'txt'
+                ) {
+                    // Process document
+                    if (typeof _handleDocumentUploadAPI === 'function') {
+                        _handleDocumentUploadAPI(file);
+                    }
+                } else if (
+                    file.type.startsWith('image/') || 
+                    ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt)
+                ) {
+                    // Process image
+                    if (typeof _handleImageUploadClientSide === 'function') {
+                        _handleImageUploadClientSide(file);
+                    }
+                } else {
+                    showNotification('Only PDF, DOCX, TXT, or image files are supported for upload.', 'error');
+                }
+                
+                // Reset the file input
+                DOM.fileInput.value = '';
+            });
+        }
+    }
+
+    if (DOM.removeAttachedDocumentButton && typeof _removeAttachedDocument === 'function') {
+        DOM.removeAttachedDocumentButton.addEventListener('click', () => _removeAttachedDocument());
+    }
+
+    if (DOM.microphoneButton && typeof _toggleListening === 'function') {
+        DOM.microphoneButton.addEventListener('click', () => _toggleListening());
     }
 
     if (DOM.resetChatButton && typeof _resetChat === 'function') {
-        DOM.resetChatButton.addEventListener('click', _resetChat);
-    }
-    if (DOM.uploadDocumentButton && DOM.documentInput && typeof _handleDocUpload === 'function') {
-        DOM.uploadDocumentButton.addEventListener('click', () => DOM.documentInput.click());
-        DOM.documentInput.addEventListener('change', (event) => {
-            const file = event.target.files[0]; if (file) _handleDocUpload(file);
-        });
-    }
-    if (DOM.uploadImageButton && DOM.imageInput && typeof _handleImgUpload === 'function') {
-        DOM.uploadImageButton.addEventListener('click', () => DOM.imageInput.click());
-        DOM.imageInput.addEventListener('change', (event) => {
-            const file = event.target.files[0]; if (file) _handleImgUpload(file);
-        });
-    }
-    if (DOM.removeAttachedDocumentButton && typeof _removeAttachedDoc === 'function') {
-        DOM.removeAttachedDocumentButton.addEventListener('click', _removeAttachedDoc);
-    }
-    if (DOM.forceWebSearchButton && typeof _sendMessageUI === 'function') {
-         DOM.forceWebSearchButton.addEventListener('click', () => _sendMessageUI("[FORCE_WEB_SEARCH] "));
-    }
-    if (DOM.microphoneButton && typeof _toggleListening === 'function') {
-        DOM.microphoneButton.addEventListener('click', _toggleListening);
-    }
-    if (DOM.getDailyBriefingButton && typeof _fetchDailyBriefing === 'function' && DOM.dailyBriefingPanel) {
-        DOM.getDailyBriefingButton.addEventListener('click', () => {
-            _fetchDailyBriefing();
-            // Also open the panel
-            const panelWasOpen = DOM.dailyBriefingPanel.classList.contains('open');
-            if (typeof window.closeAllSidePanels === 'function') window.closeAllSidePanels(); // Close others
-            if (!panelWasOpen) {
-                if (!DOM.dailyBriefingPanel.classList.contains('right-sliding')) DOM.dailyBriefingPanel.classList.add('right-sliding');
-                DOM.dailyBriefingPanel.classList.add('open');
-            }
-        });
+        DOM.resetChatButton.addEventListener('click', () => _resetChat());
     }
 
+    if (DOM.clearHistoryButton && typeof _clearAllLocalHistory === 'function') {
+        console.log("Attaching listener to clearHistoryButton");
+        DOM.clearHistoryButton.addEventListener('click', () => {
+            console.log("clearHistoryButton CLICKED");
+            _clearAllLocalHistory();
+        });
+    } else {
+        console.error("Failed to attach listener to clearHistoryButton. Button exists:", !!DOM.clearHistoryButton, "Function exists:", typeof _clearAllLocalHistory);
+    }
 
-    if (DOM.systemPromptSave) {
-        DOM.systemPromptSave.addEventListener('click', async () => {
-            if (DOM.systemPromptInput && typeof _setSystemPrompt === 'function') {
-                _setSystemPrompt(DOM.systemPromptInput.value.trim());
+    if (DOM.clearUserMemoryButton && typeof _clearUserMemoryBE === 'function') {
+        console.log("Attaching listener to clearUserMemoryButton");
+        DOM.clearUserMemoryButton.addEventListener('click', async () => {
+            console.log("clearUserMemoryButton CLICKED");
+            if (await _clearUserMemoryBE()) {
+                if (typeof _clearAllLocalHistory === 'function') _clearAllLocalHistory();
+                if (typeof _resetChat === 'function') _resetChat();
             }
-    
-            if (DOM.modelTemperatureInput && typeof _setModelTemp === 'function') {
-                const temp = parseFloat(DOM.modelTemperatureInput.value);
-                if (!isNaN(temp)) _setModelTemp(temp);
+        });
+    } else {
+        console.error("Failed to attach listener to clearUserMemoryButton. Button exists:", !!DOM.clearUserMemoryButton, "Function exists:", typeof _clearUserMemoryBE);
+    }
+
+    if (DOM.clearBackendMemoryButton && typeof _clearEidosMemoryBE === 'function') {
+        console.log("Attaching listener to clearBackendMemoryButton");
+        DOM.clearBackendMemoryButton.addEventListener('click', async () => {
+            console.log("clearBackendMemoryButton CLICKED");
+            if (await _clearEidosMemoryBE()) {
+                if (typeof _clearAllLocalHistory === 'function') _clearAllLocalHistory();
+                if (typeof _resetChat === 'function') _resetChat();
             }
-    
-            let llmChanged = false;
-            if (DOM.llmProviderUrlInput && typeof _setLLMProviderUrl === 'function') {
-                _setLLMProviderUrl(DOM.llmProviderUrlInput.value.trim());
-                llmChanged = true;
+        });
+    } else {
+        console.error("Failed to attach listener to clearBackendMemoryButton. Button exists:", !!DOM.clearBackendMemoryButton, "Function exists:", typeof _clearEidosMemoryBE);
+    }
+
+    if (DOM.systemPromptSave && typeof _saveSettingsToBackendAPI === 'function') {
+        DOM.systemPromptSave.addEventListener('click', () => {
+            // Call existing setters for other settings
+            if (DOM.apiUrlInput && typeof _setGlobalApiBaseUrl === 'function') _setGlobalApiBaseUrl(DOM.apiUrlInput.value);
+            if (DOM.apiKeyInput && typeof _setAPIKey === 'function') _setAPIKey(DOM.apiKeyInput.value);
+            if (DOM.llmProviderUrlInput && typeof _setLLMProviderUrl === 'function') _setLLMProviderUrl(DOM.llmProviderUrlInput.value);
+            if (DOM.userIdInput && typeof _setCurrentUserId === 'function') _setCurrentUserId(DOM.userIdInput.value);
+            if (DOM.weatherLocationInput && typeof _setWeatherLoc === 'function') _setWeatherLoc(DOM.weatherLocationInput.value);
+            if (DOM.modelTemperatureInput && typeof _setModelTemp === 'function') _setModelTemp(parseFloat(DOM.modelTemperatureInput.value));
+            if (DOM.contextLengthInput && typeof _setContextLen === 'function') _setContextLen(DOM.contextLengthInput.value ? parseInt(DOM.contextLengthInput.value, 10) : null);
+            if (DOM.systemPromptInput && typeof _setSystemPrompt === 'function') _setSystemPrompt(DOM.systemPromptInput.value);
+
+            // NEW: Save Admin Password
+            if (DOM.adminPasswordInput && typeof _setAdminPassword === 'function') {
+                _setAdminPassword(DOM.adminPasswordInput.value);
             }
-    
-            let apiChanged = false;
-            if (DOM.apiUrlInput && typeof _setGlobalApiBaseUrl === 'function') {
-                _setGlobalApiBaseUrl(DOM.apiUrlInput.value.trim());
-                apiChanged = true;
-            }
-    
-            if (DOM.apiKeyInput && typeof _setAPIKey === 'function') {
-                _setAPIKey(DOM.apiKeyInput.value.trim());
-            }
-    
-            let userChanged = false;
-            if (DOM.userIdInput && typeof _setCurrentUserId === 'function') {
-                _setCurrentUserId(DOM.userIdInput.value.trim());
-                userChanged = true;
-            }
-    
-            let weatherChanged = false;
-            if (DOM.weatherLocationInput && typeof _setWeatherLoc === 'function') {
-                _setWeatherLoc(DOM.weatherLocationInput.value.trim());
-                weatherChanged = true;
-                window.weatherLocationChangedThisSession = true;
-            }
-    
-            if (DOM.contextLengthInput && typeof _setContextLen === 'function') {
-                const len = parseInt(DOM.contextLengthInput.value, 10);
-                if (!isNaN(len)) _setContextLen(len);
-            }
-    
-            const settingsToSyncForBackend = [];
+
+            showNotification("Settings saved to browser's local storage.", "success");
+
+            // Prepare payload for backend sync (if needed)
+            const settingsToSync = [];
             if (DOM.weatherLocationInput && DOM.weatherLocationInput.value.trim()) {
-                settingsToSyncForBackend.push({
+                settingsToSync.push({
                     attribute_name: "preferred_location",
                     attribute_value: DOM.weatherLocationInput.value.trim(),
-                    user_statement_context: "User set default weather location via GUI settings."
+                    user_statement_context: "User set preferred weather location via GUI settings."
                 });
             }
-            if (DOM.systemPromptInput && DOM.systemPromptInput.value.trim()) {
-                settingsToSyncForBackend.push({
-                    attribute_name: "system_prompt_preference",
-                    attribute_value: DOM.systemPromptInput.value.trim(),
-                    user_statement_context: "User set system prompt preference via GUI settings."
-                });
+            // Add other settings to sync to backend if necessary
+
+            if (settingsToSync.length > 0 && typeof _saveSettingsToBackendAPI === 'function') {
+                _saveSettingsToBackendAPI({ settings: settingsToSync });
             }
-    
-            if (settingsToSyncForBackend.length > 0 && typeof _saveSettingsToBackend === 'function') {
-                const payload = { settings: settingsToSyncForBackend };
-                await _saveSettingsToBackend(payload);
-            }
-    
-            if (apiChanged || userChanged) {
-                // TODO: Reconnect WebSocket if needed
-            }
-    
-            if (llmChanged && typeof _fetchModels === 'function') {
-                _fetchModels();
-            }
-    
-            if (weatherChanged && typeof _setupWeather === 'function') {
-                _setupWeather();
-            }
-    
-            if (DOM.systemPromptPanel) DOM.systemPromptPanel.classList.remove('open');
-            showNotification('Settings saved to browser. Backend sync initiated where applicable.', 'success');
         });
     }
 
-    if (DOM.clearHistoryButton && typeof _clearAllLocalHistory === 'function') { DOM.clearHistoryButton.addEventListener('click', _clearAllLocalHistory); }
-    if (DOM.clearUserMemoryButton && typeof _clearUserMemoryBE === 'function') { DOM.clearUserMemoryButton.addEventListener('click', async () => { if (await _clearUserMemoryBE()) { if(typeof _clearAllLocalHistory === 'function') _clearAllLocalHistory(); if(typeof _resetChat === 'function') _resetChat(); }}); }
-    if (DOM.clearBackendMemoryButton && typeof _clearEidosMemoryBE === 'function') { DOM.clearBackendMemoryButton.addEventListener('click', async () => { if (await _clearEidosMemoryBE()) { if(typeof _clearAllLocalHistory === 'function') _clearAllLocalHistory(); if(typeof _resetChat === 'function') _resetChat(); }}); }
-    if (DOM.weatherCloseButton && DOM.weatherPanel) { DOM.weatherCloseButton.addEventListener('click', () => DOM.weatherPanel.style.display = 'none'); }
-    if (DOM.weatherUpdateButton && typeof _fetchWeather === 'function') { /* ... */ }
+    if (DOM.refreshDailyBriefingButton && typeof _fetchAndDisplayDailyBriefingGUI === 'function') {
+        DOM.refreshDailyBriefingButton.addEventListener('click', () => _fetchAndDisplayDailyBriefingGUI());
+    }
 
-    if (DOM.refreshDailyBriefingButton && typeof _fetchDailyBriefing === 'function') DOM.refreshDailyBriefingButton.addEventListener('click', _fetchDailyBriefing);
-    if (DOM.refreshLearningLogButton && typeof _fetchLearnings === 'function') DOM.refreshLearningLogButton.addEventListener('click', _fetchLearnings);
-    if (DOM.clearLearningLogDisplayButton && DOM.learningLogContentArea) DOM.clearLearningLogDisplayButton.addEventListener('click', () => { DOM.learningLogContentArea.innerHTML = '<p style="color: #888;">Display cleared.</p>'; });
-    if (DOM.refreshDreamJournalButton && typeof _fetchDreams === 'function') DOM.refreshDreamJournalButton.addEventListener('click', _fetchDreams);
-    if (DOM.clearDreamJournalDisplayButton && DOM.dreamJournalContentArea) DOM.clearDreamJournalDisplayButton.addEventListener('click', () => { DOM.dreamJournalContentArea.innerHTML = '<p style="color: #888;">Display cleared.</p>'; });
-    if (DOM.refreshKnowledgeLogButton && typeof _fetchKnowledgeVerifications === 'function') DOM.refreshKnowledgeLogButton.addEventListener('click', _fetchKnowledgeVerifications);
-    if (DOM.clearKnowledgeLogDisplayButton && DOM.knowledgeLogContentArea) DOM.clearKnowledgeLogDisplayButton.addEventListener('click', () => { DOM.knowledgeLogContentArea.innerHTML = '<p style="color: #888;">Display cleared.</p>'; });
-    if (DOM.clearProactiveButton && DOM.proactiveMessagesArea) DOM.clearProactiveButton.addEventListener('click', () => { DOM.proactiveMessagesArea.innerHTML = '<p style="color: #888;">No proactive messages yet.</p>'; showNotification('Proactive display cleared.', 'info'); });
-    
-    // Listener for the new "Refresh Facts" button
+    if (DOM.refreshLearningLogButton && typeof _fetchAndDisplayLearnings === 'function') {
+        DOM.refreshLearningLogButton.addEventListener('click', () => _fetchAndDisplayLearnings());
+    }
+
+    if (DOM.refreshDreamJournalButton && typeof _fetchAndDisplayDreams === 'function') {
+        DOM.refreshDreamJournalButton.addEventListener('click', () => _fetchAndDisplayDreams());
+    }
+
+    if (DOM.refreshKnowledgeLogButton && typeof _fetchAndDisplayKnowledgeVerifications === 'function') {
+        DOM.refreshKnowledgeLogButton.addEventListener('click', () => _fetchAndDisplayKnowledgeVerifications());
+    }
+
     if (DOM.refreshUserFactsButton && typeof _fetchUserFacts === 'function') {
         DOM.refreshUserFactsButton.addEventListener('click', _fetchUserFacts);
     }
 
-    if (DOM.inputContainer) { /* ... Drag-drop listeners ... */ }
-    console.log("Global event listeners set up.");
+    if (DOM.weatherUpdateButton && typeof _setupWeatherUpdates === 'function') {
+        DOM.weatherUpdateButton.addEventListener('click', () => _setupWeatherUpdates());
+    }
+
+    if (DOM.weatherCloseButton && DOM.weatherPanel) {
+        DOM.weatherCloseButton.addEventListener('click', () => {
+            DOM.weatherPanel.style.display = 'none';
+        });
+    }
+
+    if (DOM.apiUrlInput) {
+        DOM.apiUrlInput.addEventListener('change', () => _setGlobalApiBaseUrl(DOM.apiUrlInput.value));
+    }
+
+    if (DOM.apiKeyInput) {
+        DOM.apiKeyInput.addEventListener('change', () => _setAPIKey(DOM.apiKeyInput.value));
+    }
+
+    if (DOM.llmProviderUrlInput) {
+        DOM.llmProviderUrlInput.addEventListener('change', () => _setLLMProviderUrl(DOM.llmProviderUrlInput.value));
+    }
+
+    if (DOM.weatherLocationInput) {
+        DOM.weatherLocationInput.addEventListener('change', () => _setWeatherLoc(DOM.weatherLocationInput.value));
+    }
+
+    if (DOM.systemPromptInput) {
+        DOM.systemPromptInput.addEventListener('change', () => _setSystemPrompt(DOM.systemPromptInput.value));
+    }
+
+    if (DOM.modelTemperatureInput) {
+        DOM.modelTemperatureInput.addEventListener('change', () => _setModelTemp(parseFloat(DOM.modelTemperatureInput.value)));
+    }
+
+    if (DOM.contextLengthInput) {
+        DOM.contextLengthInput.addEventListener('change', () => _setContextLen(parseInt(DOM.contextLengthInput.value, 10)));
+    }
+
+    if (DOM.userIdInput) {
+        DOM.userIdInput.addEventListener('change', () => _setCurrentUserId(DOM.userIdInput.value));
+    }
+
+    // NEW: Event listener for saving Pathos event
+    if (DOM.savePathosEventButton && typeof _addPathosEventAPI === 'function') {
+        DOM.savePathosEventButton.addEventListener('click', async () => {
+            const title = DOM.pathosEventTitleInput.value.trim();
+            const startDate = DOM.pathosEventStartDateInput.value;
+            const endDate = DOM.pathosEventEndDateInput.value;
+            const eventType = DOM.pathosEventTypeSelect.value;
+            const description = DOM.pathosEventDescriptionInput.value.trim();
+            const location = DOM.pathosEventLocationInput.value.trim();
+            const activityTheme = DOM.pathosEventThemeInput.value.trim();
+            const tasksInput = DOM.pathosEventTasksInput.value.trim();
+
+            const plannedSitesOrTasks = tasksInput ? tasksInput.split('\n').map(task => task.trim()).filter(task => task) : null;
+
+            // Basic Validation
+            if (!title) { showNotification("Event Title is required.", "error"); DOM.pathosEventTitleInput.focus(); return; }
+            if (!startDate) { showNotification("Start Date is required.", "error"); DOM.pathosEventStartDateInput.focus(); return; }
+            if (!endDate) { showNotification("End Date is required.", "error"); DOM.pathosEventEndDateInput.focus(); return; }
+            if (new Date(endDate) < new Date(startDate)) { showNotification("End Date cannot be before Start Date.", "error"); DOM.pathosEventEndDateInput.focus(); return; }
+            if (!eventType) { showNotification("Event Type is required.", "error"); DOM.pathosEventTypeSelect.focus(); return; }
+
+            const eventData = {
+                title: title,
+                start_date: startDate,
+                end_date: endDate,
+                event_type: eventType,
+                description: description || null,
+                location: location || null,
+                details: {
+                    activity_theme: activityTheme || null,
+                    planned_sites_or_tasks: plannedSitesOrTasks
+                }
+            };
+            // Remove null details if empty
+            if (eventData.details && !eventData.details.activity_theme && (!eventData.details.planned_sites_or_tasks || eventData.details.planned_sites_or_tasks.length === 0)) {
+                eventData.details = null;
+            }
+            if (eventData.details && eventData.details.planned_sites_or_tasks === null) delete eventData.details.planned_sites_or_tasks;
+            if (eventData.details && eventData.details.activity_theme === null) delete eventData.details.activity_theme;
+
+            const success = await _addPathosEventAPI(eventData);
+            if (success) {
+                // Optionally clear form and close panel
+                DOM.pathosEventTitleInput.value = '';
+                DOM.pathosEventStartDateInput.value = '';
+                DOM.pathosEventEndDateInput.value = '';
+                DOM.pathosEventTypeSelect.value = '';
+                DOM.pathosEventDescriptionInput.value = '';
+                DOM.pathosEventLocationInput.value = '';
+                DOM.pathosEventThemeInput.value = '';
+                DOM.pathosEventTasksInput.value = '';
+                if (DOM.addPathosEventPanel && typeof window.closeAllSidePanels === 'function') {
+                    DOM.addPathosEventPanel.classList.remove('open');
+                }
+            }
+        });
+    } else {
+        console.warn("Save Pathos Event button or API function not available.");
+    }
+
+    console.log("Global event listeners set up (with Admin Password handling in settings).");
 }
-console.log("event_handlers.js loaded.");
+console.log("event_handlers.js loaded (with Add Pathos Event).");

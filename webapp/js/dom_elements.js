@@ -68,6 +68,8 @@ export const uploadDocumentButton = $('upload-document-button');
 export const uploadImageButton = $('upload-image-button');
 export const userIdInput = $('user-id-input');
 export const userInput = $('user-input');
+export const fileInput = $('file-input');
+export const fileUploadButton = $('file-upload-button');
 export const weatherCloseButton = $('weather-close'); // Corrected
 export const weatherDescriptionDisplay = $('weather-description'); // Corrected
 export const weatherHumidityDisplay = $('weather-humidity'); // Corrected
@@ -85,4 +87,31 @@ export const userFactsCloseButton = $('user-facts-close-button');
 export const userFactsContentArea = $('user-facts-content-area');
 export const refreshUserFactsButton = $('refresh-user-facts-button');
 
-console.log('✅ dom_elements.js loaded — all DOM hooks wired (with corrections).');
+// Chronos Panel Elements
+export const chronosPanelButton = $('chronos-panel-button');
+export const chronosPanel = $('chronos-panel');
+export const chronosPanelCloseButton = $('chronos-panel-close-button');
+export const chronosPanelContentArea = $('chronos-panel-content-area'); // Used for error display
+export const chronosCurrentActivityDisplay = $('chronos-current-activity-display');
+export const chronosTodaysScheduleList = $('chronos-todays-schedule-list');
+export const chronosUpcomingEventsList = $('chronos-upcoming-events-list');
+export const refreshChronosPanelButton = $('refresh-chronos-panel-button');
+
+// Add Pathos Event Panel Elements
+export const addPathosEventPanelButton = $('add-pathos-event-panel-button');
+export const addPathosEventPanel = $('add-pathos-event-panel');
+export const addPathosEventCloseButton = $('add-pathos-event-close-button');
+export const pathosEventTitleInput = $('pathos-event-title-input');
+export const pathosEventStartDateInput = $('pathos-event-start-date-input');
+export const pathosEventEndDateInput = $('pathos-event-end-date-input');
+export const pathosEventTypeSelect = $('pathos-event-type-select');
+export const pathosEventDescriptionInput = $('pathos-event-description-input');
+export const pathosEventLocationInput = $('pathos-event-location-input');
+export const pathosEventThemeInput = $('pathos-event-theme-input');
+export const pathosEventTasksInput = $('pathos-event-tasks-input');
+export const savePathosEventButton = $('save-pathos-event-button');
+
+// NEW: Admin Password Input
+export const adminPasswordInput = $('admin-password-input');
+
+console.log('✅ dom_elements.js loaded — all DOM hooks wired (with Admin Password input).');

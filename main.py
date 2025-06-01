@@ -4,7 +4,7 @@ import sys
 import time
 import uuid
 import httpx
-import io 
+import io
 import re
 from datetime import datetime, timezone
 import json
@@ -16,14 +16,14 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Header, WebSocket, WebSocketDisconnect, Path as FastApiPath
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ValidationError, Field # Ensure ValidationError is imported
 
-from pydantic import BaseModel, ValidationError, Field
-
-from eidos_agent.core.config import Config
+from eidos_agent.core.config import Config, LLMConfig
 from eidos_agent.utils.logger import get_logger, configure_logging
 
 configure_logging()
@@ -33,7 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent
 WEBAPP_DIR = BASE_DIR / "webapp"
 
 from eidos_agent.services.openweathermap import OpenWeatherMapService
-from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
+from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry # Used in response_model
 from eidos_agent.services.home_assistant import HomeAssistantService
 from eidos_agent.modules.ethos_core.core import EthosCore
 from eidos_agent.modules.logos_core.handler import LogosCore
@@ -44,10 +44,13 @@ from eidos_agent.core.api_models import (
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage,
     ChatCompletionChoice, ChatCompletionUsage, ModelList, ModelCard,
     UserSettingItem, UserSettingsRequest, ClearUserMemoryRequest,
-    FeedbackRequest, DreamEntryResponse
+    FeedbackRequest, DreamEntryResponse, MemoryEntry as ApiMemoryEntry # Use ApiMemoryEntry for response_model
 )
 from eidos_agent.core.connection_manager import ConnectionManager
 from eidos_agent.services.external_tts_service import ExternalTTSService
+from eidos_agent.modules.chronos_engine import ChronosEngine, PATHOS_USER_ID
+from eidos_agent.modules.chronos_models import ActivitySlot, PathosEvent, EventType, PathosEventDetails
+from eidos_agent.routers import chat_storage
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
@@ -65,27 +68,33 @@ TEMP_AUDIO_CACHE_LOCK = asyncio.Lock()
 logger.info(f"MAIN.PY GLOBAL: TEMP_AUDIO_CACHE_LOCK initialized. ID: {id(TEMP_AUDIO_CACHE_LOCK)}")
 
 async def warm_vllm_cache(pathos_if: PathosInterface, static_system_prompt: str):
-    if not pathos_if.pathos_llm_config or \
-       not pathos_if.pathos_llm_config.get('url') or \
+    main_llm_config_for_warmup: Optional[LLMConfig] = pathos_if.pathos_llm_config
+    if not main_llm_config_for_warmup or \
+       not (main_llm_config_for_warmup.get('url') or main_llm_config_for_warmup.get('base_url')) or \
        not static_system_prompt:
-        logger.warning("VLLM Cache Warming: LLM config or static prompt content missing. Skipping.")
+        logger.warning("VLLM Cache Warming: Main Pathos LLM config (URL/BaseURL) or static prompt content missing. Skipping.")
         return
-    logger.info("Attempting to warm VLLM cache with the static system prompt...")
+    llm_provider_url = main_llm_config_for_warmup.get('base_url') or main_llm_config_for_warmup.get('url')
+    llm_model_name = main_llm_config_for_warmup.get('model') or main_llm_config_for_warmup.get('model_name')
+    logger.info(f"Attempting to warm VLLM cache with static prompt for Pathos LLM. Target URL base: {llm_provider_url}, Target Model: {llm_model_name}")
+    if not llm_provider_url or not llm_model_name:
+        logger.error(f"VLLM Cache Warming: Could not determine API URL ('{llm_provider_url}') or model name ('{llm_model_name}') from Pathos LLM config. Skipping.")
+        return
+    final_api_url = f"{llm_provider_url.rstrip('/')}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    api_key = main_llm_config_for_warmup.get('api_key')
+    if api_key and api_key.lower() not in ['lm-studio', 'ollama', 'vllm', 'none', '']:
+        headers["Authorization"] = f"Bearer {api_key}"
+    warmup_messages = [{"role": "system", "content": static_system_prompt}, {"role": "user", "content": "Hello."}]
+    payload = {"model": llm_model_name, "messages": warmup_messages, "max_tokens": 5, "temperature": 0.1, "stream": False}
+    logger.debug(f"Warming VLLM cache: POST to {final_api_url} with model {llm_model_name}")
     try:
-        warmup_messages = [{"role": "system", "content": static_system_prompt}, {"role": "user", "content": "Hello."}]
-        llm_config = pathos_if.pathos_llm_config
-        final_api_url, final_model_name, headers, _, _ = pathos_if._prepare_llm_call_params(
-            temperature=0.1, max_tokens_override=5, llm_provider_url_override=None, pathos_model_override=None)
-        if not final_api_url or not final_model_name:
-            logger.error("VLLM Cache Warming: Could not determine API URL or model name. Skipping.")
-            return
-        payload = {"model": final_model_name, "messages": warmup_messages, "max_tokens": 5, "temperature": 0.1, "stream": False}
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(final_api_url, headers=headers, json=payload)
             response.raise_for_status()
-        logger.info(f"VLLM cache warming request sent successfully for model '{final_model_name}'.")
+        logger.info(f"VLLM cache warming request sent successfully for Pathos model '{llm_model_name}' at {final_api_url}.")
     except Exception as e:
-        logger.error(f"Failed to warm VLLM cache: {e}", exc_info=True)
+        logger.error(f"Failed to warm VLLM cache for Pathos LLM (URL: {final_api_url}, Model: {llm_model_name}): {e}", exc_info=True)
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
@@ -94,31 +103,37 @@ async def lifespan(app_instance: FastAPI):
     owm_service: Optional[OpenWeatherMapService] = None
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
-        ethos_core = EthosCore(Config); ethos_core.set_connection_manager(manager)
+        logger.info("Lifespan: Starting core component initialization...")
+        ethos_core = EthosCore(Config)
+        chat_storage.init_router(ethos_core)
+        ethos_core.set_connection_manager(manager)
         if Config.get_ha_config():
-             ha_service = HomeAssistantService(Config, ethos_core.memory_storage)
-             try: await ha_service.connect()
-             except Exception as ha_e: logger.error(f"Lifespan: Failed to connect HomeAssistantService: {ha_e}", exc_info=True); ha_service = None
+            ha_service = HomeAssistantService(Config, ethos_core.memory_storage)
+            try: await ha_service.connect()
+            except Exception as ha_e: logger.error(f"Lifespan: Failed to connect HomeAssistantService: {ha_e}", exc_info=True); ha_service = None
         if Config.get_openweathermap_config() and Config.get_openweathermap_config().get('api_key'):
-             owm_service = OpenWeatherMapService(Config)
-             if not owm_service.is_available: logger.warning("Lifespan: OWMService not available.")
+            owm_service = OpenWeatherMapService(Config)
+            if not owm_service.is_available: logger.warning("Lifespan: OWMService not available.")
         if Config.ENABLE_ONEIROS and ethos_core:
-            oneiros_module = OneirosModule(Config, ethos_core); ethos_core.oneiros_module = oneiros_module
-        logos_core = LogosCore(Config, ethos_core, ha_service, owm_service); await logos_core.initialize_services()
-        if ethos_core: ethos_core.logos_core = logos_core
-        
+            oneiros_module = OneirosModule(Config, ethos_core)
+            if ethos_core: ethos_core.oneiros_module = oneiros_module
+        logos_core = LogosCore(Config, ethos_core, ha_service, owm_service)
+        await logos_core.initialize_services()
+        if ethos_core: ethos_core.set_logos_core(logos_core)
+        chronos_engine_instance: Optional[ChronosEngine] = None
+        if ethos_core and logos_core and ethos_core.memory_storage:
+            chronos_engine_instance = ChronosEngine(Config, ethos_core.memory_storage, ethos_core, logos_core)
+            if ethos_core: ethos_core.set_chronos_engine(chronos_engine_instance)
+            logger.info("Lifespan: ChronosEngine initialized and set in EthosCore.")
+        else:
+            logger.warning("Lifespan: ChronosEngine NOT initialized due to missing EthosCore, LogosCore, or MemoryStorage.")
         pathos_interface = PathosInterface(Config, ethos_core, logos_core, manager)
-        pathos_interface.set_audio_cache(TEMP_AUDIO_CACHE, TEMP_AUDIO_CACHE_LOCK) # Pass global cache and lock
-        logger.info(f"MAIN.PY LIFESPAN: PathosInterface audio_cache ID: {id(pathos_interface.audio_cache) if pathos_interface.audio_cache is not None else 'None'}")
-        logger.info(f"MAIN.PY LIFESPAN: PathosInterface audio_cache_lock ID: {id(pathos_interface.audio_cache_lock) if pathos_interface.audio_cache_lock is not None else 'None'}")
-        logger.info(f"MAIN.PY LIFESPAN: Main's TEMP_AUDIO_CACHE ID: {id(TEMP_AUDIO_CACHE)}")
-        logger.info(f"MAIN.PY LIFESPAN: Main's TEMP_AUDIO_CACHE_LOCK ID: {id(TEMP_AUDIO_CACHE_LOCK)}")
+        pathos_interface.set_audio_cache(TEMP_AUDIO_CACHE, TEMP_AUDIO_CACHE_LOCK)
         if ethos_core: ethos_core.set_pathos_interface(pathos_interface)
-
         if ethos_core and logos_core and pathos_interface:
             router = InputRouter(config=Config, ethos_core=ethos_core, logos_core=logos_core, pathos_interface=pathos_interface)
-        else: raise RuntimeError("Failed to initialize InputRouter due to missing core components.")
-
+        else:
+            raise RuntimeError("Failed to initialize InputRouter due to missing core components.")
         if Config.EIDOS_TTS and isinstance(Config.EIDOS_TTS, dict) and Config.EIDOS_TTS.get('api_url'):
             try:
                 eidos_tts_service_instance = ExternalTTSService(config=Config)
@@ -127,13 +142,11 @@ async def lifespan(app_instance: FastAPI):
                 else: eidos_tts_service_instance = None
             except Exception as e_tts_init: logger.error(f"Lifespan: Failed to initialize ExternalTTSService: {e_tts_init}", exc_info=True); eidos_tts_service_instance = None
         else: eidos_tts_service_instance = None
-        
         await check_critical_llm_availability()
-        if pathos_interface and Config.LLM.get("PATHOS", {}).get("url"):
+        if pathos_interface and pathos_interface.pathos_llm_config and (pathos_interface.pathos_llm_config.get("url") or pathos_interface.pathos_llm_config.get("base_url")):
             static_prompt_for_vllm = pathos_interface.get_static_system_prompt_content()
             if static_prompt_for_vllm: await warm_vllm_cache(pathos_interface, static_prompt_for_vllm)
         if ethos_core: background_tasks = await ethos_core.get_background_tasks()
-        
         logger.info("--- Eidos System Initialized Successfully ---")
         yield
         logger.info("--- Shutting Down Eidos System ---")
@@ -148,7 +161,7 @@ async def lifespan(app_instance: FastAPI):
         if ha_service: await ha_service.disconnect()
         if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
         if oneiros_module: await oneiros_module.close()
-        if ethos_core: await ethos_core.close_memory_connection()
+        if ethos_core: await ethos_core.close()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()
         TEMP_AUDIO_CACHE.clear()
         logger.info("--- Eidos System Shutdown Complete ---")
@@ -159,8 +172,8 @@ async def lifespan(app_instance: FastAPI):
         raise RuntimeError("Eidos system failed to initialize during lifespan startup.") from e_lifespan_main
 
 app = FastAPI(title="Eidos Agent API", version="1.0", lifespan=lifespan)
+app.include_router(chat_storage.router, prefix="/v1")
 
-# Static files and CORS (as before)
 if WEBAPP_DIR.is_dir():
     js_dir = WEBAPP_DIR / "js"; css_dir = WEBAPP_DIR / "css"
     if js_dir.is_dir(): app.mount("/js", StaticFiles(directory=js_dir), name="js")
@@ -175,7 +188,6 @@ if Config.ENABLE_ONEIROS and Config.ONEIROS and Config.ONEIROS.get('enable_image
     except Exception as e_mount_static: logger.error(f"Error mounting dream image directory: {e_mount_static}", exc_info=True)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*", "X-User-Id", "X-Admin-Password"])
 
-# LLM Availability Checks (as before)
 async def check_llm_role_availability(role_name: str, llm_config: Optional[Dict[str, Any]]):
     if not llm_config or not llm_config.get('url') or not llm_config.get('model'): return True
     api_url = f"{llm_config['url'].rstrip('/')}/chat/completions"; model_name = llm_config['model']
@@ -192,472 +204,137 @@ async def check_llm_role_availability(role_name: str, llm_config: Optional[Dict[
     except Exception as e: logger.error(f"LLM Check: FAILED - Error checking role '{role_name}' (Model: {model_name}): {e}", exc_info=True); return False
 
 async def check_critical_llm_availability():
-    all_critical_llms_ok = True; critical_roles_map = { "PATHOS": Config.LLM.get('PATHOS'), "LOGOS_TECHNE (Summarization/Reflection/Upkeep)": Config.get_llm_config(Config.ETHOS.get('summarization_llm_role', 'LOGOS_TECHNE')), "ONEIROS_DREAM_LLM": Config.get_llm_config(Config.ONEIROS.get('dream_llm_role', 'PATHOS')) if Config.ONEIROS else None }
-    if Config.ENABLE_VISION_PROCESSING: critical_roles_map["LOGOS_VISION_CONTEXT"] = Config.LLM.get('LOGOS_VISION_CONTEXT')
-    if Config.ENABLE_KNOWLEDGE_UPKEEP: critical_roles_map["KNOWLEDGE_UPKEEP_LLM"] = Config.get_llm_config(Config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE'))
+    all_critical_llms_ok = True
+    critical_roles_map = {
+        "PATHOS": Config.LLM.get('PATHOS'),
+        "LOGOS_TECHNE (Summarization/Reflection/Upkeep)": Config.get_llm_config(Config.ETHOS.get('summarization_llm_role', 'LOGOS_TECHNE')),
+        "ONEIROS_DREAM_LLM": Config.get_llm_config(Config.ONEIROS.get('dream_llm_role', 'PATHOS')) if Config.ONEIROS else None
+    }
+    if Config.ENABLE_KNOWLEDGE_UPKEEP:
+        critical_roles_map["KNOWLEDGE_UPKEEP_LLM"] = Config.get_llm_config(Config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE'))
     for role_description, llm_config_to_check in critical_roles_map.items():
         if llm_config_to_check:
-            if not await check_llm_role_availability(role_description, llm_config_to_check): all_critical_llms_ok = False
-    if not all_critical_llms_ok: logger.critical("!!! WARNING: One or more critical LLMs are not available or not configured. !!!")
+            if not await check_llm_role_availability(role_description, llm_config_to_check):
+                all_critical_llms_ok = False
+    if not all_critical_llms_ok:
+        logger.critical("!!! WARNING: One or more critical LLMs are not available or not configured. !!!")
 
-# Input Parsing (extract_input_to_eidos_format - ensure it's the corrected version from previous steps)
 def extract_input_to_eidos_format(body: dict, request_id: str, user_id_from_header: Optional[str]) -> dict:
-    # 1. Determine and Normalize User ID
-    raw_user_id_from_payload = body.get('user') # User ID from main body (OpenAI compatible)
-    raw_user_id_from_header_val = user_id_from_header # User ID from X-User-Id header
-
-    # Prioritize header, then payload, then default
-    effective_raw_user_id: Optional[str] = raw_user_id_from_header_val
-    if not effective_raw_user_id:
-        effective_raw_user_id = raw_user_id_from_payload
-    if not effective_raw_user_id:
-        effective_raw_user_id = 'api_guest_user'
-
-    final_user_id: str = 'api_guest_user' # Default if all normalization fails
+    raw_user_id_from_payload = body.get('user')
+    effective_raw_user_id: Optional[str] = user_id_from_header or raw_user_id_from_payload or 'api_guest_user'
+    final_user_id = 'api_guest_user'
     if effective_raw_user_id and isinstance(effective_raw_user_id, str):
         normalized = effective_raw_user_id.lower().strip().replace(" ", "_")
-        if normalized: # Ensure not empty after normalization
-            final_user_id = normalized
-    
-    # This initial log is helpful for seeing raw vs. normalized early
-    logger.debug(
-        f"Request {request_id}: User ID determination. Header: '{raw_user_id_from_header_val}', "
-        f"Payload 'user': '{raw_user_id_from_payload}'. Effective Raw: '{effective_raw_user_id}'. "
-        f"Normalized Final User ID: '{final_user_id}'."
-    )
-
-    # 2. Extract Basic Parameters from Top Level of Request Body
+        if normalized: final_user_id = normalized
+    logger.debug(f"Request {request_id}: User ID. Header: '{user_id_from_header}', Payload: '{raw_user_id_from_payload}'. Final: '{final_user_id}'.")
     temperature_from_body = body.get('temperature')
-    # model_from_body is the model selected in the GUI dropdown, passed at the top level of the request
-    model_from_body = body.get('model') 
-
-    # 3. Extract Eidos-Specific Metadata (including overrides and TTS flag)
-    max_tokens_override: Optional[int] = None
-    llm_provider_url_override: Optional[str] = None
-    auto_tts_enabled: bool = False # Default
-    engaged_proactive_id_from_meta: Optional[str] = None
-    # force_web_search_from_meta is not typically expected here, usually from text prefix
-    # but we can initialize it if we ever decide to support it via metadata.
-    # force_web_search_from_meta: bool = False
-
-    body_metadata_dict = body.get('metadata') # This is the Eidos-specific nested 'metadata' object
+    model_from_body = body.get('model')
+    max_tokens_override, llm_provider_url_override, auto_tts_enabled, engaged_proactive_id_from_meta = None, None, False, None
+    body_metadata_dict = body.get('metadata')
     if body_metadata_dict and isinstance(body_metadata_dict, dict):
-        logger.debug(f"Request {request_id}: Processing Eidos-specific 'metadata' block: {body_metadata_dict}")
-        
-        max_tokens_override_raw = body_metadata_dict.get('max_tokens_override')
-        if max_tokens_override_raw is not None:
-            try:
-                max_tokens_override = int(max_tokens_override_raw)
-                logger.debug(f"Request {request_id}: Extracted max_tokens_override: {max_tokens_override}")
-            except ValueError:
-                logger.warning(f"Request {request_id}: Invalid max_tokens_override value '{max_tokens_override_raw}', ignoring.")
-        
+        logger.debug(f"Request {request_id}: Eidos 'metadata' block: {body_metadata_dict}")
+        if (mto_raw := body_metadata_dict.get('max_tokens_override')) is not None:
+            try: max_tokens_override = int(mto_raw)
+            except ValueError: logger.warning(f"Invalid max_tokens_override: '{mto_raw}'.")
         llm_provider_url_override = body_metadata_dict.get('llm_provider_url_override')
-        if llm_provider_url_override:
-             logger.debug(f"Request {request_id}: Extracted llm_provider_url_override: {llm_provider_url_override}")
-
-        auto_tts_enabled_raw = body_metadata_dict.get('auto_tts_enabled_for_response')
-        if isinstance(auto_tts_enabled_raw, bool):
-            auto_tts_enabled = auto_tts_enabled_raw
-        elif auto_tts_enabled_raw is not None: # If present but not bool, log warning
-            logger.warning(f"Request {request_id}: Invalid type for 'auto_tts_enabled_for_response' ('{auto_tts_enabled_raw}'), defaulting to False.")
-        logger.debug(f"Request {request_id}: Extracted auto_tts_enabled_for_response: {auto_tts_enabled}")
-        
+        if isinstance(body_metadata_dict.get('auto_tts_enabled_for_response'), bool):
+            auto_tts_enabled = body_metadata_dict['auto_tts_enabled_for_response']
         engaged_proactive_id_from_meta = body_metadata_dict.get('engaged_proactive_id')
-        if engaged_proactive_id_from_meta:
-            logger.debug(f"Request {request_id}: Extracted engaged_proactive_id: {engaged_proactive_id_from_meta}")
-
-        # pathos_model_override from metadata is also possible if client sends it nested
-        # but model_from_body (top-level) usually takes precedence for GUI selection.
-        # If you want metadata to override top-level, you'd add logic here.
-        # For now, model_from_body (top-level) is used for pathos_model_override.
-
-    else:
-        logger.debug(f"Request {request_id}: No Eidos-specific 'metadata' block found in request body.")
-
-    # 4. Initialize input_data structure
     input_data: Dict[str, Any] = {
-        "type": "text", # Default, will be changed to 'multimodal_input' if image/doc parts found
-        "text_content": "",
-        "image_content_b64": None,
-        "document_text": None,
+        "type": "text", "text_content": "", "image_content_b64": None, "document_text": None,
         "metadata": {
-            "conversation_history": [],
-            "source": "api_openai_compat_new_parser", # Or a more generic name
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user_id": final_user_id,
-            "temperature": temperature_from_body, # Can be None
-            "max_tokens_override": max_tokens_override, # Can be None
-            "llm_provider_url_override": llm_provider_url_override, # Can be None
-            "pathos_model_override": model_from_body, # From top-level 'model' key, can be None
-            "engaged_proactive_id": engaged_proactive_id_from_meta, # Can be None
-            "force_web_search_requested": False, # Initialize, will be updated by text content parsing
-            "auto_tts_enabled_for_response": auto_tts_enabled # Correctly assigned
+            "conversation_history": [], "source": "api_openai_compat_new_parser",
+            "timestamp": datetime.now(timezone.utc).isoformat(), "user_id": final_user_id,
+            "temperature": temperature_from_body, "max_tokens_override": max_tokens_override,
+            "llm_provider_url_override": llm_provider_url_override, "pathos_model_override": model_from_body,
+            "engaged_proactive_id": engaged_proactive_id_from_meta, "force_web_search_requested": False,
+            "auto_tts_enabled_for_response": auto_tts_enabled
         }
     }
-
-    # 5. Parse Messages (History and Current User Input)
     messages = body.get("messages", [])
-    if not messages:
-        logger.warning(f"Request {request_id}: No 'messages' array found in request body.")
-        # Log final structure before returning for an empty messages case
-        _log_final_parsed_input(request_id, final_user_id, input_data)
-        return input_data
-
-    # Populate conversation_history (all messages except the last one)
+    if not messages: _log_final_parsed_input(request_id, final_user_id, input_data); return input_data
     if len(messages) > 1:
         for msg_dict in messages[:-1]:
-            role = msg_dict.get("role")
-            content = msg_dict.get("content")
-            tool_calls = msg_dict.get("tool_calls")
-            tool_call_id = msg_dict.get("tool_call_id") # For tool role messages
-
-            if role not in ["system", "user", "assistant", "tool"]:
-                logger.warning(f"Request {request_id}: Skipping history message with invalid role: {role}")
-                continue
-
+            role, content, tool_calls, tool_call_id = msg_dict.get("role"), msg_dict.get("content"), msg_dict.get("tool_calls"), msg_dict.get("tool_call_id")
+            if role not in ["system", "user", "assistant", "tool"]: continue
             entry: Dict[str, Any] = {"role": role}
-
-            if isinstance(content, str):
-                entry["content"] = content
-            elif isinstance(content, list): # Handle multimodal history content (e.g., from a previous turn)
-                text_parts_hist, image_present_in_hist = [], False
+            if isinstance(content, str): entry["content"] = content
+            elif isinstance(content, list):
+                text_parts_hist, img_present_hist = [], False
                 for part in content:
-                    if isinstance(part, dict) and part.get("type") == "text":
-                        text_parts_hist.append(part.get("text", ""))
-                    elif isinstance(part, dict) and part.get("type") == "image_url":
-                        image_present_in_hist = True
-                final_history_text = " ".join(text_parts_hist).strip()
-                if image_present_in_hist:
-                    final_history_text += " [Image was present in history]" if final_history_text else "[Image was present in history]"
-                entry["content"] = final_history_text.strip() or None # Ensure None if empty
-            elif content is not None: # Fallback for other unexpected content types
-                entry["content"] = str(content)
-            
-            if tool_calls:
-                entry["tool_calls"] = tool_calls
-            if role == "tool" and tool_call_id: # Tool results must have tool_call_id
-                entry["tool_call_id"] = tool_call_id
-            
-            # Add to history only if it has some substance
-            if entry.get("content") or entry.get("tool_calls"): # Tool role might only have tool_call_id and content
-                input_data["metadata"]["conversation_history"].append(entry)
-
-    # Process the last message (current user input)
-    last_msg = messages[-1]
-    if last_msg.get("role") != "user":
-        logger.warning(f"Request {request_id}: Last message in 'messages' array is not from 'user'. Role: {last_msg.get('role')}. Processing as user input anyway.")
-        # Potentially handle this as an error or adapt, depending on strictness
-
-    last_content_from_request = last_msg.get("content", "")
-    current_input_text_parts = []
-
-    if isinstance(last_content_from_request, str):
-        current_input_text_parts.append(last_content_from_request)
-    elif isinstance(last_content_from_request, list): # OpenAI multimodal format for current input
-        input_data["type"] = "multimodal_input" # Mark as multimodal
-        for part_item in last_content_from_request:
+                    if isinstance(part, dict) and part.get("type") == "text": text_parts_hist.append(part.get("text", ""))
+                    elif isinstance(part, dict) and part.get("type") == "image_url": img_present_hist = True
+                final_hist_text = " ".join(text_parts_hist).strip()
+                if img_present_hist: final_hist_text += " [Image was present in history]" if final_hist_text else "[Image was present in history]"
+                entry["content"] = final_hist_text.strip() or None
+            elif content is not None: entry["content"] = str(content)
+            if tool_calls: entry["tool_calls"] = tool_calls
+            if role == "tool" and tool_call_id: entry["tool_call_id"] = tool_call_id
+            if entry.get("content") or entry.get("tool_calls"): input_data["metadata"]["conversation_history"].append(entry)
+    last_msg = messages[-1]; last_content_req = last_msg.get("content", ""); current_input_text_parts = []
+    if isinstance(last_content_req, str): current_input_text_parts.append(last_content_req)
+    elif isinstance(last_content_req, list):
+        input_data["type"] = "multimodal_input"
+        for part_item in last_content_req:
             if isinstance(part_item, dict):
                 part_type = part_item.get("type")
                 if part_type == "text":
                     text_part_content = part_item.get("text", "")
-                    # Check for embedded document text
                     doc_match = re.search(r"--- Uploaded Document Content ---\n([\s\S]*?)\n--- End Uploaded Document Content ---", text_part_content)
                     if doc_match:
                         input_data["document_text"] = doc_match.group(1).strip()
-                        logger.info(f"Request {request_id}: Extracted document text from user message. Length: {len(input_data['document_text'])}")
-                        # Add text before and after the document block
                         current_input_text_parts.append(text_part_content.split("--- Uploaded Document Content ---")[0].strip())
                         current_input_text_parts.append(text_part_content.split("--- End Uploaded Document Content ---")[-1].strip())
-                    else:
-                        current_input_text_parts.append(text_part_content)
+                    else: current_input_text_parts.append(text_part_content)
                 elif part_type == "image_url":
-                    image_url_data = part_item.get("image_url", {})
-                    if isinstance(image_url_data, dict):
-                        url_str = image_url_data.get("url")
-                        if url_str and url_str.startswith("data:image"): # Expecting base64 data URI
-                            try:
-                                input_data["image_content_b64"] = url_str.split(",", 1)[1]
-                                logger.info(f"Request {request_id}: Extracted base64 image data from user message. Length: {len(input_data['image_content_b64'])}")
-                            except IndexError:
-                                logger.error(f"Request {request_id}: Malformed base64 image data URI in user message: {url_str[:60]}...")
-            else: # If a part is not a dict, treat its string representation as text
-                current_input_text_parts.append(str(part_item))
-    
-    # Consolidate text parts for text_content
-    raw_text_content_for_processing = " ".join(filter(None, current_input_text_parts)).strip()
-
-    # Handle [FORCE_WEB_SEARCH] prefix
-    FORCE_SEARCH_PREFIX_PY = "[FORCE_WEB_SEARCH] "
-    if raw_text_content_for_processing.startswith(FORCE_SEARCH_PREFIX_PY):
-        input_data["metadata"]["force_web_search_requested"] = True # Set flag
-        input_data["text_content"] = raw_text_content_for_processing[len(FORCE_SEARCH_PREFIX_PY):].strip()
-        logger.info(f"Request {request_id}: Force web search detected via text prefix. Query: '{input_data['text_content']}'")
-    else:
-        input_data["text_content"] = raw_text_content_for_processing
-        # force_web_search_requested remains as set from metadata (or False if not in metadata)
-
-    # Remove "Tools Available" boilerplate if present (often added by clients like Open WebUI)
+                    img_url_data = part_item.get("image_url", {})
+                    if isinstance(img_url_data, dict) and (url_str := img_url_data.get("url")) and url_str.startswith("data:image"):
+                        try: input_data["image_content_b64"] = url_str.split(",", 1)[1]
+                        except IndexError: logger.error(f"Malformed base64 image URI: {url_str[:60]}...")
+            else: current_input_text_parts.append(str(part_item))
+    raw_text_proc = " ".join(filter(None, current_input_text_parts)).strip()
+    FORCE_SEARCH_PREFIX = "[FORCE_WEB_SEARCH] "
+    if raw_text_proc.startswith(FORCE_SEARCH_PREFIX):
+        input_data["metadata"]["force_web_search_requested"] = True
+        input_data["text_content"] = raw_text_proc[len(FORCE_SEARCH_PREFIX):].strip()
+    else: input_data["text_content"] = raw_text_proc
     if isinstance(input_data["text_content"], str) and "#### Tools Available" in input_data["text_content"]:
         input_data["text_content"] = input_data["text_content"].split("#### Tools Available")[0].strip()
-        logger.debug(f"Request {request_id}: Removed 'Tools Available' boilerplate from text_content.")
-
-    # 6. Final Log and Return
-    _log_final_parsed_input(request_id, final_user_id, input_data)
-    return input_data
+    _log_final_parsed_input(request_id, final_user_id, input_data); return input_data
 
 def _log_final_parsed_input(request_id: str, final_user_id: str, input_data: Dict[str, Any]):
-    """Helper function to log the final parsed input_data structure."""
     metadata = input_data.get("metadata", {})
     logger.info(
-        f"Request {request_id}: Parsed Input Data Summary. User: '{final_user_id}'. Type: {input_data['type']}. "
-        f"TTS Enabled for Resp: {metadata.get('auto_tts_enabled_for_response')}. "
-        f"ForceSearch: {metadata.get('force_web_search_requested')}. "
-        f"Image Provided: {bool(input_data['image_content_b64'])}. Document Provided: {bool(input_data['document_text'])}. "
-        f"Temperature: {metadata.get('temperature')}. MaxTokensOverride: {metadata.get('max_tokens_override')}. "
-        f"LLMProviderOverride: {metadata.get('llm_provider_url_override')}. "
-        f"PathosModel(Dropdown): {metadata.get('pathos_model_override')}. "
-        f"EngagedProactiveID: {metadata.get('engaged_proactive_id')}. "
-        f"History items: {len(metadata.get('conversation_history', []))}. "
-        f"Text Content Preview: '{str(input_data.get('text_content', ''))[:70]}...'"
+        f"Request {request_id}: Parsed. User:'{final_user_id}'. Type:{input_data['type']}. "
+        f"TTS:{metadata.get('auto_tts_enabled_for_response')}. FS:{metadata.get('force_web_search_requested')}. "
+        f"Img:{bool(input_data['image_content_b64'])}. Doc:{bool(input_data['document_text'])}. "
+        f"Temp:{metadata.get('temperature')}. MaxTokOverride:{metadata.get('max_tokens_override')}. "
+        f"LLMOverride:{metadata.get('llm_provider_url_override')}. PathosModel:{metadata.get('pathos_model_override')}. "
+        f"EngagedProID:{metadata.get('engaged_proactive_id')}. Hist:{len(metadata.get('conversation_history', []))}. "
+        f"Text:'{str(input_data.get('text_content', ''))[:70]}...'"
     )
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"Pydantic Validation Error: {exc.errors()}")
+    return PlainTextResponse(str(exc.errors()), status_code=422)
 
 # --- API Endpoints ---
-
-@app.delete("/v1/memory/entry/{memory_id}", status_code=200)
-async def delete_memory_entry_endpoint(
-    memory_id: str = FastApiPath(..., title="The ID of the memory entry to delete", min_length=36, max_length=36),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
-    x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")
-):
-    global ethos_core
-    if not ethos_core:
-        raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
-
-    # --- Normalize the requesting user ID ---
-    requesting_user_raw: Optional[str] = x_user_id
-    requesting_user_normalized: str = "unknown_api_caller" # Default if all else fails
-
-    if requesting_user_raw and isinstance(requesting_user_raw, str):
-        normalized = requesting_user_raw.lower().strip().replace(" ", "_")
-        if normalized: # Ensure not empty after normalization
-            requesting_user_normalized = normalized
-    
-    logger.info(
-        f"API: Request to delete memory entry ID '{memory_id}'. "
-        f"Requesting user (normalized): '{requesting_user_normalized}' (Raw X-User-Id: '{requesting_user_raw}')."
-    )
-    # --- End User ID Normalization ---
-
-    entry_to_delete = ethos_core.memory_storage.get_entry(memory_id)
-    if not entry_to_delete:
-        raise HTTPException(status_code=404, detail=f"Memory entry with ID '{memory_id}' not found.")
-
-    # The entry_owner_id from the database metadata should already be normalized (e.g., "isaac")
-    # if it was stored correctly after our previous normalization changes.
-    entry_owner_id = entry_to_delete.get('metadata', {}).get('user_id') 
-    
-    is_admin_attempt = False
-    admin_pw_cfg = Config.get_admin_password()
-
-    if admin_pw_cfg and x_admin_password:
-        if secrets.compare_digest(x_admin_password, admin_pw_cfg):
-            is_admin_attempt = True
-            logger.info(f"Admin authenticated for deleting memory entry '{memory_id}'.")
-        else:
-            logger.warning(f"Admin password provided but incorrect for deleting memory entry '{memory_id}'.")
-
-    can_delete = False
-    if is_admin_attempt:
-        can_delete = True
-    # Compare the NORMALIZED requesting user ID with the (expectedly normalized) owner ID from DB
-    elif entry_owner_id == requesting_user_normalized and entry_to_delete.get('type') == 'user_fact':
-        can_delete = True
-    elif entry_to_delete.get('type') != 'user_fact':
-        logger.warning(
-            f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) attempted to delete non-user_fact entry '{memory_id}' without admin rights."
-        )
-    else: 
-        logger.warning(
-            f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) does not own user_fact '{memory_id}' (owner: '{entry_owner_id}')."
-        )
-
-    if not can_delete:
-        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to delete this memory entry.")
-
-    try:
-        if ethos_core.memory_storage.delete_entry(memory_id):
-            logger.info(f"Successfully deleted memory entry '{memory_id}'.")
-            await ethos_core.add_memory_entry({
-                "type": "system",
-                "content": f"Memory entry '{memory_id}' (type: {entry_to_delete.get('type')}, owner: {entry_owner_id or 'N/A'}) deleted by '{requesting_user_normalized}' (Admin: {is_admin_attempt}). Raw request user: '{requesting_user_raw}'.",
-                "metadata": {
-                    "user_id": "system_admin",
-                    "action": "memory_entry_delete",
-                    "deleted_entry_id": memory_id,
-                    "deleted_entry_type": entry_to_delete.get('type'),
-                    "deleted_entry_owner": entry_owner_id,
-                    "requesting_user_normalized": requesting_user_normalized,
-                    "requesting_user_raw": requesting_user_raw,
-                    "is_admin_action": is_admin_attempt,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
-            }, user_id_context="system_admin")
-            return JSONResponse(content={"message": f"Memory entry '{memory_id}' deleted successfully."})
-        else:
-            raise HTTPException(status_code=500, detail=f"Failed to delete memory entry '{memory_id}', or it was already deleted.")
-    except Exception as e:
-        logger.error(f"Error during deletion of memory entry '{memory_id}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error during memory deletion: {str(e)}")
-
-@app.get("/v1/user/facts", response_model=List[MemoryEntry], tags=["User"])
-async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
-    raw_actual_user_id = x_user_id or "unknown_user"
-    actual_user_id = raw_actual_user_id.lower().strip().replace(" ", "_") if raw_actual_user_id else "unknown_user"
-    if not actual_user_id:
-         actual_user_id = "unknown_user"
-
-    if actual_user_id in ["unknown_user", "api_guest_user", "default_user"]:
-        logger.info(f"Request for user facts from a generic user context ('{actual_user_id}'). Returning empty list.")
-        return []
-
-    logger.info(f"API: Request for user facts for user_id (normalized): '{actual_user_id}' (Raw was: '{raw_actual_user_id}').")
-    try:
-        user_facts = await ethos_core.get_all_user_facts(user_id=actual_user_id) # Pass normalized ID
-        return user_facts
-    except Exception as e:
-        logger.error(f"API: Error fetching user facts for '{actual_user_id}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error fetching user facts.")
 
 @app.get("/", include_in_schema=False)
 async def get_gui_root():
     gui_html_path = WEBAPP_DIR / "gui.html"
-    if gui_html_path.is_file():
-        return FileResponse(str(gui_html_path))
-    else:
-        logger.error(f"GUI HTML file not found at {gui_html_path}")
-        return JSONResponse(content={"error": "Eidos GUI not found. Ensure 'webapp/gui.html' exists."}, status_code=404)
+    if gui_html_path.is_file(): return FileResponse(str(gui_html_path))
+    else: logger.error(f"GUI HTML file not found at {gui_html_path}"); return JSONResponse(content={"error": "Eidos GUI not found."}, status_code=404)
 
 @app.get("/v1/models", response_model=ModelList)
 async def list_models_endpoint():
     logger.info("Request received for /v1/models")
     model_id = Config.LLM['PATHOS']['model'] if Config.LLM and Config.LLM.get('PATHOS') and Config.LLM['PATHOS'].get('model') else 'eidos-agent'
-    model_id = model_id.split('#')[0].strip() if model_id else 'eidos-agent' # Ensure model_id is not None
+    model_id = model_id.split('#')[0].strip() if model_id else 'eidos-agent'
     eidos_model_card = ModelCard(id=model_id, owned_by="eidos-project")
     logger.info(f"Reporting model ID: {model_id}")
     return ModelList(data=[eidos_model_card])
-
-
-@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(fastapi_request: Request, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
-    # This endpoint will NOT be a StreamingResponse for the main text.
-    # TTS audio chunks will be sent via WebSocket.
-    global router, ethos_core, logos_core, pathos_interface, manager
-    if not all([router, ethos_core, logos_core, pathos_interface, manager]):
-        raise HTTPException(status_code=503, detail="Eidos system core components not fully ready.")
-
-    request_id = str(uuid.uuid4())
-    logger.critical(f">>> Request {request_id}: chat_completions ENTERED <<<")
-    logger.info(f"Request {request_id}: X-User-Id Header: '{x_user_id}'")
-
-    try:
-        body = await fastapi_request.json()
-    except json.JSONDecodeError:
-        logger.error(f"Request {request_id}: Invalid JSON body.")
-        raise HTTPException(status_code=400, detail="Invalid JSON body.")
-
-    try:
-        # Validate against Pydantic model
-        parsed_request = ChatCompletionRequest(**body)
-        if parsed_request.stream:
-            # While we are streaming TTS audio via WebSocket, the main HTTP response for text is not streamed.
-            # Client might still send stream=true if it's a generic OpenAI client.
-            # We can choose to ignore it or return an error if we don't support HTTP streaming for text.
-            logger.warning(f"Request {request_id}: Client requested streaming (stream=true), "
-                           f"but this endpoint returns full text. TTS audio is streamed via WebSocket if enabled.")
-            # For now, we'll proceed and return a non-streamed text response.
-            # If strict OpenAI compatibility for text streaming is needed, this would change.
-    except ValidationError as pydantic_exc:
-        logger.error(f"Request {request_id}: Pydantic validation error: {pydantic_exc}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Invalid request body: {pydantic_exc}")
-
-    # Use the modified extract_input_to_eidos_format
-    input_data = extract_input_to_eidos_format(body, request_id, user_id_from_header=x_user_id)
-
-    try:
-        logger.info(f"Request {request_id}: Calling router.route_input (User ID: {input_data['metadata']['user_id']}). "
-                    f"ForceSearchFlag: {input_data['metadata'].get('force_web_search_requested')}, "
-                    f"TTS Enabled for Resp: {input_data['metadata'].get('auto_tts_enabled_for_response')}")
-        
-        result: RoutingResult = await router.route_input(input_data)
-        
-        logger.info(f"Request {request_id}: router.route_input success: {result.success}")
-        router_metadata = result.metadata or {}
-        final_response_content = result.content
-
-        # --- Construct ChatCompletionResponse (as before) ---
-        message_metadata_keys = ["mood_at_response", "active_user_id_for_turn", "hexus_scores", "vision_llm_output", "retrieved_memory_ids", "tool_calls_from_pathos", "engaged_proactive_id", "forced_action", "tts_stream_attempted"]
-        message_metadata = {k: router_metadata.get(k) for k in message_metadata_keys if router_metadata.get(k) is not None}
-        
-        usage_data_keys = ["prompt_tokens_from_llm", "completion_tokens_from_llm", "estimated_prompt_tokens"]
-        usage_data_from_router = {k.replace("_from_llm",""): router_metadata.get(k) for k in usage_data_keys if router_metadata.get(k) is not None}
-        if 'prompt_tokens' in usage_data_from_router and 'completion_tokens' in usage_data_from_router:
-            usage_data_from_router['total_tokens'] = usage_data_from_router['prompt_tokens'] + usage_data_from_router['completion_tokens']
-        
-        usage_data = ChatCompletionUsage(**usage_data_from_router) if any(v is not None for v in usage_data_from_router.values()) else None
-        
-        final_tool_calls = message_metadata.get("tool_calls_from_pathos") # This comes from PathosInterface metadata
-        response_message = ChatMessage(
-            role="assistant",
-            content=final_response_content,
-            tool_calls=final_tool_calls, # Pass tool_calls if any
-            metadata=message_metadata if message_metadata else None
-        )
-        finish_reason: Literal["stop", "length", "tool_calls", "content_filter", "null"] = "tool_calls" if final_tool_calls else "stop"
-        choice = ChatCompletionChoice(index=0, message=response_message, finish_reason=finish_reason)
-        
-        final_model_name_for_response = (body.get("model", 'eidos-agent').split('#')[0].strip() if body.get("model") else 'eidos-agent')
-
-        api_response = ChatCompletionResponse(
-            id=f"chatcmpl-{request_id}",
-            object="chat.completion", # Not chat.completion.chunk
-            created=int(datetime.now(timezone.utc).timestamp()),
-            model=final_model_name_for_response,
-            choices=[choice],
-            usage=usage_data
-        )
-        logger.critical(f"<<< Request {request_id}: chat_completions EXITING (sending full text response) <<<")
-        return api_response
-
-    except HTTPException as http_exc:
-        logger.error(f"!!! Request {request_id}: HTTPException during routing/response generation: {http_exc.detail}", exc_info=False)
-        raise http_exc
-    except Exception as e:
-        logger.error(f"!!! Request {request_id}: Unhandled API exception in chat_completions: {e}", exc_info=True)
-        # Ensure a valid JSON error response
-        return JSONResponse(
-            status_code=500,
-            content={"error": {"message": f"Internal Server Error: {str(e)}", "type": "internal_error", "code": "internal_server_error"}}
-        )
-
-# --- NEW: Endpoint to serve cached TTS audio chunks ---
-@app.get("/v1/tts/audio_chunk/{chunk_id}")
-async def get_tts_audio_chunk(chunk_id: str):
-    global TEMP_AUDIO_CACHE
-    logger.debug(f"GET_CHUNK_DEBUG: Request for chunk ID: {chunk_id}. ID of global TEMP_AUDIO_CACHE: {id(TEMP_AUDIO_CACHE)}. Cache size: {len(TEMP_AUDIO_CACHE)}")
-    if chunk_id in TEMP_AUDIO_CACHE:
-        logger.debug(f"GET_CHUNK_DEBUG: Chunk {chunk_id} FOUND in cache before pop.")
-    else:
-        logger.warning(f"GET_CHUNK_DEBUG: Chunk {chunk_id} NOT FOUND in cache before pop. Current keys: {list(TEMP_AUDIO_CACHE.keys())}")
-    audio_bytes = TEMP_AUDIO_CACHE.pop(chunk_id, None) # Pop to remove after first fetch (single use)
-
-    if audio_bytes:
-        logger.info(f"Serving TTS audio chunk ID: {chunk_id}, Length: {len(audio_bytes)} bytes.")
-        return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
-    else:
-        logger.warning(f"TTS audio chunk ID: {chunk_id} not found in cache or already served.")
-        raise HTTPException(status_code=404, detail="Audio chunk not found or already served.")
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(fastapi_request: Request, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
@@ -668,35 +345,49 @@ async def chat_completions(fastapi_request: Request, x_user_id: Optional[str] = 
     except json.JSONDecodeError: logger.error(f"Request {request_id}: Invalid JSON body."); raise HTTPException(status_code=400, detail="Invalid JSON body.")
     try:
         parsed_request = ChatCompletionRequest(**body)
-        if parsed_request.stream: logger.warning(f"Request {request_id}: Streaming requested but not implemented."); return JSONResponse(status_code=501, content={"error": {"message": "Streaming is not implemented...", "type": "unimplemented_feature", "code": "streaming_not_implemented"}})
+        if parsed_request.stream:
+            logger.warning(f"Request {request_id}: Client requested streaming (stream=true), but this endpoint returns full text. TTS audio is streamed via WebSocket if enabled.")
         logger.info(f"Request {request_id}: Validated request. Model='{parsed_request.model}', Messages={len(parsed_request.messages)}")
-    except Exception as pydantic_exc: logger.error(f"Request {request_id}: Pydantic validation error: {pydantic_exc}", exc_info=True); raise HTTPException(status_code=400, detail=f"Invalid request body: {pydantic_exc}")
+    except ValidationError as pydantic_exc: logger.error(f"Request {request_id}: Pydantic validation error: {pydantic_exc}", exc_info=True); raise HTTPException(status_code=400, detail=f"Invalid request body: {pydantic_exc}")
 
     input_data = extract_input_to_eidos_format(body, request_id, user_id_from_header=x_user_id)
     try:
-        logger.info(f"Request {request_id}: Calling router.route_input (User ID: {input_data['metadata']['user_id']}). ForceSearchFlag: {input_data['metadata'].get('force_web_search_requested')}")
+        logger.info(f"Request {request_id}: Calling router.route_input (User ID: {input_data['metadata']['user_id']}). ForceSearchFlag: {input_data['metadata'].get('force_web_search_requested')}, TTS Enabled for Resp: {input_data['metadata'].get('auto_tts_enabled_for_response')}")
         result: RoutingResult = await router.route_input(input_data)
         logger.info(f"Request {request_id}: router.route_input success: {result.success}"); router_metadata = result.metadata or {}; final_response_content = result.content
-        message_metadata_keys = ["mood_at_response", "active_user_id_for_turn", "hexus_scores", "vision_llm_output", "retrieved_memory_ids", "tool_calls_from_pathos", "engaged_proactive_id", "forced_action"]
+        message_metadata_keys = ["mood_at_response", "active_user_id_for_turn", "hexus_scores", "vision_llm_output", "retrieved_memory_ids", "tool_calls_from_pathos", "engaged_proactive_id", "forced_action", "tts_stream_attempted"]
         message_metadata = {k: router_metadata.get(k) for k in message_metadata_keys if router_metadata.get(k) is not None}
         usage_data_keys = ["prompt_tokens_from_llm", "completion_tokens_from_llm", "estimated_prompt_tokens"]
         usage_data_from_router = {k.replace("_from_llm",""): router_metadata.get(k) for k in usage_data_keys if router_metadata.get(k) is not None}
         if 'prompt_tokens' in usage_data_from_router and 'completion_tokens' in usage_data_from_router: usage_data_from_router['total_tokens'] = usage_data_from_router['prompt_tokens'] + usage_data_from_router['completion_tokens']
         usage_data = ChatCompletionUsage(**usage_data_from_router) if any(v is not None for v in usage_data_from_router.values()) else None
-        final_message_content_for_api = final_response_content; final_tool_calls = message_metadata.get("tool_calls_from_pathos")
-        response_message = ChatMessage(role="assistant", content=final_message_content_for_api, tool_calls=final_tool_calls, metadata=message_metadata if message_metadata else None)
+        final_tool_calls = message_metadata.get("tool_calls_from_pathos")
+        response_message = ChatMessage(role="assistant", content=final_response_content, tool_calls=final_tool_calls, metadata=message_metadata if message_metadata else None)
         finish_reason: Literal["stop", "length", "tool_calls", "content_filter", "null"] = "tool_calls" if final_tool_calls else "stop"
         choice = ChatCompletionChoice(index=0, message=response_message, finish_reason=finish_reason)
         final_model_name_for_response = (body.get("model", 'eidos-agent').split('#')[0].strip() if body.get("model") else 'eidos-agent')
         api_response = ChatCompletionResponse(id=f"chatcmpl-{request_id}", object="chat.completion", created=int(datetime.now(timezone.utc).timestamp()), model=final_model_name_for_response, choices=[choice], usage=usage_data)
-        logger.critical(f"<<< Request {request_id}: chat_completions EXITING (sending response) <<<"); return api_response
-    except HTTPException as http_exc: logger.error(f"!!! Request {request_id}: HTTPException: {http_exc.detail}", exc_info=False); raise http_exc
-    except Exception as e: logger.error(f"!!! Request {request_id}: Unhandled API exception: {e}", exc_info=True); return JSONResponse(status_code=500, content={"error": {"message": f"Internal Server Error: {str(e)}", "type": "internal_error", "code": "internal_server_error"}})
+        logger.critical(f"<<< Request {request_id}: chat_completions EXITING (sending full text response) <<<"); return api_response
+    except HTTPException as http_exc: logger.error(f"!!! Request {request_id}: HTTPException during routing/response generation: {http_exc.detail}", exc_info=False); raise http_exc
+    except Exception as e: logger.error(f"!!! Request {request_id}: Unhandled API exception in chat_completions: {e}", exc_info=True); return JSONResponse(status_code=500, content={"error": {"message": f"Internal Server Error: {str(e)}", "type": "internal_error", "code": "internal_server_error"}})
 
+@app.get("/v1/tts/audio_chunk/{chunk_id}")
+async def get_tts_audio_chunk(chunk_id: str):
+    global TEMP_AUDIO_CACHE
+    logger.debug(f"GET_CHUNK_DEBUG: Request for chunk ID: {chunk_id}. ID of global TEMP_AUDIO_CACHE: {id(TEMP_AUDIO_CACHE)}. Cache size: {len(TEMP_AUDIO_CACHE)}")
+    if chunk_id in TEMP_AUDIO_CACHE: logger.debug(f"GET_CHUNK_DEBUG: Chunk {chunk_id} FOUND in cache before pop.")
+    else: logger.warning(f"GET_CHUNK_DEBUG: Chunk {chunk_id} NOT FOUND in cache before pop. Current keys: {list(TEMP_AUDIO_CACHE.keys())}")
+    audio_bytes = TEMP_AUDIO_CACHE.pop(chunk_id, None)
+    if audio_bytes:
+        logger.info(f"Serving TTS audio chunk ID: {chunk_id}, Length: {len(audio_bytes)} bytes.")
+        return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
+    else:
+        logger.warning(f"TTS audio chunk ID: {chunk_id} not found in cache or already served.")
+        raise HTTPException(status_code=404, detail="Audio chunk not found or already served.")
 
 @app.get("/v1/weather", status_code=200)
 async def get_weather_endpoint(location: str, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
-    global logos_core;
+    global logos_core
     if not logos_core: logger.error(f"Weather request but LogosCore not init. User: {x_user_id or 'unknown'}"); raise HTTPException(status_code=503, detail="Eidos system not ready.")
     if not location or not location.strip(): logger.warning(f"Weather request no location. User: {x_user_id or 'unknown'}"); raise HTTPException(status_code=400, detail="'location' required.")
     logger.info(f"Weather request for '{location}'. User: {x_user_id or 'unknown'}")
@@ -714,10 +405,9 @@ async def get_weather_endpoint(location: str, x_user_id: Optional[str] = Header(
 
 @app.post("/v1/user/settings", status_code=200)
 async def update_user_settings(settings_request: UserSettingsRequest, x_user_id_header: Optional[str] = Header(None, alias="X-User-Id")):
-    global logos_core, ethos_core 
+    global logos_core, ethos_core
     request_id = str(uuid.uuid4())
-    raw_user_id_from_payload = settings_request.user_id
-    raw_user_id_from_header = x_user_id_header
+    raw_user_id_from_payload = settings_request.user_id; raw_user_id_from_header = x_user_id_header
     effective_raw_user_id: Optional[str] = raw_user_id_from_payload
     if not effective_raw_user_id and raw_user_id_from_header: effective_raw_user_id = raw_user_id_from_header
     if not effective_raw_user_id: effective_raw_user_id = "api_guest_user"
@@ -730,11 +420,7 @@ async def update_user_settings(settings_request: UserSettingsRequest, x_user_id_
     results = []; all_ok = True
     for item in settings_request.settings:
         try:
-            fact_result_str = await logos_core.execute_store_user_fact(
-                attribute_name=item.attribute_name, attribute_value=str(item.attribute_value),
-                user_statement_context=item.user_statement_context or f"User set {item.attribute_name} via GUI settings.",
-                user_id=user_id_for_storage # Use normalized ID
-            )
+            fact_result_str = await logos_core.execute_store_user_fact(attribute_name=item.attribute_name, attribute_value=str(item.attribute_value), user_statement_context=item.user_statement_context or f"User set {item.attribute_name} via GUI settings.", user_id=user_id_for_storage)
             fact_res = json.loads(fact_result_str)
             if fact_res.get("status") == "success": results.append({"attribute_name": item.attribute_name, "status": "success", "message": fact_res.get("message")})
             else: all_ok = False; results.append({"attribute_name": item.attribute_name, "status": "failed", "message": fact_res.get("error")}); logger.warning(f"Failed to store setting '{item.attribute_name}' for user '{user_id_for_storage}': {fact_res.get('error')}")
@@ -754,45 +440,37 @@ async def get_daily_briefing_endpoint(x_user_id: Optional[str] = Header(None, al
     except HTTPException as http_exc: raise http_exc
     except Exception as e: logger.error(f"Unexpected error in /v1/briefing for '{user_id}': {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error processing briefing.")
 
-VALID_PITCH_SPEED_VALUES_FOR_API = ["very_low", "low", "moderate", "high", "very_high"]
-VALID_GENDER_VALUES_FOR_API = ["female", "male"]
-
-class TTSRequest(BaseModel):
+class TTSRequestAPI(BaseModel): # Renamed to avoid conflict with other TTSRequest
     text: str
-    gender: Optional[str] = None # e.g., "female", "male"
-    pitch: Optional[str] = None  # e.g., "moderate", "high"
-    speed: Optional[str] = None  # e.g., "moderate", "high"
+    gender: Optional[str] = None
+    pitch: Optional[str] = None
+    speed: Optional[str] = None
 
 @app.post("/v1/tts/synthesize", tags=["TTS"])
-async def synthesize_speech(request_data: TTSRequest): # Assuming TTSRequest Pydantic model
+async def synthesize_speech_api(request_data: TTSRequestAPI):
     global eidos_tts_service_instance
     if not eidos_tts_service_instance or not eidos_tts_service_instance.is_available():
         raise HTTPException(status_code=503, detail="TTS service is not available or not configured.")
-    # ... (input validation for gender, pitch, speed as before) ...
-    # Validate inputs if they are provided
-    if request_data.gender is not None and request_data.gender.lower() not in VALID_GENDER_VALUES_FOR_API: # VALID_... constants from main.py or config
-        raise HTTPException(status_code=422, detail=f"Invalid gender. Choose from {VALID_GENDER_VALUES_FOR_API}")
-    if request_data.pitch is not None and request_data.pitch.lower() not in VALID_PITCH_SPEED_VALUES_FOR_API:
-        raise HTTPException(status_code=422, detail=f"Invalid pitch. Choose from {VALID_PITCH_SPEED_VALUES_FOR_API}")
-    if request_data.speed is not None and request_data.speed.lower() not in VALID_PITCH_SPEED_VALUES_FOR_API:
-        raise HTTPException(status_code=422, detail=f"Invalid speed. Choose from {VALID_PITCH_SPEED_VALUES_FOR_API}")
-
+    # Validation for gender, pitch, speed can be added here if needed, similar to the old endpoint
     logger.info(f"Eidos TTS API: Synthesis request for text: '{request_data.text[:50]}...' G:{request_data.gender} P:{request_data.pitch} S:{request_data.speed}")
     try:
+        speed_val = None
+        if request_data.speed:
+            try: speed_val = float(request_data.speed) # Assuming ExternalTTSService expects float
+            except ValueError: raise HTTPException(status_code=422, detail="Invalid speed value, must be a number.")
+        
         audio_bytes = await eidos_tts_service_instance.synthesize(
             text=request_data.text,
-            gender_override=request_data.gender.lower() if request_data.gender else None,
-            pitch_override=request_data.pitch.lower() if request_data.pitch else None,
-            speed_override=request_data.speed.lower() if request_data.speed else None
+            speed_override=speed_val
+            # gender_override and pitch_override would be passed if ExternalTTSService supports them
         )
         if audio_bytes:
-            return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
+            return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav") # Assuming WAV for now
         else:
             raise HTTPException(status_code=500, detail="TTS synthesis failed to produce audio (external service).")
     except Exception as e:
         logger.error(f"Error during Eidos TTS API call to external service: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"TTS synthesis error: {str(e)}")
-
 
 @app.post("/v1/feedback", status_code=202)
 async def receive_feedback(feedback_data: FeedbackRequest, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
@@ -826,7 +504,7 @@ async def upload_document(file: UploadFile = File(..., description="Document (PD
     global logos_core
     if not logos_core: raise HTTPException(status_code=503, detail="Eidos system not ready.")
     logger.info(f"Doc upload: '{file.filename}' ({file.content_type}, {getattr(file, 'size', 'unknown')} bytes) for user '{x_user_id or 'unknown_user'}'.")
-    try: file_content = await file.read();
+    try: file_content = await file.read()
     except Exception as e: logger.error(f"Error reading uploaded file '{file.filename}': {e}", exc_info=True); raise HTTPException(status_code=422, detail=f"Error reading file: {e}")
     finally:
         if hasattr(file, 'file') and hasattr(file.file, 'close') and callable(file.file.close): file.file.close()
@@ -870,92 +548,157 @@ async def clear_user_memory(request_data: ClearUserMemoryRequest, x_user_id_head
         else: raise HTTPException(status_code=500, detail=f"Failed to clear memory for user '{user_to_clear}'.")
     except Exception as e: logger.error(f"Error during clear_memory_for_user (user: '{user_to_clear}'): {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-# --- Agent Specific Endpoints ---
-@app.get("/v1/agent/dreams", response_model=List[DreamEntryResponse])
-async def get_agent_dreams(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
-    global ethos_core
-    if not ethos_core: 
-        raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
-    
-    logger.info(f"API: Request for /v1/agent/dreams. User: {x_user_id}, Limit: {limit}")
-    
-    try:
-        # Get raw dream entries (which are 'queued_discussion_point' with specific metadata)
-        # EthosCore's get_recent_dreams should handle filtering by user_id_context appropriately
-        raw_dreams = await ethos_core.get_recent_dreams(user_id_context=x_user_id, limit=limit)
-        
-        response_dreams: List[DreamEntryResponse] = []
-        for entry in raw_dreams:
-            img_url = None
-            metadata = entry.get('metadata', {})
-            local_img_path_str = metadata.get('dream_image_path')
-
-            if local_img_path_str:
-                try:
-                    # Ensure the path is valid and construct the web-accessible URL
-                    img_filename = Path(local_img_path_str).name
-                    # This assumes your /dream_images static mount is working correctly
-                    img_url = f"/dream_images/{img_filename}" 
-                except Exception as e_path:
-                    logger.error(f"Error constructing image URL from dream_image_path '{local_img_path_str}': {e_path}")
-            
-            response_dreams.append(
-                DreamEntryResponse(
-                    id=entry.get('id', str(uuid.uuid4())), # Provide a fallback ID if missing
-                    timestamp=entry.get('timestamp', datetime.now(timezone.utc).isoformat()), # Fallback timestamp
-                    content=entry.get('content', '[No dream content]'),
-                    dream_image_url=img_url,
-                    dream_seed_summary=metadata.get('dream_seed_summary')
-                )
-            )
-        return response_dreams
-    except Exception as e:
-        logger.error(f"API: Error fetching agent dreams: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error fetching agent dreams.")
-
-@app.get("/v1/agent/learnings", response_model=List[MemoryEntry])
-async def get_agent_learnings(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+@app.delete("/v1/memory/entry/{memory_id}", status_code=200, tags=["Memory Management"])
+async def delete_memory_entry_endpoint(
+    memory_id: str = FastApiPath(..., title="The ID of the memory entry to delete", min_length=36, max_length=36),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
+    x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")
+):
     global ethos_core
     if not ethos_core:
-        raise HTTPException(status_code=503, detail="Eidos system not ready.")
-    
-    user_id_filter = x_user_id
-    logger.info(f"Request for /v1/agent/learnings. User: {user_id_filter}, Limit: {limit}")
+        raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
+    requesting_user_raw: Optional[str] = x_user_id
+    requesting_user_normalized: str = "unknown_api_caller"
+    if requesting_user_raw and isinstance(requesting_user_raw, str):
+        normalized = requesting_user_raw.lower().strip().replace(" ", "_")
+        if normalized: requesting_user_normalized = normalized
+    logger.info(f"API: Request to delete memory entry ID '{memory_id}'. Requesting user (normalized): '{requesting_user_normalized}' (Raw X-User-Id: '{requesting_user_raw}').")
+    entry_to_delete = ethos_core.memory_storage.get_entry(memory_id)
+    if not entry_to_delete:
+        raise HTTPException(status_code=404, detail=f"Memory entry with ID '{memory_id}' not found.")
+    entry_owner_id = entry_to_delete.get('metadata', {}).get('user_id')
+    is_admin_attempt = False; admin_pw_cfg = Config.get_admin_password()
+    if admin_pw_cfg and x_admin_password:
+        if secrets.compare_digest(x_admin_password, admin_pw_cfg):
+            is_admin_attempt = True; logger.info(f"Admin authenticated for deleting memory entry '{memory_id}'.")
+        else: logger.warning(f"Admin password provided but incorrect for deleting memory entry '{memory_id}'.")
+    can_delete = False
+    if is_admin_attempt: can_delete = True
+    elif entry_owner_id == requesting_user_normalized and entry_to_delete.get('type') == 'user_fact': can_delete = True
+    elif entry_to_delete.get('type') != 'user_fact': logger.warning(f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) attempted to delete non-user_fact entry '{memory_id}' without admin rights.")
+    else: logger.warning(f"User '{requesting_user_normalized}' (Raw: {requesting_user_raw}) does not own user_fact '{memory_id}' (owner: '{entry_owner_id}').")
+    if not can_delete: raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to delete this memory entry.")
+    try:
+        if ethos_core.memory_storage.delete_entry(memory_id):
+            logger.info(f"Successfully deleted memory entry '{memory_id}'.")
+            await ethos_core.add_memory_entry({
+                "type": "system",
+                "content": f"Memory entry '{memory_id}' (type: {entry_to_delete.get('type')}, owner: {entry_owner_id or 'N/A'}) deleted by '{requesting_user_normalized}' (Admin: {is_admin_attempt}). Raw request user: '{requesting_user_raw}'.",
+                "metadata": {"user_id": "system_admin", "action": "memory_entry_delete", "deleted_entry_id": memory_id, "deleted_entry_type": entry_to_delete.get('type'), "deleted_entry_owner": entry_owner_id, "requesting_user_normalized": requesting_user_normalized, "requesting_user_raw": requesting_user_raw, "is_admin_action": is_admin_attempt, "timestamp": datetime.now(timezone.utc).isoformat()}
+            }, user_id_context="system_admin")
+            return JSONResponse(content={"message": f"Memory entry '{memory_id}' deleted successfully."})
+        else: raise HTTPException(status_code=500, detail=f"Failed to delete memory entry '{memory_id}', or it was already deleted.")
+    except Exception as e: logger.error(f"Error during deletion of memory entry '{memory_id}': {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Internal server error during memory deletion: {str(e)}")
 
+@app.get("/v1/user/facts", response_model=List[ApiMemoryEntry], tags=["User Profile"]) # Use ApiMemoryEntry
+async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    global ethos_core
+    if not ethos_core: logger.error("/v1/user/facts: EthosCore not available."); raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
+    raw_actual_user_id = x_user_id or "unknown_user"
+    actual_user_id = raw_actual_user_id.lower().strip().replace(" ", "_") if raw_actual_user_id else "unknown_user"
+    if not actual_user_id: actual_user_id = "unknown_user"
+    if actual_user_id in ["unknown_user", "api_guest_user", "default_user"]:
+        logger.info(f"Request for user facts from a generic user context ('{actual_user_id}'). Returning empty list.")
+        return []
+    logger.info(f"API: Request for user facts for user_id (normalized): '{actual_user_id}' (Raw was: '{raw_actual_user_id}').")
+    try:
+        user_facts_raw: List[MemoryEntry] = await ethos_core.get_all_user_facts(user_id=actual_user_id)
+        validated_facts: List[ApiMemoryEntry] = []
+        for fact_data in user_facts_raw:
+            try:
+                if isinstance(fact_data, dict): validated_facts.append(ApiMemoryEntry(**fact_data))
+                elif hasattr(fact_data, 'model_dump'): validated_facts.append(ApiMemoryEntry(**fact_data.model_dump()))
+                else: logger.warning(f"Skipping non-dict fact data for user '{actual_user_id}': {type(fact_data)}")
+            except ValidationError as ve: logger.error(f"Validation error for a user fact (user: {actual_user_id}): {ve.errors()}. Data: {fact_data}")
+        logger.info(f"Returning {len(validated_facts)} facts for user '{actual_user_id}'.")
+        return JSONResponse(content=jsonable_encoder(validated_facts))
+    except HTTPException as http_exc: raise http_exc
+    except Exception as e: logger.error(f"API: Error fetching user facts for '{actual_user_id}': {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching user facts.")
+
+@app.get("/v1/agent/dreams", response_model=List[DreamEntryResponse], tags=["Agent State"])
+async def get_agent_dreams(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    global ethos_core
+    if not ethos_core: raise HTTPException(status_code=503, detail="Eidos system (EthosCore) not ready.")
+    logger.info(f"API: Request for /v1/agent/dreams. User: {x_user_id}, Limit: {limit}")
+    try:
+        raw_dreams = await ethos_core.get_recent_dreams(user_id_context=x_user_id, limit=limit)
+        response_dreams: List[DreamEntryResponse] = []
+        for entry in raw_dreams:
+            img_url = None; metadata = entry.get('metadata', {})
+            if local_img_path_str := metadata.get('dream_image_path'):
+                try: img_filename = Path(local_img_path_str).name; img_url = f"/dream_images/{img_filename}"
+                except Exception as e_path: logger.error(f"Error constructing image URL from dream_image_path '{local_img_path_str}': {e_path}")
+            response_dreams.append(DreamEntryResponse(id=entry.get('id', str(uuid.uuid4())), timestamp=entry.get('timestamp', datetime.now(timezone.utc).isoformat()), content=entry.get('content', '[No dream content]'), dream_image_url=img_url, dream_seed_summary=metadata.get('dream_seed_summary')))
+        return response_dreams
+    except Exception as e: logger.error(f"API: Error fetching agent dreams: {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching agent dreams.")
+
+@app.get("/v1/agent/learnings", response_model=List[ApiMemoryEntry], tags=["Agent State"]) # Use ApiMemoryEntry
+async def get_agent_learnings(limit: int = 10, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+    global ethos_core
+    if not ethos_core: raise HTTPException(status_code=503, detail="Eidos system not ready.")
+    user_id_filter = x_user_id; logger.info(f"Request for /v1/agent/learnings. User: {user_id_filter}, Limit: {limit}")
     try:
         learning_types = ["learned_correction", "learned_feedback_insight", "suggestion_reflection"]
-        learnings = await ethos_core.get_recent_learnings(
-            learning_types=learning_types,
-            user_id_context=user_id_filter,
-            limit=limit
-        )
-
-        # ✅ Validate entries without using isinstance
-        for i, entry in enumerate(learnings):
+        learnings_raw = await ethos_core.get_recent_learnings(learning_types=learning_types, user_id_context=user_id_filter, limit=limit)
+        validated_learnings: List[ApiMemoryEntry] = []
+        for entry_data in learnings_raw:
             try:
-                entry_dict = dict(entry)
-                MemoryEntry(**entry_dict)
-            except ValidationError as e:
-                logger.error(f"\n❌ MemoryEntry validation failed at index {i}:\n{e.json(indent=2)}\nEntry data:\n{entry_dict}\n")
+                if isinstance(entry_data, dict): validated_learnings.append(ApiMemoryEntry(**entry_data))
+                elif hasattr(entry_data, 'model_dump'): validated_learnings.append(ApiMemoryEntry(**entry_data.model_dump()))
+            except ValidationError as e: logger.error(f"MemoryEntry validation failed for learning: {e.json(indent=2)}\nEntry data:\n{entry_data}")
+        return JSONResponse(content=jsonable_encoder(validated_learnings))
+    except Exception as e: logger.error(f"Error fetching agent learnings: {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching agent learnings.")
 
-        return JSONResponse(content=jsonable_encoder(learnings))
-
-    except Exception as e:
-        logger.error(f"Error fetching agent learnings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error fetching agent learnings.")
-    
-@app.get("/v1/agent/knowledge_verifications", response_model=List[MemoryEntry])
+@app.get("/v1/agent/knowledge_verifications", response_model=List[ApiMemoryEntry], tags=["Agent State"]) # Use ApiMemoryEntry
 async def get_agent_knowledge_verifications(limit: int = 20, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
     global ethos_core
     if not ethos_core: raise HTTPException(status_code=503, detail="Eidos system not ready.")
     logger.info(f"Request for /v1/agent/knowledge_verifications. User: {x_user_id}, Limit: {limit}")
     try:
         if limit <= 0: limit = 20
-        verifications = await ethos_core.get_recent_knowledge_verifications(limit=limit)
-        return verifications
+        verifications_raw = await ethos_core.get_recent_knowledge_verifications(limit=limit)
+        validated_verifications: List[ApiMemoryEntry] = []
+        for entry_data in verifications_raw:
+            try:
+                if isinstance(entry_data, dict): validated_verifications.append(ApiMemoryEntry(**entry_data))
+                elif hasattr(entry_data, 'model_dump'): validated_verifications.append(ApiMemoryEntry(**entry_data.model_dump()))
+            except ValidationError as e: logger.error(f"MemoryEntry validation for knowledge verification: {e.json(indent=2)}\nData:\n{entry_data}")
+        return JSONResponse(content=jsonable_encoder(validated_verifications))
     except Exception as e: logger.error(f"Error fetching agent knowledge verifications: {e}", exc_info=True); raise HTTPException(status_code=500, detail="Internal server error fetching agent knowledge verifications.")
 
-# --- WebSocket Endpoint (ensure user_id normalization) ---
+@app.get("/v1/pathos/schedule/today", response_model=List[ActivitySlot], tags=["Pathos Chronos"])
+async def get_pathos_todays_schedule():
+    global ethos_core
+    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Schedule system not ready.")
+    try: return await ethos_core.chronos_engine.get_todays_schedule_for_user()
+    except Exception as e: logger.error(f"Error retrieving schedule: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+
+@app.get("/v1/pathos/events/upcoming", response_model=List[PathosEvent], tags=["Pathos Chronos"])
+async def get_pathos_upcoming_events(days_ahead: int = 7):
+    global ethos_core
+    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Event system not ready.")
+    if not (1 <= days_ahead <= 90): raise HTTPException(status_code=400, detail="days_ahead must be 1-90.")
+    try: return await ethos_core.chronos_engine.get_upcoming_events(days_ahead=days_ahead)
+    except Exception as e: logger.error(f"Error retrieving upcoming events: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+
+class AddPathosEventRequestAPI(BaseModel):
+    title: str; start_date: str; end_date: str; event_type: EventType
+    description: Optional[str] = None; location: Optional[str] = None
+    details: Optional[PathosEventDetails] = None
+@app.post("/v1/pathos/events/add", response_model=PathosEvent, status_code=201, tags=["Pathos Chronos"])
+async def add_pathos_planned_event_api(event_request: AddPathosEventRequestAPI, x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")):
+    global ethos_core
+    admin_pw_cfg = Config.get_admin_password()
+    if admin_pw_cfg and (not x_admin_password or not secrets.compare_digest(x_admin_password, admin_pw_cfg)): raise HTTPException(status_code=403, detail="Forbidden: Admin credentials required.")
+    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Event system not ready.")
+    try:
+        event_data_for_storage = event_request.model_dump(exclude_unset=True); event_data_for_storage['user_id'] = PATHOS_USER_ID
+        added_event = await ethos_core.chronos_engine.add_planned_event(event_data_for_storage)
+        if added_event: return added_event
+        else: raise HTTPException(status_code=500, detail="Failed to add event.")
+    except ValueError as ve: raise HTTPException(status_code=422, detail=f"Invalid event data: {ve}")
+    except Exception as e: logger.error(f"Error adding event: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -967,7 +710,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 raw_temp_uid = data["payload"]["userId"]
                 temp_uid = raw_temp_uid.lower().strip().replace(" ", "_") if isinstance(raw_temp_uid, str) and raw_temp_uid else None
                 if not temp_uid: logger.warning(f"WS: Invalid user_id '{raw_temp_uid}'. Closing."); break
-                user_id = temp_uid 
+                user_id = temp_uid
                 if await manager.connect(websocket, user_id):
                     connection_ok = True; logger.info(f"WS connected for user: {user_id}")
                     await manager.send_personal_message({"type": "status", "payload": {"message": "Connected to Eidos WS."}}, user_id)
@@ -989,47 +732,4 @@ async def websocket_endpoint(websocket: WebSocket):
         else: logger.info("WS: Unauthenticated client closing.")
 
 if __name__ == "__main__":
-    try:
-        api_cfg = Config.get_api_config()
-        host = api_cfg.get('host','0.0.0.0')
-        port = api_cfg.get('port',8088)
-        uvicorn_log_level = api_cfg.get('log_level','info').lower()
-
-        print(f"--- Starting Eidos API Server (main.py) ---")
-        print(f"Serving WebApp from: {WEBAPP_DIR.resolve()}")
-        print(f"Access GUI at: http://{host}:{port}/")
-        print(f"Uvicorn Log Level: {uvicorn_log_level}")
-        eidos_app_log_level = Config.API.get('log_level', 'info').upper() if Config.API else 'INFO'
-        print(f"Eidos App Log Level (from API_LOG_LEVEL in .env): {eidos_app_log_level}")
-        print("-" * 30)
-        print("Open WebUI (or other client) Config:")
-        print(f"  API Base URL: http://{host}:{port}/v1")
-        print(f"  API Key: (Leave empty or use any string)")
-        pathos_model_name = 'eidos-agent'
-        if Config.LLM and Config.LLM.get('PATHOS') and Config.LLM['PATHOS'].get('model'):
-            pathos_model_name = Config.LLM['PATHOS']['model'].split('#')[0].strip() if Config.LLM['PATHOS']['model'] else 'eidos-agent'
-        print(f"  Model Selection: Choose '{pathos_model_name}' (or the one you set in your client)")
-        print("-" * 30)
-        print(f"Feedback Endpoint:        POST http://{host}:{port}/v1/feedback")
-        print(f"Document Upload Endpoint:   POST http://{host}:{port}/v1/documents/upload")
-        print(f"Clear Memory Endpoint:      POST http://{host}:{port}/v1/memory/clear (Requires X-Admin-Password header)")
-        print(f"Clear User Memory Endpoint: POST http://{host}:{port}/v1/memory/clear_user")
-        print(f"Agent Learnings Endpoint:   GET  http://{host}:{port}/v1/agent/learnings")
-        print(f"Agent Dreams Endpoint:      GET  http://{host}:{port}/v1/agent/dreams")
-        print(f"Knowledge Log Endpoint:     GET  http://{host}:{port}/v1/agent/knowledge_verifications")
-        print(f"Dream Images Served At:        http://{host}:{port}/dream_images/<filename.png>")
-        print(f"Health Check Endpoint:      GET  http://{host}:{port}/health")
-        print(f"WebSocket Endpoint:         ws://{host}:{port}/ws")
-        print(f"User Settings Endpoint:     POST http://{host}:{port}/v1/user/settings")
-        print(f"Daily Briefing Endpoint:    GET  http://{host}:{port}/v1/briefing")
-        print(f"Weather Endpoint:           GET  http://{host}:{port}/v1/weather")
-        print("-" * 30)
-
-        uvicorn.run("main:app", host=host, port=port, log_level=uvicorn_log_level, reload=False)
-    except Exception as e_main:
-        log_func = logger.critical if logger and getattr(logger, 'handlers', None) else lambda msg, exc_info=False: print(f"CRITICAL STARTUP ERROR: {msg}", file=sys.stderr)
-        if isinstance(e_main, (KeyError, ValueError)) and "Config" in str(e_main): log_func(f"Configuration error: {e_main}. Check .env or config.py.", exc_info=True)
-        elif isinstance(e_main, ImportError): log_func(f"Import error: {e_main}. Check requirements.txt.", exc_info=True)
-        elif isinstance(e_main, RuntimeError) and "Eidos system failed to initialize" in str(e_main): print(f"CRITICAL: Eidos system failed to initialize. Check logs. Error: {e_main}", file=sys.stderr)
-        else: log_func(f"Failed to start Eidos API server: {e_main}", exc_info=True)
-        sys.exit(1)
+    uvicorn.run("main:app", host=Config.API.get('host','0.0.0.0'), port=Config.API.get('port',8088), log_level=Config.API.get('log_level','info'), reload=False)
