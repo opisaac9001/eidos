@@ -130,6 +130,10 @@ cp .env.example .env
 Use code with caution.
 Bash
 Edit .env to:
+<<<<<<< HEAD
+=======
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 Point LLM_PATHOS_URL (and other LLM_*_URL variables) to your VLLM OpenAI-compatible API endpoint(s).
 Specify LLM_PATHOS_MODEL as the model identifier VLLM uses for Qwen2.5 32B VL (e.g., Qwen/Qwen2.5-32B-Chat).
 Add API keys for any enabled external services (e.g., BRAVE_API_KEY).
@@ -148,10 +152,20 @@ python main.py
 Use code with caution.
 Bash
 The server listens by default on http://0.0.0.0:8088. The GUI is accessible via the root path (/).
+<<<<<<< HEAD
 6. Interacting with Pathos
 6.1 Web GUI
 Open your browser to http://<your_server_ip>:8088.
 GUI capabilities:
+=======
+
+6. Interacting with Pathos
+6.1 Web GUI
+Open your browser to http://<your_server_ip>:8088.
+
+GUI capabilities:
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 Chat with Pathos (as a friend).
 Upload documents/images (Pathos will process these as if he's looking at them).
 Provide feedback on interactions (though its impact will evolve).
@@ -171,10 +185,20 @@ POST /v1/pathos/events/add (For user to suggest an event for Pathos, admin-gated
 GET /health
 WS /ws (For GUI updates, proactive messages from Pathos, token streaming)
 See main.py and eidos_agent/core/api_models.py for full schema.
+<<<<<<< HEAD
 7. Configuration Deep-Dive
 All primary settings are managed via environment variables, typically set in the .env file.
 7.1 LLM Roles
 Each LLM role (e.g., PATHOS, LOGOS_TECHNE for utility tasks, NPC_LLM, FIRMAMENT_LLM) is configured in .env:
+=======
+
+7. Configuration Deep-Dive
+All primary settings are managed via environment variables, typically set in the .env file.
+
+7.1 LLM Roles
+Each LLM role (e.g., PATHOS, LOGOS_TECHNE for utility tasks, NPC_LLM, FIRMAMENT_LLM) is configured in .env:
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 LLM_<ROLE_NAME>_URL: Endpoint for the VLLM server providing this role.
 LLM_<ROLE_NAME>_MODEL: Model identifier used by VLLM (e.g., Qwen/Qwen2.5-32B-Chat).
 LLM_<ROLE_NAME>_API_KEY: Typically vllm or none when using VLLM locally.
@@ -185,6 +209,10 @@ BRAVE_API_KEY: For Pathos's simulated web searches.
 ONEIROS_STABLE_DIFFUSION_URL: If using Stable Diffusion for dream images.
 7.3 Feature Flags & System Parameters
 Numerous flags in .env control Eidos subsystems (e.g., ENABLE_ONEIROS, ENABLE_PROACTIVE_BEHAVIOR) and parameters for EthosCore, Firmament, Chronos, etc. (e.g., reflection intervals, mood decay rates).
+<<<<<<< HEAD
+=======
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 8. Core Modules
 Module	Role
 EthosCore	Pathos's long-term memory, core self-construct (persona directives), mood, reflection, learning.
@@ -199,6 +227,10 @@ MemoryStorage	SQLite + embedding backend for all persistent memories.
 ConnectionManager	Manages WebSocket connections for GUI updates and proactive messages.
 9. Development Roadmap
 (Focusing on the "Digital Being" vision for Pathos)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 Phase	Status	Highlight
 Phase 0: Stabilization & Foundational Persona	🔄 Current	Resolve critical bugs, robust VLLM (Qwen2.5 32B VL) stream handling, server-side chat GUI, history truncation, complete persona/prompt overhaul for 26-year-old human-believing Pathos.
 Phase A: Enhancing Interaction & Early Simulation	⏭ Next	GUI token streaming, "Computer Interaction Module" (web search), Firmament MVP (availability, basic activity logging, "busy" state & message queuing), refined proactive messaging.
@@ -206,13 +238,26 @@ Phase B: Deepening Simulation & Organic Development	⏭	Firmament NPC interactio
 Phase C: Advanced Autonomy, Relationships & World Interaction	⏭	Richer NPC relationships, Firmament environmental events, Pathos-driven goal setting (Ethos reflection), long-term life progression (Chronos/Firmament), "vision sensor" for presence.
 Phase D: Refinement & Polish	⏭ Ongoing	Continuous LLM prompt tuning, Firmament scenario expansion, memory/performance optimization, GUI evolution.
 (Previous roadmap phases related to direct assistant features, Home Assistant, or always-listening hardware have been deferred to a separate future project.)
+<<<<<<< HEAD
 10. Contributing
 Eidos is primarily a personal research and development project exploring simulated consciousness and advanced AI agents. However, insights, well-reasoned ideas, and discussions are welcome via GitHub Issues.
 Focus areas for potential future collaboration (once core simulation is mature):
+=======
+
+10. Contributing
+Eidos is primarily a personal research and development project exploring simulated consciousness and advanced AI agents. However, insights, well-reasoned ideas, and discussions are welcome via GitHub Issues.
+
+Focus areas for potential future collaboration (once core simulation is mature):
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 Advanced Firmament scenario design and scripting.
 Novel approaches to human-like memory and learning in AI.
 Ethical considerations of highly autonomous, persona-driven AI.
 11. License
 To be decided – MIT or Apache-2.0 are likely.
 A LICENSE file will be added if/when the project reaches a more public-ready state.
+<<<<<<< HEAD
+=======
+
+>>>>>>> 33a8abe5f4295b4643283b4426920fbf1e685031
 © 2025 Isaac Lamb – Exploring the frontiers of digital beings.
