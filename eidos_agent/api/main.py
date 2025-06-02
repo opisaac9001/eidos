@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, APIRouter
 # This structure assumes that 'eidos_agent' is in the Python path.
 try:
     from eidos_agent.modules.subconscious.models import ImpulseData, ImprintData
-    from eidos_agent.modules.ferment import handle_external_impulse
+    from eidos_agent.modules.firmament import handle_external_impulse # ferment -> firmament
     from eidos_agent.modules.memories import store_imprint
 except ImportError as e:
     # This fallback is mostly for isolated testing of this file if the full structure isn't in PYTHONPATH.
@@ -19,7 +19,7 @@ except ImportError as e:
     logging.warning(f"Could not import Eidos modules directly, attempting relative for dev: {e}")
     try:
         from ..modules.subconscious.models import ImpulseData, ImprintData
-        from ..modules.ferment import handle_external_impulse
+        from ..modules.firmament import handle_external_impulse # ferment -> firmament
         from ..modules.memories import store_imprint
     except ImportError:
         logging.exception("Failed to import Eidos modules. Ensure eidos_agent is in PYTHONPATH or structure is correct.")
@@ -51,17 +51,17 @@ logger = logging.getLogger(__name__)
 async def handle_subconscious_impulse(data: ImpulseData):
     """
     Endpoint to receive an impulsive thought from the Pathos subconscious node.
-    This data is then passed to the Eidos agent's "ferment" module for processing.
+    This data is then passed to the Eidos agent's "firmament" module for processing.
     """
     logger.info(f"Eidos API: Received impulse from Pathos: {data.dict()}")
     try:
-        # Pass data to the appropriate Eidos module (e.g., ferment)
+        # Pass data to the appropriate Eidos module (e.g., firmament)
         result = handle_external_impulse(
             thought=data.thought,
             timestamp=data.timestamp,
             mood=data.mood_snapshot
         )
-        logger.info(f"Eidos API: Impulse processed by ferment module. Result: {result}")
+        logger.info(f"Eidos API: Impulse processed by firmament module. Result: {result}") # ferment -> firmament
         return result
     except Exception as e:
         logger.exception(f"Eidos API: Error processing impulse: {data.dict()}")

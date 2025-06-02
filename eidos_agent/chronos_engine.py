@@ -1,17 +1,14 @@
 """
 Handles scheduled and background tasks for the Eidos agent.
 
-This module could include functionality for periodic data synchronization,
-maintenance tasks, or proactive behaviors that don't directly result from
-user interaction.
-
-For this specific implementation, it simulates a scheduled task to synchronize
+This module implements a periodic scheduler using threading.Timer to synchronize
 relevant Eidos context (conversation summaries, current actions) with the
 Pathos Subconscious Node.
 """
 import time
 import logging
-import threading # For the more advanced placeholder
+import threading
+from typing import Optional # For type hinting scheduler_timer
 
 # Attempt to import from subconscious client
 try:
@@ -21,12 +18,10 @@ except ImportError:
     # Placeholder for sync_recent_context if the import fails
     def sync_recent_context(conversation: str, current_action: str) -> bool:
         print(f"Placeholder sync_recent_context called with: Conversation='{conversation[:50]}...', Action='{current_action}'")
-        # Simulate success or failure
-        if not hasattr(sync_recent_context, 'fail_next'):
-            sync_recent_context.fail_next = False
-        
-        sync_recent_context.fail_next = not sync_recent_context.fail_next # Alternate true/false
-        return sync_recent_context.fail_next
+        if not hasattr(sync_recent_context, 'call_count'):
+            sync_recent_context.call_count = 0
+        sync_recent_context.call_count +=1
+        return sync_recent_context.call_count % 2 != 0 # Alternate true/false
 
 
 # Configure basic logging
@@ -34,32 +29,22 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+# --- Global Scheduler Control ---
+scheduler_stop_event = threading.Event()
+scheduler_timer: Optional[threading.Timer] = None
+
 # --- Placeholder Data Retrieval Functions ---
 
 def get_latest_conversation_summary() -> str:
     """
     Placeholder function to retrieve a summary of the latest conversation.
-
-    In a real system, this would interact with the Eidos dialog manager
-    or conversation history module.
-
-    Returns:
-        A placeholder string representing a conversation summary.
     """
-    # In a real implementation, this might fetch last N turns, summarize them, etc.
     return "Placeholder conversation summary: User asked about weather, Eidos provided forecast."
 
 def get_current_eidos_action() -> str:
     """
-    Placeholder function to retrieve the Eidos agent's current or most recent significant action.
-
-    This could be what the agent is currently working on, what information it's
-    processing, or what tool it's using.
-
-    Returns:
-        A placeholder string representing Eidos's current action.
+    Placeholder function to retrieve the Eidos agent's current action.
     """
-    # Examples: "analyzing_user_query", "browsing_internal_documents:topic_X", "waiting_for_user_input"
     return "Placeholder Eidos action: 'processing_user_feedback_on_prior_turn'"
 
 # --- Scheduled Task Implementation ---
@@ -75,8 +60,8 @@ def perform_scheduled_subconscious_context_sync():
     summary = get_latest_conversation_summary()
     action = get_current_eidos_action()
 
-    logger.info(f"ChronosEngine: Conversation summary: '{summary}'")
-    logger.info(f"ChronosEngine: Current Eidos action: '{action}'")
+    logger.debug(f"ChronosEngine: Conversation summary: '{summary}'")
+    logger.debug(f"ChronosEngine: Current Eidos action: '{action}'")
 
     success = sync_recent_context(conversation=summary, current_action=action)
 
@@ -85,105 +70,108 @@ def perform_scheduled_subconscious_context_sync():
     else:
         logger.warning("ChronosEngine: Scheduled context sync with subconscious node failed or partially failed.")
 
-# --- Scheduler Simulation ---
+# --- Scheduler Implementation ---
 
-# Global variable to control the timer loop, useful for stopping it in tests or on shutdown
-scheduler_timer: Optional[threading.Timer] = None
-stop_scheduler_event = threading.Event()
-
-def _run_periodically(interval_seconds: int):
-    """Helper function for periodic execution."""
-    if not stop_scheduler_event.is_set():
-        perform_scheduled_subconscious_context_sync()
-        # Schedule the next run
-        global scheduler_timer
-        scheduler_timer = threading.Timer(interval_seconds, _run_periodically, args=[interval_seconds])
-        scheduler_timer.start()
-    else:
-        logger.info("ChronosEngine: Scheduler stop event received. Not scheduling next run.")
-
-
-def start_subconscious_sync_scheduler(interval_minutes: int = 5, run_once: bool = False):
+def _run_periodic_sync(interval_seconds: int):
     """
-    Starts the simulated scheduler for subconscious context synchronization.
+    Internal function executed periodically by the scheduler.
+    
+    If the stop event is not set, it performs the sync task and then
+    schedules itself to run again.
+    """
+    global scheduler_timer # Allow modification of the global timer variable
+    if not scheduler_stop_event.is_set():
+        perform_scheduled_subconscious_context_sync()
+        
+        # Schedule the next run only if the stop event is still not set
+        if not scheduler_stop_event.is_set():
+            scheduler_timer = threading.Timer(interval_seconds, _run_periodic_sync, args=[interval_seconds])
+            scheduler_timer.daemon = True  # Allows main program to exit even if timer is active
+            scheduler_timer.start()
+            logger.debug(f"ChronosEngine: Next sync scheduled in {interval_seconds} seconds.")
+        else:
+            logger.info("ChronosEngine: Stop event set after task execution, not scheduling next run.")
+    else:
+        logger.info("ChronosEngine: Stop event set, periodic sync task not executed.")
+
+
+def start_subconscious_sync_scheduler(interval_minutes: float = 5.0):
+    """
+    Starts the periodic scheduler for subconscious context synchronization.
+
+    The scheduler uses threading.Timer to run the sync task at approximately
+    the specified interval.
 
     Args:
         interval_minutes: The interval in minutes at which the sync should occur.
-        run_once: If True, performs the sync task once immediately and does not schedule periodically.
-                  Useful for testing or environments where background threads are not desired.
     """
-    global stop_scheduler_event
-    stop_scheduler_event.clear() # Ensure it's not set from a previous run
-
-    logger.info(f"ChronosEngine: Initializing subconscious context sync scheduler.")
+    global scheduler_timer # Allow modification of the global timer variable
     
-    if run_once:
-        logger.info("ChronosEngine: Performing a single run of context sync due to run_once=True.")
-        perform_scheduled_subconscious_context_sync()
-        logger.info("ChronosEngine: Single run completed.")
-    else:
-        # This simulates a more persistent scheduler using threading.Timer for periodic execution.
-        # In a production Eidos system, this might be handled by a dedicated scheduling library
-        # like APScheduler, or integrated into an existing asyncio event loop if Eidos is async.
-        
-        # For an asyncio based approach:
-        # async def _async_run_periodically(interval_seconds: int):
-        #     while True:
-        #         await perform_scheduled_subconscious_context_sync_async() # Assuming an async version
-        #         await asyncio.sleep(interval_seconds)
-        # asyncio.create_task(_async_run_periodically(interval_minutes * 60))
-        
-        logger.info(f"ChronosEngine: Scheduler will attempt to sync context every {interval_minutes} minutes.")
-        logger.info("ChronosEngine: Starting the first sync operation now and scheduling future runs.")
-        
-        # Using threading.Timer for a simple, non-blocking periodic task
-        # Perform the first one immediately, then schedule subsequent ones.
-        # _run_periodically(interval_minutes * 60)
-        
-        # Simpler approach for this task: just one call and log.
-        # The user story asks for a "simulated scheduler" and "can just call ... once".
-        # The threading.Timer is more advanced, so sticking to the simpler request first.
-        perform_scheduled_subconscious_context_sync()
-        logger.info(f"ChronosEngine: (Simulation) First sync complete. In a real scheduler, this would run every {interval_minutes} minutes.")
+    if scheduler_timer and scheduler_timer.is_alive():
+        logger.warning("ChronosEngine: Scheduler already running. Please stop it before starting again.")
+        return
+
+    scheduler_stop_event.clear() # Clear the stop event in case it was set previously
+    interval_seconds = interval_minutes * 60
+
+    logger.info(f"ChronosEngine: Starting subconscious context sync scheduler. Interval: {interval_minutes} minutes.")
+    
+    # Kick off the first execution of the periodic task
+    # Subsequent runs will be scheduled by _run_periodic_sync itself
+    _run_periodic_sync(interval_seconds)
 
 
 def stop_subconscious_sync_scheduler():
-    """Stops the currently running scheduler, if any."""
-    global stop_scheduler_event
-    global scheduler_timer
-    logger.info("ChronosEngine: Attempting to stop subconscious context sync scheduler...")
-    stop_scheduler_event.set()
+    """
+    Stops the periodic subconscious context sync scheduler.
+
+    Sets an event to signal the scheduler loop to terminate and cancels
+    any active timer.
+    """
+    global scheduler_timer # Allow access to the global timer variable
+    logger.info("ChronosEngine: Requesting stop for subconscious context sync scheduler...")
+    scheduler_stop_event.set() # Signal the loop to stop
+
     if scheduler_timer and scheduler_timer.is_alive():
-        scheduler_timer.cancel() # Attempt to cancel the timer if it's waiting
-        logger.info("ChronosEngine: Scheduler timer cancelled.")
-    else:
-        logger.info("ChronosEngine: No active scheduler timer to cancel, or it already finished.")
+        scheduler_timer.cancel() # Attempt to cancel the currently scheduled timer
+        logger.info("ChronosEngine: Active scheduler timer cancelled.")
+    scheduler_timer = None # Clear the timer variable
+    logger.info("ChronosEngine: Subconscious context sync scheduler stopped.")
 
 
 if __name__ == '__main__':
-    from typing import Optional # Added for scheduler_timer type hint
+    logger.info("ChronosEngine: --- Test Run for Periodic Scheduler ---")
     
-    logger.info("ChronosEngine: --- Test Run ---")
+    test_interval_minutes = 0.1 # 6 seconds for quick testing
     
-    # Test 1: Run once behavior
-    print("\n--- Test 1: Running scheduler once ---")
-    start_subconscious_sync_scheduler(interval_minutes=1, run_once=True)
-    # This should call perform_scheduled_subconscious_context_sync once and then stop.
+    print(f"\n--- Starting scheduler with interval: {test_interval_minutes} minutes ({test_interval_minutes*60} seconds) ---")
+    start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
+    
+    # Let the scheduler run for a few cycles
+    # For example, let it run for (test_interval_minutes * 60 * 3.5) seconds to see about 3 executions
+    run_duration_seconds = int(test_interval_minutes * 60 * 3.5) # Approx 3 cycles
+    if run_duration_seconds < 1: run_duration_seconds = 1 # ensure at least 1 second sleep for very short intervals
+    
+    print(f"ChronosEngine Test: Main thread sleeping for {run_duration_seconds} seconds to observe scheduler...")
+    
+    # Loop with shorter sleeps to check stop_event more frequently if needed for other tests
+    # but for this simple case, one sleep is fine.
+    for _ in range(run_duration_seconds):
+        if scheduler_stop_event.is_set(): # Should not be set here unless something external stops it
+            break
+        time.sleep(1)
 
-    # Test 2: Simulated periodic behavior (single call for this placeholder)
-    # If we were to implement the threading.Timer version for real periodic calls:
-    # print("\n--- Test 2: Simulating periodic scheduler (will run one iteration and log) ---")
-    # stop_scheduler_event.clear() # Make sure it's clear before starting
-    # start_subconscious_sync_scheduler(interval_minutes=0.1, run_once=False) # Short interval for test
-    # print("ChronosEngine Test: Main thread sleeping for 10 seconds to observe scheduler...")
-    # time.sleep(10) # Sleep for a bit to let the timer fire at least once if it were looping
-    # print("ChronosEngine Test: Woke up. Stopping scheduler.")
-    # stop_subconscious_sync_scheduler()
-    # print("ChronosEngine Test: Scheduler stop requested.")
+    print("\nChronosEngine Test: Woke up. Requesting scheduler stop...")
+    stop_subconscious_sync_scheduler()
     
-    # For the current simpler implementation (calls once and logs):
-    print("\n--- Test 2: Simulating 'periodic' scheduler (will run one iteration and log intention) ---")
-    start_subconscious_sync_scheduler(interval_minutes=0.1, run_once=False) 
-    # This will execute perform_scheduled_subconscious_context_sync once and log it would run periodically.
+    # Give a moment for the last timer to be properly cancelled and threads to clean up if any
+    time.sleep(0.2) 
+    
+    print("\n--- Testing restart behavior (should log warning if not stopped properly or start if stopped) ---")
+    # Attempt to start again (if it was properly stopped, this should work)
+    start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
+    time.sleep(1) # Let it run for a very short time
+    stop_subconscious_sync_scheduler()
+
 
     logger.info("ChronosEngine: --- Test Run Finished ---")
