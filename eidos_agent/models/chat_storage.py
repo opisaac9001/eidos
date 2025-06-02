@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union # Added Union
-from pydantic import BaseModel, Field, field_validator # Use field_validator for Pydantic v2
+from pydantic import BaseModel, Field, validator  # Use validator for Pydantic v1
 import uuid
 
 class ChatMessage(BaseModel):
@@ -9,8 +9,8 @@ class ChatMessage(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None # Added for tool call history
     tool_call_id: Optional[str] = None # Added for tool result history
-
-    @field_validator('role')
+    
+    @validator('role')
     @classmethod
     def validate_role(cls, v):
         allowed_roles = {'user', 'assistant', 'system', 'tool'} # Added 'tool'
@@ -45,19 +45,19 @@ class ChatState(BaseModel):
             }
         }
 
-    @field_validator('conversation', mode='before') # Changed from 'messages'
+    @validator('conversation', pre=True)  # Changed from 'messages'
     @classmethod
     def ensure_conversation_list(cls, v):
         if v is None: return []
         return v
 
-    @field_validator('systemPrompt', mode='before')
+    @validator('systemPrompt', pre=True)
     @classmethod
     def ensure_system_prompt(cls, v):
         if not v: return "You are a helpful assistant"
         return v
 
-    @field_validator('selectedModel', mode='before')
+    @validator('selectedModel', pre=True)
     @classmethod
     def ensure_model(cls, v):
         if not v: return "eidos-agent"

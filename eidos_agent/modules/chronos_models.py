@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator # Use field_validator for Pydantic v2
+from pydantic import BaseModel, Field, validator  # Use validator for Pydantic v1
 from typing import Optional, Dict, Any, Literal, List
 from datetime import datetime, date, time, timezone
 import uuid
@@ -41,21 +41,25 @@ class ActivitySlot(BaseModel):
     activity_details: ActivitySlotDetails
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator('date', mode='before')
+    @validator('date', pre=True)
     @classmethod
     def _parse_date(cls, v):
-        if isinstance(v, str): return date.fromisoformat(v)
-        if isinstance(v, date): return v
+        if isinstance(v, str): 
+            return date.fromisoformat(v)
+        if isinstance(v, date): 
+            return v
         raise ValueError("Invalid date format")
 
-    @field_validator('start_time', 'end_time', mode='before')
+    @validator('start_time', 'end_time', pre=True)
     @classmethod
     def _parse_time(cls, v):
-        if isinstance(v, str): return time.fromisoformat(v)
-        if isinstance(v, time): return v
+        if isinstance(v, str): 
+            return time.fromisoformat(v)
+        if isinstance(v, time): 
+            return v
         raise ValueError("Invalid time format")
 
-    @field_validator('generated_at', mode='before')
+    @validator('generated_at', pre=True)
     @classmethod
     def _parse_datetime(cls, v):
         if isinstance(v, str):
@@ -77,20 +81,22 @@ class PathosEvent(BaseModel):
     title: str
     start_date: date
     end_date: date
-    event_type: EventType # Uses the updated EventType
+    event_type: EventType
     description: Optional[str] = Field(default=None)
     location: Optional[str] = Field(default=None)
-    details: PathosEventDetails = Field(default_factory=PathosEventDetails) # Ensure default factory
+    details: PathosEventDetails = Field(default_factory=PathosEventDetails)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator('start_date', 'end_date', mode='before')
+    @validator('start_date', 'end_date', pre=True)
     @classmethod
     def _parse_event_date(cls, v):
-        if isinstance(v, str): return date.fromisoformat(v)
-        if isinstance(v, date): return v
+        if isinstance(v, str): 
+            return date.fromisoformat(v)
+        if isinstance(v, date): 
+            return v
         raise ValueError("Invalid date format for event")
 
-    @field_validator('created_at', mode='before')
+    @validator('created_at', pre=True)
     @classmethod
     def _parse_event_datetime(cls, v):
         if isinstance(v, str):
@@ -100,19 +106,9 @@ class PathosEvent(BaseModel):
             return v.replace(tzinfo=timezone.utc) if v.tzinfo is None else v
         raise ValueError("Invalid datetime format for event")
 
-    @field_validator('end_date')
+    @validator('end_date')
     @classmethod
-    def _check_end_date(cls, v, info):
-        if 'start_date' in info.data and v < info.data['start_date']:
+    def _check_end_date(cls, v, values):
+        if 'start_date' in values and v < values['start_date']:
             raise ValueError('end_date must not be before start_date')
         return v
-
-# The AddPathosEventRequest model defined in main.py for the API endpoint
-# is sufficient. This internal AddPathosEventRequest can be removed if not used elsewhere.
-# class AddPathosEventRequest(BaseModel):
-#     title: str
-#     description: Optional[str] = None
-#     start_time: datetime
-#     end_time: datetime
-#     location: Optional[str] = None
-#     user_id: Optional[str] = None

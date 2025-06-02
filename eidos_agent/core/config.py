@@ -25,8 +25,8 @@ class LLMConfig(TypedDict, total=False):
     max_tool_iterations: Optional[int]
     min_tokens_override_limit: Optional[int]
     max_tokens_override_limit: Optional[int]
-    supports_vision: Optional[bool] # Added from broken
-    model_name_for_tiktoken: Optional[str] # Added from broken (used in pathos_interface)
+    supports_vision: Optional[bool] # Ensure this is here
+    model_name_for_tiktoken: Optional[str]
 
 
 class EthosConfig(TypedDict, total=False):
@@ -176,20 +176,20 @@ class EidosTTSConfig(TypedDict, total=False):
 class Config:
     LLM: Dict[str, LLMConfig] = {
         "PATHOS": {
-            "url": os.getenv("LLM_PATHOS_URL", "http://localhost:1234/v1"),
+            "url": os.getenv("LLM_PATHOS_URL", "http://localhost:8000/v1"), # Example for VLLM
             "model": os.getenv("LLM_PATHOS_MODEL"),
-            "api_key": os.getenv("LLM_PATHOS_API_KEY", "lm-studio"),
+            "api_key": os.getenv("LLM_PATHOS_API_KEY", "vllm"), # Default for VLLM
             "temperature": float(os.getenv("LLM_PATHOS_TEMP", 0.7)),
             "timeout": float(os.getenv("LLM_PATHOS_TIMEOUT", 300.0)),
-            "max_tokens": int(os.getenv("LLM_PATHOS_MAX_TOKENS", 4096)),
+            "max_tokens": int(os.getenv("LLM_PATHOS_MAX_TOKENS", 4096)), # Default output limit
             "top_p": float(os.getenv("LLM_PATHOS_TOP_P", 0.95)) if os.getenv("LLM_PATHOS_TOP_P") else None,
             "presence_penalty": float(os.getenv("LLM_PATHOS_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_PATHOS_PRESENCE_PENALTY") else None,
             "frequency_penalty": float(os.getenv("LLM_PATHOS_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_PATHOS_FREQUENCY_PENALTY") else None,
             "max_tool_iterations": int(os.getenv("LLM_PATHOS_MAX_TOOL_ITERATIONS", 5)),
             "min_tokens_override_limit": int(os.getenv("LLM_PATHOS_MIN_TOKENS_OVERRIDE_LIMIT", 256)),
             "max_tokens_override_limit": int(os.getenv("LLM_PATHOS_MAX_TOKENS_OVERRIDE_LIMIT", 32000)),
-            "supports_vision": os.getenv("LLM_PATHOS_SUPPORTS_VISION", "False").lower() == "true",
-            "model_name_for_tiktoken": os.getenv("LLM_PATHOS_TIKTOKEN_NAME", "cl100k_base") # Added
+            "supports_vision": os.getenv("LLM_PATHOS_SUPPORTS_VISION", "False").lower() == "true", # Read from .env
+            "model_name_for_tiktoken": os.getenv("LLM_PATHOS_TIKTOKEN_NAME", "cl100k_base")
         },
         "LOGOS_TECHNE": {
             "url": os.getenv("LLM_LOGOS_TECHNE_URL", "http://localhost:1234/v1"),

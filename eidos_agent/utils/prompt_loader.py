@@ -4,7 +4,7 @@ from typing import Dict, Optional
 import logging # Use standard logging here as it's a basic utility
 
 logger = logging.getLogger(__name__) # Use standard logger for this utility
-PROMPT_DIR = Path(__file__).resolve().parent.parent / "system_prompts"
+PROMPT_DIR = Path(__file__).resolve().parent.parent.parent / "system_prompts" # Three .parent
 
 _prompt_cache: Dict[str, str] = {}
 
