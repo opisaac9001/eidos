@@ -13,11 +13,12 @@ import json # Added for payload construction if LLM params are in config
 from typing import Optional, List, Dict, Any, Sequence # Sequence not used, can remove
 
 from eidos_agent.core.config import Config, OneirosConfig, LLMConfig
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
-from eidos_agent.utils.logger import get_logger # Use get_logger
+# EthosCore imports are already updated to persona_logic in this file
+from eidos_agent.persona_logic.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
+from eidos_agent.utils.logger import get_logger
 
-logger = get_logger(__name__) # Use get_logger
+logger = get_logger(__name__)
 
 WILDCARD_RE = re.compile(r"\{\{([a-zA-Z0-9_]+)\}\}")
 

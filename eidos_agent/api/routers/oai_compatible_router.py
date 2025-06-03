@@ -25,8 +25,8 @@ from eidos_agent.schemas import (
 # Imports for Eidos core components (will be injected)
 from eidos_agent.core.config import Config
 from eidos_agent.core.input_router import InputRouter, RoutingResult
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 from eidos_agent.modules.pathos_interface import PathosInterface
 from eidos_agent.core.connection_manager import ConnectionManager
 

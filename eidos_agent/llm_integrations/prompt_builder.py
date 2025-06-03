@@ -14,8 +14,8 @@ from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.utils.logger import get_logger # Use consistent logger
 
-# Import tool definitions
-from eidos_agent.modules.pathos_tools_definitions import (
+# Import tool definitions (updated to relative)
+from .pathos_tools_definitions import (
     AVAILABLE_TOOLS_FOR_PATHOS_LLM,
     # ALL_AVAILABLE_SYSTEM_TOOLS # Not directly used in this version of PromptBuilder
 )

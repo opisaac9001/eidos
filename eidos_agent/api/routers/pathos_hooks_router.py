@@ -12,17 +12,17 @@ from fastapi import APIRouter, HTTPException # Changed FastAPI to APIRouter
 # Attempt to import models from the subconscious module.
 # This structure assumes that 'eidos_agent' is in the Python path.
 try:
-    from eidos_agent.modules.subconscious.models import ImpulseData, ImprintData
-    from eidos_agent.modules.firmament import handle_external_impulse
-    from eidos_agent.modules.memories import store_imprint
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData # Updated import
+    from eidos_agent.features.firmament import handle_external_impulse # Updated import
+    from eidos_agent.features.memories_feature import store_imprint # Updated import
 except ImportError as e:
     # This fallback is mostly for isolated testing of this file if the full structure isn't in PYTHONPATH.
     # In a proper package installation, this shouldn't be necessary.
     logging.warning(f"Could not import Eidos modules directly, attempting relative for dev: {e}")
     try:
-        from ..modules.subconscious.models import ImpulseData, ImprintData
-        from ..modules.firmament import handle_external_impulse
-        from ..modules.memories import store_imprint
+        from ...features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData # Updated relative import
+        from ...features.firmament import handle_external_impulse # Updated relative import
+        from ...features.memories_feature import store_imprint # Updated relative import
     except ImportError:
         logging.exception("Failed to import Eidos modules. Ensure eidos_agent is in PYTHONPATH or structure is correct.")
         # Define dummy models if import fails, to allow FastAPI to start but endpoints will fail

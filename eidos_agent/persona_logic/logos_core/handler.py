@@ -17,16 +17,17 @@ except ImportError:
     ZoneInfo = None
 
 from eidos_agent.core.config import Config, LLMConfig, WolframAlphaConfig, NewsApiConfig
-from eidos_agent.modules.ethos_core.core import EthosCore
+# EthosCore imports are already updated to persona_logic in this file
+from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.services.web_search import WebSearchService
 from eidos_agent.services.home_assistant import HomeAssistantService, TaskResult as HATaskResult # Import TaskResult
 from eidos_agent.services.openweathermap import OpenWeatherMapService
 from eidos_agent.utils.document_parser import parse_document, SUPPORTED_EXTENSIONS
 from eidos_agent.utils.text_splitter import chunk_text_by_char
 from eidos_agent.utils.logger import get_logger
-from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
+from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.prompt_loader import load_system_prompt
-from eidos_agent.modules import simulation_module # For NPC tools
+from ...modules import simulation_module # Adjusted for new location relative to modules
 
 logger = get_logger(__name__)
 

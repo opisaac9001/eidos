@@ -7,7 +7,7 @@ import logging
 # Attempt to import from other Eidos modules
 try:
     from eidos_agent.dialog.flow_handler import is_thought_query
-    from eidos_agent.modules.subconscious.client import get_current_thoughts
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import get_current_thoughts # Updated import
 except ImportError:
     # Fallback for isolated testing or if PYTHONPATH is not set up correctly
     logging.warning("context_enricher: Could not import Eidos modules. Using placeholders for testing.")

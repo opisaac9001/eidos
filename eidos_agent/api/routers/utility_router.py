@@ -7,8 +7,8 @@ from fastapi.responses import JSONResponse
 # Core Eidos components (to be injected)
 # from eidos_agent.core.config import Config # Config might not be directly needed here
 from eidos_agent.core.input_router import InputRouter
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 from eidos_agent.modules.pathos_interface import PathosInterface
 from eidos_agent.core.connection_manager import ConnectionManager
 

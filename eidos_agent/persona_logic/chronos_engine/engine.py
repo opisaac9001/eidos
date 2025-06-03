@@ -6,18 +6,20 @@ import json
 import random
 
 from eidos_agent.core.config import Config, LLMConfig
-from eidos_agent.modules.chronos_models import (
+# Relative import for models within the same package
+from .models import (
     ActivitySlot, PathosEvent,
-    ActivitySlotDetails, PathosEventDetails, ActivityType, EventType # Ensure EventType is imported
+    ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
 )
-from eidos_agent.modules.ethos_core.memory_storage import MemoryStorage
+# EthosCore imports are already updated to persona_logic in this file
+from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryStorage
 from eidos_agent.utils.logger import get_logger
 import httpx
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from eidos_agent.modules.ethos_core.core import EthosCore
-    from eidos_agent.modules.logos_core.handler import LogosCore
+    from eidos_agent.persona_logic.ethos_core.core import EthosCore
+    from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 
 logger = get_logger(__name__)
 

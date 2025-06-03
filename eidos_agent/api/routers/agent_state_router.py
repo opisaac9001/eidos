@@ -15,9 +15,9 @@ from eidos_agent.schemas import (
     ValidationError
 )
 # This specific import from memory_storage might not be needed if GenericMemoryEntry from schemas is sufficient
-# from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
+# from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry # Path is already correct
 
-from eidos_agent.modules.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/agent", tags=["Agent State"])

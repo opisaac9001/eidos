@@ -12,8 +12,8 @@ from eidos_agent.schemas import UserSettingsRequest, ApiMemoryEntry, MemoryEntry
 from pydantic import ValidationError
 
 # Core Eidos components (to be injected)
-from eidos_agent.modules.logos_core.handler import LogosCore
-from eidos_agent.modules.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
 # from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry # Imported as GenericMemoryEntry now
 
 logger = logging.getLogger(__name__)

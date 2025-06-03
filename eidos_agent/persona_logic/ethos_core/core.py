@@ -13,19 +13,20 @@ import httpx # Not directly used here, but often in LLM calls if not delegated
 from eidos_agent.utils.prompt_loader import load_system_prompt
 
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
-from eidos_agent.modules.ethos_core.memory_storage import MemoryStorage, MemoryEntry
+from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
 from eidos_agent.utils.logger import get_logger
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from eidos_agent.modules.oneiros_module import OneirosModule
+    from eidos_agent.features.oneiros import OneirosModule # Updated import
     from eidos_agent.core.connection_manager import ConnectionManager
-    from eidos_agent.modules.pathos_interface import PathosInterface
-    from eidos_agent.modules.logos_core.handler import LogosCore
-    from eidos_agent.modules.chronos_engine import ChronosEngine, ActivitySlot
+    from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
+    from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+    # Updated import for ChronosEngine and related types
+    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot, PATHOS_USER_ID
 
-# Import PATHOS_USER_ID correctly
-from eidos_agent.modules.chronos_engine import PATHOS_USER_ID
+# PATHOS_USER_ID is now imported via TYPE_CHECKING block or directly if not under TYPE_CHECKING
+# from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # This line is removed
 
 try:
     from zoneinfo import ZoneInfo

@@ -7,11 +7,16 @@ import json
 from typing import Dict, List, Any, Optional, AsyncGenerator
 
 from eidos_agent.core.config import LLMConfig # For type hinting
-from eidos_agent.modules.llm_client import LLMClient
-from eidos_agent.modules.logos_core.handler import LogosCore
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # For add_pathos_event tool
-from eidos_agent.modules import simulation_module # For simulation tools
+from .llm_client import LLMClient # Updated to relative
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Already updated
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Already updated
+from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID # Already updated
+# Updated import for simulation module functions
+from ..features.simulation import (
+    initiate_simulated_interaction,
+    send_message_to_simulated_npc,
+    end_simulated_interaction
+)
 
 # Tool definitions are not directly needed here if passed into call_llm_with_tools
 # However, _execute_tools will need to know about them if it's not generic enough.
@@ -106,11 +111,11 @@ class ToolOrchestrator:
                     )
                     tool_response_content_str = json.dumps({"status": "success", "event_id": event_id, "message": f"Event '{function_args.get('title')}' scheduled."}) if event_id else json.dumps({"status": "error", "message": f"Failed to schedule event '{function_args.get('title')}'."})
                 elif function_name == "initiate_simulated_interaction":
-                    tool_response_content_str = json.dumps(await simulation_module.initiate_simulated_interaction(function_args.get("npc_name"), function_args.get("npc_role"), function_args.get("npc_description"), function_args.get("initial_context"), function_args.get("pathos_opening_statement")))
+                    tool_response_content_str = json.dumps(await initiate_simulated_interaction(function_args.get("npc_name"), function_args.get("npc_role"), function_args.get("npc_description"), function_args.get("initial_context"), function_args.get("pathos_opening_statement")))
                 elif function_name == "send_message_to_simulated_npc":
-                    tool_response_content_str = json.dumps(await simulation_module.send_message_to_simulated_npc(function_args.get("message_to_npc")))
+                    tool_response_content_str = json.dumps(await send_message_to_simulated_npc(function_args.get("message_to_npc")))
                 elif function_name == "end_simulated_interaction":
-                    tool_response_content_str = json.dumps(await simulation_module.end_simulated_interaction())
+                    tool_response_content_str = json.dumps(await end_simulated_interaction())
                 else:
                     tool_response_content_str = json.dumps({"error": f"Tool '{function_name}' not implemented."})
             except Exception as e:

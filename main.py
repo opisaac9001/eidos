@@ -33,12 +33,13 @@ BASE_DIR = Path(__file__).resolve().parent
 WEBAPP_DIR = BASE_DIR / "webapp"
 
 from eidos_agent.services.openweathermap import OpenWeatherMapService
-from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry # Used in response_model
+# Updated EthosCore imports to persona_logic
+from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry # Used in response_model
 from eidos_agent.services.home_assistant import HomeAssistantService
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore
-from eidos_agent.modules.pathos_interface import PathosInterface
-from eidos_agent.modules.oneiros_module import OneirosModule
+from eidos_agent.persona_logic.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+from eidos_agent.llm_integrations.pathos_interface import PathosInterface # Updated import
+from eidos_agent.features.oneiros import OneirosModule # Updated import
 from eidos_agent.core.input_router import InputRouter, RoutingResult
 # Updated import to use eidos_agent.schemas
 from eidos_agent.schemas import (
@@ -49,8 +50,10 @@ from eidos_agent.schemas import (
 )
 from eidos_agent.core.connection_manager import ConnectionManager
 from eidos_agent.services.external_tts_service import ExternalTTSService
-from eidos_agent.modules.chronos_engine import ChronosEngine, PATHOS_USER_ID
-from eidos_agent.modules.chronos_models import ActivitySlot, PathosEvent, EventType, PathosEventDetails
+# Updated imports for ChronosEngine and its models
+from eidos_agent.persona_logic.chronos_engine import (
+    ChronosEngine, PATHOS_USER_ID, ActivitySlot, PathosEvent, EventType, PathosEventDetails
+)
 # Updated import for chat_storage_router
 from eidos_agent.api.routers.chat_storage_router import router as chat_storage_router
 # Removed chat_storage init import, it's done in lifespan
@@ -67,8 +70,12 @@ from eidos_agent.api.routers.agent_actions_router import router as agent_actions
 from eidos_agent.api.routers.agent_actions_router import init_agent_actions_router
 from eidos_agent.api.routers.memory_management_router import router as memory_management_router
 from eidos_agent.api.routers.memory_management_router import init_memory_management_router
-from eidos_agent.api.routers.agent_state_router import router as agent_state_router # Import Agent State router
-from eidos_agent.api.routers.agent_state_router import init_agent_state_router # Import Agent State router init function
+from eidos_agent.api.routers.agent_state_router import router as agent_state_router
+from eidos_agent.api.routers.agent_state_router import init_agent_state_router
+from eidos_agent.api.routers.pathos_chronos_router import router as pathos_chronos_api_router
+from eidos_agent.api.routers.pathos_chronos_router import init_pathos_chronos_router
+from eidos_agent.api.routers.websocket_router import router as websocket_api_router # Import WebSocket router
+from eidos_agent.api.routers.websocket_router import init_websocket_router # Import WebSocket router init function
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
@@ -209,6 +216,18 @@ async def lifespan(app_instance: FastAPI):
         else: # pragma: no cover
             logger.error("EthosCore is None, Agent State router not initialized.")
 
+        # Initialize Pathos Chronos Router with dependencies
+        if all([ethos_core, Config]): # Config is directly available
+            init_pathos_chronos_router(ethos_core, Config)
+        else: # pragma: no cover
+            logger.error("One or more core components are None (EthosCore or Config), Pathos Chronos router not initialized.")
+
+        # Initialize WebSocket Router with dependencies
+        if manager: # manager is the ConnectionManager instance
+            init_websocket_router(manager)
+        else: # pragma: no cover
+            logger.error("ConnectionManager (manager) is None, WebSocket router not initialized.")
+
         if ethos_core: background_tasks = await ethos_core.get_background_tasks()
         logger.info("--- Eidos System Initialized Successfully ---")
         yield
@@ -243,7 +262,9 @@ app.include_router(utility_router)
 app.include_router(user_profile_router)
 app.include_router(agent_actions_router)
 app.include_router(memory_management_router)
-app.include_router(agent_state_router) # Include Agent State router
+app.include_router(agent_state_router)
+app.include_router(pathos_chronos_api_router)
+app.include_router(websocket_api_router) # Include WebSocket router
 
 if WEBAPP_DIR.is_dir(): # pragma: no cover
     js_dir = WEBAPP_DIR / "js"; css_dir = WEBAPP_DIR / "css"
@@ -382,74 +403,30 @@ async def get_gui_root(): # pragma: no cover
 
 # The /v1/agent/knowledge_verifications endpoint has been moved to the agent_state_router.
 # @app.get("/v1/agent/knowledge_verifications", response_model=List[ApiMemoryEntry], tags=["Agent State"]) # Use ApiMemoryEntry
-# async def get_agent_knowledge_verifications(limit: int = 20, x_user_id: Optional[str] = Header(None, alias="X-User-Id")):
+# The /v1/pathos/schedule/today endpoint has been moved to the pathos_chronos_router.
+# @app.get("/v1/pathos/schedule/today", response_model=List[ActivitySlot], tags=["Pathos Chronos"])
+# async def get_pathos_todays_schedule(): # pragma: no cover
 #     global ethos_core
 #     # ... implementation ...
 
-@app.get("/v1/pathos/schedule/today", response_model=List[ActivitySlot], tags=["Pathos Chronos"])
-async def get_pathos_todays_schedule(): # pragma: no cover
-    global ethos_core # This global is still used by other endpoints
-    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Schedule system not ready.")
-    try: return await ethos_core.chronos_engine.get_todays_schedule_for_user()
-    except Exception as e: logger.error(f"Error retrieving schedule: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+# The /v1/pathos/events/upcoming endpoint has been moved to the pathos_chronos_router.
+# @app.get("/v1/pathos/events/upcoming", response_model=List[PathosEvent], tags=["Pathos Chronos"])
+# async def get_pathos_upcoming_events(days_ahead: int = 7):
+#     global ethos_core
+#     # ... implementation ...
 
-@app.get("/v1/pathos/events/upcoming", response_model=List[PathosEvent], tags=["Pathos Chronos"])
-async def get_pathos_upcoming_events(days_ahead: int = 7):
-    global ethos_core
-    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Event system not ready.")
-    if not (1 <= days_ahead <= 90): raise HTTPException(status_code=400, detail="days_ahead must be 1-90.")
-    try: return await ethos_core.chronos_engine.get_upcoming_events(days_ahead=days_ahead)
-    except Exception as e: logger.error(f"Error retrieving upcoming events: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+# The AddPathosEventRequestAPI model has been moved to the pathos_chronos_router.
+# class AddPathosEventRequestAPI(BaseModel):
+#     title: str; start_date: str; end_date: str; event_type: EventType
+#     description: Optional[str] = None; location: Optional[str] = None
+#     details: Optional[PathosEventDetails] = None
 
-class AddPathosEventRequestAPI(BaseModel):
-    title: str; start_date: str; end_date: str; event_type: EventType
-    description: Optional[str] = None; location: Optional[str] = None
-    details: Optional[PathosEventDetails] = None
-@app.post("/v1/pathos/events/add", response_model=PathosEvent, status_code=201, tags=["Pathos Chronos"])
-async def add_pathos_planned_event_api(event_request: AddPathosEventRequestAPI, x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")):
-    global ethos_core
-    admin_pw_cfg = Config.get_admin_password()
-    if admin_pw_cfg and (not x_admin_password or not secrets.compare_digest(x_admin_password, admin_pw_cfg)): raise HTTPException(status_code=403, detail="Forbidden: Admin credentials required.")
-    if not ethos_core or not ethos_core.chronos_engine: raise HTTPException(status_code=503, detail="Event system not ready.")
-    try:
-        event_data_for_storage = event_request.model_dump(exclude_unset=True); event_data_for_storage['user_id'] = PATHOS_USER_ID
-        added_event = await ethos_core.chronos_engine.add_planned_event(event_data_for_storage)
-        if added_event: return added_event
-        else: raise HTTPException(status_code=500, detail="Failed to add event.")
-    except ValueError as ve: raise HTTPException(status_code=422, detail=f"Invalid event data: {ve}")
-    except Exception as e: logger.error(f"Error adding event: {e}", exc_info=True); raise HTTPException(status_code=500, detail=f"Error: {e}")
+# The /v1/pathos/events/add endpoint has been moved to the pathos_chronos_router.
+# @app.post("/v1/pathos/events/add", response_model=PathosEvent, status_code=201, tags=["Pathos Chronos"])
+# The /ws WebSocket endpoint has been moved to the websocket_router.
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket): # pragma: no cover
+#     # ... implementation ...
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    user_id = None; connection_ok = False
-    try:
-        while True:
-            data = await websocket.receive_json(); logger.debug(f"WS received: {data}")
-            if data.get("type") == "auth" and data.get("payload", {}).get("userId"):
-                raw_temp_uid = data["payload"]["userId"]
-                temp_uid = raw_temp_uid.lower().strip().replace(" ", "_") if isinstance(raw_temp_uid, str) and raw_temp_uid else None
-                if not temp_uid: logger.warning(f"WS: Invalid user_id '{raw_temp_uid}'. Closing."); break
-                user_id = temp_uid
-                if await manager.connect(websocket, user_id):
-                    connection_ok = True; logger.info(f"WS connected for user: {user_id}")
-                    await manager.send_personal_message({"type": "status", "payload": {"message": "Connected to Eidos WS."}}, user_id)
-                else: logger.error(f"WS: ConnectionManager failed for user {user_id}. Closing."); await websocket.send_json({"type": "error", "payload": {"message": "Failed to register."}}); await websocket.close(code=1011); break
-            elif user_id is None: logger.warning("WS: Message before auth. Closing."); await websocket.send_json({"type": "error", "payload": {"message": "Auth required."}}); await websocket.close(code=1008); break
-            else: logger.warning(f"WS: Unhandled message type '{data.get('type')}' from user {user_id}.")
-    except WebSocketDisconnect: logger.info(f"WS: Disconnected user: {user_id if user_id else 'unauthenticated'}.")
-    except Exception as e:
-        logger.error(f"WS: Error for user {user_id if user_id else 'unknown'}: {e}", exc_info=True)
-        try:
-            if websocket.client_state == websocket.client_state.CONNECTED: await websocket.send_json({"type": "error", "payload": {"message": f"Error: {str(e)}"}})
-        except Exception as e_send: logger.error(f"WS: Could not send error to user {user_id if user_id else 'unknown'}: {e_send}")
-        try:
-            if websocket.client_state != websocket.client_state.DISCONNECTED: await websocket.close(code=1011)
-        except Exception as e_close: logger.error(f"WS: Error during forced close for user {user_id if user_id else 'unknown'}: {e_close}")
-    finally:
-        if user_id and connection_ok: manager.disconnect(websocket, user_id); logger.info(f"WS: Ensured user {user_id} disconnected from ConnectionManager.")
-        elif user_id: logger.info(f"WS: User {user_id} (not fully registered) closing.")
-        else: logger.info("WS: Unauthenticated client closing.")
-
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     uvicorn.run("main:app", host=Config.API.get('host','0.0.0.0'), port=Config.API.get('port',8088), log_level=Config.API.get('log_level','info'), reload=False)

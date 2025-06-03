@@ -11,7 +11,8 @@ import numpy as np
 
 from eidos_agent.core.config import Config, EthosConfig
 from eidos_agent.utils.logger import get_logger
-from eidos_agent.modules.chronos_models import ActivitySlot, PathosEvent, ActivitySlotDetails, PathosEventDetails
+# Updated import for Chronos models
+from eidos_agent.persona_logic.chronos_engine.models import ActivitySlot, PathosEvent, ActivitySlotDetails, PathosEventDetails
 
 logger = get_logger(__name__)
 

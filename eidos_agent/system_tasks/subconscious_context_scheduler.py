@@ -12,7 +12,7 @@ from typing import Optional # For type hinting scheduler_timer
 
 # Attempt to import from subconscious client
 try:
-    from eidos_agent.modules.subconscious.client import sync_recent_context
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context # Updated import
 except ImportError:
     logging.warning("chronos_engine: Could not import sync_recent_context. Using placeholder for testing.")
     # Placeholder for sync_recent_context if the import fails
