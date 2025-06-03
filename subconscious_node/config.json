@@ -21,5 +21,6 @@
       "introversion": 0.4
     },
     "impulse_threshold": 0.7
-  }
+  },
+  "eidos_api_base_url": "http://localhost:8080"
 }
