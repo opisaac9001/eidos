@@ -35,7 +35,7 @@ WEBAPP_DIR = BASE_DIR / "webapp"
 from eidos_agent.services.openweathermap import OpenWeatherMapService
 # Updated EthosCore imports to persona_logic
 from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry # Used in response_model
-from eidos_agent.services.home_assistant import HomeAssistantService
+# Removed HomeAssistantService import
 from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 from eidos_agent.llm_integrations.pathos_interface import PathosInterface # Updated import
@@ -124,7 +124,7 @@ async def warm_vllm_cache(pathos_if: PathosInterface, static_system_prompt: str)
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance
-    ha_service: Optional[HomeAssistantService] = None
+    # ha_service: Optional[HomeAssistantService] = None # Removed
     owm_service: Optional[OpenWeatherMapService] = None
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
@@ -134,17 +134,14 @@ async def lifespan(app_instance: FastAPI):
         from eidos_agent.api.routers.chat_storage_router import init_chat_storage_router # Import init function
         init_chat_storage_router(ethos_core) # Call init function for chat_storage_router
         ethos_core.set_connection_manager(manager)
-        if Config.get_ha_config(): # pragma: no cover
-            ha_service = HomeAssistantService(Config, ethos_core.memory_storage)
-            try: await ha_service.connect()
-            except Exception as ha_e: logger.error(f"Lifespan: Failed to connect HomeAssistantService: {ha_e}", exc_info=True); ha_service = None
+        # Removed HomeAssistantService initialization block
         if Config.get_openweathermap_config() and Config.get_openweathermap_config().get('api_key'):
             owm_service = OpenWeatherMapService(Config)
             if not owm_service.is_available: logger.warning("Lifespan: OWMService not available.")
         if Config.ENABLE_ONEIROS and ethos_core:
             oneiros_module = OneirosModule(Config, ethos_core)
             if ethos_core: ethos_core.oneiros_module = oneiros_module
-        logos_core = LogosCore(Config, ethos_core, ha_service, owm_service)
+        logos_core = LogosCore(Config, ethos_core, owm_service) # Removed ha_service from instantiation
         await logos_core.initialize_services()
         if ethos_core: ethos_core.set_logos_core(logos_core)
         chronos_engine_instance: Optional[ChronosEngine] = None
@@ -240,7 +237,7 @@ async def lifespan(app_instance: FastAPI):
         if manager: await manager.disconnect_all()
         if pathos_interface: await pathos_interface.close()
         if logos_core: await logos_core.close()
-        if ha_service: await ha_service.disconnect()
+        # if ha_service: await ha_service.disconnect() # Removed
         if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
         if oneiros_module: await oneiros_module.close()
         if ethos_core: await ethos_core.close()

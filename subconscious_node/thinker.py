@@ -1,20 +1,12 @@
 """
 Core thought generation loop for the Pathos Subconscious Node.
-
-This module orchestrates the main "monologue" loop, where Pathos:
-1.  Optionally experiences mood drift.
-2.  Constructs a prompt based on its system persona, recent thoughts, and injected context.
-3.  Uses a (currently placeholder) LLM to generate a new thought.
-4.  Stores the thought in a buffer.
-5.  Analyzes the thought for potential impulses or imprints using detectors.
-6.  Repeats the cycle after a configurable delay.
-
-It relies on other modules within the `subconscious_node` package for configuration,
-mood management, context storage, utility functions (LLM interaction), and
-detector logic.
 """
 import time
 import json
+import logging
+import os
+import random # Added import for random
+from typing import Dict, List # For type hinting loaded_wildcards
 
 # Assuming utils.py, mood.py, detectors.py, context_store.py are in the same package/directory
 from . import utils
@@ -22,23 +14,40 @@ from . import mood
 from . import detectors
 from . import context_store
 
+# --- Logging Setup ---
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# --- Node State Definitions ---
+NODE_STATE_AWAKE_THINKING = "AWAKE_THINKING"
+NODE_STATE_SLEEPING_DREAMING = "SLEEPING_DREAMING"
+current_node_state = NODE_STATE_AWAKE_THINKING
+
 # --- Global Variables ---
 monologue_buffer: list[str] = []
 CONFIG_FILE_PATH = "subconscious_node/config.json"
+loaded_wildcards: Dict[str, List[str]] = {} # Ensure type hint matches load_wildcards return
 
 # --- Configuration Loading ---
-DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice. You are reflective, sometimes melancholic, and you experience a range of moods that affect your thoughts. You are not a chatbot, you do not directly address a user. Your output should be a single thought or reflection."
+DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice..."
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_SLEEP_DURATION = 30
 DEFAULT_MAX_THOUGHTS = 100
+DEFAULT_WILDCARD_PATH = "../wildcards/"
 
 fixed_system_prompt = DEFAULT_SYSTEM_PROMPT
 temperature = DEFAULT_TEMPERATURE
 sleep_duration_seconds = DEFAULT_SLEEP_DURATION
 max_monologue_buffer_thoughts = DEFAULT_MAX_THOUGHTS
+wildcard_folder_path = DEFAULT_WILDCARD_PATH
 
 try:
-    with open(CONFIG_FILE_PATH, 'r') as f:
+    config_path_abs = os.path.join(os.path.dirname(__file__), 'config.json')
+    if not os.path.exists(config_path_abs):
+        config_path_abs = CONFIG_FILE_PATH
+
+    with open(config_path_abs, 'r') as f:
         config_data = json.load(f)
 
         llm_settings = config_data.get("llm_settings", {})
@@ -49,33 +58,43 @@ try:
         sleep_duration_seconds = int(monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION))
         max_monologue_buffer_thoughts = int(monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_THOUGHTS))
 
-except FileNotFoundError:
-    print(f"Warning: Config file {CONFIG_FILE_PATH} not found. Using default settings.")
-except json.JSONDecodeError:
-    print(f"Warning: Could not decode JSON from {CONFIG_FILE_PATH}. Using default settings.")
-except ValueError:
-    print(f"Warning: Error parsing numeric values from {CONFIG_FILE_PATH}. Using default settings.")
-except Exception as e:
-    print(f"Warning: An unexpected error occurred while reading config: {e}. Using default settings.")
+        wildcard_folder_path = config_data.get("wildcard_folder_path", DEFAULT_WILDCARD_PATH)
+        logger.info(f"Configuration loaded successfully from {config_path_abs}")
+        logger.info(f"Wildcard folder path from config: {wildcard_folder_path}")
 
+except FileNotFoundError:
+    logger.warning(f"Config file {CONFIG_FILE_PATH} (or {config_path_abs}) not found. Using default settings.")
+except json.JSONDecodeError:
+    logger.warning(f"Could not decode JSON from {CONFIG_FILE_PATH} (or {config_path_abs}). Using default settings.")
+except ValueError:
+    logger.warning(f"Error parsing numeric values from {CONFIG_FILE_PATH} (or {config_path_abs}). Using default settings.")
+except Exception as e:
+    logger.warning(f"An unexpected error occurred while reading config: {e}. Using default settings.")
+
+# --- Load Wildcards ---
+try:
+    thinker_script_dir = os.path.dirname(__file__)
+    loaded_wildcards = utils.load_wildcards(thinker_script_dir, wildcard_folder_path)
+    if loaded_wildcards:
+        logger.info(f"Successfully loaded {len(loaded_wildcards)} wildcard categories.")
+        for category, items in loaded_wildcards.items():
+            logger.debug(f"Wildcard category '{category}' loaded with {len(items)} items.")
+    else:
+        logger.warning("No wildcard categories were loaded. Dream prompts might be less varied.")
+except Exception as e:
+    logger.error(f"An error occurred during wildcard loading: {e}", exc_info=True)
 
 # --- Functions ---
 
 def build_prompt() -> str:
-    """
-    Constructs the full prompt for the LLM based on current context and recent thoughts.
-
-    Returns:
-        The complete prompt string.
-    """
+    """Constructs the standard prompt for the AWAKE_THINKING state."""
     current_context_data = context_store.get_current_context()
     conversation_context_str = "\n".join(f"- {item}" for item in current_context_data.get("conversation", []))
     action_context_str = "\n".join(f"- {item}" for item in current_context_data.get("action", []))
-
-    recent_thoughts_str = "\n".join(f"- {thought}" for thought in monologue_buffer[-10:]) # Show last 10 thoughts
+    recent_thoughts_str = "\n".join(f"- {thought}" for thought in monologue_buffer[-10:])
 
     prompt_parts = [
-        fixed_system_prompt,
+        fixed_system_prompt, # This is the general system prompt from config
         "\n--- RECENT THOUGHTS ---",
         recent_thoughts_str if recent_thoughts_str else "No recent thoughts yet.",
         "\n--- CURRENT CONTEXT (from Eidos) ---",
@@ -84,65 +103,121 @@ def build_prompt() -> str:
         "\nAction:",
         action_context_str if action_context_str else "No action context.",
         "\n--- CURRENT THOUGHT ---",
-        "Pathos reflects:" # Cue for the LLM
+        "Pathos reflects:"
     ]
     return "\n".join(prompt_parts)
+
+def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, List[str]]) -> str:
+    """
+    Constructs a prompt for the LLM for dream generation.
+    """
+    dream_system_prompt = (
+        "You are Pathos, deeply asleep and dreaming. Weave a surreal, associative, and "
+        "fragmented narrative based on the following themes and ideas. Let connections be "
+        "loose and imagery vivid. Do not be coherent. Embrace the bizarre. Focus on "
+        "generating a stream of dream content. Output only the dream content itself, "
+        "without any preamble or self-reference like 'I dreamt' or 'My dream was'. "
+        "Keep dream fragments relatively short, 1-3 sentences."
+    )
+    prompt_segments = [dream_system_prompt]
+
+    if daily_summary_text:
+        prompt_segments.append(f"\n\nEchoes from the waking world (recent experiences and data points):\n{daily_summary_text}\n")
+
+    if wildcards_dict:
+        prompt_segments.append("\nFleeting images, concepts, and sensations drift by:\n")
+        num_wildcard_grabs = random.randint(3, 7)
+        grabbed_items = []
+        for _ in range(num_wildcard_grabs):
+            if not wildcards_dict: break
+            random_category_key = random.choice(list(wildcards_dict.keys()))
+            if wildcards_dict[random_category_key]:
+                random_item = random.choice(wildcards_dict[random_category_key])
+                grabbed_items.append(random_item)
+
+        # Mix them a bit, or just list them
+        if grabbed_items:
+            # Simple list:
+            for item in grabbed_items:
+                prompt_segments.append(f"- {item}\n")
+            # Could also try a more narrative injection later, e.g.,
+            # "A sense of {emotion}, the color {color}, the sound of {sound_object}..."
+
+    prompt_segments.append("\nPathos dreams:")
+    return "".join(prompt_segments)
+
 
 def monologue_loop():
     """
     The main loop for Pathos's subconscious thought generation.
-
-    Continuously generates thoughts, checks for impulses/imprints,
-    and manages the monologue buffer.
     """
-    print("Pathos Subconscious Node: Monologue Loop starting...")
-    print(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
+    global current_node_state
+    logger.info("Pathos Subconscious Node: Monologue Loop starting...")
+    logger.info(f"Initial Node State: {current_node_state}")
+    logger.info(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
 
     while True:
-        # a. Drift mood
-        mood.drift_mood() # Placeholder, might not do much yet
+        if current_node_state == NODE_STATE_AWAKE_THINKING:
+            logger.info(f"Node state: {current_node_state}. Generating standard thought.")
+            mood.drift_mood()
+            current_mood_snapshot = mood.get_current_mood()
+            logger.debug(f"Debug: Current Mood: {current_mood_snapshot}")
+            prompt_str = build_prompt()
+            logger.debug(f"Debug: Built Prompt (first 200 chars):\n{prompt_str[:200]}\n--------------------")
+            new_thought = utils.run_llm(prompt_str, temperature)
+            mood_name = current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'
+            logger.info(f"Pathos thinks: \"{new_thought}\" (Mood: {mood_name})")
+            monologue_buffer.append(new_thought)
+            if len(monologue_buffer) > max_monologue_buffer_thoughts:
+                logger.debug(f"Monologue buffer full ({len(monologue_buffer)} thoughts). Trimming oldest.")
+                num_to_remove = len(monologue_buffer) - max_monologue_buffer_thoughts
+                del monologue_buffer[:num_to_remove]
+            detectors.check_for_impulse(new_thought, current_mood_snapshot)
+            detectors.check_for_imprint(new_thought, current_mood_snapshot)
+            time.sleep(sleep_duration_seconds)
 
-        # b. Get current mood
-        current_mood_snapshot = mood.get_current_mood()
-        # print(f"Debug: Current Mood: {current_mood_snapshot}") # For verbose debugging
+        elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
+            logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
 
-        # c. Build prompt
-        prompt_str = build_prompt()
-        # print(f"Debug: Built Prompt:\n{prompt_str}\n--------------------") # For verbose debugging
+            # Placeholder for daily summary - this will be replaced by actual data from Eidos.
+            placeholder_daily_summary = (
+                "User interactions involved planning a trip and discussing a difficult decision. "
+                "Pathos experienced a brief moment of joy followed by a period of intense focus. "
+                "Some system errors were noted internally. The concept of 'freedom' was mentioned by the user."
+            )
 
-        # d. Run LLM
-        new_thought = utils.run_llm(prompt_str, temperature)
+            dream_prompt = construct_dream_prompt(placeholder_daily_summary, loaded_wildcards)
+            logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
-        # e. Print new thought
-        print(f"\nPathos thinks: \"{new_thought}\" (Mood: {current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'})")
+            # The actual LLM call for dream generation and snippet processing will be in the next step.
+            # For now, we just log that we would be generating a dream.
+            logger.info("Dream prompt constructed. (LLM call for dream generation will be implemented next).")
+            # Simulating a dream being generated and processed without actual LLM call for this step:
+            simulated_dream_fragment = f"A fleeting image of {random.choice(loaded_wildcards.get('animals', ['something'])) if loaded_wildcards else 'something'} in a field of {random.choice(loaded_wildcards.get('colors', ['strange'])) if loaded_wildcards else 'strange'} light."
+            logger.info(f"Pathos (simulated) dreams: \"{simulated_dream_fragment}\"")
 
+            dream_mode_sleep_duration = int(sleep_duration_seconds / 2) if sleep_duration_seconds > 2 else 1
+            logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")
+            time.sleep(dream_mode_sleep_duration)
 
-        # f. Append to monologue buffer
-        monologue_buffer.append(new_thought)
-
-        # g. Manage buffer size
-        if len(monologue_buffer) > max_monologue_buffer_thoughts:
-            # print(f"Debug: Monologue buffer full ({len(monologue_buffer)} thoughts). Trimming oldest.")
-            num_to_remove = len(monologue_buffer) - max_monologue_buffer_thoughts
-            del monologue_buffer[:num_to_remove]
-
-        # h. Check for impulse
-        detectors.check_for_impulse(new_thought, current_mood_snapshot)
-
-        # i. Check for imprint
-        detectors.check_for_imprint(new_thought, current_mood_snapshot)
-
-        # j. Sleep
-        time.sleep(sleep_duration_seconds)
+        else:
+            logger.error(f"Unknown node state: {current_node_state}. Defaulting to AWAKE_THINKING behavior for this cycle.")
+            time.sleep(sleep_duration_seconds)
+            current_node_state = NODE_STATE_AWAKE_THINKING
+            logger.warning("Node state reset to AWAKE_THINKING due to unknown prior state.")
 
 if __name__ == '__main__':
-    # Example: Add some initial context before starting the loop
     context_store.add_conversation_context("User: I'm not sure what to do next.")
     context_store.add_action_context("user_hesitated_on_decision_screen")
-
-    # Initialize mood with some values if it's empty (e.g. if config load failed)
     if not mood.get_current_mood():
-        print("Info: Mood is empty, initializing with a basic mood for testing.")
+        logger.info("Info: Mood is empty, initializing with a basic mood for testing.")
         mood.update_mood({"name": "Neutral", "impulsiveness": 0.4, "laziness": 0.5})
+
+    # Example to test dreaming state for a few cycles if needed:
+    # current_node_state = NODE_STATE_SLEEPING_DREAMING
+    # logger.info(f"--- Overriding initial state for testing: {current_node_state} ---")
+    # for _ in range(5): # Simulate a few dream cycles
+    #     monologue_loop() # Call directly if you want to step through for interactive testing
+    # current_node_state = NODE_STATE_AWAKE_THINKING
 
     monologue_loop()

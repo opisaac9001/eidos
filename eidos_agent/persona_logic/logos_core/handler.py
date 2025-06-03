@@ -20,7 +20,7 @@ from eidos_agent.core.config import Config, LLMConfig, WolframAlphaConfig, NewsA
 # EthosCore imports are already updated to persona_logic in this file
 from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.services.web_search import WebSearchService
-from eidos_agent.services.home_assistant import HomeAssistantService, TaskResult as HATaskResult # Import TaskResult
+# Removed HomeAssistantService import
 from eidos_agent.services.openweathermap import OpenWeatherMapService
 from eidos_agent.utils.document_parser import parse_document, SUPPORTED_EXTENSIONS
 from eidos_agent.utils.text_splitter import chunk_text_by_char
@@ -32,10 +32,10 @@ from ...modules import simulation_module # Adjusted for new location relative to
 logger = get_logger(__name__)
 
 class LogosCore:
-    def __init__(self, config: Config, ethos_core: EthosCore, ha_service: Optional[HomeAssistantService] = None, owm_service: Optional[OpenWeatherMapService] = None):
+    def __init__(self, config: Config, ethos_core: EthosCore, owm_service: Optional[OpenWeatherMapService] = None): # Removed ha_service
         self.config = config
         self.ethos_core = ethos_core
-        self.ha_service = ha_service
+        # self.ha_service = ha_service # Removed
         self.owm_service = owm_service
 
         self.logos_techne_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_TECHNE')
@@ -73,17 +73,19 @@ class LogosCore:
         else: logger.info("News API disabled or not configured in LogosCore.")
 
         logger.info("LogosCore initialized.")
-        if self.ha_service and self.ha_service.is_available(): logger.info("LogosCore has HomeAssistantService.")
-        else: logger.warning("LogosCore does NOT have HomeAssistantService.")
+        # Removed HomeAssistantService check log
         if self.owm_service and self.owm_service.is_available: logger.info("LogosCore has OpenWeatherMapService.")
         else: logger.warning("LogosCore does NOT have OpenWeatherMapService.")
 
     async def close(self):
         if self.http_client and not self.http_client.is_closed: await self.http_client.aclose()
         if self.web_search_service: await self.web_search_service.close()
+        # No ha_service.close() needed
         logger.info("LogosCore resources closed.")
 
-    async def initialize_services(self): logger.info("LogosCore initialize_services (no async init currently).")
+    async def initialize_services(self):
+        logger.info("LogosCore initialize_services called.")
+        # No ha_service.connect() needed
 
     async def process_uploaded_document(self, file_content: bytes, filename: str, user_id: Optional[str] = None) -> Dict[str, Any]:
          logger.info(f"LogosCore processing doc: '{filename}' ({len(file_content)} bytes) for user '{user_id or 'unknown'}'.")
@@ -177,14 +179,8 @@ class LogosCore:
                             except json.JSONDecodeError: pass
                         if should_store: await self.execute_store_user_fact("derived_iana_timezone", iana_tz, f"IANA timezone from OWM for '{location}'.", user_id_context)
                 return owm_res
-        ha_weather_entity = self.config.HOME_ASSISTANT.get('ha_weather_entity_id') if self.config.HOME_ASSISTANT else None
-        if self.ha_service and self.ha_service.is_available() and ha_weather_entity:
-            try:
-                if ha_state := await self.ha_service._get_entity_state_full(ha_weather_entity):
-                    attrs = ha_state.get('attributes', {}); data = {"location": location, "description": ha_state.get('state'), "temperature": attrs.get('temperature'), "unit": attrs.get('temperature_unit'), "humidity": attrs.get('humidity'), "wind_speed": attrs.get('wind_speed'), "source": f"Home Assistant ({ha_weather_entity})"}
-                    return {"success": True, "weather_data": {k: v for k, v in data.items() if v is not None}}
-            except Exception as ha_e: logger.error(f"Error fetching HA weather: {ha_e}", exc_info=True)
-        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return {"success": False, "error": "No weather service available.", "location": location}
+        # Removed Home Assistant weather fetching block
+        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return {"success": False, "error": "No weather service available (excluding HA).", "location": location} # Modified error message slightly
         wa_res = await self.query_wolfram_alpha(f"weather in {location}"); data = {"location": location}; success = False; err_msg = None
         if wa_res.get('success') and (raw_resp := wa_res.get('raw_response')):
             query_res = raw_resp.get('queryresult', {})

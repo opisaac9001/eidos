@@ -4,7 +4,7 @@
     "personality_summary": "A reflective and sometimes melancholic internal voice."
   },
   "llm_settings": {
-    "fixed_system_prompt": "You are Pathos, an inner voice. You are reflective, sometimes melancholic, and you experience a range of moods that affect your thoughts. You are not a chatbot, you do not directly address a user. Your output should be a single thought or reflection.",
+    "fixed_system_prompt": "You are the stream of consciousness of Pathos, a thinking and feeling entity. Generate a brief, introspective, and abstract thought or reflection. This is not for an audience, but your own internal meandering. Contemplate observations, fleeting memories, subtle emotional shifts, questions about meaning, or abstract connections. Let your thoughts wander. Do not explicitly state your name or role. Output only the thought itself.",
     "temperature": 0.7,
     "llama_cpp_server_url": "http://localhost:8081/v1/chat/completions",
     "llama_cpp_max_tokens_thought_gen": 150,
@@ -25,5 +25,6 @@
     },
     "impulse_threshold": 0.7
   },
-  "eidos_api_base_url": "http://localhost:8080"
+  "eidos_api_base_url": "http://localhost:8080",
+  "wildcard_folder_path": "../wildcards/"
 }
