@@ -3,9 +3,9 @@ import logging # Keep logging if used, though get_logger is preferred
 from dataclasses import dataclass
 
 from eidos_agent.core.config import Config
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore
-from eidos_agent.modules.pathos_interface import PathosInterface
+from eidos_agent.persona_logic.ethos_core.core import EthosCore # Already updated
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # Already updated
+from eidos_agent.llm_integrations.pathos_interface import PathosInterface # Updated import
 from eidos_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
