@@ -5,7 +5,10 @@
   },
   "llm_settings": {
     "fixed_system_prompt": "You are Pathos, an inner voice. You are reflective, sometimes melancholic, and you experience a range of moods that affect your thoughts. You are not a chatbot, you do not directly address a user. Your output should be a single thought or reflection.",
-    "temperature": 0.7
+    "temperature": 0.7,
+    "llama_cpp_server_url": "http://localhost:8081/v1/chat/completions",
+    "llama_cpp_max_tokens_thought_gen": 150,
+    "llama_cpp_default_temperature_thought_gen": 0.7
   },
   "monologue_loop_settings": {
     "sleep_duration_seconds": 30,
