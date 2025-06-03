@@ -75,14 +75,14 @@ def perform_scheduled_subconscious_context_sync():
 def _run_periodic_sync(interval_seconds: int):
     """
     Internal function executed periodically by the scheduler.
-    
+
     If the stop event is not set, it performs the sync task and then
     schedules itself to run again.
     """
     global scheduler_timer # Allow modification of the global timer variable
     if not scheduler_stop_event.is_set():
         perform_scheduled_subconscious_context_sync()
-        
+
         # Schedule the next run only if the stop event is still not set
         if not scheduler_stop_event.is_set():
             scheduler_timer = threading.Timer(interval_seconds, _run_periodic_sync, args=[interval_seconds])
@@ -106,7 +106,7 @@ def start_subconscious_sync_scheduler(interval_minutes: float = 5.0):
         interval_minutes: The interval in minutes at which the sync should occur.
     """
     global scheduler_timer # Allow modification of the global timer variable
-    
+
     if scheduler_timer and scheduler_timer.is_alive():
         logger.warning("ChronosEngine: Scheduler already running. Please stop it before starting again.")
         return
@@ -115,7 +115,7 @@ def start_subconscious_sync_scheduler(interval_minutes: float = 5.0):
     interval_seconds = interval_minutes * 60
 
     logger.info(f"ChronosEngine: Starting subconscious context sync scheduler. Interval: {interval_minutes} minutes.")
-    
+
     # Kick off the first execution of the periodic task
     # Subsequent runs will be scheduled by _run_periodic_sync itself
     _run_periodic_sync(interval_seconds)
@@ -141,19 +141,19 @@ def stop_subconscious_sync_scheduler():
 
 if __name__ == '__main__':
     logger.info("ChronosEngine: --- Test Run for Periodic Scheduler ---")
-    
+
     test_interval_minutes = 0.1 # 6 seconds for quick testing
-    
+
     print(f"\n--- Starting scheduler with interval: {test_interval_minutes} minutes ({test_interval_minutes*60} seconds) ---")
     start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
-    
+
     # Let the scheduler run for a few cycles
     # For example, let it run for (test_interval_minutes * 60 * 3.5) seconds to see about 3 executions
     run_duration_seconds = int(test_interval_minutes * 60 * 3.5) # Approx 3 cycles
     if run_duration_seconds < 1: run_duration_seconds = 1 # ensure at least 1 second sleep for very short intervals
-    
+
     print(f"ChronosEngine Test: Main thread sleeping for {run_duration_seconds} seconds to observe scheduler...")
-    
+
     # Loop with shorter sleeps to check stop_event more frequently if needed for other tests
     # but for this simple case, one sleep is fine.
     for _ in range(run_duration_seconds):
@@ -163,10 +163,10 @@ if __name__ == '__main__':
 
     print("\nChronosEngine Test: Woke up. Requesting scheduler stop...")
     stop_subconscious_sync_scheduler()
-    
+
     # Give a moment for the last timer to be properly cancelled and threads to clean up if any
-    time.sleep(0.2) 
-    
+    time.sleep(0.2)
+
     print("\n--- Testing restart behavior (should log warning if not stopped properly or start if stopped) ---")
     # Attempt to start again (if it was properly stopped, this should work)
     start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)

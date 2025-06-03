@@ -6,7 +6,7 @@ import json # For loading/dumping content if stored as JSON string in memory
 from pydantic import ValidationError
 
 from ..utils.logger import get_logger
-from ..models.chat_storage import ChatState, ChatMessage # Import from the models file
+from eidos_agent.schemas import ChatState, ChatMessage # Updated import from schemas
 from ..core.config import Config # Not directly used here, but good for context
 from ..modules.ethos_core.core import EthosCore
 

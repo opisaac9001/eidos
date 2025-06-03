@@ -13,11 +13,11 @@ from eidos_agent.modules.ethos_core.core import EthosCore
 from eidos_agent.modules.logos_core.handler import LogosCore
 from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.logger import get_logger
-from eidos_agent.core.api_models import ChatMessage 
+from eidos_agent.schemas import ChatMessage # Changed from core.api_models
 # PATHOS_USER_ID is used by ToolOrchestrator._execute_tools, but ToolOrchestrator imports it directly.
-# from eidos_agent.modules.chronos_engine import PATHOS_USER_ID 
+# from eidos_agent.modules.chronos_engine import PATHOS_USER_ID
 # simulation_module is used by ToolOrchestrator._execute_tools, ToolOrchestrator imports it directly.
-# from eidos_agent.modules import simulation_module 
+# from eidos_agent.modules import simulation_module
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -52,14 +52,14 @@ class PathosInterface:
         self.pathos_llm_config: Optional[LLMConfig] = config.get_llm_config('PATHOS')
         self._enhanced_pathos_llm_config: Optional[LLMConfig] = None
         self.current_active_user_id: str = "default_user"
-        
+
         self.prompt_builder = PromptBuilder(self.config, self.ethos_core, self.logos_core)
-        
+
         timeout_seconds_cfg = self.pathos_llm_config.get('timeout', 300.0) if self.pathos_llm_config else 300.0
         try: timeout_value = float(timeout_seconds_cfg)
         except (ValueError, TypeError): timeout_value = 300.0
-        self.http_client = httpx.AsyncClient(timeout=timeout_value) 
-        self.llm_client = LLMClient(self.http_client) 
+        self.http_client = httpx.AsyncClient(timeout=timeout_value)
+        self.llm_client = LLMClient(self.http_client)
         self.tool_orchestrator = ToolOrchestrator(self.llm_client, self.logos_core, self.ethos_core) # Instantiate ToolOrchestrator
 
         self.eidos_tts_service_instance: Optional['ExternalTTSService'] = None
@@ -106,7 +106,7 @@ class PathosInterface:
 
     async def generate_response(
         self,
-        user_id: str, 
+        user_id: str,
         user_input: str,
         image_data_b64: Optional[str] = None,
         document_text: Optional[str] = None,
@@ -115,7 +115,7 @@ class PathosInterface:
     ) -> Dict[str, Any]:
         response_metadata: Dict[str, Any] = {}
         req_meta = request_metadata if request_metadata is not None else {}
-        user_id_for_response = user_id 
+        user_id_for_response = user_id
         self._update_active_user(user_id_for_response)
         should_stream_tts_for_this_response = req_meta.get('auto_tts_enabled_for_response', False)
         response_metadata["tts_stream_attempted"] = should_stream_tts_for_this_response
@@ -138,16 +138,16 @@ class PathosInterface:
         system_provided_info_for_prompt: Dict[str, Any] = {}
 
         initial_llm_messages, retrieved_memories, current_mood, hexus_scores, estimated_prompt_tokens = await self.prompt_builder.build_main_llm_messages(
-            user_id=user_id_for_response, 
-            user_input_text=user_input, 
+            user_id=user_id_for_response,
+            user_input_text=user_input,
             history_context=req_meta.get('conversation_history', []),
-            image_data_b64=image_data_b64, 
+            image_data_b64=image_data_b64,
             vision_description_if_non_multimodal=vision_description_for_non_multimodal_pathos,
-            document_text=document_text, 
+            document_text=document_text,
             force_web_search=req_meta.get('force_web_search_requested', False),
-            engaged_proactive_id=req_meta.get('engaged_proactive_id'), 
+            engaged_proactive_id=req_meta.get('engaged_proactive_id'),
             system_provided_info=system_provided_info_for_prompt,
-            enhanced_pathos_llm_config=enhanced_pathos_config 
+            enhanced_pathos_llm_config=enhanced_pathos_config
         )
         full_history_for_interaction_log: List[Dict[str, Any]] = list(initial_llm_messages)
         llm_usage_data: Optional[Dict[str, Any]] = None; llm_error_occurred = False
@@ -160,15 +160,15 @@ class PathosInterface:
             current_conversation_messages = list(initial_llm_messages)
             # Use self.tool_orchestrator.call_llm_with_tools
             async for item in self.tool_orchestrator.call_llm_with_tools(
-                llm_config_to_use=enhanced_pathos_config, 
+                llm_config_to_use=enhanced_pathos_config,
                 messages=current_conversation_messages,
                 tools_definition=getattr(self, 'AVAILABLE_TOOLS_FOR_PATHOS_LLM', ALL_AVAILABLE_SYSTEM_TOOLS), 
-                user_id=user_id_for_response, 
-                stream_tool_calls=True, 
-                temperature_override=req_meta.get('temperature'), 
+                user_id=user_id_for_response,
+                stream_tool_calls=True,
+                temperature_override=req_meta.get('temperature'),
                 max_tokens_override=req_meta.get('max_tokens_override'),
-                llm_provider_url_override=req_meta.get('llm_provider_url_override'), 
-                model_override=req_meta.get('pathos_model_override') 
+                llm_provider_url_override=req_meta.get('llm_provider_url_override'),
+                model_override=req_meta.get('pathos_model_override')
             ):
                 item_type = item.get("type"); payload = item.get("payload")
                 if item_type == "text_chunk" and isinstance(payload, str):
@@ -190,7 +190,7 @@ class PathosInterface:
         
         final_pathos_response_text = "".join(final_pathos_response_text_parts).strip()
         if final_assistant_message_payload_for_response and isinstance(final_assistant_message_payload_for_response.get("content"), str) and not final_pathos_response_text:
-            final_pathos_response_text = final_assistant_message_payload_for_response["content"] 
+            final_pathos_response_text = final_assistant_message_payload_for_response["content"]
         
         final_pathos_response_text = re.sub(r"<think>.*?</think>\s*", "", final_pathos_response_text, flags=re.DOTALL).strip()
         if not final_pathos_response_text and not llm_error_occurred and not (final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls")):
@@ -208,27 +208,27 @@ class PathosInterface:
         if self.ethos_core: self.ethos_core.update_mood_on_interaction(user_input, final_pathos_response_text, bool(image_data_b64), bool(document_text))
         
         tool_calls_for_metadata = final_assistant_message_payload_for_response.get("tool_calls") if final_assistant_message_payload_for_response else None
-        conversation_id = kwargs.get("conversation_id", "unknown_conv_id") 
+        conversation_id = kwargs.get("conversation_id", "unknown_conv_id")
 
         detected_intent_to_search = False
-        original_user_query_for_search = user_input 
-        pathos_formulated_search_query = None 
+        original_user_query_for_search = user_input
+        pathos_formulated_search_query = None
 
-        if final_pathos_response_text and not tool_calls_for_metadata: 
+        if final_pathos_response_text and not tool_calls_for_metadata:
             response_lower = final_pathos_response_text.lower()
             for phrase in self.INTENT_TO_SEARCH_PHRASES:
                 if phrase.lower() in response_lower:
                     detected_intent_to_search = True
-                    logger.info(f"PathosInterface: Detected intent to search in response: '{final_pathos_response_text}' (Trigger: '{phrase}') for user_id: {user_id_for_response}, conversation_id: {conversation_id}") 
+                    logger.info(f"PathosInterface: Detected intent to search in response: '{final_pathos_response_text}' (Trigger: '{phrase}') for user_id: {user_id_for_response}, conversation_id: {conversation_id}")
                     pathos_formulated_search_query = f"Information related to Pathos's statement: '{final_pathos_response_text}' (Original user query: '{user_input}')" 
                     response_metadata["detected_intent_to_search"] = True
                     response_metadata["pathos_stated_intent_text"] = final_pathos_response_text
                     response_metadata["original_user_query_for_search"] = user_input
-                    response_metadata["pathos_formulated_search_query_mvp"] = pathos_formulated_search_query 
+                    response_metadata["pathos_formulated_search_query_mvp"] = pathos_formulated_search_query
                     break
         
         if detected_intent_to_search:
-            logger.info(f"PathosInterface: TODO - Call Computer Interaction Module with query. User='{original_user_query_for_search}', Pathos Response='{final_pathos_response_text}' for user_id: {user_id_for_response}, conversation_id: {conversation_id}") 
+            logger.info(f"PathosInterface: TODO - Call Computer Interaction Module with query. User='{original_user_query_for_search}', Pathos Response='{final_pathos_response_text}' for user_id: {user_id_for_response}, conversation_id: {conversation_id}")
             pass 
 
         response_metadata["tool_calls_from_pathos"] = tool_calls_for_metadata
@@ -261,7 +261,7 @@ class PathosInterface:
         
         logger.info(f"Attempting to generate proactive message of type '{proactive_type}' for user '{user_id}'. Context: {str(context)[:100]}")
         prompt_for_llm = ""
-        user_name_for_prompt = user_id 
+        user_name_for_prompt = user_id
         
         if proactive_type == "greeting":
             time_of_day = context.get("time_of_day", "day") if isinstance(context, dict) else "day"
@@ -281,10 +281,10 @@ class PathosInterface:
         if self.ethos_core:
             persona_directives_for_proactive = "\n".join(self.ethos_core.get_persona_directives())
         else:
-            persona_directives_for_proactive = "You are Pathos, a friendly AI." 
+            persona_directives_for_proactive = "You are Pathos, a friendly AI."
 
         system_prompt_content_parts_pm = [
-            persona_directives_for_proactive, 
+            persona_directives_for_proactive,
             f"\nYou are generating a specific, brief, VERY CASUAL, and proactive message for user '{user_id}'.",
             f"Your current mood is valence {current_mood_pm['valence']:.2f}, arousal {current_mood_pm['arousal']:.2f}.",
             "(Current Hexus Scores: " + ", ".join([f"{k}={v:.2f}" for k, v in hexus_scores_pm.items()]) + ")",
@@ -296,12 +296,12 @@ class PathosInterface:
         
         proactive_text_content_accumulator = []; llm_usage_data: Optional[Dict[str, Any]] = None; llm_error_occurred = False
         
-        async for item in self.llm_client.call_llm_api( 
-            llm_config=enhanced_config, 
-            messages=proactive_messages_for_llm, 
-            tools_definition=None, 
-            temperature_override=float(enhanced_config.get('temperature', 0.4)), 
-            max_tokens_override=150, 
+        async for item in self.llm_client.call_llm_api(
+            llm_config=enhanced_config,
+            messages=proactive_messages_for_llm,
+            tools_definition=None,
+            temperature_override=float(enhanced_config.get('temperature', 0.4)),
+            max_tokens_override=150,
             stream=True
         ):
             if isinstance(item, str): proactive_text_content_accumulator.append(item)
@@ -327,19 +327,19 @@ class PathosInterface:
                     sentence = sentence_text.strip();
                     if not sentence: continue
                     forced_chunk_id = f"proactive_tts_{user_id}_{uuid.uuid4().hex[:10]}_{tts_sequence_num_proactive}"
-                    asyncio.create_task(self.send_sentence_to_tts_and_notify_client(sentence=sentence, user_id=user_id, sequence_num=tts_sequence_num_proactive, forced_chunk_id=forced_chunk_id, chunk_id_prefix="proactive_tts_")) 
+                    asyncio.create_task(self.send_sentence_to_tts_and_notify_client(sentence=sentence, user_id=user_id, sequence_num=tts_sequence_num_proactive, forced_chunk_id=forced_chunk_id, chunk_id_prefix="proactive_tts_"))
                     tts_sequence_num_proactive += 1
-            return proactive_text_content, audio_chunk_info_list 
+            return proactive_text_content, audio_chunk_info_list
         else: 
             logger.warning(f"Proactive message generation for '{proactive_type}' failed or resulted in empty content. LLM response/error: {proactive_text_content}")
             return None, []
     
-    async def send_sentence_to_tts_and_notify_client(self, sentence: str, user_id: str, sequence_num: int, forced_chunk_id: Optional[str] = None, chunk_id_prefix: str = "chat_tts_main_"): 
+    async def send_sentence_to_tts_and_notify_client(self, sentence: str, user_id: str, sequence_num: int, forced_chunk_id: Optional[str] = None, chunk_id_prefix: str = "chat_tts_main_"):
         if not self.eidos_tts_service_instance or not self.connection_manager or self.audio_cache is None or not self.eidos_tts_service_instance.is_available():
             logger.error(f"TTS prerequisites missing for user {user_id}. TTS Service: {self.eidos_tts_service_instance}, ConnMgr: {self.connection_manager}, AudioCache: {self.audio_cache}, TTS Available: {self.eidos_tts_service_instance.is_available() if self.eidos_tts_service_instance else False}"); return
         
         final_chunk_id = forced_chunk_id if forced_chunk_id else f"{chunk_id_prefix}{user_id}_{uuid.uuid4().hex[:10]}_{sequence_num}"
-        log_prefix = f"FORCED_ID({final_chunk_id})" if forced_chunk_id else f"PREFIX({chunk_id_prefix})" 
+        log_prefix = f"FORCED_ID({final_chunk_id})" if forced_chunk_id else f"PREFIX({chunk_id_prefix})"
         logger.debug(f"TTS_SEND ({user_id}, {sequence_num}, {log_prefix}): START for sentence: '{sentence[:30]}...'")
         
         audio_bytes: Optional[bytes] = None
@@ -383,19 +383,19 @@ class PathosInterface:
             "user_id": feedback_user_id,
             "source": feedback_data.get('source', 'api_feedback_endpoint'),
             "feedback_timestamp_received_by_api": datetime.now(timezone.utc).isoformat(),
-            "processed_by_reflection": False, 
-            **feedback_data 
+            "processed_by_reflection": False,
+            **feedback_data
         }
         feedback_content_str = json.dumps(feedback_data) 
 
         if self.ethos_core:
             await self.ethos_core.add_memory_entry(
-                {"type": "feedback", "content": feedback_content_str, "metadata": memory_metadata, "salience": 1.2}, 
+                {"type": "feedback", "content": feedback_content_str, "metadata": memory_metadata, "salience": 1.2},
                 user_id_context=feedback_user_id
             )
             if self.config.ENABLE_MOOD_SIMULATION:
                 mood_update_payload = {"feedback_type": feedback_data.get("feedback_type"), "rating": feedback_data.get("rating")}
-                await self.ethos_core.update_mood_state('feedback', mood_update_payload) 
+                await self.ethos_core.update_mood_state('feedback', mood_update_payload)
         else:
             logger.error("EthosCore not available in PathosInterface, cannot process feedback.")
 

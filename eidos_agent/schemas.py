@@ -1,7 +1,14 @@
-from pydantic import BaseModel, Field
+"""
+Central Pydantic models and schemas for Eidos agent API and data structures.
+
+This module defines the data structures used for API request/response validation
+and for internal data representation within the Eidos agent.
+"""
+from pydantic import BaseModel, Field, validator # Added validator
 from typing import List, Optional, Dict, Any, Literal, Union
 import uuid
 import time
+from datetime import datetime # Added datetime
 
 class FunctionCall(BaseModel):
     name: str
@@ -151,3 +158,50 @@ class KnowledgeVerificationLogEntry(BaseModel):
     new_statement: Optional[str] = None
     superseded_by_fact_id: Optional[str] = None
     verification_details: Optional[str] = None
+
+
+# --- ChatState Model (moved from models/chat_storage.py) ---
+class ChatState(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the chat")
+    timestamp: datetime = Field(default_factory=datetime.now)
+    systemPrompt: str = Field(default="You are a helpful assistant")
+    conversation: List[ChatMessage] = Field(default_factory=list)
+    selectedModel: str = Field(default="eidos-agent")
+    title: Optional[str] = None
+    userId: str = Field(..., description="User ID associated with this chat")
+    isArchived: bool = False
+
+    class Config:
+        json_schema_extra = { # Kept for potential use, though Config is Pydantic v2 style
+            "example": {
+                "id": "chat_123",
+                "timestamp": "2024-01-20T12:00:00Z",
+                "systemPrompt": "You are a helpful assistant",
+                "conversation": [
+                    {"role": "user", "content": "Hello", "metadata": None},
+                    {"role": "assistant", "content": "Hi there!", "metadata": None}
+                ],
+                "selectedModel": "eidos-agent",
+                "title": "Sample Chat",
+                "userId": "user123",
+                "isArchived": False
+            }
+        }
+
+    @validator('conversation', pre=True)
+    @classmethod
+    def ensure_conversation_list(cls, v):
+        if v is None: return []
+        return v
+
+    @validator('systemPrompt', pre=True)
+    @classmethod
+    def ensure_system_prompt(cls, v):
+        if not v: return "You are a helpful assistant"
+        return v
+
+    @validator('selectedModel', pre=True)
+    @classmethod
+    def ensure_model(cls, v):
+        if not v: return "eidos-agent"
+        return v

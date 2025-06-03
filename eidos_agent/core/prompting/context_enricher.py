@@ -122,13 +122,13 @@ if __name__ == '__main__':
     # (This tests the specific condition: `thoughts_data and thoughts_data.get("recent_thoughts")`)
     if hasattr(get_current_thoughts, 'call_count'):
         get_current_thoughts.call_count = 0 # Reset to ensure predictable placeholder behavior
-    
+
     # Mock get_current_thoughts to return a specific dict for this test
-    original_get_thoughts = get_current_thoughts 
+    original_get_thoughts = get_current_thoughts
     def mock_get_thoughts_no_recent():
         print("Mocked get_current_thoughts for 'no recent_thoughts key' test called.")
         return {"mood": {"name": "Curious"}, "summary": "Thinking about something else."}
-    
+
     # If using the placeholder, we need to be able to swap it
     if hasattr(enrich_prompt_with_subconscious, '__globals__') and 'get_current_thoughts' in enrich_prompt_with_subconscious.__globals__:
         enrich_prompt_with_subconscious.__globals__['get_current_thoughts'] = mock_get_thoughts_no_recent
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     enriched_prompt_5 = enrich_prompt_with_subconscious(base_system_prompt, user_message_5)
     print(f"\nUser: \"{user_message_5}\" (testing specific 'no recent_thoughts' key)")
     print(f"Prompt:\n{enriched_prompt_5}")
-    
+
     if 'get_current_thoughts' in enrich_prompt_with_subconscious.__globals__ and \
        enrich_prompt_with_subconscious.__globals__['get_current_thoughts'] == mock_get_thoughts_no_recent:
         assert "Pathos reports: \"Thinking about something else.\"" in enriched_prompt_5

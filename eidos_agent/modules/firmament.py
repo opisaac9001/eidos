@@ -47,9 +47,9 @@ def handle_external_impulse(thought: str, timestamp: str, mood: Dict[str, Any]) 
         "status": "pending_review", # New field to track status
         "triggered_by": "subconscious"
     }
-    
+
     pending_impulses_buffer.append(impulse_data)
-    
+
     logger.info(f"FIRMAMENT: Impulse added to pending buffer. Current buffer size: {len(pending_impulses_buffer)}") # FERMENT -> FIRMAMENT
     logger.debug(f"FIRMAMENT: Impulse details: {impulse_data}") # More detailed log at debug level # FERMENT -> FIRMAMENT
 
@@ -66,7 +66,7 @@ def get_pending_impulses() -> List[Dict[str, Any]]:
 
 if __name__ == '__main__':
     print("--- Testing firmament.handle_external_impulse and get_pending_impulses ---") # ferment -> firmament
-    
+
     # Initial state
     print(f"Initial pending impulses: {get_pending_impulses()}")
     assert len(get_pending_impulses()) == 0
@@ -92,22 +92,22 @@ if __name__ == '__main__':
     print("\n--- Testing maxlen behavior ---")
     # Reduce MAX_PENDING_IMPULSES for this test block if it's too high for quick testing
     # Or simulate by directly manipulating a local deque for this test part
-    
+
     # For this test, let's assume MAX_PENDING_IMPULSES is small, e.g., 3 for demo.
     # We'll clear the global one and use a local one for this specific test part
     # to avoid affecting other tests if MAX_PENDING_IMPULSES is large.
-    
+
     # If we want to test the global buffer's maxlen directly, we'd need to set MAX_PENDING_IMPULSES low.
     # The current MAX_PENDING_IMPULSES is 50, so filling it would take many iterations.
     # Instead, we'll demonstrate the deque's behavior locally.
-    
+
     local_test_buffer = collections.deque(maxlen=3)
     print(f"Local test buffer (maxlen=3) initial: {list(local_test_buffer)}")
     for i in range(5):
         imp_data = {"thought": f"Test thought {i+1}", "timestamp": f"ts{i+1}", "mood": {}, "status": "pending_review", "triggered_by": "subconscious"}
         local_test_buffer.append(imp_data)
         print(f"Added 'Test thought {i+1}'. Local buffer: {list(local_test_buffer)}")
-    
+
     assert len(local_test_buffer) == 3
     assert local_test_buffer[0]["thought"] == "Test thought 3" # Oldest (0,1,2) were pushed out
     assert local_test_buffer[-1]["thought"] == "Test thought 5" # Newest

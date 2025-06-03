@@ -79,9 +79,9 @@ class SubconsciousMonitor:
             if self.is_listening:
                 logger.warning("SubconsciousMonitor: Monitoring is already active.")
                 return None # Or return existing task
-            
+
             # Reset is_listening, it will be set by listen_for_pushes
-            self.is_listening = False 
+            self.is_listening = False
             task = asyncio.create_task(self.listen_for_pushes())
             return task
         else:
@@ -117,23 +117,23 @@ async def main_test_async():
     # Attempt to start monitoring, which should launch listen_for_pushes
     # In a real app, this task might be stored on the monitor instance
     listening_task = monitor.start_monitoring()
-    
+
     if listening_task:
         print("Monitoring started. `listen_for_pushes` should be running in the background.")
         try:
             # Let it "listen" for a very short time
             await asyncio.sleep(0.2) # Reduced sleep time for faster test
-            
+
             # Here you could simulate receiving a push if the placeholder was more advanced
             # For now, we just observe the logs from the listen_for_pushes loop.
-            
+
         finally:
             print("\nStopping monitoring...")
             monitor.stop_monitoring()
             # Wait for the task to actually finish if it was started
             # Add a timeout to prevent test hanging indefinitely if stop doesn't work
             try:
-                await asyncio.wait_for(listening_task, timeout=1.0) 
+                await asyncio.wait_for(listening_task, timeout=1.0)
                 print("Listening task finished.")
             except asyncio.TimeoutError:
                 print("Listening task did not finish in time after stop signal.")
@@ -165,13 +165,13 @@ if __name__ == '__main__':
     # This script now involves an async function, so we use asyncio.run()
     # If this monitor were to be used in a synchronous Eidos,
     # start_monitoring would need to run listen_for_pushes in a separate thread.
-    
+
     # The placeholder `listen_for_pushes` is async, so we run the test with asyncio.
     try:
         asyncio.run(main_test_async())
     except KeyboardInterrupt:
         print("\nTest run interrupted by user.")
-    
+
     print("\n--- Simpler non-async conceptual calls (prints logs) ---")
     # For synchronous context, the methods would just log their placeholder status
     monitor_sync = SubconsciousMonitor()

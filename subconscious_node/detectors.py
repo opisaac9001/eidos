@@ -16,7 +16,7 @@ import logging # Added logging
 import requests # Added requests
 
 # Assuming mood.py is in the same directory (or package)
-from .mood import get_current_mood 
+from .mood import get_current_mood
 
 # --- Constants and Configuration ---
 IMPULSE_KEYWORDS = ["i want", "maybe i should", "i should call", "i need to"]
@@ -48,7 +48,7 @@ if os.path.exists(CONFIG_FILE_PATH):
             config_data = json.load(f)
         impulse_threshold = config_data.get("mood_settings", {}).get("impulse_threshold", impulse_threshold)
         EIDOS_API_BASE_URL = config_data.get("eidos_api_base_url", EIDOS_API_BASE_URL)
-        
+
         if EIDOS_API_BASE_URL == "http://localhost:8080" and "eidos_api_base_url" not in config_data:
             logger.warning(f"EIDOS_API_BASE_URL not found in {CONFIG_FILE_PATH}, using default: {EIDOS_API_BASE_URL}")
         if impulse_threshold == 0.7 and "impulse_threshold" not in config_data.get("mood_settings", {}):
@@ -77,16 +77,16 @@ def check_for_impulse(thought: str, current_mood_snapshot: dict) -> dict | None:
                     "mood_snapshot": current_mood_snapshot,
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                 }
-                
+
                 target_url = f"{EIDOS_API_BASE_URL}/v1/pathos/impulse"
                 logger.info(f"IMPULSE DETECTED: \"{thought[:50]}...\". Attempting to send to Eidos API: {target_url}")
                 try:
                     response = requests.post(target_url, json=impulse_data_dict, timeout=10)
-                    response.raise_for_status() 
+                    response.raise_for_status()
                     logger.info(f"Successfully sent impulse to Eidos: \"{impulse_data_dict['thought'][:50]}...\". Response: {response.status_code}")
                 except requests.exceptions.RequestException as e:
                     logger.error(f"Failed to send impulse to Eidos API at {target_url}. Error: {e}")
-                
+
                 return impulse_data_dict
             else:
                 logger.debug(f"Impulse keyword \"{keyword}\" found in \"{thought}\", but impulsiveness ({current_mood_snapshot.get('impulsiveness', 0)}) not above threshold ({impulse_threshold}).")
@@ -102,13 +102,13 @@ def check_for_imprint(thought: str, current_mood_snapshot: dict) -> dict | None:
         if keyword in thought_lower:
             imprint_data_dict = { # Renamed for clarity
                 "content": thought, # Field name matches Eidos ImprintData model
-                "mood": current_mood_snapshot, 
-                "topics": ["placeholder_topic"], 
+                "mood": current_mood_snapshot,
+                "topics": ["placeholder_topic"],
                 "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }
-            
+
             logger.info(f"IMPRINT DETECTED: \"{thought[:50]}...\".")
-            
+
             # 1. Append to local soft_memory.jsonl
             try:
                 with open(SOFT_MEMORY_FILE_PATH, 'a') as f:
@@ -116,7 +116,7 @@ def check_for_imprint(thought: str, current_mood_snapshot: dict) -> dict | None:
                 logger.info(f"Successfully appended imprint to local file: {SOFT_MEMORY_FILE_PATH}")
             except IOError as e:
                 logger.error(f"Could not write imprint to {SOFT_MEMORY_FILE_PATH}: {e}")
-            
+
             # 2. Send to Eidos API
             target_url = f"{EIDOS_API_BASE_URL}/v1/pathos/memory/imprint"
             logger.info(f"Attempting to send memory imprint to Eidos API: {target_url}")
@@ -126,7 +126,7 @@ def check_for_imprint(thought: str, current_mood_snapshot: dict) -> dict | None:
                 logger.info(f"Successfully sent memory imprint to Eidos: \"{imprint_data_dict['content'][:50]}...\". Response: {response.status_code}")
             except requests.exceptions.RequestException as e:
                 logger.error(f"Failed to send memory imprint to Eidos API at {target_url}. Error: {e}")
-                
+
             return imprint_data_dict
     return None
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     # Test mood setup
     # from .mood import update_mood # Not needed if get_current_mood() is not used directly in tests
     # Instead, we pass mood snapshots directly.
-    
+
     test_mood_high_impulsiveness = {"impulsiveness": 0.85, "laziness": 0.3, "name": "Excited"}
     test_mood_low_impulsiveness = {"impulsiveness": 0.1, "laziness": 0.7, "name": "Calm"}
 
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     assert impulse1["thought"] == thought1
 
     thought2 = "Maybe I should just stay quiet and observe for now."
-    impulse2 = check_for_impulse(thought2, test_mood_low_impulsiveness) 
+    impulse2 = check_for_impulse(thought2, test_mood_low_impulsiveness)
     assert impulse2 is None # Should not trigger due to low impulsiveness
 
     thought3 = "This is an interesting observation about cloud patterns." # No impulse keyword
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     impulse4 = check_for_impulse(thought4, test_mood_high_impulsiveness)
     assert impulse4 is not None
     assert impulse4["thought"] == thought4
-    
+
     # Test Imprint Detection
     print("\n--- Testing Imprint Detection ---")
     # Clean up soft_memory.jsonl for this test run

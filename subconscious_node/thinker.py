@@ -97,7 +97,7 @@ def monologue_loop():
     """
     print("Pathos Subconscious Node: Monologue Loop starting...")
     print(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
-    
+
     while True:
         # a. Drift mood
         mood.drift_mood() # Placeholder, might not do much yet
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     # Example: Add some initial context before starting the loop
     context_store.add_conversation_context("User: I'm not sure what to do next.")
     context_store.add_action_context("user_hesitated_on_decision_screen")
-    
+
     # Initialize mood with some values if it's empty (e.g. if config load failed)
     if not mood.get_current_mood():
         print("Info: Mood is empty, initializing with a basic mood for testing.")

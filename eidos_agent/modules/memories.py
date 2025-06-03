@@ -55,7 +55,7 @@ def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topics: Li
         # Append to File
         with open(IMPRINTS_FILE_PATH, 'a') as f:
             f.write(json.dumps(imprint_data) + '\n')
-        
+
         logger.info(f"MEMORIES: Successfully stored imprint to '{IMPRINTS_FILE_PATH}'. Content: '{content[:100]}...'")
         return {
             "status": "imprint successfully stored",
@@ -71,7 +71,7 @@ def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topics: Li
 
 if __name__ == '__main__':
     print("--- Testing memories.store_imprint (Persistent Storage) ---")
-    
+
     # Clean up existing file for a fresh test run, if it exists
     if os.path.exists(IMPRINTS_FILE_PATH):
         os.remove(IMPRINTS_FILE_PATH)

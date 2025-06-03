@@ -64,7 +64,7 @@ def sync_recent_context(conversation_history_summary: str, current_action: str) 
     """
     conversation_url = f"{SUBCONSCIOUS_NODE_BASE_URL}/inject/conversation"
     action_url = f"{SUBCONSCIOUS_NODE_BASE_URL}/inject/action"
-    
+
     success_conversation = False
     success_action = False
 
@@ -91,7 +91,7 @@ def sync_recent_context(conversation_history_summary: str, current_action: str) 
         logger.error(f"Failed to inject action context at {action_url}: {e}")
     except Exception as e: # Catch any other unexpected errors
         logger.error(f"An unexpected error occurred during action context injection: {e}")
-        
+
     return success_conversation and success_action
 
 # --- Example Usage (for testing) ---
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     logger.info("\nAttempting to sync context...")
     conv_summary = "User said: 'Tell me about the weather.' Pathos responded: (Thinking about rain)"
     action = "user_clicked_details_button"
-    
+
     sync_success = sync_recent_context(conv_summary, action)
     if sync_success:
         logger.info("Context synced successfully.")
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     #     logger.info("Correctly handled non-existent server for get_current_thoughts.")
     # else:
     #     logger.error(f"Unexpected response from non-existent server: {thoughts_data_fail}")
-    
+
     # sync_fail = sync_recent_context("test conv", "test action")
     # if not sync_fail:
     #     logger.info("Correctly handled non-existent server for sync_recent_context.")

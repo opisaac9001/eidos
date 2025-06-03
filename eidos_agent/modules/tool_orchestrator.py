@@ -52,23 +52,23 @@ class ToolOrchestrator:
             if not function_name or not tool_call_id:
                 logger.warning(f"Tool call missing function name or ID: {tool_call}")
                 tool_results_messages.append({
-                    "tool_call_id": tool_call_id or "unknown_tool_id", 
-                    "role": "tool", 
-                    "name": function_name or "unknown_function", 
+                    "tool_call_id": tool_call_id or "unknown_tool_id",
+                    "role": "tool",
+                    "name": function_name or "unknown_function",
                     "content": json.dumps({"error": "Tool call missing function name or ID."})
                 })
                 continue
 
             logger.info(f"Executing tool: {function_name} (ID: {tool_call_id}) for user '{user_id}'. Args: {function_args_str[:100]}")
-            
+
             try:
                 function_args = json.loads(function_args_str)
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON arguments for tool {function_name} (ID: {tool_call_id}): {e}. Args: {function_args_str}")
                 tool_results_messages.append({
-                    "tool_call_id": tool_call_id, 
-                    "role": "tool", 
-                    "name": function_name, 
+                    "tool_call_id": tool_call_id,
+                    "role": "tool",
+                    "name": function_name,
                     "content": json.dumps({"error": f"Invalid JSON arguments: {e}"})
                 })
                 continue
@@ -94,14 +94,14 @@ class ToolOrchestrator:
                     tool_response_content_str = await self.logos_core.execute_get_news_headlines()
                 elif function_name == "add_pathos_event": # Uses ethos_core.chronos_bridge_add_event
                     event_id = await self.ethos_core.chronos_bridge_add_event(
-                        title=function_args.get("title"), 
-                        start_date_str=function_args.get("start_date"), 
-                        end_date_str=function_args.get("end_date"), 
-                        event_type_str=function_args.get("event_type"), 
-                        description=function_args.get("description"), 
-                        location=function_args.get("location"), 
-                        activity_theme=function_args.get("activity_theme"), 
-                        planned_sites_or_tasks=function_args.get("planned_sites_or_tasks"), 
+                        title=function_args.get("title"),
+                        start_date_str=function_args.get("start_date"),
+                        end_date_str=function_args.get("end_date"),
+                        event_type_str=function_args.get("event_type"),
+                        description=function_args.get("description"),
+                        location=function_args.get("location"),
+                        activity_theme=function_args.get("activity_theme"),
+                        planned_sites_or_tasks=function_args.get("planned_sites_or_tasks"),
                         user_id_for_event=PATHOS_USER_ID # Using imported PATHOS_USER_ID
                     )
                     tool_response_content_str = json.dumps({"status": "success", "event_id": event_id, "message": f"Event '{function_args.get('title')}' scheduled."}) if event_id else json.dumps({"status": "error", "message": f"Failed to schedule event '{function_args.get('title')}'."})
@@ -116,25 +116,25 @@ class ToolOrchestrator:
             except Exception as e:
                 logger.error(f"Error executing tool {function_name} (ID: {tool_call_id}) for user '{user_id}': {e}", exc_info=True)
                 tool_response_content_str = json.dumps({"error": f"Error in tool {function_name}: {str(e)}"})
-            
+
             tool_results_messages.append({
-                "tool_call_id": tool_call_id, 
-                "role": "tool", 
-                "name": function_name, 
+                "tool_call_id": tool_call_id,
+                "role": "tool",
+                "name": function_name,
                 "content": tool_response_content_str
             })
         return tool_results_messages
 
     async def call_llm_with_tools(
-        self, 
-        llm_config_to_use: LLMConfig, 
+        self,
+        llm_config_to_use: LLMConfig,
         messages: List[Dict[str, Any]],
-        tools_definition: List[Dict[str, Any]], 
-        user_id: str, 
+        tools_definition: List[Dict[str, Any]],
+        user_id: str,
         stream_tool_calls: bool = False,
-        temperature_override: Optional[float] = None, 
+        temperature_override: Optional[float] = None,
         max_tokens_override: Optional[int] = None,
-        llm_provider_url_override: Optional[str] = None, 
+        llm_provider_url_override: Optional[str] = None,
         model_override: Optional[str] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
@@ -155,35 +155,35 @@ class ToolOrchestrator:
             async for llm_item in self.llm_client.call_llm_api(
                 llm_config=llm_config_to_use,
                 messages=current_messages,
-                tools_definition=tools_definition, 
+                tools_definition=tools_definition,
                 stream=True, # Always stream from LLMClient to process chunks
-                temperature_override=temperature_override, 
+                temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
-                llm_provider_url_override=llm_provider_url_override, 
-                model_override=model_override 
+                llm_provider_url_override=llm_provider_url_override,
+                model_override=model_override
             ):
                 item_type = llm_item.get("type") if isinstance(llm_item, dict) else "text_chunk_direct_str"
                 payload = llm_item.get("payload") if isinstance(llm_item, dict) else llm_item
 
-                if item_type == "text_chunk_direct_str" and isinstance(payload, str): 
+                if item_type == "text_chunk_direct_str" and isinstance(payload, str):
                     if not llm_had_tool_calls_this_iter: accumulated_content_chunks.append(payload)
                     if stream_tool_calls: yield {"type": "text_chunk", "payload": payload}
                 elif item_type == "tool_calls_chunk" and isinstance(payload, dict):
                     llm_had_tool_calls_this_iter = True
-                    assistant_msg_obj_this_iter = payload 
-                    accumulated_content_chunks = [] 
+                    assistant_msg_obj_this_iter = payload
+                    accumulated_content_chunks = []
                 elif item_type == "error_chunk":
                     logger.error(f"ToolOrchestrator: Error chunk received from LLMClient: {payload}")
                     yield llm_item; llm_error_occurred_in_loop = True; return
-                elif item_type == "usage_chunk": 
+                elif item_type == "usage_chunk":
                     llm_usage_this_iter = payload
-            
-            if llm_error_occurred_in_loop: return 
+
+            if llm_error_occurred_in_loop: return
 
             if llm_had_tool_calls_this_iter and assistant_msg_obj_this_iter:
                 current_messages.append(assistant_msg_obj_this_iter)
                 yield {"type": "assistant_message_chunk", "payload": assistant_msg_obj_this_iter} # Yield the full assistant message with tool_calls
-                
+
                 actual_tool_calls = assistant_msg_obj_this_iter.get("tool_calls", [])
                 if not actual_tool_calls: # Should not happen if llm_had_tool_calls_this_iter is True
                     final_text_on_bad_tool = "".join(accumulated_content_chunks).strip() or "Tool call error: LLM indicated tool use but provided no tool calls."
@@ -194,10 +194,10 @@ class ToolOrchestrator:
                     return
 
                 tool_results = await self._execute_tools(actual_tool_calls, user_id)
-                for res_msg in tool_results: 
+                for res_msg in tool_results:
                     current_messages.append(res_msg)
-                    yield {"type": "tool_result_chunk", "payload": res_msg} 
-                
+                    yield {"type": "tool_result_chunk", "payload": res_msg}
+
                 if i == max_iterations - 1: # Max iterations reached
                     logger.warning(f"ToolOrchestrator: Max tool iterations ({max_iterations}) reached for user '{user_id}'. Forcing final response from LLM.")
                     # Force a final response from the LLM without tools
@@ -209,10 +209,10 @@ class ToolOrchestrator:
                         temperature_override=temperature_override, max_tokens_override=max_tokens_override,
                         llm_provider_url_override=llm_provider_url_override, model_override=model_override
                     ):
-                        if isinstance(item_max, str): 
+                        if isinstance(item_max, str):
                             final_text_acc_max.append(item_max)
                             if stream_tool_calls: yield {"type": "text_chunk", "payload": item_max}
-                        elif isinstance(item_max, dict) and item_max.get("type") == "error_chunk": 
+                        elif isinstance(item_max, dict) and item_max.get("type") == "error_chunk":
                             yield item_max; return # Propagate error
                         elif isinstance(item_max, dict) and item_max.get("type") == "usage_chunk":
                             final_usage_max_iter = item_max.get("payload")
@@ -226,16 +226,16 @@ class ToolOrchestrator:
                     return
             else: # No tool calls in this iteration, this is the final text response
                 final_text_response = "".join(accumulated_content_chunks).strip()
-                if not final_text_response and not llm_error_occurred_in_loop: 
+                if not final_text_response and not llm_error_occurred_in_loop:
                     logger.warning(f"ToolOrchestrator: No text content accumulated and no tool calls in iteration {i+1} for user '{user_id}'.")
                     final_text_response = "I'm not sure how to respond to that. Can you try rephrasing?" if i == 0 else "Okay, I've processed that."
-                
+
                 final_msg_obj = {"role": "assistant", "content": final_text_response}
                 # current_messages.append(final_msg_obj) # PathosInterface will add this to its history
                 yield {"type": "final_assistant_message", "payload": final_msg_obj}
                 if llm_usage_this_iter: yield {"type": "usage_chunk", "payload": llm_usage_this_iter}
                 return
-        
+
         # Fallback if loop completes max_iterations without a natural stop (should be caught by i == max_iterations - 1 logic)
         logger.warning(f"ToolOrchestrator: Tool call loop completed all iterations ({max_iterations}) without a definitive response for user '{user_id}'. This state should ideally be handled within the loop.")
         fallback_text = "I've completed a series of actions. If you need more help, please let me know!"
