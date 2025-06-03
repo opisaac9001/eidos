@@ -51,6 +51,7 @@ from eidos_agent.services.external_tts_service import ExternalTTSService
 from eidos_agent.modules.chronos_engine import ChronosEngine, PATHOS_USER_ID
 from eidos_agent.modules.chronos_models import ActivitySlot, PathosEvent, EventType, PathosEventDetails
 from eidos_agent.routers import chat_storage
+from eidos_agent.api.main import router as pathos_hooks_router # Import the new router
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
@@ -173,6 +174,7 @@ async def lifespan(app_instance: FastAPI):
 
 app = FastAPI(title="Eidos Agent API", version="1.0", lifespan=lifespan)
 app.include_router(chat_storage.router, prefix="/v1")
+app.include_router(pathos_hooks_router) # Include the Pathos hooks router
 
 if WEBAPP_DIR.is_dir():
     js_dir = WEBAPP_DIR / "js"; css_dir = WEBAPP_DIR / "css"

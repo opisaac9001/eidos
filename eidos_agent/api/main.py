@@ -1,17 +1,19 @@
 """
-Main API for the Eidos Agent.
+API Router for Eidos Agent hooks related to the Pathos Subconscious Node.
 
-This FastAPI application exposes various endpoints for interacting with the Eidos agent,
-including hooks for receiving data from the Pathos Subconscious Node.
+This module defines API routes using FastAPI's APIRouter for handling
+interactions with the Pathos Subconscious Node, such as receiving impulses
+and memory imprints. This router is intended to be included in a main
+FastAPI application.
 """
 import logging
-from fastapi import FastAPI, HTTPException, APIRouter
+from fastapi import APIRouter, HTTPException # Changed FastAPI to APIRouter
 
 # Attempt to import models from the subconscious module.
 # This structure assumes that 'eidos_agent' is in the Python path.
 try:
     from eidos_agent.modules.subconscious.models import ImpulseData, ImprintData
-    from eidos_agent.modules.firmament import handle_external_impulse # ferment -> firmament
+    from eidos_agent.modules.firmament import handle_external_impulse
     from eidos_agent.modules.memories import store_imprint
 except ImportError as e:
     # This fallback is mostly for isolated testing of this file if the full structure isn't in PYTHONPATH.
@@ -19,7 +21,7 @@ except ImportError as e:
     logging.warning(f"Could not import Eidos modules directly, attempting relative for dev: {e}")
     try:
         from ..modules.subconscious.models import ImpulseData, ImprintData
-        from ..modules.firmament import handle_external_impulse # ferment -> firmament
+        from ..modules.firmament import handle_external_impulse
         from ..modules.memories import store_imprint
     except ImportError:
         logging.exception("Failed to import Eidos modules. Ensure eidos_agent is in PYTHONPATH or structure is correct.")
@@ -30,30 +32,28 @@ except ImportError as e:
         def store_imprint(*args, **kwargs): raise RuntimeError("Module not loaded")
 
 
-# --- FastAPI App Instance ---
-app = FastAPI(
-    title="Eidos Agent API",
-    description="Main API for the Eidos intelligent agent.",
-    version="0.1.0"
+# --- APIRouter Instance ---
+router = APIRouter(
+    prefix="/v1/pathos", # Optional: define a prefix for all routes in this router
+    tags=["Pathos Subconscious Hooks"], # Optional: add tags for OpenAPI docs
 )
 
 # Configure basic logging if not already configured (e.g., by Uvicorn)
 # This is mainly for direct script execution or testing.
+# In a larger app, logging is usually configured at the application entry point.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- API Router for Subconscious Hooks (Optional, but good practice) ---
-# router = APIRouter() # Example if we want to use a router
 
 # --- Subconscious Node Hooks ---
 
-@app.post("/v1/pathos/impulse", summary="Receive impulse from Pathos subconscious node")
+@router.post("/impulse", summary="Receive impulse from Pathos subconscious node")
 async def handle_subconscious_impulse(data: ImpulseData):
     """
     Endpoint to receive an impulsive thought from the Pathos subconscious node.
     This data is then passed to the Eidos agent's "firmament" module for processing.
     """
-    logger.info(f"Eidos API: Received impulse from Pathos: {data.dict()}")
+    logger.info(f"Eidos API (Router): Received impulse from Pathos: {data.dict()}")
     try:
         # Pass data to the appropriate Eidos module (e.g., firmament)
         result = handle_external_impulse(
@@ -61,19 +61,19 @@ async def handle_subconscious_impulse(data: ImpulseData):
             timestamp=data.timestamp,
             mood=data.mood_snapshot
         )
-        logger.info(f"Eidos API: Impulse processed by firmament module. Result: {result}") # ferment -> firmament
+        logger.info(f"Eidos API (Router): Impulse processed by firmament module. Result: {result}")
         return result
     except Exception as e:
-        logger.exception(f"Eidos API: Error processing impulse: {data.dict()}")
+        logger.exception(f"Eidos API (Router): Error processing impulse: {data.dict()}")
         raise HTTPException(status_code=500, detail=f"Error processing impulse in Eidos: {str(e)}")
 
-@app.post("/v1/pathos/memory/imprint", summary="Receive memory imprint from Pathos subconscious node")
+@router.post("/memory/imprint", summary="Receive memory imprint from Pathos subconscious node")
 async def store_subconscious_memory_imprint(data: ImprintData):
     """
     Endpoint to receive a memory imprint from the Pathos subconscious node.
     This data is then passed to the Eidos agent's "memories" module for storage.
     """
-    logger.info(f"Eidos API: Received memory imprint from Pathos: {data.dict()}")
+    logger.info(f"Eidos API (Router): Received memory imprint from Pathos: {data.dict()}")
     try:
         # Pass data to the appropriate Eidos module (e.g., memories)
         result = store_imprint(
@@ -82,32 +82,28 @@ async def store_subconscious_memory_imprint(data: ImprintData):
             mood=data.mood,
             topics=data.topics
         )
-        logger.info(f"Eidos API: Imprint processed by memories module. Result: {result}")
+        logger.info(f"Eidos API (Router): Imprint processed by memories module. Result: {result}")
         return result
     except Exception as e:
-        logger.exception(f"Eidos API: Error processing memory imprint: {data.dict()}")
+        logger.exception(f"Eidos API (Router): Error processing memory imprint: {data.dict()}")
         raise HTTPException(status_code=500, detail=f"Error processing imprint in Eidos: {str(e)}")
 
-# Example: Include router if it was used
-# app.include_router(router, prefix="/hooks")
+# Note: The root path "/" previously defined with @app.get("/") would typically not be part of a
+# specific sub-router like this one, or if it is, its path would be relative to the router's prefix.
+# For example, if this router is included with prefix "/pathos_hooks", then a "@router.get("/")"
+# here would be accessible at "/pathos_hooks/".
+# I'll remove the root GET for this router as it's specific to Pathos hooks.
+# If a general API root is needed, it should be on the main FastAPI app instance.
 
-@app.get("/", include_in_schema=False)
-async def root():
-    return {"message": "Eidos Agent API is active. See /docs for available endpoints."}
-
-# To run this API (for testing purposes):
-# Ensure FastAPI and Uvicorn are installed: pip install fastapi uvicorn
-# Run from the directory containing 'eidos_agent': python -m eidos_agent.api.main
-# (This assumes your project structure allows this type of execution)
-# Or, more commonly: uvicorn eidos_agent.api.main:app --reload --port 8080
-# (Run from the project root directory, e.g., the parent of 'eidos_agent')
-
-if __name__ == "__main__":
-    import uvicorn
-    logger.info("Starting Eidos Agent API directly using Uvicorn (for development/testing)...")
-    # Note: For production, use a proper ASGI server like Gunicorn with Uvicorn workers.
-    # The path 'eidos_agent.api.main:app' might need adjustment based on how you run it.
-    # If run as `python eidos_agent/api/main.py`, then `main:app` or `api.main:app` might be needed
-    # depending on current working directory and PYTHONPATH.
-    # A common way from project root: uvicorn eidos_agent.api.main:app --reload --port 8080
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+# The file is no longer runnable as a standalone FastAPI application using uvicorn directly on this file.
+# It needs to be included in a main FastAPI application.
+# Example (in a different file, e.g., main_app.py):
+# from fastapi import FastAPI
+# from eidos_agent.api import main as pathos_hooks_router # Assuming this file is eidos_agent/api/main.py
+#
+# app = FastAPI()
+# app.include_router(pathos_hooks_router.router) # Include the router
+#
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8080)
