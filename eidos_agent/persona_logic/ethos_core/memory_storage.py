@@ -31,7 +31,11 @@ class MemoryEntry(TypedDict, total=False):
         'user_fact', 'world_knowledge', 'learned_correction',
         'proactive_action_record', 'queued_discussion_point',
         'learned_feedback_insight', 'suggestion_reflection',
-        'aspiration' # Added from broken EthosCore
+        'aspiration', # Added from broken EthosCore
+        'dream_narrative_from_node',
+        'firmament_activity_log',
+        'received_subconscious_intention',
+        'npc_dialogue_event' # New type added
     ]
     content: str
     embedding: Optional[list[float]]

@@ -4,7 +4,7 @@ import logging
 import json # Added for potential debug logging
 import random # Added
 import time # Added
-from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple # Added Tuple
+from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple, List # Added Tuple and List
 from datetime import datetime
 
 # Assuming Config is in core.config and EthosCore, ChronosEngine are where they are
