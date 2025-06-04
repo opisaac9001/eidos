@@ -27,5 +27,6 @@
   },
   "eidos_api_base_url": "http://localhost:8080",
   "eidos_dream_fragment_url": "http://localhost:8080/v1/oneiros/dream_fragment",
+  "eidos_firmament_intention_url": "http://localhost:8080/v1/firmament/subconscious_intention",
   "wildcard_folder_path": "../wildcards/"
 }

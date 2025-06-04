@@ -14,6 +14,8 @@ import os
 import datetime
 import logging # Added logging
 import requests # Added requests
+import time # Added time
+from typing import Dict, Any, Optional # Added for explicit type hinting
 
 # Assuming mood.py is in the same directory (or package)
 from .mood import get_current_mood
@@ -62,7 +64,58 @@ else:
     logger.warning(f"{CONFIG_FILE_PATH} not found. Using default impulse_threshold: {impulse_threshold} and EIDOS_API_BASE_URL: {EIDOS_API_BASE_URL}")
 
 
+# --- Intention Detection Configuration ---
+INTENTION_KEYWORDS = [
+    "i should", "i want to", "i need to", "i'm going to", "maybe i will",
+    "let's try to", "my goal is to", "i plan to", "i must", "i could"
+]
+INTENTION_COOLDOWN_SECONDS = 60
+last_intention_sent_time: float = 0.0
+
+
 # --- Detector Functions ---
+
+def check_for_actionable_intention(thought_text: str, current_mood_snapshot: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    '''
+    Checks if a thought constitutes an actionable intention and if cooldown allows.
+    Returns a dictionary with 'intention' and 'metadata' if found, else None.
+    '''
+    global last_intention_sent_time
+
+    thought_lower = thought_text.lower()
+    is_potential_intention = False
+    for keyword in INTENTION_KEYWORDS:
+        if keyword in thought_lower: # Using 'in' for broader match, not just startswith
+            is_potential_intention = True
+            break
+
+    if not is_potential_intention:
+        return None
+
+    current_time = time.time()
+    if (current_time - last_intention_sent_time) < INTENTION_COOLDOWN_SECONDS:
+        # Optional: Log that an intention was detected but suppressed by cooldown
+        logger.debug(f"Intention detected ('{thought_text[:50]}...') but cooldown active.")
+        return None
+
+    # Intention detected and cooldown permits
+    last_intention_sent_time = current_time
+
+    # For now, the 'intention' is the original thought. Can be refined.
+    captured_intention_string = thought_text
+
+    prepared_metadata = {
+        "timestamp_of_thought": datetime.datetime.now().isoformat(), # Using datetime for ISO format
+        "mood_at_thought": current_mood_snapshot,
+        "original_thought": thought_text
+        # Add other relevant metadata if available, e.g., thought_id
+    }
+
+    # Ensure logger is defined if used for debug, or remove log line above
+    # For now, assuming no logger in this specific function for simplicity of subtask
+    # print(f"Actionable intention detected: {captured_intention_string}") # For debug if no logger
+
+    return {"intention": captured_intention_string, "metadata": prepared_metadata}
 
 def check_for_impulse(thought: str, current_mood_snapshot: dict) -> dict | None:
     """

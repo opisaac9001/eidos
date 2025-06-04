@@ -205,6 +205,17 @@ def monologue_loop():
                 del monologue_buffer[:num_to_remove]
             detectors.check_for_impulse(new_thought, current_mood_snapshot)
             detectors.check_for_imprint(new_thought, current_mood_snapshot)
+
+            actionable_intention_data = detectors.check_for_actionable_intention(new_thought, current_mood_snapshot)
+            if actionable_intention_data:
+                logger.info(f"Actionable intention detected by subconscious_node: {actionable_intention_data['intention']}")
+                # Send it to Eidos/Firmament
+                success_sending = utils.send_intention_to_eidos(actionable_intention_data)
+                if success_sending:
+                    logger.info("Successfully sent intention to Eidos/Firmament.")
+                else:
+                    logger.warning("Failed to send intention to Eidos/Firmament.")
+
             time.sleep(sleep_duration_seconds)
 
         elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
