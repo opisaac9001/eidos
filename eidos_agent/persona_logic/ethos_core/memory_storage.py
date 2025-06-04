@@ -487,3 +487,40 @@ class MemoryStorage:
             logger.error(f"Error updating NPC fields for ID {npc_id}: {e}", exc_info=True)
             conn.rollback()
             return False
+
+    def delete_npc_profile(self, npc_id: str) -> bool:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM npc_profiles WHERE npc_id = ?", (npc_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                logger.info(f"Deleted NPC profile with ID: {npc_id}")
+                return True
+            logger.warning(f"No NPC profile found with ID: {npc_id} to delete.")
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Error deleting NPC profile with ID {npc_id}: {e}", exc_info=True)
+            conn.rollback()
+            return False
+
+    # Placeholder for list_npc_profiles
+    def list_npc_profiles(self, limit: int = 100, offset: int = 0) -> List[NPCProfile]:
+        logger.warning("list_npc_profiles is a placeholder and not fully implemented.")
+        # This would typically fetch from DB, order, limit, offset
+        # For now, returns empty or a dummy example if you have one.
+        return []
+
+    # Placeholder for add_fact_to_npc_profile
+    def add_fact_to_npc_profile(self, npc_id: str, fact: str) -> bool:
+        logger.warning(f"add_fact_to_npc_profile is a placeholder for {npc_id} with fact '{fact}'. Not fully implemented.")
+        # This would typically fetch profile, append to known_facts_by_pathos, then save.
+        # For now, simulates success.
+        # Example sketch:
+        # profile = self.get_npc_profile_by_id(npc_id)
+        # if profile:
+        #     if fact not in profile.known_facts_by_pathos:
+        #         profile.known_facts_by_pathos.append(fact)
+        #         return self.save_npc_profile(profile)
+        # return False
+        return True # Simulate success for now
