@@ -38,6 +38,7 @@ DEFAULT_WILDCARD_PATH = "../wildcards/"
 
 fixed_system_prompt = DEFAULT_SYSTEM_PROMPT
 temperature = DEFAULT_TEMPERATURE
+dream_temperature = 0.9 # Added for dream generation
 sleep_duration_seconds = DEFAULT_SLEEP_DURATION
 max_monologue_buffer_thoughts = DEFAULT_MAX_THOUGHTS
 wildcard_folder_path = DEFAULT_WILDCARD_PATH
@@ -53,6 +54,8 @@ try:
         llm_settings = config_data.get("llm_settings", {})
         fixed_system_prompt = llm_settings.get("fixed_system_prompt", DEFAULT_SYSTEM_PROMPT)
         temperature = float(llm_settings.get("temperature", DEFAULT_TEMPERATURE))
+        # dream_temperature can also be made configurable if needed, for now, it's hardcoded above or here
+        # dream_temperature = float(llm_settings.get("dream_temperature", 0.9))
 
         monologue_loop_settings = config_data.get("monologue_loop_settings", {})
         sleep_duration_seconds = int(monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION))
@@ -189,12 +192,11 @@ def monologue_loop():
             dream_prompt = construct_dream_prompt(placeholder_daily_summary, loaded_wildcards)
             logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
-            # The actual LLM call for dream generation and snippet processing will be in the next step.
-            # For now, we just log that we would be generating a dream.
-            logger.info("Dream prompt constructed. (LLM call for dream generation will be implemented next).")
-            # Simulating a dream being generated and processed without actual LLM call for this step:
-            simulated_dream_fragment = f"A fleeting image of {random.choice(loaded_wildcards.get('animals', ['something'])) if loaded_wildcards else 'something'} in a field of {random.choice(loaded_wildcards.get('colors', ['strange'])) if loaded_wildcards else 'strange'} light."
-            logger.info(f"Pathos (simulated) dreams: \"{simulated_dream_fragment}\"")
+            # Actual LLM call for dream generation
+            generated_dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
+            logger.info(f"Pathos dreams: \"{generated_dream_fragment}\"")
+            # TODO: Implement sending the generated_dream_fragment to Eidos (e.g., via a new API call)
+            logger.info("Next step would be to send this dream fragment to Eidos.")
 
             dream_mode_sleep_duration = int(sleep_duration_seconds / 2) if sleep_duration_seconds > 2 else 1
             logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")
