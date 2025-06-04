@@ -3,7 +3,8 @@ import httpx
 import logging
 import json # Added for potential debug logging
 import random # Added
-from typing import Optional, TYPE_CHECKING, Dict, Any
+import time # Added
+from typing import Optional, TYPE_CHECKING, Dict, Any, Tuple # Added Tuple
 from datetime import datetime
 
 # Assuming Config is in core.config and EthosCore, ChronosEngine are where they are
@@ -20,6 +21,7 @@ except ImportError:
 if TYPE_CHECKING:
     from eidos_agent.persona_logic.ethos_core.core import EthosCore
     from eidos_agent.persona_logic.chronos_engine.engine import ChronosEngine
+    from eidos_agent.features.oneiros.module import OneirosModule # Add this
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +34,15 @@ AVAILABILITY_STATUS_AVAILABLE = "AVAILABLE"
 AVAILABILITY_STATUS_UNKNOWN = "UNKNOWN"
 
 class FirmamentModule:
-    def __init__(self, config: Config, ethos_core: 'EthosCore', chronos_engine: 'ChronosEngine'):
+    def __init__(self, config: Config, ethos_core: 'EthosCore', chronos_engine: 'ChronosEngine', oneiros_module: 'OneirosModule'):
         self.config = config
         self.fm_config: FirmamentModuleConfig = config.get_firmament_module_config()
         self.ethos_core = ethos_core
         self.chronos_engine = chronos_engine
+        self.oneiros_module = oneiros_module # Added
         self.http_client: Optional[httpx.AsyncClient] = None
         self.firmament_llm_config: Optional[LLMConfig] = None
+        self.last_npc_interaction_time: float = 0.0 # Added
 
         if self.fm_config.get("enable_firmament", False):
             llm_role = self.fm_config.get("firmament_llm_role")
@@ -119,6 +123,22 @@ class FirmamentModule:
 
             logger.debug("FirmamentModule: Simulation tick finished.")
 
+            # Check for NPC interaction opportunity based on activity context
+            if activity_slot and self._is_npc_interaction_warranted(activity_slot, None): # activity_slot should be valid here
+                logger.info(f"FirmamentModule: NPC interaction opportunity identified for activity: {activity_slot.activity_title}")
+                npc_result = await self._generate_npc_interaction_snippet(activity_slot, None, mood)
+                if npc_result:
+                    interaction_snippet, npc_role = npc_result
+                    logger.info(f"FirmamentModule: Generated NPC interaction for activity: {interaction_snippet}")
+                    await self._store_activity_log(
+                        snippet=interaction_snippet,
+                        activity_slot=activity_slot,
+                        mood_at_time=mood,
+                        extra_metadata={"interaction_type": "npc_brief", "npc_role": npc_role}
+                    )
+                else:
+                    logger.debug("FirmamentModule: No NPC interaction snippet generated for activity despite opportunity.")
+
         except Exception as e:
             logger.error(f"FirmamentModule: Unhandled error during simulation tick: {e}", exc_info=True)
 
@@ -181,6 +201,51 @@ class FirmamentModule:
 
         # No specific return value needed from receive_subconscious_intention itself,
         # as it's acting as an event handler.
+
+    def _is_npc_interaction_warranted(self, activity_slot: Optional[ActivitySlot], intention: Optional[str]) -> bool:
+        '''
+        Determines if a simplified NPC interaction is warranted based on context.
+        Includes a cooldown mechanism.
+        '''
+        if not self.fm_config.get("enable_firmament"): # Or a specific enable flag for NPC interactions
+            return False
+
+        cooldown_seconds = self.fm_config.get("npc_interaction_cooldown_seconds", 1800) # Default 30 mins
+        current_time = time.time()
+
+        if (current_time - self.last_npc_interaction_time) < cooldown_seconds:
+            logger.debug("FirmamentModule: NPC interaction opportunity identified, but cooldown is active.")
+            return False
+
+        # Define keywords that suggest an NPC interaction
+        location_keywords = ["cafe", "shop", "store", "reception", "counter", "market", "bar ", "restaurant"]
+        activity_keywords = ["meeting", "appointment", "errand", "social", "ordering", "buying", "check out", "service"]
+        intention_keywords = ["ask ", "talk to", "order from", "buy from", "meet with", "speak to", "get help from"] # Note space for "ask "
+
+        if activity_slot:
+            if activity_slot.activity_details and activity_slot.activity_details.location_context:
+                loc_lower = activity_slot.activity_details.location_context.lower()
+                if any(keyword in loc_lower for keyword in location_keywords):
+                    logger.debug(f"NPC interaction warranted by location: {loc_lower}")
+                    # self.last_npc_interaction_time = current_time # Cooldown reset only if an interaction actually happens
+                    return True
+
+            act_name_lower = activity_slot.slot_name.lower() if activity_slot.slot_name else ""
+            act_title_lower = activity_slot.activity_title.lower()
+            act_type_lower = activity_slot.activity_type.lower()
+
+            combined_activity_text = f"{act_name_lower} {act_title_lower} {act_type_lower}"
+            if any(keyword in combined_activity_text for keyword in activity_keywords):
+                logger.debug(f"NPC interaction warranted by activity: {combined_activity_text}")
+                return True
+
+        if intention:
+            intention_lower = intention.lower()
+            if any(keyword in intention_lower for keyword in intention_keywords):
+                logger.debug(f"NPC interaction warranted by intention: {intention_lower}")
+                return True
+
+        return False
 
     async def get_availability_status(self) -> str:
         '''
@@ -289,6 +354,17 @@ class FirmamentModule:
             return None
 
         try:
+            dream_influence_text = None
+            if self.oneiros_module: # Check if oneiros_module is provided
+                try:
+                    # Get dream summary, e.g., from last 8 hours
+                    recent_dream_summary = self.oneiros_module.get_last_dream_summary(max_age_hours=8)
+                    if recent_dream_summary:
+                        dream_influence_text = f"A recent dream had themes of: '{recent_dream_summary[:150].replace('\n', ' ')}...'"
+                        logger.debug(f"FirmamentModule: Adding dream influence to prompt: {dream_influence_text}")
+                except Exception as e:
+                    logger.error(f"FirmamentModule: Error getting dream summary from OneirosModule: {e}", exc_info=False) # Keep log brief
+
             # 1. Prompt Construction
             system_prompt = (
                 "You are describing a brief moment in the life of Pathos, a 47-year-old British tech consultant. "
@@ -298,21 +374,23 @@ class FirmamentModule:
                 "Do not break character or explain your reasoning. Output only the descriptive sentence."
             )
 
-            # Simplified environmental context for Phase 1
-            # This could be expanded later based on activity_slot.activity_type or other factors
-            environmental_context = "He is currently at his home office desk."
-            if "leisure" in activity_slot.activity_type.lower() or "break" in activity_slot.slot_name.lower():
-                environmental_context = "He is taking a break at home."
-            if "outdoor" in activity_slot.activity_type.lower() or "walk" in activity_slot.slot_name.lower(): # Example future type
-                environmental_context = "He is out for a walk in his neighborhood."
-
+            # Environmental context determination
+            environmental_context = "He is currently at his home." # Default fallback
+            if activity_slot.activity_details and activity_slot.activity_details.location_context:
+                environmental_context = f"He is at {activity_slot.activity_details.location_context}."
+            elif "leisure" in activity_slot.activity_type.lower() or "break" in activity_slot.slot_name.lower():
+                environmental_context = "He is taking a break at home." # More specific fallback if no location_context
+            elif "work" in activity_slot.activity_type.lower() or "office" in activity_slot.slot_name.lower():
+                 environmental_context = "He is at his home office desk." # Fallback for work if no specific location
 
             user_prompt_parts = [
                 f"Current Schedule: Slot '{activity_slot.slot_name}' (Activity: '{activity_slot.activity_title}') from {activity_slot.start_time.strftime('%H:%M')} to {activity_slot.end_time.strftime('%H:%M')}.",
                 f"Current Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).",
-                f"Current Setting: {environmental_context}",
-                "Describe a brief moment (one sentence):"
             ]
+            if dream_influence_text:
+                user_prompt_parts.append(f"Subtle Influence from Recent Dream: {dream_influence_text}")
+            user_prompt_parts.append(f"Current Setting: {environmental_context}")
+            user_prompt_parts.append("Describe a brief moment (one sentence):")
             user_prompt = "\n".join(user_prompt_parts)
 
             # 2. LLM Call
@@ -388,7 +466,12 @@ class FirmamentModule:
             logger.error(f"FirmamentModule: Unexpected error generating activity snippet: {e}", exc_info=True)
             return None
 
-    async def _store_activity_log(self, snippet: str, activity_slot: ActivitySlot, mood_at_time: Dict[str, Any], related_intention_id: Optional[str] = None) -> Optional[str]:
+    async def _store_activity_log(self,
+                                snippet: str,
+                                activity_slot: ActivitySlot,
+                                mood_at_time: Dict[str, Any],
+                                related_intention_id: Optional[str] = None,
+                                extra_metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         '''
         Stores the generated activity log snippet as a memory in EthosCore.
         Returns the ID of the stored memory entry, or None if storage fails.
@@ -403,7 +486,7 @@ class FirmamentModule:
                 current_time = datetime.now() # Fallback, though less ideal
                 logger.warning("FirmamentModule: Could not get current Pathos time for memory, using system now().")
 
-            metadata = {
+            current_metadata = { # Renamed to current_metadata to avoid conflict with parameter
                 "source": "firmament_module",
                 "timestamp": current_time.isoformat(),
                 "activity_slot_name": activity_slot.slot_name,
@@ -414,14 +497,21 @@ class FirmamentModule:
                 "mood_name_at_time": mood_at_time.get("name")
             }
             if related_intention_id:
-                metadata["related_intention_memory_id"] = related_intention_id
+                current_metadata["related_intention_memory_id"] = related_intention_id
+
+            if extra_metadata: # New part
+                current_metadata.update(extra_metadata)
 
             entry_data = {
-                "type": "firmament_activity_log",
+                "type": "firmament_activity_log", # Type remains the same
                 "content": snippet,
-                "metadata": metadata,
-                "salience": random.uniform(0.2, 0.4) # Low-to-moderate salience for background activity
+                "metadata": current_metadata, # Use the constructed metadata
+                "salience": random.uniform(0.2, 0.4) # Default salience
             }
+            # If it's an NPC interaction, consider slightly higher salience
+            if extra_metadata and "interaction_type" in extra_metadata:
+                entry_data["salience"] = random.uniform(0.3, 0.5)
+
             # Assuming PATHOS_USER_ID is available (imported or defined as fallback in module)
             memory_entry = await self.ethos_core.add_memory_entry(
                 entry_data=entry_data,
@@ -455,6 +545,36 @@ class FirmamentModule:
 
         try:
             # 1. Context Gathering
+            # Check for NPC interaction opportunity based on intention AND current activity context
+            if self._is_npc_interaction_warranted(current_activity_slot, intention):
+                logger.info(f"FirmamentModule: NPC interaction opportunity identified for intention: {intention}")
+                npc_result = await self._generate_npc_interaction_snippet(current_activity_slot, intention, current_mood)
+                if npc_result:
+                    interaction_snippet, npc_role = npc_result
+                    logger.info(f"FirmamentModule: Generated NPC interaction for intention: {interaction_snippet}")
+
+                    slot_for_storage = current_activity_slot if current_activity_slot else self._create_dummy_activity_slot_for_context(f"NPC interaction for intention: {intention[:30]}...")
+
+                    await self._store_activity_log(
+                        snippet=interaction_snippet,
+                        activity_slot=slot_for_storage,
+                        mood_at_time=current_mood,
+                        related_intention_id=original_intention_memory_id,
+                        extra_metadata={"interaction_type": "npc_brief", "npc_role": npc_role, "triggered_by_intention_id": original_intention_memory_id}
+                    )
+                else:
+                    logger.debug("FirmamentModule: No NPC interaction snippet generated for intention despite opportunity.")
+
+            dream_influence_text = None
+            if self.oneiros_module: # Check if oneiros_module is provided
+                try:
+                    recent_dream_summary = self.oneiros_module.get_last_dream_summary(max_age_hours=8)
+                    if recent_dream_summary:
+                        dream_influence_text = f"A recent dream had themes of: '{recent_dream_summary[:150].replace('\n', ' ')}...'"
+                        logger.debug(f"FirmamentModule: Adding dream influence to intention simulation prompt: {dream_influence_text}")
+                except Exception as e:
+                    logger.error(f"FirmamentModule: Error getting dream summary from OneirosModule for intention sim: {e}", exc_info=False)
+
             current_activity_slot = await self._get_current_activity_slot()
             current_mood = await self._get_current_mood()
             if not current_mood: # Should have a default from _get_current_mood if EthosCore fails
@@ -463,7 +583,14 @@ class FirmamentModule:
 
             activity_context_for_prompt = "Currently idle or between scheduled activities."
             if current_activity_slot:
-                activity_context_for_prompt = f"Currently engaged in '{current_activity_slot.activity_title}' (schedule slot: '{current_activity_slot.slot_name}')."
+                location_detail = ""
+                if current_activity_slot.activity_details and current_activity_slot.activity_details.location_context:
+                    location_detail = f" at {current_activity_slot.activity_details.location_context}"
+                activity_context_for_prompt = (
+                    f"Currently engaged in '{current_activity_slot.activity_title}'"
+                    f" (schedule slot: '{current_activity_slot.slot_name}')"
+                    f"{location_detail}."
+                )
 
             # 2. Prompt Construction for Firmament LLM
             system_prompt = (
@@ -477,9 +604,11 @@ class FirmamentModule:
             user_prompt_parts = [
                 f"Pathos's Internal Intention: \"{intention}\"",
                 f"His Current Mood: Valence={current_mood.get('valence', 0.0):.2f}, Arousal={current_mood.get('arousal', 0.0):.2f} (Name: {current_mood.get('name', 'unknown')}).",
-                f"His Current Scheduled Context: {activity_context_for_prompt}",
-                "Describe his simulated short action or reaction sequence (1-3 sentences):"
             ]
+            if dream_influence_text:
+                user_prompt_parts.append(f"Subtle Influence from Recent Dream: {dream_influence_text}")
+            user_prompt_parts.append(f"His Current Scheduled Context: {activity_context_for_prompt}")
+            user_prompt_parts.append("Describe his simulated short action or reaction sequence (1-3 sentences):")
             user_prompt = "\n".join(user_prompt_parts)
 
             # 3. LLM Call
@@ -559,3 +688,118 @@ class FirmamentModule:
             logger.error(f"FirmamentModule: Request error simulating intention LLM call: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"FirmamentModule: Unexpected error in _simulate_intention_consequence: {e}", exc_info=True)
+
+    async def _generate_npc_interaction_snippet(self,
+                                              context_slot: Optional[ActivitySlot],
+                                              context_intention: Optional[str],
+                                              mood: Dict[str, Any]) -> Optional[Tuple[str, str]]: # Return tuple
+        '''
+        Generates a brief, two-turn NPC interaction snippet using the Firmament LLM.
+        Returns a tuple of (interaction_snippet, npc_role) or None.
+        '''
+        if not self.http_client or not self.firmament_llm_config or not self.firmament_llm_config.get("url"):
+            logger.error("FirmamentModule: LLM client/config not available for NPC interaction. Aborting.")
+            return None
+
+        # 1. Determine NPC Role and Interaction Context
+        npc_role = "person" # Default
+        interaction_description = "a brief interaction"
+
+        if context_slot:
+            loc = context_slot.activity_details.location_context.lower() if context_slot.activity_details and context_slot.activity_details.location_context else ""
+            act_title = context_slot.activity_title.lower()
+
+            if "cafe" in loc or "coffee" in act_title: npc_role = "barista"; interaction_description = "ordering coffee"
+            elif "shop" in loc or "store" in loc or "market" in loc or "buy" in act_title: npc_role = "shopkeeper"; interaction_description = "making a purchase or inquiry"
+            elif "reception" in loc or "desk" in loc and "help" in act_title : npc_role = "receptionist"; interaction_description = "asking for assistance"
+            elif "library" in loc: npc_role = "librarian"; interaction_description = "inquiring at the library"
+            elif "meeting" in act_title: npc_role = "colleague" if "client" not in act_title else "client contact"; interaction_description = f"a brief exchange during a {act_title}"
+            elif "social" in context_slot.activity_type.lower(): npc_role = "acquaintance"; interaction_description = "a casual social exchange"
+
+        if context_intention:
+            intention_lower = context_intention.lower()
+            if "ask" in intention_lower and ("librarian" in intention_lower or "information" in intention_lower) : npc_role = "librarian"; interaction_description = f"acting on intention: {context_intention}"
+            elif "order" in intention_lower and ("food" in intention_lower or "drink" in intention_lower or "coffee" in intention_lower): npc_role = "barista" if "coffee" in intention_lower else "waiter"; interaction_description = f"acting on intention: {context_intention}"
+            elif "buy" in intention_lower: npc_role = "shopkeeper"; interaction_description = f"acting on intention: {context_intention}"
+            # Fallback to a more general description if specific role isn't clear from intention alone
+            elif not context_slot : interaction_description = f"acting on intention: {context_intention}"
+
+
+        # 2. Prompt Construction
+        system_prompt = (
+            "You are simulating a very brief, two-turn interaction. Pathos speaks first, then an NPC responds. "
+            "The interaction should be mundane and typical for the context. "
+            "Output format strictly: Pathos: [Pathos's line (max 15 words)]\nNPC ([Role]): [NPC's line (max 15 words)]"
+        )
+
+        user_prompt_parts = [
+            f"Pathos's Current Situation: {interaction_description}.",
+            f"Pathos's Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).",
+            f"NPC Role: {npc_role}.",
+            "Generate the two-turn interaction (Pathos first, then NPC response):"
+        ]
+        user_prompt = "\n".join(user_prompt_parts)
+
+        # 3. LLM Call (similar to _generate_activity_log_snippet)
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+        payload = {
+            "model": self.firmament_llm_config.get("model"), "messages": messages,
+            "temperature": self.firmament_llm_config.get("temperature", 0.75), # Slightly more creative for dialogue
+            "max_tokens": 70, # Max tokens for two short lines
+        }
+        if not payload["model"]: del payload["model"]
+
+        api_url = self.firmament_llm_config["url"]
+        if not api_url.endswith("/chat/completions"): api_url = api_url.rstrip("/") + "/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        api_key = self.firmament_llm_config.get("api_key")
+        if api_key and api_key.lower() not in ["lm-studio", "ollama", "none", ""]: headers["Authorization"] = f"Bearer {api_key}"
+
+        try:
+            logger.debug(f"FirmamentModule: Calling Firmament LLM for NPC interaction. NPC Role: {npc_role}, Context: {interaction_description}")
+            response = await self.http_client.post(api_url, headers=headers, json=payload)
+            response.raise_for_status()
+            result_json = response.json()
+
+            # 4. Parse LLM Response
+            if result_json.get("choices") and isinstance(result_json["choices"], list) and len(result_json["choices"]) > 0:
+                choice = result_json["choices"][0]
+                if choice.get("message") and isinstance(choice["message"], dict):
+                    content = choice["message"].get("content")
+                    if content and isinstance(content, str):
+                        # Basic validation for the expected format
+                        if "Pathos:" in content and f"NPC ({npc_role}):" in content: # Basic validation
+                            interaction_snippet = content.strip()
+                            logger.info(f"FirmamentModule: Generated NPC interaction snippet: '{interaction_snippet}' with NPC role '{npc_role}'")
+                            self.last_npc_interaction_time = time.time()
+                            return interaction_snippet, npc_role # Return tuple
+                        else:
+                            logger.warning(f"FirmamentModule: NPC interaction snippet from LLM in unexpected format: {content}")
+
+            logger.warning(f"FirmamentModule: LLM response for NPC interaction missing content. Response: {result_json}")
+            return None
+
+        except httpx.HTTPStatusError as e: # Handle HTTP errors
+            logger.error(f"FirmamentModule: HTTP error calling Firmament LLM for NPC interaction: {e.status_code} - {e.response.text[:200] if e.response else 'N/A'}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"FirmamentModule: Error generating NPC interaction snippet: {e}", exc_info=True)
+            return None
+
+    def _create_dummy_activity_slot_for_context(self, title_context: str) -> ActivitySlot:
+        # Ensure ActivitySlotDetails, ActivitySlot, PATHOS_USER_ID, datetime are imported/available
+        # from eidos_agent.persona_logic.chronos_engine.models import ActivitySlotDetails, ActivitySlot
+        # from datetime import datetime # Should be at top
+        # PATHOS_USER_ID should be available
+
+        dummy_details = ActivitySlotDetails(description=f"Context: {title_context}", location_context="Implicit Location")
+        return ActivitySlot(
+            user_id=PATHOS_USER_ID,
+            date=datetime.now().date(),
+            start_time=datetime.now().time(),
+            end_time=datetime.now().time(),
+            slot_name="AdHocFirmamentActivity",
+            activity_title=title_context[:100], # Truncate if too long
+            activity_type="internal_processing",
+            activity_details=dummy_details
+        )

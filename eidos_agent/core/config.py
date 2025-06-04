@@ -176,6 +176,7 @@ class FirmamentModuleConfig(TypedDict, total=False):
     enable_firmament: bool
     firmament_llm_role: str  # Role to look up in Config.LLM
     simulation_tick_interval_seconds: float
+    npc_interaction_cooldown_seconds: float
 
 class Config:
     LLM: Dict[str, LLMConfig] = {
@@ -252,7 +253,8 @@ class Config:
     FIRMAMENT_MODULE: FirmamentModuleConfig = {
         "enable_firmament": ENABLE_FIRMAMENT, # Use the class attribute
         "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"), # Default to an existing efficient LLM role
-        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", 15 * 60)) # Default 15 mins
+        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", 15 * 60)), # Default 15 mins
+        "npc_interaction_cooldown_seconds": float(os.getenv("FIRMAMENT_NPC_INTERACTION_COOLDOWN", 30 * 60)) # Default 30 mins
     }
 
     ETHOS: EthosConfig = {

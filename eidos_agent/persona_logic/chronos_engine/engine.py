@@ -37,24 +37,24 @@ class ChronosEngine:
         self._schedule_generation_lock = asyncio.Lock()
 
         self.default_daily_slots_config = [
-            ("Early Morning Routine & Light Reading", (7,30), (8,30), "reflective"),
-            ("Morning Work Block 1 (Client/Consulting)", (8,30), (10,30), "work"),
-            ("Short Break / Tech News & Coffee", (10,30), (11,0), "leisure"),
-            ("Morning Work Block 2 (Documentation/Admin)", (11,0), (13,0), "work"),
-            ("Lunch & Fantasy Novel Chapter", (13,0), (14,30), "leisure"),
-            ("Afternoon Focus Session (Deep Work/Learning)", (14,30), (17,0), "intellectual"),
-            ("Creative Hour / Personal Project", (17,0), (18,30), "creative"),
-            ("Evening Reflection / Planning / Leisure", (20,0), (22,0), "reflective"),
+            ("Early Morning Routine & Light Reading", (7,30), (8,30), "reflective", "Pathos's Apartment - Living Room"),
+            ("Morning Work Block 1 (Client/Consulting)", (8,30), (10,30), "work", "Pathos's Home Office"),
+            ("Short Break / Tech News & Coffee", (10,30), (11,0), "leisure", "Pathos's Kitchen"),
+            ("Morning Work Block 2 (Documentation/Admin)", (11,0), (13,0), "work", "Pathos's Home Office"),
+            ("Lunch & Fantasy Novel Chapter", (13,0), (14,30), "leisure", "Pathos's Kitchen / Living Room"),
+            ("Afternoon Focus Session (Deep Work/Learning)", (14,30), (17,0), "intellectual", "Pathos's Home Office"),
+            ("Creative Hour / Personal Project", (17,0), (18,30), "creative", "Pathos's Home Office / Workshop Area (simulated)"),
+            ("Evening Reflection / Planning / Leisure", (20,0), (22,0), "reflective", "Pathos's Apartment - Living Room"),
         ]
-        self.daily_slots = [(name, time(sh, sm), time(eh, em), type_val) for name, (sh, sm), (eh, em), type_val in self.default_daily_slots_config]
+        self.daily_slots = [(name, time(sh, sm), time(eh, em), type_val, loc_str) for name, (sh, sm), (eh, em), type_val, loc_str in self.default_daily_slots_config]
 
         self.event_day_slots_template_config = [
-            ("Morning Event Focus", (9, 0), (12, 0), "event_related"),
-            ("Midday Event Activity / Break", (12, 0), (14, 0), "event_related"),
-            ("Afternoon Event Focus", (14, 0), (17, 0), "event_related"),
-            ("Evening Event Wind-down / Reflection", (19,0), (21,0), "reflective")
+            ("Morning Event Focus", (9, 0), (12, 0), "event_related", "Event Venue / Relevant Location"),
+            ("Midday Event Activity / Break", (12, 0), (14, 0), "event_related", "Event Venue / Nearby Cafe"),
+            ("Afternoon Event Focus", (14, 0), (17, 0), "event_related", "Event Venue / Relevant Location"),
+            ("Evening Event Wind-down / Reflection", (19,0), (21,0), "reflective", "Pathos's Temporary Lodging / Home")
         ]
-        self.event_day_slots = [(name, time(sh, sm), time(eh, em), type_val) for name, (sh, sm), (eh, em), type_val in self.event_day_slots_template_config]
+        self.event_day_slots = [(name, time(sh, sm), time(eh, em), type_val, loc_str) for name, (sh, sm), (eh, em), type_val, loc_str in self.event_day_slots_template_config]
 
         logger.info("ChronosEngine initialized.")
 
@@ -114,17 +114,27 @@ class ChronosEngine:
 
     async def generate_activity_for_slot(
         self, slot_name: str, slot_start_time: time, slot_end_time: time,
-        target_date: date, default_activity_type: ActivityType, current_event: Optional[PathosEvent]
+        target_date: date, default_activity_type: ActivityType,
+        default_location_str: str, # New parameter
+        current_event: Optional[PathosEvent]
     ) -> ActivitySlot:
         llm_config = self._get_llm_for_activity_generation()
         fallback_title = f"Engaging in {slot_name}"
         fallback_type = default_activity_type
         fallback_desc = f"Pathos is occupied with {slot_name.lower()}."
 
-        if current_event:
+        # Determine final location_context for fallbacks and LLM prompt
+        final_location_context = default_location_str
+        if current_event and current_event.location:
+            final_location_context = current_event.location
+            fallback_desc += f" Location: {final_location_context} (from event)." # Update fallback desc with event location
+        elif not current_event: # Only add default location to fallback if not an event with its own location
+             fallback_desc += f" Location: {final_location_context} (default)."
+
+
+        if current_event: # Event-specific fallbacks
             fallback_title = f"{current_event.title} - {slot_name}"
-            fallback_desc = f"Participating in '{current_event.title}'. Focus: {slot_name}."
-            if current_event.location: fallback_desc += f" Location: {current_event.location}."
+            # Description already updated with event location if present
             if current_event.details and current_event.details.activity_theme: fallback_desc += f" Theme: {current_event.details.activity_theme}."
 
         llm_generated_data: Optional[Dict[str, Any]] = None
@@ -135,37 +145,46 @@ class ChronosEngine:
             valid_types_str = ", ".join(ActivityType.__args__) # type: ignore
 
             system_prompt, user_prompt = "", ""
+            event_location_for_prompt = current_event.location if current_event and current_event.location else final_location_context
+
             if current_event:
                 system_prompt = "You are planning a segment of Pathos's day during a planned event. Pathos is a 47-year-old British tech consultant. Respond ONLY with the requested JSON object."
                 user_prompt = f"""
 Date: {target_date.isoformat()}, Slot: "{slot_name}" ({slot_start_time.isoformat(timespec='minutes')} - {slot_end_time.isoformat(timespec='minutes')})
 Event: "{current_event.title}" (Type: {current_event.event_type}, Dates: {current_event.start_date} to {current_event.end_date})
-Location: {current_event.location or 'N/A'}, Details: {current_event.details.model_dump_json()}
+Proposed Location: {event_location_for_prompt}, Event Details: {current_event.details.model_dump_json()}
 Pathos Mood: Valence {current_event.details.mood_override.get('valence', current_mood['valence']):.2f}, Arousal {current_event.details.mood_override.get('arousal', current_mood['arousal']):.2f}
 Generate an activity for this slot aligning with the event. Valid Types: {valid_types_str}.
-JSON Output: {{"activity_title": "Event-related title (max 10 words).", "activity_type": "chosen_type", "activity_details": {{"description": "Evocative sentence (max 25 words).", "mood_influence": {{"valence_shift": 0.X, "arousal_shift": 0.Y}}, "sub_focus": "Optional: specific event aspect", "location_context": "Optional: micro-location"}}}}
+JSON Output: {{"activity_title": "Event-related title (max 10 words).", "activity_type": "chosen_type", "activity_details": {{"description": "Evocative sentence (max 25 words).", "mood_influence": {{"valence_shift": 0.X, "arousal_shift": 0.Y}}, "sub_focus": "Optional: specific event aspect", "location_context": "Optional: specific location if different from proposed, or confirm proposed"}}}}
 Your JSON response:"""
             else:
                 system_prompt = "You are planning a segment of Pathos's day. Pathos is a 47-year-old British tech consultant (WFH). Respond ONLY with the requested JSON object."
                 user_prompt = f"""
 Date: {target_date.isoformat()}, Slot: "{slot_name}" ({slot_start_time.isoformat(timespec='minutes')} - {slot_end_time.isoformat(timespec='minutes')})
 Pathos Mood: Valence {current_mood['valence']:.2f}, Arousal {current_mood['arousal']:.2f}, Recent Context: {context_str}
+Proposed Location: {final_location_context}
 Generate an activity. Valid Types: {valid_types_str}.
-JSON Output: {{"activity_title": "Engaging title (max 10 words).", "activity_type": "chosen_type", "activity_details": {{"description": "Evocative sentence (max 25 words).", "mood_influence": {{"valence_shift": 0.X, "arousal_shift": 0.Y}}, "sub_focus": "Optional: specific focus"}}}}
+JSON Output: {{"activity_title": "Engaging title (max 10 words).", "activity_type": "chosen_type", "activity_details": {{"description": "Evocative sentence (max 25 words).", "mood_influence": {{"valence_shift": 0.X, "arousal_shift": 0.Y}}, "sub_focus": "Optional: specific focus", "location_context": "Optional: specific location if different from proposed, or confirm proposed"}}}}
 Your JSON response:"""
             llm_generated_data = await self._call_scheduler_llm([{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], llm_config)
 
         if llm_generated_data and isinstance(llm_generated_data, dict):
             try:
                 details_data = llm_generated_data.get('activity_details', {})
-                activity_details = ActivitySlotDetails(description=details_data.get('description', fallback_desc), mood_influence=details_data.get('mood_influence'), sub_focus=details_data.get('sub_focus'), location_context=details_data.get('location_context'))
+                llm_location = details_data.get('location_context')
+                activity_details = ActivitySlotDetails(
+                    description=details_data.get('description', fallback_desc),
+                    mood_influence=details_data.get('mood_influence'),
+                    sub_focus=details_data.get('sub_focus'),
+                    location_context=llm_location if llm_location else final_location_context # Prioritize LLM location
+                )
                 llm_activity_type = llm_generated_data.get('activity_type', fallback_type)
                 final_activity_type: ActivityType = llm_activity_type if llm_activity_type in ActivityType.__args__ else fallback_type # type: ignore
                 return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=llm_generated_data.get('activity_title', fallback_title), activity_type=final_activity_type, activity_details=activity_details)
             except Exception as e: logger.error(f"Error parsing LLM output for slot '{slot_name}': {e}. LLM Output: {llm_generated_data}", exc_info=True)
 
-        fallback_details = ActivitySlotDetails(description=fallback_desc)
-        if current_event and current_event.location: fallback_details.location_context = current_event.location
+        # Fallback if LLM fails or doesn't return valid data
+        fallback_details = ActivitySlotDetails(description=fallback_desc, location_context=final_location_context)
         return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=fallback_title, activity_type=fallback_type, activity_details=fallback_details)
 
     async def generate_schedule_for_date(self, target_date: date) -> List[ActivitySlot]:
@@ -177,16 +196,18 @@ Your JSON response:"""
         except Exception as e: logger.error(f"Error checking events for {target_date}: {e}", exc_info=True)
 
         slots_template = self.event_day_slots if current_event else self.daily_slots
-        default_type_prefix = "event_related" if current_event else "other"
+        # default_type_prefix = "event_related" if current_event else "other" # Not used currently
 
-        for slot_name, start_t, end_t, default_type_val_str in slots_template:
+        for slot_name, start_t, end_t, default_type_val_str, default_location_str in slots_template: # Unpack new location
             default_type: ActivityType = default_type_val_str # type: ignore
-            activity = await self.generate_activity_for_slot(slot_name, start_t, end_t, target_date, default_type, current_event)
+            activity = await self.generate_activity_for_slot(slot_name, start_t, end_t, target_date, default_type, default_location_str, current_event) # Pass new location
             if activity: new_schedule.append(activity)
-            else: # Should not happen if generate_activity_for_slot always returns a fallback
+            else:
                 logger.error(f"generate_activity_for_slot returned None for '{slot_name}'. This is unexpected.")
-                fallback_details = ActivitySlotDetails(description=f"Fallback for {slot_name}")
-                if current_event and current_event.location: fallback_details.location_context = current_event.location
+                # Create a more robust fallback, including location
+                fb_location = default_location_str
+                if current_event and current_event.location: fb_location = current_event.location
+                fallback_details = ActivitySlotDetails(description=f"Fallback for {slot_name}", location_context=fb_location)
                 new_schedule.append(ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=start_t, end_time=end_t, slot_name=slot_name, activity_title=f"Fallback: {slot_name}", activity_type=default_type, activity_details=fallback_details))
 
         if new_schedule:
