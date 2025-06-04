@@ -20,8 +20,12 @@ from .pathos_tools_definitions import (
     # ALL_AVAILABLE_SYSTEM_TOOLS # Not directly used in this version of PromptBuilder
 )
 
-# Import the enricher function
-from eidos_agent.core.prompting.context_enricher import enrich_prompt_with_subconscious
+# Import the enricher function (this will be replaced)
+# from eidos_agent.core.prompting.context_enricher import enrich_prompt_with_subconscious
+
+# Import the new SubconsciousFeedIntegrator
+from eidos_agent.features.subconscious_interface_to_node.subconscious_feed_integrator import SubconsciousFeedIntegrator
+
 
 # Handle tiktoken import and logging
 try:
@@ -117,6 +121,19 @@ class PromptBuilder:
         self.config = config
         self.ethos_core = ethos_core
         self.logos_core = logos_core
+        # Initialize the SubconsciousFeedIntegrator
+        # It's okay if this uses default cache settings for now.
+        # If SubconsciousFeedIntegrator needs config (e.g. for cache duration),
+        # it should ideally pull from Config itself or be passed params here.
+        # The current SubconsciousFeedIntegrator takes an optional cache_duration_seconds.
+        # We can make it configurable via main Config if needed later.
+        try:
+            self.feed_integrator: Optional[SubconsciousFeedIntegrator] = SubconsciousFeedIntegrator()
+            logger.info("SubconsciousFeedIntegrator initialized in PromptBuilder.")
+        except Exception as e:
+            self.feed_integrator = None
+            logger.error(f"Failed to initialize SubconsciousFeedIntegrator in PromptBuilder: {e}", exc_info=True)
+
         logger.info("PromptBuilder initialized.")
 
     def get_static_system_prompt_content(self) -> Optional[str]:
@@ -236,8 +253,16 @@ class PromptBuilder:
             final_system_prompt_content = final_system_prompt_content.replace(placeholder, str(value) if value is not None else "")
 
         # Enrich with subconscious thoughts if user_input_text is a thought query
-        # user_input_text is the equivalent of user_msg for the enricher
-        final_system_prompt_content = enrich_prompt_with_subconscious(final_system_prompt_content, user_input_text)
+        if self.feed_integrator:
+            subconscious_enrichment = self.feed_integrator.get_formatted_thoughts_for_prompt(user_input_text)
+            if subconscious_enrichment:
+                final_system_prompt_content += subconscious_enrichment
+                logger.debug("Subconscious enrichment added to system prompt.")
+            else:
+                logger.debug("No subconscious enrichment needed or available for this input.")
+        else:
+            logger.warning("SubconsciousFeedIntegrator not available in PromptBuilder. Skipping subconscious enrichment.")
+
 
         if force_web_search:
             final_system_prompt_content += "\n\nIMPORTANT_NOTE: User requested web search. Prioritize web_search tool if appropriate."
