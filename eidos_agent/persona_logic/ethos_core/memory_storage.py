@@ -296,6 +296,80 @@ class MemoryStorage:
         except sqlite3.Error as e: logger.error(f"Error fetching events for user '{user_id}': {e}", exc_info=True)
         return events
 
+    def get_memories_for_summary(
+        self,
+        user_id: str,
+        start_time_utc: datetime,
+        end_time_utc: datetime,
+        types: List[str],
+        limit: int = 30
+    ) -> List[MemoryEntry]:
+        '''
+        Retrieves memories for a user within a given UTC datetime range and of specified types,
+        ordered by salience (desc, nulls last) and then timestamp (desc).
+        '''
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        entries: List[MemoryEntry] = []
+
+        # Constructing the WHERE clause for types
+        if not types: # Should not happen if called correctly, but handle
+            return []
+        type_placeholders = ','.join('?' * len(types))
+
+        sql_query = f"""
+            SELECT * FROM memories
+            WHERE timestamp >= ? AND timestamp <= ?
+              AND type IN ({type_placeholders})
+        """
+
+        params: List[Any] = [start_time_utc.isoformat(), end_time_utc.isoformat()]
+        params.extend(types)
+
+        can_use_json_extract = True
+        try:
+            cursor.execute("SELECT json_extract('{"key":"value"}', '$.key')")
+        except sqlite3.OperationalError as oe_test:
+            if "no such function: json_extract" in str(oe_test).lower():
+                can_use_json_extract = False
+            else:
+                logger.error(f"Unexpected SQLite error testing json_extract: {oe_test}")
+                can_use_json_extract = False
+
+        if can_use_json_extract:
+            sql_query += " AND json_extract(metadata, '$.user_id') = ? "
+            params.append(user_id)
+            sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
+            params.append(limit)
+        else:
+            sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
+            params.append(limit * 5)
+
+        try:
+            logger.debug(f"Executing get_memories_for_summary. Query: {sql_query}, Params: {params}")
+            cursor.execute(sql_query, tuple(params))
+            rows = cursor.fetchall()
+
+            for row_data_raw in rows:
+                entry = self._row_to_entry(dict(row_data_raw))
+                if not can_use_json_extract:
+                    if entry.get('metadata', {}).get('user_id') != user_id:
+                        continue
+                entries.append(entry)
+
+            if not can_use_json_extract:
+                entries = entries[:limit]
+
+            logger.info(f"Retrieved {len(entries)} memories for summary for user {user_id}.")
+            return entries
+
+        except sqlite3.Error as e:
+            logger.error(f"Error retrieving memories for summary (user: {user_id}, types: {types}): {e}", exc_info=True)
+            return []
+        except Exception as e_general:
+            logger.error(f"Unexpected error in get_memories_for_summary: {e_general}", exc_info=True)
+            return []
+
     async def get(self, key: str) -> Optional[Any]:
         entry = self.get_entry(key) # This is synchronous but should be fine for this use case
         if entry and entry.get('type') == 'chat_storage' and 'content' in entry:

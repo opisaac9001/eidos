@@ -15,6 +15,7 @@ from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
 from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
 from eidos_agent.utils.logger import get_logger
+import pytz # Added import
 
 from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
 
@@ -1935,6 +1936,134 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
         self._save_task_last_run_time("HexusDecay", now)
         logger.debug(f"--- Ethos: Hexus Decay Finished (Placeholder). Scores: {self.hexus_scores} ---")
 
+    async def generate_daily_experiential_summary(self, user_id: str = PATHOS_USER_ID) -> str:
+        '''
+        Generates a narrative summary of Pathos's experiences over the lookback period,
+        suitable for seeding dreams in the subconscious_node.
+        '''
+        default_summary = "Pathos experienced a day of various activities and thoughts."
+        if not self.ethos_config.get("enable_memory_summarization", True): # Default to True if not specified
+            logger.info("EthosCore: Memory summarization for daily dream seed is disabled by EthosConfig.enable_memory_summarization.")
+            return default_summary
+
+        summarization_llm_role = self.ethos_config.get("summarization_llm_role", "LOGOS_TECHNE")
+        llm_config = self.config.get_llm_config(summarization_llm_role)
+
+        if not llm_config or not llm_config.get("url"):
+            logger.error(f"EthosCore: Summarization LLM role '{summarization_llm_role}' not configured or URL missing. Cannot generate daily summary.")
+            return default_summary
+
+        if not self.logos_core: # LogosCore is used for the actual LLM call
+            logger.error("EthosCore: LogosCore not available. Cannot make LLM call for daily summary.")
+            return default_summary
+
+        try:
+            # Get parameters from config
+            lookback_hours = self.ethos_config.get("daily_summary_lookback_hours", 18)
+            max_memories_to_fetch = self.ethos_config.get("daily_summary_max_memories", 30)
+
+            # 1. Determine Time Range
+            pathos_home_tz_str = self.ethos_config.get("pathos_home_timezone", "UTC")
+            try:
+                pathos_home_tz = pytz.timezone(pathos_home_tz_str)
+            except pytz.UnknownTimeZoneError:
+                logger.warning(f"EthosCore: Unknown timezone '{pathos_home_tz_str}' in config. Defaulting to UTC for daily summary.")
+                pathos_home_tz = pytz.utc
+
+            # Get Pathos's current local time via the existing EthosCore method
+            # This method already handles timezone conversion.
+            end_dt_pathos_local = await self.get_local_datetime_for_user(user_id)
+            if not end_dt_pathos_local:
+                logger.error("EthosCore: Could not determine Pathos's current local time for daily summary. Using UTC now.")
+                end_dt_pathos_local = datetime.now(timezone.utc) # Fallback to UTC now
+
+            start_dt_pathos_local = end_dt_pathos_local - timedelta(hours=lookback_hours)
+
+            logger.info(f"EthosCore: Generating daily summary for period: {start_dt_pathos_local.isoformat()} to {end_dt_pathos_local.isoformat()} (Pathos Local Time)")
+
+            # 2. Retrieve Memories
+            memory_types_for_summary = [
+                'interaction', 'firmament_activity_log', 'received_subconscious_intention',
+                'npc_dialogue_event', 'dream_narrative_from_node', # include last night's dream
+                'user_fact', 'world_knowledge' # recently learned things
+            ]
+            # get_memories_by_time_range_and_types needs start/end in UTC if DB stores UTC
+            # Assuming get_local_datetime_for_user returns tz-aware, convert to UTC for DB query
+            start_dt_utc = start_dt_pathos_local.astimezone(timezone.utc)
+            end_dt_utc = end_dt_pathos_local.astimezone(timezone.utc)
+
+            # Assuming MemoryStorage will have this method or an equivalent that can handle datetime objects
+            # and type filtering. If it expects strings, isoformat() conversion will be needed here.
+            # For now, coding as per the assumption it can handle datetime objects.
+            recent_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+                user_id=user_id,
+                start_time=start_dt_utc,
+                end_time=end_dt_utc,
+                types=memory_types_for_summary,
+                limit=max_memories_to_fetch,
+                sort_by_salience_then_recency=True # Assumes MemoryStorage method supports this
+            )
+
+            if not recent_memories:
+                logger.info("EthosCore: No significant memories found in the lookback period for daily summary.")
+                return "Pathos's day seemed quiet, with few distinct events or thoughts recorded."
+
+            # 3. Format Memories for Prompt
+            formatted_memories_for_prompt = []
+            for mem in recent_memories:
+                try:
+                    # Convert UTC timestamp from memory back to Pathos's local time for display in prompt
+                    mem_ts_utc = datetime.fromisoformat(mem.get('timestamp', '').replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
+                    mem_ts_local = mem_ts_utc.astimezone(pathos_home_tz)
+                    time_str = mem_ts_local.strftime("%H:%M")
+                    # Shorten content, especially for logs or long interactions
+                    content_snippet = mem.get('content', '')
+                    if len(content_snippet) > 100: content_snippet = content_snippet[:97] + "..."
+                    formatted_memories_for_prompt.append(f"- {time_str} ({mem.get('type')}): {content_snippet}")
+                except ValueError: # Catch errors from fromisoformat or strftime
+                    formatted_memories_for_prompt.append(f"- ({mem.get('type')}): {mem.get('content', '')[:100]}...")
+
+            memory_text_for_prompt = "\n".join(formatted_memories_for_prompt)
+
+            # 4. Fetch Current Mood
+            current_mood = self.get_current_mood() # This is synchronous
+            mood_summary_for_prompt = f"His overall mood state towards the end of this period was: {current_mood.get('name', 'neutral')} (Valence: {current_mood.get('valence',0):.2f}, Arousal: {current_mood.get('arousal',0):.2f})."
+
+            # 5. Construct LLM Prompt
+            system_prompt = (
+                "You are tasked with creating a brief, narrative summary of Pathos's day based on selected memories and his mood. "
+                "This summary will be used to seed his subconscious dream engine. Focus on key events, significant interactions, "
+                "strong emotional shifts, important thoughts, or new learnings. "
+                "Weave these elements into a short story (1-2 paragraphs, max 150-200 words). "
+                "Be evocative and reflective, capturing the essence of his experiences. Do not just list memories."
+            )
+            user_prompt = (
+                f"Here are selected memories from Pathos's experiences over the last {lookback_hours} hours (times are Pathos's local time {pathos_home_tz_str}):\n"
+                f"{memory_text_for_prompt}\n\n"
+                f"{mood_summary_for_prompt}\n\n"
+                "Please provide the narrative summary of Pathos's day:"
+            )
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+            # 6. LLM Call via LogosCore (assuming _call_llm_client_directly exists and is suitable)
+            # The _call_llm_client_directly method in LogosCore returns a Dict, we need the text content.
+            llm_response_dict = await self.logos_core._call_llm_client_directly(
+                llm_config=llm_config,
+                messages=messages,
+                max_tokens_override=300 # Allow enough tokens for a couple of paragraphs
+            )
+
+            if llm_response_dict and llm_response_dict.get("content"):
+                summary_text = str(llm_response_dict["content"]).strip()
+                logger.info(f"EthosCore: Successfully generated daily summary: '{summary_text[:100]}...'")
+                return summary_text
+            else:
+                logger.error(f"EthosCore: Daily summary generation LLM call did not return valid content. Response: {llm_response_dict}")
+                return default_summary
+
+        except Exception as e:
+            logger.error(f"EthosCore: Error generating daily experiential summary: {e}", exc_info=True)
+            return default_summary
 
     async def chronos_bridge_add_event(self, title: str, start_date_str: str, end_date_str: str, event_type_str: str, description: Optional[str], location: Optional[str], activity_theme: Optional[str], planned_sites_or_tasks: Optional[List[str]], user_id_for_event: str) -> Optional[str]:
         if not self.chronos_engine:
