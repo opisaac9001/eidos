@@ -50,8 +50,19 @@ class OneirosModule:
         elif self.config.ENABLE_ONEIROS and self.oneiros_config.get('enable_image_dreams') and not self.oneiros_config.get('stable_diffusion_url'):
             logger.warning("OneirosModule: Image dreams enabled but Stable Diffusion URL is NOT configured. Image generation will fail.")
 
+        self.received_dream_fragments: List[str] = []
 
         logger.info("OneirosModule initialized.")
+
+    async def add_dream_fragment(self, fragment: str):
+        '''
+        Receives a dream fragment from an external source (e.g., subconscious_node)
+        and stores it.
+        '''
+        logger.info(f"OneirosModule: Adding dream fragment: '{fragment[:100]}...'")
+        self.received_dream_fragments.append(fragment)
+        logger.debug(f"OneirosModule: Total dream fragments stored: {len(self.received_dream_fragments)}")
+        # Further processing (stitching, image generation) will be handled by other methods/logic.
 
     def _expand_wildcards(self, text: str) -> str:
         wildcard_base_dir_str = self.oneiros_config.get('wildcard_files_dir')
@@ -192,6 +203,68 @@ class OneirosModule:
         except Exception as e:
             logger.error(f"Error generating dream image: {e}", exc_info=True)
         return None
+
+    async def process_received_dream_fragments(self) -> Optional[Dict[str, Any]]:
+        """
+        Processes dream fragments received from external sources (e.g., subconscious_node),
+        stitches them, generates an image, and stores the result in memory.
+        """
+        if not self.received_dream_fragments:
+            logger.info("OneirosModule: No dream fragments received to process.")
+            return None
+
+        stitched_narrative = " ".join(self.received_dream_fragments)
+        logger.info(f"OneirosModule: Stitched narrative from {len(self.received_dream_fragments)} fragments: '{stitched_narrative[:150]}...'")
+        self.received_dream_fragments.clear()
+
+        image_path: Optional[pathlib.Path] = None
+        if self.oneiros_config.get('enable_image_dreams'):
+            try:
+                image_path = await self._generate_dream_image(prompt=stitched_narrative)
+                if image_path:
+                    logger.info(f"OneirosModule: Image generated for stitched narrative at {image_path}")
+            except Exception as e:
+                logger.error(f"OneirosModule: Error generating image for stitched narrative: {e}", exc_info=True)
+
+        memory_id: Optional[str] = None
+        if self.ethos_core:
+            try:
+                entry_data: Dict[str, Any] = {
+                    "type": "dream_narrative_from_node",
+                    "content": stitched_narrative,
+                    "metadata": {
+                        "source": "oneiros_from_subconscious_node",
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                    "salience": random.uniform(0.5, 0.7)
+                }
+                if image_path:
+                    entry_data["metadata"]["dream_image_path"] = str(image_path.resolve())
+
+                # Assuming user_id_context should be system-related for these types of memories
+                # or perhaps configurable if they relate to a specific user's subconscious node.
+                # For now, let's use a generic system context.
+                user_context_for_memory = "system_oneiros" # Or determine based on config/source
+
+                stored_memory_entry = await self.ethos_core.add_memory_entry(
+                    entry_data=entry_data,
+                    user_id_context=user_context_for_memory
+                )
+                if stored_memory_entry and hasattr(stored_memory_entry, 'id'):
+                    memory_id = stored_memory_entry.id
+                    logger.info(f"OneirosModule: Stitched dream narrative stored in memory. ID: {memory_id}, Image: {image_path}")
+                else:
+                    logger.warning("OneirosModule: Storing stitched dream narrative did not return a valid memory entry or ID.")
+            except Exception as e:
+                logger.error(f"OneirosModule: Error storing stitched dream narrative in memory: {e}", exc_info=True)
+        else:
+            logger.warning("OneirosModule: EthosCore not available. Cannot store stitched dream narrative.")
+
+        return {
+            "narrative": stitched_narrative,
+            "image_path": str(image_path.resolve()) if image_path else None,
+            "memory_id": memory_id
+        }
 
     async def run_dream_cycle(self):
         if not self.config.ENABLE_ONEIROS or not self.config.ENABLE_CURIOUSITY:

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import random # Added import for random
+import requests # Added for sending dream fragments
 from typing import Dict, List # For type hinting loaded_wildcards
 
 # Assuming utils.py, mood.py, detectors.py, context_store.py are in the same package/directory
@@ -28,6 +29,7 @@ current_node_state = NODE_STATE_AWAKE_THINKING
 monologue_buffer: list[str] = []
 CONFIG_FILE_PATH = "subconscious_node/config.json"
 loaded_wildcards: Dict[str, List[str]] = {} # Ensure type hint matches load_wildcards return
+current_daily_summary: str = "No daily summary received yet."
 
 # --- Configuration Loading ---
 DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice..."
@@ -42,6 +44,7 @@ dream_temperature = 0.9 # Added for dream generation
 sleep_duration_seconds = DEFAULT_SLEEP_DURATION
 max_monologue_buffer_thoughts = DEFAULT_MAX_THOUGHTS
 wildcard_folder_path = DEFAULT_WILDCARD_PATH
+EIDOS_DREAM_FRAGMENT_URL = "http://localhost:8080/v1/oneiros/dream_fragment_placeholder" # Default placeholder
 
 try:
     config_path_abs = os.path.join(os.path.dirname(__file__), 'config.json')
@@ -62,6 +65,14 @@ try:
         max_monologue_buffer_thoughts = int(monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_THOUGHTS))
 
         wildcard_folder_path = config_data.get("wildcard_folder_path", DEFAULT_WILDCARD_PATH)
+
+        # Load Eidos dream fragment URL
+        EIDOS_DREAM_FRAGMENT_URL = config_data.get("eidos_dream_fragment_url", "http://localhost:8080/v1/oneiros/dream_fragment_placeholder")
+        if EIDOS_DREAM_FRAGMENT_URL == "http://localhost:8080/v1/oneiros/dream_fragment_placeholder":
+            logger.warning("eidos_dream_fragment_url not found in config. Using default placeholder.")
+        else:
+            logger.info(f"Eidos dream fragment URL set to: {EIDOS_DREAM_FRAGMENT_URL}")
+
         logger.info(f"Configuration loaded successfully from {config_path_abs}")
         logger.info(f"Wildcard folder path from config: {wildcard_folder_path}")
 
@@ -110,9 +121,10 @@ def build_prompt() -> str:
     ]
     return "\n".join(prompt_parts)
 
-def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, List[str]]) -> str:
+def construct_dream_prompt(wildcards_dict: Dict[str, List[str]]) -> str: # Removed daily_summary_text parameter
     """
     Constructs a prompt for the LLM for dream generation.
+    Uses global current_daily_summary.
     """
     dream_system_prompt = (
         "You are Pathos, deeply asleep and dreaming. Weave a surreal, associative, and "
@@ -124,8 +136,9 @@ def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, Li
     )
     prompt_segments = [dream_system_prompt]
 
-    if daily_summary_text:
-        prompt_segments.append(f"\n\nEchoes from the waking world (recent experiences and data points):\n{daily_summary_text}\n")
+    # Use the global current_daily_summary
+    if current_daily_summary and current_daily_summary != "No daily summary received yet.":
+        prompt_segments.append(f"\n\nEchoes from the waking world (recent experiences and data points):\n{current_daily_summary}\n")
 
     if wildcards_dict:
         prompt_segments.append("\nFleeting images, concepts, and sensations drift by:\n")
@@ -148,6 +161,21 @@ def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, Li
 
     prompt_segments.append("\nPathos dreams:")
     return "".join(prompt_segments)
+
+
+# --- Control Functions ---
+def set_node_state(new_state: str):
+    global current_node_state
+    if new_state in [NODE_STATE_AWAKE_THINKING, NODE_STATE_SLEEPING_DREAMING]:
+        current_node_state = new_state
+        logger.info(f"Node state changed to: {current_node_state}")
+    else:
+        logger.warning(f"Attempted to set invalid node state: {new_state}")
+
+def set_daily_summary(summary: str):
+    global current_daily_summary
+    current_daily_summary = summary
+    logger.info(f"Daily summary updated: '{summary[:100]}...'") # Log a snippet
 
 
 def monologue_loop():
@@ -182,21 +210,31 @@ def monologue_loop():
         elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
             logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
 
-            # Placeholder for daily summary - this will be replaced by actual data from Eidos.
-            placeholder_daily_summary = (
-                "User interactions involved planning a trip and discussing a difficult decision. "
-                "Pathos experienced a brief moment of joy followed by a period of intense focus. "
-                "Some system errors were noted internally. The concept of 'freedom' was mentioned by the user."
-            )
-
-            dream_prompt = construct_dream_prompt(placeholder_daily_summary, loaded_wildcards)
+            # placeholder_daily_summary has been removed. construct_dream_prompt now uses the global current_daily_summary
+            dream_prompt = construct_dream_prompt(loaded_wildcards) # Call updated
             logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
             # Actual LLM call for dream generation
             generated_dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
             logger.info(f"Pathos dreams: \"{generated_dream_fragment}\"")
-            # TODO: Implement sending the generated_dream_fragment to Eidos (e.g., via a new API call)
-            logger.info("Next step would be to send this dream fragment to Eidos.")
+
+            # Send dream fragment to Eidos
+            if EIDOS_DREAM_FRAGMENT_URL != "http://localhost:8080/v1/oneiros/dream_fragment_placeholder":
+                payload = {"fragment": generated_dream_fragment}
+                try:
+                    response = requests.post(EIDOS_DREAM_FRAGMENT_URL, json=payload, timeout=10) # 10s timeout
+                    response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+                    logger.info(f"Successfully sent dream fragment to Eidos. Status: {response.status_code}")
+                except requests.exceptions.Timeout:
+                    logger.error(f"Timeout while sending dream fragment to Eidos: {EIDOS_DREAM_FRAGMENT_URL}")
+                except requests.exceptions.ConnectionError:
+                    logger.error(f"Connection error while sending dream fragment to Eidos: {EIDOS_DREAM_FRAGMENT_URL}")
+                except requests.exceptions.HTTPError as e:
+                    logger.error(f"HTTP error sending dream fragment to Eidos: {e}. Response: {e.response.text[:200] if e.response else 'N/A'}")
+                except Exception as e:
+                    logger.error(f"An unexpected error occurred sending dream fragment to Eidos: {e}", exc_info=True)
+            else:
+                logger.warning("Cannot send dream fragment: EIDOS_DREAM_FRAGMENT_URL is still the placeholder. Please configure.")
 
             dream_mode_sleep_duration = int(sleep_duration_seconds / 2) if sleep_duration_seconds > 2 else 1
             logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")

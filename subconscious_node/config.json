@@ -26,5 +26,6 @@
     "impulse_threshold": 0.7
   },
   "eidos_api_base_url": "http://localhost:8080",
+  "eidos_dream_fragment_url": "http://localhost:8080/v1/oneiros/dream_fragment",
   "wildcard_folder_path": "../wildcards/"
 }

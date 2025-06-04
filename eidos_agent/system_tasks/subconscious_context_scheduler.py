@@ -9,12 +9,13 @@ import time
 import logging
 import threading
 from typing import Optional # For type hinting scheduler_timer
+from datetime import datetime # Added datetime import
 
 # Attempt to import from subconscious client
 try:
-    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context # Updated import
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context, send_node_control_command # Updated import
 except ImportError:
-    logging.warning("chronos_engine: Could not import sync_recent_context. Using placeholder for testing.")
+    logging.warning("chronos_engine: Could not import subconscious client functions. Using placeholders for testing.")
     # Placeholder for sync_recent_context if the import fails
     def sync_recent_context(conversation: str, current_action: str) -> bool:
         print(f"Placeholder sync_recent_context called with: Conversation='{conversation[:50]}...', Action='{current_action}'")
@@ -32,6 +33,7 @@ if not logger.handlers:
 # --- Global Scheduler Control ---
 scheduler_stop_event = threading.Event()
 scheduler_timer: Optional[threading.Timer] = None
+is_subconscious_sleeping: bool = False # Added global for sleep state
 
 # --- Placeholder Data Retrieval Functions ---
 
@@ -56,19 +58,69 @@ def perform_scheduled_subconscious_context_sync():
     Retrieves the latest conversation summary and current Eidos action, then
     sends this information to the subconscious node.
     """
-    logger.info("ChronosEngine: Performing scheduled subconscious context sync...")
-    summary = get_latest_conversation_summary()
-    action = get_current_eidos_action()
+    global is_subconscious_sleeping # Allow modification of this global
 
-    logger.debug(f"ChronosEngine: Conversation summary: '{summary}'")
-    logger.debug(f"ChronosEngine: Current Eidos action: '{action}'")
+    logger.info("Scheduler: Performing scheduled tasks...")
+    current_hour = datetime.now().hour
 
-    success = sync_recent_context(conversation=summary, current_action=action)
+    # Define "night" and "morning" hours (simplistic)
+    NIGHT_HOUR_START = 22 # 10 PM
+    MORNING_HOUR_START = 7  # 7 AM
 
-    if success:
-        logger.info("ChronosEngine: Scheduled context sync with subconscious node completed successfully.")
+    if NIGHT_HOUR_START <= current_hour or current_hour < MORNING_HOUR_START: # Night time
+        if not is_subconscious_sleeping:
+            logger.info("Scheduler: Transitioning subconscious to SLEEPING_DREAMING state.")
+            daily_summary = "Daily summary: Eidos was active, user interacted with several features, general mood was positive. Some interesting discussions about AI ethics took place."
+            # Ensure send_node_control_command is available or placeholder is used
+            if 'send_node_control_command' in globals():
+                success = send_node_control_command(node_state="SLEEPING_DREAMING", daily_summary=daily_summary)
+                if success:
+                    is_subconscious_sleeping = True
+                    logger.info("Scheduler: Subconscious node set to SLEEPING_DREAMING.")
+                    # Placeholder for triggering OneirosModule processing
+                    logger.info("Scheduler: Would trigger OneirosModule.process_received_dream_fragments() here if it were callable synchronously or scheduler was async.")
+                else:
+                    logger.error("Scheduler: Failed to set subconscious node to SLEEPING_DREAMING.")
+            else: # Placeholder logic if import failed
+                logger.warning("Scheduler: send_node_control_command not available. Simulating state change.")
+                is_subconscious_sleeping = True # Simulate success for placeholder
+                logger.info("Scheduler: (Placeholder) Subconscious node set to SLEEPING_DREAMING.")
+        else:
+            logger.info("Scheduler: Subconscious is already sleeping. No state change needed.")
+            # Potentially trigger Oneiros processing periodically during sleep too
+            logger.info("Scheduler: (Night) Would consider triggering OneirosModule.process_received_dream_fragments() here.")
+
+    elif current_hour >= MORNING_HOUR_START and current_hour < NIGHT_HOUR_START: # Day time
+        if is_subconscious_sleeping:
+            logger.info("Scheduler: Transitioning subconscious to AWAKE_THINKING state.")
+            if 'send_node_control_command' in globals():
+                success = send_node_control_command(node_state="AWAKE_THINKING")
+                if success:
+                    is_subconscious_sleeping = False
+                    logger.info("Scheduler: Subconscious node set to AWAKE_THINKING.")
+                else:
+                    logger.error("Scheduler: Failed to set subconscious node to AWAKE_THINKING.")
+            else: # Placeholder logic
+                logger.warning("Scheduler: send_node_control_command not available. Simulating state change.")
+                is_subconscious_sleeping = False # Simulate success
+                logger.info("Scheduler: (Placeholder) Subconscious node set to AWAKE_THINKING.")
+
+        # Perform regular context sync only if awake
+        logger.info("Scheduler: Subconscious is AWAKE. Performing context sync.")
+        summary = get_latest_conversation_summary() # Existing function
+        action = get_current_eidos_action()       # Existing function
+
+        logger.debug(f"Scheduler: Conversation summary for sync: '{summary}'")
+        logger.debug(f"Scheduler: Current Eidos action for sync: '{action}'")
+
+        sync_success = sync_recent_context(conversation=summary, current_action=action)
+        if sync_success:
+            logger.info("Scheduler: Scheduled context sync with subconscious node completed successfully.")
+        else:
+            logger.warning("Scheduler: Scheduled context sync with subconscious node failed or partially failed.")
     else:
-        logger.warning("ChronosEngine: Scheduled context sync with subconscious node failed or partially failed.")
+        # This case should ideally not be reached if logic is correct, but good for debug
+        logger.debug("Scheduler: Outside of defined night/day logic for sleep/wake cycle.")
 
 # --- Scheduler Implementation ---
 
