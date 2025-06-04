@@ -152,32 +152,3 @@ if __name__ == '__main__':
     # #     data = await get_current_thoughts_async()
     # #     print(data)
     # # asyncio.run(main())
-
-from typing import Dict, Optional # Ensure Optional is imported for older Pythons if not already at top for Dict
-
-def send_node_control_command(node_state: Optional[str] = None, daily_summary: Optional[str] = None) -> bool:
-    '''
-    Sends a control command to the subconscious node to change its state or update daily summary.
-    '''
-    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/node/control-state"
-    payload = {}
-    if node_state:
-        payload["node_state"] = node_state
-    if daily_summary:
-        payload["daily_summary"] = daily_summary
-
-    if not payload:
-        logger.warning("send_node_control_command called without node_state or daily_summary.")
-        return False
-
-    try:
-        response = requests.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
-        response.raise_for_status()
-        logger.info(f"Successfully sent control command to subconscious node: {payload}")
-        return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send control command to subconscious node at {url}: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"An unexpected error occurred sending control command: {e}")
-        return False

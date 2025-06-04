@@ -13,14 +13,13 @@ and utility functions.
 from fastapi import FastAPI
 import uvicorn # For running the app with Uvicorn
 from pydantic import BaseModel
-from typing import List, Dict, Optional # Added Optional
+from typing import List, Dict
 
 # Assuming context_store.py, mood.py, utils.py, thinker.py are in the same package/directory
 from . import context_store
 from . import mood
 from . import utils
 from . import thinker # To access monologue_buffer
-from .thinker import set_node_state, set_daily_summary, NODE_STATE_AWAKE_THINKING, NODE_STATE_SLEEPING_DREAMING # Added imports
 
 # --- FastAPI App Instance ---
 app = FastAPI(
@@ -54,32 +53,8 @@ class MessageResponse(BaseModel):
     context: str | None = None
     data: Dict | None = None
 
-class NodeControlStatePayload(BaseModel):
-    node_state: Optional[str] = None
-    daily_summary: Optional[str] = None
-
 
 # --- API Endpoints ---
-
-@app.post("/node/control-state", response_model=MessageResponse, tags=["Node Control"])
-async def control_node_state(payload: NodeControlStatePayload):
-    actions_taken = []
-    if payload.node_state is not None:
-        if payload.node_state in [NODE_STATE_AWAKE_THINKING, NODE_STATE_SLEEPING_DREAMING]:
-            set_node_state(payload.node_state)
-            actions_taken.append(f"Node state set to {payload.node_state}")
-        else:
-            # Setter function in thinker.py handles logging the warning
-            actions_taken.append(f"Invalid node_state '{payload.node_state}' ignored.")
-
-    if payload.daily_summary is not None:
-        set_daily_summary(payload.daily_summary)
-        actions_taken.append("Daily summary updated.")
-
-    if not actions_taken:
-        return {"message": "No control actions taken. Provide 'node_state' or 'daily_summary'."}
-
-    return {"message": "Node control actions processed.", "context": ", ".join(actions_taken)}
 
 @app.post("/inject/conversation", response_model=MessageResponse, tags=["Context Injection"])
 async def inject_conversation(data: ContextInject):

@@ -172,14 +172,6 @@ class EidosTTSConfig(TypedDict, total=False):
     lang_code: Optional[str]
     normalization_options: Optional[Dict[str, bool]]
 
-class FirmamentModuleConfig(TypedDict, total=False):
-    enable_firmament: bool
-    firmament_llm_role: str  # Role to look up in Config.LLM
-    simulation_tick_interval_seconds: float
-    npc_interaction_cooldown_seconds: float
-    pathos_sim_llm_role: Optional[str]
-    generic_npc_llm_role: Optional[str]
-    dialogue_summary_llm_role: Optional[str]
 
 class Config:
     LLM: Dict[str, LLMConfig] = {
@@ -234,30 +226,6 @@ class Config:
             "presence_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY") else None,
             "frequency_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_RESEARCH_TIKTOKEN_NAME", "cl100k_base") # Added
-        },
-        "PATHOS_SIM_LLM": {
-            "url": os.getenv("LLM_PATHOS_SIM_URL", os.getenv("LLM_LOGOS_TECHNE_URL")), # Default to LOGOS_TECHNE URL
-            "model": os.getenv("LLM_PATHOS_SIM_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
-            "api_key": os.getenv("LLM_PATHOS_SIM_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY")), # Default
-            "temperature": float(os.getenv("LLM_PATHOS_SIM_TEMP", 0.7)), # Specific default temp
-            "timeout": float(os.getenv("LLM_PATHOS_SIM_TIMEOUT", 120.0)), # Specific default timeout
-            "max_tokens": int(os.getenv("LLM_PATHOS_SIM_MAX_TOKENS", 512)), # Specific default max_tokens
-            "top_p": float(os.getenv("LLM_PATHOS_SIM_TOP_P", 0.95)) if os.getenv("LLM_PATHOS_SIM_TOP_P") else None,
-            "presence_penalty": float(os.getenv("LLM_PATHOS_SIM_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_PATHOS_SIM_PRESENCE_PENALTY") else None,
-            "frequency_penalty": float(os.getenv("LLM_PATHOS_SIM_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_PATHOS_SIM_FREQUENCY_PENALTY") else None,
-            "model_name_for_tiktoken": os.getenv("LLM_PATHOS_SIM_TIKTOKEN_NAME", os.getenv("LLM_LOGOS_TECHNE_TIKTOKEN_NAME", "cl100k_base"))
-        },
-        "GENERIC_NPC_LLM": {
-            "url": os.getenv("LLM_NPC_GENERIC_URL", os.getenv("LLM_LOGOS_TECHNE_URL")), # Default to LOGOS_TECHNE URL
-            "model": os.getenv("LLM_NPC_GENERIC_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
-            "api_key": os.getenv("LLM_NPC_GENERIC_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY")), # Default
-            "temperature": float(os.getenv("LLM_NPC_GENERIC_TEMP", 0.8)), # Slightly higher temp for NPC dialogue
-            "timeout": float(os.getenv("LLM_NPC_GENERIC_TIMEOUT", 120.0)),
-            "max_tokens": int(os.getenv("LLM_NPC_GENERIC_MAX_TOKENS", 512)),
-            "top_p": float(os.getenv("LLM_NPC_GENERIC_TOP_P", 0.95)) if os.getenv("LLM_NPC_GENERIC_TOP_P") else None,
-            "presence_penalty": float(os.getenv("LLM_NPC_GENERIC_PRESENCE_PENALTY", 0.1)) if os.getenv("LLM_NPC_GENERIC_PRESENCE_PENALTY") else None, # Slight presence penalty
-            "frequency_penalty": float(os.getenv("LLM_NPC_GENERIC_FREQUENCY_PENALTY", 0.1)) if os.getenv("LLM_NPC_GENERIC_FREQUENCY_PENALTY") else None, # Slight frequency penalty
-            "model_name_for_tiktoken": os.getenv("LLM_NPC_GENERIC_TIKTOKEN_NAME", os.getenv("LLM_LOGOS_TECHNE_TIKTOKEN_NAME", "cl100k_base"))
         }
     }
 
@@ -275,17 +243,6 @@ class Config:
     ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "True").lower() == "true"
     ENABLE_KNOWLEDGE_UPKEEP = os.getenv("ENABLE_KNOWLEDGE_UPKEEP", "True").lower() == "true"
     ENABLE_AUTONOMOUS_CURIOSITY_RESEARCH = os.getenv("ENABLE_AUTONOMOUS_CURIOSITY_RESEARCH", "False").lower() == "true"
-    ENABLE_FIRMAMENT = os.getenv("ENABLE_FIRMAMENT", "True").lower() == "true"
-
-    FIRMAMENT_MODULE: FirmamentModuleConfig = {
-        "enable_firmament": ENABLE_FIRMAMENT, # Use the class attribute
-        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"), # Default to an existing efficient LLM role
-        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", 15 * 60)), # Default 15 mins
-        "npc_interaction_cooldown_seconds": float(os.getenv("FIRMAMENT_NPC_INTERACTION_COOLDOWN", 30 * 60)), # Default 30 mins
-        "pathos_sim_llm_role": os.getenv("FIRMAMENT_PATHOS_SIM_LLM_ROLE", "PATHOS_SIM_LLM"),
-        "generic_npc_llm_role": os.getenv("FIRMAMENT_GENERIC_NPC_LLM_ROLE", "GENERIC_NPC_LLM"),
-        "dialogue_summary_llm_role": os.getenv("FIRMAMENT_DIALOGUE_SUMMARY_LLM_ROLE", os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"))
-    }
 
     ETHOS: EthosConfig = {
         "memory_db_path": os.getenv("ETHOS_MEMORY_DB_PATH", str(PROJECT_ROOT / "eidos_memories" / "memory.sqlite")),
@@ -526,8 +483,6 @@ class Config:
     def get_eidos_tts_config() -> Optional[EidosTTSConfig]: return Config.EIDOS_TTS
     @staticmethod
     def get_admin_password() -> Optional[str]: return Config.EIDOS_ADMIN_PASSWORD
-    @staticmethod
-    def get_firmament_module_config() -> FirmamentModuleConfig: return Config.FIRMAMENT_MODULE
 
     @staticmethod
     def setup():

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone # Added timezone
+from datetime import datetime
 import logging
 import random
 import re
@@ -50,21 +50,8 @@ class OneirosModule:
         elif self.config.ENABLE_ONEIROS and self.oneiros_config.get('enable_image_dreams') and not self.oneiros_config.get('stable_diffusion_url'):
             logger.warning("OneirosModule: Image dreams enabled but Stable Diffusion URL is NOT configured. Image generation will fail.")
 
-        self.received_dream_fragments: List[str] = []
-        self.last_processed_dream_summary: Optional[str] = None
-        self.last_dream_summary_timestamp: Optional[datetime] = None
 
         logger.info("OneirosModule initialized.")
-
-    async def add_dream_fragment(self, fragment: str):
-        '''
-        Receives a dream fragment from an external source (e.g., subconscious_node)
-        and stores it.
-        '''
-        logger.info(f"OneirosModule: Adding dream fragment: '{fragment[:100]}...'")
-        self.received_dream_fragments.append(fragment)
-        logger.debug(f"OneirosModule: Total dream fragments stored: {len(self.received_dream_fragments)}")
-        # Further processing (stitching, image generation) will be handled by other methods/logic.
 
     def _expand_wildcards(self, text: str) -> str:
         wildcard_base_dir_str = self.oneiros_config.get('wildcard_files_dir')
@@ -206,73 +193,6 @@ class OneirosModule:
             logger.error(f"Error generating dream image: {e}", exc_info=True)
         return None
 
-    async def process_received_dream_fragments(self) -> Optional[Dict[str, Any]]:
-        """
-        Processes dream fragments received from external sources (e.g., subconscious_node),
-        stitches them, generates an image, and stores the result in memory.
-        """
-        if not self.received_dream_fragments:
-            logger.info("OneirosModule: No dream fragments received to process.")
-            return None
-
-        stitched_narrative = " ".join(self.received_dream_fragments)
-        logger.info(f"OneirosModule: Stitched narrative from {len(self.received_dream_fragments)} fragments: '{stitched_narrative[:150]}...'")
-        self.received_dream_fragments.clear()
-
-        if stitched_narrative: # Should always be true if this point is reached
-            self.last_processed_dream_summary = stitched_narrative
-            self.last_dream_summary_timestamp = datetime.now(timezone.utc)
-            logger.info(f"OneirosModule: Updated last dream summary (from stitched fragments): '{self.last_processed_dream_summary[:70]}...'")
-
-        image_path: Optional[pathlib.Path] = None
-        if self.oneiros_config.get('enable_image_dreams'):
-            try:
-                image_path = await self._generate_dream_image(prompt=stitched_narrative)
-                if image_path:
-                    logger.info(f"OneirosModule: Image generated for stitched narrative at {image_path}")
-            except Exception as e:
-                logger.error(f"OneirosModule: Error generating image for stitched narrative: {e}", exc_info=True)
-
-        memory_id: Optional[str] = None
-        if self.ethos_core:
-            try:
-                entry_data: Dict[str, Any] = {
-                    "type": "dream_narrative_from_node",
-                    "content": stitched_narrative,
-                    "metadata": {
-                        "source": "oneiros_from_subconscious_node",
-                        "timestamp": datetime.now().isoformat(),
-                    },
-                    "salience": random.uniform(0.5, 0.7)
-                }
-                if image_path:
-                    entry_data["metadata"]["dream_image_path"] = str(image_path.resolve())
-
-                # Assuming user_id_context should be system-related for these types of memories
-                # or perhaps configurable if they relate to a specific user's subconscious node.
-                # For now, let's use a generic system context.
-                user_context_for_memory = "system_oneiros" # Or determine based on config/source
-
-                stored_memory_entry = await self.ethos_core.add_memory_entry(
-                    entry_data=entry_data,
-                    user_id_context=user_context_for_memory
-                )
-                if stored_memory_entry and hasattr(stored_memory_entry, 'id'):
-                    memory_id = stored_memory_entry.id
-                    logger.info(f"OneirosModule: Stitched dream narrative stored in memory. ID: {memory_id}, Image: {image_path}")
-                else:
-                    logger.warning("OneirosModule: Storing stitched dream narrative did not return a valid memory entry or ID.")
-            except Exception as e:
-                logger.error(f"OneirosModule: Error storing stitched dream narrative in memory: {e}", exc_info=True)
-        else:
-            logger.warning("OneirosModule: EthosCore not available. Cannot store stitched dream narrative.")
-
-        return {
-            "narrative": stitched_narrative,
-            "image_path": str(image_path.resolve()) if image_path else None,
-            "memory_id": memory_id
-        }
-
     async def run_dream_cycle(self):
         if not self.config.ENABLE_ONEIROS or not self.config.ENABLE_CURIOUSITY:
             logger.debug("Dream cycle skipped: Oneiros or Curiosity disabled in config.")
@@ -367,18 +287,13 @@ class OneirosModule:
             dream_output = await self._call_dream_llm(dream_prompt_messages)
             image_path: Optional[pathlib.Path] = None # Ensure type hint
 
-            if dream_output: # Update last dream summary
-                self.last_processed_dream_summary = dream_output
-                self.last_dream_summary_timestamp = datetime.now(timezone.utc)
-                logger.info(f"OneirosModule: Updated last dream summary (from internal cycle): '{self.last_processed_dream_summary[:70]}...'")
-
             if dream_output and self.oneiros_config.get('enable_image_dreams'):
                 # Generate a more specific image prompt from the dream output if needed
                 image_generation_prompt = f"A dreamlike visualization of: {dream_output[:200]}" # Example
                 image_path = await self._generate_dream_image(image_generation_prompt)
 
             if dream_output and self.ethos_core:
-                logger.info(f"Oneiros: Dream output generated: {dream_output[:150]}...") # This log remains, specific to the cycle
+                logger.info(f"Oneiros: Dream output generated: {dream_output[:150]}...")
                 source_memory_ids = [m.get('id') for m in selected_seeds if m.get('id')]
 
                 user_id_counts: Dict[str, int] = {}
@@ -437,24 +352,3 @@ class OneirosModule:
             await self.http_client.aclose()
         # sd_client is not fully implemented, so no close needed yet
         logger.info("OneirosModule resources closed.")
-
-    def get_last_dream_summary(self, max_age_hours: int = 12) -> Optional[str]:
-        '''
-        Returns the summary of the last processed dream if it's recent enough.
-        '''
-        if not self.last_processed_dream_summary or not self.last_dream_summary_timestamp:
-            return None
-
-        # Ensure current time is timezone-aware for comparison
-        now_utc = datetime.now(timezone.utc)
-        age = now_utc - self.last_dream_summary_timestamp
-
-        if age.total_seconds() < (max_age_hours * 3600):
-            logger.debug(f"OneirosModule: Providing recent dream summary (age: {age}).")
-            return self.last_processed_dream_summary
-        else:
-            logger.debug(f"OneirosModule: Last dream summary is too old (age: {age}). Not providing.")
-            # Optionally clear the old summary
-            # self.last_processed_dream_summary = None
-            # self.last_dream_summary_timestamp = None
-            return None

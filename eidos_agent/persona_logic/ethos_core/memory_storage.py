@@ -13,7 +13,6 @@ from eidos_agent.core.config import Config, EthosConfig
 from eidos_agent.utils.logger import get_logger
 # Updated import for Chronos models
 from eidos_agent.persona_logic.chronos_engine.models import ActivitySlot, PathosEvent, ActivitySlotDetails, PathosEventDetails
-from eidos_agent.persona_logic.social_graph.models import NPCProfile # Added NPCProfile import
 
 logger = get_logger(__name__)
 
@@ -31,11 +30,7 @@ class MemoryEntry(TypedDict, total=False):
         'user_fact', 'world_knowledge', 'learned_correction',
         'proactive_action_record', 'queued_discussion_point',
         'learned_feedback_insight', 'suggestion_reflection',
-        'aspiration', # Added from broken EthosCore
-        'dream_narrative_from_node',
-        'firmament_activity_log',
-        'received_subconscious_intention',
-        'npc_dialogue_event' # New type added
+        'aspiration' # Added from broken EthosCore
     ]
     content: str
     embedding: Optional[list[float]]
@@ -106,47 +101,8 @@ class MemoryStorage:
                     end_date TEXT NOT NULL, event_type TEXT NOT NULL, description TEXT, location TEXT,
                     details TEXT, created_at TEXT NOT NULL )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pathos_events_user_dates ON pathos_events (user_id, start_date, end_date)")
-
-            # Create npc_profiles table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS npc_profiles (
-                    npc_id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    role_description TEXT,
-                    persona_summary_prompt TEXT,
-                    relationship_strength REAL DEFAULT 0.0,
-                    known_facts_by_pathos TEXT,
-                    pathos_notes_on_npc TEXT,
-                    interaction_history_summary TEXT,
-                    last_interaction_ts TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )""")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_npc_name ON npc_profiles (name COLLATE NOCASE)")
-
-            conn.commit(); logger.info("DB tables (memories, schedules, events, npc_profiles) ensured.")
+            conn.commit(); logger.info("DB tables (memories, schedules, events) ensured.")
         except sqlite3.Error as e: logger.error(f"Error ensuring DB tables: {e}", exc_info=True); raise
-
-    def _row_to_npc_profile(self, row: Union[sqlite3.Row, Dict[str, Any]]) -> Optional[NPCProfile]:
-        if not row:
-            return None
-        try:
-            data = dict(row)
-            if 'known_facts_by_pathos' in data and isinstance(data['known_facts_by_pathos'], str):
-                data['known_facts_by_pathos'] = json.loads(data['known_facts_by_pathos'])
-            else:
-                data['known_facts_by_pathos'] = data.get('known_facts_by_pathos', [])
-
-            for field_name in ["last_interaction_ts", "created_at", "updated_at"]:
-                if data.get(field_name) and isinstance(data[field_name], str):
-                    dt_obj = datetime.fromisoformat(data[field_name].replace("Z", "+00:00"))
-                    data[field_name] = dt_obj.replace(tzinfo=timezone.utc) if dt_obj.tzinfo is None else dt_obj.astimezone(timezone.utc)
-                else:
-                    data[field_name] = None # Ensure it's None if missing or not a string
-            return NPCProfile(**data)
-        except (json.JSONDecodeError, ValueError, TypeError, Exception) as e: # Broader exception for Pydantic validation too
-            logger.error(f"Error converting row to NPCProfile for npc_id {row.get('npc_id', 'UNKNOWN')}: {e}", exc_info=True)
-            return None
 
     def _serialize_embedding(self, embedding: Optional[List[float]]) -> Optional[bytes]:
         if embedding is None: return None
@@ -399,132 +355,3 @@ class MemoryStorage:
         except Exception as e:
             logger.error(f"Error retrieving entries by type '{entry_type}' and user '{user_id}': {e}", exc_info=True)
             return []
-
-    # --- NPC Profile CRUD ---
-
-    def save_npc_profile(self, profile: NPCProfile) -> bool:
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        profile.updated_at = datetime.now(timezone.utc) # Always update 'updated_at'
-
-        sql = """
-            INSERT INTO npc_profiles (
-                npc_id, name, role_description, persona_summary_prompt,
-                relationship_strength, known_facts_by_pathos, pathos_notes_on_npc,
-                interaction_history_summary, last_interaction_ts, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(npc_id) DO UPDATE SET
-                name=excluded.name, role_description=excluded.role_description,
-                persona_summary_prompt=excluded.persona_summary_prompt,
-                relationship_strength=excluded.relationship_strength,
-                known_facts_by_pathos=excluded.known_facts_by_pathos,
-                pathos_notes_on_npc=excluded.pathos_notes_on_npc,
-                interaction_history_summary=excluded.interaction_history_summary,
-                last_interaction_ts=excluded.last_interaction_ts,
-                updated_at=excluded.updated_at
-        """
-        try:
-            cursor.execute(sql, (
-                profile.npc_id, profile.name, profile.role_description, profile.persona_summary_prompt,
-                profile.relationship_strength, json.dumps(profile.known_facts_by_pathos), profile.pathos_notes_on_npc,
-                profile.interaction_history_summary,
-                profile.last_interaction_ts.isoformat() if profile.last_interaction_ts else None,
-                profile.created_at.isoformat(), profile.updated_at.isoformat()
-            ))
-            conn.commit()
-            logger.info(f"Saved/Updated NPC profile: {profile.name} (ID: {profile.npc_id})")
-            return True
-        except sqlite3.Error as e:
-            logger.error(f"Error saving NPC profile {profile.name} (ID: {profile.npc_id}): {e}", exc_info=True)
-            conn.rollback()
-            return False
-
-    def get_npc_profile_by_id(self, npc_id: str) -> Optional[NPCProfile]:
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT * FROM npc_profiles WHERE npc_id = ?", (npc_id,))
-            row = cursor.fetchone()
-            return self._row_to_npc_profile(row)
-        except sqlite3.Error as e:
-            logger.error(f"Error getting NPC profile by ID {npc_id}: {e}", exc_info=True)
-            return None
-
-    def get_npc_profile_by_name(self, name: str) -> Optional[NPCProfile]:
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT * FROM npc_profiles WHERE name = ? COLLATE NOCASE", (name,))
-            row = cursor.fetchone()
-            return self._row_to_npc_profile(row)
-        except sqlite3.Error as e:
-            logger.error(f"Error getting NPC profile by name '{name}': {e}", exc_info=True)
-            return None
-
-    def update_npc_profile_fields(self, npc_id: str, updates: Dict[str, Any]) -> bool:
-        if not updates: return False
-
-        valid_fields = getattr(NPCProfile, '__annotations__', {}).keys()
-        for key in updates.keys():
-            if key not in valid_fields:
-                logger.error(f"Invalid field '{key}' for NPCProfile update.")
-                return False
-
-        set_clauses = [f"{field_name} = ?" for field_name in updates.keys()]
-        values = []
-        for field_name, value in updates.items():
-            if field_name == "known_facts_by_pathos": values.append(json.dumps(value))
-            elif isinstance(value, datetime): values.append(value.isoformat())
-            else: values.append(value)
-
-        set_clauses.append("updated_at = ?")
-        values.append(datetime.now(timezone.utc).isoformat())
-        values.append(npc_id)
-
-        sql = f"UPDATE npc_profiles SET {', '.join(set_clauses)} WHERE npc_id = ?"
-        conn = self._get_connection(); cursor = conn.cursor()
-        try:
-            cursor.execute(sql, tuple(values))
-            conn.commit()
-            return cursor.rowcount > 0
-        except sqlite3.Error as e:
-            logger.error(f"Error updating NPC fields for ID {npc_id}: {e}", exc_info=True)
-            conn.rollback()
-            return False
-
-    def delete_npc_profile(self, npc_id: str) -> bool:
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("DELETE FROM npc_profiles WHERE npc_id = ?", (npc_id,))
-            conn.commit()
-            if cursor.rowcount > 0:
-                logger.info(f"Deleted NPC profile with ID: {npc_id}")
-                return True
-            logger.warning(f"No NPC profile found with ID: {npc_id} to delete.")
-            return False
-        except sqlite3.Error as e:
-            logger.error(f"Error deleting NPC profile with ID {npc_id}: {e}", exc_info=True)
-            conn.rollback()
-            return False
-
-    # Placeholder for list_npc_profiles
-    def list_npc_profiles(self, limit: int = 100, offset: int = 0) -> List[NPCProfile]:
-        logger.warning("list_npc_profiles is a placeholder and not fully implemented.")
-        # This would typically fetch from DB, order, limit, offset
-        # For now, returns empty or a dummy example if you have one.
-        return []
-
-    # Placeholder for add_fact_to_npc_profile
-    def add_fact_to_npc_profile(self, npc_id: str, fact: str) -> bool:
-        logger.warning(f"add_fact_to_npc_profile is a placeholder for {npc_id} with fact '{fact}'. Not fully implemented.")
-        # This would typically fetch profile, append to known_facts_by_pathos, then save.
-        # For now, simulates success.
-        # Example sketch:
-        # profile = self.get_npc_profile_by_id(npc_id)
-        # if profile:
-        #     if fact not in profile.known_facts_by_pathos:
-        #         profile.known_facts_by_pathos.append(fact)
-        #         return self.save_npc_profile(profile)
-        # return False
-        return True # Simulate success for now

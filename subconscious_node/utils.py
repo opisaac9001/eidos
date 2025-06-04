@@ -27,9 +27,6 @@ LLAMA_CPP_MAX_TOKENS = 150
 LLAMA_CPP_DEFAULT_TEMP = 0.7
 # Default value for wildcard path (will be updated from config if available)
 WILDCARD_RELATIVE_PATH = "../wildcards/" # Default, assuming 'wildcards' is one level up from 'subconscious_node'
-# Default for Eidos Firmament Intention URL
-EIDOS_FIRMAMENT_INTENTION_URL = "http://placeholder_eidos_url/firmament_intention_error"
-
 
 try:
     if os.path.exists(CONFIG_FILE_PATH):
@@ -45,47 +42,11 @@ try:
         # Load wildcard_folder_path from config
         WILDCARD_RELATIVE_PATH = config_data.get("wildcard_folder_path", WILDCARD_RELATIVE_PATH)
         logger.info(f"Wildcard relative path loaded: '{WILDCARD_RELATIVE_PATH}'")
-
-        # Load Eidos Firmament Intention URL
-        EIDOS_FIRMAMENT_INTENTION_URL = config_data.get("eidos_firmament_intention_url", EIDOS_FIRMAMENT_INTENTION_URL)
-        if EIDOS_FIRMAMENT_INTENTION_URL == "http://placeholder_eidos_url/firmament_intention_error" and "eidos_firmament_intention_url" not in config_data:
-             logger.warning(f"eidos_firmament_intention_url not found in config. Using placeholder: {EIDOS_FIRMAMENT_INTENTION_URL}")
-        else:
-            logger.info(f"Eidos Firmament intention URL set to: {EIDOS_FIRMAMENT_INTENTION_URL}")
-
     else:
-        logger.warning(f"Config file not found at {CONFIG_FILE_PATH}. Using default settings for LLM, wildcards, and Eidos URLs.")
+        logger.warning(f"Config file not found at {CONFIG_FILE_PATH}. Using default settings for LLM and wildcards.")
 except Exception as e:
     logger.error(f"Error loading settings from {CONFIG_FILE_PATH}: {e}. Using defaults.", exc_info=True)
 
-
-def send_intention_to_eidos(intention_payload: Dict[str, Any]) -> bool:
-    '''
-    Sends the detected intention payload to the Eidos Firmament API.
-    '''
-    if EIDOS_FIRMAMENT_INTENTION_URL == "http://placeholder_eidos_url/firmament_intention_error":
-        logger.warning("Cannot send intention to Eidos: eidos_firmament_intention_url is not configured or using placeholder.")
-        return False
-
-    try:
-        # The payload from check_for_actionable_intention already has 'intention' and 'metadata' keys,
-        # matching the Pydantic model on Eidos side.
-        response = requests.post(EIDOS_FIRMAMENT_INTENTION_URL, json=intention_payload, timeout=10) # 10s timeout
-        response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
-        logger.info(f"Successfully sent intention to Eidos/Firmament. Payload: {intention_payload['intention'][:50]}..., Status: {response.status_code}")
-        return True
-    except requests.exceptions.Timeout:
-        logger.error(f"Timeout while sending intention to Eidos: {EIDOS_FIRMAMENT_INTENTION_URL}")
-        return False
-    except requests.exceptions.ConnectionError:
-        logger.error(f"Connection error while sending intention to Eidos: {EIDOS_FIRMAMENT_INTENTION_URL}")
-        return False
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTP error sending intention to Eidos: {e}. Response: {e.response.text[:200] if e.response else 'N/A'}")
-        return False
-    except Exception as e:
-        logger.error(f"An unexpected error occurred sending intention to Eidos: {e}", exc_info=True)
-        return False
 
 def load_wildcards(config_folder_path: str, relative_wildcard_path: str) -> Dict[str, List[str]]:
     """
@@ -206,7 +167,6 @@ if __name__ == '__main__':
     print(f"LLAMA_CPP_MAX_TOKENS: {LLAMA_CPP_MAX_TOKENS}")
     print(f"LLAMA_CPP_DEFAULT_TEMP: {LLAMA_CPP_DEFAULT_TEMP}")
     print(f"WILDCARD_RELATIVE_PATH: {WILDCARD_RELATIVE_PATH}")
-    print(f"EIDOS_FIRMAMENT_INTENTION_URL: {EIDOS_FIRMAMENT_INTENTION_URL}") # Added for test print
 
     print("\n--- Wildcard Loading Test ---")
     # utils.py is in subconscious_node, so __file__ is subconscious_node/utils.py

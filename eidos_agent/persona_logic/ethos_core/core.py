@@ -13,13 +13,10 @@ import httpx # Not directly used here, but often in LLM calls if not delegated
 from eidos_agent.utils.prompt_loader import load_system_prompt
 
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
-from .memory_storage import MemoryStorage, MemoryEntry
+from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
 from eidos_agent.utils.logger import get_logger
-from ..social_graph.models import NPCProfile # Added
-from pydantic import ValidationError # Added
 
 from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
-import uuid # Ensure uuid is explicitly imported
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -1990,101 +1987,3 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
         self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + arousal_shift))
         self.last_mood_update_time = datetime.now(timezone.utc)
         logger.debug(f"Mood updated due to '{event_type}'. New mood: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f}")
-
-    # --- NPC Profile Management Methods ---
-
-    async def save_npc_profile(self, profile_data: Union[NPCProfile, Dict[str, Any]]) -> Optional[NPCProfile]:
-        '''Saves (creates or updates) an NPC profile.'''
-        npc_profile_obj: Optional[NPCProfile] = None
-        if isinstance(profile_data, dict):
-            try:
-                # Ensure created_at and updated_at are handled if dict is for new profile
-                if 'npc_id' not in profile_data: # New profile from dict
-                     profile_data['npc_id'] = f"npc_{uuid.uuid4().hex}" # Generate ID if not present
-                if 'created_at' not in profile_data:
-                    profile_data['created_at'] = datetime.now(timezone.utc)
-                profile_data['updated_at'] = datetime.now(timezone.utc)
-                npc_profile_obj = NPCProfile(**profile_data)
-            except ValidationError as e:
-                logger.error(f"EthosCore: Validation error creating NPCProfile from dict: {e}", exc_info=True)
-                return None
-        elif isinstance(profile_data, NPCProfile):
-            npc_profile_obj = profile_data
-            npc_profile_obj.updated_at = datetime.now(timezone.utc) # Ensure updated_at is fresh
-        else:
-            logger.error("EthosCore: Invalid type for profile_data in save_npc_profile. Must be NPCProfile or dict.")
-            return None
-
-        if self.memory_storage.save_npc_profile(npc_profile_obj):
-            return npc_profile_obj
-        return None
-
-    async def get_npc_profile(self, npc_id: Optional[str] = None, name: Optional[str] = None) -> Optional[NPCProfile]:
-        '''Retrieves an NPC profile by ID or name. ID takes precedence.'''
-        if not npc_id and not name:
-            logger.warning("EthosCore: get_npc_profile called without npc_id or name.")
-            return None
-        if npc_id:
-            return self.memory_storage.get_npc_profile_by_id(npc_id)
-        if name: # npc_id was None if we reach here
-            return self.memory_storage.get_npc_profile_by_name(name)
-        return None # Should not be reached if logic above is correct
-
-    async def list_known_npcs(self, limit: int = 100, offset: int = 0) -> List[NPCProfile]:
-        '''Lists known NPC profiles, ordered by name.'''
-        return self.memory_storage.list_npc_profiles(limit, offset)
-
-    async def add_fact_to_npc(self, npc_id: str, fact: str) -> bool:
-        '''Adds a known fact to an NPC's profile.'''
-        if not npc_id or not fact:
-            logger.warning("EthosCore: add_fact_to_npc called with missing npc_id or fact.")
-            return False
-        return self.memory_storage.add_fact_to_npc_profile(npc_id, fact)
-
-    async def update_npc_relationship_strength(self, npc_id: str, new_strength: float) -> bool:
-        '''Updates the relationship strength for an NPC.'''
-        if not npc_id:
-            logger.warning("EthosCore: update_npc_relationship_strength called with missing npc_id.")
-            return False
-        clamped_strength = max(-1.0, min(1.0, new_strength))
-        return self.memory_storage.update_npc_profile_fields(npc_id, {"relationship_strength": clamped_strength})
-
-    async def update_npc_last_interaction(self, npc_id: str, interaction_ts: Optional[datetime] = None) -> bool:
-        '''Updates the last interaction timestamp for an NPC.'''
-        if not npc_id:
-            logger.warning("EthosCore: update_npc_last_interaction called with missing npc_id.")
-            return False
-        ts = interaction_ts if interaction_ts else datetime.now(timezone.utc)
-        return self.memory_storage.update_npc_profile_fields(npc_id, {"last_interaction_ts": ts})
-
-    async def update_npc_persona_summary_prompt(self, npc_id: str, new_prompt: str) -> bool:
-        '''Updates the NPC's persona summary prompt.'''
-        if not npc_id or not new_prompt:
-            logger.warning("EthosCore: update_npc_persona_summary_prompt called with missing npc_id or prompt.")
-            return False
-        return self.memory_storage.update_npc_profile_fields(npc_id, {"persona_summary_prompt": new_prompt})
-
-    async def update_npc_pathos_notes(self, npc_id: str, notes: str) -> bool:
-        '''Updates Pathos's private notes on an NPC.'''
-        if not npc_id:
-            logger.warning("EthosCore: update_npc_pathos_notes called with missing npc_id.")
-            return False
-        return self.memory_storage.update_npc_profile_fields(npc_id, {"pathos_notes_on_npc": notes})
-
-    async def update_npc_interaction_history_summary(self, npc_id: str, summary: str) -> bool:
-        '''Updates the LLM-generated summary of interaction history for an NPC.'''
-        if not npc_id:
-            logger.warning("EthosCore: update_npc_interaction_history_summary called with missing npc_id.")
-            return False
-        return self.memory_storage.update_npc_profile_fields(npc_id, {"interaction_history_summary": summary})
-
-    async def delete_npc_profile(self, npc_id: str) -> bool:
-        '''Deletes an NPC profile. Use with caution.'''
-        if not npc_id:
-            logger.warning("EthosCore: delete_npc_profile called with missing npc_id.")
-            return False
-        if hasattr(self.memory_storage, 'delete_npc_profile'):
-            return getattr(self.memory_storage, 'delete_npc_profile')(npc_id)
-        else:
-            logger.error("EthosCore: MemoryStorage does not have delete_npc_profile method.")
-            return False
