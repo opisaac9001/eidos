@@ -77,6 +77,9 @@ from eidos_agent.api.routers.pathos_chronos_router import init_pathos_chronos_ro
 from eidos_agent.api.routers.websocket_router import router as websocket_api_router # Import WebSocket router
 from eidos_agent.api.routers.websocket_router import init_websocket_router # Import WebSocket router init function
 
+from eidos_agent.features.oneiros.tasks import oneiros_processing_task
+from eidos_agent.system_tasks.subconscious_context_scheduler import SCHEDULER_STATE, init_scheduler as init_subconscious_scheduler
+
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
 logos_core: Optional[LogosCore] = None
@@ -225,7 +228,39 @@ async def lifespan(app_instance: FastAPI):
         else: # pragma: no cover
             logger.error("ConnectionManager (manager) is None, WebSocket router not initialized.")
 
-        if ethos_core: background_tasks = await ethos_core.get_background_tasks()
+        if ethos_core:
+            background_tasks = await ethos_core.get_background_tasks()
+            # Initialize subconscious_context_scheduler after ethos_core is ready
+            init_subconscious_scheduler(ethos_core) # Assuming this function exists and is imported
+            logger.info("Lifespan: Subconscious context scheduler initialized with EthosCore.")
+
+
+            # Launch Oneiros Processing Task
+            if oneiros_module and Config.ENABLE_ONEIROS: # Check if oneiros is enabled
+                try:
+                    # Get interval from config, provide a default if not found
+                    oneiros_processing_interval = Config.ONEIROS.get('dream_processing_interval_seconds', 30 * 60) # Default 30 mins
+                    if not isinstance(oneiros_processing_interval, (int, float)) or oneiros_processing_interval <= 0: # Validate interval
+                        logger.warning(f"Lifespan: Invalid Oneiros dream_processing_interval_seconds ({oneiros_processing_interval}). Using default 1800s.")
+                        oneiros_processing_interval = 1800
+
+                    logger.info(f"Lifespan: Launching Oneiros processing task with interval {oneiros_processing_interval}s.")
+                    oneiros_proc_task = asyncio.create_task(
+                        oneiros_processing_task(
+                            oneiros_module=oneiros_module,
+                            subconscious_scheduler_state=SCHEDULER_STATE,
+                            processing_interval_seconds=int(oneiros_processing_interval)
+                        )
+                    )
+                    background_tasks.append(oneiros_proc_task) # Add to existing list for shutdown handling
+                    logger.info("Lifespan: oneiros_processing_task added to background tasks.")
+                except Exception as e_oneiros_task_start:
+                    logger.error(f"Lifespan: Failed to create or add oneiros_processing_task: {e_oneiros_task_start}", exc_info=True)
+            elif Config.ENABLE_ONEIROS: # Oneiros enabled but module instance is None (init failed)
+                logger.warning("Lifespan: Oneiros enabled in config, but OneirosModule instance not available. Processing task not started.")
+            else: # Oneiros not enabled at all
+                logger.info("Lifespan: Oneiros is disabled by configuration. Processing task not started.")
+
         logger.info("--- Eidos System Initialized Successfully ---")
         yield
         logger.info("--- Shutting Down Eidos System ---")
