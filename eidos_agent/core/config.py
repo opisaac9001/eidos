@@ -160,6 +160,15 @@ class BraveSearchConfig(TypedDict, total=False):
     timeout: int
     max_results_per_query: int
 
+class BookshelfConfig(TypedDict, total=False):
+    qdrant_host: str
+    qdrant_port: int
+    qdrant_api_key: Optional[str]
+    qdrant_collection_name: str
+    embedding_model_name: str
+    embedding_dimension: int
+    # Potentially add chunk_size, chunk_overlap if they need to be configurable here
+
 VALID_PITCH_SPEED_VALUES = ["very_low", "low", "moderate", "high", "very_high"]
 VALID_GENDER_VALUES = ["female", "male"]
 
@@ -459,6 +468,33 @@ class Config:
     MAX_CONCURRENT_TASKS = int(os.getenv("MAX_CONCURRENT_TASKS", 5))
     EIDOS_ADMIN_PASSWORD = os.getenv("EIDOS_ADMIN_PASSWORD")
 
+    BOOKSHELF: Optional[BookshelfConfig] = None
+    # Populate Bookshelf config if essential env vars are set
+    # Check for QDRANT_HOST as a minimum requirement to enable bookshelf
+    if os.getenv("QDRANT_HOST"):
+        qdrant_port_str = os.getenv("QDRANT_PORT", "6333")
+        embedding_dim_str = os.getenv("BOOKSHELF_EMBEDDING_DIMENSION", "384")
+        try:
+            qdrant_port_int = int(qdrant_port_str)
+            embedding_dim_int = int(embedding_dim_str)
+        except ValueError:
+            print(f"Warning: Invalid port ('{qdrant_port_str}') or embedding dimension ('{embedding_dim_str}') for Bookshelf. Using defaults.")
+            qdrant_port_int = 6333
+            embedding_dim_int = 384 # Default for all-MiniLM-L6-v2
+
+        BOOKSHELF = {
+            "qdrant_host": os.environ["QDRANT_HOST"], # Use os.environ to ensure it exists if check passed
+            "qdrant_port": qdrant_port_int,
+            "qdrant_api_key": os.getenv("QDRANT_API_KEY"),
+            "qdrant_collection_name": os.getenv("QDRANT_COLLECTION_NAME", "eidos_bookshelf"),
+            "embedding_model_name": os.getenv("BOOKSHELF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
+            "embedding_dimension": embedding_dim_int,
+        }
+        print(f"Bookshelf feature configured with Qdrant at {BOOKSHELF['qdrant_host']}:{BOOKSHELF['qdrant_port']}")
+    else:
+        print("Bookshelf feature not configured: QDRANT_HOST environment variable not set.")
+
+
     @staticmethod
     def get_llm_config(role: str) -> Optional[LLMConfig]:
         return Config.LLM.get(role)
@@ -487,6 +523,8 @@ class Config:
     def get_eidos_tts_config() -> Optional[EidosTTSConfig]: return Config.EIDOS_TTS
     @staticmethod
     def get_admin_password() -> Optional[str]: return Config.EIDOS_ADMIN_PASSWORD
+    @staticmethod
+    def get_bookshelf_config() -> Optional[BookshelfConfig]: return Config.BOOKSHELF
 
     @staticmethod
     def setup():

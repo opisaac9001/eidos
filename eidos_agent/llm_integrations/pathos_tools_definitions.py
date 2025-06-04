@@ -6,6 +6,23 @@ and the broader Eidos system when interacting with or via Pathos.
 """
 
 # --- Individual Tool Definitions ---
+
+# Bookshelf Handler Instance
+# This assumes that the configuration for BookshelfHandler (via Config.get_bookshelf_config())
+# is available when this module is loaded. If not, this instantiation might fail or be None.
+# A more robust system might use a service locator or dependency injection.
+from eidos_agent.features.bookshelf_feature.handler import BookshelfHandler
+from eidos_agent.core.config import Config # To check if bookshelf is configured
+
+bookshelf_handler_instance: BookshelfHandler | None = None
+if Config.get_bookshelf_config(): # Only initialize if configured
+    bookshelf_handler_instance = BookshelfHandler()
+else:
+    print("Warning: BookshelfHandler not initialized in pathos_tools_definitions as Bookshelf is not configured.")
+
+# Tool definitions will point to methods on bookshelf_handler_instance.
+# The actual execution will require this instance to be available to the tool dispatcher.
+
 GET_CURRENT_TIME_TOOL_DEFINITION = [ { "type": "function", "function": { "name": "get_current_time", "description": ("Gets the current date and time. If a location is specified, it attempts to provide the local time for that location. If no location is given, or if the specified location's time cannot be determined, it defaults to Coordinated Universal Time (UTC)."), "parameters": { "type": "object", "properties": { "location": { "type": "string", "description": ( "Optional. The city and state/country (e.g., 'San Francisco, CA', 'London, UK') or a standard IANA timezone name (e.g., 'America/New_York', 'Europe/London') for which to get the local time." ) } }, "required": [] } } } ]
 WEB_SEARCH_TOOL_DEFINITION = [ { "type": "function", "function": { "name": "web_search", "description": "MUST use this function to find current information like news, events, weather, facts. REQUIRED for queries about 'latest', 'today', 'current', 'who won', 'what is X'. Do NOT answer from memory if current information is needed.", "parameters": { "type": "object", "properties": { "query": { "type": "string", "description": "The specific search query phrase to use for the web search. Formulate a good query based on the user's request." } }, "required": ["query"] } } } ]
 MATH_CALCULATOR_TOOL_DEFINITION = [ { "type": "function", "function": { "name": "math_calculator", "description": "Calculates the result of a mathematical expression. Use for arithmetic, algebra, calculus, etc. Input should be a standard mathematical expression string.", "parameters": { "type": "object", "properties": { "expression": { "type": "string", "description": "The mathematical expression to evaluate (e.g., '2 * (5 + 3)', 'derivative of x^2')." } }, "required": ["expression"] } } } ]
@@ -18,6 +35,90 @@ ADD_PATHOS_EVENT_TOOL_DEFINITION = [{ "type": "function", "function": { "name": 
 INITIATE_SIMULATED_INTERACTION_TOOL_DEFINITION = [{ "type": "function", "function": { "name": "initiate_simulated_interaction", "description": "Starts a simulated conversation with a new Non-Player Character (NPC). Use this to begin an interaction based on a scenario Pathos wants to explore.", "parameters": { "type": "object", "properties": { "npc_name": {"type": "string", "description": "Optional. The name of the NPC. If not provided, a name might be implicitly determined or not used."}, "npc_role": {"type": "string", "description": "The role or relationship of the NPC to Pathos (e.g., 'store clerk', 'client', 'old friend')."}, "npc_description": {"type": "string", "description": "A short description of the NPC's personality, demeanor, or key characteristics (e.g., 'grumpy, impatient', 'friendly, helpful', 'curious about AI')."}, "initial_context": {"type": "string", "description": "The initial situation, setting, or topic for the conversation (e.g., 'Pathos is at a cafe trying to order a coffee', 'Pathos is meeting a new client to discuss a project', 'Pathos wants to ask for directions to a specific book section')."}, "pathos_opening_statement": {"type": "string", "description": "Pathos's first line or question to the NPC to start the conversation."} }, "required": ["npc_role", "npc_description", "initial_context", "pathos_opening_statement"] } } }]
 SEND_MESSAGE_TO_SIMULATED_NPC_TOOL_DEFINITION = [{ "type": "function", "function": { "name": "send_message_to_simulated_npc", "description": "Sends Pathos's message to the currently active NPC in an ongoing simulated conversation and gets the NPC's reply.", "parameters": { "type": "object", "properties": { "message_to_npc": {"type": "string", "description": "Pathos's message or response to the NPC."} }, "required": ["message_to_npc"] } } }]
 END_SIMULATED_INTERACTION_TOOL_DEFINITION = [{ "type": "function", "function": { "name": "end_simulated_interaction", "description": "Ends the current simulated conversation with the NPC.", "parameters": {"type": "object", "properties": {}, "required": []} } }]
+
+
+# --- Bookshelf Tool Definitions ---
+BOOKSHELF_ADD_DOCUMENT_TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "bookshelf_add_document",
+        "description": "Adds a new document to your personal bookshelf for later retrieval and reference. Use this to store text content like articles, notes, or user-provided documents you need to remember.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_name": {"type": "string", "description": "A unique name or title for the document (e.g., 'My Research Notes on AI', 'Recipe for Sourdough Bread')."},
+                "document_content": {"type": "string", "description": "The full text content of the document to be added."},
+                "document_source": {"type": "string", "description": "Optional. The origin or source of the document (e.g., 'User upload', 'Web article scrape', 'Personal note'). Defaults to 'unknown' if not provided."},
+                "topics": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "Optional. A list of keywords or topics relevant to the document (e.g., ['artificial intelligence', 'research', 'ethics'])."
+                }
+            },
+            "required": ["document_name", "document_content"]
+        }
+    }
+}]
+
+BOOKSHELF_QUERY_TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "bookshelf_query",
+        "description": "Searches your personal bookshelf for documents relevant to a query. Returns context from matching documents.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query_text": {"type": "string", "description": "The question or search term to query your bookshelf with."},
+                "document_name": {"type": "string", "description": "Optional. If provided, the search will be limited to only the document with this specific name."},
+                "topics_filter": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "Optional. A list of topics to filter the search by. Documents matching any of these topics will be prioritized or included."
+                },
+                "top_k": {"type": "integer", "description": "Optional. The number of most relevant text chunks to retrieve. Defaults to 3 or 5."}
+            },
+            "required": ["query_text"]
+        }
+    }
+}]
+
+BOOKSHELF_LIST_DOCUMENTS_TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "bookshelf_list_documents",
+        "description": "Lists the names of all documents currently stored on your personal bookshelf.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }
+}]
+
+BOOKSHELF_GET_DOCUMENT_RAW_TEXT_TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "bookshelf_get_document_raw_text",
+        "description": "Retrieves the full, raw text content of a specific document from your bookshelf. Use this if you need to read or analyze an entire document.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_name": {"type": "string", "description": "The unique name of the document to retrieve."}
+            },
+            "required": ["document_name"]
+        }
+    }
+}]
+
+BOOKSHELF_REMOVE_DOCUMENT_TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "bookshelf_remove_document",
+        "description": "Removes a document and all its content from your personal bookshelf. Use this to 'forget' or delete a document.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_name": {"type": "string", "description": "The unique name of the document to remove."}
+            },
+            "required": ["document_name"]
+        }
+    }
+}]
+
 
 # --- Composite Tool Lists ---
 
@@ -48,5 +149,11 @@ ALL_AVAILABLE_SYSTEM_TOOLS = [
     *ADD_PATHOS_EVENT_TOOL_DEFINITION,      # System might add events too
     *INITIATE_SIMULATED_INTERACTION_TOOL_DEFINITION, # System might initiate for testing/scenarios
     *SEND_MESSAGE_TO_SIMULATED_NPC_TOOL_DEFINITION,
-    *END_SIMULATED_INTERACTION_TOOL_DEFINITION
+    *END_SIMULATED_INTERACTION_TOOL_DEFINITION,
+    # Bookshelf tools for the system to use (e.g., when directed by user commands processed by Logos)
+    *BOOKSHELF_ADD_DOCUMENT_TOOL_DEFINITION,
+    *BOOKSHELF_QUERY_TOOL_DEFINITION,
+    *BOOKSHELF_LIST_DOCUMENTS_TOOL_DEFINITION,
+    *BOOKSHELF_GET_DOCUMENT_RAW_TEXT_TOOL_DEFINITION,
+    *BOOKSHELF_REMOVE_DOCUMENT_TOOL_DEFINITION,
 ]
