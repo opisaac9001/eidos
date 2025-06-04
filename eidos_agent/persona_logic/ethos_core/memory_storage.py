@@ -99,7 +99,7 @@ class MemoryStorage:
                 CREATE TABLE IF NOT EXISTS pathos_events (
                     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, start_date TEXT NOT NULL,
                     end_date TEXT NOT NULL, event_type TEXT NOT NULL, description TEXT, location TEXT,
-                    details TEXT, created_at TEXT NOT NULL )""")
+                    details TEXT, created_at TEXT NOT NULL, specific_time TEXT )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pathos_events_user_dates ON pathos_events (user_id, start_date, end_date)")
             conn.commit(); logger.info("DB tables (memories, schedules, events) ensured.")
         except sqlite3.Error as e: logger.error(f"Error ensuring DB tables: {e}", exc_info=True); raise
@@ -260,8 +260,9 @@ class MemoryStorage:
     async def add_event_to_db(self, event: PathosEvent) -> bool:
         conn = self._get_connection(); cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, description=excluded.description, location=excluded.location, details=excluded.details",
-                           (event.id, event.user_id, event.title, event.start_date.isoformat(), event.end_date.isoformat(), event.event_type, event.description, event.location, event.details.model_dump_json(), event.created_at.isoformat()))
+            # Added specific_time to the INSERT and ON CONFLICT SET
+            cursor.execute("INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, description=excluded.description, location=excluded.location, details=excluded.details, specific_time=excluded.specific_time",
+                           (event.id, event.user_id, event.title, event.start_date.isoformat(), event.end_date.isoformat(), event.event_type, event.description, event.location, event.details.model_dump_json(), event.created_at.isoformat(), event.specific_time.isoformat() if event.specific_time else None))
             conn.commit(); logger.info(f"Added/Updated event '{event.title}' (ID: {event.id})."); return True
         except sqlite3.Error as e: logger.error(f"Error adding event '{event.title}': {e}", exc_info=True); conn.rollback(); return False
 
@@ -269,15 +270,29 @@ class MemoryStorage:
         conn = self._get_connection(); cursor = conn.cursor(); events: List[PathosEvent] = []
         try:
             cursor.execute("SELECT * FROM pathos_events WHERE user_id = ? AND start_date <= ? AND end_date >= ? ORDER BY start_date ASC", (user_id, range_end_date.isoformat(), range_start_date.isoformat()))
-            for row_data in map(dict, cursor.fetchall()):
+            for row_data_map in map(dict, cursor.fetchall()):
+                # Use .get for specific_time as it's a new column and might be None for old entries
+                specific_time_str = row_data_map.get('specific_time')
+                specific_time_obj = None
+                if specific_time_str:
+                    try:
+                        specific_time_obj = time.fromisoformat(specific_time_str)
+                    except ValueError:
+                        logger.warning(f"Could not parse specific_time '{specific_time_str}' for event ID {row_data_map.get('id')}. Setting to None.")
+
                 try:
-                    details_dict = json.loads(row_data['details']) if row_data['details'] else {}
-                    data_model = {**row_data, 'details': PathosEventDetails(**details_dict)}
+                    details_dict = json.loads(row_data_map['details']) if row_data_map['details'] else {}
+                    # Prepare data_model carefully, ensuring specific_time is handled
+                    data_model = {
+                        **row_data_map,
+                        'details': PathosEventDetails(**details_dict),
+                        'specific_time': specific_time_obj # Use parsed object or None
+                    }
                     data_model['start_date'] = date.fromisoformat(data_model['start_date'])
                     data_model['end_date'] = date.fromisoformat(data_model['end_date'])
                     data_model['created_at'] = datetime.fromisoformat(data_model['created_at'].replace("Z", "+00:00"))
                     events.append(PathosEvent(**data_model))
-                except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing event ID {row_data.get('id')}: {e}", exc_info=True)
+                except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing event ID {row_data_map.get('id')}: {e}", exc_info=True)
         except sqlite3.Error as e: logger.error(f"Error fetching events for user '{user_id}': {e}", exc_info=True)
         return events
 
