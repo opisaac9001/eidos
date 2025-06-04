@@ -76,12 +76,17 @@ from eidos_agent.api.routers.pathos_chronos_router import router as pathos_chron
 from eidos_agent.api.routers.pathos_chronos_router import init_pathos_chronos_router
 from eidos_agent.api.routers.websocket_router import router as websocket_api_router # Import WebSocket router
 from eidos_agent.api.routers.websocket_router import init_websocket_router # Import WebSocket router init function
+from eidos_agent.features.firmament_module.module import FirmamentModule
+from eidos_agent.features.firmament_module.tasks import firmament_ticker_task
+from eidos_agent.api.routers.firmament_router import router as firmament_api_router # New import
+from eidos_agent.api.routers.firmament_router import init_firmament_router      # New import
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
 logos_core: Optional[LogosCore] = None
 pathos_interface: Optional[PathosInterface] = None
 oneiros_module: Optional[OneirosModule] = None
+firmament_module: Optional[FirmamentModule] = None # Added firmament_module global
 router: Optional[InputRouter] = None
 background_tasks: List[asyncio.Task] = []
 manager = ConnectionManager()
@@ -123,7 +128,7 @@ async def warm_vllm_cache(pathos_if: PathosInterface, static_system_prompt: str)
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
-    global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance
+    global ethos_core, logos_core, pathos_interface, oneiros_module, firmament_module, router, background_tasks, manager, eidos_tts_service_instance # Added firmament_module to globals
     # ha_service: Optional[HomeAssistantService] = None # Removed
     owm_service: Optional[OpenWeatherMapService] = None
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
@@ -154,7 +159,55 @@ async def lifespan(app_instance: FastAPI):
         pathos_interface = PathosInterface(Config, ethos_core, logos_core, manager)
         pathos_interface.set_audio_cache(TEMP_AUDIO_CACHE, TEMP_AUDIO_CACHE_LOCK)
         if ethos_core: ethos_core.set_pathos_interface(pathos_interface)
-        if ethos_core and logos_core and pathos_interface:
+
+        # FirmamentModule Initialization - Placed after Ethos, Chronos, Oneiros
+        global firmament_module # Ensure we are assigning to the global
+        # Firmament needs Ethos, Chronos, and Oneiros to be successfully initialized.
+        if Config.ENABLE_FIRMAMENT and ethos_core and chronos_engine_instance and oneiros_module:
+            try:
+                logger.info("Lifespan: Initializing FirmamentModule...")
+                # Pass the Config class directly, similar to how EthosCore(Config) is done
+                firmament_module = FirmamentModule(
+                    config=Config,
+                    ethos_core=ethos_core,
+                    chronos_engine=chronos_engine_instance,
+                    oneiros_module=oneiros_module
+                )
+                await firmament_module.start()
+                logger.info("Lifespan: FirmamentModule initialized and started successfully.")
+            except Exception as e_fm_init:
+                logger.error(f"Lifespan: Failed to initialize FirmamentModule: {e_fm_init}", exc_info=True)
+                firmament_module = None
+        elif Config.ENABLE_FIRMAMENT:
+            logger.warning(
+                "Lifespan: FirmamentModule enabled in config, but one or more core dependencies "
+                "(EthosCore, ChronosEngine, OneirosModule) are missing. FirmamentModule NOT initialized."
+            )
+        else:
+            logger.info("Lifespan: FirmamentModule is disabled by configuration.")
+
+            # Launch Firmament Ticker Task if module is enabled and initialized
+            if firmament_module and firmament_module.fm_config.get("enable_firmament"):
+                logger.info("Lifespan: Firmament is enabled, launching firmament_ticker_task.")
+                try:
+                    firmament_tick_task = asyncio.create_task(firmament_ticker_task(firmament_module))
+                    background_tasks.append(firmament_tick_task) # Add to existing list for shutdown handling
+                    logger.info("Lifespan: firmament_ticker_task added to background tasks.")
+                except Exception as e_ticker_start:
+                    logger.error(f"Lifespan: Failed to create or add firmament_ticker_task: {e_ticker_start}", exc_info=True)
+            elif firmament_module: # If module exists but is not enabled
+                 logger.info("Lifespan: FirmamentModule initialized but not enabled in its config. Ticker task not started.")
+            # If firmament_module is None, it means it wasn't initialized, previous logs would cover why.
+
+            if firmament_module: # Check if firmament_module was successfully initialized
+                try:
+                    init_firmament_router(firmament_module) # Initialize router with the instance
+                except Exception as e_fm_router_init:
+                    logger.error(f"Lifespan: Failed to initialize Firmament router: {e_fm_router_init}", exc_info=True)
+            else:
+                logger.warning("Lifespan: FirmamentModule not available, Firmament router not initialized.")
+
+        if ethos_core and logos_core and pathos_interface: # router initialization needs to be after all modules that might be passed to it
             router = InputRouter(config=Config, ethos_core=ethos_core, logos_core=logos_core, pathos_interface=pathos_interface)
         else:
             raise RuntimeError("Failed to initialize InputRouter due to missing core components.")
@@ -240,6 +293,7 @@ async def lifespan(app_instance: FastAPI):
         # if ha_service: await ha_service.disconnect() # Removed
         if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
         if oneiros_module: await oneiros_module.close()
+        if firmament_module: await firmament_module.close() # Added firmament_module close
         if ethos_core: await ethos_core.close()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()
         TEMP_AUDIO_CACHE.clear()
@@ -262,6 +316,7 @@ app.include_router(memory_management_router)
 app.include_router(agent_state_router)
 app.include_router(pathos_chronos_api_router)
 app.include_router(websocket_api_router) # Include WebSocket router
+app.include_router(firmament_api_router) # Include Firmament router
 
 if WEBAPP_DIR.is_dir(): # pragma: no cover
     js_dir = WEBAPP_DIR / "js"; css_dir = WEBAPP_DIR / "css"

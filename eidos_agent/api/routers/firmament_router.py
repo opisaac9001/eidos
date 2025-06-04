@@ -1,17 +1,33 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException # Depends & HTTPException for future endpoint
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, Optional # Added Optional
 
-# Placeholder for FirmamentModule dependency, similar to oneiros_router
-from eidos_agent.features.firmament_module.module import FirmamentModule # Uncommented
-async def get_firmament_module() -> FirmamentModule: # Uncommented and defined
-    # This function needs to be replaced by actual dependency injection logic
-    # that provides the singleton FirmamentModule instance.
-    raise NotImplementedError(
-        "Dependency provider 'get_firmament_module' is a placeholder and "
-        "needs to be implemented to return the actual FirmamentModule instance."
-    )
+from eidos_agent.features.firmament_module.module import FirmamentModule
+
+# Global variable to hold the FirmamentModule instance for this router
+_current_firmament_module: Optional[FirmamentModule] = None
+
+def init_firmament_router(fm_module: FirmamentModule):
+    '''
+    Initializes the Firmament router with the FirmamentModule instance.
+    This is called from main.py during startup.
+    '''
+    global _current_firmament_module
+    _current_firmament_module = fm_module
+    logger.info("Firmament router initialized with FirmamentModule instance.")
+
+async def get_firmament_module_dependency() -> FirmamentModule:
+    '''
+    FastAPI dependency provider for FirmamentModule.
+    '''
+    if _current_firmament_module is None:
+        logger.error("FirmamentModule dependency not available. Router not properly initialized from main.py.")
+        raise HTTPException(
+            status_code=503, # Service Unavailable
+            detail="FirmamentModule is not available or not initialized for this router."
+        )
+    return _current_firmament_module
 
 router = APIRouter(
     prefix="/v1/firmament",
@@ -31,7 +47,7 @@ class SubconsciousIntentionPayload(BaseModel):
 )
 async def handle_subconscious_intention(
     payload: SubconsciousIntentionPayload,
-    firmament_module: FirmamentModule = Depends(get_firmament_module)
+    firmament_module: FirmamentModule = Depends(get_firmament_module_dependency) # Updated
 ):
     logger.info(
         f"Firmament Router: Received subconscious intention: '{payload.intention[:100]}...'. "
