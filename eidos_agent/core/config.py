@@ -172,6 +172,10 @@ class EidosTTSConfig(TypedDict, total=False):
     lang_code: Optional[str]
     normalization_options: Optional[Dict[str, bool]]
 
+class FirmamentModuleConfig(TypedDict, total=False):
+    enable_firmament: bool
+    firmament_llm_role: str  # Role to look up in Config.LLM
+    simulation_tick_interval_seconds: float
 
 class Config:
     LLM: Dict[str, LLMConfig] = {
@@ -243,6 +247,13 @@ class Config:
     ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "True").lower() == "true"
     ENABLE_KNOWLEDGE_UPKEEP = os.getenv("ENABLE_KNOWLEDGE_UPKEEP", "True").lower() == "true"
     ENABLE_AUTONOMOUS_CURIOSITY_RESEARCH = os.getenv("ENABLE_AUTONOMOUS_CURIOSITY_RESEARCH", "False").lower() == "true"
+    ENABLE_FIRMAMENT = os.getenv("ENABLE_FIRMAMENT", "True").lower() == "true"
+
+    FIRMAMENT_MODULE: FirmamentModuleConfig = {
+        "enable_firmament": ENABLE_FIRMAMENT, # Use the class attribute
+        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"), # Default to an existing efficient LLM role
+        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", 15 * 60)) # Default 15 mins
+    }
 
     ETHOS: EthosConfig = {
         "memory_db_path": os.getenv("ETHOS_MEMORY_DB_PATH", str(PROJECT_ROOT / "eidos_memories" / "memory.sqlite")),
@@ -483,6 +494,8 @@ class Config:
     def get_eidos_tts_config() -> Optional[EidosTTSConfig]: return Config.EIDOS_TTS
     @staticmethod
     def get_admin_password() -> Optional[str]: return Config.EIDOS_ADMIN_PASSWORD
+    @staticmethod
+    def get_firmament_module_config() -> FirmamentModuleConfig: return Config.FIRMAMENT_MODULE
 
     @staticmethod
     def setup():
