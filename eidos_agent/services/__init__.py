@@ -1,1 +1,5 @@
-# Placeholder for eidos_agent\services\__init__.py
+from .memory_ingestion_service import MemoryIngestionService
+
+__all__ = [
+    "MemoryIngestionService"
+]
