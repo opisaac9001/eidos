@@ -213,12 +213,14 @@ class FirmamentModule:
             logger.error(f"FirmamentModule: Error getting current mood: {e}", exc_info=True)
             return None
 
-    async def _generate_activity_log_snippet(self, activity_slot: ActivitySlot, mood: Dict[str, Any]) -> Optional[str]:
+    async def _generate_activity_log_snippet(self, activity_slot: ActivitySlot, mood: Dict[str, Any]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
         if not self.http_client or not self.firmament_llm_config or not self.firmament_llm_config.get("url"):
             logger.error("FirmamentModule: Firmament LLM client or configuration is not available. Cannot generate snippet.")
-            return None
+            return None, None
 
         firmament_llm_role = self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE") # Fallback role
+        deviation_info: Optional[Dict[str, Any]] = None
+        actual_snippet_text: Optional[str] = None
 
         try:
             # Dream Influence
@@ -250,39 +252,79 @@ class FirmamentModule:
             )
             user_prompt_parts = [
                 f"Current Schedule: Slot '{activity_slot.slot_name}' (Activity: '{activity_slot.activity_title}') from {activity_slot.start_time.strftime('%H:%M')} to {activity_slot.end_time.strftime('%H:%M')}.",
-                f"Current Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')})."
             ]
-            if dream_influence_text:
+
+            # Check for sub_focus (Living Calendar specific detail)
+            sub_focus_text = None
+            if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
+                sub_focus_text = activity_slot.activity_details.sub_focus
+
+            if sub_focus_text:
+                user_prompt_parts.append(f"Specific Focus for this Activity: '{sub_focus_text}'.")
+
+            # Existing appends for Mood, Dream Influence, Setting, and the final instruction
+            user_prompt_parts.append(f"Current Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).")
+            if dream_influence_text: # Make sure this is handled correctly if dream_influence_text might not be defined
                 user_prompt_parts.append(f"Subtle Influence from Recent Dream: {dream_influence_text}")
             user_prompt_parts.append(f"Current Setting: {environmental_context}")
-            user_prompt_parts.append("Describe a brief moment (one sentence):")
+            user_prompt_parts.append(
+                f"Describe a brief moment (one sentence). If your description implies Pathos is about to START A COMPLETELY NEW AND DIFFERENT activity "
+                f"than the scheduled one ('{activity_slot.activity_title}'), append a JSON object on a NEW LINE after your descriptive sentence, "
+                f"like this: {{\"deviate\": true, \"new_task_title\": \"Brief title for new task\", \"new_task_description\": \"Short description of what he now wants to do\", \"estimated_duration_minutes\": 30, \"new_task_type\": \"reflective\"}}. "
+                f"Valid new_task_types: work, intellectual, reflective, creative, leisure, maintenance, social, learning, planning, other. Otherwise, just provide the single descriptive sentence."
+            )
             user_prompt = "\n".join(user_prompt_parts)
 
             messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
-            firmament_llm_role = self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE") # Ensure consistent role usage
-            snippet_text = await self._call_llm_api(
+            llm_full_response = await self._call_llm_api(
                 messages=messages,
                 llm_role_name=firmament_llm_role,
-                max_tokens_override=60,
+                max_tokens_override=150, # Increased max_tokens for potential JSON
                 temperature_override=self.firmament_llm_config.get("temperature", 0.6) if self.firmament_llm_config else 0.6
             )
 
-            if snippet_text:
-                # Further clean-up: remove potential quote marks if LLM wraps output
-                # This specific cleaning can remain here if needed.
-                if snippet_text.startswith('"') and snippet_text.endswith('"'):
-                    snippet_text = snippet_text[1:-1]
-                if snippet_text.startswith("'") and snippet_text.endswith("'"):
-                    snippet_text = snippet_text[1:-1]
-                logger.info(f"FirmamentModule: Generated snippet: '{snippet_text}'")
-                return snippet_text
+            if llm_full_response:
+                lines = llm_full_response.strip().split('\n')
+                actual_snippet_text = lines[0].strip() # Assume the first line is the snippet
+
+                if len(lines) > 1:
+                    for line_idx in range(1, len(lines)):
+                        json_line_candidate = lines[line_idx].strip()
+                        # Handle potential markdown around JSON
+                        if json_line_candidate.startswith("```json"):
+                            json_line_candidate = json_line_candidate[len("```json"):].strip()
+                        if json_line_candidate.endswith("```"):
+                            json_line_candidate = json_line_candidate[:-len("```")].strip()
+
+                        # Handle potential double curly braces from LLM error
+                        if json_line_candidate.startswith("{{") and json_line_candidate.endswith("}}"):
+                             json_line_candidate = json_line_candidate[1:-1] # Strip one layer
+
+                        if json_line_candidate.startswith("{") and json_line_candidate.endswith("}"):
+                            try:
+                                parsed_json = json.loads(json_line_candidate)
+                                if isinstance(parsed_json, dict) and parsed_json.get("deviate") is True:
+                                    deviation_info = parsed_json
+                                    logger.info(f"FirmamentModule: Parsed deviation JSON from LLM: {deviation_info}")
+                                    break # Found deviation JSON
+                            except json.JSONDecodeError:
+                                logger.warning(f"FirmamentModule: Failed to parse potential JSON line: '{json_line_candidate}'")
+
+                # Clean up potential quote marks from the actual snippet text
+                if actual_snippet_text and actual_snippet_text.startswith('"') and actual_snippet_text.endswith('"'):
+                    actual_snippet_text = actual_snippet_text[1:-1]
+                if actual_snippet_text and actual_snippet_text.startswith("'") and actual_snippet_text.endswith("'"):
+                    actual_snippet_text = actual_snippet_text[1:-1]
+
+                logger.info(f"FirmamentModule: Generated snippet: '{actual_snippet_text}', Deviation: {deviation_info is not None}")
+                return actual_snippet_text, deviation_info
 
             logger.warning(f"FirmamentModule: _call_llm_api for snippet generation returned None or empty. Role: {firmament_llm_role}")
-            return None
-        except Exception as e: # General exception handling for the logic within this method
+            return None, None
+        except Exception as e:
             logger.error(f"FirmamentModule: Unexpected error in _generate_activity_log_snippet logic: {e}", exc_info=True)
-            return None
+            return None, None
 
     async def _store_activity_log(self, snippet: str, activity_slot: ActivitySlot, mood_at_time: Dict[str, Any], related_intention_id: Optional[str] = None, extra_metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         if not self.fm_config.get("enable_firmament") or not self.ethos_core:
@@ -360,15 +402,68 @@ class FirmamentModule:
                 mood = {"name": "unknown", "valence": 0.0, "arousal": 0.0}
                 logger.warning("FirmamentModule: Could not retrieve current mood. Using default for tick.")
 
-            snippet = await self._generate_activity_log_snippet(activity_slot, mood)
-            if snippet:
-                await self._store_activity_log(snippet, activity_slot, mood)
-            else:
-                logger.info("FirmamentModule: No activity log snippet generated during this simulation tick.")
+            # Pass the current activity_slot (which could be None if Pathos is idle)
+            # or a dummy slot if activity_slot is None, to ensure _generate_activity_log_snippet always gets a valid slot object.
+            context_slot_for_snippet = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Idle / Between Activities")
+            snippet, deviation_data = await self._generate_activity_log_snippet(context_slot_for_snippet, mood)
 
-            # NPC Interaction part
-            if self._is_npc_interaction_warranted(activity_slot, None):
-                npc_profile_to_use: Optional[NPCProfile] = None
+            if deviation_data and self.chronos_engine:
+                logger.info(f"Firmament: Deviation detected by LLM: {deviation_data}")
+                new_task_title = deviation_data.get("new_task_title")
+                new_task_description = deviation_data.get("new_task_description")
+                duration_minutes = deviation_data.get("estimated_duration_minutes")
+                new_task_type_str = deviation_data.get("new_task_type", "other")
+
+                from eidos_agent.persona_logic.chronos_engine.models import ActivityType # Ensure import
+                from datetime import timedelta # Ensure timedelta is imported
+
+                valid_activity_types = list(ActivityType.__args__) # type: ignore
+                if new_task_type_str not in valid_activity_types:
+                    logger.warning(f"Invalid new_task_type '{new_task_type_str}' from LLM. Defaulting to 'other'.")
+                    new_task_type = 'other'
+                else:
+                    new_task_type = new_task_type_str # type: ignore
+
+                if new_task_title and new_task_description and isinstance(duration_minutes, int) and duration_minutes > 0:
+                    estimated_duration = timedelta(minutes=duration_minutes)
+
+                    current_slot_id_to_interrupt = None
+                    # activity_slot is the original slot that was active at the start of the tick
+                    if activity_slot and activity_slot.slot_name != "AdHocFirmamentActivity":
+                        current_slot_id_to_interrupt = activity_slot.id
+
+                    newly_started_spontaneous_slot = await self.chronos_engine.report_spontaneous_activity(
+                        user_id=PATHOS_USER_ID,
+                        current_slot_id_if_any=current_slot_id_to_interrupt,
+                        new_activity_title=new_task_title,
+                        new_activity_description=new_task_description,
+                        estimated_duration=estimated_duration,
+                        new_activity_type=new_task_type
+                        # new_activity_location could be added to LLM output too if desired
+                    )
+
+                    if newly_started_spontaneous_slot:
+                        logger.info(f"Firmament: ChronosEngine confirmed spontaneous activity: {newly_started_spontaneous_slot.activity_title}")
+                        if snippet: # Log the original snippet that might have indicated the deviation thought
+                            log_slot_context_for_deviation_snippet = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Reflecting before spontaneous action")
+                            await self._store_activity_log(snippet, log_slot_context_for_deviation_snippet, mood, extra_metadata={"deviation_led_to_spontaneous_task": new_task_title})
+                        return # End the tick here, as a new activity has been started and schedule adjusted.
+                    else:
+                        logger.warning("Firmament: ChronosEngine failed to start spontaneous activity or returned None.")
+                else:
+                    logger.warning(f"Firmament: LLM deviation data incomplete: {deviation_data}")
+
+            # Original snippet logging if no deviation or if deviation processing failed to start a new task
+            if snippet:
+                log_context_slot_for_original_snippet = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Observing environment")
+                await self._store_activity_log(snippet, log_context_slot_for_original_snippet, mood)
+
+            if not snippet and not deviation_data: # Only run NPC if no snippet AND no deviation attempt was made
+                logger.info("FirmamentModule: No activity log snippet generated and no deviation detected. Checking for NPC interaction.")
+                # Use npc_context_slot for clarity, which is activity_slot or a dummy if idle
+                npc_context_slot = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Idle observation for NPC check")
+                if self._is_npc_interaction_warranted(npc_context_slot, None):
+                    npc_profile_to_use: Optional[NPCProfile] = None
                 interaction_source_description = "activity"
 
                 if activity_slot and activity_slot.activity_details and isinstance(activity_slot.activity_details.metadata, dict):
@@ -636,10 +731,75 @@ class FirmamentModule:
                     snippet=simulated_action_snippet, activity_slot=activity_slot_for_storage,
                     mood_at_time=current_mood, related_intention_id=original_intention_memory_id
                 )
-            else:
+
+            # Report outcome for the actual current_activity_slot if it's not a dummy one
+            if current_activity_slot and current_activity_slot.slot_name != "AdHocFirmamentActivity" and self.chronos_engine:
+                event_time_dt = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
+                if not event_time_dt:
+                    event_time_dt = datetime.now(timezone.utc) # Fallback
+
+                # Heuristic for outcome_status
+                determined_outcome_status = 'partially_completed' # Default
+
+                COMPLETION_KEYWORDS = {'complete', 'finish', 'finished', 'done', 'send', 'sent', 'submit', 'submitted', 'finalize', 'finalized', 'achieve', 'achieved', 'resolve', 'resolved', 'accomplish', 'accomplished'}
+                INTERRUPTION_KEYWORDS = {'instead', 'actually', 'switched to', 'distracted by', 'suddenly remembered', 'abandoned'}
+                # CONTINUATION_KEYWORDS not strictly needed due to default and interruption logic
+
+                slot_text_content = (
+                    (current_activity_slot.activity_title or "") + " " +
+                    (current_activity_slot.activity_details.description or "") + " " +
+                    (current_activity_slot.activity_details.sub_focus or "")
+                ).lower()
+                intention_text_lower = (intention or "").lower()
+                snippet_text_lower = (simulated_action_snippet or "").lower()
+
+                def text_contains_any_keyword(text: str, keywords: set) -> bool:
+                    if not text: return False
+                    return any(keyword in text for keyword in keywords)
+
+                slot_words = set(w for w in slot_text_content.split() if len(w) > 3)
+                intention_snippet_combined_text = intention_text_lower + " " + snippet_text_lower
+                intention_snippet_words = set(w for w in intention_snippet_combined_text.split() if len(w) > 3)
+
+                are_related = False
+                if slot_words and intention_snippet_words: # Ensure both sets are non-empty before intersection
+                    are_related = len(slot_words.intersection(intention_snippet_words)) > 0
+
+                is_completion_action = text_contains_any_keyword(intention_snippet_combined_text, COMPLETION_KEYWORDS)
+                is_interruption_action = text_contains_any_keyword(intention_snippet_combined_text, INTERRUPTION_KEYWORDS)
+
+                if is_completion_action:
+                    if are_related:
+                        determined_outcome_status = 'completed'
+                        logger.debug(f"Status for slot {current_activity_slot.id} determined as 'completed' by keywords and relatedness.")
+                    else: # Completion keywords present, but for something unrelated
+                        determined_outcome_status = 'interrupted'
+                        logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' (completed unrelated task).")
+                elif is_interruption_action:
+                    determined_outcome_status = 'interrupted'
+                    logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' by keywords.")
+                elif not are_related and (intention_text_lower.strip() or snippet_text_lower.strip()): # Action taken but unrelated
+                    determined_outcome_status = 'interrupted'
+                    logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' due to low topic similarity with non-empty intention/snippet.")
+                elif are_related: # Default 'partially_completed' is appropriate
+                     logger.debug(f"Status for slot {current_activity_slot.id} defaults to 'partially_completed' (related action, no completion/interruption keywords).")
+                # If no keywords, and not related, and intention/snippet are empty, it also defaults to 'partially_completed' - this might be okay, or could be 'interrupted' if intention was to do nothing related.
+                # For now, the above logic covers main cases.
+
+                logger.info(f"Firmament: Reporting outcome for scheduled slot '{current_activity_slot.activity_title}' (ID: {current_activity_slot.id}) as '{determined_outcome_status}' due to intention processing: '{intention[:50]}...'. Snippet: '{snippet_text_lower[:50]}...'")
+                await self.chronos_engine.report_activity_outcome(
+                    slot_id=current_activity_slot.id,
+                    actual_end_time=event_time_dt.time(),
+                    status=determined_outcome_status, # USE THE NEW VARIABLE HERE
+                    outcome_metadata={
+                        "source": "firmament_intention_consequence",
+                        "intention_text": intention,
+                        "simulated_action_snippet": simulated_action_snippet or "N/A"
+                    }
+                )
+            elif not simulated_action_snippet :
                 logger.warning(f"FirmamentModule: _call_llm_api for P2 intention simulation returned None. Role: {firmament_llm_role}")
-                # Removed 'return' here to allow flow to continue even if snippet is None,
-                # consistent with original behavior where LLM failure didn't stop the method.
+
         except Exception as e: # Catchall for the logic within this method, including storage
             logger.error(f"Error in _simulate_intention_consequence logic: {e}", exc_info=True)
 

@@ -1,8 +1,12 @@
 import asyncio
 from datetime import datetime, date, time, timedelta, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 import json
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None # type: ignore
 import random
 
 from eidos_agent.core.config import Config, LLMConfig
@@ -57,6 +61,40 @@ class ChronosEngine:
         self.event_day_slots = [(name, time(sh, sm), time(eh, em), type_val) for name, (sh, sm), (eh, em), type_val in self.event_day_slots_template_config]
 
         logger.info("ChronosEngine initialized.")
+
+    ACTIVITY_TYPE_TO_IMPORTANCE: Dict[ActivityType, Literal['high', 'medium', 'low']] = {
+        'work': 'high', 'intellectual': 'high',
+        'event_related': 'high',
+        'social': 'medium', 'learning': 'medium', 'creative': 'medium',
+        'planning': 'medium', 'travel': 'medium',
+        'reflective': 'low', 'leisure': 'low', 'maintenance': 'low', 'other': 'low'
+    }
+
+    def _get_slot_duration(self, slot: ActivitySlot) -> timedelta:
+        # Ensure start_time and end_time are valid time objects
+        if not isinstance(slot.start_time, time) or not isinstance(slot.end_time, time):
+            logger.error(f"Slot {slot.id} has invalid time types for duration calculation. Start: {type(slot.start_time)}, End: {type(slot.end_time)}")
+            return timedelta(0)
+        return datetime.combine(slot.date, slot.end_time) - datetime.combine(slot.date, slot.start_time)
+
+    def _get_slot_importance(self, slot: ActivitySlot, event_map: Dict[str, PathosEvent]) -> Literal['critical', 'high', 'medium', 'low']:
+        if slot.activity_details and slot.activity_details.metadata:
+            source_event_id = slot.activity_details.metadata.get('source_event_id')
+            if source_event_id and source_event_id in event_map:
+                event = event_map[source_event_id]
+                if event.details and event.details.importance:
+                    # Ensure the value is one of the allowed Literal strings
+                    if event.details.importance in ['critical', 'high', 'medium', 'low']:
+                        return event.details.importance
+                    else:
+                        logger.warning(f"Event {event.id} has invalid importance '{event.details.importance}'. Defaulting for slot {slot.id}.")
+
+        importance_val_str = self.ACTIVITY_TYPE_TO_IMPORTANCE.get(slot.activity_type, 'medium')
+        # Cast to Literal type
+        if importance_val_str == 'critical': return 'critical' # Should not happen from this map
+        if importance_val_str == 'high': return 'high'
+        if importance_val_str == 'low': return 'low'
+        return 'medium'
 
     def _get_llm_for_activity_generation(self) -> Optional[LLMConfig]:
         scheduler_llm_role = self.config.ETHOS.get('scheduler_llm_role', 'LOGOS_TECHNE')
@@ -368,3 +406,273 @@ class ChronosEngine:
         current_schedule = await self.get_todays_schedule_for_user()
         if current_schedule: logger.info(f"Chronos: Today's ({today}) schedule for Pathos available ({len(current_schedule)} activities).")
         else: logger.warning(f"Chronos: Failed to ensure today's ({today}) schedule for Pathos is available.")
+
+    async def report_activity_outcome(self,
+                                    slot_id: str,
+                                    actual_end_time: time,
+                                    status: Literal['completed', 'partially_completed', 'interrupted'],
+                                    outcome_metadata: Optional[Dict[str, Any]] = None):
+        logger.info(f"Reporting outcome for slot_id: {slot_id}. Status: {status}, Actual End Time: {actual_end_time.isoformat() if actual_end_time else 'N/A'}. Outcome Metadata: {outcome_metadata}")
+
+        slot_to_update = await self.memory_storage.get_schedule_item_by_id(slot_id)
+
+        if not slot_to_update:
+            logger.warning(f"report_activity_outcome: ActivitySlot with ID '{slot_id}' not found. Cannot update outcome.")
+            return
+
+        slot_to_update.actual_end_time = actual_end_time
+        slot_to_update.status = status
+
+        if outcome_metadata and isinstance(outcome_metadata, dict):
+            if "deviation_reason" in outcome_metadata and outcome_metadata["deviation_reason"]:
+                slot_to_update.deviation_reason = (slot_to_update.deviation_reason + "; " if slot_to_update.deviation_reason else "") + str(outcome_metadata["deviation_reason"])
+            logger.debug(f"Outcome metadata processed for slot {slot_id}: {outcome_metadata}")
+
+
+        target_date = slot_to_update.date
+        user_id = slot_to_update.user_id
+
+        async with self._schedule_generation_lock:
+            todays_schedule: List[ActivitySlot] = await self.memory_storage.load_schedule_from_db(target_date, user_id)
+
+            if not todays_schedule:
+                logger.warning(f"report_activity_outcome: Could not load schedule for date {target_date} to update slot {slot_id}. Saving only the updated slot.")
+                await self.memory_storage.save_schedule_to_db([slot_to_update], user_id)
+                if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                     self._todays_schedule_cache[user_id] = [slot_to_update]
+                return
+
+            current_slot_index = -1
+            slot_updated_in_list = False
+            for i, s in enumerate(todays_schedule):
+                if s.id == slot_id:
+                    todays_schedule[i] = slot_to_update
+                    current_slot_index = i
+                    slot_updated_in_list = True
+                    break
+
+            if not slot_updated_in_list: # Should not happen if load_schedule_from_db is consistent with get_schedule_item_by_id
+                 logger.error(f"report_activity_outcome: Slot {slot_id} found by ID but not in loaded daily schedule for {target_date}. Appending and saving.")
+                 todays_schedule.append(slot_to_update)
+                 todays_schedule.sort(key=lambda s: s.start_time) # Ensure order
+
+            overall_schedule_has_changed = slot_updated_in_list # True if the primary slot was updated in the list
+
+            deviation = timedelta(0)
+            if slot_to_update.actual_end_time and slot_to_update.end_time:
+                actual_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
+                scheduled_end_dt = datetime.combine(slot_to_update.date, slot_to_update.end_time)
+                deviation = actual_end_dt - scheduled_end_dt
+
+            SIGNIFICANT_DEVIATION_THRESHOLD = timedelta(minutes=5)
+
+            if current_slot_index != -1 and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD:
+                event_id_to_event_map: Dict[str, PathosEvent] = {}
+                source_event_ids = list(set(
+                    s.activity_details.metadata.get('source_event_id')
+                    for s in todays_schedule
+                    if s.activity_details and s.activity_details.metadata and s.activity_details.metadata.get('source_event_id')
+                ))
+                for event_id_str in source_event_ids:
+                    if event_id_str: # Ensure not None
+                        event = await self.memory_storage.get_event_by_id(event_id_str)
+                        if event: event_id_to_event_map[event_id_str] = event
+
+                if deviation > timedelta(0): # Lost time
+                    time_to_absorb = deviation
+                    logger.info(f"Slot {slot_id} created positive deviation: {time_to_absorb}. Attempting absorption.")
+                    HIGH_FLEXIBILITY_THRESHOLD = 0.8
+                    MIN_SLOT_DURATION_AFTER_SHORTEN = timedelta(minutes=15)
+                    schedule_changed_due_to_absorption = False
+
+                    for i in range(current_slot_index + 1, len(todays_schedule)):
+                        slot_eval = todays_schedule[i]
+                        if time_to_absorb <= timedelta(0): break
+                        if not (slot_eval.status == 'pending' or slot_eval.status == 'delayed'): continue
+
+                        importance = self._get_slot_importance(slot_eval, event_id_to_event_map)
+                        flexibility = slot_eval.activity_details.flexibility_score if slot_eval.activity_details.flexibility_score is not None else 0.5
+
+                        if importance == 'low' and flexibility >= HIGH_FLEXIBILITY_THRESHOLD:
+                            slot_duration_val = self._get_slot_duration(slot_eval)
+                            if time_to_absorb >= slot_duration_val:
+                                logger.info(f"Skipping low-importance, high-flex slot '{slot_eval.activity_title}' (duration: {slot_duration_val}) to absorb delay from {slot_id}.")
+                                time_to_absorb -= slot_duration_val
+                                slot_eval.status = 'skipped'; slot_eval.deviation_reason = (slot_eval.deviation_reason or "") + f";skipped_to_absorb_from_{slot_id}"
+                                slot_eval.actual_start_time = None; slot_eval.actual_end_time = None
+                                schedule_changed_due_to_absorption = True
+                            else:
+                                original_end_t = slot_eval.end_time
+                                new_end_dt_abs = datetime.combine(slot_eval.date, slot_eval.end_time) - time_to_absorb
+                                if (datetime.combine(slot_eval.date, slot_eval.start_time) + MIN_SLOT_DURATION_AFTER_SHORTEN) <= new_end_dt_abs:
+                                    logger.info(f"Shortening low-importance, high-flex slot '{slot_eval.activity_title}' by {time_to_absorb} from {slot_id}.")
+                                    if slot_eval.original_scheduled_end_time is None: slot_eval.original_scheduled_end_time = original_end_t
+                                    slot_eval.end_time = new_end_dt_abs.time()
+                                    slot_eval.deviation_reason = (slot_eval.deviation_reason or "") + f";shortened_to_absorb_from_{slot_id}"
+                                    time_to_absorb = timedelta(0)
+                                    schedule_changed_due_to_absorption = True
+                    if schedule_changed_due_to_absorption: overall_schedule_has_changed = True
+
+                    deviation = time_to_absorb # Update deviation to remaining time_to_absorb for final shift
+
+                # Cascading shift for any remaining deviation (positive or negative)
+                if abs(deviation) > timedelta(microseconds=1): # If any deviation remains or was gained
+                    logger.info(f"Applying final shift of {deviation} to subsequent slots after slot {slot_id}.")
+                    last_effective_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
+
+                    for i in range(current_slot_index + 1, len(todays_schedule)):
+                        slot_to_shift = todays_schedule[i]
+                        if slot_to_shift.status == 'skipped': continue
+
+                        original_start_t = slot_to_shift.original_scheduled_start_time or slot_to_shift.start_time
+                        slot_duration = self._get_slot_duration(slot_to_shift) # Use current duration (might have been shortened)
+
+                        # Set original times if not set yet (first time this slot is being shifted)
+                        if slot_to_shift.original_scheduled_start_time is None: slot_to_shift.original_scheduled_start_time = slot_to_shift.start_time
+                        if slot_to_shift.original_scheduled_end_time is None: slot_to_shift.original_scheduled_end_time = slot_to_shift.end_time
+
+                        new_start_dt = datetime.combine(slot_to_shift.date, original_start_t) + deviation
+
+                        if last_effective_end_dt and new_start_dt < last_effective_end_dt : # Prevent overlap if shifting earlier or packing
+                             new_start_dt = last_effective_end_dt
+
+                        slot_to_shift.start_time = new_start_dt.time()
+                        slot_to_shift.end_time = (new_start_dt + slot_duration).time()
+
+                        if slot_to_shift.status == 'pending': slot_to_shift.status = 'delayed'
+                        shift_type = 'late' if deviation > timedelta(0) else 'early'
+                        slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason or "") + f";shifted_{shift_type}_due_to_{slot_id}"
+                        overall_schedule_has_changed = True
+                        last_effective_end_dt = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
+
+            # Event Completion Logic (after all schedule adjustments)
+            if slot_to_update.status == 'completed':
+                if slot_to_update.activity_details and slot_to_update.activity_details.metadata:
+                    source_event_id = slot_to_update.activity_details.metadata.get('source_event_id')
+                    if source_event_id and isinstance(source_event_id, str):
+                        event_to_update = await self.memory_storage.get_event_by_id(source_event_id)
+                        if event_to_update:
+                            is_specific_timed_single_day_event = (
+                                event_to_update.specific_time is not None and
+                                event_to_update.start_date == slot_to_update.date and
+                                event_to_update.end_date == slot_to_update.date
+                            )
+                            if is_specific_timed_single_day_event and event_to_update.status != 'completed':
+                                event_to_update.status = 'completed'
+                                if slot_to_update.actual_end_time:
+                                    pathos_local_dt_at_event_end = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
+                                    pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
+                                    pathos_tz = timezone.utc
+                                    if ZoneInfo and pathos_tz_str.lower() != "utc":
+                                        try: pathos_tz = ZoneInfo(pathos_tz_str)
+                                        except Exception as e_tz: logger.warning(f"Could not resolve TZ '{pathos_tz_str}': {e_tz}. Using UTC.")
+                                    pathos_local_dt_at_event_end = pathos_local_dt_at_event_end.replace(tzinfo=pathos_tz)
+                                    event_to_update.actual_end_datetime = pathos_local_dt_at_event_end.astimezone(timezone.utc)
+                                    logger.info(f"Marking event {event_to_update.id} as 'completed'. End UTC: {event_to_update.actual_end_datetime.isoformat()}")
+                                else:
+                                    logger.warning(f"Cannot set actual_end_datetime for event {event_to_update.id}, slot's actual_end_time is None.")
+                                await self.memory_storage.add_event_to_db(event_to_update)
+                        elif event_to_update: logger.debug(f"Event {event_to_update.id} not a specific timed single day event, not auto-completing.")
+                        else: logger.warning(f"Source event ID {source_event_id} from slot {slot_to_update.id} not found.")
+                else: logger.debug(f"Slot {slot_to_update.id} completed, but no metadata to link to an event.")
+
+            if overall_schedule_has_changed:
+                await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
+                logger.info(f"Saved updates for slot {slot_id} (and potentially subsequent slots/event) to DB for {target_date}.")
+                if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                    self._todays_schedule_cache[user_id] = todays_schedule
+                    logger.debug(f"Cache updated for {target_date} after reporting outcome for slot {slot_id}.")
+            else: # Should only happen if slot_id was not found in todays_schedule initially, which is unlikely if get_schedule_item_by_id worked.
+                logger.warning(f"report_activity_outcome: No changes made to schedule for slot {slot_id} on {target_date}. This might indicate an issue if an update was expected.")
+
+
+    async def report_spontaneous_activity(self,
+                                        user_id: str,
+                                        current_slot_id_if_any: Optional[str],
+                                        new_activity_title: str,
+                                        new_activity_description: str,
+                                        estimated_duration: timedelta,
+                                        new_activity_type: ActivityType = 'other',
+                                        new_activity_location: Optional[str] = None) -> Optional[ActivitySlot]:
+
+        now_local_dt = await self.ethos_core.get_local_datetime_for_user(user_id)
+        current_date_val = now_local_dt.date()
+        current_time_val = now_local_dt.time()
+
+        if current_slot_id_if_any:
+            logger.info(f"Spontaneous activity '{new_activity_title}' is interrupting current slot {current_slot_id_if_any}.")
+            await self.report_activity_outcome(
+                slot_id=current_slot_id_if_any,
+                actual_end_time=current_time_val,
+                status='interrupted',
+                outcome_metadata={"reason": f"interrupted_by_spontaneous: {new_activity_title[:50]}"}
+            )
+
+        new_slot_start_time = current_time_val
+        new_slot_start_datetime = datetime.combine(current_date_val, new_slot_start_time)
+        new_slot_end_datetime = new_slot_start_datetime + estimated_duration
+        new_slot_end_time = new_slot_end_datetime.time()
+
+        spontaneous_slot_details = ActivitySlotDetails(
+            description=new_activity_description,
+            location_context=new_activity_location,
+            flexibility_score=0.6, # Default moderate flexibility
+            metadata={"source": "spontaneous_firmament", "original_title_request": new_activity_title}
+        )
+
+        new_spontaneous_slot = ActivitySlot(
+            id=f"slot_{uuid.uuid4().hex}",
+            user_id=user_id, date=current_date_val,
+            start_time=new_slot_start_time, end_time=new_slot_end_time,
+            slot_name=f"Spontaneous: {new_activity_title[:30]}",
+            activity_title=new_activity_title, activity_type=new_activity_type,
+            activity_details=spontaneous_slot_details,
+            status='in_progress', actual_start_time=new_slot_start_time,
+            deviation_reason='spontaneous_activity'
+        )
+        logger.info(f"Created new spontaneous slot: {new_spontaneous_slot.id} ('{new_spontaneous_slot.activity_title}') from {new_spontaneous_slot.start_time} to {new_spontaneous_slot.end_time}")
+
+        async with self._schedule_generation_lock:
+            # Load the latest schedule, which might have been modified by report_activity_outcome if a slot was interrupted
+            todays_schedule = await self.memory_storage.load_schedule_from_db(current_date_val, user_id)
+
+            final_schedule_for_day: List[ActivitySlot] = []
+            spontaneous_slot_inserted = False
+
+            for existing_slot in todays_schedule:
+                # Check for overlap:
+                # A starts before B ends AND A ends after B starts
+                overlap = (existing_slot.start_time < new_spontaneous_slot.end_time and
+                           existing_slot.end_time > new_spontaneous_slot.start_time)
+
+                if overlap:
+                    logger.info(f"Spontaneous slot {new_spontaneous_slot.id} conflicts with existing slot {existing_slot.id} ('{existing_slot.activity_title}'). Marking existing as 'skipped'.")
+                    existing_slot.status = 'skipped'
+                    existing_slot.deviation_reason = (existing_slot.deviation_reason + "; " if existing_slot.deviation_reason else "") + f"superseded_by_spontaneous_{new_spontaneous_slot.id}"
+                    existing_slot.actual_start_time = None
+                    existing_slot.actual_end_time = None
+                    final_schedule_for_day.append(existing_slot) # Keep the skipped slot
+                else:
+                    # If no overlap, decide where to place slots relative to each other
+                    if existing_slot.end_time <= new_spontaneous_slot.start_time:
+                        final_schedule_for_day.append(existing_slot)
+                    elif existing_slot.start_time >= new_spontaneous_slot.end_time:
+                        if not spontaneous_slot_inserted:
+                            final_schedule_for_day.append(new_spontaneous_slot)
+                            spontaneous_slot_inserted = True
+                        final_schedule_for_day.append(existing_slot)
+                    else: # Should not be reached if overlap is handled, but as a fallback
+                        final_schedule_for_day.append(existing_slot)
+
+
+            if not spontaneous_slot_inserted:
+                final_schedule_for_day.append(new_spontaneous_slot)
+
+            final_schedule_for_day.sort(key=lambda s: s.start_time)
+
+            await self.memory_storage.save_schedule_to_db(final_schedule_for_day, user_id)
+            self._todays_schedule_cache[user_id] = final_schedule_for_day
+            self._cache_date = current_date_val
+            logger.info(f"Integrated spontaneous slot {new_spontaneous_slot.id} into schedule for {current_date_val} and saved.")
+
+        return new_spontaneous_slot

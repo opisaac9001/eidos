@@ -30,7 +30,8 @@ class MemoryEntry(TypedDict, total=False):
         'user_fact', 'world_knowledge', 'learned_correction',
         'proactive_action_record', 'queued_discussion_point',
         'learned_feedback_insight', 'suggestion_reflection',
-        'aspiration' # Added from broken EthosCore
+        'aspiration', # Added from broken EthosCore
+        'npc_dialogue_event'
     ]
     content: str
     embedding: Optional[list[float]]
@@ -98,15 +99,20 @@ class MemoryStorage:
                 CREATE TABLE IF NOT EXISTS daily_schedule_items (
                     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, date TEXT NOT NULL, start_time TEXT NOT NULL,
                     end_time TEXT NOT NULL, slot_name TEXT, activity_title TEXT NOT NULL, activity_type TEXT,
-                    activity_details TEXT, generated_at TEXT NOT NULL )""")
+                    activity_details TEXT, generated_at TEXT NOT NULL,
+                    status TEXT, actual_start_time TEXT, actual_end_time TEXT,
+                    deviation_reason TEXT, original_scheduled_start_time TEXT, original_scheduled_end_time TEXT
+                )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_daily_sched_user_date ON daily_schedule_items (user_id, date)")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS pathos_events (
                     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, start_date TEXT NOT NULL,
                     end_date TEXT NOT NULL, event_type TEXT NOT NULL, description TEXT, location TEXT,
-                    details TEXT, created_at TEXT NOT NULL, specific_time TEXT )""")
+                    details TEXT, created_at TEXT NOT NULL, specific_time TEXT,
+                    status TEXT, actual_start_datetime TEXT, actual_end_datetime TEXT
+                )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pathos_events_user_dates ON pathos_events (user_id, start_date, end_date)")
-            conn.commit(); logger.info("DB tables (memories, schedules, events) ensured.")
+            conn.commit(); logger.info("DB tables (memories, schedules, events) ensured with new fields.")
         except sqlite3.Error as e: logger.error(f"Error ensuring DB tables: {e}", exc_info=True); raise
 
     def _serialize_embedding(self, embedding: Optional[List[float]]) -> Optional[bytes]:
@@ -239,8 +245,24 @@ class MemoryStorage:
         try:
             date_str = schedule[0].date.isoformat()
             cursor.execute("DELETE FROM daily_schedule_items WHERE user_id = ? AND date = ?", (user_id, date_str))
-            items = [(item.id, item.user_id, item.date.isoformat(), item.start_time.isoformat(timespec='minutes'), item.end_time.isoformat(timespec='minutes'), item.slot_name, item.activity_title, item.activity_type, item.activity_details.model_dump_json(), item.generated_at.isoformat()) for item in schedule]
-            cursor.executemany("INSERT INTO daily_schedule_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", items)
+            items_to_insert = []
+            for item in schedule:
+                items_to_insert.append((
+                    item.id, item.user_id, item.date.isoformat(),
+                    item.start_time.isoformat(timespec='minutes'), item.end_time.isoformat(timespec='minutes'),
+                    item.slot_name, item.activity_title, item.activity_type,
+                    item.activity_details.model_dump_json(), item.generated_at.isoformat(),
+                    item.status,
+                    item.actual_start_time.isoformat(timespec='minutes') if item.actual_start_time else None,
+                    item.actual_end_time.isoformat(timespec='minutes') if item.actual_end_time else None,
+                    item.deviation_reason,
+                    item.original_scheduled_start_time.isoformat(timespec='minutes') if item.original_scheduled_start_time else None,
+                    item.original_scheduled_end_time.isoformat(timespec='minutes') if item.original_scheduled_end_time else None
+                ))
+            cursor.executemany(
+                "INSERT INTO daily_schedule_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                items_to_insert
+            )
             conn.commit(); logger.info(f"Saved {len(schedule)} schedule items for user '{user_id}' on {date_str}.")
         except sqlite3.Error as e: logger.error(f"Error saving schedule for user '{user_id}': {e}", exc_info=True); conn.rollback()
 
@@ -257,6 +279,18 @@ class MemoryStorage:
                     data_model['start_time'] = time.fromisoformat(data_model['start_time'])
                     data_model['end_time'] = time.fromisoformat(data_model['end_time'])
                     data_model['generated_at'] = datetime.fromisoformat(data_model['generated_at'].replace("Z", "+00:00"))
+                    # Load new fields
+                    data_model['status'] = row_data.get('status', 'pending') # Default if column missing
+                    actual_start_str = row_data.get('actual_start_time')
+                    data_model['actual_start_time'] = time.fromisoformat(actual_start_str) if actual_start_str else None
+                    actual_end_str = row_data.get('actual_end_time')
+                    data_model['actual_end_time'] = time.fromisoformat(actual_end_str) if actual_end_str else None
+                    data_model['deviation_reason'] = row_data.get('deviation_reason')
+                    original_start_str = row_data.get('original_scheduled_start_time')
+                    data_model['original_scheduled_start_time'] = time.fromisoformat(original_start_str) if original_start_str else None
+                    original_end_str = row_data.get('original_scheduled_end_time')
+                    data_model['original_scheduled_end_time'] = time.fromisoformat(original_end_str) if original_end_str else None
+
                     items.append(ActivitySlot(**data_model))
                 except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing schedule item ID {row_data.get('id')}: {e}", exc_info=True)
         except sqlite3.Error as e: logger.error(f"Error loading schedule for user '{user_id}': {e}", exc_info=True)
@@ -265,9 +299,23 @@ class MemoryStorage:
     async def add_event_to_db(self, event: PathosEvent) -> bool:
         conn = self._get_connection(); cursor = conn.cursor()
         try:
-            # Added specific_time to the INSERT and ON CONFLICT SET
-            cursor.execute("INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, description=excluded.description, location=excluded.location, details=excluded.details, specific_time=excluded.specific_time",
-                           (event.id, event.user_id, event.title, event.start_date.isoformat(), event.end_date.isoformat(), event.event_type, event.description, event.location, event.details.model_dump_json(), event.created_at.isoformat(), event.specific_time.isoformat() if event.specific_time else None))
+            cursor.execute(
+                "INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+                "title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, "
+                "description=excluded.description, location=excluded.location, details=excluded.details, "
+                "created_at=excluded.created_at, specific_time=excluded.specific_time, status=excluded.status, "
+                "actual_start_datetime=excluded.actual_start_datetime, actual_end_datetime=excluded.actual_end_datetime",
+                (
+                    event.id, event.user_id, event.title,
+                    event.start_date.isoformat(), event.end_date.isoformat(),
+                    event.event_type, event.description, event.location,
+                    event.details.model_dump_json(), event.created_at.isoformat(),
+                    event.specific_time.isoformat() if event.specific_time else None,
+                    event.status,
+                    event.actual_start_datetime.isoformat() if event.actual_start_datetime else None,
+                    event.actual_end_datetime.isoformat() if event.actual_end_datetime else None
+                )
+            )
             conn.commit(); logger.info(f"Added/Updated event '{event.title}' (ID: {event.id})."); return True
         except sqlite3.Error as e: logger.error(f"Error adding event '{event.title}': {e}", exc_info=True); conn.rollback(); return False
 
@@ -296,6 +344,13 @@ class MemoryStorage:
                     data_model['start_date'] = date.fromisoformat(data_model['start_date'])
                     data_model['end_date'] = date.fromisoformat(data_model['end_date'])
                     data_model['created_at'] = datetime.fromisoformat(data_model['created_at'].replace("Z", "+00:00"))
+                    # Load new event fields
+                    data_model['status'] = row_data_map.get('status', 'planned') # Default if column missing
+                    actual_start_dt_str = row_data_map.get('actual_start_datetime')
+                    data_model['actual_start_datetime'] = datetime.fromisoformat(actual_start_dt_str.replace("Z", "+00:00")) if actual_start_dt_str else None
+                    actual_end_dt_str = row_data_map.get('actual_end_datetime')
+                    data_model['actual_end_datetime'] = datetime.fromisoformat(actual_end_dt_str.replace("Z", "+00:00")) if actual_end_dt_str else None
+
                     events.append(PathosEvent(**data_model))
                 except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing event ID {row_data_map.get('id')}: {e}", exc_info=True)
         except sqlite3.Error as e: logger.error(f"Error fetching events for user '{user_id}': {e}", exc_info=True)
@@ -449,3 +504,117 @@ class MemoryStorage:
         except Exception as e:
             logger.error(f"Error retrieving entries by type '{entry_type}' and user '{user_id}': {e}", exc_info=True)
             return []
+
+    async def get_schedule_item_by_id(self, slot_id: str) -> Optional[ActivitySlot]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM daily_schedule_items WHERE id = ?", (slot_id,))
+            row_data = cursor.fetchone()
+            if not row_data:
+                logger.info(f"No schedule item found with ID {slot_id}")
+                return None
+
+            item_dict = dict(row_data)
+            details_dict_str = item_dict.get('activity_details')
+            details_dict = json.loads(details_dict_str) if details_dict_str else {}
+
+            # Parse date and time fields
+            item_dict['date'] = date.fromisoformat(item_dict['date'])
+            item_dict['start_time'] = time.fromisoformat(item_dict['start_time'])
+            item_dict['end_time'] = time.fromisoformat(item_dict['end_time'])
+            item_dict['generated_at'] = datetime.fromisoformat(item_dict['generated_at'].replace("Z", "+00:00"))
+
+            # Handle new Optional[time] fields for ActivitySlot
+            time_fields_to_parse = ['actual_start_time', 'actual_end_time', 'original_scheduled_start_time', 'original_scheduled_end_time']
+            for time_field in time_fields_to_parse:
+                if item_dict.get(time_field) and isinstance(item_dict[time_field], str):
+                    item_dict[time_field] = time.fromisoformat(item_dict[time_field])
+                else:
+                    # If it's already None (e.g. from DB NULL), or not a string, set to None to be safe for Pydantic
+                    item_dict[time_field] = None
+
+            # Ensure status and deviation_reason are present or default if necessary (Pydantic model handles defaults)
+            # status is TEXT, so direct assignment is fine. Pydantic model default is 'pending'.
+            item_dict['status'] = item_dict.get('status', 'pending')
+            # deviation_reason is TEXT, Pydantic model default is None.
+            item_dict['deviation_reason'] = item_dict.get('deviation_reason')
+
+
+            data_model_for_slot = {
+                **item_dict, # Contains all columns from DB, parsed as needed
+                'activity_details': ActivitySlotDetails(**details_dict) # details_dict has flexibility_score
+            }
+
+            slot = ActivitySlot(**data_model_for_slot)
+            logger.info(f"Retrieved and parsed schedule item ID {slot_id}")
+            return slot
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error loading schedule item ID {slot_id} from DB: {e}", exc_info=True)
+            return None
+        except (json.JSONDecodeError, ValueError, TypeError) as e_parse:
+            # ValueError for fromisoformat, TypeError for Pydantic if unexpected types
+            logger.error(f"Error parsing schedule item ID {slot_id} data: {e_parse}", exc_info=True)
+            return None
+        except Exception as e_generic: # Catch any other unexpected errors
+            logger.error(f"Unexpected error retrieving schedule item ID {slot_id}: {e_generic}", exc_info=True)
+            return None
+
+    async def get_event_by_id(self, event_id: str) -> Optional[PathosEvent]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM pathos_events WHERE id = ?", (event_id,))
+            row_data = cursor.fetchone()
+            if not row_data:
+                logger.info(f"No PathosEvent found with ID {event_id}")
+                return None
+
+            item_dict = dict(row_data)
+            details_dict_str = item_dict.get('details')
+            details_dict = json.loads(details_dict_str) if details_dict_str else {}
+
+            # Parse date/time fields from item_dict
+            item_dict['start_date'] = date.fromisoformat(item_dict['start_date'])
+            item_dict['end_date'] = date.fromisoformat(item_dict['end_date'])
+            item_dict['created_at'] = datetime.fromisoformat(item_dict['created_at'].replace("Z", "+00:00"))
+
+            if item_dict.get('specific_time') and isinstance(item_dict['specific_time'], str):
+                item_dict['specific_time'] = time.fromisoformat(item_dict['specific_time'])
+            else:
+                item_dict['specific_time'] = None
+
+            # Handle new Optional[datetime] fields for PathosEvent
+            for dt_field in ['actual_start_datetime', 'actual_end_datetime']:
+                if item_dict.get(dt_field) and isinstance(item_dict[dt_field], str):
+                    # Ensure timezone awareness, assuming stored as UTC 'Z' or offset
+                    dt_str = item_dict[dt_field]
+                    if dt_str.endswith('Z'):
+                        item_dict[dt_field] = datetime.fromisoformat(dt_str[:-1] + '+00:00')
+                    else:
+                        item_dict[dt_field] = datetime.fromisoformat(dt_str)
+                else:
+                    item_dict[dt_field] = None
+
+            # 'status' is TEXT, directly usable. Pydantic model default is 'planned'.
+            item_dict['status'] = item_dict.get('status', 'planned')
+
+            # 'importance' is in details_dict, handled by PathosEventDetails model
+
+            data_model_for_event = {
+                **item_dict,
+                'details': PathosEventDetails(**details_dict)
+            }
+
+            event = PathosEvent(**data_model_for_event)
+            logger.info(f"Retrieved and parsed PathosEvent ID {event_id}")
+            return event
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error loading PathosEvent ID {event_id} from DB: {e}", exc_info=True)
+            return None
+        except (json.JSONDecodeError, ValueError, TypeError) as e_parse:
+            logger.error(f"Error parsing PathosEvent ID {event_id} data: {e_parse}", exc_info=True)
+            return None
+        except Exception as e_generic: # Catch any other unexpected errors
+            logger.error(f"Unexpected error retrieving PathosEvent ID {event_id}: {e_generic}", exc_info=True)
+            return None
