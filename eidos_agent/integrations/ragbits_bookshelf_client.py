@@ -169,16 +169,91 @@ class RagbitsBookshelfClient:
     # Methods to be refactored in subsequent steps:
     # delete_document_chunks, get_document_chunks
 
-    def delete_document_chunks(self, doc_id: str) -> bool:
-        # This method will be refactored to use self.qdrant_vector_store.delete_by_metadata() or similar
-        logger.warning("RagbitsBookshelfClient.delete_document_chunks is not yet refactored for actual ragbits components.")
-        return False
+    async def delete_document_chunks(self, doc_id: str, user_id: str) -> bool:
+        logger.info(f"Attempting to delete all chunks for document ID '{doc_id}' (user: '{user_id}') from bookshelf.")
 
-    def get_document_chunks(self, doc_id: str) -> List[Dict[str, Any]]:
-        # This method might involve querying with a filter for doc_id or might be removed
-        # if not directly supported by QdrantVectorStore in this way.
-        logger.warning("RagbitsBookshelfClient.get_document_chunks is not yet refactored for actual ragbits components.")
-        return []
+        # Construct the 'where' filter for listing chunks.
+        # Metadata keys should match what was stored in add_document.
+        where_filter = {
+            "metadata.original_document_id": doc_id,
+            "metadata.user_id": user_id  # Ensure user-specific deletion
+        }
+
+        try:
+            logger.debug(f"Listing chunks for doc_id '{doc_id}', user_id '{user_id}' with filter: {where_filter}")
+            # The .list() method in ragbits QdrantVectorStore returns List[VectorStoreEntry]
+            # Setting limit=None should fetch all matching entries based on QdrantVectorStore implementation.
+            entries_to_delete: List[VectorStoreEntry] = await self.qdrant_vector_store.list(
+                where=where_filter,
+                limit=None
+            )
+
+            if not entries_to_delete:
+                logger.info(f"No chunks found for document ID '{doc_id}' and user '{user_id}' to delete.")
+                return True # Document effectively not there for this user, or already deleted.
+
+            ids_to_delete: List[UUID] = [entry.id for entry in entries_to_delete if entry.id]
+
+            if not ids_to_delete:
+                logger.warning(f"Found entries for doc_id '{doc_id}' but could not extract valid UUIDs for deletion.")
+                return False # Should ideally not happen if entries_to_delete was populated and entries have IDs
+
+            logger.debug(f"Found {len(ids_to_delete)} chunk UUIDs to delete for doc_id '{doc_id}'.")
+
+            await self.qdrant_vector_store.remove(ids=ids_to_delete)
+            logger.info(f"Successfully submitted deletion for {len(ids_to_delete)} chunks for document ID '{doc_id}'.")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error deleting chunks for document ID '{doc_id}': {e}", exc_info=True)
+            return False
+
+    # Method to be refactored next:
+    # get_document_chunks
+
+    async def get_document_chunks(self, doc_id: str, user_id: str) -> List[DocumentChunkInfo]:
+        """Retrieves all chunks and their metadata associated with a given document ID and user ID."""
+        logger.info(f"Retrieving all chunks for document ID '{doc_id}' for user '{user_id}'.")
+
+        where_filter = {
+            "metadata.original_document_id": doc_id,
+            "metadata.user_id": user_id
+        }
+
+        retrieved_chunks: List[DocumentChunkInfo] = []
+
+        try:
+            # Using limit=None to attempt to fetch all matching entries.
+            entries: List[VectorStoreEntry] = await self.qdrant_vector_store.list(
+                where=where_filter,
+                limit=None
+            )
+
+            if not entries:
+                logger.info(f"No chunks found for document ID '{doc_id}' and user '{user_id}'.")
+                return []
+
+            for entry in entries:
+                stored_metadata = entry.metadata if entry.metadata else {}
+                # Ensure entry.text is not None before slicing
+                text_content = entry.text if entry.text else ""
+                retrieved_chunks.append(DocumentChunkInfo(
+                    chunk_id=str(entry.id),
+                    document_id=stored_metadata.get("original_document_id", doc_id), # Fallback to input doc_id
+                    chunk_index=stored_metadata.get("chunk_index", -1), # Fallback for index
+                    text_preview=text_content[:200] + "..." if len(text_content) > 200 else text_content,
+                    metadata=stored_metadata
+                ))
+
+            # Sort by chunk_index to ensure original order
+            retrieved_chunks.sort(key=lambda x: x.get("chunk_index", 0))
+
+            logger.info(f"Retrieved {len(retrieved_chunks)} chunks for document ID '{doc_id}'.")
+            return retrieved_chunks
+
+        except Exception as e:
+            logger.error(f"Error retrieving chunks for document ID '{doc_id}': {e}", exc_info=True)
+            return []
 
     async def close(self): # Add a close method for the qdrant client
         if self.qdrant_http_client:
