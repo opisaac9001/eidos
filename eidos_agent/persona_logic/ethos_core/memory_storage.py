@@ -234,13 +234,20 @@ class MemoryStorage:
         except Exception as e: logger.error(f"Failed to embed query '{query_text[:50]}...': {e}"); return []
         try:
             conn = self._get_connection(); cursor = conn.cursor()
-            sql = "SELECT * FROM memories WHERE embedding IS NOT NULL AND type != 'pending_context_document' AND type != 'chat_storage'"
+            # Added "AND (is_archived = 0 OR is_archived IS NULL)" to filter out archived memories
+            sql = "SELECT * FROM memories WHERE embedding IS NOT NULL AND type != 'pending_context_document' AND type != 'chat_storage' AND (is_archived = 0 OR is_archived IS NULL)"
             params: List[Any] = []
             if allowed_types:
                 valid_types = [t for t in allowed_types if t not in ['pending_context_document', 'chat_storage']]
-                if valid_types: sql += f" AND type IN ({','.join('?'*len(valid_types))})"; params.extend(valid_types)
-                else: return []
-            sql += " ORDER BY timestamp DESC LIMIT 500"; cursor.execute(sql, tuple(params)); rows = cursor.fetchall()
+                if valid_types:
+                    sql += f" AND type IN ({','.join('?'*len(valid_types))})"
+                    params.extend(valid_types)
+                else:
+                    # If allowed_types is provided but results in no valid types for this query, return empty.
+                    return []
+            # Consider if this limit should be configurable or larger. For now, keeping existing 500.
+            sql += " ORDER BY timestamp DESC LIMIT 500"
+            cursor.execute(sql, tuple(params)); rows = cursor.fetchall()
         except sqlite3.Error as e: logger.error(f"Error retrieving for similarity search: {e}", exc_info=True); return []
         sims = []
         for row in rows:
@@ -389,12 +396,15 @@ class MemoryStorage:
 
         if can_use_json_extract:
             sql_query += " AND json_extract(metadata, '$.user_id') = ? "
-            params.append(user_id)
+            params.append(user_id) # user_id param added
+            sql_query += " AND (is_archived = 0 OR is_archived IS NULL) " # New condition
             sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
-            params.append(limit)
+            params.append(limit) # limit param added
         else:
+            # For the else case, user_id is filtered in Python later.
+            sql_query += " AND (is_archived = 0 OR is_archived IS NULL) " # New condition
             sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
-            params.append(limit * 5)
+            params.append(limit * 5) # Fetch more for Python filtering, limit param added
 
         try:
             logger.debug(f"Executing get_memories_for_summary. Query: {sql_query}, Params: {params}")
@@ -466,13 +476,14 @@ class MemoryStorage:
                 SELECT * FROM memories
                 WHERE type = ?
                   AND json_extract(metadata, '$.user_id') = ?
+                  AND (is_archived = 0 OR is_archived IS NULL)
                 ORDER BY timestamp DESC
                 LIMIT ?
             """
             params = [entry_type, user_id, limit]
         else:
             logger.warning(f"json_extract not available for get_entries_by_type_and_user (type: {entry_type}, user: {user_id}). Falling back to Python filter.")
-            sql_query = "SELECT * FROM memories WHERE type = ? ORDER BY timestamp DESC LIMIT ?"
+            sql_query = "SELECT * FROM memories WHERE type = ? AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC LIMIT ?"
             params = [entry_type, limit * 5] # Fetch more to allow for Python filtering
 
         try:

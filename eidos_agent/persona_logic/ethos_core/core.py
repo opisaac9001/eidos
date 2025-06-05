@@ -871,11 +871,11 @@ class EthosCore:
         facts_entries: List[MemoryEntry] = []
         sql_query_str, params_list = "", [] # Renamed params to params_list
         if can_use_json_extract:
-            sql_query_str = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') IS NOT NULL ORDER BY timestamp DESC"
+            sql_query_str = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') IS NOT NULL AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC"
             params_list = [user_id]
         else:
             logger.warning(f"json_extract not available for get_all_user_facts (user: {user_id}). This will be less efficient.")
-            sql_query_str = "SELECT * FROM memories WHERE type = 'user_fact' ORDER BY timestamp DESC"
+            sql_query_str = "SELECT * FROM memories WHERE type = 'user_fact' AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC"
             # params_list remains empty
         try:
             cursor.execute(sql_query_str, tuple(params_list)); rows_raw = cursor.fetchall() # Use params_list
@@ -1763,44 +1763,78 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
     async def get_recent_learnings(self, learning_types: List[str], user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         if not learning_types or limit <= 0: return []
         conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-        placeholders = ','.join('?' * len(learning_types)); sql = f"SELECT * FROM memories WHERE type IN ({placeholders})"
+
+        placeholders = ','.join('?' * len(learning_types))
+        # Modified SQL base to include is_archived filter
+        sql = f"SELECT * FROM memories WHERE type IN ({placeholders}) AND (is_archived = 0 OR is_archived IS NULL)"
+
         params: List[Any] = list(learning_types)
         can_use_json = True
-        try: cursor.execute("SELECT json_extract('{\"k\":\"v\"}', '$.k')")
-        except sqlite3.OperationalError: can_use_json = False
+        try:
+            cursor.execute("SELECT json_extract('{\"k\":\"v\"}', '$.k')")
+        except sqlite3.OperationalError:
+            can_use_json = False
+            logger.warning("json_extract not available for get_recent_learnings. User filtering will be done in Python.")
         
+        # Append user_id filtering logic
         if can_use_json:
             if user_id_context and user_id_context not in self.system_user_ids:
                 sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = ?)"
-                params.extend([user_id_context, PATHOS_USER_ID]) # Pathos's own learnings are relevant too
-            elif user_id_context in self.system_user_ids or not user_id_context: # For system or no specific user, get Pathos's learnings
-                sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL)"
+                params.extend([user_id_context, PATHOS_USER_ID])
+            elif user_id_context in self.system_user_ids or not user_id_context: # System or general context
+                sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL)" # Pathos's own or truly global (NULL user_id)
                 params.append(PATHOS_USER_ID)
-        sql += " ORDER BY timestamp DESC LIMIT ?"; params.append(limit * 5 if not can_use_json else limit)
+
+        fetch_limit_for_sql = limit
+        # Determine if Python-side filtering for user_id will be needed
+        needs_python_user_filter = not can_use_json and user_id_context is not None
+
+        if needs_python_user_filter:
+            fetch_limit_for_sql = limit * 5 # Fetch more if user_id filtering will happen in Python
+            logger.debug(f"Adjusted fetch limit for get_recent_learnings to {fetch_limit_for_sql} due to Python-based user_id filtering for user '{user_id_context}'.")
+
+        sql += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(fetch_limit_for_sql)
         
         try:
-            cursor.execute(sql, tuple(params)); rows = cursor.fetchall(); learnings: List[MemoryEntry] = []
+            logger.debug(f"Executing get_recent_learnings query: {sql} with params: {params}")
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+            learnings: List[MemoryEntry] = []
             for row_data in rows:
-                entry = self.memory_storage._row_to_entry(dict(row_data)); entry_uid = entry.get('metadata', {}).get('user_id')
-                if not can_use_json: # Python-side filtering if json_extract not available
-                    if user_id_context and user_id_context not in self.system_user_ids:
-                        if entry_uid != user_id_context and entry_uid != PATHOS_USER_ID: continue
-                    elif user_id_context in self.system_user_ids or not user_id_context:
-                        if entry_uid != PATHOS_USER_ID and entry_uid is not None: continue # Allow NULL user_id for Pathos's general learnings
+                entry = self.memory_storage._row_to_entry(dict(row_data))
+                entry_uid = entry.get('metadata', {}).get('user_id')
+
+                if needs_python_user_filter:
+                    # Apply Python-side user_id filtering if json_extract was not available for it
+                    if user_id_context and user_id_context not in self.system_user_ids: # Specific user context
+                        if not (entry_uid == user_id_context or entry_uid == PATHOS_USER_ID):
+                            continue
+                    # This 'else' handles 'user_id_context in self.system_user_ids or not user_id_context'
+                    # which means we want Pathos's own (PATHOS_USER_ID) or truly global (user_id is None)
+                    elif not (entry_uid == PATHOS_USER_ID or entry_uid is None):
+                            continue
+
                 learnings.append(entry)
-            if not can_use_json: learnings.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+            # If Python user filtering happened, the list might be longer than the original limit before this step.
+            # The SQL already sorted by timestamp, so direct slicing is fine.
             return learnings[:limit]
-        except Exception as e: logger.error(f"Error retrieving learnings: {e}", exc_info=True); return []
+        except Exception as e:
+            logger.error(f"Error retrieving learnings (types: {learning_types}, user: {user_id_context}): {e}", exc_info=True)
+            return []
 
     async def get_recent_knowledge_verifications(self, limit: int = 20) -> List[MemoryEntry]:
         conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-        sql = "SELECT * FROM memories WHERE type = 'world_knowledge' AND json_extract(metadata, '$.last_verified_timestamp') IS NOT NULL ORDER BY json_extract(metadata, '$.last_verified_timestamp') DESC LIMIT ?"
+        # Added (is_archived = 0 OR is_archived IS NULL)
+        sql = "SELECT * FROM memories WHERE type = 'world_knowledge' AND json_extract(metadata, '$.last_verified_timestamp') IS NOT NULL AND (is_archived = 0 OR is_archived IS NULL) ORDER BY json_extract(metadata, '$.last_verified_timestamp') DESC LIMIT ?"
         oe_msg = ""
         try: cursor.execute(sql, (limit,))
         except sqlite3.OperationalError as oe:
             oe_msg = str(oe).lower()
             if "no such function: json_extract" in oe_msg:
-                sql_fb = "SELECT * FROM memories WHERE type = 'world_knowledge' ORDER BY timestamp DESC LIMIT ?" # Less ideal sort
+                # Added (is_archived = 0 OR is_archived IS NULL)
+                sql_fb = "SELECT * FROM memories WHERE type = 'world_knowledge' AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC LIMIT ?" # Less ideal sort
                 cursor.execute(sql_fb, (limit * 5,)) # Fetch more for Python filtering
             else: raise
         
