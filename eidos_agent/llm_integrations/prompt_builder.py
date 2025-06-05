@@ -185,14 +185,18 @@ class PromptBuilder:
     ) -> Tuple[List[Dict[str, Any]], List[MemoryEntry], Dict[str, float], Dict[str, float], int]:
         """
         Builds the list of messages to be sent to the main Pathos LLM.
-
-        This involves constructing the system prompt with dynamic context (mood, memories, etc.)
-        and appending user input and history.
+        This involves constructing the system prompt with dynamic context (mood, memories, etc.),
+        potentially injecting relevant past interactions, and managing token limits.
         """
+        # Get Dynamic Context Configuration
+        dynamic_context_enabled = self.config.DYNAMIC_CONTEXT_ENABLED
+        max_retrieved_chunks = self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS
+        similarity_threshold = self.config.DYNAMIC_CONTEXT_SIMILARITY_THRESHOLD
+        # LLM token limits will be used further down.
+
+        # --- Standard System Prompt Construction (as before) ---
         main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "ERROR: Main Pathos system prompt template not found.")
-
         persona_directives_content = "\n".join(self.ethos_core.get_persona_directives()) if self.ethos_core else load_system_prompt("pathos_directives", "Default persona: You are Pathos.")
-
         current_mood_dict = self.ethos_core.get_current_mood() if self.ethos_core else {'valence': 0.0, 'arousal': 0.0}
         current_mood_str = f"Valence: {current_mood_dict['valence']:.2f}, Arousal: {current_mood_dict['arousal']:.2f}"
         current_activity_description = (await self.ethos_core.get_current_activity_description()) if self.ethos_core else "Currently idle."
@@ -242,75 +246,179 @@ class PromptBuilder:
             "{{CURRENT_HEXUS_SCORES_FOR_PROMPT}}": hexus_scores_str,
             "{{PATHOS_SCHEDULE_CONTEXT}}": pathos_schedule_context,
             "{{PATHOS_ASPIRATIONS_CONTEXT}}": pathos_aspirations_context,
-            "{{RELEVANT_MEMORIES_CONTEXT_FOR_PROMPT}}": memories_formatted_for_prompt,
+            "{{RELEVANT_MEMORIES_CONTEXT_FOR_PROMPT}}": memories_formatted_for_prompt, # Standard short-term memory retrieval
             "{{TODAYS_BRIEFING_CONTEXT_FOR_PROMPT}}": todays_briefing_context,
             "{{VISION_ANALYSIS_CONTEXT_FOR_PROMPT}}": vision_analysis_context_for_prompt,
             "{{AVAILABLE_TOOLS_JSON_FOR_PROMPT}}": available_tools_json_for_prompt
         }
 
-        final_system_prompt_content = main_system_prompt_template
+        base_system_prompt_content = main_system_prompt_template
         for placeholder, value in system_prompt_replacements.items():
-            final_system_prompt_content = final_system_prompt_content.replace(placeholder, str(value) if value is not None else "")
+            base_system_prompt_content = base_system_prompt_content.replace(placeholder, str(value) if value is not None else "")
 
-        # Enrich with subconscious thoughts if user_input_text is a thought query
+        # Enrich with subconscious thoughts
         if self.feed_integrator:
             subconscious_enrichment = self.feed_integrator.get_formatted_thoughts_for_prompt(user_input_text)
             if subconscious_enrichment:
-                final_system_prompt_content += subconscious_enrichment
-                logger.debug("Subconscious enrichment added to system prompt.")
-            else:
-                logger.debug("No subconscious enrichment needed or available for this input.")
+                base_system_prompt_content += subconscious_enrichment
         else:
-            logger.warning("SubconsciousFeedIntegrator not available in PromptBuilder. Skipping subconscious enrichment.")
-
+            logger.warning("SubconsciousFeedIntegrator not available. Skipping subconscious enrichment.")
 
         if force_web_search:
-            final_system_prompt_content += "\n\nIMPORTANT_NOTE: User requested web search. Prioritize web_search tool if appropriate."
+            base_system_prompt_content += "\n\nIMPORTANT_NOTE: User requested web search. Prioritize web_search tool if appropriate."
 
         if system_provided_info:
-            final_system_prompt_content += "\n\n--- System Provided Information (for your awareness) ---"
-            if info := system_provided_info.get("weather"): final_system_prompt_content += f"\nCurrent Weather Context: Location: {info.get('location')}, Conditions: {info.get('temperature')}{info.get('unit')} {info.get('description')}."
-            if info := system_provided_info.get("current_time_info"): final_system_prompt_content += f"\nCurrent Time Context: {info}"
-            if info := system_provided_info.get("news_headlines"): final_system_prompt_content += f"\nRecent News Headlines Context: {str(info)[:500]}..."
-            if info := system_provided_info.get("web_search_summary"): final_system_prompt_content += f"\nQuick Web Search Summary: {info}"
-            final_system_prompt_content += "\n--- End System Provided Information ---"
+            base_system_prompt_content += "\n\n--- System Provided Information (for your awareness) ---"
+            if info := system_provided_info.get("weather"): base_system_prompt_content += f"\nCurrent Weather Context: Location: {info.get('location')}, Conditions: {info.get('temperature')}{info.get('unit')} {info.get('description')}."
+            if info := system_provided_info.get("current_time_info"): base_system_prompt_content += f"\nCurrent Time Context: {info}"
+            if info := system_provided_info.get("news_headlines"): base_system_prompt_content += f"\nRecent News Headlines Context: {str(info)[:500]}..."
+            if info := system_provided_info.get("web_search_summary"): base_system_prompt_content += f"\nQuick Web Search Summary: {info}"
+            base_system_prompt_content += "\n--- End System Provided Information ---"
 
-        messages: List[Dict[str, Any]] = [{"role": "system", "content": final_system_prompt_content}]
+        system_prompt_message = {"role": "system", "content": base_system_prompt_content}
 
-        cleaned_history = []
+        # --- Dynamic Context Injection & Truncation ---
+        model_name_for_tiktoken = "cl100k_base" # Default
+        if enhanced_pathos_llm_config:
+             model_name_for_tiktoken = enhanced_pathos_llm_config.get('model_name_for_tiktoken', enhanced_pathos_llm_config.get('model', 'cl100k_base'))
+
+        injected_past_messages: List[Dict[str, Any]] = []
+        if dynamic_context_enabled and self.ethos_core:
+            logger.debug(f"Dynamic context enabled. Retrieving past interactions for user '{user_id}'.")
+            # For now, current_history_entry_ids is passed as empty. Content-based filtering will be applied.
+            retrieved_past_interactions = await self.ethos_core.retrieve_relevant_past_interactions(
+                query_text=user_input_text, # Query based on current user input
+                user_id=user_id,
+                current_history_entry_ids=[],
+                top_k=max_retrieved_chunks,
+                similarity_threshold=similarity_threshold
+            )
+
+            if retrieved_past_interactions:
+                # Content-based filtering against current history_context
+                history_content_set = {msg.get("content") for msg in history_context if isinstance(msg.get("content"), str)}
+
+                unique_past_interactions = []
+                for mem_entry in retrieved_past_interactions:
+                    if mem_entry.get('content') not in history_content_set:
+                        unique_past_interactions.append(mem_entry)
+                    else:
+                        logger.debug(f"Filtered out past interaction (ID: {mem_entry.get('id')}) due to content match with current history.")
+
+                # Format for injection
+                max_len_past_interaction = 250 # Max length for each injected snippet
+                for mem_entry in unique_past_interactions: # Already sorted by relevance by EthosCore
+                    past_interaction_text = mem_entry.get('content', '')
+                    past_timestamp_str = mem_entry.get('timestamp', 'an earlier time')
+                    try:
+                        past_dt_obj = datetime.fromisoformat(past_timestamp_str.replace("Z", "+00:00"))
+                        formatted_past_ts = past_dt_obj.strftime("%Y-%m-%d %H:%M")
+                    except ValueError:
+                        formatted_past_ts = past_timestamp_str # Fallback to raw string
+
+                    formatted_past_text = past_interaction_text[:max_len_past_interaction] + "..." if len(past_interaction_text) > max_len_past_interaction else past_interaction_text
+
+                    # System message to frame the recalled interaction
+                    system_recall_content = f"[Recalling an earlier part of our conversation (around {formatted_past_ts}) that seems relevant:]\n{formatted_past_text}"
+
+                    # Estimate tokens for this specific injected message
+                    # Note: estimate_tokens_for_messages expects a list of messages.
+                    tokens_for_this_injection = estimate_tokens_for_messages([{"role": "system", "content": system_recall_content}], model_name_for_tiktoken)
+
+                    injected_past_messages.append({
+                        "role": "system",
+                        "content": system_recall_content,
+                        "_is_injected_context": True, # Mark for truncation logic
+                        "_estimated_tokens": tokens_for_this_injection # Store its token count
+                    })
+                if injected_past_messages:
+                    logger.info(f"Injecting {len(injected_past_messages)} relevant past interaction snippets.")
+
+        # Clean history_context (remove old system prompts, etc.)
+        cleaned_history: List[Dict[str, Any]] = []
         for msg in history_context:
-            if msg.get("role") == "system":
-                if msg.get("content") == final_system_prompt_content or \
-                   "Error: Main Pathos system prompt not found" in msg.get("content","") or \
-                   msg.get("content") == "You are a helpful assistant":
-                    continue
-            cleaned_history.append(msg)
+            is_old_system_prompt = msg.get("role") == "system" and (
+                msg.get("content") == base_system_prompt_content or # Exact match (unlikely now with dynamic parts)
+                "Error: Main Pathos system prompt not found" in msg.get("content","") or
+                msg.get("content") == "You are a helpful assistant" or
+                msg.get("_is_injected_context") # Remove previously injected context from history
+            )
+            if not is_old_system_prompt:
+                # Add estimated tokens to history messages if not already present
+                if "_estimated_tokens" not in msg:
+                    msg["_estimated_tokens"] = estimate_tokens_for_messages([msg], model_name_for_tiktoken)
+                cleaned_history.append(msg)
 
-        if cleaned_history: messages.extend(cleaned_history)
-
+        # Prepare current user message (multimodal if needed)
         user_message_content_parts: List[Dict[str, Any]] = []
         current_user_input_full = user_input_text
         if document_text: current_user_input_full += f"\n\n--- Attached Document Content ---\n{document_text}\n--- End of Document ---"
         user_message_content_parts.append({"type": "text", "text": current_user_input_full})
 
         if image_data_b64 and is_multimodal_llm:
-            image_mime_type = "image/jpeg" # Default, can be refined
+            image_mime_type = "image/jpeg" # Default
             if image_data_b64.startswith("iVBORw0KGgo"): image_mime_type = "image/png"
             elif image_data_b64.startswith("/9j/"): image_mime_type = "image/jpeg"
             user_message_content_parts.append({"type": "image_url", "image_url": {"url": f"data:{image_mime_type};base64,{image_data_b64}"}})
 
         final_user_content: Union[str, List[Dict[str,Any]]] = user_message_content_parts[0]["text"] if len(user_message_content_parts) == 1 and user_message_content_parts[0]["type"] == "text" else user_message_content_parts
-        messages.append({"role": "user", "content": final_user_content})
+        current_user_message = {"role": "user", "content": final_user_content}
+        current_user_message["_estimated_tokens"] = estimate_tokens_for_messages([current_user_message], model_name_for_tiktoken)
 
-        estimated_tokens = -1
-        if enhanced_pathos_llm_config: # Use the passed config for token estimation
-            model_name_for_tiktoken = enhanced_pathos_llm_config.get('model_name_for_tiktoken', enhanced_pathos_llm_config.get('model', 'cl100k_base'))
-            estimated_tokens = estimate_tokens_for_messages(messages, model_name_for_tiktoken) # Call local/static version
-            logger.info(f"Estimated tokens for messages (user: {user_id}, model for tiktoken: {model_name_for_tiktoken}): {estimated_tokens}")
 
-        logger.info(f"Built main LLM messages for user '{user_id}'. System prompt length: {len(final_system_prompt_content)}. Total messages: {len(messages)}")
+        # Assemble messages: System Prompt, Injected Past, Cleaned History, Current User Input
+        # System prompt needs its token count too
+        system_prompt_message["_estimated_tokens"] = estimate_tokens_for_messages([system_prompt_message], model_name_for_tiktoken)
 
-        return messages, retrieved_memories_raw, current_mood_dict, hexus_scores_dict, estimated_tokens
+        tentative_messages: List[Dict[str, Any]] = [system_prompt_message] + injected_past_messages + cleaned_history + [current_user_message]
+
+        # Token Truncation Logic
+        max_prompt_tokens = self.config.LLM_MAX_PROMPT_TOKENS_MAIN - self.config.LLM_RESPONSE_BUFFER_TOKENS
+
+        current_total_tokens = sum(m.get("_estimated_tokens", 0) for m in tentative_messages)
+        logger.debug(f"Initial token count before truncation: {current_total_tokens}. Max allowed: {max_prompt_tokens}")
+
+        # Truncation loop
+        # Priority: 1. Oldest from cleaned_history, 2. Oldest from injected_past_messages
+        while current_total_tokens > max_prompt_tokens:
+            removed_something = False
+            # Try removing from cleaned_history first (oldest standard history)
+            # Ensure system_prompt (index 0) and current_user_message (last index) are not removed initially
+            if len(tentative_messages) > 2: # Must have more than sys prompt and user msg
+                # Find first removable message from cleaned_history part
+                # System prompt is at index 0. Injected messages follow. Then cleaned history.
+                start_of_cleaned_history_idx = 1 + len(injected_past_messages)
+                if start_of_cleaned_history_idx < len(tentative_messages) -1: # Check if cleaned_history part exists and is not the user message
+                    removed_msg = tentative_messages.pop(start_of_cleaned_history_idx)
+                    current_total_tokens -= removed_msg.get("_estimated_tokens", 0)
+                    logger.debug(f"Truncation: Removed message from cleaned_history (tokens: {removed_msg.get('_estimated_tokens',0)}). New total: {current_total_tokens}")
+                    removed_something = True
+                elif injected_past_messages: # No more cleaned_history to remove, try injected context
+                    # Remove from the start of injected_past_messages (oldest injected)
+                    removed_msg = tentative_messages.pop(1) # Index 1 is the oldest injected if any
+                    current_total_tokens -= removed_msg.get("_estimated_tokens", 0)
+                    injected_past_messages.pop(0) # Also remove from the separate list
+                    logger.debug(f"Truncation: Removed message from injected_past_messages (tokens: {removed_msg.get('_estimated_tokens',0)}). New total: {current_total_tokens}")
+                    removed_something = True
+
+            if not removed_something:
+                # This means only system prompt and current user message are left, or something is wrong.
+                logger.warning(f"Cannot truncate further. System prompt and user message alone exceed token limit ({current_total_tokens} > {max_prompt_tokens}). This may lead to LLM errors.")
+                # Potentially truncate system prompt or user message if absolutely necessary,
+                # but this usually indicates a design issue or extremely large single messages.
+                # For now, break to avoid infinite loop.
+                break
+
+        final_messages = tentative_messages
+        # Clean up internal token count keys before sending to LLM
+        for msg in final_messages:
+            msg.pop("_estimated_tokens", None)
+            msg.pop("_is_injected_context", None)
+
+        final_estimated_tokens = estimate_tokens_for_messages(final_messages, model_name_for_tiktoken)
+        logger.info(f"Built main LLM messages for user '{user_id}'. Final token count: {final_estimated_tokens}. System prompt length: {len(system_prompt_message['content'])}. Total messages: {len(final_messages)}")
+
+        return final_messages, retrieved_memories_raw, current_mood_dict, hexus_scores_dict, final_estimated_tokens
 
 # Note: PATHOS_USER_ID is used by _execute_tools in PathosInterface for add_pathos_event.
 # If _execute_tools were moved here, PATHOS_USER_ID would need to be imported here too.

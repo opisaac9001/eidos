@@ -494,6 +494,13 @@ class Config:
     else:
         print("Bookshelf feature not configured: QDRANT_HOST environment variable not set.")
 
+    # Dynamic Context Window Settings
+    DYNAMIC_CONTEXT_ENABLED: bool = os.getenv("DYNAMIC_CONTEXT_ENABLED", "True").lower() == "true"
+    DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS: int = int(os.getenv("DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS", "1")) # Default to 1 relevant past interaction chunk
+    DYNAMIC_CONTEXT_SIMILARITY_THRESHOLD: float = float(os.getenv("DYNAMIC_CONTEXT_SIMILARITY_THRESHOLD", "0.75"))
+    LLM_MAX_PROMPT_TOKENS_MAIN: int = int(os.getenv("LLM_MAX_PROMPT_TOKENS_MAIN", "7000")) # Max tokens for the entire prompt sent to Pathos LLM
+    LLM_RESPONSE_BUFFER_TOKENS: int = int(os.getenv("LLM_RESPONSE_BUFFER_TOKENS", "1000")) # Reserved for LLM's response generation
+
 
     @staticmethod
     def get_llm_config(role: str) -> Optional[LLMConfig]:

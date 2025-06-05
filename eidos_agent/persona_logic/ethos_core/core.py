@@ -2116,3 +2116,78 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
         self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + arousal_shift))
         self.last_mood_update_time = datetime.now(timezone.utc)
         logger.debug(f"Mood updated due to '{event_type}'. New mood: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f}")
+
+    async def retrieve_relevant_past_interactions(
+        self,
+        query_text: str,
+        user_id: str,
+        current_history_entry_ids: List[str], # IDs of MemoryEntry objects already in the standard recent history
+        top_k: int,
+        similarity_threshold: float
+    ) -> List[MemoryEntry]:
+        """
+        Retrieves relevant past chat interactions based on similarity to the query_text,
+        excluding entries already present in the current recent history.
+        """
+        logger.info(f"Retrieving relevant past interactions for user '{user_id}' with query '{query_text[:50]}...'. Excluding {len(current_history_entry_ids)} current IDs. Top_k={top_k}, Threshold={similarity_threshold}")
+
+        if not query_text or not user_id:
+            return []
+
+        # Fetch more candidates than top_k to allow for filtering
+        # The +5 is a small buffer. Consider if memory_storage.find_similar's internal limit (e.g. 500) is sufficient.
+        fetch_k = top_k + len(current_history_entry_ids) + 10
+
+        # Call memory_storage.find_similar()
+        # Assuming 'interaction' is the correct type for past conversation turns.
+        # The find_similar method in MemoryStorage already filters out 'pending_context_document' and 'chat_storage'.
+        try:
+            # find_similar returns List[Tuple[float, MemoryEntry]]
+            similar_results_with_scores = self.memory_storage.find_similar(
+                query_text=query_text,
+                top_k=fetch_k, # Fetch more to filter
+                allowed_types=['interaction'], # Specify that we only want 'interaction' type memories
+                threshold=similarity_threshold # Use the provided threshold
+            )
+        except Exception as e:
+            logger.error(f"Error calling memory_storage.find_similar: {e}", exc_info=True)
+            return []
+
+        if not similar_results_with_scores:
+            logger.debug(f"No similar past interactions found by memory_storage.find_similar for user '{user_id}'.")
+            return []
+
+        # Filter results in Python
+        valid_candidates: List[MemoryEntry] = []
+        processed_ids = set(current_history_entry_ids) # Keep track of IDs to ensure uniqueness after filtering
+
+        for score, mem_entry in similar_results_with_scores:
+            entry_id = mem_entry.get('id')
+            if not entry_id or entry_id in processed_ids:
+                logger.debug(f"Skipping entry ID {entry_id}: already processed or in current history.")
+                continue
+
+            # Ensure the user_id in the metadata matches the input user_id
+            # This is crucial if find_similar doesn't filter by user_id in its SQL for 'interaction' type.
+            # MemoryStorage.find_similar has a user_id_context param but it's for prioritizing, not strict filtering for all types.
+            metadata_user_id = mem_entry.get('metadata', {}).get('user_id')
+            if metadata_user_id != user_id:
+                logger.debug(f"Skipping entry ID {entry_id}: metadata user_id '{metadata_user_id}' does not match requested user_id '{user_id}'.")
+                continue
+
+            # Add score to metadata if not already there, for potential later use, though not strictly needed by PromptBuilder currently
+            if 'similarity_score' not in mem_entry.get('metadata', {}): # Avoid overwriting if somehow already there
+                 mem_entry.setdefault('metadata', {})['similarity_score'] = score
+
+            valid_candidates.append(mem_entry)
+            processed_ids.add(entry_id) # Add to processed to ensure it's not picked again if somehow duplicated in find_similar results
+
+        # Sort by similarity score (descending) - find_similar already does this, but if we combined lists, re-sorting might be needed.
+        # Here, find_similar already sorts, so this is more for ensuring contract if logic changed.
+        # valid_candidates.sort(key=lambda x: x.get('metadata', {}).get('similarity_score', 0.0), reverse=True)
+        # No need to re-sort if find_similar's output order is trusted for the filtered set.
+
+        final_selection = valid_candidates[:top_k]
+
+        logger.info(f"Retrieved {len(final_selection)} relevant past interactions for user '{user_id}' after filtering. (Initial candidates: {len(similar_results_with_scores)}, Valid after filters: {len(valid_candidates)})")
+        return final_selection
