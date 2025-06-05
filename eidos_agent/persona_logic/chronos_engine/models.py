@@ -28,6 +28,8 @@ class ActivitySlotDetails(BaseModel):
     mood_influence: Optional[Dict[str, float]] = Field(default=None)
     sub_focus: Optional[str] = Field(default=None)
     location_context: Optional[str] = Field(default=None)
+    flexibility_score: Optional[float] = Field(default=0.5) # New field
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict) # New field for metadata
 
 class ActivitySlot(BaseModel):
     id: str = Field(default_factory=lambda: f"slot_{uuid.uuid4().hex}")
@@ -40,6 +42,14 @@ class ActivitySlot(BaseModel):
     activity_type: ActivityType
     activity_details: ActivitySlotDetails
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # New fields
+    status: Optional[Literal['pending', 'in_progress', 'completed', 'partially_completed', 'skipped', 'cancelled', 'delayed']] = Field(default='pending')
+    actual_start_time: Optional[time] = Field(default=None)
+    actual_end_time: Optional[time] = Field(default=None)
+    deviation_reason: Optional[str] = Field(default=None)
+    original_scheduled_start_time: Optional[time] = Field(default=None)
+    original_scheduled_end_time: Optional[time] = Field(default=None)
 
     @validator('date', pre=True)
     @classmethod
@@ -76,6 +86,7 @@ class PathosEventDetails(BaseModel):
     relevant_memory_tags: Optional[List[str]] = Field(default=None)
     event_subtype: Optional[str] = Field(default=None) # e.g., "delivery", "reminder_call", "package_pickup"
     event_specific_data: Dict[str, Any] = Field(default_factory=dict) # e.g., {"item_name": "Book X", "tracking_id": "123"}
+    importance: Optional[Literal['low', 'medium', 'high', 'critical']] = Field(default='medium') # New field
 
 class PathosEvent(BaseModel):
     id: str = Field(default_factory=lambda: f"event_{uuid.uuid4().hex}")
@@ -89,6 +100,11 @@ class PathosEvent(BaseModel):
     details: PathosEventDetails = Field(default_factory=PathosEventDetails)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     specific_time: Optional[time] = Field(default=None) # For events that occur at a particular time on their start_date
+
+    # New fields
+    status: Optional[Literal['planned', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rescheduled']] = Field(default='planned')
+    actual_start_datetime: Optional[datetime] = Field(default=None)
+    actual_end_datetime: Optional[datetime] = Field(default=None)
 
     @validator('start_date', 'end_date', pre=True)
     @classmethod

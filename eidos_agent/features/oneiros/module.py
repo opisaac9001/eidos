@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+
 from datetime import datetime
 import logging
 import random
@@ -222,6 +223,7 @@ class OneirosModule:
                 logger.info("Oneiros: Not enough diverse/salient memories to seed a meaningful dream.")
                 if self.ethos_core.config.ENABLE_PROACTIVE_BEHAVIOR:
                     logger.debug("Dream cycle finished (no seeds), triggering proactive check via EthosCore.")
+
                     asyncio.create_task(self.ethos_core.run_proactive_check("OneirosDreamCycleNoSeeds"), name="ProactiveCheckAfterOneirosNoSeeds")
                 return
 

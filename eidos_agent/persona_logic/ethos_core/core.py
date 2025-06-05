@@ -17,7 +17,6 @@ from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative imp
 from eidos_agent.utils.logger import get_logger
 import pytz # Added import
 
-from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -26,8 +25,13 @@ if TYPE_CHECKING:
     from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
     # Updated import for ChronosEngine and related types
-    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot
+experimental/eidos-subconscious-integration
+    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot, PATHOS_USER_ID
 
+# PATHOS_USER_ID is now imported via TYPE_CHECKING block or directly if not under TYPE_CHECKING
+# from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # This line is removed
+
+    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
