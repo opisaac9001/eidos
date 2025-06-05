@@ -94,15 +94,20 @@ class MemoryStorage:
                 CREATE TABLE IF NOT EXISTS daily_schedule_items (
                     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, date TEXT NOT NULL, start_time TEXT NOT NULL,
                     end_time TEXT NOT NULL, slot_name TEXT, activity_title TEXT NOT NULL, activity_type TEXT,
-                    activity_details TEXT, generated_at TEXT NOT NULL )""")
+                    activity_details TEXT, generated_at TEXT NOT NULL,
+                    status TEXT, actual_start_time TEXT, actual_end_time TEXT,
+                    deviation_reason TEXT, original_scheduled_start_time TEXT, original_scheduled_end_time TEXT
+                )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_daily_sched_user_date ON daily_schedule_items (user_id, date)")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS pathos_events (
                     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, start_date TEXT NOT NULL,
                     end_date TEXT NOT NULL, event_type TEXT NOT NULL, description TEXT, location TEXT,
-                    details TEXT, created_at TEXT NOT NULL, specific_time TEXT )""")
+                    details TEXT, created_at TEXT NOT NULL, specific_time TEXT,
+                    status TEXT, actual_start_datetime TEXT, actual_end_datetime TEXT
+                )""")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pathos_events_user_dates ON pathos_events (user_id, start_date, end_date)")
-            conn.commit(); logger.info("DB tables (memories, schedules, events) ensured.")
+            conn.commit(); logger.info("DB tables (memories, schedules, events) ensured with new fields.")
         except sqlite3.Error as e: logger.error(f"Error ensuring DB tables: {e}", exc_info=True); raise
 
     def _serialize_embedding(self, embedding: Optional[List[float]]) -> Optional[bytes]:
@@ -235,8 +240,24 @@ class MemoryStorage:
         try:
             date_str = schedule[0].date.isoformat()
             cursor.execute("DELETE FROM daily_schedule_items WHERE user_id = ? AND date = ?", (user_id, date_str))
-            items = [(item.id, item.user_id, item.date.isoformat(), item.start_time.isoformat(timespec='minutes'), item.end_time.isoformat(timespec='minutes'), item.slot_name, item.activity_title, item.activity_type, item.activity_details.model_dump_json(), item.generated_at.isoformat()) for item in schedule]
-            cursor.executemany("INSERT INTO daily_schedule_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", items)
+            items_to_insert = []
+            for item in schedule:
+                items_to_insert.append((
+                    item.id, item.user_id, item.date.isoformat(),
+                    item.start_time.isoformat(timespec='minutes'), item.end_time.isoformat(timespec='minutes'),
+                    item.slot_name, item.activity_title, item.activity_type,
+                    item.activity_details.model_dump_json(), item.generated_at.isoformat(),
+                    item.status,
+                    item.actual_start_time.isoformat(timespec='minutes') if item.actual_start_time else None,
+                    item.actual_end_time.isoformat(timespec='minutes') if item.actual_end_time else None,
+                    item.deviation_reason,
+                    item.original_scheduled_start_time.isoformat(timespec='minutes') if item.original_scheduled_start_time else None,
+                    item.original_scheduled_end_time.isoformat(timespec='minutes') if item.original_scheduled_end_time else None
+                ))
+            cursor.executemany(
+                "INSERT INTO daily_schedule_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                items_to_insert
+            )
             conn.commit(); logger.info(f"Saved {len(schedule)} schedule items for user '{user_id}' on {date_str}.")
         except sqlite3.Error as e: logger.error(f"Error saving schedule for user '{user_id}': {e}", exc_info=True); conn.rollback()
 
@@ -253,6 +274,18 @@ class MemoryStorage:
                     data_model['start_time'] = time.fromisoformat(data_model['start_time'])
                     data_model['end_time'] = time.fromisoformat(data_model['end_time'])
                     data_model['generated_at'] = datetime.fromisoformat(data_model['generated_at'].replace("Z", "+00:00"))
+                    # Load new fields
+                    data_model['status'] = row_data.get('status', 'pending') # Default if column missing
+                    actual_start_str = row_data.get('actual_start_time')
+                    data_model['actual_start_time'] = time.fromisoformat(actual_start_str) if actual_start_str else None
+                    actual_end_str = row_data.get('actual_end_time')
+                    data_model['actual_end_time'] = time.fromisoformat(actual_end_str) if actual_end_str else None
+                    data_model['deviation_reason'] = row_data.get('deviation_reason')
+                    original_start_str = row_data.get('original_scheduled_start_time')
+                    data_model['original_scheduled_start_time'] = time.fromisoformat(original_start_str) if original_start_str else None
+                    original_end_str = row_data.get('original_scheduled_end_time')
+                    data_model['original_scheduled_end_time'] = time.fromisoformat(original_end_str) if original_end_str else None
+
                     items.append(ActivitySlot(**data_model))
                 except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing schedule item ID {row_data.get('id')}: {e}", exc_info=True)
         except sqlite3.Error as e: logger.error(f"Error loading schedule for user '{user_id}': {e}", exc_info=True)
@@ -261,9 +294,23 @@ class MemoryStorage:
     async def add_event_to_db(self, event: PathosEvent) -> bool:
         conn = self._get_connection(); cursor = conn.cursor()
         try:
-            # Added specific_time to the INSERT and ON CONFLICT SET
-            cursor.execute("INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, description=excluded.description, location=excluded.location, details=excluded.details, specific_time=excluded.specific_time",
-                           (event.id, event.user_id, event.title, event.start_date.isoformat(), event.end_date.isoformat(), event.event_type, event.description, event.location, event.details.model_dump_json(), event.created_at.isoformat(), event.specific_time.isoformat() if event.specific_time else None))
+            cursor.execute(
+                "INSERT INTO pathos_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+                "title=excluded.title, start_date=excluded.start_date, end_date=excluded.end_date, event_type=excluded.event_type, "
+                "description=excluded.description, location=excluded.location, details=excluded.details, "
+                "created_at=excluded.created_at, specific_time=excluded.specific_time, status=excluded.status, "
+                "actual_start_datetime=excluded.actual_start_datetime, actual_end_datetime=excluded.actual_end_datetime",
+                (
+                    event.id, event.user_id, event.title,
+                    event.start_date.isoformat(), event.end_date.isoformat(),
+                    event.event_type, event.description, event.location,
+                    event.details.model_dump_json(), event.created_at.isoformat(),
+                    event.specific_time.isoformat() if event.specific_time else None,
+                    event.status,
+                    event.actual_start_datetime.isoformat() if event.actual_start_datetime else None,
+                    event.actual_end_datetime.isoformat() if event.actual_end_datetime else None
+                )
+            )
             conn.commit(); logger.info(f"Added/Updated event '{event.title}' (ID: {event.id})."); return True
         except sqlite3.Error as e: logger.error(f"Error adding event '{event.title}': {e}", exc_info=True); conn.rollback(); return False
 
@@ -292,6 +339,13 @@ class MemoryStorage:
                     data_model['start_date'] = date.fromisoformat(data_model['start_date'])
                     data_model['end_date'] = date.fromisoformat(data_model['end_date'])
                     data_model['created_at'] = datetime.fromisoformat(data_model['created_at'].replace("Z", "+00:00"))
+                    # Load new event fields
+                    data_model['status'] = row_data_map.get('status', 'planned') # Default if column missing
+                    actual_start_dt_str = row_data_map.get('actual_start_datetime')
+                    data_model['actual_start_datetime'] = datetime.fromisoformat(actual_start_dt_str.replace("Z", "+00:00")) if actual_start_dt_str else None
+                    actual_end_dt_str = row_data_map.get('actual_end_datetime')
+                    data_model['actual_end_datetime'] = datetime.fromisoformat(actual_end_dt_str.replace("Z", "+00:00")) if actual_end_dt_str else None
+
                     events.append(PathosEvent(**data_model))
                 except (json.JSONDecodeError, ValueError, TypeError) as e: logger.error(f"Error parsing event ID {row_data_map.get('id')}: {e}", exc_info=True)
         except sqlite3.Error as e: logger.error(f"Error fetching events for user '{user_id}': {e}", exc_info=True)
