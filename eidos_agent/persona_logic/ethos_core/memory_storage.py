@@ -36,6 +36,7 @@ class MemoryEntry(TypedDict, total=False):
     embedding: Optional[list[float]]
     metadata: Dict[str, Any]
     salience: Optional[float]
+    summary_llm: Optional[str] # New field
 
 class MemoryStorage:
     def __init__(self, config: Config):
