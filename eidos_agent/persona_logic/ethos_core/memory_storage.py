@@ -30,7 +30,8 @@ class MemoryEntry(TypedDict, total=False):
         'user_fact', 'world_knowledge', 'learned_correction',
         'proactive_action_record', 'queued_discussion_point',
         'learned_feedback_insight', 'suggestion_reflection',
-        'aspiration' # Added from broken EthosCore
+        'aspiration', # Added from broken EthosCore
+        'npc_dialogue_event'
     ]
     content: str
     embedding: Optional[list[float]]

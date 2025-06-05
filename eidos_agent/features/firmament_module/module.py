@@ -250,13 +250,23 @@ class FirmamentModule:
             )
             user_prompt_parts = [
                 f"Current Schedule: Slot '{activity_slot.slot_name}' (Activity: '{activity_slot.activity_title}') from {activity_slot.start_time.strftime('%H:%M')} to {activity_slot.end_time.strftime('%H:%M')}.",
-                f"Current Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')})."
             ]
-            if dream_influence_text:
+
+            # Check for sub_focus (Living Calendar specific detail)
+            sub_focus_text = None
+            if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
+                sub_focus_text = activity_slot.activity_details.sub_focus
+
+            if sub_focus_text:
+                user_prompt_parts.append(f"Specific Focus for this Activity: '{sub_focus_text}'.")
+
+            # Existing appends for Mood, Dream Influence, Setting, and the final instruction
+            user_prompt_parts.append(f"Current Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).")
+            if dream_influence_text: # Make sure this is handled correctly if dream_influence_text might not be defined
                 user_prompt_parts.append(f"Subtle Influence from Recent Dream: {dream_influence_text}")
             user_prompt_parts.append(f"Current Setting: {environmental_context}")
             user_prompt_parts.append("Describe a brief moment (one sentence):")
-            user_prompt = "\n".join(user_prompt_parts)
+            user_prompt = "\n".join(user_prompt_parts) # Ensure this join is present at the end
 
             messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
