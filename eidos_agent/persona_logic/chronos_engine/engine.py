@@ -3,6 +3,10 @@ from datetime import datetime, date, time, timedelta, timezone
 from typing import List, Optional, Dict, Any, Literal
 import uuid
 import json
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None # type: ignore
 import random
 
 from eidos_agent.core.config import Config, LLMConfig
@@ -210,17 +214,32 @@ class ChronosEngine:
                 current_location_context = final_location_context # from event or default slot
                 if llm_location_context: current_location_context = llm_location_context # LLM overrides
 
+                activity_metadata_payload = {}
+                if current_event_context:
+                    activity_metadata_payload["source_event_id"] = current_event_context.id
+
                 activity_details = ActivitySlotDetails(
                     description=llm_desc,
                     mood_influence=details_data.get('mood_influence'),
                     sub_focus=current_sub_focus,
-                    location_context=current_location_context
+                    location_context=current_location_context,
+                    flexibility_score=details_data.get('flexibility_score', 0.5), # LLM can suggest or use default
+                    metadata=activity_metadata_payload
                 )
                 return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=llm_title, activity_type=final_activity_type, activity_details=activity_details)
             except Exception as e: logger.error(f"Error parsing LLM output for slot '{slot_name}': {e}. LLM Output: {llm_generated_data}", exc_info=True)
 
         # Fallback if LLM fails or no LLM config
-        fallback_details = ActivitySlotDetails(description=fallback_desc, sub_focus=final_sub_focus, location_context=final_location_context)
+        activity_metadata_payload_fallback = {}
+        if current_event_context:
+            activity_metadata_payload_fallback["source_event_id"] = current_event_context.id
+
+        fallback_details = ActivitySlotDetails(
+            description=fallback_desc,
+            sub_focus=final_sub_focus,
+            location_context=final_location_context,
+            metadata=activity_metadata_payload_fallback # Add metadata here too
+        )
         return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=fallback_title, activity_type=fallback_type, activity_details=fallback_details)
 
     async def generate_schedule_for_date(self, target_date: date) -> List[ActivitySlot]:
@@ -558,117 +577,178 @@ class ChronosEngine:
             SIGNIFICANT_DEVIATION_THRESHOLD = timedelta(minutes=5)
             schedule_changed_by_absorption = False
             schedule_modified_by_final_shift = False
-            overall_schedule_changed = False # General flag
 
-            # First, update the current slot in the loaded schedule list
+            # slot_updated_in_list is True if the primary slot_to_update was found and placed in todays_schedule
             slot_updated_in_list = False
             current_slot_index = -1
+
             for i, existing_slot in enumerate(todays_schedule):
                 if existing_slot.id == slot_id:
-                    todays_schedule[i] = slot_to_update # Apply updates to the slot_to_update object in the list
+                    todays_schedule[i] = slot_to_update
                     slot_updated_in_list = True
                     current_slot_index = i
                     break
 
-            overall_schedule_changed = slot_updated_in_list
+            # This flag will determine if a save is needed at the end
+            overall_schedule_has_changed = slot_updated_in_list
 
-            if deviation > timedelta(0) and deviation > SIGNIFICANT_DEVIATION_THRESHOLD: # Lost time, try to absorb
+            if deviation > timedelta(0) and deviation > SIGNIFICANT_DEVIATION_THRESHOLD: # Lost time
                 time_to_absorb = deviation
-                logger.info(f"Lost time: {time_to_absorb}. Attempting to absorb with subsequent flexible slots.")
+                logger.info(f"Slot {slot_id} created a positive deviation of {time_to_absorb}. Attempting to absorb with subsequent flexible slots.")
 
                 HIGH_FLEXIBILITY_THRESHOLD = 0.8
                 MIN_SLOT_DURATION_AFTER_SHORTEN = timedelta(minutes=15)
 
-                if current_slot_index != -1: # Ensure the reported slot was found
+                # Iterate directly on todays_schedule for absorption pass, as we have current_slot_index
+                if current_slot_index != -1:
                     for i in range(current_slot_index + 1, len(todays_schedule)):
-                        slot = todays_schedule[i]
-                        if slot.status != 'pending': continue
-                        if time_to_absorb <= timedelta(0): break
+                        slot_being_evaluated = todays_schedule[i] # Direct reference
+                        if slot_being_evaluated.status != 'pending':
+                            continue
+                        if time_to_absorb <= timedelta(0):
+                            break
 
-                        flexibility = slot.activity_details.flexibility_score if slot.activity_details.flexibility_score is not None else 0.5
+                        flexibility = slot_being_evaluated.activity_details.flexibility_score if slot_being_evaluated.activity_details.flexibility_score is not None else 0.5
 
                         if flexibility >= HIGH_FLEXIBILITY_THRESHOLD:
-                            slot_date = slot.date
-                            slot_duration = datetime.combine(slot_date, slot.end_time) - datetime.combine(slot_date, slot.start_time)
+                            slot_date = slot_being_evaluated.date
+                            current_slot_duration = datetime.combine(slot_date, slot_being_evaluated.end_time) - datetime.combine(slot_date, slot_being_evaluated.start_time)
 
-                            if time_to_absorb >= slot_duration: # Skip this slot
-                                logger.info(f"Skipping highly flexible slot '{slot.activity_title}' (duration: {slot_duration}) to absorb {slot_duration} of delay.")
-                                time_to_absorb -= slot_duration
-                                slot.status = 'skipped'
-                                slot.deviation_reason = (slot.deviation_reason + "; " if slot.deviation_reason else "") + f"skipped_to_absorb_prior_delay_of_{slot_id}"
-                                slot.actual_start_time = None
-                                slot.actual_end_time = None
+                            if time_to_absorb >= current_slot_duration:
+                                logger.info(f"Skipping highly flexible slot '{slot_being_evaluated.activity_title}' (duration: {current_slot_duration}) to absorb {current_slot_duration} of delay from slot {slot_id}.")
+                                time_to_absorb -= current_slot_duration
+                                slot_being_evaluated.status = 'skipped'
+                                slot_being_evaluated.deviation_reason = (slot_being_evaluated.deviation_reason + "; " if slot_being_evaluated.deviation_reason else "") + f"skipped_to_absorb_prior_delay_of_{slot_id}"
+                                slot_being_evaluated.actual_start_time = None
+                                slot_being_evaluated.actual_end_time = None
                                 schedule_changed_by_absorption = True
-                            else: # Shorten this slot
-                                original_end_time_for_shorten = slot.end_time
-                                new_end_datetime_shorten = datetime.combine(slot_date, slot.end_time) - time_to_absorb
+                            else:
+                                original_end_time_val = slot_being_evaluated.end_time
+                                new_end_datetime_val = datetime.combine(slot_date, slot_being_evaluated.end_time) - time_to_absorb
+                                new_potential_duration = new_end_datetime_val - datetime.combine(slot_date, slot_being_evaluated.start_time)
 
-                                if (datetime.combine(slot_date, slot.start_time) + MIN_SLOT_DURATION_AFTER_SHORTEN) <= new_end_datetime_shorten:
-                                    logger.info(f"Shortening highly flexible slot '{slot.activity_title}' by {time_to_absorb} to absorb delay.")
-                                    if slot.original_scheduled_end_time is None: slot.original_scheduled_end_time = original_end_time_for_shorten
-                                    slot.end_time = new_end_datetime_shorten.time()
-                                    slot.deviation_reason = (slot.deviation_reason + "; " if slot.deviation_reason else "") + f"shortened_to_absorb_prior_delay_of_{slot_id}"
+                                if new_potential_duration >= MIN_SLOT_DURATION_AFTER_SHORTEN :
+                                    logger.info(f"Shortening highly flexible slot '{slot_being_evaluated.activity_title}' by {time_to_absorb} to absorb delay from slot {slot_id}.")
+                                    if slot_being_evaluated.original_scheduled_end_time is None: slot_being_evaluated.original_scheduled_end_time = original_end_time_val
+                                    slot_being_evaluated.end_time = new_end_datetime_val.time()
+                                    slot_being_evaluated.deviation_reason = (slot_being_evaluated.deviation_reason + "; " if slot_being_evaluated.deviation_reason else "") + f"shortened_to_absorb_prior_delay_of_{slot_id}"
                                     time_to_absorb = timedelta(0)
                                     schedule_changed_by_absorption = True
                                 else:
-                                    logger.debug(f"Slot '{slot.activity_title}' cannot be shortened enough to absorb {time_to_absorb} and maintain min duration. Will be shifted.")
+                                    logger.debug(f"Slot '{slot_being_evaluated.activity_title}' cannot be shortened enough. Will be shifted if remaining deviation.")
 
-                final_shift_deviation = time_to_absorb # This is the remaining time to push subsequent tasks by
-                logger.info(f"Remaining deviation after absorption: {final_shift_deviation}")
+                    if schedule_changed_by_absorption:
+                        overall_schedule_has_changed = True
 
-                if final_shift_deviation > timedelta(0) and current_slot_index != -1: # If still time to push
-                    last_known_end_datetime = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
+
+                final_shift_deviation = time_to_absorb
+                logger.info(f"Remaining deviation after absorption attempts for slot {slot_id}: {final_shift_deviation}")
+
+                if final_shift_deviation > timedelta(0) and current_slot_index != -1:
+                    last_processed_actual_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
 
                     for i in range(current_slot_index + 1, len(todays_schedule)):
                         slot_to_shift = todays_schedule[i]
-                        if slot_to_shift.status == 'skipped': continue # Don't shift already skipped slots
+                        if slot_to_shift.status == 'skipped': continue
 
                         if slot_to_shift.original_scheduled_start_time is None: slot_to_shift.original_scheduled_start_time = slot_to_shift.start_time
                         if slot_to_shift.original_scheduled_end_time is None: slot_to_shift.original_scheduled_end_time = slot_to_shift.end_time
 
-                        slot_duration = datetime.combine(slot_to_shift.date, slot_to_shift.end_time) - datetime.combine(slot_to_shift.date, slot_to_shift.start_time)
+                        current_slot_duration = datetime.combine(slot_to_shift.date, slot_to_shift.end_time) - datetime.combine(slot_to_shift.date, slot_to_shift.start_time)
 
-                        # New start time is either right after the previous (if known) or shifted original
-                        prospective_start_dt = datetime.combine(slot_to_shift.date, slot_to_shift.original_scheduled_start_time) + final_shift_deviation
-                        if last_known_end_datetime and prospective_start_dt < last_known_end_datetime :
-                             prospective_start_dt = last_known_end_datetime # Ensure no overlap, start immediately after
+                        effective_start_dt = datetime.combine(slot_to_shift.date, slot_to_shift.original_scheduled_start_time) # Start from its original time before this final shift
 
-                        slot_to_shift.start_time = prospective_start_dt.time()
-                        slot_to_shift.end_time = (prospective_start_dt + slot_duration).time()
+                        if last_processed_actual_end_dt and effective_start_dt < last_processed_actual_end_dt:
+                             effective_start_dt = last_processed_actual_end_dt
+
+                        effective_start_dt += final_shift_deviation # Apply the remaining deviation here
+
+                        slot_to_shift.start_time = effective_start_dt.time()
+                        slot_to_shift.end_time = (effective_start_dt + current_slot_duration).time()
 
                         if slot_to_shift.status == 'pending': slot_to_shift.status = 'delayed'
-                        reason_suffix = f"final_shift_late_due_to_{slot_id}"
-                        slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason + "; " if slot_to_shift.deviation_reason else "") + reason_suffix
+                        reason = f"shifted_due_to_prior_delay_of_{slot_id}"
+                        slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason + "; " if slot_to_shift.deviation_reason else "") + reason
                         schedule_modified_by_final_shift = True
-                        last_known_end_datetime = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
+                        last_processed_actual_end_dt = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
 
-            elif deviation < timedelta(0) and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD: # Gained time, shift earlier
-                logger.info(f"Slot {slot_id} finished early by {abs(deviation)}. Shifting subsequent pending slots earlier.")
-                # Simple uniform shift earlier for this case
+            elif deviation < timedelta(0) and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD: # Gained time
+                logger.info(f"Slot {slot_id} finished {abs(deviation)} early. Shifting subsequent pending/delayed slots earlier.")
                 if current_slot_index != -1:
+                    last_processed_actual_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
                     for i in range(current_slot_index + 1, len(todays_schedule)):
                         next_slot = todays_schedule[i]
-                        if next_slot.status == 'pending' or next_slot.status == 'delayed': # Only shift pending or already delayed
+                        if next_slot.status in ['pending', 'delayed']:
+                            original_start_for_shift = next_slot.original_scheduled_start_time if next_slot.original_scheduled_start_time else next_slot.start_time
+                            original_end_for_shift = next_slot.original_scheduled_end_time if next_slot.original_scheduled_end_time else next_slot.end_time
+                            current_slot_duration = datetime.combine(next_slot.date, original_end_for_shift) - datetime.combine(next_slot.date, original_start_for_shift)
+
                             if next_slot.original_scheduled_start_time is None: next_slot.original_scheduled_start_time = next_slot.start_time
                             if next_slot.original_scheduled_end_time is None: next_slot.original_scheduled_end_time = next_slot.end_time
 
-                            current_slot_date_for_calc = next_slot.date
-                            new_start_dt = datetime.combine(current_slot_date_for_calc, next_slot.start_time) + deviation # deviation is negative
-                            new_end_dt = datetime.combine(current_slot_date_for_calc, next_slot.end_time) + deviation   # deviation is negative
+                            # Tentative new start: original start + (negative) deviation
+                            new_start_dt = datetime.combine(next_slot.date, original_start_for_shift) + deviation
+
+                            # Ensure it doesn't start before the actual end of the previously completed/updated slot
+                            if last_processed_actual_end_dt and new_start_dt < last_processed_actual_end_dt:
+                                new_start_dt = last_processed_actual_end_dt
 
                             next_slot.start_time = new_start_dt.time()
-                            next_slot.end_time = new_end_dt.time()
-                            if next_slot.status == 'pending': next_slot.status = 'delayed' # Mark as adjusted
-                            current_deviation_reason = f"prior_activity_id_{slot_id}_finished_early"
-                            next_slot.deviation_reason = (next_slot.deviation_reason + "; " if next_slot.deviation_reason else "") + current_deviation_reason
-                            schedule_modified_by_final_shift = True # Use this flag for any shift
+                            next_slot.end_time = (new_start_dt + current_slot_duration).time() # Maintain original duration
 
-            overall_schedule_changed = overall_schedule_changed or schedule_changed_by_absorption or schedule_modified_by_final_shift
-            # --- End of Rescheduling Logic ---
+                            if next_slot.status == 'pending': next_slot.status = 'delayed'
+                            reason = f"shifted_early_due_to_{slot_id}"
+                            next_slot.deviation_reason = (next_slot.deviation_reason + "; " if next_slot.deviation_reason else "") + reason
+                            schedule_modified_by_final_shift = True
+                            last_processed_actual_end_dt = datetime.combine(next_slot.date, next_slot.end_time)
 
-            if overall_schedule_changed:
+            overall_schedule_has_changed = overall_schedule_has_changed or schedule_changed_by_absorption or schedule_modified_by_final_shift
+
+            # New Event Completion Logic
+            if slot_to_update.status == 'completed':
+                # Ensure activity_details and metadata exist before trying to access them
+                if slot_to_update.activity_details and slot_to_update.activity_details.metadata:
+                    source_event_id = slot_to_update.activity_details.metadata.get('source_event_id')
+                    if source_event_id and isinstance(source_event_id, str):
+                        logger.debug(f"Slot {slot_to_update.id} completed, checking linked event {source_event_id} for completion.")
+                        event_to_update = await self.memory_storage.get_event_by_id(source_event_id)
+
+                        if event_to_update:
+                            is_specific_timed_single_day_event = (
+                                event_to_update.specific_time is not None and
+                                event_to_update.start_date == slot_to_update.date and
+                                event_to_update.end_date == slot_to_update.date
+                            )
+
+                            if is_specific_timed_single_day_event:
+                                if event_to_update.status != 'completed':
+                                    event_to_update.status = 'completed'
+                                    if slot_to_update.actual_end_time:
+                                        pathos_local_dt_at_event_end = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
+                                        pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
+                                        pathos_tz = timezone.utc
+                                        if ZoneInfo and pathos_tz_str.lower() != "utc":
+                                            try: pathos_tz = ZoneInfo(pathos_tz_str)
+                                            except Exception as e_tz: logger.warning(f"Could not resolve Pathos home timezone '{pathos_tz_str}': {e_tz}. Using UTC.")
+
+                                        pathos_local_dt_at_event_end = pathos_local_dt_at_event_end.replace(tzinfo=pathos_tz)
+                                        event_to_update.actual_end_datetime = pathos_local_dt_at_event_end.astimezone(timezone.utc)
+                                        logger.info(f"Marking event {event_to_update.id} ('{event_to_update.title}') as 'completed'. Actual end UTC: {event_to_update.actual_end_datetime.isoformat()}")
+                                    else:
+                                        logger.warning(f"Cannot set actual_end_datetime for event {event_to_update.id}, slot's actual_end_time is None.")
+
+                                    await self.memory_storage.add_event_to_db(event_to_update)
+                        else:
+                            logger.warning(f"Source event ID {source_event_id} from slot {slot_to_update.id} not found.")
+                else:
+                    logger.debug(f"Slot {slot_to_update.id} completed, but no activity_details.metadata or source_event_id found to link to an event.")
+
+
+            # --- End of Rescheduling Logic / Event Completion ---
+
+            if overall_schedule_has_changed: # Consolidated save condition
                 await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
-                logger.info(f"Saved updates for slot {slot_id} (and potentially subsequent slots) to DB for {target_date}.")
+                logger.info(f"Saved updates for slot {slot_id} (and potentially subsequent slots/event) to DB for {target_date}.")
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
                     self._todays_schedule_cache[user_id] = todays_schedule
                     logger.debug(f"Cache updated for {target_date} after reporting outcome for slot {slot_id}.")

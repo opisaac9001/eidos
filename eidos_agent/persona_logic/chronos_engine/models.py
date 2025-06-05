@@ -29,6 +29,7 @@ class ActivitySlotDetails(BaseModel):
     sub_focus: Optional[str] = Field(default=None)
     location_context: Optional[str] = Field(default=None)
     flexibility_score: Optional[float] = Field(default=0.5) # New field
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict) # New field for metadata
 
 class ActivitySlot(BaseModel):
     id: str = Field(default_factory=lambda: f"slot_{uuid.uuid4().hex}")
