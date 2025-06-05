@@ -461,7 +461,6 @@ class ChronosEngine:
             # if hasattr(slot_to_update.activity_details, 'outcome_notes') and outcome_metadata.get("notes"):
             #    slot_to_update.activity_details.outcome_notes = outcome_metadata.get("notes")
 
-
         target_date = slot_to_update.date
         user_id = slot_to_update.user_id
 
@@ -476,43 +475,74 @@ class ChronosEngine:
 
             if not todays_schedule:
                 logger.warning(f"report_activity_outcome: Could not load schedule for date {target_date} to update slot {slot_id}. Attempting to save the single updated slot. This might lead to data loss for other slots on this day if they existed.")
-                # This path is taken if the day's schedule is unexpectedly empty or fails to load.
-                # Saving just the single slot ensures its update is persisted, but other slots for that day might be lost from DB
-                # if save_schedule_to_db implicitly clears other items for the day when saving a partial list.
-                # Assuming save_schedule_to_db correctly handles replacing only the items provided if it's a full day,
-                # or if it's designed to update/insert based on ID. Given its current structure (delete then insert many),
-                # this will effectively make this slot the *only* one for the day.
                 await self.memory_storage.save_schedule_to_db([slot_to_update], user_id)
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
-                     self._todays_schedule_cache[user_id] = [slot_to_update] # Update cache, reflecting the single item save
+                     self._todays_schedule_cache[user_id] = [slot_to_update]
                 logger.info(f"Force-saved updated slot {slot_id} as single-item schedule for {target_date} due to prior load failure.")
                 return
 
+            # --- Start of Rescheduling Logic ---
+            deviation = timedelta(0)
+            if slot_to_update.actual_end_time and slot_to_update.end_time:
+                current_slot_date = slot_to_update.date
+                actual_end_datetime = datetime.combine(current_slot_date, slot_to_update.actual_end_time)
+                scheduled_end_datetime = datetime.combine(current_slot_date, slot_to_update.end_time)
+                deviation = actual_end_datetime - scheduled_end_datetime
+
+            SIGNIFICANT_DEVIATION_THRESHOLD = timedelta(minutes=5)
+            schedule_modified_by_rescheduling = False
+
+            # First, update the current slot in the loaded schedule list
             slot_updated_in_list = False
+            current_slot_index = -1
             for i, existing_slot in enumerate(todays_schedule):
                 if existing_slot.id == slot_id:
                     todays_schedule[i] = slot_to_update
                     slot_updated_in_list = True
+                    current_slot_index = i
                     break
 
-            if slot_updated_in_list:
+            if abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD:
+                logger.info(f"Slot {slot_id} had significant deviation of {deviation}. Rescheduling subsequent pending slots.")
+
+                if current_slot_index != -1 : # Ensure current slot was found to iterate from
+                    for i in range(current_slot_index + 1, len(todays_schedule)):
+                        next_slot = todays_schedule[i]
+                        if next_slot.status == 'pending':
+                            logger.debug(f"Rescheduling pending slot '{next_slot.activity_title}' (ID: {next_slot.id}) due to deviation.")
+
+                            if next_slot.original_scheduled_start_time is None:
+                                next_slot.original_scheduled_start_time = next_slot.start_time
+                            if next_slot.original_scheduled_end_time is None:
+                                next_slot.original_scheduled_end_time = next_slot.end_time
+
+                            current_slot_date_for_calc = next_slot.date
+                            new_start_dt = datetime.combine(current_slot_date_for_calc, next_slot.start_time) + deviation
+                            new_end_dt = datetime.combine(current_slot_date_for_calc, next_slot.end_time) + deviation
+
+                            next_slot.start_time = new_start_dt.time()
+                            next_slot.end_time = new_end_dt.time()
+
+                            if next_slot.status == 'pending':
+                                next_slot.status = 'delayed'
+                            current_deviation_reason = f"prior_activity_id_{slot_id}_shift_{'late' if deviation > timedelta(0) else 'early'}"
+                            next_slot.deviation_reason = current_deviation_reason if not next_slot.deviation_reason else next_slot.deviation_reason + "; " + current_deviation_reason
+
+                            todays_schedule[i] = next_slot
+                            schedule_modified_by_rescheduling = True
+            # --- End of Rescheduling Logic ---
+
+            if slot_updated_in_list or schedule_modified_by_rescheduling:
                 await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
-                logger.info(f"Updated slot {slot_id} with outcome and re-saved schedule for {target_date}.")
+                logger.info(f"Updated slot {slot_id} (and potentially subsequent slots) and re-saved schedule for {target_date}.")
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
                     self._todays_schedule_cache[user_id] = todays_schedule
                     logger.debug(f"Cache updated for {target_date} after reporting outcome for slot {slot_id}.")
             else:
-                # This case means the slot_id was found by get_schedule_item_by_id, but not in the list loaded by load_schedule_from_db.
-                # This could happen if the cache was stale or if there's an inconsistency.
-                # To handle this, we can append/replace the slot and save.
-                logger.warning(f"report_activity_outcome: Slot {slot_id} was found by ID but not in its day's loaded schedule for {target_date}. Appending/replacing and saving.")
-                # Remove if a different version of the slot was somehow in the list
-                todays_schedule = [s for s in todays_schedule if s.id != slot_id]
-                todays_schedule.append(slot_to_update)
-                todays_schedule.sort(key=lambda s: s.start_time) # Ensure order
-
-                await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
-                logger.info(f"Appended/Replaced slot {slot_id} and re-saved schedule for {target_date}.")
+                # This case implies the slot_id was found by get_schedule_item_by_id, but not in the list loaded by load_schedule_from_db.
+                # (and no rescheduling occurred as a consequence)
+                logger.warning(f"report_activity_outcome: Slot {slot_id} was found by ID but not in its day's loaded schedule for {target_date} AND no rescheduling occurred. Attempting to save as single-item schedule.")
+                await self.memory_storage.save_schedule_to_db([slot_to_update], user_id)
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
-                     self._todays_schedule_cache[user_id] = todays_schedule
-                     logger.debug(f"Cache updated after appending/replacing slot {slot_id}.")
+                     self._todays_schedule_cache[user_id] = [slot_to_update]
+                     logger.debug(f"Cache updated after saving single slot {slot_id}.")

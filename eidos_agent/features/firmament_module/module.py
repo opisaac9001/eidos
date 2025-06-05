@@ -646,10 +646,29 @@ class FirmamentModule:
                     snippet=simulated_action_snippet, activity_slot=activity_slot_for_storage,
                     mood_at_time=current_mood, related_intention_id=original_intention_memory_id
                 )
-            else:
+
+            # Report outcome for the actual current_activity_slot if it's not a dummy one
+            if current_activity_slot and current_activity_slot.slot_name != "AdHocFirmamentActivity" and self.chronos_engine:
+                event_time_dt = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
+                if not event_time_dt:
+                    event_time_dt = datetime.now(timezone.utc) # Fallback
+
+                outcome_status = 'partially_completed'
+
+                logger.info(f"Firmament: Reporting outcome for scheduled slot '{current_activity_slot.activity_title}' (ID: {current_activity_slot.id}) as '{outcome_status}' due to intention processing: '{intention[:50]}...'.")
+                await self.chronos_engine.report_activity_outcome(
+                    slot_id=current_activity_slot.id,
+                    actual_end_time=event_time_dt.time(),
+                    status=outcome_status,
+                    outcome_metadata={
+                        "source": "firmament_intention_consequence",
+                        "intention_text": intention,
+                        "simulated_action_snippet": simulated_action_snippet or "N/A"
+                    }
+                )
+            elif not simulated_action_snippet : # Ensure this is the correct variable name from the outer scope.
                 logger.warning(f"FirmamentModule: _call_llm_api for P2 intention simulation returned None. Role: {firmament_llm_role}")
-                # Removed 'return' here to allow flow to continue even if snippet is None,
-                # consistent with original behavior where LLM failure didn't stop the method.
+
         except Exception as e: # Catchall for the logic within this method, including storage
             logger.error(f"Error in _simulate_intention_consequence logic: {e}", exc_info=True)
 
