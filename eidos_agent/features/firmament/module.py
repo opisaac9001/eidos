@@ -172,6 +172,14 @@ class FirmamentModule:
         deviation_info: Optional[Dict[str, Any]] = None
         actual_snippet_text: Optional[str] = None
         try:
+            # Heuristic to check if this is a spontaneous activity context
+            is_spontaneous_context = False
+            if activity_slot.deviation_reason == 'spontaneous_activity':
+                is_spontaneous_context = True
+            elif activity_slot.activity_details and activity_slot.activity_details.metadata and \
+                 activity_slot.activity_details.metadata.get('source') == 'spontaneous_firmament':
+                is_spontaneous_context = True
+
             dream_influence_text = None
             if self.oneiros_module:
                 try:
@@ -188,19 +196,41 @@ class FirmamentModule:
                  environmental_context = "He is at his home office desk."
 
             system_prompt = ("You are describing a brief moment in the life of Pathos. Generate a single, concise sentence (max 20-25 words) for his current micro-action, thought, or observation. Focus on being observational and immersive. Avoid direct speech unless it's an internal thought.")
-            user_prompt_parts = [
-                f"Scheduled: '{activity_slot.activity_title}' ({activity_slot.start_time.strftime('%H:%M')}-{activity_slot.end_time.strftime('%H:%M')}).",
-            ]
-            if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
-                user_prompt_parts.append(f"Focus: '{activity_slot.activity_details.sub_focus}'.")
-            user_prompt_parts.append(f"Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} ({mood.get('name', 'neutral')}).")
+
+            user_prompt_parts = []
+            prompt_instruction = "Describe a brief moment (one sentence):" # Default instruction
+
+            if is_spontaneous_context:
+                user_prompt_parts.append(f"Pathos is currently in a spontaneous activity: '{activity_slot.activity_title}'.")
+                user_prompt_parts.append(f"Type: {activity_slot.activity_type}.")
+                start_time_display = activity_slot.actual_start_time or activity_slot.start_time
+                user_prompt_parts.append(f"Started around: {start_time_display.strftime('%H:%M')}.")
+
+                if activity_slot.activity_details and activity_slot.activity_details.description:
+                    user_prompt_parts.append(f"Context/Description: {activity_slot.activity_details.description}")
+                prompt_instruction = "Describe his current brief moment or thought related to this spontaneous activity (one sentence):"
+            else: # Normally scheduled activity
+                user_prompt_parts.append(
+                    f"Scheduled: '{activity_slot.activity_title}' ({activity_slot.start_time.strftime('%H:%M')}-{activity_slot.end_time.strftime('%H:%M')})."
+                )
+                if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
+                    user_prompt_parts.append(f"Focus: '{activity_slot.activity_details.sub_focus}'.")
+
+                # Deviation detection prompt only for scheduled tasks
+                prompt_instruction = (
+                    f"Your sentence. IMPORTANT: If your sentence implies Pathos starts a NEW, UNPLANNED activity different from '{activity_slot.activity_title}', "
+                    f"append JSON on a NEW LINE after your descriptive sentence, like this: {{\"deviate\": true, \"new_task_title\": \"Brief title for new task\", \"new_task_description\": \"Short description of what he now wants to do\", \"estimated_duration_minutes\": 30, \"new_task_type\": \"reflective\"}}. "
+                    f"Valid new_task_types: {', '.join(list(ActivityType.__args__))}. Otherwise, just the sentence."
+                )
+
+            # Common context elements
+            user_prompt_parts.append(f"Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).")
             if dream_influence_text: user_prompt_parts.append(f"Dream Influence: {dream_influence_text}")
             user_prompt_parts.append(f"Setting: {environmental_context}")
-            user_prompt_parts.append(
-                f"Your sentence. IMPORTANT: If your sentence implies Pathos starts a NEW, UNPLANNED activity different from '{activity_slot.activity_title}', "
-                f"append JSON on a NEW LINE: {{\"deviate\": true, \"new_task_title\": \"New task title\", \"new_task_description\": \"New task description\", \"estimated_duration_minutes\": 30, \"new_task_type\": \"valid_type\"}}. "
-                f"Valid types: {', '.join(list(ActivityType.__args__))}. Otherwise, just the sentence." # type: ignore
-            )
+
+            # Add the tailored instruction last
+            user_prompt_parts.append(prompt_instruction)
+
             user_prompt = "\n".join(user_prompt_parts)
             messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
@@ -277,18 +307,17 @@ class FirmamentModule:
         newly_started_spontaneous_slot: Optional[ActivitySlot] = None # Ensure it's defined for the scope
 
         if deviation_data and self.chronos_engine:
-            logger.info(f"Firmament: Deviation detected: {deviation_data}")
+            logger.info(f"Firmament: Deviation detected by LLM: {deviation_data}")
             new_task_title = deviation_data.get("new_task_title")
             new_task_description = deviation_data.get("new_task_description")
             duration_minutes = deviation_data.get("estimated_duration_minutes")
             new_task_type_str = deviation_data.get("new_task_type", "other")
 
-            # Ensure ActivityType and timedelta are available
-            from eidos_agent.persona_logic.chronos_engine.models import ActivityType
-            from datetime import timedelta
+            from eidos_agent.persona_logic.chronos_engine.models import ActivityType # Local import for safety
+            from datetime import timedelta # Local import for safety
 
             valid_activity_types = list(ActivityType.__args__) # type: ignore
-            new_task_type: ActivityType = 'other'
+            new_task_type: ActivityType = 'other' # Default
             if new_task_type_str in valid_activity_types:
                 new_task_type = new_task_type_str # type: ignore
             else:
@@ -328,9 +357,8 @@ class FirmamentModule:
         elif original_snippet: # No deviation_data, but we have an original_snippet. This is the "normal" path.
             await self._store_activity_log(original_snippet, context_slot_for_initial_snippet, mood)
 
-        # Fall through to NPC interaction only if:
-        # 1. No original_snippet was generated (implies LLM failed for initial snippet) AND
-        # 2. No spontaneous activity was successfully started (newly_started_spontaneous_slot is None).
+        # Fall through to NPC interaction only if no snippet was generated at all (original_snippet is None)
+        # AND no spontaneous activity was successfully started (newly_started_spontaneous_slot is None).
         if not original_snippet and not newly_started_spontaneous_slot:
             logger.info("FirmamentModule: No snippet generated and no successful deviation. Checking for NPC interaction.")
             npc_context_slot = context_slot_for_initial_snippet # This is the original (or dummy) slot
