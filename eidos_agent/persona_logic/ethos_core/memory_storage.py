@@ -133,9 +133,18 @@ class MemoryStorage:
             try: metadata = json.loads(meta_str)
             except json.JSONDecodeError: logger.warning(f"Could not decode metadata for entry {data.get('id', 'N/A')}")
         return MemoryEntry(
-            id=str(data.get('id', uuid.uuid4())), timestamp=str(data.get('timestamp', datetime.now(timezone.utc).isoformat())),
-            type=data.get('type'), content=str(data.get('content', "")), # type: ignore
-            embedding=self._deserialize_embedding(data.get('embedding')), metadata=metadata, salience=data.get('salience')
+            id=str(data.get('id', uuid.uuid4())),
+            timestamp=str(data.get('timestamp', datetime.now(timezone.utc).isoformat())),
+            type=data.get('type'), # type: ignore
+            content=str(data.get('content', "")),
+            embedding=self._deserialize_embedding(data.get('embedding')),
+            metadata=metadata,
+            salience=data.get('salience'),
+            summary_llm=data.get('summary_llm'), # Existing added field
+            timestamp_last_salience_update=data.get('timestamp_last_salience_update'), # New
+            last_accessed_ts=data.get('last_accessed_ts'),                            # New
+            access_count=int(data.get('access_count')) if data.get('access_count') is not None else None, # New, ensure int or None
+            is_archived=bool(data.get('is_archived')) if data.get('is_archived') is not None else None # New, convert 0/1 to bool, or None
         )
 
     def add_entry(self, entry_data: Dict) -> MemoryEntry:
@@ -159,13 +168,50 @@ class MemoryStorage:
 
     def get_entry(self, entry_id: str) -> Optional[MemoryEntry]:
         try:
-            conn = self._get_connection(); cursor = conn.cursor()
-            cursor.execute("SELECT * FROM memories WHERE id = ?", (entry_id,)); row = cursor.fetchone()
-            return self._row_to_entry(row) if row else None
-        except sqlite3.Error as e: logger.error(f"Error getting entry {entry_id}: {e}", exc_info=True); return None
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            # Assumes "SELECT *" is used and the table schema includes the new columns.
+            cursor.execute("SELECT * FROM memories WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+
+            if row:
+                entry_to_return = self._row_to_entry(row)
+
+                # Safely get and increment access_count
+                current_access_count = entry_to_return.get('access_count')
+                if not isinstance(current_access_count, int):
+                    if current_access_count is not None:
+                        logger.warning(f"Memory entry {entry_id} had non-integer access_count '{current_access_count}'. Resetting to 0 for increment.")
+                    current_access_count = 0
+
+                updates_for_access_stats = {
+                    "last_accessed_ts": datetime.now(timezone.utc).isoformat(),
+                    "access_count": current_access_count + 1
+                }
+
+                # Update the entry in the DB with new access stats
+                # This call to update_entry should not re-embed if only access stats are changing.
+                if not self.update_entry(entry_id, updates_for_access_stats):
+                    logger.warning(f"Failed to update access stats for memory {entry_id}. This might affect salience calculations.")
+
+                return entry_to_return
+            else:
+                return None
+        except sqlite3.Error as e_sql:
+            logger.error(f"SQLite error getting entry {entry_id}: {e_sql}", exc_info=True)
+            return None
+        except Exception as e_gen:
+            logger.error(f"Unexpected error in get_entry for {entry_id}: {e_gen}", exc_info=True)
+            return None
 
     def update_entry(self, entry_id: str, updates: Dict) -> bool:
-        allowed = {'content', 'metadata', 'salience', 'type', 'timestamp'}; fields, values = [], []
+        allowed = {
+            'content', 'metadata', 'salience', 'type', 'timestamp',
+            'summary_llm', # Ensure this is allowed if it's updatable
+            'timestamp_last_salience_update', 'last_accessed_ts',
+            'access_count', 'is_archived'
+        }
+        fields, values = [], []
         for k, v in updates.items():
             if k in allowed:
                 fields.append(f"{k} = ?"); values.append(json.dumps(v) if k == 'metadata' else v)
@@ -194,13 +240,20 @@ class MemoryStorage:
         except Exception as e: logger.error(f"Failed to embed query '{query_text[:50]}...': {e}"); return []
         try:
             conn = self._get_connection(); cursor = conn.cursor()
-            sql = "SELECT * FROM memories WHERE embedding IS NOT NULL AND type != 'pending_context_document' AND type != 'chat_storage'"
+            # Added "AND (is_archived = 0 OR is_archived IS NULL)" to filter out archived memories
+            sql = "SELECT * FROM memories WHERE embedding IS NOT NULL AND type != 'pending_context_document' AND type != 'chat_storage' AND (is_archived = 0 OR is_archived IS NULL)"
             params: List[Any] = []
             if allowed_types:
                 valid_types = [t for t in allowed_types if t not in ['pending_context_document', 'chat_storage']]
-                if valid_types: sql += f" AND type IN ({','.join('?'*len(valid_types))})"; params.extend(valid_types)
-                else: return []
-            sql += " ORDER BY timestamp DESC LIMIT 500"; cursor.execute(sql, tuple(params)); rows = cursor.fetchall()
+                if valid_types:
+                    sql += f" AND type IN ({','.join('?'*len(valid_types))})"
+                    params.extend(valid_types)
+                else:
+                    # If allowed_types is provided but results in no valid types for this query, return empty.
+                    return []
+            # Consider if this limit should be configurable or larger. For now, keeping existing 500.
+            sql += " ORDER BY timestamp DESC LIMIT 500"
+            cursor.execute(sql, tuple(params)); rows = cursor.fetchall()
         except sqlite3.Error as e: logger.error(f"Error retrieving for similarity search: {e}", exc_info=True); return []
         sims = []
         for row in rows:
@@ -398,12 +451,15 @@ class MemoryStorage:
 
         if can_use_json_extract:
             sql_query += " AND json_extract(metadata, '$.user_id') = ? "
-            params.append(user_id)
+            params.append(user_id) # user_id param added
+            sql_query += " AND (is_archived = 0 OR is_archived IS NULL) " # New condition
             sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
-            params.append(limit)
+            params.append(limit) # limit param added
         else:
+            # For the else case, user_id is filtered in Python later.
+            sql_query += " AND (is_archived = 0 OR is_archived IS NULL) " # New condition
             sql_query += " ORDER BY salience DESC NULLS LAST, timestamp DESC LIMIT ? "
-            params.append(limit * 5)
+            params.append(limit * 5) # Fetch more for Python filtering, limit param added
 
         try:
             logger.debug(f"Executing get_memories_for_summary. Query: {sql_query}, Params: {params}")
@@ -475,13 +531,14 @@ class MemoryStorage:
                 SELECT * FROM memories
                 WHERE type = ?
                   AND json_extract(metadata, '$.user_id') = ?
+                  AND (is_archived = 0 OR is_archived IS NULL)
                 ORDER BY timestamp DESC
                 LIMIT ?
             """
             params = [entry_type, user_id, limit]
         else:
             logger.warning(f"json_extract not available for get_entries_by_type_and_user (type: {entry_type}, user: {user_id}). Falling back to Python filter.")
-            sql_query = "SELECT * FROM memories WHERE type = ? ORDER BY timestamp DESC LIMIT ?"
+            sql_query = "SELECT * FROM memories WHERE type = ? AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC LIMIT ?"
             params = [entry_type, limit * 5] # Fetch more to allow for Python filtering
 
         try:
@@ -505,6 +562,88 @@ class MemoryStorage:
             logger.error(f"Error retrieving entries by type '{entry_type}' and user '{user_id}': {e}", exc_info=True)
             return []
 
+    async def get_memories_for_salience_processing(
+        self,
+        limit: int,
+        user_id: Optional[str] = None
+    ) -> List[MemoryEntry]:
+        """
+        Retrieves memories that are candidates for salience processing.
+        Prioritizes non-archived memories that haven't had their salience updated recently,
+        or ever. If user_id is provided, filters for that user's memories.
+        """
+        logger.debug(f"Fetching up to {limit} memories for salience processing (User: {user_id if user_id else 'Any'}).")
+        entries: List[MemoryEntry] = []
+
+        # Ensure the table has the new columns; if not, this query might fail or not work as expected.
+        # This method assumes the schema migration for is_archived and timestamp_last_salience_update has occurred.
+        sql_query = "SELECT * FROM memories WHERE (is_archived = 0 OR is_archived IS NULL)"
+        params: List[Any] = []
+
+        can_use_json_extract_for_user_filter = False
+        if user_id:
+            _conn_check = self._get_connection() # Use existing connection or create new one
+            _cursor_check = _conn_check.cursor()
+            try:
+                # Test if json_extract is available. This is a common pattern in this class.
+                _cursor_check.execute("SELECT json_extract('{\"key\":\"value\"}', '$.key')")
+                can_use_json_extract_for_user_filter = True
+            except sqlite3.OperationalError as oe_test:
+                if "no such function: json_extract" not in str(oe_test).lower():
+                    # If the error is something other than json_extract not being available, log it.
+                    logger.error(f"Unexpected SQLite error when testing json_extract availability: {oe_test}")
+                # In either case (no such function or other error during test), we can't use json_extract.
+                can_use_json_extract_for_user_filter = False
+            finally:
+                # It's important to close cursors that are opened, especially if they are temporary checks.
+                # However, _get_connection() returns a potentially shared connection, so closing cursor is fine.
+                if _cursor_check: _cursor_check.close()
+
+
+            if can_use_json_extract_for_user_filter:
+                sql_query += " AND json_extract(metadata, '$.user_id') = ?"
+                params.append(user_id)
+            else:
+                logger.warning(f"json_extract not available for user_id filter in get_memories_for_salience_processing. Will filter in Python if user_id ('{user_id}') specified.")
+
+        # Order by salience update timestamp (NULLS FIRST to get those never processed), then by creation timestamp
+        sql_query += " ORDER BY timestamp_last_salience_update ASC NULLS FIRST, timestamp ASC LIMIT ?"
+
+        fetch_limit = limit
+        if user_id and not can_use_json_extract_for_user_filter:
+            # Fetch more rows if we need to filter in Python, to increase chance of getting `limit` matches.
+            fetch_limit = limit * 10 # Heuristic: fetch 10x more, adjust as needed.
+            logger.debug(f"Adjusted fetch limit to {fetch_limit} due to Python-based user_id ('{user_id}') filtering.")
+        params.append(fetch_limit)
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            logger.debug(f"Executing query for salience processing: {sql_query} with params {params}")
+            cursor.execute(sql_query, tuple(params))
+            rows = cursor.fetchall() # Fetches all rows up to fetch_limit
+
+            for row_data_raw in rows: # row_data_raw is sqlite3.Row
+                entry = self._row_to_entry(dict(row_data_raw)) # Convert sqlite3.Row to dict for _row_to_entry
+
+                if user_id and not can_use_json_extract_for_user_filter:
+                    # Python-based filtering for user_id if json_extract wasn't used
+                    if entry.get('metadata', {}).get('user_id') != user_id:
+                        continue # Skip this entry, does not match user_id
+
+                entries.append(entry)
+                if len(entries) >= limit: # Stop once we have enough entries matching the original limit
+                    break
+
+            logger.info(f"Retrieved {len(entries)} memories for salience processing for user '{user_id if user_id else 'any'}'.")
+            return entries
+
+        except sqlite3.Error as e_sql:
+            logger.error(f"SQLite error fetching memories for salience processing: {e_sql}", exc_info=True)
+            return []
+        except Exception as e_gen: # Catch any other unexpected errors
+            logger.error(f"Unexpected error fetching memories for salience processing: {e_gen}", exc_info=True)
+            return []
     async def get_schedule_item_by_id(self, slot_id: str) -> Optional[ActivitySlot]:
         conn = self._get_connection()
         cursor = conn.cursor()
