@@ -62,6 +62,38 @@ class ChronosEngine:
 
         logger.info("ChronosEngine initialized.")
 
+    ACTIVITY_TYPE_TO_IMPORTANCE = {
+        'work': 'high', 'intellectual': 'high',
+        'event_related': 'high',
+        'social': 'medium', 'learning': 'medium', 'creative': 'medium',
+        'planning': 'medium', 'travel': 'medium',
+        'reflective': 'low', 'leisure': 'low', 'maintenance': 'low', 'other': 'low'
+    }
+
+    def _get_slot_duration(self, slot: ActivitySlot, slot_date: Optional[date] = None) -> timedelta:
+        d = slot_date or slot.date
+        # Ensure start_time and end_time are valid time objects
+        if not isinstance(slot.start_time, time) or not isinstance(slot.end_time, time):
+            logger.error(f"Slot {slot.id} has invalid time types for duration calculation. Start: {slot.start_time}, End: {slot.end_time}")
+            # Fallback to a zero duration to prevent crashes, though this indicates a data issue.
+            return timedelta(0)
+        return datetime.combine(d, slot.end_time) - datetime.combine(d, slot.start_time)
+
+    def _get_slot_importance(self, slot: ActivitySlot, event_map: Dict[str, PathosEvent]) -> Literal['critical', 'high', 'medium', 'low']:
+        if slot.activity_details and slot.activity_details.metadata:
+            source_event_id = slot.activity_details.metadata.get('source_event_id')
+            if source_event_id and source_event_id in event_map:
+                event = event_map[source_event_id]
+                if event.details and event.details.importance:
+                    return event.details.importance # 'critical', 'high', 'medium', 'low'
+
+        # Fallback to activity type based importance
+        importance_val = self.ACTIVITY_TYPE_TO_IMPORTANCE.get(slot.activity_type, 'medium')
+        if importance_val == 'critical': return 'critical' # Should not happen from this map but for type safety
+        if importance_val == 'high': return 'high'
+        if importance_val == 'medium': return 'medium'
+        return 'low' # Default for 'low' or unknown
+
     def _get_llm_for_activity_generation(self) -> Optional[LLMConfig]:
         scheduler_llm_role = self.config.ETHOS.get('scheduler_llm_role', 'LOGOS_TECHNE')
         llm_config = self.config.get_llm_config(scheduler_llm_role) # type: ignore
@@ -575,10 +607,8 @@ class ChronosEngine:
                 deviation = actual_end_datetime - scheduled_end_datetime
 
             SIGNIFICANT_DEVIATION_THRESHOLD = timedelta(minutes=5)
-            schedule_changed_by_absorption = False
+            schedule_changed_due_to_absorption = False
             schedule_modified_by_final_shift = False
-
-            # slot_updated_in_list is True if the primary slot_to_update was found and placed in todays_schedule
             slot_updated_in_list = False
             current_slot_index = -1
 
@@ -589,122 +619,123 @@ class ChronosEngine:
                     current_slot_index = i
                     break
 
-            # This flag will determine if a save is needed at the end
             overall_schedule_has_changed = slot_updated_in_list
 
-            if deviation > timedelta(0) and deviation > SIGNIFICANT_DEVIATION_THRESHOLD: # Lost time
-                time_to_absorb = deviation
-                logger.info(f"Slot {slot_id} created a positive deviation of {time_to_absorb}. Attempting to absorb with subsequent flexible slots.")
+            if current_slot_index != -1 and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD:
+                # Fetch event details for importance mapping if we are going to reschedule
+                event_id_to_event_map: Dict[str, PathosEvent] = {}
+                slot_ids_with_events = [
+                    s.activity_details.metadata.get('source_event_id')
+                    for s in todays_schedule
+                    if s.activity_details and s.activity_details.metadata and s.activity_details.metadata.get('source_event_id')
+                ]
+                if slot_ids_with_events:
+                    try:
+                        # This assumes memory_storage can fetch multiple events by ID efficiently if such a method exists.
+                        # For now, we'll fetch one by one if needed inside _get_slot_importance or pre-fetch if only a few.
+                        # For simplicity, _get_slot_importance will handle individual fetches if event_map is not pre-populated.
+                        # However, the provided _get_slot_importance expects event_map. So, let's build it.
+                        unique_event_ids = list(set(slot_ids_with_events))
+                        for event_id_to_fetch in unique_event_ids:
+                            event = await self.memory_storage.get_event_by_id(event_id_to_fetch)
+                            if event:
+                                event_id_to_event_map[event_id_to_fetch] = event
+                    except Exception as e_fetch_events:
+                        logger.error(f"Error fetching event details for rescheduling logic: {e_fetch_events}")
 
-                HIGH_FLEXIBILITY_THRESHOLD = 0.8
-                MIN_SLOT_DURATION_AFTER_SHORTEN = timedelta(minutes=15)
 
-                # Iterate directly on todays_schedule for absorption pass, as we have current_slot_index
-                if current_slot_index != -1:
+                if deviation > timedelta(0): # Lost time
+                    time_to_absorb = deviation
+                    logger.info(f"Slot {slot_id} created positive deviation: {time_to_absorb}. Attempting absorption.")
+
+                    HIGH_FLEXIBILITY_THRESHOLD = 0.8
+                    MIN_SLOT_DURATION_AFTER_SHORTEN = timedelta(minutes=15)
+
                     for i in range(current_slot_index + 1, len(todays_schedule)):
-                        slot_being_evaluated = todays_schedule[i] # Direct reference
-                        if slot_being_evaluated.status != 'pending':
-                            continue
-                        if time_to_absorb <= timedelta(0):
-                            break
+                        slot_eval = todays_schedule[i]
+                        if time_to_absorb <= timedelta(0): break
+                        if not (slot_eval.status == 'pending' or slot_eval.status == 'delayed'): continue
 
-                        flexibility = slot_being_evaluated.activity_details.flexibility_score if slot_being_evaluated.activity_details.flexibility_score is not None else 0.5
+                        importance = self._get_slot_importance(slot_eval, event_id_to_event_map)
+                        flexibility = slot_eval.activity_details.flexibility_score if slot_eval.activity_details.flexibility_score is not None else 0.5
 
-                        if flexibility >= HIGH_FLEXIBILITY_THRESHOLD:
-                            slot_date = slot_being_evaluated.date
-                            current_slot_duration = datetime.combine(slot_date, slot_being_evaluated.end_time) - datetime.combine(slot_date, slot_being_evaluated.start_time)
-
-                            if time_to_absorb >= current_slot_duration:
-                                logger.info(f"Skipping highly flexible slot '{slot_being_evaluated.activity_title}' (duration: {current_slot_duration}) to absorb {current_slot_duration} of delay from slot {slot_id}.")
-                                time_to_absorb -= current_slot_duration
-                                slot_being_evaluated.status = 'skipped'
-                                slot_being_evaluated.deviation_reason = (slot_being_evaluated.deviation_reason + "; " if slot_being_evaluated.deviation_reason else "") + f"skipped_to_absorb_prior_delay_of_{slot_id}"
-                                slot_being_evaluated.actual_start_time = None
-                                slot_being_evaluated.actual_end_time = None
-                                schedule_changed_by_absorption = True
-                            else:
-                                original_end_time_val = slot_being_evaluated.end_time
-                                new_end_datetime_val = datetime.combine(slot_date, slot_being_evaluated.end_time) - time_to_absorb
-                                new_potential_duration = new_end_datetime_val - datetime.combine(slot_date, slot_being_evaluated.start_time)
-
-                                if new_potential_duration >= MIN_SLOT_DURATION_AFTER_SHORTEN :
-                                    logger.info(f"Shortening highly flexible slot '{slot_being_evaluated.activity_title}' by {time_to_absorb} to absorb delay from slot {slot_id}.")
-                                    if slot_being_evaluated.original_scheduled_end_time is None: slot_being_evaluated.original_scheduled_end_time = original_end_time_val
-                                    slot_being_evaluated.end_time = new_end_datetime_val.time()
-                                    slot_being_evaluated.deviation_reason = (slot_being_evaluated.deviation_reason + "; " if slot_being_evaluated.deviation_reason else "") + f"shortened_to_absorb_prior_delay_of_{slot_id}"
+                        if importance == 'low' and flexibility >= HIGH_FLEXIBILITY_THRESHOLD:
+                            slot_duration = self._get_slot_duration(slot_eval)
+                            if time_to_absorb >= slot_duration: # Skip
+                                logger.info(f"Skipping low-importance, high-flex slot '{slot_eval.activity_title}' (duration: {slot_duration}) to absorb delay.")
+                                time_to_absorb -= slot_duration
+                                slot_eval.status = 'skipped'
+                                slot_eval.deviation_reason = (slot_eval.deviation_reason or "") + f";skipped_to_absorb_delay_from_{slot_id}"
+                                slot_eval.actual_start_time = None; slot_eval.actual_end_time = None
+                                schedule_changed_due_to_absorption = True
+                            else: # Shorten
+                                original_end_t = slot_eval.end_time
+                                new_end_dt_abs = datetime.combine(slot_eval.date, slot_eval.end_time) - time_to_absorb
+                                if (datetime.combine(slot_eval.date, slot_eval.start_time) + MIN_SLOT_DURATION_AFTER_SHORTEN) <= new_end_dt_abs:
+                                    logger.info(f"Shortening low-importance, high-flex slot '{slot_eval.activity_title}' by {time_to_absorb}.")
+                                    if slot_eval.original_scheduled_end_time is None: slot_eval.original_scheduled_end_time = original_end_t
+                                    slot_eval.end_time = new_end_dt_abs.time()
+                                    slot_eval.deviation_reason = (slot_eval.deviation_reason or "") + f";shortened_to_absorb_delay_from_{slot_id}"
                                     time_to_absorb = timedelta(0)
-                                    schedule_changed_by_absorption = True
-                                else:
-                                    logger.debug(f"Slot '{slot_being_evaluated.activity_title}' cannot be shortened enough. Will be shifted if remaining deviation.")
+                                    schedule_changed_due_to_absorption = True
 
-                    if schedule_changed_by_absorption:
-                        overall_schedule_has_changed = True
+                    if schedule_changed_due_to_absorption: overall_schedule_has_changed = True
 
+                    final_shift_deviation = time_to_absorb
+                    if final_shift_deviation > timedelta(0): # If still time to push
+                        logger.info(f"Remaining deviation after absorption: {final_shift_deviation}. Applying as cascading shift.")
+                        last_known_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
+                        for i in range(current_slot_index + 1, len(todays_schedule)):
+                            slot_to_shift = todays_schedule[i]
+                            if slot_to_shift.status == 'skipped': continue
 
-                final_shift_deviation = time_to_absorb
-                logger.info(f"Remaining deviation after absorption attempts for slot {slot_id}: {final_shift_deviation}")
+                            orig_start_t = slot_to_shift.original_scheduled_start_time or slot_to_shift.start_time
+                            orig_end_t = slot_to_shift.original_scheduled_end_time or slot_to_shift.end_time
+                            current_duration = self._get_slot_duration(slot_to_shift) # Use current duration in case it was shortened
 
-                if final_shift_deviation > timedelta(0) and current_slot_index != -1:
-                    last_processed_actual_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
+                            if slot_to_shift.original_scheduled_start_time is None: slot_to_shift.original_scheduled_start_time = slot_to_shift.start_time
+                            if slot_to_shift.original_scheduled_end_time is None: slot_to_shift.original_scheduled_end_time = slot_to_shift.end_time
 
-                    for i in range(current_slot_index + 1, len(todays_schedule)):
-                        slot_to_shift = todays_schedule[i]
-                        if slot_to_shift.status == 'skipped': continue
+                            effective_start_dt = datetime.combine(slot_to_shift.date, orig_start_t)
+                            if last_known_end_dt and effective_start_dt < last_known_end_dt: # If original start is now before prev slot's actual end
+                                effective_start_dt = last_known_end_dt # Start immediately after
 
-                        if slot_to_shift.original_scheduled_start_time is None: slot_to_shift.original_scheduled_start_time = slot_to_shift.start_time
-                        if slot_to_shift.original_scheduled_end_time is None: slot_to_shift.original_scheduled_end_time = slot_to_shift.end_time
+                            effective_start_dt += final_shift_deviation # Apply remaining deviation
 
-                        current_slot_duration = datetime.combine(slot_to_shift.date, slot_to_shift.end_time) - datetime.combine(slot_to_shift.date, slot_to_shift.start_time)
+                            slot_to_shift.start_time = effective_start_dt.time()
+                            slot_to_shift.end_time = (effective_start_dt + current_duration).time()
+                            if slot_to_shift.status == 'pending': slot_to_shift.status = 'delayed'
+                            slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason or "") + f";shifted_late_due_to_{slot_id}"
+                            schedule_modified_by_final_shift = True
+                            last_known_end_dt = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
 
-                        effective_start_dt = datetime.combine(slot_to_shift.date, slot_to_shift.original_scheduled_start_time) # Start from its original time before this final shift
-
-                        if last_processed_actual_end_dt and effective_start_dt < last_processed_actual_end_dt:
-                             effective_start_dt = last_processed_actual_end_dt
-
-                        effective_start_dt += final_shift_deviation # Apply the remaining deviation here
-
-                        slot_to_shift.start_time = effective_start_dt.time()
-                        slot_to_shift.end_time = (effective_start_dt + current_slot_duration).time()
-
-                        if slot_to_shift.status == 'pending': slot_to_shift.status = 'delayed'
-                        reason = f"shifted_due_to_prior_delay_of_{slot_id}"
-                        slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason + "; " if slot_to_shift.deviation_reason else "") + reason
-                        schedule_modified_by_final_shift = True
-                        last_processed_actual_end_dt = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
-
-            elif deviation < timedelta(0) and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD: # Gained time
-                logger.info(f"Slot {slot_id} finished {abs(deviation)} early. Shifting subsequent pending/delayed slots earlier.")
-                if current_slot_index != -1:
-                    last_processed_actual_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
+                elif deviation < timedelta(0): # Gained time
+                    logger.info(f"Slot {slot_id} finished {abs(deviation)} early. Shifting subsequent slots earlier.")
+                    last_known_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
                     for i in range(current_slot_index + 1, len(todays_schedule)):
                         next_slot = todays_schedule[i]
                         if next_slot.status in ['pending', 'delayed']:
-                            original_start_for_shift = next_slot.original_scheduled_start_time if next_slot.original_scheduled_start_time else next_slot.start_time
-                            original_end_for_shift = next_slot.original_scheduled_end_time if next_slot.original_scheduled_end_time else next_slot.end_time
-                            current_slot_duration = datetime.combine(next_slot.date, original_end_for_shift) - datetime.combine(next_slot.date, original_start_for_shift)
+                            orig_start_t = next_slot.original_scheduled_start_time or next_slot.start_time
+                            orig_end_t = next_slot.original_scheduled_end_time or next_slot.end_time
+                            current_duration = datetime.combine(next_slot.date, orig_end_t) - datetime.combine(next_slot.date, orig_start_t)
 
                             if next_slot.original_scheduled_start_time is None: next_slot.original_scheduled_start_time = next_slot.start_time
                             if next_slot.original_scheduled_end_time is None: next_slot.original_scheduled_end_time = next_slot.end_time
 
-                            # Tentative new start: original start + (negative) deviation
-                            new_start_dt = datetime.combine(next_slot.date, original_start_for_shift) + deviation
-
-                            # Ensure it doesn't start before the actual end of the previously completed/updated slot
-                            if last_processed_actual_end_dt and new_start_dt < last_processed_actual_end_dt:
-                                new_start_dt = last_processed_actual_end_dt
+                            new_start_dt = datetime.combine(next_slot.date, orig_start_t) + deviation
+                            if last_known_end_dt and new_start_dt < last_known_end_dt:
+                                new_start_dt = last_known_end_dt
 
                             next_slot.start_time = new_start_dt.time()
-                            next_slot.end_time = (new_start_dt + current_slot_duration).time() # Maintain original duration
-
+                            next_slot.end_time = (new_start_dt + current_duration).time()
                             if next_slot.status == 'pending': next_slot.status = 'delayed'
-                            reason = f"shifted_early_due_to_{slot_id}"
-                            next_slot.deviation_reason = (next_slot.deviation_reason + "; " if next_slot.deviation_reason else "") + reason
+                            next_slot.deviation_reason = (next_slot.deviation_reason or "") + f";shifted_early_due_to_{slot_id}"
                             schedule_modified_by_final_shift = True
-                            last_processed_actual_end_dt = datetime.combine(next_slot.date, next_slot.end_time)
+                            last_known_end_dt = datetime.combine(next_slot.date, next_slot.end_time)
 
-            overall_schedule_has_changed = overall_schedule_has_changed or schedule_changed_by_absorption or schedule_modified_by_final_shift
+                if schedule_modified_by_final_shift: overall_schedule_has_changed = True
 
-            # New Event Completion Logic
+            # New Event Completion Logic (placed after all schedule adjustments, before save)
             if slot_to_update.status == 'completed':
                 # Ensure activity_details and metadata exist before trying to access them
                 if slot_to_update.activity_details and slot_to_update.activity_details.metadata:
