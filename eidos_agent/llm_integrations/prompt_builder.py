@@ -4,7 +4,7 @@ particularly for the Pathos Subconscious Node.
 """
 import logging
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta # Added timedelta
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 from eidos_agent.core.config import Config, LLMConfig # Assuming LLMConfig is needed, or just Config
@@ -37,6 +37,8 @@ except ImportError:
     logging.getLogger(__name__).warning("Tiktoken not found. Token estimation will be unavailable. Install with: pip install tiktoken")
 
 logger = get_logger(__name__)
+
+DAYS_TO_PREFER_SUMMARY_FOR_CONTEXT = 1.0 # Added constant
 
 def estimate_tokens_for_messages(messages: List[Dict[str, Any]], model_name_for_tiktoken: str = "cl100k_base") -> int:
     """
@@ -220,7 +222,52 @@ class PromptBuilder:
                 top_k=Config.get_nested_value(self.config.ETHOS, ['retrieval_limit_for_pathos_context'], 3), # self.config
                 user_id_context=user_id
             )
-        memories_formatted_for_prompt = "\n".join([f"- {m['content'][:300]}..." for m in retrieved_memories_raw if isinstance(m, dict) and 'content' in m]) or "No specific memories retrieved."
+
+        # New logic for formatting memories, potentially using summaries:
+        formatted_memory_strings = []
+        now_utc = datetime.now(timezone.utc)
+
+        for m in retrieved_memories_raw:
+            if not (isinstance(m, dict) and m.get('content')):
+                continue
+
+            summary_content = m.get('summary_llm')
+            use_summary = False
+            # Default display timestamp if parsing fails or not applicable
+            memory_display_timestamp = "an earlier time"
+
+            if summary_content and isinstance(summary_content, str) and summary_content.strip():
+                timestamp_str = m.get('timestamp')
+                if timestamp_str:
+                    try:
+                        # Ensure timestamp is timezone-aware (UTC) for comparison
+                        mem_ts_parsed = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        if mem_ts_parsed.tzinfo is None:
+                            mem_ts = mem_ts_parsed.replace(tzinfo=timezone.utc)
+                        else:
+                            mem_ts = mem_ts_parsed.astimezone(timezone.utc)
+
+                        memory_display_timestamp = mem_ts.strftime('%Y-%m-%d %H:%M UTC')
+                        # Use '>=' so 1.0 means 1 full day (24 hours) or more has passed
+                        if (now_utc - mem_ts).days >= DAYS_TO_PREFER_SUMMARY_FOR_CONTEXT:
+                            use_summary = True
+                    except ValueError as e_ts:
+                        logger.debug(f"Could not parse timestamp for memory {m.get('id', 'N/A')} ('{timestamp_str}') to decide on summary: {e_ts}")
+                    except Exception as e_gen_ts:
+                        logger.warning(f"Unexpected error processing timestamp for memory {m.get('id', 'N/A')}: {e_gen_ts}")
+
+            if use_summary:
+                summary_snippet = summary_content[:350] + "..." if len(summary_content) > 350 else summary_content
+                formatted_memory_strings.append(f"- [Summary from {memory_display_timestamp}]: {summary_snippet}")
+            else:
+                content_snippet = m['content'][:300] + "..." if len(m['content']) > 300 else m['content']
+                prefix_for_content = ""
+                # Add timestamp to content if summary not used, timestamp is available, and not obviously part of content
+                if memory_display_timestamp != "an earlier time" and not m['content'].startswith(memory_display_timestamp.split(' ')[0]):
+                     prefix_for_content = f"[From {memory_display_timestamp}]: "
+                formatted_memory_strings.append(f"- {prefix_for_content}{content_snippet}")
+
+        memories_formatted_for_prompt = "\n".join(formatted_memory_strings) or "No specific memories retrieved for this query."
 
         # Use passed enhanced_pathos_llm_config
         is_multimodal_llm = enhanced_pathos_llm_config and enhanced_pathos_llm_config.get('supports_vision', False)
@@ -309,18 +356,42 @@ class PromptBuilder:
                 # Format for injection
                 max_len_past_interaction = 250 # Max length for each injected snippet
                 for mem_entry in unique_past_interactions: # Already sorted by relevance by EthosCore
-                    past_interaction_text = mem_entry.get('content', '')
-                    past_timestamp_str = mem_entry.get('timestamp', 'an earlier time')
-                    try:
-                        past_dt_obj = datetime.fromisoformat(past_timestamp_str.replace("Z", "+00:00"))
-                        formatted_past_ts = past_dt_obj.strftime("%Y-%m-%d %H:%M")
-                    except ValueError:
-                        formatted_past_ts = past_timestamp_str # Fallback to raw string
+                    summary_content = mem_entry.get('summary_llm')
+                    original_content = mem_entry.get('content', '')
+                    use_summary = False
+                    interaction_display_timestamp = "an earlier time" # Default
+                    parsed_timestamp_for_age_check = None
 
-                    formatted_past_text = past_interaction_text[:max_len_past_interaction] + "..." if len(past_interaction_text) > max_len_past_interaction else past_interaction_text
+                    timestamp_str = mem_entry.get('timestamp')
+                    if timestamp_str:
+                        try:
+                            # Robust timestamp parsing
+                            parsed_dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                            if parsed_dt.tzinfo is None:
+                                parsed_timestamp_for_age_check = parsed_dt.replace(tzinfo=timezone.utc)
+                            else:
+                                parsed_timestamp_for_age_check = parsed_dt.astimezone(timezone.utc)
+                            interaction_display_timestamp = parsed_timestamp_for_age_check.strftime('%Y-%m-%d %H:%M UTC')
+                        except ValueError as e_ts:
+                            logger.debug(f"Could not parse timestamp for past interaction {mem_entry.get('id', 'N/A')} ('{timestamp_str}'): {e_ts}")
+                        except Exception as e_gen_ts: # Catch any other unexpected errors
+                            logger.warning(f"Unexpected error processing timestamp for past interaction {mem_entry.get('id', 'N/A')}: {e_gen_ts}")
 
-                    # System message to frame the recalled interaction
-                    system_recall_content = f"[Recalling an earlier part of our conversation (around {formatted_past_ts}) that seems relevant:]\n{formatted_past_text}"
+                    if summary_content and isinstance(summary_content, str) and summary_content.strip() and parsed_timestamp_for_age_check:
+                        # now_utc should be defined earlier in the method from previous changes
+                        if (now_utc - parsed_timestamp_for_age_check).days >= DAYS_TO_PREFER_SUMMARY_FOR_CONTEXT:
+                            use_summary = True
+
+                    if use_summary:
+                        summary_snippet = summary_content[:max_len_past_interaction] + "..." if len(summary_content) > max_len_past_interaction else summary_content
+                        system_recall_content = f"[Recalling a summary of an earlier part of our conversation (around {interaction_display_timestamp}) that seems relevant:]\n{summary_snippet}"
+                    else:
+                        content_snippet = original_content[:max_len_past_interaction] + "..." if len(original_content) > max_len_past_interaction else original_content
+                        # Use a slightly different prefix if it's not a summary but still has a good timestamp
+                        prefix_str = "Recalling an earlier part of our conversation"
+                        if interaction_display_timestamp != "an earlier time":
+                             prefix_str += f" (around {interaction_display_timestamp})"
+                        system_recall_content = f"[{prefix_str} that seems relevant:]\n{content_snippet}"
 
                     # Estimate tokens for this specific injected message
                     # Note: estimate_tokens_for_messages expects a list of messages.

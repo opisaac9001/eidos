@@ -1,615 +1,289 @@
-import logging
-import uuid
-from typing import List, Dict, Optional, Any
+from typing import Optional, List, Dict, Any, TypedDict, Union
+from uuid import uuid4, UUID # Add UUID
 
-from qdrant_client import QdrantClient, models as qmodels
-# from qdrant_client.http import models as qmodels # Older import, now models is top-level
+# Ragbits imports
+from ragbits.core.embeddings.litellm import LiteLLMEmbedder
+from ragbits.core.vector_stores.qdrant import QdrantVectorStore
+from ragbits.core.vector_stores.base import VectorStoreEntry, VectorStoreOptions, VectorStoreResult # For creating entries and querying
+# from ragbits.document_search.ingestion.parsers.text import TextParser # Deferred
+# from ragbits.document_search.ingestion.chunkers import ChunkOptions # Deferred
 
-# --- Start of Dummy Ragbits Classes (to be replaced by actual ragbits imports) ---
-# These are placeholders to make the file syntactically valid without ragbits installed.
-# Replace with actual imports:
-# from ragbits.core.embedders import LiteLLMEmbedder # Corrected path
-# from ragbits.core.vector_stores import QdrantVectorStore # Corrected path
-# from ragbits.document_search import DocumentSearch
-# from ragbits.core.text_chunkers import TextChunker, TextChunk # Corrected path
-# from ragbits.core.metadata import Metadata
-# from ragbits.core.vector_stores import VectorStoreDocument
+# Qdrant client imports
+from qdrant_client import AsyncQdrantClient # models are used by QdrantVectorStore internally
 
-class DummyEmbedder:
-    def __init__(self, model: str, **kwargs):
-        self.model = model
-        self.dimension = 384 # Default for 'sentence-transformers/all-MiniLM-L6-v2'
+from eidos_agent.core.config import BookshelfConfig
+from eidos_agent.utils.logger import get_logger
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        logger.warning("Using DummyEmbedder.embed_documents")
-        return [[0.1] * self.dimension for _ in texts]
+logger = get_logger(__name__)
 
-    def embed_query(self, text: str) -> List[float]:
-        logger.warning("Using DummyEmbedder.embed_query")
-        return [0.1] * self.dimension
 
-    def get_embedding_dimension(self) -> int:
-        logger.warning("Using DummyEmbedder.get_embedding_dimension")
-        return self.dimension
-
-LiteLLMEmbedder = DummyEmbedder # Alias to match planned import
-
-class DummyTextChunk:
-    def __init__(self, text_content: str, metadata: Optional[Dict[str, Any]] = None):
-        self.text_content = text_content
-        self.metadata = metadata or {}
-
-TextChunk = DummyTextChunk # Alias
-
-class DummyTextChunker:
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200, **kwargs):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-
-    def chunk(self, text: str, **kwargs) -> List[TextChunk]:
-        logger.warning("Using DummyTextChunker.chunk")
-        if not text:
-            return []
-        # Simplified chunking logic for the dummy
-        chunks = []
-        start = 0
-        while start < len(text):
-            end = start + self.chunk_size
-            chunks.append(TextChunk(text_content=text[start:end]))
-            start = end - self.chunk_overlap
-            if start + self.chunk_size <= end and end < len(text) : # prevent infinite loop on very small overlap/size
-                start = end
-        return chunks
-
-TextChunker = DummyTextChunker # Alias
-
-# --- End of Dummy Ragbits Classes ---
-
-logger = logging.getLogger(__name__)
-
-DEFAULT_QDRANT_DISTANCE = qmodels.Distance.COSINE
-DEFAULT_CHUNK_SIZE = 1000 # Characters
-DEFAULT_CHUNK_OVERLAP = 200 # Characters
+class DocumentChunkInfo(TypedDict): # Renamed and updated
+    chunk_id: str
+    document_id: str
+    chunk_index: int
+    text_preview: str
+    metadata: Dict[str, Any]
 
 class RagbitsBookshelfClient:
-    """
-    A client to manage and query documents in the Eidos Bookshelf
-    using Ragbits and Qdrant.
-    """
+    def __init__(self, config: BookshelfConfig):
+        self.config = config
+        self.embedder_name = config.get("embedding_model_name", "sentence-transformers/all-MiniLM-L6-v2")
+        # embedding_dimension from config is used by QdrantVectorStore's internal collection creation logic
+        # if it needs to create the collection, it will use embedder.get_vector_size().
+        self.collection_name = config.get("qdrant_collection_name", "eidos_bookshelf")
 
-    def __init__(
-        self,
-        qdrant_host: str,
-        qdrant_port: int = 6333,
-        qdrant_collection_name: str = "eidos_bookshelf",
-        embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-        embedding_vector_size: Optional[int] = None,
-        qdrant_api_key: Optional[str] = None,
-        qdrant_prefer_grpc: bool = True,
-        qdrant_timeout_seconds: int = 20, # Added timeout
-        chunk_size: int = DEFAULT_CHUNK_SIZE,
-        chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
-    ):
-        self.qdrant_collection_name = qdrant_collection_name
-        self.embedding_model_name = embedding_model_name
-        self.qdrant_host = qdrant_host
-        self.qdrant_port = qdrant_port
+        logger.info(f"Initializing RagbitsBookshelfClient with embedder: {self.embedder_name}, Qdrant: {config.get('qdrant_host')}:{config.get('qdrant_port')}, Collection: {self.collection_name}")
 
-        logger.info(
-            f"Initializing RagbitsBookshelfClient for collection '{self.qdrant_collection_name}' "
-            f"at {self.qdrant_host}:{self.qdrant_port} "
-            f"with embedding model '{self.embedding_model_name}'"
+        self.embedder = LiteLLMEmbedder(model_name=self.embedder_name)
+
+        self.qdrant_http_client = AsyncQdrantClient(
+            host=config.get("qdrant_host", "localhost"),
+            port=config.get("qdrant_port", 6333),
+            api_key=config.get("qdrant_api_key")
         )
 
-        # 1. Initialize Embedder
-        self.embedder = LiteLLMEmbedder(model=self.embedding_model_name) # type: ignore
-        logger.info(f"Embedder initialized for model: {self.embedding_model_name}")
-
-        # 2. Determine Vector Size
-        if embedding_vector_size:
-            self.embedding_vector_size = embedding_vector_size
-        else:
-            try:
-                self.embedding_vector_size = self.embedder.get_embedding_dimension()
-                logger.info(f"Inferred embedding vector size: {self.embedding_vector_size}")
-            except Exception as e:
-                logger.error(f"Could not infer embedding dimension from embedder: {e}. Please provide 'embedding_vector_size'.")
-                raise ValueError("Could not infer embedding dimension and none was provided.") from e
-
-        if not self.embedding_vector_size: # Final check
-             logger.error("Embedding vector size is not set. Cannot proceed.")
-             raise ValueError("Embedding vector size is crucial and could not be determined.")
-
-
-        # 3. Initialize QdrantClient
-        try:
-            self.qdrant_client = QdrantClient(
-                host=qdrant_host,
-                port=qdrant_port if qdrant_prefer_grpc else None,
-                grpc_port=qdrant_port if qdrant_prefer_grpc else None, # Specify grpc_port for clarity
-                http_port=qdrant_port if not qdrant_prefer_grpc else None, # Specify http_port if not gRPC
-                api_key=qdrant_api_key,
-                prefer_grpc=qdrant_prefer_grpc,
-                timeout=qdrant_timeout_seconds,
-            )
-            # Quick check to see if Qdrant is accessible
-            # self.qdrant_client.health_check() # This can be part of readiness checks elsewhere
-            logger.info(f"QdrantClient initialized for {qdrant_host}:{qdrant_port}.")
-        except Exception as e:
-            logger.error(f"Failed to initialize QdrantClient: {e}", exc_info=True)
-            raise
-
-        # 4. Initialize TextChunker (as per refined plan, not using DocumentSearch for ingest)
-        self.text_chunker = TextChunker( # type: ignore
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
+        self.qdrant_vector_store = QdrantVectorStore(
+            client=self.qdrant_http_client,
+            index_name=self.collection_name,
+            embedder=self.embedder
+            # QdrantVectorStore will use its embedder's get_vector_size() and default Distance.COSINE
+            # when creating the collection if it doesn't exist.
         )
-        logger.info(f"TextChunker initialized with size={chunk_size}, overlap={chunk_overlap}.")
 
-        # 5. Ensure Qdrant Collection Exists and is Configured
-        # Note: QdrantVectorStore from ragbits might handle this, but direct control is fine too.
-        self._ensure_collection_exists()
+        logger.info("RagbitsBookshelfClient initialized with actual ragbits components.")
 
+    # _ensure_collection_exists method is removed.
+    # QdrantVectorStore's .store() method handles collection creation.
 
-    def _ensure_collection_exists(self):
-        """
-        Ensures the Qdrant collection exists and is configured correctly.
-        This includes creating payload indexes for filterable metadata.
-        """
-        try:
-            self.qdrant_client.get_collection(collection_name=self.qdrant_collection_name)
-            logger.info(f"Qdrant collection '{self.qdrant_collection_name}' already exists.")
-            # Optionally, verify existing configuration if needed, though this can get complex.
-        except Exception as e: # More specific exception handling if possible (e.g. qdrant_client.http.exceptions.UnexpectedResponse)
-            logger.warning(f"Qdrant collection '{self.qdrant_collection_name}' not found (error: {type(e).__name__}). Attempting to create it.")
-            try:
-                self.qdrant_client.create_collection(
-                    collection_name=self.qdrant_collection_name,
-                    vectors_config=qmodels.VectorParams(
-                        size=self.embedding_vector_size,
-                        distance=DEFAULT_QDRANT_DISTANCE
-                    )
-                )
-                logger.info(f"Successfully created Qdrant collection '{self.qdrant_collection_name}'.")
-
-                # Create payload indexes for frequently filtered metadata fields
-                # Indexing 'document_name'
-                self.qdrant_client.create_payload_index(
-                    collection_name=self.qdrant_collection_name,
-                    field_name="document_name", # Assuming metadata is stored flat in payload, not nested under "metadata."
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD
-                )
-                logger.info(f"Created payload index on 'document_name' for collection '{self.qdrant_collection_name}'.")
-
-                # Indexing 'document_source'
-                self.qdrant_client.create_payload_index(
-                    collection_name=self.qdrant_collection_name,
-                    field_name="document_source",
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD
-                )
-                logger.info(f"Created payload index on 'document_source' for collection '{self.qdrant_collection_name}'.")
-
-                # Indexing 'topics' (if it's a list of keywords)
-                self.qdrant_client.create_payload_index(
-                    collection_name=self.qdrant_collection_name,
-                    field_name="topics",
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD # For list of strings
-                )
-                logger.info(f"Created payload index on 'topics' for collection '{self.qdrant_collection_name}'.")
-
-            except Exception as creation_e:
-                logger.error(f"Failed to create Qdrant collection '{self.qdrant_collection_name}': {creation_e}", exc_info=True)
-                raise
-
-
-    def add_document(
+    async def add_document(
         self,
-        document_content: str,
-        document_name: str, # Unique identifier for the document
-        document_source: str, # e.g., filename, URL, user_upload_id
-        topics: Optional[List[str]] = None
-    ) -> None:
-        """
-        Chunks, embeds, and ingests a document into the Qdrant collection.
-        """
-        logger.info(f"Adding document: Name='{document_name}', Source='{document_source}'")
-        if not document_content.strip():
-            logger.warning(f"Document '{document_name}' has no content. Skipping.")
-            return
+        doc_id: str, # This is the custom ID for the whole document
+        content: str,
+        user_id: str, # User ID for ownership/filtering
+        other_metadata: Optional[Dict[str, Any]] = None
+    ) -> List[DocumentChunkInfo]: # Return a list of dicts representing processed chunks for confirmation
+        logger.info(f"Processing document ID '{doc_id}' for user '{user_id}' for bookshelf.")
+        if not content.strip():
+            logger.warning(f"Document '{doc_id}' has no content. Skipping.")
+            return []
 
-        text_chunks: List[TextChunk] = self.text_chunker.chunk(text=document_content) # type: ignore
+        # Simplified chunking logic (TextParser usage deferred)
+        _chunk_size = self.config.get("chunk_size", 512)
+        _chunk_overlap = self.config.get("chunk_overlap", 50)
+        text_chunks: List[str] = []
+        start = 0
+        while start < len(content):
+            end = start + _chunk_size
+            text_chunks.append(content[start:end])
+            if end >= len(content):
+                break
+            start += _chunk_size - _chunk_overlap
+            if start >= len(content): break # Avoid infinite loop
 
         if not text_chunks:
-            logger.warning(f"Text chunking resulted in no chunks for document '{document_name}'. Skipping.")
-            return
+            logger.warning(f"Text chunking produced no chunks for document '{doc_id}'.")
+            return []
 
-        points_to_upsert = []
-        for i, chunk in enumerate(text_chunks):
-            chunk_text = chunk.text_content # Assuming TextChunk has text_content
+        logger.info(f"Document '{doc_id}' split into {len(text_chunks)} chunks.")
 
-            # Embed the individual chunk text
-            try:
-                embedding = self.embedder.embed_documents([chunk_text])[0] # type: ignore
-            except Exception as e:
-                logger.error(f"Failed to embed chunk {i} for document '{document_name}': {e}", exc_info=True)
-                continue # Skip this chunk
+        vector_store_entries: List[VectorStoreEntry] = []
+        processed_chunk_confirmations: List[DocumentChunkInfo] = []
 
-            payload = {
-                "document_name": document_name,
-                "document_source": document_source,
-                "topics": topics or [],
-                "original_text": chunk_text, # Storing the original text in the payload
-                "chunk_index": i,
-                "total_chunks": len(text_chunks),
-            }
+        base_doc_metadata = other_metadata.copy() if other_metadata else {}
+        base_doc_metadata["original_document_id"] = doc_id
+        base_doc_metadata["user_id"] = user_id
 
-            # Generate a unique ID for each point, or let Qdrant assign one if IDs are not critical to manage externally
-            point_id = str(uuid.uuid4())
+        for i, chunk_text in enumerate(text_chunks):
+            chunk_entry_id = uuid4() # Generate UUID for each chunk/entry
 
-            points_to_upsert.append(qmodels.PointStruct(
-                id=point_id,
-                vector=embedding,
-                payload=payload
+            chunk_specific_metadata = base_doc_metadata.copy()
+            chunk_specific_metadata["chunk_index"] = i
+            chunk_specific_metadata["chunk_id"] = str(chunk_entry_id)
+
+            entry = VectorStoreEntry(
+                id=chunk_entry_id,
+                text=chunk_text,
+                metadata=chunk_specific_metadata
+            )
+            vector_store_entries.append(entry)
+            processed_chunk_confirmations.append(DocumentChunkInfo(
+                chunk_id=str(chunk_entry_id),
+                document_id=doc_id,
+                chunk_index=i,
+                text_preview=chunk_text[:100] + "..." if len(chunk_text) > 100 else chunk_text,
+                metadata=chunk_specific_metadata
             ))
 
-        if points_to_upsert:
+        if vector_store_entries:
             try:
-                self.qdrant_client.upsert(
-                    collection_name=self.qdrant_collection_name,
-                    points=points_to_upsert,
-                    wait=True # Wait for operation to complete for consistency
-                )
-                logger.info(f"Successfully added {len(points_to_upsert)} chunks for document '{document_name}'.")
+                await self.qdrant_vector_store.store(entries=vector_store_entries)
+                logger.info(f"Successfully stored {len(vector_store_entries)} chunks for document ID '{doc_id}' in Qdrant.")
             except Exception as e:
-                logger.error(f"Failed to upsert points for document '{document_name}': {e}", exc_info=True)
-                # Consider partial success or retry strategies if needed
-        else:
-            logger.warning(f"No document chunks prepared for ingestion for document '{document_name}'.")
+                logger.error(f"Failed to store chunks for document ID '{doc_id}' in Qdrant: {e}", exc_info=True)
+                return []
 
+        return processed_chunk_confirmations
 
-    def query_documents(
+    # Methods to be refactored in subsequent steps:
+    # query_bookshelf, delete_document_chunks, get_document_chunks
+
+    async def query_bookshelf(
         self,
         query_text: str,
-        document_name: Optional[str] = None,
-        topics_filter: Optional[List[str]] = None, # Added topics filter
-        top_k: int = 5
-    ) -> List[Dict[str, Any]]:
-        """
-        Queries the documents for relevant chunks.
-        """
-        logger.info(f"Querying documents with text: '{query_text[:100]}...', top_k={top_k}")
-
-        try:
-            query_embedding = self.embedder.embed_query(query_text) # type: ignore
-        except Exception as e:
-            logger.error(f"Failed to embed query '{query_text[:100]}...': {e}", exc_info=True)
+        top_k: int = 5,
+        filter_conditions: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]: # Returns list of dicts, matching DocumentChunkInfo but with score
+        logger.info(f"Querying bookshelf with text: '{query_text[:50]}...', top_k: {top_k}, filters: {filter_conditions}")
+        if not query_text.strip():
             return []
 
-        filters_list = []
-        if document_name:
-            logger.info(f"Filtering query by document_name: '{document_name}'")
-            filters_list.append(qmodels.FieldCondition(
-                key="document_name", # Assuming payload field is directly "document_name"
-                match=qmodels.MatchValue(value=document_name)
-            ))
-
-        if topics_filter:
-            logger.info(f"Filtering query by topics: {topics_filter}")
-            # This creates an OR condition for topics (any of the topics must match)
-            # For AND, you would use multiple FieldCondition in the 'must' list.
-            filters_list.append(qmodels.FieldCondition(
-                key="topics", # Assuming payload field is "topics"
-                match=qmodels.MatchAny(any=topics_filter) # Matches if 'topics' array contains any of these
-            ))
-
-        query_filter = None
-        if filters_list:
-            query_filter = qmodels.Filter(must=filters_list)
-            logger.debug(f"Constructed Qdrant filter: {query_filter.model_dump_json(indent=2)}")
-
+        # filter_conditions should have keys like "metadata.user_id", "metadata.original_document_id" etc.
+        # as QdrantVectorStore._create_qdrant_filter expects this format for nested metadata fields.
+        vs_options = VectorStoreOptions(k=top_k, where=filter_conditions if filter_conditions else None)
 
         try:
-            search_results = self.qdrant_client.search(
-                collection_name=self.qdrant_collection_name,
-                query_vector=query_embedding,
-                query_filter=query_filter,
-                limit=top_k,
-                with_payload=True # To get the metadata and original_text
+            search_results: List[VectorStoreResult] = await self.qdrant_vector_store.retrieve(
+                text=query_text,
+                options=vs_options
             )
         except Exception as e:
-            logger.error(f"Error during Qdrant search: {e}", exc_info=True)
+            logger.error(f"Error querying bookshelf via QdrantVectorStore: {e}", exc_info=True)
             return []
 
-        results_formatted = []
-        for hit in search_results:
-            results_formatted.append({
-                "id": hit.id,
-                "score": hit.score,
-                "text_content": hit.payload.get("original_text") if hit.payload else None,
-                "metadata": {k: v for k, v in hit.payload.items() if k != "original_text"} if hit.payload else {}
+        formatted_results: List[Dict[str, Any]] = []
+        for result_item in search_results:
+            entry = result_item.entry # This is a VectorStoreEntry
+            stored_metadata = entry.metadata if entry.metadata else {}
+
+            formatted_results.append({
+                "chunk_id": str(entry.id),
+                "document_id": stored_metadata.get("original_document_id"),
+                "text": entry.text,
+                "score": result_item.score,
+                "metadata": stored_metadata
             })
-        logger.info(f"Retrieved {len(results_formatted)} chunks for query.")
-        return results_formatted
 
+        logger.info(f"Bookshelf query returned {len(formatted_results)} results from QdrantVectorStore.")
+        return formatted_results
 
-    def get_document_chunks(self, document_name: str, limit: int = 1000) -> List[Dict[str, Any]]:
-        """
-        Retrieves all chunks for a specific document, up to a limit.
-        """
-        logger.info(f"Retrieving up to {limit} chunks for document_name: '{document_name}'")
-        doc_filter = qmodels.Filter(must=[
-            qmodels.FieldCondition(key="document_name", match=qmodels.MatchValue(value=document_name))
-        ])
+    # Methods to be refactored in subsequent steps:
+    # delete_document_chunks, get_document_chunks
 
-        try:
-            # Scroll API is suitable for getting all points matching a filter.
-            # It's more efficient than search if you don't need vector similarity scoring.
-            scrolled_points, next_offset = self.qdrant_client.scroll(
-                collection_name=self.qdrant_collection_name,
-                scroll_filter=doc_filter,
-                limit=limit,
-                with_payload=True,
-                with_vectors=False # No need for vectors if just retrieving content
-            )
-            # TODO: Implement pagination using next_offset if more than `limit` chunks are expected for a single document.
-            if next_offset:
-                 logger.warning(f"Document '{document_name}' has more chunks than the current limit ({limit}). "
-                                 "Consider implementing pagination if this is an issue.")
+    async def delete_document_chunks(self, doc_id: str, user_id: str) -> bool:
+        logger.info(f"Attempting to delete all chunks for document ID '{doc_id}' (user: '{user_id}') from bookshelf.")
 
-            results = []
-            for point in scrolled_points:
-                results.append({
-                    "id": point.id,
-                    "text_content": point.payload.get("original_text") if point.payload else None,
-                    "metadata": {k:v for k,v in point.payload.items() if k != "original_text"} if point.payload else {}
-                })
-            logger.info(f"Retrieved {len(results)} chunks for document '{document_name}'.")
-            return results
-        except Exception as e:
-            logger.error(f"Error retrieving chunks for document '{document_name}': {e}", exc_info=True)
-            return []
-
-    def list_all_document_names(self, batch_size: int = 100) -> List[str]:
-        """
-        Lists unique document names from the collection.
-        WARNING: This scrolls through points and collects unique names client-side.
-                 It can be inefficient on very large collections.
-        """
-        logger.info(f"Listing all document names from '{self.qdrant_collection_name}'. This may be slow on large collections.")
-        document_names = set()
-        current_offset = None
+        # Construct the 'where' filter for listing chunks.
+        # Metadata keys should match what was stored in add_document.
+        where_filter = {
+            "metadata.original_document_id": doc_id,
+            "metadata.user_id": user_id  # Ensure user-specific deletion
+        }
 
         try:
-            while True:
-                points, next_offset_id = self.qdrant_client.scroll(
-                    collection_name=self.qdrant_collection_name,
-                    limit=batch_size,
-                    offset=current_offset,
-                    with_payload=["document_name"], # Only fetch the 'document_name' field from payload
-                    with_vectors=False
-                )
-
-                for point in points:
-                    if point.payload and "document_name" in point.payload:
-                        doc_name = point.payload["document_name"]
-                        if isinstance(doc_name, str):
-                            document_names.add(doc_name)
-
-                if not next_offset_id: # No more pages
-                    break
-                current_offset = next_offset_id
-
-            logger.info(f"Found {len(document_names)} unique document names.")
-            return sorted(list(document_names))
-        except Exception as e:
-            # Catching a broad exception here as various issues like connection errors can occur.
-            logger.error(f"Error listing document names from Qdrant: {e}", exc_info=True)
-            # Depending on policy, you might want to re-raise or return empty list.
-            return []
-
-
-    def delete_document(self, document_name: str) -> bool:
-        """
-        Deletes all chunks associated with a specific document_name from Qdrant.
-        """
-        logger.info(f"Attempting to delete document: '{document_name}' from '{self.qdrant_collection_name}'")
-        try:
-            # Define points selector based on metadata filter
-            points_selector = qmodels.FilterSelector(
-                filter=qmodels.Filter(must=[
-                    qmodels.FieldCondition(
-                        key="document_name",
-                        match=qmodels.MatchValue(value=document_name)
-                    )
-                ])
+            logger.debug(f"Listing chunks for doc_id '{doc_id}', user_id '{user_id}' with filter: {where_filter}")
+            # The .list() method in ragbits QdrantVectorStore returns List[VectorStoreEntry]
+            # Setting limit=None should fetch all matching entries based on QdrantVectorStore implementation.
+            entries_to_delete: List[VectorStoreEntry] = await self.qdrant_vector_store.list(
+                where=where_filter,
+                limit=None
             )
 
-            response = self.qdrant_client.delete_points(
-                collection_name=self.qdrant_collection_name,
-                points_selector=points_selector,
-                wait=True # Wait for the operation to complete
-            )
+            if not entries_to_delete:
+                logger.info(f"No chunks found for document ID '{doc_id}' and user '{user_id}' to delete.")
+                return True # Document effectively not there for this user, or already deleted.
 
-            # response.status will be one of models.UpdateStatus
-            if response.status == qmodels.UpdateStatus.COMPLETED:
-                logger.info(f"Successfully deleted points for document '{document_name}'. Status: {response.status}")
-                return True
-            elif response.status == qmodels.UpdateStatus.ACKNOWLEDGED:
-                 logger.info(f"Deletion request for document '{document_name}' acknowledged by Qdrant. Status: {response.status}")
-                 return True # Usually good enough
-            else:
-                logger.warning(f"Deletion for document '{document_name}' resulted in status: {response.status}")
-                return False
+            ids_to_delete: List[UUID] = [entry.id for entry in entries_to_delete if entry.id]
+
+            if not ids_to_delete:
+                logger.warning(f"Found entries for doc_id '{doc_id}' but could not extract valid UUIDs for deletion.")
+                return False # Should ideally not happen if entries_to_delete was populated and entries have IDs
+
+            logger.debug(f"Found {len(ids_to_delete)} chunk UUIDs to delete for doc_id '{doc_id}'.")
+
+            await self.qdrant_vector_store.remove(ids=ids_to_delete)
+            logger.info(f"Successfully submitted deletion for {len(ids_to_delete)} chunks for document ID '{doc_id}'.")
+            return True
+
         except Exception as e:
-            logger.error(f"Error deleting document '{document_name}': {e}", exc_info=True)
+            logger.error(f"Error deleting chunks for document ID '{doc_id}': {e}", exc_info=True)
             return False
 
-    def get_collection_info(self) -> Optional[Dict[str, Any]]:
-        """Gets information about the Qdrant collection."""
+    # Method to be refactored next:
+    # get_document_chunks
+
+    async def get_document_chunks(self, doc_id: str, user_id: str) -> List[DocumentChunkInfo]:
+        """Retrieves all chunks and their metadata associated with a given document ID and user ID."""
+        logger.info(f"Retrieving all chunks for document ID '{doc_id}' for user '{user_id}'.")
+
+        where_filter = {
+            "metadata.original_document_id": doc_id,
+            "metadata.user_id": user_id
+        }
+
+        retrieved_chunks: List[DocumentChunkInfo] = []
+
         try:
-            collection_info_model = self.qdrant_client.get_collection(collection_name=self.qdrant_collection_name)
-            return collection_info_model.model_dump() # Convert Pydantic model to dict
+            # Using limit=None to attempt to fetch all matching entries.
+            entries: List[VectorStoreEntry] = await self.qdrant_vector_store.list(
+                where=where_filter,
+                limit=None
+            )
+
+            if not entries:
+                logger.info(f"No chunks found for document ID '{doc_id}' and user '{user_id}'.")
+                return []
+
+            for entry in entries:
+                stored_metadata = entry.metadata if entry.metadata else {}
+                # Ensure entry.text is not None before slicing
+                text_content = entry.text if entry.text else ""
+                retrieved_chunks.append(DocumentChunkInfo(
+                    chunk_id=str(entry.id),
+                    document_id=stored_metadata.get("original_document_id", doc_id), # Fallback to input doc_id
+                    chunk_index=stored_metadata.get("chunk_index", -1), # Fallback for index
+                    text_preview=text_content[:200] + "..." if len(text_content) > 200 else text_content,
+                    metadata=stored_metadata
+                ))
+
+            # Sort by chunk_index to ensure original order
+            retrieved_chunks.sort(key=lambda x: x.get("chunk_index", 0))
+
+            logger.info(f"Retrieved {len(retrieved_chunks)} chunks for document ID '{doc_id}'.")
+            return retrieved_chunks
+
         except Exception as e:
-            logger.error(f"Could not get info for collection '{self.qdrant_collection_name}': {e}", exc_info=True)
-            return None
+            logger.error(f"Error retrieving chunks for document ID '{doc_id}': {e}", exc_info=True)
+            return []
 
-# Example Usage (Conceptual - would be in Eidos code or integration tests)
-# To run this, you'd need:
-# 1. `pip install qdrant-client sentence-transformers` (for the dummy embedder to work with a real model)
-# 2. A Qdrant instance running and accessible (e.g., `docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`)
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger.info("Starting conceptual test of RagbitsBookshelfClient...")
+    async def close(self): # Add a close method for the qdrant client
+        if self.qdrant_http_client:
+            await self.qdrant_http_client.close()
+            logger.info("Qdrant client closed in RagbitsBookshelfClient.")
 
-    MOCK_QDRANT_HOST = "localhost"
-    MOCK_QDRANT_PORT = 6333
-    MOCK_COLLECTION_NAME = "test_bookshelf_client_direct" # New name to avoid conflict
-    MOCK_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2" # Real model for local test
-    MOCK_EMBEDDING_SIZE = 384 # Must match the real model
+# Example Usage (Conceptual) - This will likely break until other methods are refactored
+if __name__ == '__main__':
+    # Create a dummy BookshelfConfig for testing
+    dummy_bs_config_main: BookshelfConfig = {
+        "qdrant_host": "localhost", "qdrant_port": 6333,
+        "qdrant_collection_name": "test_bookshelf_main_actual_ragbits",
+        "embedding_model_name": "sentence-transformers/all-MiniLM-L6-v2", # A real model for LiteLLM
+        "embedding_dimension": 384, "chunk_size": 100, "chunk_overlap": 10,
+        "qdrant_api_key": None
+    }
 
-    # Temp: Replace DummyEmbedder with actual LiteLLMEmbedder for this test block IF ragbits is installed
-    # For now, this test will run with the DUMMY embedder, which is fine for structure testing.
-    # If you have `ragbits` and `litellm` installed, you could uncomment the real import
-    # and comment out the `LiteLLMEmbedder = DummyEmbedder` alias.
-    # from ragbits.core.embedders import LiteLLMEmbedder # Actual import
+    # This example requires a running Qdrant instance for LiteLLMEmbedder and QdrantVectorStore to fully work.
+    # For unit testing without live services, these would need to be mocked.
+    # client_main = RagbitsBookshelfClient(config=dummy_bs_config_main)
 
-    print(f"Attempting to initialize client with Qdrant at {MOCK_QDRANT_HOST}:{MOCK_QDRANT_PORT}")
-    print(f"Using embedding model: {MOCK_EMBEDDING_MODEL} (size: {MOCK_EMBEDDING_SIZE})")
-    print(f"Target collection: {MOCK_COLLECTION_NAME}")
+    # print("Conceptual example - full functionality requires method refactoring and live services/mocks.")
+    # # Example calls would go here, but are expected to fail or log warnings until methods are refactored.
 
-    bookshelf_client = None # Initialize to None
-
-    try:
-        bookshelf_client = RagbitsBookshelfClient(
-            qdrant_host=MOCK_QDRANT_HOST,
-            qdrant_port=MOCK_QDRANT_PORT,
-            qdrant_collection_name=MOCK_COLLECTION_NAME,
-            embedding_model_name=MOCK_EMBEDDING_MODEL,
-            embedding_vector_size=MOCK_EMBEDDING_SIZE, # Explicitly pass size
-        )
-        logger.info("RagbitsBookshelfClient initialized.")
-
-        # Clean up collection if it exists from previous test runs
-        try:
-            logger.info(f"Attempting to delete pre-existing collection '{MOCK_COLLECTION_NAME}' for a fresh test.")
-            bookshelf_client.qdrant_client.delete_collection(collection_name=MOCK_COLLECTION_NAME)
-            logger.info(f"Deleted existing collection '{MOCK_COLLECTION_NAME}'.")
-            # Re-ensure collection (it will be created by _ensure_collection_exists)
-            bookshelf_client._ensure_collection_exists()
-        except Exception as e:
-            logger.info(f"Could not delete collection (it might not exist, which is fine): {type(e).__name__} - {e}")
-            # If deletion failed because it didn't exist, _ensure_collection_exists will create it
-            bookshelf_client._ensure_collection_exists()
-
-
-        logger.info("Testing add_document...")
-        sample_content_1 = "The quick brown fox jumps over the lazy dog. This is a classic sentence used for testing typewriters and fonts." * 5
-        sample_content_1 += " Artificial intelligence (AI) is rapidly changing the world."
-        bookshelf_client.add_document(
-            document_content=sample_content_1,
-            document_name="doc_alpha",
-            document_source="test_data_v1",
-            topics=["animals", "testing", "ai"]
-        )
-
-        sample_content_2 = "The exploration of Mars continues to be a fascinating subject for scientists and space enthusiasts alike. Future missions aim to search for signs of past life." * 5
-        bookshelf_client.add_document(
-            document_content=sample_content_2,
-            document_name="doc_beta",
-            document_source="test_data_v1", # Same source, different name
-            topics=["space", "mars", "science"]
-        )
-        logger.info("add_document test completed.")
-
-        # Verify collection info
-        collection_info = bookshelf_client.get_collection_info()
-        logger.info(f"Collection info after adding documents: {collection_info}")
-        assert collection_info is not None
-        # Dummy embedder won't actually add points unless Qdrant is running and accepts them
-        # For a real test, points_count would be > 0 if Qdrant is up.
-        # With dummy embedder and no Qdrant, this might be 0 or raise error.
-        # Assuming Qdrant is running for this conceptual test:
-        # assert collection_info.get("points_count", 0) > 0
-
-
-        logger.info("Testing query_documents...")
-        query_results_ai = bookshelf_client.query_documents("What is AI?", top_k=2)
-        logger.info(f"Query results for 'AI': {query_results_ai}")
-        # Add assertions based on expected dummy behavior or real behavior if Qdrant is up
-        # assert len(query_results_ai) > 0
-        # if query_results_ai:
-        #     assert "artificial intelligence" in query_results_ai[0].get("text_content", "").lower()
-
-        query_results_mars_filtered = bookshelf_client.query_documents(
-            "Information about Mars exploration",
-            document_name="doc_beta",
-            top_k=1
-        )
-        logger.info(f"Query results for 'Mars' in 'doc_beta': {query_results_mars_filtered}")
-        # assert len(query_results_mars_filtered) > 0
-        # if query_results_mars_filtered:
-        #    assert "mars" in query_results_mars_filtered[0].get("text_content", "").lower()
-        #    assert query_results_mars_filtered[0]["metadata"]["document_name"] == "doc_beta"
-
-        query_results_topics = bookshelf_client.query_documents(
-            "Tell me about space",
-            topics_filter=["space"],
-            top_k=1
-        )
-        logger.info(f"Query results for 'space' topic: {query_results_topics}")
-        # assert len(query_results_topics) > 0
-        # if query_results_topics:
-        #    assert "space" in query_results_topics[0]["metadata"].get("topics", [])
-
-
-        logger.info("Testing list_all_document_names...")
-        doc_names = bookshelf_client.list_all_document_names()
-        logger.info(f"Listed document names: {doc_names}")
-        # assert "doc_alpha" in doc_names
-        # assert "doc_beta" in doc_names
-
-        logger.info("Testing get_document_chunks for 'doc_alpha'...")
-        doc_alpha_chunks = bookshelf_client.get_document_chunks("doc_alpha")
-        logger.info(f"Retrieved {len(doc_alpha_chunks)} chunks for 'doc_alpha'. First chunk metadata: {doc_alpha_chunks[0]['metadata'] if doc_alpha_chunks else 'N/A'}")
-        # assert len(doc_alpha_chunks) > 0
-        # if doc_alpha_chunks:
-        #    assert doc_alpha_chunks[0]["metadata"]["document_name"] == "doc_alpha"
-
-        logger.info("Testing delete_document for 'doc_alpha'...")
-        delete_status = bookshelf_client.delete_document("doc_alpha")
-        logger.info(f"Deletion status for 'doc_alpha': {delete_status}")
-        # assert delete_status
-
-        doc_names_after_delete = bookshelf_client.list_all_document_names()
-        logger.info(f"Listed document names after delete: {doc_names_after_delete}")
-        # assert "doc_alpha" not in doc_names_after_delete
-        # assert "doc_beta" in doc_names_after_delete
-
-        # Final check on collection info
-        final_collection_info = bookshelf_client.get_collection_info()
-        logger.info(f"Final collection info: {final_collection_info}")
-        # if final_collection_info and doc_names_after_delete: # if doc_beta is still there
-        #    assert final_collection_info.get("points_count", 0) > 0 # Check if doc_beta chunks are still there
-        # else: # if all docs were deleted or collection is empty
-        #    assert final_collection_info.get("points_count", 0) == 0
-
-
-        logger.info("Conceptual test of RagbitsBookshelfClient completed.")
-        logger.info("NOTE: Assertions are commented out as they require a running Qdrant instance and potentially real ragbits components for full validation.")
-
-    except ImportError as ie:
-        logger.error(f"ImportError: {ie}. Please ensure qdrant-client is installed. For full functionality, ragbits and litellm would be needed.")
-    except ValueError as ve:
-        logger.error(f"ValueError during initialization or operation: {ve}", exc_info=True)
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during the conceptual test: {e}", exc_info=True)
-    finally:
-        if bookshelf_client and MOCK_COLLECTION_NAME: # Attempt to clean up if client was initialized
-            try:
-                logger.info(f"Attempting final cleanup: Deleting test collection '{MOCK_COLLECTION_NAME}'")
-                # bookshelf_client.qdrant_client.delete_collection(collection_name=MOCK_COLLECTION_NAME)
-                logger.info(f"Test collection '{MOCK_COLLECTION_NAME}' cleanup successful or collection did not exist.")
-            except Exception as ce:
-                logger.warning(f"Error during final cleanup of collection '{MOCK_COLLECTION_NAME}': {ce}")
-                logger.warning("You may need to manually delete the Qdrant collection if it persists.")
-        logger.info("Test execution finished.")
+    # # Example of how close would be called in an async context
+    # # async def main_example():
+    # #     client = RagbitsBookshelfClient(config=dummy_bs_config_main)
+    # #     # ... operations ...
+    # #     await client.close()
+    # # import asyncio
+    # # asyncio.run(main_example())
+    logger.info("RagbitsBookshelfClient __main__ block: Methods like add_document, query_bookshelf need refactoring to work with new components.")
+    logger.info("This example will not run full operations until subsequent refactoring steps.")

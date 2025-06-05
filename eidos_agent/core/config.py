@@ -167,7 +167,8 @@ class BookshelfConfig(TypedDict, total=False):
     qdrant_collection_name: str
     embedding_model_name: str
     embedding_dimension: int
-    # Potentially add chunk_size, chunk_overlap if they need to be configurable here
+    chunk_size: int # New field
+    chunk_overlap: int # New field
 
 VALID_PITCH_SPEED_VALUES = ["very_low", "low", "moderate", "high", "very_high"]
 VALID_GENDER_VALUES = ["female", "male"]
@@ -474,13 +475,19 @@ class Config:
     if os.getenv("QDRANT_HOST"):
         qdrant_port_str = os.getenv("QDRANT_PORT", "6333")
         embedding_dim_str = os.getenv("BOOKSHELF_EMBEDDING_DIMENSION", "384")
+        bookshelf_chunk_size_str = os.getenv("BOOKSHELF_CHUNK_SIZE", "512") # New
+        bookshelf_chunk_overlap_str = os.getenv("BOOKSHELF_CHUNK_OVERLAP", "50") # New
         try:
             qdrant_port_int = int(qdrant_port_str)
             embedding_dim_int = int(embedding_dim_str)
+            bookshelf_chunk_size_int = int(bookshelf_chunk_size_str) # New
+            bookshelf_chunk_overlap_int = int(bookshelf_chunk_overlap_str) # New
         except ValueError:
-            print(f"Warning: Invalid port ('{qdrant_port_str}') or embedding dimension ('{embedding_dim_str}') for Bookshelf. Using defaults.")
+            print(f"Warning: Invalid port ('{qdrant_port_str}'), embedding dimension ('{embedding_dim_str}'), chunk size ('{bookshelf_chunk_size_str}'), or chunk overlap ('{bookshelf_chunk_overlap_str}') for Bookshelf. Using defaults.")
             qdrant_port_int = 6333
             embedding_dim_int = 384 # Default for all-MiniLM-L6-v2
+            bookshelf_chunk_size_int = 512 # New default
+            bookshelf_chunk_overlap_int = 50 # New default
 
         BOOKSHELF = {
             "qdrant_host": os.environ["QDRANT_HOST"], # Use os.environ to ensure it exists if check passed
@@ -489,8 +496,10 @@ class Config:
             "qdrant_collection_name": os.getenv("QDRANT_COLLECTION_NAME", "eidos_bookshelf"),
             "embedding_model_name": os.getenv("BOOKSHELF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
             "embedding_dimension": embedding_dim_int,
+            "chunk_size": bookshelf_chunk_size_int, # New
+            "chunk_overlap": bookshelf_chunk_overlap_int, # New
         }
-        print(f"Bookshelf feature configured with Qdrant at {BOOKSHELF['qdrant_host']}:{BOOKSHELF['qdrant_port']}")
+        print(f"Bookshelf feature configured with Qdrant at {BOOKSHELF['qdrant_host']}:{BOOKSHELF['qdrant_port']}. Collection: {BOOKSHELF['qdrant_collection_name']}, Embedding: {BOOKSHELF['embedding_model_name']} (Dim: {BOOKSHELF['embedding_dimension']}), Chunk Size: {BOOKSHELF['chunk_size']}, Chunk Overlap: {BOOKSHELF['chunk_overlap']}")
     else:
         print("Bookshelf feature not configured: QDRANT_HOST environment variable not set.")
 

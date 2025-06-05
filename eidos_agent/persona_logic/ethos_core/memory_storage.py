@@ -36,6 +36,11 @@ class MemoryEntry(TypedDict, total=False):
     embedding: Optional[list[float]]
     metadata: Dict[str, Any]
     salience: Optional[float]
+    summary_llm: Optional[str] # New field
+    timestamp_last_salience_update: Optional[str] # New
+    last_accessed_ts: Optional[str]              # New
+    access_count: Optional[int]                  # New
+    is_archived: Optional[bool]                  # New
 
 class MemoryStorage:
     def __init__(self, config: Config):
