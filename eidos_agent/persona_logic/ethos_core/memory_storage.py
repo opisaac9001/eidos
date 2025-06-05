@@ -499,3 +499,58 @@ class MemoryStorage:
         except Exception as e:
             logger.error(f"Error retrieving entries by type '{entry_type}' and user '{user_id}': {e}", exc_info=True)
             return []
+
+    async def get_schedule_item_by_id(self, slot_id: str) -> Optional[ActivitySlot]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM daily_schedule_items WHERE id = ?", (slot_id,))
+            row_data = cursor.fetchone()
+            if not row_data:
+                logger.info(f"No schedule item found with ID {slot_id}")
+                return None
+
+            item_dict = dict(row_data)
+            details_dict_str = item_dict.get('activity_details')
+            details_dict = json.loads(details_dict_str) if details_dict_str else {}
+
+            # Parse date and time fields
+            item_dict['date'] = date.fromisoformat(item_dict['date'])
+            item_dict['start_time'] = time.fromisoformat(item_dict['start_time'])
+            item_dict['end_time'] = time.fromisoformat(item_dict['end_time'])
+            item_dict['generated_at'] = datetime.fromisoformat(item_dict['generated_at'].replace("Z", "+00:00"))
+
+            # Handle new Optional[time] fields for ActivitySlot
+            time_fields_to_parse = ['actual_start_time', 'actual_end_time', 'original_scheduled_start_time', 'original_scheduled_end_time']
+            for time_field in time_fields_to_parse:
+                if item_dict.get(time_field) and isinstance(item_dict[time_field], str):
+                    item_dict[time_field] = time.fromisoformat(item_dict[time_field])
+                else:
+                    # If it's already None (e.g. from DB NULL), or not a string, set to None to be safe for Pydantic
+                    item_dict[time_field] = None
+
+            # Ensure status and deviation_reason are present or default if necessary (Pydantic model handles defaults)
+            # status is TEXT, so direct assignment is fine. Pydantic model default is 'pending'.
+            item_dict['status'] = item_dict.get('status', 'pending')
+            # deviation_reason is TEXT, Pydantic model default is None.
+            item_dict['deviation_reason'] = item_dict.get('deviation_reason')
+
+
+            data_model_for_slot = {
+                **item_dict, # Contains all columns from DB, parsed as needed
+                'activity_details': ActivitySlotDetails(**details_dict) # details_dict has flexibility_score
+            }
+
+            slot = ActivitySlot(**data_model_for_slot)
+            logger.info(f"Retrieved and parsed schedule item ID {slot_id}")
+            return slot
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error loading schedule item ID {slot_id} from DB: {e}", exc_info=True)
+            return None
+        except (json.JSONDecodeError, ValueError, TypeError) as e_parse:
+            # ValueError for fromisoformat, TypeError for Pydantic if unexpected types
+            logger.error(f"Error parsing schedule item ID {slot_id} data: {e_parse}", exc_info=True)
+            return None
+        except Exception as e_generic: # Catch any other unexpected errors
+            logger.error(f"Unexpected error retrieving schedule item ID {slot_id}: {e_generic}", exc_info=True)
+            return None

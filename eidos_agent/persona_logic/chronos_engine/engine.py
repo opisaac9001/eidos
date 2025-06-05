@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, date, time, timedelta, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 import json
 import random
@@ -316,13 +316,82 @@ class ChronosEngine:
         async with self._schedule_generation_lock:
             if self._cache_date == target_date and PATHOS_USER_ID in self._todays_schedule_cache and self._todays_schedule_cache[PATHOS_USER_ID]:
                 schedule_to_check = self._todays_schedule_cache[PATHOS_USER_ID]
+                logger.debug(f"Loaded schedule from cache for {target_date}")
             else:
+                logger.debug(f"Cache miss for {target_date}. Loading from DB or generating.")
                 schedule_to_check = await self.memory_storage.load_schedule_from_db(target_date, PATHOS_USER_ID)
-                if not schedule_to_check: schedule_to_check = await self.generate_schedule_for_date(target_date)
-                if schedule_to_check: self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check; self._cache_date = target_date
-                else: return None
-        for activity in schedule_to_check:
-            if activity.start_time <= current_time_val < activity.end_time: return activity
+                if not schedule_to_check:
+                    logger.info(f"No schedule in DB for {target_date}, generating new one.")
+                    schedule_to_check = await self.generate_schedule_for_date(target_date)
+
+                if schedule_to_check:
+                    self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check
+                    self._cache_date = target_date
+                    logger.info(f"Populated cache for {target_date} with {len(schedule_to_check)} activities.")
+                else:
+                    logger.warning(f"Failed to load or generate schedule for {target_date}.")
+                    return None
+
+        current_mood = self.ethos_core.get_current_mood() # Synchronous call
+
+        processed_schedule_for_saving = False # Flag to indicate if schedule needs re-saving
+
+        for activity_index, activity in enumerate(schedule_to_check):
+            if activity.start_time <= current_time_val < activity.end_time:
+                if activity.status in ['completed', 'skipped']:
+                    logger.debug(f"Activity '{activity.activity_title}' already {activity.status}. Skipping.")
+                    continue # Already processed
+
+                if activity.status == 'pending': # Check if it's actionable
+                    # Mood/Flexibility Check
+                    flexibility_score = activity.activity_details.flexibility_score if activity.activity_details.flexibility_score is not None else 0.5
+                    mood_valence = current_mood.get('valence', 0.0)
+
+                    # Define thresholds (these can be class constants or config later)
+                    NEGATIVE_MOOD_THRESHOLD = -0.5
+                    HIGH_FLEXIBILITY_THRESHOLD = 0.7
+
+                    if mood_valence < NEGATIVE_MOOD_THRESHOLD and flexibility_score >= HIGH_FLEXIBILITY_THRESHOLD:
+                        logger.info(f"Pathos (mood: {mood_valence:.2f}) is skipping flexible activity '{activity.activity_title}' (flex: {flexibility_score:.2f}, status: {activity.status}).")
+                        activity.status = 'skipped'
+                        activity.deviation_reason = "mood_avoidance_low_valence_high_flexibility"
+                        activity.actual_start_time = None
+                        activity.actual_end_time = None
+                        schedule_to_check[activity_index] = activity # Update in list
+                        processed_schedule_for_saving = True
+                        # This activity is now skipped, continue to find the next *actual* current activity Pathos might do
+                        continue
+                    else:
+                        # Activity is not skipped by mood, should be in progress
+                        logger.info(f"Activity '{activity.activity_title}' changing status from {activity.status} to in_progress.")
+                        activity.status = 'in_progress'
+                        # Set actual_start_time only if it's not already set (e.g. from a previous 'in_progress' state)
+                        if activity.actual_start_time is None:
+                            activity.actual_start_time = current_time_val
+                        schedule_to_check[activity_index] = activity # Update in list
+                        processed_schedule_for_saving = True
+                        # Save the updated schedule if changes were made before returning
+                        if processed_schedule_for_saving:
+                            async with self._schedule_generation_lock: # Protect cache and DB write
+                                # Update the cache directly
+                                self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check
+                                # Save the entire updated schedule back to DB
+                                await self.memory_storage.save_schedule_to_db(schedule_to_check, PATHOS_USER_ID)
+                                logger.debug(f"Saved updated schedule to DB due to status change in get_current_activity for slot {activity.id}")
+                        return activity
+                elif activity.status == 'in_progress':
+                    # If it was already in_progress, just return it
+                    logger.debug(f"Activity '{activity.activity_title}' is already in_progress. Returning.")
+                    return activity
+                # Potentially handle other statuses like 'delayed' if current_time_val has caught up
+
+        # If loop completes, no suitable activity found
+        # Save the schedule if any items were skipped and no other activity was chosen
+        if processed_schedule_for_saving:
+            async with self._schedule_generation_lock:
+                self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check
+                await self.memory_storage.save_schedule_to_db(schedule_to_check, PATHOS_USER_ID)
+                logger.debug("Saved updated schedule to DB due to skipped items at end of get_current_activity.")
         return None
 
     async def get_todays_schedule_for_user(self) -> List[ActivitySlot]:
@@ -367,3 +436,83 @@ class ChronosEngine:
         current_schedule = await self.get_todays_schedule_for_user()
         if current_schedule: logger.info(f"Chronos: Today's ({today}) schedule for Pathos available ({len(current_schedule)} activities).")
         else: logger.warning(f"Chronos: Failed to ensure today's ({today}) schedule for Pathos is available.")
+
+    async def report_activity_outcome(self,
+                                    slot_id: str,
+                                    actual_end_time: time,
+                                    status: Literal['completed', 'partially_completed', 'interrupted'],
+                                    outcome_metadata: Optional[Dict[str, Any]] = None):
+        logger.info(f"Reporting outcome for slot_id: {slot_id}. Status: {status}, Actual End Time: {actual_end_time.isoformat() if actual_end_time else 'N/A'}. Outcome Metadata: {outcome_metadata}")
+
+        slot_to_update = await self.memory_storage.get_schedule_item_by_id(slot_id)
+
+        if not slot_to_update:
+            logger.warning(f"report_activity_outcome: ActivitySlot with ID '{slot_id}' not found. Cannot update outcome.")
+            return
+
+        slot_to_update.actual_end_time = actual_end_time
+        slot_to_update.status = status
+
+        if outcome_metadata:
+            logger.debug(f"Outcome metadata received for slot {slot_id}: {outcome_metadata}")
+            # Example for future: if 'deviation_reason' in outcome_metadata and not slot_to_update.deviation_reason:
+            # slot_to_update.deviation_reason = outcome_metadata["deviation_reason"]
+            # Or store notes in activity_details if a field like 'outcome_notes' is added to ActivitySlotDetails:
+            # if hasattr(slot_to_update.activity_details, 'outcome_notes') and outcome_metadata.get("notes"):
+            #    slot_to_update.activity_details.outcome_notes = outcome_metadata.get("notes")
+
+
+        target_date = slot_to_update.date
+        user_id = slot_to_update.user_id
+
+        async with self._schedule_generation_lock:
+            todays_schedule: List[ActivitySlot] = []
+            if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                todays_schedule = self._todays_schedule_cache[user_id]
+                logger.debug(f"report_activity_outcome: Loaded schedule for {target_date} from cache.")
+            else:
+                logger.debug(f"report_activity_outcome: Cache miss for {target_date}. Loading schedule from DB to update slot {slot_id}.")
+                todays_schedule = await self.memory_storage.load_schedule_from_db(target_date, user_id)
+
+            if not todays_schedule:
+                logger.warning(f"report_activity_outcome: Could not load schedule for date {target_date} to update slot {slot_id}. Attempting to save the single updated slot. This might lead to data loss for other slots on this day if they existed.")
+                # This path is taken if the day's schedule is unexpectedly empty or fails to load.
+                # Saving just the single slot ensures its update is persisted, but other slots for that day might be lost from DB
+                # if save_schedule_to_db implicitly clears other items for the day when saving a partial list.
+                # Assuming save_schedule_to_db correctly handles replacing only the items provided if it's a full day,
+                # or if it's designed to update/insert based on ID. Given its current structure (delete then insert many),
+                # this will effectively make this slot the *only* one for the day.
+                await self.memory_storage.save_schedule_to_db([slot_to_update], user_id)
+                if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                     self._todays_schedule_cache[user_id] = [slot_to_update] # Update cache, reflecting the single item save
+                logger.info(f"Force-saved updated slot {slot_id} as single-item schedule for {target_date} due to prior load failure.")
+                return
+
+            slot_updated_in_list = False
+            for i, existing_slot in enumerate(todays_schedule):
+                if existing_slot.id == slot_id:
+                    todays_schedule[i] = slot_to_update
+                    slot_updated_in_list = True
+                    break
+
+            if slot_updated_in_list:
+                await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
+                logger.info(f"Updated slot {slot_id} with outcome and re-saved schedule for {target_date}.")
+                if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                    self._todays_schedule_cache[user_id] = todays_schedule
+                    logger.debug(f"Cache updated for {target_date} after reporting outcome for slot {slot_id}.")
+            else:
+                # This case means the slot_id was found by get_schedule_item_by_id, but not in the list loaded by load_schedule_from_db.
+                # This could happen if the cache was stale or if there's an inconsistency.
+                # To handle this, we can append/replace the slot and save.
+                logger.warning(f"report_activity_outcome: Slot {slot_id} was found by ID but not in its day's loaded schedule for {target_date}. Appending/replacing and saving.")
+                # Remove if a different version of the slot was somehow in the list
+                todays_schedule = [s for s in todays_schedule if s.id != slot_id]
+                todays_schedule.append(slot_to_update)
+                todays_schedule.sort(key=lambda s: s.start_time) # Ensure order
+
+                await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
+                logger.info(f"Appended/Replaced slot {slot_id} and re-saved schedule for {target_date}.")
+                if self._cache_date == target_date and user_id in self._todays_schedule_cache:
+                     self._todays_schedule_cache[user_id] = todays_schedule
+                     logger.debug(f"Cache updated after appending/replacing slot {slot_id}.")
