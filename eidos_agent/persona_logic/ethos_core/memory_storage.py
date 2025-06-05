@@ -618,3 +618,104 @@ class MemoryStorage:
         except Exception as e_generic: # Catch any other unexpected errors
             logger.error(f"Unexpected error retrieving PathosEvent ID {event_id}: {e_generic}", exc_info=True)
             return None
+
+    async def get_slots_for_event(self,
+                                event_id: str,
+                                user_id: str,
+                                event_start_date: date,
+                                event_end_date: date) -> List[ActivitySlot]:
+        if not event_id or not user_id:
+            logger.warning("get_slots_for_event called with missing event_id or user_id.")
+            return []
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        matching_slots: List[ActivitySlot] = []
+
+        logger.debug(f"Fetching slots for event_id: {event_id}, user_id: {user_id}, range: {event_start_date.isoformat()} to {event_end_date.isoformat()}")
+
+        try:
+            cursor.execute("""
+                SELECT * FROM daily_schedule_items
+                WHERE user_id = ? AND date >= ? AND date <= ?
+                ORDER BY date ASC, start_time ASC
+            """, (user_id, event_start_date.isoformat(), event_end_date.isoformat()))
+
+            rows = cursor.fetchall()
+            if not rows:
+                logger.debug(f"No schedule items found for user {user_id} in date range {event_start_date}-{event_end_date} for event {event_id}.")
+                return []
+
+            for row_data_raw in rows:
+                item_dict = {}
+                try:
+                    item_dict = dict(row_data_raw)
+                    details_str = item_dict.get('activity_details')
+                    if not details_str:
+                        logger.debug(f"Slot {item_dict.get('id')} missing activity_details, cannot check for event link {event_id}.")
+                        continue
+
+                    details_dict = json.loads(details_str)
+
+                    # Check if the slot is linked to the event via metadata
+                    metadata_in_details = details_dict.get('metadata')
+                    if isinstance(metadata_in_details, dict) and metadata_in_details.get('source_event_id') == event_id:
+                        # Full parsing logic copied from load_schedule_from_db / get_schedule_item_by_id
+                        item_dict['date'] = date.fromisoformat(item_dict['date'])
+                        item_dict['start_time'] = time.fromisoformat(item_dict['start_time'])
+                        item_dict['end_time'] = time.fromisoformat(item_dict['end_time'])
+
+                        generated_at_raw = item_dict.get('generated_at')
+                        if isinstance(generated_at_raw, str) and generated_at_raw:
+                            parsed_dt = None
+                            if 'Z' in generated_at_raw: parsed_dt = datetime.fromisoformat(generated_at_raw.replace('Z', '+00:00'))
+                            elif re.search(r'[+-]\d{2}:\d{2}$', generated_at_raw): parsed_dt = datetime.fromisoformat(generated_at_raw)
+                            else: parsed_dt = datetime.fromisoformat(generated_at_raw)
+
+                            if parsed_dt.tzinfo is None: item_dict['generated_at'] = parsed_dt.replace(tzinfo=timezone.utc)
+                            else: item_dict['generated_at'] = parsed_dt.astimezone(timezone.utc)
+                        elif isinstance(generated_at_raw, datetime):
+                             dt_obj = generated_at_raw
+                             if dt_obj.tzinfo is None: item_dict['generated_at'] = dt_obj.replace(tzinfo=timezone.utc)
+                             else: item_dict['generated_at'] = dt_obj.astimezone(timezone.utc)
+                        else:
+                            logger.warning(f"generated_at for slot {item_dict.get('id')} is invalid type {type(generated_at_raw)}. Using current UTC time.")
+                            item_dict['generated_at'] = datetime.now(timezone.utc) # Fallback
+
+                        for time_field in ['actual_start_time', 'actual_end_time', 'original_scheduled_start_time', 'original_scheduled_end_time']:
+                            if item_dict.get(time_field) and isinstance(item_dict[time_field], str):
+                                item_dict[time_field] = time.fromisoformat(item_dict[time_field])
+                            else: item_dict[time_field] = None
+
+                        activity_details_obj = ActivitySlotDetails(**details_dict)
+
+                        slot_constructor_data = {
+                            'id': item_dict.get('id'),
+                            'user_id': item_dict.get('user_id'),
+                            'date': item_dict.get('date'),
+                            'start_time': item_dict.get('start_time'),
+                            'end_time': item_dict.get('end_time'),
+                            'slot_name': item_dict.get('slot_name'),
+                            'activity_title': item_dict.get('activity_title'),
+                            'activity_type': item_dict.get('activity_type'),
+                            'activity_details': activity_details_obj,
+                            'generated_at': item_dict.get('generated_at'),
+                            'status': item_dict.get('status', 'pending'),
+                            'actual_start_time': item_dict.get('actual_start_time'),
+                            'actual_end_time': item_dict.get('actual_end_time'),
+                            'deviation_reason': item_dict.get('deviation_reason'),
+                            'original_scheduled_start_time': item_dict.get('original_scheduled_start_time'),
+                            'original_scheduled_end_time': item_dict.get('original_scheduled_end_time')
+                        }
+                        matching_slots.append(ActivitySlot(**slot_constructor_data))
+                except (json.JSONDecodeError, ValueError, TypeError) as e_parse:
+                    logger.error(f"Error parsing slot data (ID: {item_dict.get('id', 'Unknown') if item_dict else 'Unknown'}) for event {event_id}: {e_parse}", exc_info=True)
+                    continue # Skip this slot if parsing fails
+
+        except sqlite3.Error as e_sql:
+            logger.error(f"SQLite error in get_slots_for_event (event_id: {event_id}): {e_sql}", exc_info=True)
+        except Exception as e_general:
+            logger.error(f"Unexpected error in get_slots_for_event (event_id: {event_id}): {e_general}", exc_info=True)
+
+        logger.info(f"Found {len(matching_slots)} slots linked to event_id: {event_id} for user_id: {user_id} in range {event_start_date} to {event_end_date}.")
+        return matching_slots

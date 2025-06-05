@@ -738,59 +738,79 @@ class FirmamentModule:
                 if not event_time_dt:
                     event_time_dt = datetime.now(timezone.utc) # Fallback
 
-                # Heuristic for outcome_status
-                determined_outcome_status = 'partially_completed' # Default
+                determined_outcome_status = 'partially_completed' # Default status
+                FIRMAMENT_STATUS_CLASSIFIER_LLM_ROLE = "FIRMAMENT_STATUS_CLASSIFIER" # Define role
 
-                COMPLETION_KEYWORDS = {'complete', 'finish', 'finished', 'done', 'send', 'sent', 'submit', 'submitted', 'finalize', 'finalized', 'achieve', 'achieved', 'resolve', 'resolved', 'accomplish', 'accomplished'}
-                INTERRUPTION_KEYWORDS = {'instead', 'actually', 'switched to', 'distracted by', 'suddenly remembered', 'abandoned'}
-                # CONTINUATION_KEYWORDS not strictly needed due to default and interruption logic
+                if self.fm_config.get("enable_llm_status_classification", False): # Check config flag
+                    logger.debug(f"Attempting LLM-based status classification for slot: {current_activity_slot.id}, intention: {intention[:50]}")
 
-                slot_text_content = (
-                    (current_activity_slot.activity_title or "") + " " +
-                    (current_activity_slot.activity_details.description or "") + " " +
-                    (current_activity_slot.activity_details.sub_focus or "")
-                ).lower()
-                intention_text_lower = (intention or "").lower()
-                snippet_text_lower = (simulated_action_snippet or "").lower()
+                    slot_title = current_activity_slot.activity_title
+                    slot_desc = current_activity_slot.activity_details.description if current_activity_slot.activity_details else 'N/A'
+                    slot_sub_focus = current_activity_slot.activity_details.sub_focus if current_activity_slot.activity_details else 'N/A'
 
-                def text_contains_any_keyword(text: str, keywords: set) -> bool:
-                    if not text: return False
-                    return any(keyword in text for keyword in keywords)
+                    classifier_system_prompt = (
+                        "You are an analytical assistant. Your task is to classify the outcome of an action taken by Pathos "
+                        "(based on his intention and a simulated snippet of what he did) in relation to his currently scheduled activity. "
+                        "Respond ONLY with a JSON object containing 'outcome_status' and a brief 'reasoning'. "
+                        "Valid outcome_status values are: 'completed', 'partially_completed', 'interrupted'."
+                    )
+                    classifier_user_prompt = (
+                        f"Scheduled Activity:\n"
+                        f"- Title: "{slot_title}"\n"
+                        f"- Description: "{slot_desc or 'N/A'}"\n"
+                        f"- Specific Focus: "{slot_sub_focus or 'N/A'}"\n\n"
+                        f"Pathos's Intention: "{intention}"\n\n"
+                        f"Simulated Action Snippet: "{simulated_action_snippet or 'N/A'}"\n\n"
+                        "Based on the Intention and Simulated Action Snippet, how did this affect the Scheduled Activity? "
+                        "Choose one outcome_status: 'completed', 'partially_completed', 'interrupted'.\n\n"
+                        "JSON Response:"
+                    )
+                    messages = [
+                        {"role": "system", "content": classifier_system_prompt},
+                        {"role": "user", "content": classifier_user_prompt}
+                    ]
 
-                slot_words = set(w for w in slot_text_content.split() if len(w) > 3)
-                intention_snippet_combined_text = intention_text_lower + " " + snippet_text_lower
-                intention_snippet_words = set(w for w in intention_snippet_combined_text.split() if len(w) > 3)
+                    llm_response_str = await self._call_llm_api(
+                        messages=messages,
+                        llm_role_name=FIRMAMENT_STATUS_CLASSIFIER_LLM_ROLE,
+                        max_tokens_override=100,
+                        temperature_override=0.2
+                    )
 
-                are_related = False
-                if slot_words and intention_snippet_words: # Ensure both sets are non-empty before intersection
-                    are_related = len(slot_words.intersection(intention_snippet_words)) > 0
+                    if llm_response_str:
+                        try:
+                            json_start_index = llm_response_str.find('{')
+                            json_end_index = llm_response_str.rfind('}')
+                            if json_start_index != -1 and json_end_index != -1 and json_end_index > json_start_index:
+                                json_str_to_parse = llm_response_str[json_start_index : json_end_index+1]
+                                parsed_response = json.loads(json_str_to_parse)
+                                status_from_llm = parsed_response.get("outcome_status")
+                                reasoning_from_llm = parsed_response.get("reasoning", "N/A")
 
-                is_completion_action = text_contains_any_keyword(intention_snippet_combined_text, COMPLETION_KEYWORDS)
-                is_interruption_action = text_contains_any_keyword(intention_snippet_combined_text, INTERRUPTION_KEYWORDS)
+                                valid_statuses = ['completed', 'partially_completed', 'interrupted']
+                                if status_from_llm in valid_statuses:
+                                    determined_outcome_status = status_from_llm
+                                    logger.info(f"LLM classified outcome for slot {current_activity_slot.id} as '{determined_outcome_status}'. Reasoning: {reasoning_from_llm}")
+                                else:
+                                    logger.warning(f"LLM returned invalid status '{status_from_llm}' for slot {current_activity_slot.id}. Defaulting. Reasoning: {reasoning_from_llm}")
+                            else:
+                                logger.warning(f"Could not find valid JSON object in LLM status response for slot {current_activity_slot.id}. Response: {llm_response_str}")
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse JSON from LLM status response for slot {current_activity_slot.id}. Error: {e}. Response: {llm_response_str}")
+                        except Exception as e_gen:
+                            logger.error(f"Unexpected error parsing LLM status response: {e_gen}. Raw: {llm_response_str}", exc_info=True)
+                    else:
+                        logger.warning(f"LLM call for status classification for slot {current_activity_slot.id} returned no response. Defaulting status.")
+                else:
+                    if not self.fm_config.get("enable_llm_status_classification", False):
+                         logger.debug("LLM-based status classification is disabled. Using default 'partially_completed'.")
+                    # Default 'partially_completed' will be used if no real slot or if classification disabled/fails
 
-                if is_completion_action:
-                    if are_related:
-                        determined_outcome_status = 'completed'
-                        logger.debug(f"Status for slot {current_activity_slot.id} determined as 'completed' by keywords and relatedness.")
-                    else: # Completion keywords present, but for something unrelated
-                        determined_outcome_status = 'interrupted'
-                        logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' (completed unrelated task).")
-                elif is_interruption_action:
-                    determined_outcome_status = 'interrupted'
-                    logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' by keywords.")
-                elif not are_related and (intention_text_lower.strip() or snippet_text_lower.strip()): # Action taken but unrelated
-                    determined_outcome_status = 'interrupted'
-                    logger.debug(f"Status for slot {current_activity_slot.id} determined as 'interrupted' due to low topic similarity with non-empty intention/snippet.")
-                elif are_related: # Default 'partially_completed' is appropriate
-                     logger.debug(f"Status for slot {current_activity_slot.id} defaults to 'partially_completed' (related action, no completion/interruption keywords).")
-                # If no keywords, and not related, and intention/snippet are empty, it also defaults to 'partially_completed' - this might be okay, or could be 'interrupted' if intention was to do nothing related.
-                # For now, the above logic covers main cases.
-
-                logger.info(f"Firmament: Reporting outcome for scheduled slot '{current_activity_slot.activity_title}' (ID: {current_activity_slot.id}) as '{determined_outcome_status}' due to intention processing: '{intention[:50]}...'. Snippet: '{snippet_text_lower[:50]}...'")
+                logger.info(f"Firmament: Reporting outcome for scheduled slot '{current_activity_slot.activity_title}' (ID: {current_activity_slot.id}) as '{determined_outcome_status}' due to intention processing: '{intention[:50]}...'. Snippet: '{(simulated_action_snippet or "")[:50]}...'")
                 await self.chronos_engine.report_activity_outcome(
                     slot_id=current_activity_slot.id,
                     actual_end_time=event_time_dt.time(),
-                    status=determined_outcome_status, # USE THE NEW VARIABLE HERE
+                    status=determined_outcome_status,
                     outcome_metadata={
                         "source": "firmament_intention_consequence",
                         "intention_text": intention,
