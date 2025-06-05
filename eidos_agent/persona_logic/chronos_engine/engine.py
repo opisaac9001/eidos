@@ -343,42 +343,108 @@ class ChronosEngine:
                     continue # Already processed
 
                 if activity.status == 'pending': # Check if it's actionable
-                    # Mood/Flexibility Check
-                    flexibility_score = activity.activity_details.flexibility_score if activity.activity_details.flexibility_score is not None else 0.5
-                    mood_valence = current_mood.get('valence', 0.0)
+                    flexibility_score_val = activity.activity_details.flexibility_score if activity.activity_details.flexibility_score is not None else 0.5
+                    mood_valence_val = current_mood.get('valence', 0.0)
 
-                    # Define thresholds (these can be class constants or config later)
-                    NEGATIVE_MOOD_THRESHOLD = -0.5
-                    HIGH_FLEXIBILITY_THRESHOLD = 0.7
+                    # Thresholds and Delay Duration
+                    MODERATE_MOOD_VALENCE_MIN = -0.5
+                    MODERATE_MOOD_VALENCE_MAX = -0.2
+                    MODERATE_FLEXIBILITY_MIN = 0.4
+                    MODERATE_FLEXIBILITY_MAX = 0.7
+                    DELAY_DURATION = timedelta(minutes=30)
 
-                    if mood_valence < NEGATIVE_MOOD_THRESHOLD and flexibility_score >= HIGH_FLEXIBILITY_THRESHOLD:
-                        logger.info(f"Pathos (mood: {mood_valence:.2f}) is skipping flexible activity '{activity.activity_title}' (flex: {flexibility_score:.2f}, status: {activity.status}).")
+                    # New Delay Logic
+                    if MODERATE_MOOD_VALENCE_MIN <= mood_valence_val < MODERATE_MOOD_VALENCE_MAX and \
+                       MODERATE_FLEXIBILITY_MIN <= flexibility_score_val < MODERATE_FLEXIBILITY_MAX:
+
+                        logger.info(f"Pathos (mood: {mood_valence_val:.2f}) is delaying moderately flexible activity '{activity.activity_title}' (flex: {flexibility_score_val:.2f}) by {DELAY_DURATION}.")
+
+                        if activity.original_scheduled_start_time is None:
+                            activity.original_scheduled_start_time = activity.start_time
+                        if activity.original_scheduled_end_time is None:
+                            activity.original_scheduled_end_time = activity.end_time
+
+                        current_slot_date_for_calc = activity.date # or target_date from method params
+
+                        new_start_dt = datetime.combine(current_slot_date_for_calc, activity.start_time) + DELAY_DURATION
+                        new_end_dt = datetime.combine(current_slot_date_for_calc, activity.end_time) + DELAY_DURATION
+
+                        activity.start_time = new_start_dt.time()
+                        activity.end_time = new_end_dt.time()
+                        activity.status = 'delayed'
+                        activity.deviation_reason = f"mood_delay_moderate_flex_valence_{mood_valence_val:.2f}"
+
+                        schedule_to_check[activity_index] = activity # Update in the list
+                        processed_schedule_for_saving = True
+                        continue # Move to the next activity in schedule_to_check
+
+                    # Existing Skip Logic (ensure different thresholds if necessary)
+                    SEVERE_NEGATIVE_MOOD_THRESHOLD = -0.5 # Assuming NEGATIVE_MOOD_THRESHOLD was for severe cases
+                    HIGH_FLEXIBILITY_THRESHOLD = 0.7       # Re-affirm or use a distinct variable
+
+                    if mood_valence_val < SEVERE_NEGATIVE_MOOD_THRESHOLD and flexibility_score_val >= HIGH_FLEXIBILITY_THRESHOLD:
+                        logger.info(f"Pathos (mood: {mood_valence_val:.2f}) is skipping flexible activity '{activity.activity_title}' (flex: {flexibility_score_val:.2f}, status: {activity.status}).")
                         activity.status = 'skipped'
                         activity.deviation_reason = "mood_avoidance_low_valence_high_flexibility"
                         activity.actual_start_time = None
                         activity.actual_end_time = None
                         schedule_to_check[activity_index] = activity # Update in list
                         processed_schedule_for_saving = True
-                        # This activity is now skipped, continue to find the next *actual* current activity Pathos might do
                         continue
-                    else:
-                        # Activity is not skipped by mood, should be in progress
-                        logger.info(f"Activity '{activity.activity_title}' changing status from {activity.status} to in_progress.")
-                        activity.status = 'in_progress'
-                        # Set actual_start_time only if it's not already set (e.g. from a previous 'in_progress' state)
-                        if activity.actual_start_time is None:
-                            activity.actual_start_time = current_time_val
-                        schedule_to_check[activity_index] = activity # Update in list
-                        processed_schedule_for_saving = True
-                        # Save the updated schedule if changes were made before returning
-                        if processed_schedule_for_saving:
-                            async with self._schedule_generation_lock: # Protect cache and DB write
-                                # Update the cache directly
-                                self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check
-                                # Save the entire updated schedule back to DB
-                                await self.memory_storage.save_schedule_to_db(schedule_to_check, PATHOS_USER_ID)
-                                logger.debug(f"Saved updated schedule to DB due to status change in get_current_activity for slot {activity.id}")
-                        return activity
+
+                    # New Shorten Logic (if not delayed and not skipped by severe mood)
+                    mood_arousal_val = current_mood.get('arousal', 0.0)
+                    MIN_DURATION_FOR_SHORTENING = timedelta(minutes=60)
+                    SHORTEN_PERCENTAGE = 0.25
+                    MIN_ACTIVITY_DURATION = timedelta(minutes=15)
+                    MODERATE_FLEXIBILITY_FOR_SHORTENING = 0.3
+
+                    original_start_dt = datetime.combine(activity.date, activity.start_time)
+                    original_end_dt = datetime.combine(activity.date, activity.end_time)
+                    original_duration = original_end_dt - original_start_dt
+
+                    if mood_arousal_val < current_mood.get('arousal_thresholds', {}).get('low_engagement', -0.3) and \
+                       original_duration >= MIN_DURATION_FOR_SHORTENING and \
+                       flexibility_score_val >= MODERATE_FLEXIBILITY_FOR_SHORTENING:
+
+                        reduction_amount = original_duration * SHORTEN_PERCENTAGE
+                        new_duration = original_duration - reduction_amount
+
+                        if new_duration < MIN_ACTIVITY_DURATION:
+                            new_duration = MIN_ACTIVITY_DURATION
+
+                        new_end_time_dt = original_start_dt + new_duration
+
+                        if new_end_time_dt.time() > activity.start_time and new_duration >= MIN_ACTIVITY_DURATION:
+                            logger.info(f"Pathos (mood arousal: {mood_arousal_val:.2f}) is shortening activity '{activity.activity_title}' (flex: {flexibility_score_val:.2f}) from {original_duration} to {new_duration}.")
+
+                            if activity.original_scheduled_end_time is None:
+                                activity.original_scheduled_end_time = activity.end_time
+
+                            activity.end_time = new_end_time_dt.time()
+                            shorten_reason = f"mood_shorten_low_arousal_{mood_arousal_val:.2f}"
+                            if activity.deviation_reason:
+                                activity.deviation_reason += "; " + shorten_reason
+                            else:
+                                activity.deviation_reason = shorten_reason
+
+                            schedule_to_check[activity_index] = activity
+                            processed_schedule_for_saving = True
+
+                    # Logic to set to 'in_progress' and return (this will execute if not delayed or skipped)
+                    logger.info(f"Activity '{activity.activity_title}' changing status from {activity.status} to in_progress.")
+                    activity.status = 'in_progress'
+                    if activity.actual_start_time is None:
+                        activity.actual_start_time = current_time_val
+                    schedule_to_check[activity_index] = activity
+                    processed_schedule_for_saving = True
+
+                    if processed_schedule_for_saving: # This flag would be true if shortened or just started
+                        async with self._schedule_generation_lock:
+                            self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check
+                            await self.memory_storage.save_schedule_to_db(schedule_to_check, PATHOS_USER_ID)
+                            logger.debug(f"Saved updated schedule to DB due to status/time change in get_current_activity for slot {activity.id}")
+                    return activity
                 elif activity.status == 'in_progress':
                     # If it was already in_progress, just return it
                     logger.debug(f"Activity '{activity.activity_title}' is already in_progress. Returning.")
