@@ -495,10 +495,11 @@ class EthosCore:
                  can_use_json_extract = False
 
 
-            sql_query = f"SELECT * FROM memories WHERE type = ?"
+            sql_query = f"SELECT * FROM memories WHERE type = ? AND (is_archived = 0 OR is_archived IS NULL)" # Added is_archived filter
             params: List[Any] = [dream_type]
 
             if can_use_json_extract:
+                # is_archived filter is already in the base
                 sql_query += f" AND json_extract(metadata, '$.source') = ?"
                 params.append(dream_source_filter)
                 
@@ -625,14 +626,14 @@ class EthosCore:
             except sqlite3.OperationalError: can_use_json_extract = False
 
             if can_use_json_extract:
-                sql = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') = ? ORDER BY timestamp DESC LIMIT 1"
+                sql = "SELECT * FROM memories WHERE type = 'user_fact' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.fact_attribute_key') = ? AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC LIMIT 1"
                 cursor.execute(sql, (user_id, normalized_key))
                 row = cursor.fetchone()
                 if row:
                     return self.memory_storage._row_to_entry(row)
             else:
                 logger.warning("json_extract not available. Falling back for get_user_fact. This may be slow.")
-                cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' ORDER BY timestamp DESC")
+                cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC")
                 for r_row_data in cursor.fetchall():
                     r_row = dict(r_row_data) # Convert sqlite3.Row to dict
                     entry = self.memory_storage._row_to_entry(r_row)
@@ -1732,11 +1733,11 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
         
         queued_points: List[MemoryEntry] = []; fetch_limit = limit * 2 if limit > 0 else 10
         if can_use_json_extract:
-            sql = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL) AND (json_extract(metadata, '$.status') IS NULL OR json_extract(metadata, '$.status') = 'pending') ORDER BY salience DESC, timestamp ASC LIMIT ?"
+            sql = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (is_archived = 0 OR is_archived IS NULL) AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL) AND (json_extract(metadata, '$.status') IS NULL OR json_extract(metadata, '$.status') = 'pending') ORDER BY salience DESC, timestamp ASC LIMIT ?"
             params = (user_id, "system_oneiros", fetch_limit) # Allow points for specific user, system_oneiros (global dreams), or NULL user_id (Pathos's own thoughts)
         else:
             logger.warning("json_extract not available for get_queued_discussion_points. Querying all and filtering in Python.")
-            sql = "SELECT * FROM memories WHERE type = 'queued_discussion_point' ORDER BY timestamp DESC LIMIT ?"
+            sql = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC LIMIT ?"
             params = (fetch_limit * 5,) # Fetch more for Python filtering
         
         cursor.execute(sql, params); rows_raw = cursor.fetchall()
