@@ -453,7 +453,7 @@ class ChronosEngine:
             if not slot_updated_in_list:
                  logger.error(f"report_activity_outcome: Slot {slot_id} found by ID but not in loaded daily schedule for {target_date}. Appending and saving.")
                  todays_schedule.append(slot_to_update)
-                 todays_schedule.sort(key=lambda s: s.start_time)
+                 todays_schedule.sort(key=lambda s: s.start_time) # Ensure order
 
             overall_schedule_has_changed = slot_updated_in_list
 
@@ -464,6 +464,7 @@ class ChronosEngine:
                 deviation = actual_end_dt - scheduled_end_dt
 
             SIGNIFICANT_DEVIATION_THRESHOLD = timedelta(minutes=5)
+            final_processing_shift_needed = deviation # Initialize with original deviation
 
             if current_slot_index != -1 and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD:
                 event_id_to_event_map: Dict[str, PathosEvent] = {}
@@ -477,12 +478,12 @@ class ChronosEngine:
                         event = await self.memory_storage.get_event_by_id(event_id_str)
                         if event: event_id_to_event_map[event_id_str] = event
 
-                schedule_changed_due_to_absorption = False
                 if deviation > timedelta(0): # Lost time
                     time_to_absorb = deviation
                     logger.info(f"Slot {slot_id} created positive deviation: {time_to_absorb}. Attempting absorption based on importance.")
-                    HIGH_FLEXIBILITY_THRESHOLD = 0.8
+                    HIGH_FLEXIBILITY_THRESHOLD_ABSORB = 0.8
                     MIN_SLOT_DURATION_AFTER_SHORTEN = timedelta(minutes=15)
+                    schedule_changed_due_to_absorption = False
 
                     for i in range(current_slot_index + 1, len(todays_schedule)):
                         slot_eval = todays_schedule[i]
@@ -492,7 +493,7 @@ class ChronosEngine:
                         importance = self._get_slot_importance(slot_eval, event_id_to_event_map)
                         flexibility = slot_eval.activity_details.flexibility_score if slot_eval.activity_details.flexibility_score is not None else 0.5
 
-                        if importance == 'low' and flexibility >= HIGH_FLEXIBILITY_THRESHOLD:
+                        if importance == 'low' and flexibility >= HIGH_FLEXIBILITY_THRESHOLD_ABSORB:
                             slot_duration_val = self._get_slot_duration(slot_eval)
                             if time_to_absorb >= slot_duration_val:
                                 logger.info(f"Skipping low-importance, high-flex slot '{slot_eval.activity_title}' (duration: {slot_duration_val}) to absorb delay from {slot_id}.")
@@ -511,10 +512,55 @@ class ChronosEngine:
                                     time_to_absorb = timedelta(0)
                                     schedule_changed_due_to_absorption = True
                     if schedule_changed_due_to_absorption: overall_schedule_has_changed = True
-                    deviation = time_to_absorb
+                    final_processing_shift_needed = time_to_absorb # Update shift needed with remaining time_to_absorb
 
-                if abs(deviation) > timedelta(microseconds=1):
-                    logger.info(f"Applying final shift of {deviation} to subsequent slots after slot {slot_id}.")
+                elif deviation < timedelta(0): # Time was gained
+                    gained_time = abs(deviation)
+                    POSITIVE_MOOD_VALENCE_THRESHOLD = 0.3
+                    EXTENDABLE_ACTIVITY_TYPES = {'leisure', 'creative', 'reflective', 'learning'}
+                    HIGH_FLEXIBILITY_FOR_EXTENSION = 0.6
+                    MAX_EXTENSION_MINUTES_PER_SLOT = 30
+                    MAX_TOTAL_GAINED_TIME_FOR_EXTENSIONS_PERCENTAGE = 0.75
+                    MIN_EXTENSION_DURATION = timedelta(minutes=5)
+
+                    time_allocatable_for_extensions = gained_time * MAX_TOTAL_GAINED_TIME_FOR_EXTENSIONS_PERCENTAGE
+                    time_used_for_extensions = timedelta(0)
+                    schedule_modified_by_extensions = False
+
+                    current_mood = self.ethos_core.get_current_mood()
+                    logger.info(f"Time gained: {gained_time}. Mood valence: {current_mood.get('valence',0.0):.2f}. Max allocatable for extensions: {time_allocatable_for_extensions}.")
+
+                    if current_mood.get('valence', 0.0) > POSITIVE_MOOD_VALENCE_THRESHOLD:
+                        for i_ext in range(current_slot_index + 1, len(todays_schedule)):
+                            next_slot_to_extend = todays_schedule[i_ext]
+                            if time_used_for_extensions >= time_allocatable_for_extensions or \
+                               (time_allocatable_for_extensions - time_used_for_extensions) < MIN_EXTENSION_DURATION:
+                                break
+                            if next_slot_to_extend.status in ['pending', 'delayed']:
+                                flexibility = next_slot_to_extend.activity_details.flexibility_score if next_slot_to_extend.activity_details.flexibility_score is not None else 0.5
+                                is_extendable_type = next_slot_to_extend.activity_type in EXTENDABLE_ACTIVITY_TYPES
+                                if is_extendable_type or flexibility >= HIGH_FLEXIBILITY_FOR_EXTENSION:
+                                    potential_extension = min(
+                                        time_allocatable_for_extensions - time_used_for_extensions,
+                                        timedelta(minutes=MAX_EXTENSION_MINUTES_PER_SLOT)
+                                    )
+                                    if potential_extension >= MIN_EXTENSION_DURATION:
+                                        logger.info(f"Extending slot '{next_slot_to_extend.activity_title}' (ID: {next_slot_to_extend.id}) by {potential_extension}.")
+                                        if next_slot_to_extend.original_scheduled_end_time is None:
+                                            next_slot_to_extend.original_scheduled_end_time = next_slot_to_extend.end_time
+                                        new_end_dt = datetime.combine(next_slot_to_extend.date, next_slot_to_extend.end_time) + potential_extension
+                                        next_slot_to_extend.end_time = new_end_dt.time()
+                                        ext_reason = f"extended_mood_gain_{int(potential_extension.total_seconds()//60)}m"
+                                        next_slot_to_extend.deviation_reason = (next_slot_to_extend.deviation_reason or "") + ("; " if next_slot_to_extend.deviation_reason else "") + ext_reason
+                                        schedule_modified_by_extensions = True
+                                        time_used_for_extensions += potential_extension
+                        if schedule_modified_by_extensions: overall_schedule_has_changed = True
+                    final_processing_shift_needed = deviation + time_used_for_extensions
+                    logger.info(f"Original gained time: {deviation}. Time used for extensions: {time_used_for_extensions}. Final shift for subsequent tasks: {final_processing_shift_needed}")
+
+                # Final Cascading Shift Logic
+                if abs(final_processing_shift_needed) > timedelta(microseconds=1):
+                    logger.info(f"Applying final shift of {final_processing_shift_needed} to subsequent slots after slot {slot_id}.")
                     last_effective_end_dt = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time) if slot_to_update.actual_end_time else None
 
                     for i in range(current_slot_index + 1, len(todays_schedule)):
@@ -522,12 +568,13 @@ class ChronosEngine:
                         if slot_to_shift.status == 'skipped': continue
 
                         original_start_t = slot_to_shift.original_scheduled_start_time or slot_to_shift.start_time
+                        # Use current duration, as it might have been extended or shortened already
                         slot_duration = self._get_slot_duration(slot_to_shift)
 
                         if slot_to_shift.original_scheduled_start_time is None: slot_to_shift.original_scheduled_start_time = slot_to_shift.start_time
                         if slot_to_shift.original_scheduled_end_time is None: slot_to_shift.original_scheduled_end_time = slot_to_shift.end_time
 
-                        new_start_dt = datetime.combine(slot_to_shift.date, original_start_t) + deviation
+                        new_start_dt = datetime.combine(slot_to_shift.date, original_start_t) + final_processing_shift_needed
 
                         if last_effective_end_dt and new_start_dt < last_effective_end_dt :
                              new_start_dt = last_effective_end_dt
@@ -536,11 +583,12 @@ class ChronosEngine:
                         slot_to_shift.end_time = (new_start_dt + slot_duration).time()
 
                         if slot_to_shift.status == 'pending': slot_to_shift.status = 'delayed'
-                        shift_type = 'late' if deviation > timedelta(0) else 'early'
+                        shift_type = 'late' if final_processing_shift_needed > timedelta(0) else 'early'
                         slot_to_shift.deviation_reason = (slot_to_shift.deviation_reason or "") + f";shifted_{shift_type}_due_to_{slot_id}"
                         overall_schedule_has_changed = True
                         last_effective_end_dt = datetime.combine(slot_to_shift.date, slot_to_shift.end_time)
 
+            # Event Completion Logic
             if slot_to_update.status == 'completed':
                 if slot_to_update.activity_details and slot_to_update.activity_details.metadata:
                     source_event_id = slot_to_update.activity_details.metadata.get('source_event_id')
@@ -565,7 +613,7 @@ class ChronosEngine:
                                     pathos_local_dt_at_event_end = pathos_local_dt_at_event_end.replace(tzinfo=pathos_tz)
                                     event_to_update.actual_end_datetime = pathos_local_dt_at_event_end.astimezone(timezone.utc)
                                 await self.memory_storage.add_event_to_db(event_to_update)
-                            else: # Complex event (multi-day or non-specific time single day)
+                            else:
                                 logger.debug(f"Checking complex event {event_to_update.id} ('{event_to_update.title}') for completion.")
                                 related_slots = await self.memory_storage.get_slots_for_event(
                                     event_id=event_to_update.id, user_id=event_to_update.user_id,
@@ -600,9 +648,8 @@ class ChronosEngine:
                                         event_to_update.status = 'completed'
                                         if latest_completion_datetime_utc:
                                             event_to_update.actual_end_datetime = latest_completion_datetime_utc
-                                        elif slot_to_update.actual_end_time: # Fallback to current slot's end time
+                                        elif slot_to_update.actual_end_time:
                                             fallback_end_dt_local = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
-                                            # (timezone logic as above)
                                             pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
                                             pathos_tz = timezone.utc
                                             if ZoneInfo and pathos_tz_str.lower() != "utc":
