@@ -27,7 +27,9 @@ from eidos_agent.core.config import Config
 from eidos_agent.core.input_router import InputRouter, RoutingResult
 from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
 from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+
 from eidos_agent.llm_integrations.pathos_interface import PathosInterface # Updated import path
+test
 from eidos_agent.core.connection_manager import ConnectionManager
 
 logger = logging.getLogger(__name__)

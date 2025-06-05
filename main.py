@@ -131,6 +131,7 @@ async def lifespan(app_instance: FastAPI):
         logger.info("Lifespan: Starting core component initialization...")
         ethos_core = EthosCore(Config)
         # chat_storage.init_router(ethos_core) # This is now done by chat_storage_router itself if it needs ethos_core
+
         from eidos_agent.api.routers.chat_storage_router import init_router # Import init function
         init_router(ethos_core) # Call init function for chat_storage_router
         ethos_core.set_connection_manager(manager)

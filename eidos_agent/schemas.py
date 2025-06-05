@@ -214,3 +214,4 @@ class ApiMemoryEntry(BaseModel):
     content: str
     metadata: Optional[Dict[str, Any]] = None
     salience: Optional[float] = None
+
