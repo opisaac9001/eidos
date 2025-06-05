@@ -5,9 +5,10 @@ import uuid
 import json # For loading/dumping content if stored as JSON string in memory
 from pydantic import ValidationError
 
-from ..utils.logger import get_logger
+from eidos_agent.utils.logger import get_logger
 from eidos_agent.schemas import ChatState, ChatMessage # Updated import from schemas
-from ..core.config import Config # Not directly used here, but good for context
+from eidos_agent.core.config import Config # Updated to use absolute import
+test
 from eidos_agent.persona_logic.ethos_core.core import EthosCore # Updated import to persona_logic
 
 logger = get_logger(__name__)

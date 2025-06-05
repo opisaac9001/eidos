@@ -27,7 +27,8 @@ from eidos_agent.utils.text_splitter import chunk_text_by_char
 from eidos_agent.utils.logger import get_logger
 from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.prompt_loader import load_system_prompt
-from ...modules import simulation_module # Adjusted for new location relative to modules
+
+from eidos_agent.features.simulation.module import initiate_simulated_interaction, send_message_to_simulated_npc, end_simulated_interaction
 
 logger = get_logger(__name__)
 

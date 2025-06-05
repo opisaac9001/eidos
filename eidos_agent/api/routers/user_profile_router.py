@@ -8,13 +8,17 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 # Pydantic models from eidos_agent.schemas
+experimental/eidos-subconscious-integration
 from eidos_agent.schemas import UserSettingsRequest, ApiMemoryEntry, MemoryEntry as GenericMemoryEntry # Renamed to avoid clash
+=======
+from eidos_agent.schemas import UserSettingsRequest, ApiMemoryEntry, MemoryEntry
+test
 from pydantic import ValidationError
 
 # Core Eidos components (to be injected)
 from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct
-# from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry # Imported as GenericMemoryEntry now
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/user", tags=["User Profile"])
@@ -109,9 +113,11 @@ async def get_user_facts_endpoint(x_user_id: Optional[str] = Header(None, alias=
 
     logger.info(f"API: Request for user facts for user_id (normalized): '{actual_user_id}' (Raw X-User-Id was: '{raw_actual_user_id}').")
 
+experimental/eidos-subconscious-integration
     try:
         # Assuming get_all_user_facts returns a list of dicts or Pydantic models (GenericMemoryEntry)
         user_facts_raw: List[GenericMemoryEntry] = await _ethos_core.get_all_user_facts(user_id=actual_user_id)
+
 
         validated_facts: List[ApiMemoryEntry] = []
         for fact_data_item in user_facts_raw:

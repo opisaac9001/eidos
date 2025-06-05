@@ -223,10 +223,11 @@ Your JSON response:"""
             self._cache_date = today
             return self._todays_schedule_cache.get(PATHOS_USER_ID, [])
 
-    async def get_upcoming_events(self, days_ahead: int = 7) -> List[PathosEvent]:
-        pathos_local_now = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
+
+    async def get_upcoming_events(self, user_id: str = PATHOS_USER_ID, days_ahead: int = 7) -> List[PathosEvent]:
+        pathos_local_now = await self.ethos_core.get_local_datetime_for_user(user_id)
         start_date_val, end_date_val = pathos_local_now.date(), pathos_local_now.date() + timedelta(days=days_ahead)
-        return await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, start_date_val, end_date_val)
+        return await self.memory_storage.get_events_for_date_range(user_id, start_date_val, end_date_val)
 
     async def add_planned_event(self, event_data: Dict[str, Any]) -> Optional[PathosEvent]:
         try:

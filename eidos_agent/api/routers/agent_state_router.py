@@ -11,9 +11,11 @@ from fastapi.encoders import jsonable_encoder
 from eidos_agent.schemas import (
     DreamEntryResponse,
     ApiMemoryEntry,
-    MemoryEntry as GenericMemoryEntry,
-    ValidationError
-)
+
+    MemoryEntry as GenericMemoryEntry
+
+from pydantic import ValidationError
+test
 # This specific import from memory_storage might not be needed if GenericMemoryEntry from schemas is sufficient
 # from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry # Path is already correct
 

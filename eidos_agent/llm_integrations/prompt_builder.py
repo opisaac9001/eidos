@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 from eidos_agent.core.config import Config, LLMConfig # Assuming LLMConfig is needed, or just Config
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore # For execute_get_time
-from eidos_agent.modules.ethos_core.memory_storage import MemoryEntry
+
+from eidos_agent.persona_logic.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.logos_core.handler import LogosCore # For execute_get_time
+from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.utils.logger import get_logger # Use consistent logger
 

@@ -205,3 +205,13 @@ class ChatState(BaseModel):
     def ensure_model(cls, v):
         if not v: return "eidos-agent"
         return v
+
+class ApiMemoryEntry(BaseModel):
+    """A simplified memory entry model for API responses."""
+    id: str
+    timestamp: str
+    type: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+    salience: Optional[float] = None
+

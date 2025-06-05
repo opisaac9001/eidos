@@ -407,3 +407,79 @@ class PathosInterface:
                 logger.info("PathosInterface: HTTP client closed.")
         except Exception as e: logger.error(f"Error closing PathosInterface resources: {e}", exc_info=True)
         logger.info("PathosInterface closed.")
+
+    async def _store_final_interaction(
+        self,
+        original_user_input: str,
+        pathos_response: str,
+        mood_at_response: Dict[str, float],
+        retrieved_memories: List[Dict[str, Any]],
+        full_history_for_pathos: List[Dict[str, Any]],
+        error: bool = False,
+        image_provided_this_turn: bool = False,
+        vision_llm_output: Optional[str] = None,
+        is_proactive_turn: bool = False,
+        forced_action: bool = False
+    ):
+        """Store the final interaction details in Ethos memory system."""
+        if not self.ethos_core:
+            logger.error("Cannot store final interaction: EthosCore not available.")
+            return
+
+        try:
+            # Construct interaction content string
+            interaction_content_parts = []
+            interaction_content_parts.append(f"User: {original_user_input}")
+            
+            # Add any vision context if provided
+            if image_provided_this_turn and vision_llm_output:
+                interaction_content_parts.append(f"\nImage Analysis: {vision_llm_output}")
+            
+            # Add Pathos's response
+            interaction_content_parts.append(f"\nPathos: {pathos_response}")
+
+            # Add any tool usage from the conversation history
+            tool_calls = []
+            for msg in full_history_for_pathos:
+                if msg.get("tool_calls"):
+                    tool_calls.extend(msg["tool_calls"])
+            if tool_calls:
+                interaction_content_parts.append("\nTools Used by Pathos:")
+                for tool in tool_calls:
+                    interaction_content_parts.append(f"- {tool.get('function', {}).get('name', 'unknown_tool')}")
+
+            # Build metadata
+            metadata = {
+                "user_id": self.current_active_user_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "mood_at_response": mood_at_response,
+                "is_error": error,
+                "is_proactive": is_proactive_turn,
+                "had_image": image_provided_this_turn,
+                "forced_action": forced_action,
+                "retrieved_memory_count": len(retrieved_memories),
+                "retrieved_memory_ids": [m.get("id") for m in retrieved_memories if isinstance(m, dict) and "id" in m],
+            }
+
+            # Calculate salience based on various factors
+            base_salience = 1.0
+            if error:
+                base_salience *= 1.2  # Errors are more notable
+            if is_proactive_turn:
+                base_salience *= 1.1  # Proactive interactions are slightly more notable
+            if len(retrieved_memories) > 0:
+                base_salience *= (1.0 + min(len(retrieved_memories) * 0.05, 0.2))  # More memories = more significant
+            
+            # Store the interaction in Ethos memory
+            await self.ethos_core.add_memory_entry(
+                entry_data={
+                    "type": "chat_interaction",
+                    "content": "\n".join(interaction_content_parts),
+                    "metadata": metadata,
+                    "salience": base_salience
+                },
+                user_id_context=self.current_active_user_id
+            )
+
+        except Exception as e:
+            logger.error(f"Error storing final interaction in Ethos: {e}", exc_info=True)

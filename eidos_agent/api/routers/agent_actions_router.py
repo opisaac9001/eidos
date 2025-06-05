@@ -9,9 +9,11 @@ from fastapi.responses import JSONResponse
 from eidos_agent.schemas import FeedbackRequest
 
 # Core Eidos components (to be injected)
-from eidos_agent.modules.pathos_interface import PathosInterface
-from eidos_agent.modules.ethos_core.core import EthosCore
-from eidos_agent.modules.logos_core.handler import LogosCore
+
+from eidos_agent.llm_integrations.pathos_interface import PathosInterface
+from eidos_agent.persona_logic.ethos_core.core import EthosCore
+from eidos_agent.persona_logic.logos_core.handler import LogosCore
+test
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["Agent Actions"])
