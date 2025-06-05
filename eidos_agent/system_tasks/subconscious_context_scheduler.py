@@ -8,13 +8,15 @@ Pathos Subconscious Node.
 import time
 import logging
 import threading
-from typing import Optional # For type hinting scheduler_timer
+from typing import Optional, TYPE_CHECKING # For type hinting scheduler_timer
+import asyncio # For asyncio.run()
+from datetime import datetime, timezone # For time check
 
 # Attempt to import from subconscious client
 try:
-    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context # Updated import
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context, send_node_control_command # Updated import
 except ImportError:
-    logging.warning("chronos_engine: Could not import sync_recent_context. Using placeholder for testing.")
+    logging.warning("subconscious_context_scheduler: Could not import sync_recent_context or send_node_control_command. Using placeholders for testing.")
     # Placeholder for sync_recent_context if the import fails
     def sync_recent_context(conversation: str, current_action: str) -> bool:
         print(f"Placeholder sync_recent_context called with: Conversation='{conversation[:50]}...', Action='{current_action}'")
@@ -23,6 +25,16 @@ except ImportError:
         sync_recent_context.call_count +=1
         return sync_recent_context.call_count % 2 != 0 # Alternate true/false
 
+    def send_node_control_command(node_state: str, daily_summary: Optional[str] = None) -> bool:
+        print(f"Placeholder send_node_control_command called with: NodeState='{node_state}', Summary='{daily_summary[:50] if daily_summary else None}...'")
+        if not hasattr(send_node_control_command, 'call_count'):
+            send_node_control_command.call_count = 0
+        send_node_control_command.call_count +=1
+        return send_node_control_command.call_count % 2 != 0
+
+
+if TYPE_CHECKING:
+    from eidos_agent.persona_logic.ethos_core.core import EthosCore
 
 # Configure basic logging
 logger = logging.getLogger(__name__)
@@ -32,6 +44,22 @@ if not logger.handlers:
 # --- Global Scheduler Control ---
 scheduler_stop_event = threading.Event()
 scheduler_timer: Optional[threading.Timer] = None
+_ethos_core_instance: Optional['EthosCore'] = None
+
+SCHEDULER_STATE = {
+    'is_subconscious_sleeping': False,
+    # This dictionary can be expanded later if other state needs to be shared
+}
+
+# --- Initialization ---
+def init_scheduler(ethos_core_input: 'EthosCore'):
+    '''
+    Initializes the scheduler with necessary module instances.
+    Called from main.py during startup.
+    '''
+    global _ethos_core_instance
+    _ethos_core_instance = ethos_core_input
+    logger.info("SubconsciousContextScheduler initialized with EthosCore instance.")
 
 # --- Placeholder Data Retrieval Functions ---
 
@@ -55,20 +83,86 @@ def perform_scheduled_subconscious_context_sync():
 
     Retrieves the latest conversation summary and current Eidos action, then
     sends this information to the subconscious node.
+    Also handles transitioning to SLEEPING_DREAMING state at night.
     """
-    logger.info("ChronosEngine: Performing scheduled subconscious context sync...")
-    summary = get_latest_conversation_summary()
-    action = get_current_eidos_action()
+    logger.info("Scheduler: Performing scheduled subconscious context sync...")
 
-    logger.debug(f"ChronosEngine: Conversation summary: '{summary}'")
-    logger.debug(f"ChronosEngine: Current Eidos action: '{action}'")
+    # Determine current hour (e.g., based on system time where scheduler runs, assuming UTC for now or local server time)
+    # For more accuracy, this should use Pathos's local time if EthosCore is available.
+    # However, EthosCore calls are async, and this function is sync.
+    # A simpler time check for now:
+    current_hour = datetime.now(timezone.utc).hour # Or use a configured timezone if scheduler runs in a specific one
 
-    success = sync_recent_context(conversation=summary, current_action=action)
+    # Define night time, e.g., 10 PM to 6 AM
+    # This could be made configurable later.
+    is_night_time = 22 <= current_hour or current_hour < 6 # Define night time, e.g., 10 PM to 6 AM (UTC for now)
+    # MORNING_HOUR_START could be a config, e.g. 6
+    # NIGHT_HOUR_START could be a config, e.g. 22
 
-    if success:
-        logger.info("ChronosEngine: Scheduled context sync with subconscious node completed successfully.")
-    else:
-        logger.warning("ChronosEngine: Scheduled context sync with subconscious node failed or partially failed.")
+    if is_night_time:
+        if not SCHEDULER_STATE.get('is_subconscious_sleeping', False):
+            logger.info("Scheduler: Night time. Attempting to transition subconscious to SLEEPING_DREAMING state.")
+            daily_summary = "Pathos experienced a day of various activities and thoughts. (Fallback summary)"
+            if _ethos_core_instance:
+                logger.info("Scheduler: Attempting to generate real daily summary from EthosCore...")
+                try:
+                    logger.debug("Scheduler: Calling asyncio.run(EthosCore.generate_daily_experiential_summary())...")
+                    summary_text = asyncio.run(_ethos_core_instance.generate_daily_experiential_summary())
+                    if summary_text:
+                        daily_summary = summary_text
+                        logger.info("Scheduler: Successfully generated real daily summary from EthosCore.")
+                    else:
+                        logger.warning("Scheduler: EthosCore returned empty summary, using fallback.")
+                except RuntimeError as e_run:
+                    if "cannot run event loop while another loop is running" in str(e_run).lower() or \
+                       "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
+                        logger.error(f"Scheduler: asyncio.run() conflict. Cannot generate real daily summary from sync thread. Error: {e_run}")
+                        logger.error("Scheduler: THIS IS A KNOWN ISSUE. Consider refactoring scheduler to be async or use loop.call_soon_threadsafe if main loop is accessible.")
+                    else:
+                        logger.error(f"Scheduler: Error generating real daily summary: {e_run}", exc_info=True)
+                except Exception as e_sum_gen:
+                    logger.error(f"Scheduler: Unexpected error during daily summary generation: {e_sum_gen}", exc_info=True)
+            else:
+                logger.warning("Scheduler: EthosCore instance not available. Using fallback daily summary.")
+
+            logger.info(f"Scheduler: Sending command to transition subconscious to SLEEPING_DREAMING with summary: {daily_summary[:100]}...")
+            success_sleep_command = send_node_control_command(node_state="SLEEPING_DREAMING", daily_summary=daily_summary)
+            if success_sleep_command:
+                logger.info("Scheduler: Command to set SLEEPING_DREAMING state sent successfully.")
+                SCHEDULER_STATE['is_subconscious_sleeping'] = True
+            else:
+                logger.warning("Scheduler: Failed to send SLEEPING_DREAMING state command. Node may not be sleeping.")
+                SCHEDULER_STATE['is_subconscious_sleeping'] = False # Explicitly not sleeping if command failed
+        else:
+            logger.info("Scheduler: Night time, and subconscious_node already marked as sleeping.")
+
+    else: # Daytime
+        if SCHEDULER_STATE.get('is_subconscious_sleeping', False):
+            logger.info("Scheduler: Daytime. Attempting to transition subconscious to AWAKE_THINKING state.")
+            success_wake_command = send_node_control_command(node_state="AWAKE_THINKING")
+            if success_wake_command:
+                logger.info("Scheduler: Command to set AWAKE_THINKING state sent successfully.")
+                SCHEDULER_STATE['is_subconscious_sleeping'] = False
+            else:
+                logger.warning("Scheduler: Failed to send AWAKE_THINKING state command. Node may still be sleeping.")
+                # SCHEDULER_STATE remains True here, as we failed to confirm it's awake.
+        else:
+            SCHEDULER_STATE['is_subconscious_sleeping'] = False
+            logger.info("Scheduler: Daytime. Subconscious_node assumed or already AWAKE.")
+
+        if not SCHEDULER_STATE.get('is_subconscious_sleeping', False):
+            logger.info("Scheduler: Performing standard context sync with subconscious_node.")
+            summary = get_latest_conversation_summary()
+            action = get_current_eidos_action()
+            logger.debug(f"Scheduler: Conversation summary: '{summary}'")
+            logger.debug(f"Scheduler: Current Eidos action: '{action}'")
+            sync_success = sync_recent_context(conversation=summary, current_action=action)
+            if sync_success:
+                logger.info("Scheduler: Scheduled context sync with subconscious node completed successfully.")
+            else:
+                logger.warning("Scheduler: Scheduled context sync with subconscious node failed or partially failed.")
+        else:
+            logger.info("Scheduler: Skipping context sync as subconscious_node is (or failed to transition from) sleeping.")
 
 # --- Scheduler Implementation ---
 

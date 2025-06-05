@@ -74,6 +74,8 @@ class PathosEventDetails(BaseModel):
     activity_theme: Optional[str] = Field(default=None)
     planned_sites_or_tasks: Optional[List[str]] = Field(default=None)
     relevant_memory_tags: Optional[List[str]] = Field(default=None)
+    event_subtype: Optional[str] = Field(default=None) # e.g., "delivery", "reminder_call", "package_pickup"
+    event_specific_data: Dict[str, Any] = Field(default_factory=dict) # e.g., {"item_name": "Book X", "tracking_id": "123"}
 
 class PathosEvent(BaseModel):
     id: str = Field(default_factory=lambda: f"event_{uuid.uuid4().hex}")
@@ -86,6 +88,7 @@ class PathosEvent(BaseModel):
     location: Optional[str] = Field(default=None)
     details: PathosEventDetails = Field(default_factory=PathosEventDetails)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    specific_time: Optional[time] = Field(default=None) # For events that occur at a particular time on their start_date
 
     @validator('start_date', 'end_date', pre=True)
     @classmethod

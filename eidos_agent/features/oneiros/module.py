@@ -354,3 +354,9 @@ class OneirosModule:
             await self.http_client.aclose()
         # sd_client is not fully implemented, so no close needed yet
         logger.info("OneirosModule resources closed.")
+
+    def has_pending_fragments(self) -> bool:
+        '''
+        Checks if there are any dream fragments pending for processing.
+        '''
+        return bool(self.received_dream_fragments)

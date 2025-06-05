@@ -88,6 +88,8 @@ class EthosConfig(TypedDict, total=False):
     reflection_feedback_llm_role: str # From broken
     dream_curiosity_llm_role: str # From broken
     curiosity_notification_llm_role: str # From broken
+    daily_summary_max_memories: Optional[int]
+    daily_summary_lookback_hours: Optional[int]
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -303,6 +305,8 @@ class Config:
         "reflection_feedback_llm_role": os.getenv("ETHOS_REFLECTION_FEEDBACK_LLM_ROLE", "LOGOS_TECHNE"),
         "dream_curiosity_llm_role": os.getenv("ETHOS_DREAM_CURIOSITY_LLM_ROLE", "LOGOS_TECHNE"),
         "curiosity_notification_llm_role": os.getenv("ETHOS_CURIOSITY_NOTIFICATION_LLM_ROLE", "LOGOS_TECHNE"),
+        "daily_summary_max_memories": int(os.getenv("ETHOS_DAILY_SUMMARY_MAX_MEMORIES", "30")),
+        "daily_summary_lookback_hours": int(os.getenv("ETHOS_DAILY_SUMMARY_LOOKBACK_HOURS", "18")),
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None
