@@ -302,26 +302,98 @@ class FirmamentModule:
             except Exception as e:
                 logger.error(f"FirmamentModule: Error storing received intention as memory: {e}", exc_info=True)
 
-        current_mood_from_subconscious = metadata.get("mood_snapshot") # Mood at the time of intention
+        current_mood_from_subconscious = metadata.get("mood_snapshot", self.ethos_core.get_current_mood()) # Fallback to current Eidos mood
         current_activity_slot_before_new_action = await self._get_current_activity_slot()
         newly_started_spontaneous_slot: Optional[ActivitySlot] = None
 
-        # --- Decision Making for Action (Heuristic) ---
-        # For now, assume most impulses are candidates for action and lead to a new Chronos task.
-        # A more complex decision logic could be added here later.
-        actionable_intention = True # Simple assumption for now
+        # --- LLM Call for Activity Planning ---
+        activity_context_str = "Pathos is currently idle."
+        if current_activity_slot_before_new_action:
+            activity_context_str = f"Pathos is currently engaged in: '{current_activity_slot_before_new_action.activity_title}'."
 
-        if actionable_intention and self.chronos_engine:
-            new_activity_title = intention[:120] # Cap length for Chronos
+        # Ensure ActivityType is available for the prompt
+        valid_activity_types_str = ", ".join(list(ActivityType.__args__)) # type: ignore
+
+        system_prompt_planning = (
+            "You are an assistant helping Pathos decide how to act on an internal thought/intention. "
+            "Pathos is a 47-year-old British tech consultant. Based on his intention and current state, "
+            "suggest a concrete, short, spontaneous activity. Respond ONLY with a JSON object containing: "
+            "activity_title (max 10 words), activity_description (1-2 sentences, max 30 words), "
+            "estimated_duration_minutes (integer, e.g., 15, 30, 60), "
+            f"and activity_type (choose one from: {valid_activity_types_str})."
+        )
+        user_prompt_planning = (
+            f"Pathos's internal intention: \"{intention}\"\n\n"
+            f"Pathos's current mood: {current_mood_from_subconscious}\n"
+            f"Pathos's current activity context: {activity_context_str}\n\n"
+            f"Valid Activity Types: {valid_activity_types_str}\n\n"
+            "Based on this, provide a JSON object for a suitable spontaneous activity.\n"
+            "Example JSON:\n"
+            "{\n"
+            "  \"activity_title\": \"Brief Title\",\n"
+            "  \"activity_description\": \"A short description of the activity.\",\n"
+            "  \"estimated_duration_minutes\": 20,\n"
+            "  \"activity_type\": \"reflective\"\n"
+            "}\n"
+            "Your JSON response:"
+        )
+
+        messages_planning = [{"role": "system", "content": system_prompt_planning}, {"role": "user", "content": user_prompt_planning}]
+
+        planned_activity_json_str = await self._call_llm_api(
+            messages_planning,
+            self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE"), # Ensure this role is configured
+            max_tokens_override=200, # Max tokens for the JSON response
+            temperature_override=0.5  # Lower temp for more structured output
+        )
+
+        planned_activity_data: Optional[Dict[str, Any]] = None
+        if planned_activity_json_str:
+            try:
+                # Attempt to extract JSON from potential markdown code blocks
+                match = re.search(r"```json\s*(\{.*?\})\s*```", planned_activity_json_str, re.DOTALL)
+                if match:
+                    json_str_cleaned = match.group(1)
+                else:
+                    json_str_cleaned = planned_activity_json_str.strip()
+
+                planned_activity_data = json.loads(json_str_cleaned)
+                logger.info(f"Firmament: LLM planned activity: {planned_activity_data}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Firmament: Failed to parse LLM activity plan JSON: {e}. Response was: {planned_activity_json_str}")
+                planned_activity_data = None # Ensure it's None if parsing fails
+
+        # --- Use LLM plan or Fallback to Heuristic ---
+        if planned_activity_data and all(k in planned_activity_data for k in ["activity_title", "activity_description", "estimated_duration_minutes", "activity_type"]):
+            new_activity_title = str(planned_activity_data["activity_title"])[:120] # Cap length
+            new_activity_description = str(planned_activity_data["activity_description"])
+            duration_minutes = int(planned_activity_data["estimated_duration_minutes"])
+            new_activity_type_str = str(planned_activity_data["activity_type"])
+
+            if new_activity_type_str in list(ActivityType.__args__): # type: ignore
+                new_activity_type: ActivityType = new_activity_type_str # type: ignore
+            else:
+                logger.warning(f"Firmament: LLM proposed invalid activity_type '{new_activity_type_str}'. Defaulting to 'reflective'.")
+                new_activity_type = "reflective"
+
+            estimated_duration = timedelta(minutes=max(5, duration_minutes)) # Ensure at least 5 mins
+            logger.info(f"Firmament: Using LLM-planned activity: '{new_activity_title}'")
+        else:
+            logger.warning("Firmament: LLM activity planning failed or returned invalid data. Using fallback heuristic.")
+            new_activity_title = intention[:60] # Shorter cap for heuristic title
             new_activity_description = f"Acting on a subconscious intention: {intention}"
-            estimated_duration = timedelta(minutes=self.fm_config.get("intention_based_activity_duration_minutes", 15))
-            new_activity_type: ActivityType = self.fm_config.get("intention_based_activity_type", "reflective") # type: ignore
+            # TODO: Make these configurable via self.fm_config as suggested
+            default_duration_minutes = self.fm_config.get("default_spontaneous_activity_duration_minutes", 15)
+            default_activity_type: ActivityType = self.fm_config.get("default_spontaneous_activity_type", "reflective") # type: ignore
+            estimated_duration = timedelta(minutes=default_duration_minutes)
+            new_activity_type = default_activity_type
 
+        if self.chronos_engine:
             current_slot_id_to_interrupt = None
             if current_activity_slot_before_new_action and current_activity_slot_before_new_action.slot_name != "AdHocFirmamentActivity":
                 current_slot_id_to_interrupt = current_activity_slot_before_new_action.id
 
-            logger.info(f"Firmament: Attempting to report spontaneous activity from intention: '{new_activity_title}'")
+            logger.info(f"Firmament: Reporting spontaneous activity to Chronos: '{new_activity_title}'")
             try:
                 newly_started_spontaneous_slot = await self.chronos_engine.report_spontaneous_activity(
                     user_id=PATHOS_USER_ID,
@@ -330,16 +402,18 @@ class FirmamentModule:
                     new_activity_description=new_activity_description,
                     estimated_duration=estimated_duration,
                     new_activity_type=new_activity_type,
-                    metadata={"source": "firmament_subconscious_driven", "original_intention": intention}
+                    metadata={"source": "firmament_subconscious_llm_planned" if planned_activity_data else "firmament_subconscious_heuristic",
+                              "original_intention": intention,
+                              "llm_planned_details": planned_activity_data if planned_activity_data else None}
                 )
                 if newly_started_spontaneous_slot:
-                    logger.info(f"Firmament: ChronosEngine started spontaneous activity from intention: {newly_started_spontaneous_slot.activity_title} (ID: {newly_started_spontaneous_slot.id})")
+                    logger.info(f"Firmament: ChronosEngine started spontaneous activity: {newly_started_spontaneous_slot.activity_title} (ID: {newly_started_spontaneous_slot.id})")
                 else:
-                    logger.warning(f"Firmament: ChronosEngine did not return a new slot for spontaneous activity from intention '{new_activity_title}'.")
+                    logger.warning(f"Firmament: ChronosEngine did not return a new slot for spontaneous activity '{new_activity_title}'.")
             except Exception as e:
                 logger.error(f"Firmament: Error calling report_spontaneous_activity: {e}", exc_info=True)
 
-        # --- Simulate and Log Pathos Acting on the Intention ---
+        # --- Simulate and Log Pathos Acting on the Intention (in context of new or existing slot) ---
         try:
             # Pass mood from subconscious metadata, and the newly created slot if any
             await self._simulate_intention_consequence(

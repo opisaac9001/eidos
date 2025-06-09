@@ -10,6 +10,9 @@ The API relies on other modules within the `subconscious_node` package for
 core logic such as context management, mood tracking, thought generation (via thinker),
 and utility functions.
 """
+from dotenv import load_dotenv # For .env file support
+load_dotenv() # Load environment variables from .env file if present
+
 import logging # Added for explicit logging configuration
 from fastapi import FastAPI
 import uvicorn # For running the app with Uvicorn
@@ -56,6 +59,9 @@ class NodeControlCommand(BaseModel):
 class MoodUpdatePayload(BaseModel):
     mood_aspects: Dict[str, float]
 
+class SignificantMemoryInject(BaseModel):
+    summary: str
+
 class CurrentThoughtsResponse(BaseModel):
     recent_thoughts: List[str]
     mood: Dict
@@ -86,6 +92,15 @@ async def inject_action(data: ContextInject):
     """
     context_store.add_action_context(data.content)
     return {"message": "Action context injected", "context": data.content}
+
+@app.post("/inject/significant_memory", response_model=MessageResponse, tags=["Context Injection"])
+async def inject_significant_memory(data: SignificantMemoryInject):
+    """
+    Injects a significant memory summary into the subconscious node's context.
+    """
+    context_store.add_significant_memory_summary(data.summary)
+    logger.info(f"Significant memory summary injected: {data.summary[:100]}...")
+    return {"message": "Significant memory summary injected", "context": data.summary}
 
 @app.get("/current_thoughts", response_model=CurrentThoughtsResponse, tags=["Observation"])
 async def get_thoughts():

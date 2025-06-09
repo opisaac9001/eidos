@@ -15,7 +15,13 @@ from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
 from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
 from eidos_agent.utils.logger import get_logger
-import pytz # Added import
+import pytz
+
+# Import MoodEngine
+from .mood_engine import MoodEngine
+
+# Direct import for PATHOS_USER_ID for runtime use
+from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
 
 
 from typing import TYPE_CHECKING
@@ -24,14 +30,12 @@ if TYPE_CHECKING:
     from eidos_agent.core.connection_manager import ConnectionManager
     from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
-    # Updated import for ChronosEngine and related types
-experimental/eidos-subconscious-integration
-    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot, PATHOS_USER_ID
-
-# PATHOS_USER_ID is now imported via TYPE_CHECKING block or directly if not under TYPE_CHECKING
-# from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # This line is removed
-
     from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot
+    # PATHOS_USER_ID is available via direct import above for runtime,
+    # but can also be included here if preferred for type checking consistency.
+    # from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
+
+
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -107,6 +111,7 @@ class EthosCore:
         self.pathos_interface: Optional['PathosInterface'] = None
         self.logos_core: Optional['LogosCore'] = None
         self.chronos_engine: Optional['ChronosEngine'] = None
+        self.mood_engine = MoodEngine(self) # Instantiate MoodEngine
 
         self.system_user_ids: List[Optional[str]] = [
             "unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing",
@@ -2125,36 +2130,26 @@ Respond ONLY with JSON: {{"decision": "SCHEDULE" | "POSTPONE", "reasoning": "bri
         """Returns the current mood state of Pathos."""
         if not self.config.ENABLE_MOOD_SIMULATION:
             return {"valence": 0.0, "arousal": 0.0, "simulation_disabled": True}
-        return self.current_mood
+        # Delegate to MoodEngine
+        return self.mood_engine.get_current_mood_snapshot()
 
     async def update_mood_state(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
         """
-        Updates Pathos's mood based on an event.
-        This is a simplified placeholder. A more complex MoodEngine would live here.
+        Updates Pathos's mood based on an event by delegating to the MoodEngine.
         """
         if not self.config.ENABLE_MOOD_SIMULATION:
+            logger.debug("Mood simulation disabled. Skipping mood update.")
+            return
+        if not self.mood_engine:
+            logger.error("MoodEngine not initialized in EthosCore. Cannot update mood state.")
             return
 
-        valence_shift, arousal_shift = 0.0, 0.0
+        # Delegate event processing to MoodEngine
+        self.mood_engine.process_event(event_type, payload)
+        # The MoodEngine itself will log the changes.
+        # We can add a summary log here if desired.
+        logger.debug(f"Processed mood event '{event_type}' via MoodEngine. Current mood after event: {self.mood_engine.get_current_mood_snapshot()}")
 
-        if event_type == 'feedback':
-            fb_type = payload.get('feedback_type') if payload else None
-            rating = payload.get('rating') if payload else None
-            if fb_type == 'positive' or (rating is not None and rating > 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
-            elif fb_type == 'negative' or (rating is not None and rating < 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            elif fb_type == 'correction': # Corrections might be slightly negative initially but lead to positive if learned
-                valence_shift -= 0.05 
-                arousal_shift += 0.03
-        # Add other event_types: 'successful_tool_use', 'failed_tool_use', 'new_learning', 'dream_recalled' etc.
-        
-        self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['valence'] + valence_shift))
-        self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + arousal_shift))
-        self.last_mood_update_time = datetime.now(timezone.utc)
-        logger.debug(f"Mood updated due to '{event_type}'. New mood: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f}")
 
     async def retrieve_relevant_past_interactions(
         self,

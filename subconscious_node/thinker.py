@@ -37,54 +37,88 @@ monologue_thread: Optional[threading.Thread] = None
 stop_monologue_event = threading.Event()
 
 
-# --- Configuration Loading ---
+# --- Configuration Loading (Mirrors logic in utils.py for now) ---
+# TODO: Centralize config loading in a shared module/function.
+
+# Default values used if not found in config.json or environment variables
 DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice..."
-DEFAULT_TEMPERATURE = 0.7
+DEFAULT_TEMPERATURE = 0.75 # Aligned with last config update
 DEFAULT_SLEEP_DURATION = 30
 DEFAULT_MAX_THOUGHTS = 100
-DEFAULT_WILDCARD_PATH = "../wildcards/"
+DEFAULT_WILDCARD_PATH = "../wildcards/" # Should match utils.py default
 
+# Initialize with hardcoded defaults
 fixed_system_prompt = DEFAULT_SYSTEM_PROMPT
 temperature = DEFAULT_TEMPERATURE
 sleep_duration_seconds = DEFAULT_SLEEP_DURATION
 max_monologue_buffer_thoughts = DEFAULT_MAX_THOUGHTS
-wildcard_folder_path = DEFAULT_WILDCARD_PATH
+wildcard_folder_path = DEFAULT_WILDCARD_PATH # This specific var is for wildcard loading path
 
-try:
-    config_path_abs = os.path.join(os.path.dirname(__file__), 'config.json')
-    if not os.path.exists(config_path_abs):
-        config_path_abs = CONFIG_FILE_PATH
+# Load from config.json
+config_data_thinker = {}
+config_file_path_thinker = os.path.join(os.path.dirname(__file__), 'config.json') # Consistent with CONFIG_FILE_PATH global
 
-    with open(config_path_abs, 'r') as f:
-        config_data = json.load(f)
+if os.path.exists(config_file_path_thinker):
+    try:
+        with open(config_file_path_thinker, 'r') as f:
+            config_data_thinker = json.load(f)
+        logger.info(f"Thinker: Successfully loaded configuration from {config_file_path_thinker}")
+    except Exception as e:
+        logger.error(f"Thinker: Error loading config from {config_file_path_thinker}: {e}. Using defaults or env vars.", exc_info=True)
+else:
+    logger.info(f"Thinker: Config file {config_file_path_thinker} not found. Using defaults or env vars.")
 
-        llm_settings = config_data.get("llm_settings", {})
-        fixed_system_prompt = llm_settings.get("fixed_system_prompt", DEFAULT_SYSTEM_PROMPT)
-        temperature = float(llm_settings.get("temperature", DEFAULT_TEMPERATURE))
+# Apply overrides: Env Var -> Config File -> Hardcoded Default
+# LLM Settings
+_llm_settings = config_data_thinker.get("llm_settings", {})
+_json_system_prompt = _llm_settings.get("fixed_system_prompt", DEFAULT_SYSTEM_PROMPT)
+_system_prompt_file = os.getenv("SUBPROCESS_LLM_SYSTEM_PROMPT_FILE")
+if _system_prompt_file:
+    try:
+        with open(_system_prompt_file, 'r') as f_prompt:
+            fixed_system_prompt = f_prompt.read()
+            logger.info(f"Thinker: Loaded system prompt from file: {_system_prompt_file}")
+    except Exception as e_prompt:
+        fixed_system_prompt = _json_system_prompt
+        logger.error(f"Thinker: Failed to load system prompt from file '{_system_prompt_file}': {e_prompt}. Using JSON or default.")
+else:
+    fixed_system_prompt = _json_system_prompt
 
-        monologue_loop_settings = config_data.get("monologue_loop_settings", {})
-        sleep_duration_seconds = int(monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION))
-        max_monologue_buffer_thoughts = int(monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_THOUGHTS))
+_json_temp = _llm_settings.get("temperature", DEFAULT_TEMPERATURE)
+temperature = float(os.getenv("SUBPROCESS_LLM_TEMPERATURE", _json_temp))
 
-        wildcard_folder_path = config_data.get("wildcard_folder_path", DEFAULT_WILDCARD_PATH)
-        logger.info(f"Configuration loaded successfully from {config_path_abs}")
-        logger.info(f"Wildcard folder path from config: {wildcard_folder_path}")
+# Monologue Loop Settings
+_monologue_loop_settings = config_data_thinker.get("monologue_loop_settings", {})
+_json_sleep_duration = _monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION)
+sleep_duration_seconds = int(os.getenv("SUBPROCESS_SLEEP_DURATION_SECONDS", _json_sleep_duration))
 
-except FileNotFoundError:
-    logger.warning(f"Config file {CONFIG_FILE_PATH} (or {config_path_abs}) not found. Using default settings.")
-except json.JSONDecodeError:
-    logger.warning(f"Could not decode JSON from {CONFIG_FILE_PATH} (or {config_path_abs}). Using default settings.")
-except ValueError:
-    logger.warning(f"Error parsing numeric values from {CONFIG_FILE_PATH} (or {config_path_abs}). Using default settings.")
-except Exception as e:
-    logger.warning(f"An unexpected error occurred while reading config: {e}. Using default settings.")
+_json_max_buffer_thoughts = _monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_THOUGHTS)
+max_monologue_buffer_thoughts = int(os.getenv("SUBPROCESS_MAX_BUFFER_THOUGHTS", _json_max_buffer_thoughts))
+
+# Wildcard path (used for loading wildcards)
+_json_wildcard_path = config_data_thinker.get("wildcard_folder_path", DEFAULT_WILDCARD_PATH)
+wildcard_folder_path = os.getenv("SUBPROCESS_WILDCARD_RELATIVE_PATH", _json_wildcard_path)
+
+
+logger.info(f"Thinker Effective fixed_system_prompt: '{fixed_system_prompt[:100]}...'")
+logger.info(f"Thinker Effective temperature: {temperature}")
+logger.info(f"Thinker Effective sleep_duration_seconds: {sleep_duration_seconds}")
+logger.info(f"Thinker Effective max_monologue_buffer_thoughts: {max_monologue_buffer_thoughts}")
+logger.info(f"Thinker Effective wildcard_folder_path (for loading): '{wildcard_folder_path}'")
+
 
 # --- Load Wildcards ---
+# This uses the `wildcard_folder_path` determined above.
 try:
-    thinker_script_dir = os.path.dirname(__file__)
+    thinker_script_dir = os.path.dirname(__file__) # directory of thinker.py
+    # utils.load_wildcards expects the path from where utils.py is, to the wildcards folder.
+    # If wildcard_folder_path is absolute, os.path.join might not behave as expected.
+    # The WILDCARD_RELATIVE_PATH in utils.py is relative to utils.py itself.
+    # Here, wildcard_folder_path is directly used by utils.load_wildcards, assuming it's correctly relative or absolute.
+    # For consistency, we pass `thinker_script_dir` and `wildcard_folder_path` (which might be `../wildcards` or an absolute path from env).
     loaded_wildcards = utils.load_wildcards(thinker_script_dir, wildcard_folder_path)
     if loaded_wildcards:
-        logger.info(f"Successfully loaded {len(loaded_wildcards)} wildcard categories.")
+        logger.info(f"Thinker: Successfully loaded {len(loaded_wildcards)} wildcard categories using path: {wildcard_folder_path}.")
         for category, items in loaded_wildcards.items():
             logger.debug(f"Wildcard category '{category}' loaded with {len(items)} items.")
     else:
@@ -110,12 +144,18 @@ def build_prompt() -> str:
         conversation_context_str if conversation_context_str else "No conversation context.",
         "\nAction:",
         action_context_str if action_context_str else "No action context.",
-        "\n--- RECENT SIGNIFICANT MEMORIES (from Eidos, if any) ---",
-        # Placeholder for now. Eidos will inject context directly into conversation/action for now.
-        "No specific significant memories explicitly recalled by Pathos at this moment, relying on current context.",
+    ]
+
+    # Add significant memories to the prompt
+    significant_memories_list = current_context_data.get("significant_memories", [])
+    significant_memories_str = "\n".join(f"- {mem}" for mem in significant_memories_list) if significant_memories_list else "No specific long-term memories are at the forefront of Pathos's mind right now."
+
+    prompt_parts.extend([
+        "\n--- RECENT SIGNIFICANT MEMORIES (from Eidos) ---",
+        significant_memories_str,
         "\n--- CURRENT THOUGHT ---",
         "Pathos reflects:"
-    ]
+    ])
     return "\n".join(prompt_parts)
 
 def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, List[str]]) -> str:
@@ -179,16 +219,22 @@ def monologue_loop():
             logger.debug(f"Debug: Current Mood: {current_mood_snapshot}")
             prompt_str = build_prompt()
             logger.debug(f"Debug: Built Prompt (first 200 chars):\n{prompt_str[:200]}\n--------------------")
-            new_thought = utils.run_llm(prompt_str, temperature)
-            mood_name = current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'
-            logger.info(f"Pathos thinks: \"{new_thought}\" (Mood: {mood_name})")
-            monologue_buffer.append(new_thought)
-            if len(monologue_buffer) > max_monologue_buffer_thoughts:
-                logger.debug(f"Monologue buffer full ({len(monologue_buffer)} thoughts). Trimming oldest.")
-                num_to_remove = len(monologue_buffer) - max_monologue_buffer_thoughts
-                del monologue_buffer[:num_to_remove]
-            detectors.check_for_impulse(new_thought, current_mood_snapshot)
-            detectors.check_for_imprint(new_thought, current_mood_snapshot)
+            new_thought = utils.run_llm(prompt_str, temperature) # This can return error strings
+
+            if new_thought and not new_thought.startswith(("[Error:", "[Warning:")):
+                mood_name = current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'
+                logger.info(f"Pathos thinks: \"{new_thought}\" (Mood: {mood_name})")
+                monologue_buffer.append(new_thought)
+                if len(monologue_buffer) > max_monologue_buffer_thoughts:
+                    logger.debug(f"Monologue buffer full ({len(monologue_buffer)} thoughts). Trimming oldest.")
+                    num_to_remove = len(monologue_buffer) - max_monologue_buffer_thoughts
+                    del monologue_buffer[:num_to_remove]
+                detectors.check_for_impulse(new_thought, current_mood_snapshot)
+                detectors.check_for_imprint(new_thought, current_mood_snapshot)
+            elif new_thought: # It's an error or warning string from run_llm
+                logger.warning(f"LLM generation issue for standard thought: {new_thought}")
+            else: # Empty or None result, also an issue
+                logger.error("LLM generation returned empty or None for standard thought.")
 
             # Use event.wait for stoppable sleep
             if stop_monologue_event.is_set(): break
@@ -208,12 +254,12 @@ def monologue_loop():
             logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
             # Use a slightly higher temperature for dreaming, capped at a reasonable value (e.g., 1.0 or 1.1)
-            dream_temperature = min(temperature + 0.15, 1.1)
+            dream_temperature = min(temperature + 0.15, 1.1) # Ensure temperature is the global thinker var
             logger.debug(f"Using temperature {dream_temperature} for dream generation.")
 
-            dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
+            dream_fragment = utils.run_llm(dream_prompt, dream_temperature) # This can return error strings
 
-            if dream_fragment:
+            if dream_fragment and not dream_fragment.startswith(("[Error:", "[Warning:")):
                 logger.info(f"Pathos dreams: \"{dream_fragment}\"")
                 dream_buffer.append(dream_fragment)
                 if len(dream_buffer) > max_dream_buffer_fragments:
@@ -221,9 +267,11 @@ def monologue_loop():
                     num_to_remove_dreams = len(dream_buffer) - max_dream_buffer_fragments
                     del dream_buffer[:num_to_remove_dreams]
                 # Optionally, pass to a specialized detector for dream content later
-                # detectors.check_for_dream_imprint(dream_fragment, mood.get_current_mood())
-            else:
-                logger.warning("LLM returned empty dream fragment.")
+                # detectors.check_for_dream_imprint(dream_fragment, mood.get_current_mood()) # Assuming mood is still relevant
+            elif dream_fragment: # It's an error or warning string
+                logger.warning(f"LLM generation issue for dream fragment: {dream_fragment}")
+            else: # Empty or None result
+                logger.error("LLM generation returned empty or None for dream fragment.")
 
             # Dreams might occur more rapidly or with different pacing than thoughts
             dream_mode_sleep_duration = int(sleep_duration_seconds / 1.5) if sleep_duration_seconds > 3 else 2

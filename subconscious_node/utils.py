@@ -19,56 +19,135 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # --- Configuration Loading ---
-CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
+CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), 'config.json') # Path to config.json
 
-# Default values for LLM
+# Default values
+DEFAULT_LLM_SYSTEM_PROMPT = "You are Pathos, an inner voice..." # Fallback if file not found or key missing
 DEFAULT_LLAMA_CPP_SERVER_URL = "http://localhost:8081/v1/chat/completions"
 DEFAULT_LLAMA_CPP_MAX_TOKENS = 150
 DEFAULT_LLAMA_CPP_TEMP = 0.7
-# Default value for wildcard path
-DEFAULT_WILDCARD_RELATIVE_PATH = "../wildcards/" # Assuming 'wildcards' is one level up from 'subconscious_node'
+DEFAULT_WILDCARD_RELATIVE_PATH = "../wildcards/"
+DEFAULT_SLEEP_DURATION_SECONDS = 30
+DEFAULT_MAX_BUFFER_THOUGHTS = 100
+DEFAULT_MOOD_IMPULSE_THRESHOLD = 0.7
+DEFAULT_EIDOS_API_BASE_URL = "http://localhost:8080"
+DEFAULT_MOOD_COMPONENTS = {
+    "impulsiveness": 0.3, "laziness": 0.5, "proactivity": 0.4,
+    "extroversion": 0.6, "introversion": 0.4
+}
 
-# Initialize with defaults
+# Initialize with hardcoded defaults, which will be updated
 LLAMA_CPP_SERVER_URL = DEFAULT_LLAMA_CPP_SERVER_URL
-LLAMA_CPP_MAX_TOKENS = DEFAULT_LLAMA_CPP_MAX_TOKENS
-LLAMA_CPP_DEFAULT_TEMP = DEFAULT_LLAMA_CPP_TEMP
 WILDCARD_RELATIVE_PATH = DEFAULT_WILDCARD_RELATIVE_PATH
+LLM_TEMPERATURE = DEFAULT_LLAMA_CPP_TEMP # Corresponds to llama_cpp_default_temperature_thought_gen and temperature
+LLM_MAX_TOKENS = DEFAULT_LLAMA_CPP_MAX_TOKENS # Corresponds to llama_cpp_max_tokens_thought_gen
+FIXED_SYSTEM_PROMPT = DEFAULT_LLM_SYSTEM_PROMPT
+SLEEP_DURATION_SECONDS = DEFAULT_SLEEP_DURATION_SECONDS
+MAX_MONOLOGUE_BUFFER_THOUGHTS = DEFAULT_MAX_BUFFER_THOUGHTS
+MOOD_IMPULSE_THRESHOLD = DEFAULT_MOOD_IMPULSE_THRESHOLD
+CURRENT_DEFAULT_MOOD = DEFAULT_MOOD_COMPONENTS.copy()
+EIDOS_API_BASE_URL = DEFAULT_EIDOS_API_BASE_URL
+
 
 config_data = {}
 if os.path.exists(CONFIG_FILE_PATH):
     try:
         with open(CONFIG_FILE_PATH, 'r') as f:
             config_data = json.load(f)
-            logger.info(f"Successfully loaded configuration from {CONFIG_FILE_PATH}")
+        logger.info(f"Successfully loaded configuration from {CONFIG_FILE_PATH}")
+    except FileNotFoundError:
+        logger.info(f"Config file {CONFIG_FILE_PATH} not found. Using defaults or environment variables.")
     except json.JSONDecodeError:
         logger.error(f"Could not decode JSON from {CONFIG_FILE_PATH}. Will use defaults or environment variables.", exc_info=True)
-    except Exception as e:
-        logger.error(f"Unexpected error loading config from {CONFIG_FILE_PATH}: {e}. Will use defaults or environment variables.", exc_info=True)
+    except Exception as e: # Catch any other loading errors
+        logger.error(f"Unexpected error loading config from {CONFIG_FILE_PATH}: {e}. Using defaults or environment variables.", exc_info=True)
+# Ensure config_data is a dict even if loading failed, for safe .get() calls later
+if not isinstance(config_data, dict):
+    config_data = {}
+
+
+# --- Apply Overrides: Env Var -> Config File -> Hardcoded Default ---
+
+# LLM Settings
+llm_settings = config_data.get("llm_settings", {}) # Safely get llm_settings or empty dict
+_json_system_prompt = llm_settings.get("fixed_system_prompt", DEFAULT_LLM_SYSTEM_PROMPT)
+_system_prompt_file = os.getenv("SUBPROCESS_LLM_SYSTEM_PROMPT_FILE")
+
+if _system_prompt_file:
+    try:
+        with open(_system_prompt_file, 'r', encoding='utf-8') as f_prompt: # Added encoding
+            FIXED_SYSTEM_PROMPT = f_prompt.read().strip() # Strip whitespace
+        logger.info(f"Loaded system prompt from environment variable file: {_system_prompt_file}")
+    except FileNotFoundError:
+        FIXED_SYSTEM_PROMPT = _json_system_prompt # Fallback to JSON if file not found
+        logger.error(f"System prompt file specified in SUBPROCESS_LLM_SYSTEM_PROMPT_FILE ('{_system_prompt_file}') not found. Using JSON config or default.")
+    except IOError as e_io:
+        FIXED_SYSTEM_PROMPT = _json_system_prompt # Fallback to JSON on other IO errors
+        logger.error(f"IOError reading system prompt file '{_system_prompt_file}': {e_io}. Using JSON config or default.")
+    except Exception as e_prompt: # Catch any other exception during file read
+        FIXED_SYSTEM_PROMPT = _json_system_prompt
+        logger.error(f"Failed to load system prompt from file '{_system_prompt_file}': {e_prompt}. Using JSON config or default.", exc_info=True)
 else:
-    logger.info(f"Config file {CONFIG_FILE_PATH} not found. Using defaults or environment variables.")
+    FIXED_SYSTEM_PROMPT = _json_system_prompt
 
-# LLM Settings from config_data (will be overridden by env var if set)
-llm_settings = config_data.get("llm_settings", {})
-config_llama_url = llm_settings.get("llama_cpp_server_url")
-config_max_tokens = llm_settings.get("llama_cpp_max_tokens_thought_gen")
-config_default_temp = llm_settings.get("llama_cpp_default_temperature_thought_gen")
+_json_temp = llm_settings.get("temperature", DEFAULT_LLAMA_CPP_TEMP)
+LLM_TEMPERATURE = float(os.getenv("SUBPROCESS_LLM_TEMPERATURE", _json_temp))
 
-# Wildcard path from config_data (will be overridden by env var if set)
-config_wildcard_path = config_data.get("wildcard_folder_path")
+_json_max_tokens = llm_settings.get("llama_cpp_max_tokens_thought_gen", DEFAULT_LLAMA_CPP_MAX_TOKENS)
+LLM_MAX_TOKENS = int(os.getenv("SUBPROCESS_LLM_MAX_TOKENS", _json_max_tokens))
 
-# Precedence: Env Var -> Config File Value -> Hardcoded Default
-LLAMA_CPP_SERVER_URL = os.getenv("SUBPROCESS_LLAMA_CPP_SERVER_URL", config_llama_url if config_llama_url else DEFAULT_LLAMA_CPP_SERVER_URL)
-WILDCARD_RELATIVE_PATH = os.getenv("SUBPROCESS_WILDCARD_RELATIVE_PATH", config_wildcard_path if config_wildcard_path else DEFAULT_WILDCARD_RELATIVE_PATH)
+# llama_cpp_default_temperature_thought_gen in config.json corresponds to LLM_TEMPERATURE
+# It was set to the same as "temperature" in the previous subtask.
+# If it needs to be distinct, it needs its own env var. For now, it uses LLM_TEMPERATURE.
+LLAMA_CPP_DEFAULT_TEMP = LLM_TEMPERATURE # Keep them linked as per previous step
 
-# For these, env var override is less common, but we'll keep the pattern of config -> default
-LLAMA_CPP_MAX_TOKENS = config_max_tokens if config_max_tokens is not None else DEFAULT_LLAMA_CPP_MAX_TOKENS
-LLAMA_CPP_DEFAULT_TEMP = config_default_temp if config_default_temp is not None else DEFAULT_LLAMA_CPP_TEMP
+_json_llama_url = llm_settings.get("llama_cpp_server_url", DEFAULT_LLAMA_CPP_SERVER_URL)
+LLAMA_CPP_SERVER_URL = os.getenv("SUBPROCESS_LLAMA_CPP_SERVER_URL", _json_llama_url)
 
 
-logger.info(f"Effective Llama.cpp URL: '{LLAMA_CPP_SERVER_URL}' (Env > Config > Default)")
-logger.info(f"Effective Wildcard Relative Path: '{WILDCARD_RELATIVE_PATH}' (Env > Config > Default)")
-logger.info(f"Effective Llama.cpp MaxTokens: {LLAMA_CPP_MAX_TOKENS} (Config > Default)")
-logger.info(f"Effective Llama.cpp DefaultTemp: {LLAMA_CPP_DEFAULT_TEMP} (Config > Default)")
+# Monologue Loop Settings
+monologue_loop_settings = config_data.get("monologue_loop_settings", {})
+_json_sleep_duration = monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION_SECONDS)
+SLEEP_DURATION_SECONDS = int(os.getenv("SUBPROCESS_SLEEP_DURATION_SECONDS", _json_sleep_duration))
+
+_json_max_buffer_thoughts = monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_BUFFER_THOUGHTS)
+MAX_MONOLOGUE_BUFFER_THOUGHTS = int(os.getenv("SUBPROCESS_MAX_BUFFER_THOUGHTS", _json_max_buffer_thoughts))
+
+
+# Mood Settings
+mood_settings_json = config_data.get("mood_settings", {})
+_json_impulse_threshold = mood_settings_json.get("impulse_threshold", DEFAULT_MOOD_IMPULSE_THRESHOLD)
+MOOD_IMPULSE_THRESHOLD = float(os.getenv("SUBPROCESS_MOOD_IMPULSE_THRESHOLD", _json_impulse_threshold))
+
+_json_default_mood = mood_settings_json.get("default_mood", DEFAULT_MOOD_COMPONENTS)
+CURRENT_DEFAULT_MOOD = {
+    "impulsiveness": float(os.getenv("SUBPROCESS_DEFAULT_MOOD_IMPULSIVENESS", _json_default_mood.get("impulsiveness", DEFAULT_MOOD_COMPONENTS["impulsiveness"]))),
+    "laziness": float(os.getenv("SUBPROCESS_DEFAULT_MOOD_LAZINESS", _json_default_mood.get("laziness", DEFAULT_MOOD_COMPONENTS["laziness"]))),
+    "proactivity": float(os.getenv("SUBPROCESS_DEFAULT_MOOD_PROACTIVITY", _json_default_mood.get("proactivity", DEFAULT_MOOD_COMPONENTS["proactivity"]))),
+    "extroversion": float(os.getenv("SUBPROCESS_DEFAULT_MOOD_EXTROVERSION", _json_default_mood.get("extroversion", DEFAULT_MOOD_COMPONENTS["extroversion"]))),
+    "introversion": float(os.getenv("SUBPROCESS_DEFAULT_MOOD_INTROVERSION", _json_default_mood.get("introversion", DEFAULT_MOOD_COMPONENTS["introversion"]))),
+}
+
+# Wildcard path
+_json_wildcard_path = config_data.get("wildcard_folder_path", DEFAULT_WILDCARD_RELATIVE_PATH)
+WILDCARD_RELATIVE_PATH = os.getenv("SUBPROCESS_WILDCARD_RELATIVE_PATH", _json_wildcard_path)
+
+# Eidos API Base URL (for detectors.py, though it loads its own config)
+_json_eidos_api_url = config_data.get("eidos_api_base_url", DEFAULT_EIDOS_API_BASE_URL)
+EIDOS_API_BASE_URL = os.getenv("SUBPROCESS_EIDOS_API_BASE_URL", _json_eidos_api_url)
+
+
+# Log effective settings
+logger.info(f"Effective FIXED_SYSTEM_PROMPT: '{FIXED_SYSTEM_PROMPT[:100]}...' (Env File > JSON > Default)")
+logger.info(f"Effective LLM_TEMPERATURE: {LLM_TEMPERATURE} (Env > JSON > Default)")
+logger.info(f"Effective LLM_MAX_TOKENS: {LLM_MAX_TOKENS} (Env > JSON > Default)")
+logger.info(f"Effective LLAMA_CPP_SERVER_URL: '{LLAMA_CPP_SERVER_URL}' (Env > JSON > Default)")
+logger.info(f"Effective SLEEP_DURATION_SECONDS: {SLEEP_DURATION_SECONDS} (Env > JSON > Default)")
+logger.info(f"Effective MAX_MONOLOGUE_BUFFER_THOUGHTS: {MAX_MONOLOGUE_BUFFER_THOUGHTS} (Env > JSON > Default)")
+logger.info(f"Effective MOOD_IMPULSE_THRESHOLD: {MOOD_IMPULSE_THRESHOLD} (Env > JSON > Default)")
+logger.info(f"Effective CURRENT_DEFAULT_MOOD: {CURRENT_DEFAULT_MOOD} (Env > JSON > Default)")
+logger.info(f"Effective WILDCARD_RELATIVE_PATH: '{WILDCARD_RELATIVE_PATH}' (Env > JSON > Default)")
+logger.info(f"Effective EIDOS_API_BASE_URL (for utils context): '{EIDOS_API_BASE_URL}' (Env > JSON > Default)")
 
 
 def load_wildcards(config_folder_path: str, relative_wildcard_path: str) -> Dict[str, List[str]]:
@@ -143,38 +222,54 @@ def run_llm(prompt: str, temperature: Optional[float] = None) -> str:
 
   try:
       response = requests.post(LLAMA_CPP_SERVER_URL, json=payload, timeout=60)
-      response.raise_for_status()
+      response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
 
       response_json = response.json()
-      logger.debug(f"Llama.cpp raw response JSON: {json.dumps(response_json, indent=2)[:500]}...")
+      # Enhanced logging for debugging the raw response
+      logger.debug(f"Llama.cpp raw response JSON: {json.dumps(response_json, indent=2)}")
 
-      if (choices := response_json.get("choices")) and \
-         isinstance(choices, list) and len(choices) > 0 and \
-         (message := choices[0].get("message")) and \
-         isinstance(message, dict) and \
-         (content := message.get("content")):
-          thought = str(content).strip()
-          logger.info(f"Llama.cpp generated thought: {thought[:100]}...")
-          return thought
-      else:
-          logger.error(f"Unexpected JSON structure from llama.cpp: {response_json}")
-          return "[Error: Unexpected response structure from LLM]"
+      choices = response_json.get("choices")
+      if not choices or not isinstance(choices, list) or len(choices) == 0:
+          logger.error(f"LLM response missing 'choices' list or 'choices' is empty. Full response: {response_json}")
+          return "[Error: LLM response missing or empty choices]"
 
-  except requests.exceptions.Timeout:
-      logger.error(f"API call to llama.cpp server ({LLAMA_CPP_SERVER_URL}) timed out.")
+      message = choices[0].get("message")
+      if not message or not isinstance(message, dict):
+          logger.error(f"First choice in LLM response missing 'message' dict. Full response: {response_json}")
+          return "[Error: LLM response choice missing message]"
+
+      content = message.get("content")
+      if content is None: # Allow empty string, but not None
+          logger.error(f"Message in LLM response choice missing 'content'. Full response: {response_json}")
+          return "[Error: LLM response message missing content]"
+
+      thought = str(content).strip()
+      if not thought: # Handle if content is an empty string after stripping
+          logger.warning(f"LLM generated an empty thought. Prompt: '{prompt[:200]}...'")
+          return "[Warning: LLM generated empty thought]"
+
+      logger.info(f"Llama.cpp generated thought: {thought[:100]}...")
+      return thought
+
+  except requests.exceptions.Timeout as e_timeout:
+      logger.error(f"API call to LLM server ({LLAMA_CPP_SERVER_URL}) timed out after {payload.get('timeout', 'default')}s. Error: {e_timeout}", exc_info=True)
       return "[Error: LLM server request timed out]"
-  except requests.exceptions.ConnectionError:
-      logger.error(f"API call to llama.cpp server ({LLAMA_CPP_SERVER_URL}) failed due to connection error.")
+  except requests.exceptions.ConnectionError as e_conn:
+      logger.error(f"API call to LLM server ({LLAMA_CPP_SERVER_URL}) failed due to connection error. Ensure server is running. Error: {e_conn}", exc_info=True)
       return "[Error: Could not connect to LLM server]"
-  except requests.exceptions.HTTPError as e:
-      logger.error(f"HTTP error from llama.cpp server ({LLAMA_CPP_SERVER_URL}): {e}. Response: {e.response.text[:200] if e.response else 'N/A'}")
-      return f"[Error: LLM server returned HTTP {e.response.status_code if e.response else 'error'}]"
-  except json.JSONDecodeError:
-      logger.error(f"Failed to decode JSON response from llama.cpp server ({LLAMA_CPP_SERVER_URL}). Response: {response.text[:200] if response else 'N/A'}")
+  except requests.exceptions.HTTPError as e_http:
+      error_detail = "Unknown HTTP error"
+      if e_http.response is not None:
+          error_detail = f"HTTP {e_http.response.status_code}. Response: {e_http.response.text[:200]}"
+      logger.error(f"HTTP error from LLM server ({LLAMA_CPP_SERVER_URL}): {error_detail}", exc_info=True)
+      return f"[Error: LLM server returned {error_detail}]"
+  except json.JSONDecodeError as e_json:
+      response_text_snippet = response.text[:200] if 'response' in locals() and hasattr(response, 'text') else "N/A"
+      logger.error(f"Failed to decode JSON response from LLM server ({LLAMA_CPP_SERVER_URL}). Response snippet: {response_text_snippet}. Error: {e_json}", exc_info=True)
       return "[Error: Malformed JSON response from LLM]"
-  except Exception as e:
-      logger.error(f"An unexpected error occurred while processing llama.cpp response: {e}", exc_info=True)
-      return "[Error: Failed to process LLM response due to an unexpected error]"
+  except Exception as e_unexpected: # Catch-all for other unexpected errors
+      logger.error(f"An unexpected error occurred while processing LLM response from {LLAMA_CPP_SERVER_URL}: {e_unexpected}", exc_info=True)
+      return "[Error: Unexpected error processing LLM response]"
 
 
 def summarize_thoughts(thoughts: list[str]) -> str:

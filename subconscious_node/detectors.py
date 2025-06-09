@@ -48,28 +48,35 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-# --- Load Configuration ---
-impulse_threshold = 0.7 # Default value
-EIDOS_API_BASE_URL = "http://localhost:8080" # Default Eidos API URL
+# --- Configuration Loading (Mirrors logic from utils.py for relevant parts) ---
+DEFAULT_MOOD_IMPULSE_THRESHOLD = 0.7
+DEFAULT_EIDOS_API_BASE_URL = "http://localhost:8080" # Default Eidos API URL
 
+impulse_threshold = DEFAULT_MOOD_IMPULSE_THRESHOLD
+EIDOS_API_BASE_URL = DEFAULT_EIDOS_API_BASE_URL
+
+config_data_detectors = {}
 if os.path.exists(CONFIG_FILE_PATH):
     try:
         with open(CONFIG_FILE_PATH, 'r') as f:
-            config_data = json.load(f)
-        impulse_threshold = config_data.get("mood_settings", {}).get("impulse_threshold", impulse_threshold)
-        EIDOS_API_BASE_URL = config_data.get("eidos_api_base_url", EIDOS_API_BASE_URL)
-
-        if EIDOS_API_BASE_URL == "http://localhost:8080" and "eidos_api_base_url" not in config_data:
-            logger.warning(f"EIDOS_API_BASE_URL not found in {CONFIG_FILE_PATH}, using default: {EIDOS_API_BASE_URL}")
-        if impulse_threshold == 0.7 and "impulse_threshold" not in config_data.get("mood_settings", {}):
-             logger.info(f"impulse_threshold not found in {CONFIG_FILE_PATH} under mood_settings, using default: {impulse_threshold}")
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from {CONFIG_FILE_PATH}: {e}. Using default impulse_threshold: {impulse_threshold} and EIDOS_API_BASE_URL: {EIDOS_API_BASE_URL}")
+            config_data_detectors = json.load(f)
+        logger.info(f"Detectors: Successfully loaded configuration from {CONFIG_FILE_PATH}")
     except Exception as e:
-        logger.error(f"Unexpected error loading config from {CONFIG_FILE_PATH}: {e}. Using defaults.")
+        logger.error(f"Detectors: Error loading config from {CONFIG_FILE_PATH}: {e}. Using defaults or env vars.", exc_info=True)
 else:
-    logger.warning(f"{CONFIG_FILE_PATH} not found. Using default impulse_threshold: {impulse_threshold} and EIDOS_API_BASE_URL: {EIDOS_API_BASE_URL}")
+    logger.info(f"Detectors: Config file {CONFIG_FILE_PATH} not found. Using defaults or env vars.")
+
+# Mood Settings
+_mood_settings_json = config_data_detectors.get("mood_settings", {})
+_json_impulse_threshold = _mood_settings_json.get("impulse_threshold", DEFAULT_MOOD_IMPULSE_THRESHOLD)
+impulse_threshold = float(os.getenv("SUBPROCESS_MOOD_IMPULSE_THRESHOLD", _json_impulse_threshold))
+
+# Eidos API Base URL
+_json_eidos_api_url = config_data_detectors.get("eidos_api_base_url", DEFAULT_EIDOS_API_BASE_URL)
+EIDOS_API_BASE_URL = os.getenv("SUBPROCESS_EIDOS_API_BASE_URL", _json_eidos_api_url)
+
+logger.info(f"Detectors Effective impulse_threshold: {impulse_threshold} (Env > JSON > Default)")
+logger.info(f"Detectors Effective EIDOS_API_BASE_URL: '{EIDOS_API_BASE_URL}' (Env > JSON > Default)")
 
 
 # --- Detector Functions ---

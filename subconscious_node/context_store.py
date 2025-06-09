@@ -9,9 +9,11 @@ such as the `thinker` module, to inform thought generation.
 # --- Global Variables ---
 conversation_context_buffer: list[str] = []
 action_context_buffer: list[str] = []
+significant_memories_buffer: list[str] = []
 
 # --- Constants ---
 MAX_CONTEXT_ITEMS: int = 10
+MAX_SIGNIFICANT_MEMORIES: int = 5 # Max number of significant memory summaries to keep
 
 # --- Context Management Functions ---
 
@@ -57,17 +59,30 @@ def get_current_context() -> dict:
   """
   return {
     "conversation": conversation_context_buffer.copy(), # Return copies
-    "action": action_context_buffer.copy()
+    "action": action_context_buffer.copy(),
+    "significant_memories": significant_memories_buffer.copy()
   }
+
+def add_significant_memory_summary(summary: str):
+    """
+    Adds a new significant memory summary to its buffer.
+
+    If the buffer size exceeds MAX_SIGNIFICANT_MEMORIES,
+    the oldest items are removed.
+    """
+    global significant_memories_buffer
+    significant_memories_buffer.append(summary)
+    if len(significant_memories_buffer) > MAX_SIGNIFICANT_MEMORIES:
+        significant_memories_buffer = significant_memories_buffer[-MAX_SIGNIFICANT_MEMORIES:]
 
 def clear_all_context():
   """
-  Clears all items from both conversation and action context buffers.
+  Clears all items from conversation, action, and significant memories context buffers.
   """
-  global conversation_context_buffer
-  global action_context_buffer
+  global conversation_context_buffer, action_context_buffer, significant_memories_buffer
   conversation_context_buffer = []
   action_context_buffer = []
+  significant_memories_buffer = []
 
 if __name__ == '__main__':
   # Example Usage (for testing purposes)
@@ -92,7 +107,20 @@ if __name__ == '__main__':
   print("Last conversation item:", get_current_context()["conversation"][-1])
   print("Last action item:", get_current_context()["action"][-1])
 
+  add_significant_memory_summary("Recalled a key insight about project Alpha.")
+  add_significant_memory_summary("Remembered a promise made to a colleague.")
+  print("Context after adding significant memories:", get_current_context())
+  assert len(get_current_context()["significant_memories"]) == 2
+
+  for i in range(MAX_SIGNIFICANT_MEMORIES + 2):
+      add_significant_memory_summary(f"Significant memory item {i+1}")
+  print(f"Significant memories after exceeding MAX ({MAX_SIGNIFICANT_MEMORIES}):", get_current_context()["significant_memories"])
+  assert len(get_current_context()["significant_memories"]) == MAX_SIGNIFICANT_MEMORIES
+  assert get_current_context()["significant_memories"][-1] == f"Significant memory item {MAX_SIGNIFICANT_MEMORIES + 2 -1}"
+
+
   clear_all_context()
   print("Context after clearing:", get_current_context())
   assert len(get_current_context()["conversation"]) == 0
   assert len(get_current_context()["action"]) == 0
+  assert len(get_current_context()["significant_memories"]) == 0

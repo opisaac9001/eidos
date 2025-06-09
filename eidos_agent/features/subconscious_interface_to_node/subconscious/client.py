@@ -42,11 +42,21 @@ def get_current_thoughts() -> Optional[Dict]:
         response = requests.get(url, timeout=DEFAULT_TIMEOUT)
         response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
         return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to get thoughts from subconscious node at {url}: {e}")
-        return default_response # Or return None, depending on how Eidos should handle this
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON response from subconscious node at {url}: {e}")
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout while getting thoughts from subconscious node at {url}: {e_timeout}")
+        return default_response
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error while getting thoughts from subconscious node at {url}: {e_conn}")
+        return default_response
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} while getting thoughts from subconscious node at {url}. Response: {e_http.response.text[:200]}")
+        return default_response
+    except json.JSONDecodeError as e_json:
+        response_text_snippet = response.text[:200] if 'response' in locals() and hasattr(response, 'text') else "N/A"
+        logger.error(f"Failed to decode JSON response from subconscious node at {url}. Response snippet: {response_text_snippet}. Error: {e_json}")
+        return default_response
+    except requests.exceptions.RequestException as e_req: # Catch other request-related errors
+        logger.error(f"Failed to get thoughts from subconscious node at {url} due to general request error: {e_req}")
         return default_response
 
 
@@ -73,24 +83,37 @@ def sync_recent_context(conversation_history_summary: str, current_action: str) 
         payload_conv = {"content": conversation_history_summary}
         response_conv = requests.post(conversation_url, json=payload_conv, timeout=DEFAULT_TIMEOUT)
         response_conv.raise_for_status()
-        logger.info(f"Successfully injected conversation context: {conversation_history_summary[:100]}...")
+        logger.info(f"Successfully POSTed conversation_context to {conversation_url}: {conversation_history_summary[:100]}...")
         success_conversation = True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to inject conversation context at {conversation_url}: {e}")
-    except Exception as e: # Catch any other unexpected errors
-        logger.error(f"An unexpected error occurred during conversation context injection: {e}")
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout while POSTing conversation_context to {conversation_url}: {e_timeout}")
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error while POSTing conversation_context to {conversation_url}: {e_conn}")
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} while POSTing conversation_context to {conversation_url}. Response: {e_http.response.text[:200]}")
+    except requests.exceptions.RequestException as e_req:
+        logger.error(f"Failed to POST conversation_context to {conversation_url} due to general request error: {e_req}")
+    except Exception as e_generic: # Catch any other unexpected errors
+        logger.error(f"An unexpected error occurred during conversation context injection to {conversation_url}: {e_generic}", exc_info=True)
+
 
     # Inject action context
     try:
         payload_action = {"content": current_action}
         response_action = requests.post(action_url, json=payload_action, timeout=DEFAULT_TIMEOUT)
         response_action.raise_for_status()
-        logger.info(f"Successfully injected action context: {current_action}")
+        logger.info(f"Successfully POSTed action_context to {action_url}: {current_action}")
         success_action = True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to inject action context at {action_url}: {e}")
-    except Exception as e: # Catch any other unexpected errors
-        logger.error(f"An unexpected error occurred during action context injection: {e}")
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout while POSTing action_context to {action_url}: {e_timeout}")
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error while POSTing action_context to {action_url}: {e_conn}")
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} while POSTing action_context to {action_url}. Response: {e_http.response.text[:200]}")
+    except requests.exceptions.RequestException as e_req:
+        logger.error(f"Failed to POST action_context to {action_url} due to general request error: {e_req}")
+    except Exception as e_generic: # Catch any other unexpected errors
+        logger.error(f"An unexpected error occurred during action context injection to {action_url}: {e_generic}", exc_info=True)
 
     return success_conversation and success_action
 
@@ -124,13 +147,22 @@ def send_node_control_command(node_state: str, daily_summary: Optional[str] = No
         except json.JSONDecodeError:
             # This might happen if the response is 2xx but not JSON, or empty.
             # For /control/state, it should be JSON, but good to be robust.
-            logger.info(f"Subconscious node control command successful (status {response.status_code}), but no valid JSON response body.")
+            logger.info(f"Control command successful (status {response.status_code}), but no valid JSON response body for {url}.")
         return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send control command to subconscious node at {url}: {e}")
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout sending control command to {url}: {e_timeout}")
         return False
-    except Exception as e: # Catch any other unexpected errors
-        logger.error(f"An unexpected error occurred during node control command: {e}")
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error sending control command to {url}: {e_conn}")
+        return False
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} sending control command to {url}. Response: {e_http.response.text[:200]}")
+        return False
+    except requests.exceptions.RequestException as e_req:
+        logger.error(f"Failed to send control command to {url} due to general request error: {e_req}")
+        return False
+    except Exception as e_generic: # Catch any other unexpected errors
+        logger.error(f"An unexpected error occurred during node control command to {url}: {e_generic}", exc_info=True)
         return False
 
 
@@ -155,13 +187,61 @@ def sync_mood_to_subconscious(mood_snapshot: Dict[str, float]) -> bool:
             response_data = response.json()
             logger.info(f"Subconscious node mood sync successful. Response: {response_data.get('message', 'No message field.')}")
         except json.JSONDecodeError:
-            logger.info(f"Subconscious node mood sync successful (status {response.status_code}), but no valid JSON response body.")
+            logger.info(f"Mood sync successful (status {response.status_code}), but no valid JSON response body for {url}.")
         return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to sync mood to subconscious node at {url}: {e}")
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout syncing mood to {url}: {e_timeout}")
         return False
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during mood sync: {e}")
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error syncing mood to {url}: {e_conn}")
+        return False
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} syncing mood to {url}. Response: {e_http.response.text[:200]}")
+        return False
+    except requests.exceptions.RequestException as e_req:
+        logger.error(f"Failed to sync mood to {url} due to general request error: {e_req}")
+        return False
+    except Exception as e_generic:
+        logger.error(f"An unexpected error occurred during mood sync to {url}: {e_generic}", exc_info=True)
+        return False
+
+def inject_significant_memory_summary(summary: str) -> bool:
+    """
+    Injects a significant memory summary into the subconscious node.
+
+    Args:
+        summary: A string containing the significant memory summary.
+
+    Returns:
+        True if the injection was successful (2xx status), False otherwise.
+    """
+    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/inject/significant_memory"
+    payload = {"summary": summary}
+
+    logger.info(f"Injecting significant memory summary to subconscious node: {summary[:100]}...")
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()
+        try:
+            response_data = response.json()
+            logger.info(f"Subconscious node significant memory injection successful. Response: {response_data.get('message', 'No message field.')}")
+        except json.JSONDecodeError:
+            logger.info(f"Significant memory injection successful (status {response.status_code}), but no valid JSON response body for {url}.")
+        return True
+    except requests.exceptions.Timeout as e_timeout:
+        logger.error(f"Timeout injecting significant memory to {url}: {e_timeout}")
+        return False
+    except requests.exceptions.ConnectionError as e_conn:
+        logger.error(f"Connection error injecting significant memory to {url}: {e_conn}")
+        return False
+    except requests.exceptions.HTTPError as e_http:
+        logger.error(f"HTTP error {e_http.response.status_code} injecting significant memory to {url}. Response: {e_http.response.text[:200]}")
+        return False
+    except requests.exceptions.RequestException as e_req:
+        logger.error(f"Failed to inject significant memory to {url} due to general request error: {e_req}")
+        return False
+    except Exception as e_generic:
+        logger.error(f"An unexpected error occurred during significant memory injection to {url}: {e_generic}", exc_info=True)
         return False
 
 # --- Example Usage (for testing) ---
@@ -214,6 +294,14 @@ if __name__ == '__main__':
         logger.info(f"Mood sync for {another_mood} successful.")
     else:
         logger.warning(f"Mood sync for {another_mood} failed.")
+
+    logger.info("\nAttempting to inject significant memory...")
+    sig_mem_summary = "Pathos learned that consistent practice leads to mastery in coding."
+    sig_mem_success = inject_significant_memory_summary(sig_mem_summary)
+    if sig_mem_success:
+        logger.info("Significant memory injected successfully.")
+    else:
+        logger.warning("Significant memory injection failed.")
 
 
     # Test with a potentially non-running server to see error logging
