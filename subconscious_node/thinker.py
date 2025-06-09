@@ -5,8 +5,9 @@ import time
 import json
 import logging
 import os
-import random # Added import for random
-from typing import Dict, List # For type hinting loaded_wildcards
+import random
+import threading # Added for thread management
+from typing import Dict, List, Optional # Added Optional for monologue_thread type hint
 
 # Assuming utils.py, mood.py, detectors.py, context_store.py are in the same package/directory
 from . import utils
@@ -22,14 +23,19 @@ if not logger.handlers:
 # --- Node State Definitions ---
 NODE_STATE_AWAKE_THINKING = "AWAKE_THINKING"
 NODE_STATE_SLEEPING_DREAMING = "SLEEPING_DREAMING"
-current_node_state = NODE_STATE_AWAKE_THINKING
+NODE_STATE_IDLE = "IDLE" # A state where the loop is not actively running thoughts
+current_node_state = NODE_STATE_IDLE # Start in IDLE, loop started by API call
 
-# --- Global Variables ---
+# --- Global Variables & Thread Management ---
 monologue_buffer: list[str] = []
 dream_buffer: list[str] = [] # Buffer for storing dream fragments
 current_daily_summary_for_dreaming: str | None = None # Populated by Eidos control command
 CONFIG_FILE_PATH = "subconscious_node/config.json"
 loaded_wildcards: Dict[str, List[str]] = {} # Ensure type hint matches load_wildcards return
+
+monologue_thread: Optional[threading.Thread] = None
+stop_monologue_event = threading.Event()
+
 
 # --- Configuration Loading ---
 DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice..."
@@ -163,8 +169,10 @@ def monologue_loop():
     # Max dream fragments can be configured separately if needed, using max_monologue_buffer_thoughts for now.
     max_dream_buffer_fragments = max_monologue_buffer_thoughts
 
-    while True:
+    while not stop_monologue_event.is_set():
         if current_node_state == NODE_STATE_AWAKE_THINKING:
+            # Check event again before potentially long operation
+            if stop_monologue_event.is_set(): break
             logger.info(f"Node state: {current_node_state}. Generating standard thought.")
             mood.drift_mood()
             current_mood_snapshot = mood.get_current_mood()
@@ -181,9 +189,13 @@ def monologue_loop():
                 del monologue_buffer[:num_to_remove]
             detectors.check_for_impulse(new_thought, current_mood_snapshot)
             detectors.check_for_imprint(new_thought, current_mood_snapshot)
-            time.sleep(sleep_duration_seconds)
+
+            # Use event.wait for stoppable sleep
+            if stop_monologue_event.is_set(): break
+            stop_monologue_event.wait(timeout=sleep_duration_seconds)
 
         elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
+            if stop_monologue_event.is_set(): break
             logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
             mood.drift_mood() # Mood can also drift during sleep, perhaps more erratically
 
@@ -216,13 +228,52 @@ def monologue_loop():
             # Dreams might occur more rapidly or with different pacing than thoughts
             dream_mode_sleep_duration = int(sleep_duration_seconds / 1.5) if sleep_duration_seconds > 3 else 2
             logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")
-            time.sleep(dream_mode_sleep_duration)
 
+            if stop_monologue_event.is_set(): break
+            stop_monologue_event.wait(timeout=dream_mode_sleep_duration)
+
+        elif current_node_state == NODE_STATE_IDLE:
+            logger.debug(f"Node state is {NODE_STATE_IDLE}. Monologue loop is quiet, checking event.")
+            # Sleep for a short duration to prevent busy-waiting if in IDLE but thread not stopped.
+            # This allows the loop to naturally exit if stop_monologue_event gets set.
+            if stop_monologue_event.is_set(): break
+            stop_monologue_event.wait(timeout=1.0) # Check every second
+
+        else: # Unknown state
+            logger.error(f"Unknown node state: {current_node_state}. Monologue loop pausing. Please set to known state (AWAKE_THINKING, SLEEPING_DREAMING, IDLE).")
+            if stop_monologue_event.is_set(): break
+            stop_monologue_event.wait(timeout=sleep_duration_seconds) # Wait before re-checking state or stop event
+
+    logger.info("Monologue loop has stopped.")
+
+
+def start_monologue_loop_thread():
+    global monologue_thread, stop_monologue_event
+    if monologue_thread is None or not monologue_thread.is_alive():
+        stop_monologue_event.clear()
+        monologue_thread = threading.Thread(target=monologue_loop, daemon=True)
+        monologue_thread.start()
+        logger.info("Monologue loop thread started.")
+    else:
+        logger.info("Monologue loop thread is already running.")
+
+def stop_monologue_loop_thread():
+    global monologue_thread, stop_monologue_event
+    if monologue_thread is not None and monologue_thread.is_alive():
+        logger.info("Stopping monologue loop thread...")
+        stop_monologue_event.set()
+        # Use a timeout slightly longer than the typical loop sleep times to allow graceful exit.
+        # The monologue_loop's use of stop_monologue_event.wait() should make it responsive.
+        join_timeout = max(sleep_duration_seconds, int(sleep_duration_seconds / 1.5) if sleep_duration_seconds > 3 else 2) + 2
+        monologue_thread.join(timeout=join_timeout)
+        if monologue_thread.is_alive():
+            logger.warning("Monologue loop thread did not stop in time.")
         else:
-            logger.error(f"Unknown node state: {current_node_state}. Defaulting to AWAKE_THINKING behavior for this cycle.")
-            time.sleep(sleep_duration_seconds)
-            current_node_state = NODE_STATE_AWAKE_THINKING
-            logger.warning("Node state reset to AWAKE_THINKING due to unknown prior state.")
+            logger.info("Monologue loop thread stopped.")
+        monologue_thread = None # Clear the thread object after stopping
+    else:
+        logger.info("Monologue loop thread is not running or already stopped.")
+
 
 if __name__ == '__main__':
     context_store.add_conversation_context("User: I'm not sure what to do next.")
@@ -232,10 +283,22 @@ if __name__ == '__main__':
         mood.update_mood({"name": "Neutral", "impulsiveness": 0.4, "laziness": 0.5})
 
     # Example to test dreaming state for a few cycles if needed:
-    # current_node_state = NODE_STATE_SLEEPING_DREAMING
-    # logger.info(f"--- Overriding initial state for testing: {current_node_state} ---")
-    # for _ in range(5): # Simulate a few dream cycles
-    #     monologue_loop() # Call directly if you want to step through for interactive testing
-    # current_node_state = NODE_STATE_AWAKE_THINKING
+    # current_node_state = NODE_STATE_SLEEPING_DREAMING # Set initial state for testing
+    # start_monologue_loop_thread() # Start the loop in a thread
+    # logger.info(f"--- Main thread: monologue_loop started for testing {current_node_state} ---")
+    #
+    # # Let it run for a bit
+    # time.sleep(15) # e.g., run for 15 seconds
+    #
+    # logger.info("--- Main thread: attempting to switch to AWAKE_THINKING ---")
+    # current_node_state = NODE_STATE_AWAKE_THINKING # Switch state
+    # time.sleep(15)
+    #
+    # logger.info("--- Main thread: attempting to stop monologue_loop ---")
+    # stop_monologue_loop_thread()
+    # logger.info("--- Main thread: monologue_loop hopefully stopped ---")
 
-    monologue_loop()
+    # Default behavior for __main__ could be to start it if not auto-started by FastAPI.
+    # However, with FastAPI startup/shutdown events, direct __main__ execution of monologue_loop
+    # is less relevant unless for specific standalone testing.
+    logger.info("Thinker module __main__ finished. Loop is not started by default here; use API or test functions.")

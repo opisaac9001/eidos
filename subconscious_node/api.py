@@ -135,22 +135,45 @@ async def control_node_state(command: NodeControlCommand):
     """
     Updates the node's operational state (e.g., AWAKE_THINKING, SLEEPING_DREAMING)
     and can provide a daily summary for dream generation.
+    It also starts or stops the monologue loop based on the target state.
     """
     previous_state = thinker.current_node_state
-    thinker.current_node_state = command.node_state
+    new_state = command.node_state
+    action_taken = "none"
+
+    thinker.current_node_state = new_state # Update state first
 
     if command.daily_summary is not None:
         thinker.current_daily_summary_for_dreaming = command.daily_summary
         summary_status = "updated"
     else:
-        summary_status = "not provided"
+        summary_status = "not provided (or not applicable)"
+
+    # Logic for starting/stopping the thread based on the new state
+    if new_state == thinker.NODE_STATE_AWAKE_THINKING or new_state == thinker.NODE_STATE_SLEEPING_DREAMING:
+        if previous_state == thinker.NODE_STATE_IDLE or previous_state not in [thinker.NODE_STATE_AWAKE_THINKING, thinker.NODE_STATE_SLEEPING_DREAMING]:
+            thinker.start_monologue_loop_thread()
+            action_taken = "monologue_loop_started"
+        else:
+            action_taken = "monologue_loop_state_changed_but_already_running"
+        logger.info(f"Node state set to '{new_state}'. Monologue loop should be running/starting.")
+    elif new_state == thinker.NODE_STATE_IDLE:
+        thinker.stop_monologue_loop_thread()
+        action_taken = "monologue_loop_stopped"
+        logger.info(f"Node state set to '{new_state}'. Monologue loop stopped.")
+    else: # Unknown state
+        thinker.stop_monologue_loop_thread() # Stop if unknown state is commanded
+        action_taken = f"monologue_loop_stopped_due_to_unknown_state ({new_state})"
+        logger.warning(f"Node commanded to unknown state '{new_state}'. Monologue loop stopped as a precaution.")
+
 
     return {
-        "message": f"Node state changed from '{previous_state}' to '{command.node_state}'. Daily summary {summary_status}.",
+        "message": f"Node state changed from '{previous_state}' to '{new_state}'. Daily summary {summary_status}. Action: {action_taken}.",
         "data": {
-            "new_state": command.node_state,
+            "new_state": new_state,
             "previous_state": previous_state,
-            "daily_summary_provided": command.daily_summary is not None
+            "daily_summary_provided": command.daily_summary is not None,
+            "loop_action": action_taken
         }
     }
 
@@ -174,11 +197,26 @@ async def control_node_mood(payload: MoodUpdatePayload):
             "data": {"received_aspects": payload.mood_aspects}
         }
 
+# --- FastAPI Application Lifecycle Events ---
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Subconscious Node API starting up. Monologue loop will await control command to start.")
+    # The monologue loop is NOT auto-started here anymore.
+    # It's started by a /control/state command setting state to AWAKE_THINKING or SLEEPING_DREAMING.
+    # Ensure initial state in thinker.py is IDLE or similar non-processing state.
+    thinker.current_node_state = thinker.NODE_STATE_IDLE # Explicitly set to IDLE on startup
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Subconscious Node API shutting down. Stopping monologue loop.")
+    thinker.stop_monologue_loop_thread()
+
 # --- Main Block to Run the App ---
 if __name__ == '__main__':
     print("Starting Pathos Subconscious Node API server...")
-    # It's generally recommended to run thinker.py (monologue_loop) in a separate process.
-    # For simplicity in this single-file setup, we acknowledge it would run concurrently.
-    # If thinker.py is not running, /current_thoughts will show an empty buffer.
-    print("Note: The monologue_loop in thinker.py should be running in a separate process for the API to reflect live thoughts.")
+    # Note: The monologue_loop in thinker.py is now managed by API calls and
+    # FastAPI lifecycle events (startup/shutdown).
+    # If running this __main__ directly, the loop won't start automatically unless
+    # thinker.start_monologue_loop_thread() is explicitly called here for testing,
+    # or a /control/state API call is made after startup.
     uvicorn.run(app, host="0.0.0.0", port=8000)
