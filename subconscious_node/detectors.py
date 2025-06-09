@@ -19,8 +19,18 @@ import requests # Added requests
 from .mood import get_current_mood
 
 # --- Constants and Configuration ---
-IMPULSE_KEYWORDS = ["i want", "maybe i should", "i should call", "i need to"]
-IMPRINT_KEYWORDS = ["realize", "understand", "remember", "come to terms with", "finally grasp"]
+IMPULSE_KEYWORDS = [
+    "i want", "maybe i should", "i should call", "i need to",
+    "tell someone", "ask about", "should share",
+    "let's try", "time to", "got to get that done",
+    "must", "really need to"
+]
+IMPRINT_KEYWORDS = [
+    "realize", "understand", "remember", "come to terms with", "finally grasp",
+    "feel like", "starting to feel", "sense that", # Note: 'feel like' could be broad, monitor impact
+    "it all connects", "makes sense now", "so that's why",
+    "decided that", "concluded", "my take is"
+]
 
 # Determine the absolute path to config.json relative to this file's directory
 # This ensures that the path is correct regardless of where the script is run from.

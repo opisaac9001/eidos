@@ -22,30 +22,53 @@ if not logger.handlers:
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 
 # Default values for LLM
-LLAMA_CPP_SERVER_URL = "http://localhost:8081/v1/chat/completions"
-LLAMA_CPP_MAX_TOKENS = 150
-LLAMA_CPP_DEFAULT_TEMP = 0.7
-# Default value for wildcard path (will be updated from config if available)
-WILDCARD_RELATIVE_PATH = "../wildcards/" # Default, assuming 'wildcards' is one level up from 'subconscious_node'
+DEFAULT_LLAMA_CPP_SERVER_URL = "http://localhost:8081/v1/chat/completions"
+DEFAULT_LLAMA_CPP_MAX_TOKENS = 150
+DEFAULT_LLAMA_CPP_TEMP = 0.7
+# Default value for wildcard path
+DEFAULT_WILDCARD_RELATIVE_PATH = "../wildcards/" # Assuming 'wildcards' is one level up from 'subconscious_node'
 
-try:
-    if os.path.exists(CONFIG_FILE_PATH):
+# Initialize with defaults
+LLAMA_CPP_SERVER_URL = DEFAULT_LLAMA_CPP_SERVER_URL
+LLAMA_CPP_MAX_TOKENS = DEFAULT_LLAMA_CPP_MAX_TOKENS
+LLAMA_CPP_DEFAULT_TEMP = DEFAULT_LLAMA_CPP_TEMP
+WILDCARD_RELATIVE_PATH = DEFAULT_WILDCARD_RELATIVE_PATH
+
+config_data = {}
+if os.path.exists(CONFIG_FILE_PATH):
+    try:
         with open(CONFIG_FILE_PATH, 'r') as f:
             config_data = json.load(f)
+            logger.info(f"Successfully loaded configuration from {CONFIG_FILE_PATH}")
+    except json.JSONDecodeError:
+        logger.error(f"Could not decode JSON from {CONFIG_FILE_PATH}. Will use defaults or environment variables.", exc_info=True)
+    except Exception as e:
+        logger.error(f"Unexpected error loading config from {CONFIG_FILE_PATH}: {e}. Will use defaults or environment variables.", exc_info=True)
+else:
+    logger.info(f"Config file {CONFIG_FILE_PATH} not found. Using defaults or environment variables.")
 
-        llm_settings = config_data.get("llm_settings", {})
-        LLAMA_CPP_SERVER_URL = llm_settings.get("llama_cpp_server_url", LLAMA_CPP_SERVER_URL)
-        LLAMA_CPP_MAX_TOKENS = llm_settings.get("llama_cpp_max_tokens_thought_gen", LLAMA_CPP_MAX_TOKENS)
-        LLAMA_CPP_DEFAULT_TEMP = llm_settings.get("llama_cpp_default_temperature_thought_gen", LLAMA_CPP_DEFAULT_TEMP)
-        logger.info(f"Llama.cpp settings loaded: URL='{LLAMA_CPP_SERVER_URL}', MaxTokens={LLAMA_CPP_MAX_TOKENS}, DefaultTemp={LLAMA_CPP_DEFAULT_TEMP}")
+# LLM Settings from config_data (will be overridden by env var if set)
+llm_settings = config_data.get("llm_settings", {})
+config_llama_url = llm_settings.get("llama_cpp_server_url")
+config_max_tokens = llm_settings.get("llama_cpp_max_tokens_thought_gen")
+config_default_temp = llm_settings.get("llama_cpp_default_temperature_thought_gen")
 
-        # Load wildcard_folder_path from config
-        WILDCARD_RELATIVE_PATH = config_data.get("wildcard_folder_path", WILDCARD_RELATIVE_PATH)
-        logger.info(f"Wildcard relative path loaded: '{WILDCARD_RELATIVE_PATH}'")
-    else:
-        logger.warning(f"Config file not found at {CONFIG_FILE_PATH}. Using default settings for LLM and wildcards.")
-except Exception as e:
-    logger.error(f"Error loading settings from {CONFIG_FILE_PATH}: {e}. Using defaults.", exc_info=True)
+# Wildcard path from config_data (will be overridden by env var if set)
+config_wildcard_path = config_data.get("wildcard_folder_path")
+
+# Precedence: Env Var -> Config File Value -> Hardcoded Default
+LLAMA_CPP_SERVER_URL = os.getenv("SUBPROCESS_LLAMA_CPP_SERVER_URL", config_llama_url if config_llama_url else DEFAULT_LLAMA_CPP_SERVER_URL)
+WILDCARD_RELATIVE_PATH = os.getenv("SUBPROCESS_WILDCARD_RELATIVE_PATH", config_wildcard_path if config_wildcard_path else DEFAULT_WILDCARD_RELATIVE_PATH)
+
+# For these, env var override is less common, but we'll keep the pattern of config -> default
+LLAMA_CPP_MAX_TOKENS = config_max_tokens if config_max_tokens is not None else DEFAULT_LLAMA_CPP_MAX_TOKENS
+LLAMA_CPP_DEFAULT_TEMP = config_default_temp if config_default_temp is not None else DEFAULT_LLAMA_CPP_TEMP
+
+
+logger.info(f"Effective Llama.cpp URL: '{LLAMA_CPP_SERVER_URL}' (Env > Config > Default)")
+logger.info(f"Effective Wildcard Relative Path: '{WILDCARD_RELATIVE_PATH}' (Env > Config > Default)")
+logger.info(f"Effective Llama.cpp MaxTokens: {LLAMA_CPP_MAX_TOKENS} (Config > Default)")
+logger.info(f"Effective Llama.cpp DefaultTemp: {LLAMA_CPP_DEFAULT_TEMP} (Config > Default)")
 
 
 def load_wildcards(config_folder_path: str, relative_wildcard_path: str) -> Dict[str, List[str]]:

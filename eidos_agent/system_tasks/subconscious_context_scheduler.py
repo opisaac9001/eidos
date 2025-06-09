@@ -11,26 +11,25 @@ import threading
 from typing import Optional, TYPE_CHECKING # For type hinting scheduler_timer
 import asyncio # For asyncio.run()
 from datetime import datetime, timezone # For time check
+import random # For mood simulation
 
 # Attempt to import from subconscious client
 try:
-    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context, send_node_control_command # Updated import
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context, send_node_control_command, sync_mood_to_subconscious
 except ImportError:
-    logging.warning("subconscious_context_scheduler: Could not import sync_recent_context or send_node_control_command. Using placeholders for testing.")
-    # Placeholder for sync_recent_context if the import fails
+    logging.warning("subconscious_context_scheduler: Could not import client functions. Using placeholders for testing.")
+    # Placeholder functions if the import fails
     def sync_recent_context(conversation: str, current_action: str) -> bool:
-        print(f"Placeholder sync_recent_context called with: Conversation='{conversation[:50]}...', Action='{current_action}'")
-        if not hasattr(sync_recent_context, 'call_count'):
-            sync_recent_context.call_count = 0
-        sync_recent_context.call_count +=1
-        return sync_recent_context.call_count % 2 != 0 # Alternate true/false
+        print(f"Placeholder sync_recent_context: Conv='{conversation[:50]}...', Action='{current_action}'")
+        return True
 
     def send_node_control_command(node_state: str, daily_summary: Optional[str] = None) -> bool:
-        print(f"Placeholder send_node_control_command called with: NodeState='{node_state}', Summary='{daily_summary[:50] if daily_summary else None}...'")
-        if not hasattr(send_node_control_command, 'call_count'):
-            send_node_control_command.call_count = 0
-        send_node_control_command.call_count +=1
-        return send_node_control_command.call_count % 2 != 0
+        print(f"Placeholder send_node_control_command: State='{node_state}', Summary='{daily_summary[:50] if daily_summary else 'N/A'}'")
+        return True
+
+    def sync_mood_to_subconscious(mood_snapshot: dict) -> bool:
+        print(f"Placeholder sync_mood_to_subconscious: Mood='{mood_snapshot}'")
+        return True
 
 
 if TYPE_CHECKING:
@@ -61,19 +60,89 @@ def init_scheduler(ethos_core_input: 'EthosCore'):
     _ethos_core_instance = ethos_core_input
     logger.info("SubconsciousContextScheduler initialized with EthosCore instance.")
 
-# --- Placeholder Data Retrieval Functions ---
+# --- Data Retrieval Functions ---
 
 def get_latest_conversation_summary() -> str:
     """
-    Placeholder function to retrieve a summary of the latest conversation.
+    Retrieves a summary of the latest conversation from EthosCore.
     """
-    return "Placeholder conversation summary: User asked about weather, Eidos provided forecast."
+    if not _ethos_core_instance:
+        logger.warning("Scheduler (conv_summary): EthosCore instance not available.")
+        return "Conversation summary: Unknown (EthosCore not available)"
+    try:
+        # This call needs to happen in a running event loop or be handled carefully
+        # if this scheduler is in a separate thread.
+        logger.debug("Scheduler (conv_summary): Attempting to retrieve recent memories.")
+        recent_memories = asyncio.run(
+            _ethos_core_instance.retrieve_relevant_memories(
+                query_text="recent conversation snippets", # Generic query
+                n_results=3,
+                user_id_context="pathos_agent_internal", # TODO: Use constant
+                filter_types=["user_interaction", "llm_response", "dialogue_summary"]
+            )
+        )
+        if recent_memories:
+            summary_parts = [mem.get('content', '') for mem in recent_memories]
+            # Assuming memories are returned newest first, might want to reverse for chronological summary
+            # summary_parts.reverse()
+            full_summary = " ".join(filter(None, summary_parts)).strip()
+            if not full_summary:
+                 return "No content in recent conversation memories."
+            max_len = 500 # Max length for summary to send to subconscious
+            return (full_summary[:max_len] + '...') if len(full_summary) > max_len else full_summary
+        else:
+            return "No recent conversation memories found to summarize."
+    except RuntimeError as e_run:
+        if "cannot run event loop while another loop is running" in str(e_run).lower() or \
+           "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
+            logger.error(f"Scheduler (conv_summary): asyncio.run() conflict. Details: {e_run}")
+            return "Conversation summary: Error due to asyncio conflict."
+        else:
+            logger.error(f"Scheduler (conv_summary): Runtime error retrieving memories: {e_run}", exc_info=True)
+            return "Conversation summary: Error retrieving memories."
+    except Exception as e:
+        logger.error(f"Scheduler (conv_summary): Unexpected error retrieving memories: {e}", exc_info=True)
+        return "Conversation summary: Failed to generate due to unexpected error."
 
 def get_current_eidos_action() -> str:
     """
-    Placeholder function to retrieve the Eidos agent's current action.
+    Retrieves Eidos agent's current action from ChronosEngine via EthosCore.
     """
-    return "Placeholder Eidos action: 'processing_user_feedback_on_prior_turn'"
+    if not _ethos_core_instance or not _ethos_core_instance.chronos_engine:
+        logger.warning("Scheduler (eidos_action): EthosCore or ChronosEngine instance not available.")
+        return "Eidos action: Unknown (EthosCore/ChronosEngine not available)"
+    try:
+        logger.debug("Scheduler (eidos_action): Attempting to get current Pathos time and activity.")
+        pathos_user_id = "pathos_agent_internal" # TODO: Use constant
+
+        # Getting local datetime for user
+        pathos_now = asyncio.run(_ethos_core_instance.get_local_datetime_for_user(pathos_user_id))
+        if not pathos_now:
+            logger.warning("Scheduler (eidos_action): Could not retrieve Pathos's current local time.")
+            return "Eidos action: Unknown (Could not get Pathos time)"
+
+        # Getting current activity
+        activity_slot = asyncio.run(_ethos_core_instance.chronos_engine.get_current_activity(pathos_now))
+
+        if activity_slot:
+            sub_focus_text = 'general'
+            if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
+                sub_focus_text = activity_slot.activity_details.sub_focus
+            return f"Pathos is currently: '{activity_slot.activity_title}' (Focus: {sub_focus_text})"
+        else:
+            return "Pathos is currently idle or between activities."
+
+    except RuntimeError as e_run:
+        if "cannot run event loop while another loop is running" in str(e_run).lower() or \
+           "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
+            logger.error(f"Scheduler (eidos_action): asyncio.run() conflict. Details: {e_run}")
+            return "Eidos action: Error due to asyncio conflict."
+        else:
+            logger.error(f"Scheduler (eidos_action): Runtime error getting current action: {e_run}", exc_info=True)
+            return "Eidos action: Error getting current action."
+    except Exception as e:
+        logger.error(f"Scheduler (eidos_action): Unexpected error getting current action: {e}", exc_info=True)
+        return "Eidos action: Failed to get due to unexpected error."
 
 # --- Scheduled Task Implementation ---
 
@@ -152,17 +221,38 @@ def perform_scheduled_subconscious_context_sync():
 
         if not SCHEDULER_STATE.get('is_subconscious_sleeping', False):
             logger.info("Scheduler: Performing standard context sync with subconscious_node.")
+            # Sync conversation and action context
             summary = get_latest_conversation_summary()
             action = get_current_eidos_action()
-            logger.debug(f"Scheduler: Conversation summary: '{summary}'")
-            logger.debug(f"Scheduler: Current Eidos action: '{action}'")
-            sync_success = sync_recent_context(conversation=summary, current_action=action)
-            if sync_success:
-                logger.info("Scheduler: Scheduled context sync with subconscious node completed successfully.")
+            logger.debug(f"Scheduler: Conversation summary for sync: '{summary}'")
+            logger.debug(f"Scheduler: Current Eidos action for sync: '{action}'")
+            sync_context_success = sync_recent_context(conversation=summary, current_action=action)
+            if sync_context_success:
+                logger.info("Scheduler: Scheduled context (conversation/action) sync with subconscious node completed successfully.")
             else:
-                logger.warning("Scheduler: Scheduled context sync with subconscious node failed or partially failed.")
+                logger.warning("Scheduler: Scheduled context (conversation/action) sync with subconscious node failed or partially failed.")
+
+            # Simulate fetching mood from EthosCore and sync it
+            if _ethos_core_instance:
+                # In a real scenario, this would be:
+                # current_eidos_mood = asyncio.run(_ethos_core_instance.mood_engine.get_current_mood_snapshot())
+                # For now, simulate:
+                simulated_eidos_mood = {
+                    "impulsiveness": round(random.uniform(0.2, 0.8), 2),
+                    "proactivity": round(random.uniform(0.3, 0.7), 2),
+                    "valence": round(random.uniform(-0.5, 0.5), 2), # Example additional mood aspect
+                    "focus": round(random.uniform(0.1, 0.9), 2) # Another example
+                }
+                logger.info(f"Scheduler: Simulated Eidos mood for sync: {simulated_eidos_mood}")
+                sync_mood_success = sync_mood_to_subconscious(simulated_eidos_mood)
+                if sync_mood_success:
+                    logger.info("Scheduler: Mood synced to subconscious node successfully.")
+                else:
+                    logger.warning("Scheduler: Mood sync to subconscious node failed.")
+            else:
+                logger.warning("Scheduler: EthosCore instance not available, skipping mood sync.")
         else:
-            logger.info("Scheduler: Skipping context sync as subconscious_node is (or failed to transition from) sleeping.")
+            logger.info("Scheduler: Skipping context and mood sync as subconscious_node is (or failed to transition from) sleeping.")
 
 # --- Scheduler Implementation ---
 

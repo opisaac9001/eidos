@@ -10,12 +10,18 @@ The API relies on other modules within the `subconscious_node` package for
 core logic such as context management, mood tracking, thought generation (via thinker),
 and utility functions.
 """
+import logging # Added for explicit logging configuration
 from fastapi import FastAPI
 import uvicorn # For running the app with Uvicorn
 from pydantic import BaseModel
 from typing import List, Dict
 
 # Assuming context_store.py, mood.py, utils.py, thinker.py are in the same package/directory
+# Also, ensure logger is initialized for this module
+logger = logging.getLogger(__name__)
+if not logger.handlers: # Ensure basicConfig is called if no handlers are set up
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 from . import context_store
 from . import mood
 from . import utils
@@ -42,6 +48,13 @@ class MemoryImprintPayload(BaseModel):
     mood: Dict
     topics: List[str]
     timestamp: str
+
+class NodeControlCommand(BaseModel):
+    node_state: str
+    daily_summary: str | None = None
+
+class MoodUpdatePayload(BaseModel):
+    mood_aspects: Dict[str, float]
 
 class CurrentThoughtsResponse(BaseModel):
     recent_thoughts: List[str]
@@ -116,6 +129,50 @@ async def receive_memory_imprint(payload: MemoryImprintPayload):
 @app.get("/", include_in_schema=False)
 async def root():
     return {"message": "Pathos Subconscious Node is active. See /docs for API details."}
+
+@app.post("/control/state", response_model=MessageResponse, tags=["Node Control"])
+async def control_node_state(command: NodeControlCommand):
+    """
+    Updates the node's operational state (e.g., AWAKE_THINKING, SLEEPING_DREAMING)
+    and can provide a daily summary for dream generation.
+    """
+    previous_state = thinker.current_node_state
+    thinker.current_node_state = command.node_state
+
+    if command.daily_summary is not None:
+        thinker.current_daily_summary_for_dreaming = command.daily_summary
+        summary_status = "updated"
+    else:
+        summary_status = "not provided"
+
+    return {
+        "message": f"Node state changed from '{previous_state}' to '{command.node_state}'. Daily summary {summary_status}.",
+        "data": {
+            "new_state": command.node_state,
+            "previous_state": previous_state,
+            "daily_summary_provided": command.daily_summary is not None
+        }
+    }
+
+@app.post("/control/mood", response_model=MessageResponse, tags=["Node Control"])
+async def control_node_mood(payload: MoodUpdatePayload):
+    """
+    Updates the subconscious node's internal mood state.
+    """
+    try:
+        mood.update_mood(payload.mood_aspects)
+        logger.info(f"Subconscious node mood updated with aspects: {payload.mood_aspects}")
+        return {
+            "message": "Node mood updated successfully.",
+            "data": {"updated_aspects": payload.mood_aspects}
+        }
+    except Exception as e:
+        logger.exception(f"Error updating subconscious node mood: {e}")
+        # Consider raising HTTPException for client feedback
+        return {
+            "message": f"Failed to update node mood: {str(e)}",
+            "data": {"received_aspects": payload.mood_aspects}
+        }
 
 # --- Main Block to Run the App ---
 if __name__ == '__main__':

@@ -15,16 +15,26 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Define Storage Path
-IMPRINTS_DIR = "eidos_memories"
-IMPRINTS_FILE_PATH = os.path.join(IMPRINTS_DIR, "pathos_subconscious_imprints.jsonl")
+# NOTE: The EthosCore instance would typically be accessed via
+# a dependency injection mechanism or a global application context in a FastAPI app.
+# from eidos_agent.main import get_ethos_core # Hypothetical access
+ETHOS_CORE_INSTANCE = None # Placeholder
+DEFAULT_SALIENCE_FOR_IMPRINT = 0.6
 
-def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topics: List[str]) -> Dict[str, Any]:
+# Attempt to import PATHOS_USER_ID, provide a fallback if not found
+try:
+    from eidos_agent.persona_logic.chronos_engine.engine import PATHOS_USER_ID
+except ImportError:
+    PATHOS_USER_ID = "pathos_agent_internal" # Fallback if direct import fails
+
+def set_ethos_core_instance(instance): # Helper for testing or app setup
+    global ETHOS_CORE_INSTANCE
+    ETHOS_CORE_INSTANCE = instance
+
+async def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topics: List[str]) -> Dict[str, Any]:
     """
-    Stores a memory imprint received from the subconscious node persistently to a JSONL file.
-
-    The function ensures the storage directory exists, prepares the imprint data,
-    and appends it as a JSON line to the specified file.
+    Stores a memory imprint received from the subconscious node by adding it
+    to EthosCore.
 
     Args:
         content: The textual content of the memory imprint.
@@ -33,114 +43,114 @@ def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topics: Li
         topics: A list of keywords or topics related to the imprint.
 
     Returns:
-        A dictionary indicating the status of the storage operation, including
-        the file path on success or an error message on failure.
+        A dictionary indicating the status of the storage operation.
     """
-    logger.info(f"MEMORIES: Received subconscious imprint for persistent storage.")
+    logger.info(f"MEMORIES HANDLER: Received imprint for EthosCore storage: '{content[:100]}...'")
+
+    if not ETHOS_CORE_INSTANCE:
+        logger.error("MEMORIES HANDLER: EthosCore instance not available. Cannot store imprint.")
+        return {"status": "error", "detail": "EthosCore not configured"}
+
+    entry_data = {
+        "type": "subconscious_imprint", # Or "pathos_realization", "subconscious_insight"
+        "content": content,
+        "metadata": {
+            "source": "subconscious_node_hook", # Clearly mark it came via this hook
+            "original_timestamp": timestamp, # Timestamp from subconscious node
+            "mood_at_imprint": mood, # Mood from subconscious node
+            "topics_from_imprint": topics, # Topics from subconscious node
+            # Potentially add other relevant info from ImprintData if it evolves
+        },
+        "salience": DEFAULT_SALIENCE_FOR_IMPRINT
+    }
 
     try:
-        # Ensure Directory Exists
-        if not os.path.exists(IMPRINTS_DIR):
-            os.makedirs(IMPRINTS_DIR, exist_ok=True)
-            logger.info(f"MEMORIES: Created directory for imprints at '{IMPRINTS_DIR}'.")
+        # EthosCore.add_memory_entry is typically async
+        memory_record = await ETHOS_CORE_INSTANCE.add_memory_entry(
+            entry_data=entry_data,
+            user_id_context=PATHOS_USER_ID
+        )
+        if memory_record and hasattr(memory_record, 'id') and memory_record.id:
+            logger.info(f"MEMORIES HANDLER: Imprint successfully stored in EthosCore with ID {memory_record.id}. Content: '{content[:100]}...'")
+            return {
+                "status": "imprint_stored_in_ethos",
+                "memory_id": memory_record.id,
+                "imprint_content": content
+            }
+        else:
+            logger.warning(f"MEMORIES HANDLER: EthosCore.add_memory_entry did not return a valid record or ID for imprint: '{content[:100]}...'")
+            return {"status": "failed_to_store_imprint_in_ethos", "detail": "EthosCore returned no ID", "imprint_content": content}
 
-        # Prepare Imprint Data
-        imprint_data = {
-            "timestamp": timestamp,
-            "content": content,
-            "mood_snapshot": mood, # 'mood' parameter is used as the mood_snapshot
-            "topics": topics
-        }
+    except Exception as e:
+        logger.exception(f"MEMORIES HANDLER: Error calling EthosCore.add_memory_entry for imprint '{content[:100]}...'")
+        return {"status": "error_processing_imprint", "detail": str(e)}
 
-        # Append to File
-        with open(IMPRINTS_FILE_PATH, 'a') as f:
-            f.write(json.dumps(imprint_data) + '\n')
-
-        logger.info(f"MEMORIES: Successfully stored imprint to '{IMPRINTS_FILE_PATH}'. Content: '{content[:100]}...'")
-        return {
-            "status": "imprint successfully stored",
-            "file_path": IMPRINTS_FILE_PATH,
-            "imprint_content": content
-        }
-    except IOError as e:
-        logger.error(f"MEMORIES: IOError while storing imprint to '{IMPRINTS_FILE_PATH}': {e}")
-        return {"status": "failed to store imprint", "error": str(e), "imprint_content": content}
-    except Exception as e: # Catch any other unexpected errors
-        logger.error(f"MEMORIES: Unexpected error while storing imprint: {e}", exc_info=True)
-        return {"status": "failed to store imprint", "error": str(e), "imprint_content": content}
 
 if __name__ == '__main__':
-    print("--- Testing memories.store_imprint (Persistent Storage) ---")
+    print("--- Testing memories_feature.handler.store_imprint (mocked EthosCore) ---")
 
-    # Clean up existing file for a fresh test run, if it exists
-    if os.path.exists(IMPRINTS_FILE_PATH):
-        os.remove(IMPRINTS_FILE_PATH)
-        print(f"Removed existing test file: {IMPRINTS_FILE_PATH}")
-    if os.path.exists(IMPRINTS_DIR) and not os.listdir(IMPRINTS_DIR): # remove dir if it's empty
-        os.rmdir(IMPRINTS_DIR)
-        print(f"Removed empty test directory: {IMPRINTS_DIR}")
+    # Mock EthosCore and its method for testing
+    class MockEthosCore:
+        async def add_memory_entry(self, entry_data: Dict[str, Any], user_id_context: str) -> Any:
+            print(f"MockEthosCore.add_memory_entry called:")
+            print(f"  User ID Context: {user_id_context}")
+            print(f"  Entry Data: {json.dumps(entry_data, indent=2)}")
+            if "error" in entry_data["content"].lower():
+                raise ValueError("Simulated error in EthosCore")
 
+            # Simulate a returned memory record object with an ID
+            class MockMemoryRecord:
+                def __init__(self, id_val):
+                    self.id = id_val
 
-    imprints_to_store = [
-        {
-            "content": "Realized that consistent effort, even small, leads to big results.",
-            "timestamp": "2023-10-27T11:00:00Z",
-            "mood": {"name": "Reflective", "clarity": 0.9},
-            "topics": ["realization", "effort", "consistency"]
-        },
-        {
-            "content": "The sound of rain can be incredibly soothing.",
-            "timestamp": "2023-10-27T11:05:00Z",
-            "mood": {"name": "Calm", "peacefulness": 0.8},
-            "topics": ["nature", "sound", "rain", "soothing"]
-        },
-        {
-            "content": "A moment of sudden inspiration for a new project idea.",
-            "timestamp": "2023-10-27T11:10:00Z",
-            "mood": {"name": "Excited", "energy": 0.85},
-            "topics": ["creativity", "ideas", "inspiration"]
-        }
-    ]
+            return MockMemoryRecord(id_val=f"mock_mem_{hash(entry_data['content'])}")
 
-    results = []
-    for i, imprint_args in enumerate(imprints_to_store):
-        print(f"\nStoring imprint {i+1}...")
-        result = store_imprint(**imprint_args)
-        print(f"Result: {result}")
-        results.append(result)
+    # Set the mock instance for the handler to use
+    mock_ethos_instance = MockEthosCore()
+    set_ethos_core_instance(mock_ethos_instance)
+    print("MockEthosCore instance set.")
 
-    print("\n--- Verification ---")
-    successful_stores = [res for res in results if res["status"] == "imprint successfully stored"]
-    print(f"Successfully stored {len(successful_stores)} out of {len(imprints_to_store)} imprints.")
-    assert len(successful_stores) == len(imprints_to_store), "Not all imprints were stored successfully."
+    import asyncio
 
-    if os.path.exists(IMPRINTS_FILE_PATH):
-        print(f"\nContents of '{IMPRINTS_FILE_PATH}':")
-        line_count = 0
-        try:
-            with open(IMPRINTS_FILE_PATH, 'r') as f:
-                for line in f:
-                    print(f"  {line.strip()}")
-                    # Verify it's valid JSON
-                    json.loads(line.strip())
-                    line_count += 1
-            print(f"Total imprints in file: {line_count}")
-            assert line_count == len(imprints_to_store), "Number of lines in file does not match number of imprints stored."
-        except Exception as e:
-            print(f"Error reading or verifying file content: {e}")
-            assert False, "Error during file content verification."
-    else:
-        print(f"Error: Imprints file '{IMPRINTS_FILE_PATH}' was not created.")
-        assert False, "Imprints file not created."
+    async def run_tests():
+        imprints_to_store = [
+            {
+                "content": "Realized that consistent effort, even small, leads to big results.",
+                "timestamp": "2023-10-27T11:00:00Z",
+                "mood": {"name": "Reflective", "clarity": 0.9, "valence": 0.6, "arousal": 0.3},
+                "topics": ["realization", "effort", "consistency"]
+            },
+            {
+                "content": "The sound of rain can be incredibly soothing.",
+                "timestamp": "2023-10-27T11:05:00Z",
+                "mood": {"name": "Calm", "peacefulness": 0.8, "valence": 0.5, "arousal": 0.1},
+                "topics": ["nature", "sound", "rain", "soothing"]
+            },
+            {
+                "content": "A moment of sudden inspiration for a new project idea with error.",
+                "timestamp": "2023-10-27T11:10:00Z",
+                "mood": {"name": "Excited", "energy": 0.85, "valence": 0.8, "arousal": 0.7},
+                "topics": ["creativity", "ideas", "inspiration"]
+            }
+        ]
 
-    print("\nPersistent storage tests completed. Verify logs for detailed output.")
+        for i, imprint_args in enumerate(imprints_to_store):
+            print(f"\nStoring imprint {i+1}...")
+            result = await store_imprint(**imprint_args)
+            print(f"Result from handler: {result}")
+            if "error" in imprint_args["content"].lower():
+                assert result["status"] == "error_processing_imprint"
+            else:
+                assert result["status"] == "imprint_stored_in_ethos"
+                assert "memory_id" in result
 
-    # To simulate an error (e.g., permission denied), you might temporarily change permissions
-    # on IMPRINTS_DIR or IMPRINTS_FILE_PATH manually before running a test call.
-    # For example, on Linux/macOS:
-    # os.chmod(IMPRINTS_DIR, 0o444) # Read-only
-    # error_result = store_imprint("This should fail.", "2023-10-27T12:00:00Z", {}, [])
-    # print(f"\nError simulation result: {error_result}")
-    # assert error_result["status"] == "failed to store imprint"
-    # os.chmod(IMPRINTS_DIR, 0o755) # Restore permissions
-    # print("Error simulation test (manual setup) would appear above.")
+        # Test case where EthosCore is not set
+        set_ethos_core_instance(None)
+        print("\nEthosCore instance unset for next test.")
+        result_no_ec = await store_imprint(**imprints_to_store[0])
+        print(f"Result with no EthosCore: {result_no_ec}")
+        assert result_no_ec["status"] == "error"
+        assert result_no_ec["detail"] == "EthosCore not configured"
+
+    asyncio.run(run_tests())
+    print("\nMemories feature handler tests completed.")

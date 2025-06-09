@@ -11,13 +11,13 @@ For asynchronous operations, `httpx` would be a suitable alternative.
 import requests
 import logging
 import json # For json.JSONDecodeError
-from typing import Dict, Optional # Tuple was unused
+import os # Added for os.getenv
+from typing import Dict, Optional, Any # Added Any for payload typing
 
-# --- Configuration Placeholder ---
-# In a real Eidos application, this would likely come from a central config system.
-# For example: from eidos.config import get_config
-# SUBCONSCIOUS_NODE_BASE_URL = get_config().subconscious_node_url
-SUBCONSCIOUS_NODE_BASE_URL = "http://localhost:8000" # Default for local development
+# --- Configuration ---
+# Read from environment variable EIDOS_SUBCONSCIOUS_NODE_BASE_URL,
+# with a default if not set.
+SUBCONSCIOUS_NODE_BASE_URL = os.getenv("EIDOS_SUBCONSCIOUS_NODE_BASE_URL", "http://localhost:8000")
 DEFAULT_TIMEOUT = 5  # seconds
 
 # --- Logging Setup ---
@@ -94,6 +94,76 @@ def sync_recent_context(conversation_history_summary: str, current_action: str) 
 
     return success_conversation and success_action
 
+
+def send_node_control_command(node_state: str, daily_summary: Optional[str] = None) -> bool:
+    """
+    Sends a control command to the subconscious node to change its state
+    and optionally provide a daily summary for dreaming.
+
+    Args:
+        node_state: The new state for the node (e.g., "AWAKE_THINKING", "SLEEPING_DREAMING").
+        daily_summary: An optional string containing the summary of the day's events.
+
+    Returns:
+        True if the command was successfully sent (2xx status), False otherwise.
+    """
+    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/control/state"
+    payload: Dict[str, Any] = {"node_state": node_state}
+    if daily_summary is not None:
+        payload["daily_summary"] = daily_summary
+
+    logger.info(f"Sending control command to subconscious node: State='{node_state}', Summary provided='{daily_summary is not None}'")
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()  # Raises HTTPError for bad responses (4XX or 5XX)
+        # The /control/state endpoint returns a MessageResponse which is JSON.
+        # We can optionally log the message from the response.
+        try:
+            response_data = response.json()
+            logger.info(f"Subconscious node control command successful. Response: {response_data.get('message', 'No message field.')}")
+        except json.JSONDecodeError:
+            # This might happen if the response is 2xx but not JSON, or empty.
+            # For /control/state, it should be JSON, but good to be robust.
+            logger.info(f"Subconscious node control command successful (status {response.status_code}), but no valid JSON response body.")
+        return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send control command to subconscious node at {url}: {e}")
+        return False
+    except Exception as e: # Catch any other unexpected errors
+        logger.error(f"An unexpected error occurred during node control command: {e}")
+        return False
+
+
+def sync_mood_to_subconscious(mood_snapshot: Dict[str, float]) -> bool:
+    """
+    Synchronizes the current mood snapshot from Eidos to the subconscious node.
+
+    Args:
+        mood_snapshot: A dictionary representing the current mood aspects and their values.
+
+    Returns:
+        True if the mood was successfully synced (2xx status), False otherwise.
+    """
+    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/control/mood"
+    payload = {"mood_aspects": mood_snapshot}
+
+    logger.info(f"Syncing mood to subconscious node: {mood_snapshot}")
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()
+        try:
+            response_data = response.json()
+            logger.info(f"Subconscious node mood sync successful. Response: {response_data.get('message', 'No message field.')}")
+        except json.JSONDecodeError:
+            logger.info(f"Subconscious node mood sync successful (status {response.status_code}), but no valid JSON response body.")
+        return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to sync mood to subconscious node at {url}: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during mood sync: {e}")
+        return False
+
 # --- Example Usage (for testing) ---
 if __name__ == '__main__':
     # Ensure the subconscious_node API server is running on http://localhost:8000
@@ -116,6 +186,35 @@ if __name__ == '__main__':
         logger.info("Context synced successfully.")
     else:
         logger.warning("Context sync failed or partially failed.")
+
+    logger.info("\nAttempting to send control commands...")
+    control_success_dream = send_node_control_command("SLEEPING_DREAMING", "Today was eventful, user seemed happy.")
+    if control_success_dream:
+        logger.info("Control command (SLEEPING_DREAMING with summary) sent successfully.")
+    else:
+        logger.warning("Control command (SLEEPING_DREAMING with summary) failed.")
+
+    control_success_awake = send_node_control_command("AWAKE_THINKING")
+    if control_success_awake:
+        logger.info("Control command (AWAKE_THINKING) sent successfully.")
+    else:
+        logger.warning("Control command (AWAKE_THINKING) failed.")
+
+    logger.info("\nAttempting to sync mood...")
+    sample_mood = {"valence": 0.2, "arousal": 0.6, "impulsiveness": 0.7}
+    mood_sync_success = sync_mood_to_subconscious(sample_mood)
+    if mood_sync_success:
+        logger.info(f"Mood sync for {sample_mood} successful.")
+    else:
+        logger.warning(f"Mood sync for {sample_mood} failed.")
+
+    another_mood = {"valence": -0.5, "arousal": 0.3, "proactivity": 0.2}
+    mood_sync_success_2 = sync_mood_to_subconscious(another_mood)
+    if mood_sync_success_2:
+        logger.info(f"Mood sync for {another_mood} successful.")
+    else:
+        logger.warning(f"Mood sync for {another_mood} failed.")
+
 
     # Test with a potentially non-running server to see error logging
     # SUBCONSCIOUS_NODE_BASE_URL = "http://localhost:8001" # Non-existent server

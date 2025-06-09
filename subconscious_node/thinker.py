@@ -26,6 +26,8 @@ current_node_state = NODE_STATE_AWAKE_THINKING
 
 # --- Global Variables ---
 monologue_buffer: list[str] = []
+dream_buffer: list[str] = [] # Buffer for storing dream fragments
+current_daily_summary_for_dreaming: str | None = None # Populated by Eidos control command
 CONFIG_FILE_PATH = "subconscious_node/config.json"
 loaded_wildcards: Dict[str, List[str]] = {} # Ensure type hint matches load_wildcards return
 
@@ -102,6 +104,9 @@ def build_prompt() -> str:
         conversation_context_str if conversation_context_str else "No conversation context.",
         "\nAction:",
         action_context_str if action_context_str else "No action context.",
+        "\n--- RECENT SIGNIFICANT MEMORIES (from Eidos, if any) ---",
+        # Placeholder for now. Eidos will inject context directly into conversation/action for now.
+        "No specific significant memories explicitly recalled by Pathos at this moment, relying on current context.",
         "\n--- CURRENT THOUGHT ---",
         "Pathos reflects:"
     ]
@@ -155,6 +160,8 @@ def monologue_loop():
     logger.info("Pathos Subconscious Node: Monologue Loop starting...")
     logger.info(f"Initial Node State: {current_node_state}")
     logger.info(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
+    # Max dream fragments can be configured separately if needed, using max_monologue_buffer_thoughts for now.
+    max_dream_buffer_fragments = max_monologue_buffer_thoughts
 
     while True:
         if current_node_state == NODE_STATE_AWAKE_THINKING:
@@ -178,25 +185,36 @@ def monologue_loop():
 
         elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
             logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
+            mood.drift_mood() # Mood can also drift during sleep, perhaps more erratically
 
-            # Placeholder for daily summary - this will be replaced by actual data from Eidos.
-            placeholder_daily_summary = (
-                "User interactions involved planning a trip and discussing a difficult decision. "
-                "Pathos experienced a brief moment of joy followed by a period of intense focus. "
-                "Some system errors were noted internally. The concept of 'freedom' was mentioned by the user."
-            )
+            summary_for_prompt = current_daily_summary_for_dreaming
+            if summary_for_prompt is None:
+                logger.warning("Daily summary for dreaming is None. Using a fallback message for dream prompt.")
+                summary_for_prompt = "The day's events are a blur, like faded photographs."
 
-            dream_prompt = construct_dream_prompt(placeholder_daily_summary, loaded_wildcards)
+            dream_prompt = construct_dream_prompt(summary_for_prompt, loaded_wildcards)
             logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
-            # The actual LLM call for dream generation and snippet processing will be in the next step.
-            # For now, we just log that we would be generating a dream.
-            logger.info("Dream prompt constructed. (LLM call for dream generation will be implemented next).")
-            # Simulating a dream being generated and processed without actual LLM call for this step:
-            simulated_dream_fragment = f"A fleeting image of {random.choice(loaded_wildcards.get('animals', ['something'])) if loaded_wildcards else 'something'} in a field of {random.choice(loaded_wildcards.get('colors', ['strange'])) if loaded_wildcards else 'strange'} light."
-            logger.info(f"Pathos (simulated) dreams: \"{simulated_dream_fragment}\"")
+            # Use a slightly higher temperature for dreaming, capped at a reasonable value (e.g., 1.0 or 1.1)
+            dream_temperature = min(temperature + 0.15, 1.1)
+            logger.debug(f"Using temperature {dream_temperature} for dream generation.")
 
-            dream_mode_sleep_duration = int(sleep_duration_seconds / 2) if sleep_duration_seconds > 2 else 1
+            dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
+
+            if dream_fragment:
+                logger.info(f"Pathos dreams: \"{dream_fragment}\"")
+                dream_buffer.append(dream_fragment)
+                if len(dream_buffer) > max_dream_buffer_fragments:
+                    logger.debug(f"Dream buffer full ({len(dream_buffer)} fragments). Trimming oldest.")
+                    num_to_remove_dreams = len(dream_buffer) - max_dream_buffer_fragments
+                    del dream_buffer[:num_to_remove_dreams]
+                # Optionally, pass to a specialized detector for dream content later
+                # detectors.check_for_dream_imprint(dream_fragment, mood.get_current_mood())
+            else:
+                logger.warning("LLM returned empty dream fragment.")
+
+            # Dreams might occur more rapidly or with different pacing than thoughts
+            dream_mode_sleep_duration = int(sleep_duration_seconds / 1.5) if sleep_duration_seconds > 3 else 2
             logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")
             time.sleep(dream_mode_sleep_duration)
 

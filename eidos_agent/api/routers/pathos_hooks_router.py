@@ -56,7 +56,8 @@ async def handle_subconscious_impulse(data: ImpulseData):
     logger.info(f"Eidos API (Router): Received impulse from Pathos: {data.dict()}")
     try:
         # Pass data to the appropriate Eidos module (e.g., firmament)
-        result = handle_external_impulse(
+        # handle_external_impulse is now an async function
+        result = await handle_external_impulse(
             thought=data.thought,
             timestamp=data.timestamp,
             mood=data.mood_snapshot
@@ -76,7 +77,8 @@ async def store_subconscious_memory_imprint(data: ImprintData):
     logger.info(f"Eidos API (Router): Received memory imprint from Pathos: {data.dict()}")
     try:
         # Pass data to the appropriate Eidos module (e.g., memories)
-        result = store_imprint(
+        # store_imprint is now an async function
+        result = await store_imprint(
             content=data.content,
             timestamp=data.timestamp,
             mood=data.mood,

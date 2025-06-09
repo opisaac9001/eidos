@@ -164,100 +164,10 @@ class FirmamentModule:
             logger.error(f"FirmamentModule: Error getting current mood: {e}", exc_info=True)
             return None
 
-    async def _generate_activity_log_snippet(self, activity_slot: ActivitySlot, mood: Dict[str, Any]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-        if not self.http_client or not self.firmament_llm_config or not self.firmament_llm_config.get("url"):
-            logger.error("FirmamentModule: LLM client/config not available for snippet generation.")
-            return None, None
-        firmament_llm_role = self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE")
-        deviation_info: Optional[Dict[str, Any]] = None
-        actual_snippet_text: Optional[str] = None
-        try:
-            # Heuristic to check if this is a spontaneous activity context
-            is_spontaneous_context = False
-            if activity_slot.deviation_reason == 'spontaneous_activity':
-                is_spontaneous_context = True
-            elif activity_slot.activity_details and activity_slot.activity_details.metadata and \
-                 activity_slot.activity_details.metadata.get('source') == 'spontaneous_firmament':
-                is_spontaneous_context = True
-
-            dream_influence_text = None
-            if self.oneiros_module:
-                try:
-                    recent_dream_summary = self.oneiros_module.get_last_dream_summary(max_age_hours=8)
-                    if recent_dream_summary: dream_influence_text = f"A recent dream had themes of: '{recent_dream_summary[:150].replace('\n', ' ')}...'"
-                except Exception as e: logger.error(f"FirmamentModule: Error getting dream summary: {e}", exc_info=False)
-
-            environmental_context = "He is currently at his home."
-            if activity_slot.activity_details and activity_slot.activity_details.location_context:
-                environmental_context = f"He is at {activity_slot.activity_details.location_context}."
-            elif "leisure" in activity_slot.activity_type.lower() or "break" in (activity_slot.slot_name or "").lower():
-                environmental_context = "He is taking a break at home."
-            elif "work" in activity_slot.activity_type.lower() or "office" in (activity_slot.slot_name or "").lower():
-                 environmental_context = "He is at his home office desk."
-
-            system_prompt = ("You are describing a brief moment in the life of Pathos. Generate a single, concise sentence (max 20-25 words) for his current micro-action, thought, or observation. Focus on being observational and immersive. Avoid direct speech unless it's an internal thought.")
-
-            user_prompt_parts = []
-            prompt_instruction = "Describe a brief moment (one sentence):" # Default instruction
-
-            if is_spontaneous_context:
-                user_prompt_parts.append(f"Pathos is currently in a spontaneous activity: '{activity_slot.activity_title}'.")
-                user_prompt_parts.append(f"Type: {activity_slot.activity_type}.")
-                start_time_display = activity_slot.actual_start_time or activity_slot.start_time
-                user_prompt_parts.append(f"Started around: {start_time_display.strftime('%H:%M')}.")
-
-                if activity_slot.activity_details and activity_slot.activity_details.description:
-                    user_prompt_parts.append(f"Context/Description: {activity_slot.activity_details.description}")
-                prompt_instruction = "Describe his current brief moment or thought related to this spontaneous activity (one sentence):"
-            else: # Normally scheduled activity
-                user_prompt_parts.append(
-                    f"Scheduled: '{activity_slot.activity_title}' ({activity_slot.start_time.strftime('%H:%M')}-{activity_slot.end_time.strftime('%H:%M')})."
-                )
-                if activity_slot.activity_details and activity_slot.activity_details.sub_focus:
-                    user_prompt_parts.append(f"Focus: '{activity_slot.activity_details.sub_focus}'.")
-
-                # Deviation detection prompt only for scheduled tasks
-                prompt_instruction = (
-                    f"Your sentence. IMPORTANT: If your sentence implies Pathos starts a NEW, UNPLANNED activity different from '{activity_slot.activity_title}', "
-                    f"append JSON on a NEW LINE after your descriptive sentence, like this: {{\"deviate\": true, \"new_task_title\": \"Brief title for new task\", \"new_task_description\": \"Short description of what he now wants to do\", \"estimated_duration_minutes\": 30, \"new_task_type\": \"reflective\"}}. "
-                    f"Valid new_task_types: {', '.join(list(ActivityType.__args__))}. Otherwise, just the sentence."
-                )
-
-            # Common context elements
-            user_prompt_parts.append(f"Mood: Valence={mood.get('valence', 0.0):.2f}, Arousal={mood.get('arousal', 0.0):.2f} (Name: {mood.get('name', 'neutral')}).")
-            if dream_influence_text: user_prompt_parts.append(f"Dream Influence: {dream_influence_text}")
-            user_prompt_parts.append(f"Setting: {environmental_context}")
-
-            # Add the tailored instruction last
-            user_prompt_parts.append(prompt_instruction)
-
-            user_prompt = "\n".join(user_prompt_parts)
-            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
-
-            llm_full_response = await self._call_llm_api(messages, firmament_llm_role, max_tokens_override=150)
-
-            if llm_full_response:
-                lines = llm_full_response.strip().split('\n')
-                actual_snippet_text = lines[0].strip()
-                if len(lines) > 1:
-                    for line_idx in range(1, len(lines)):
-                        json_line_candidate = lines[line_idx].strip()
-                        if json_line_candidate.startswith("```json"): json_line_candidate = json_line_candidate[len("```json"):].strip()
-                        if json_line_candidate.endswith("```"): json_line_candidate = json_line_candidate[:-len("```")].strip()
-                        if json_line_candidate.startswith("{{") and json_line_candidate.endswith("}}"): json_line_candidate = json_line_candidate[1:-1]
-                        if json_line_candidate.startswith("{") and json_line_candidate.endswith("}"):
-                            try:
-                                parsed_json = json.loads(json_line_candidate)
-                                if isinstance(parsed_json, dict) and parsed_json.get("deviate") is True:
-                                    deviation_info = parsed_json; logger.info(f"Parsed deviation JSON: {deviation_info}"); break
-                            except json.JSONDecodeError: logger.warning(f"Failed to parse JSON line: '{json_line_candidate}'")
-                if actual_snippet_text and actual_snippet_text.startswith('"') and actual_snippet_text.endswith('"'): actual_snippet_text = actual_snippet_text[1:-1]
-                if actual_snippet_text and actual_snippet_text.startswith("'") and actual_snippet_text.endswith("'"): actual_snippet_text = actual_snippet_text[1:-1]
-                return actual_snippet_text, deviation_info
-            return None, None
-        except Exception as e:
-            logger.error(f"Error in _generate_activity_log_snippet: {e}", exc_info=True)
-            return None, None
+    # _generate_activity_log_snippet is being removed as its functionality for Pathos's thoughts
+    # and deviation detection is now superseded by the subconscious node and the new logic in
+    # receive_subconscious_intention. If it had other uses (e.g., summarizing NPC interactions
+    # independently), those would need to be re-evaluated. For this refactoring, it's considered obsolete.
 
     async def _store_activity_log(self, snippet: str, activity_slot: ActivitySlot, mood_at_time: Dict[str, Any], related_intention_id: Optional[str] = None, extra_metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         if not self.fm_config.get("enable_firmament") or not self.ethos_core: return None
@@ -301,70 +211,22 @@ class FirmamentModule:
         activity_slot = await self._get_current_activity_slot() # Actual scheduled slot or None
         mood = await self._get_current_mood() or {"name": "unknown", "valence": 0.0, "arousal": 0.0}
 
-        context_slot_for_initial_snippet = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Idle / Between Activities")
-        original_snippet, deviation_data = await self._generate_activity_log_snippet(context_slot_for_initial_snippet, mood)
+        # Pathos's internal thought generation and deviation based on it is REMOVED from here.
+        # That functionality is now driven by impulses from the subconscious node via receive_subconscious_intention.
 
-        newly_started_spontaneous_slot: Optional[ActivitySlot] = None # Ensure it's defined for the scope
+        # The main loop will now focus on NPC interactions or other environmental simulations.
+        # We create a context slot for NPC interactions, which could be the current activity or a generic one if idle.
+        npc_context_slot = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Idle / Between Activities")
 
-        if deviation_data and self.chronos_engine:
-            logger.info(f"Firmament: Deviation detected by LLM: {deviation_data}")
-            new_task_title = deviation_data.get("new_task_title")
-            new_task_description = deviation_data.get("new_task_description")
-            duration_minutes = deviation_data.get("estimated_duration_minutes")
-            new_task_type_str = deviation_data.get("new_task_type", "other")
-
-            from eidos_agent.persona_logic.chronos_engine.models import ActivityType # Local import for safety
-            from datetime import timedelta # Local import for safety
-
-            valid_activity_types = list(ActivityType.__args__) # type: ignore
-            new_task_type: ActivityType = 'other' # Default
-            if new_task_type_str in valid_activity_types:
-                new_task_type = new_task_type_str # type: ignore
-            else:
-                logger.warning(f"Invalid new_task_type '{new_task_type_str}' from LLM. Defaulting to 'other'.")
-
-            if new_task_title and new_task_description and isinstance(duration_minutes, int) and duration_minutes > 0:
-                estimated_duration = timedelta(minutes=duration_minutes)
-                current_slot_id_to_interrupt = activity_slot.id if activity_slot and activity_slot.slot_name != "AdHocFirmamentActivity" else None
-
-                newly_started_spontaneous_slot = await self.chronos_engine.report_spontaneous_activity(
-                    user_id=PATHOS_USER_ID, current_slot_id_if_any=current_slot_id_to_interrupt,
-                    new_activity_title=new_task_title, new_activity_description=new_task_description,
-                    estimated_duration=estimated_duration, new_activity_type=new_task_type
-                )
-
-                if newly_started_spontaneous_slot:
-                    logger.info(f"Firmament: ChronosEngine started spontaneous activity: {newly_started_spontaneous_slot.activity_title}")
-                    # Generate a new snippet specifically for the spontaneous activity
-                    spontaneous_snippet_text, _ = await self._generate_activity_log_snippet(newly_started_spontaneous_slot, mood)
-                    if spontaneous_snippet_text:
-                        await self._store_activity_log(spontaneous_snippet_text, newly_started_spontaneous_slot, mood, extra_metadata={"source": "spontaneous_activity_commenced", "original_deviation_trigger_snippet": original_snippet or "N/A"})
-                    elif original_snippet: # Fallback: Log the original snippet that led to deviation, but against the new slot.
-                        logger.warning(f"Failed to generate new snippet for spontaneous slot {newly_started_spontaneous_slot.id}. Logging original snippet against it.")
-                        await self._store_activity_log(original_snippet, newly_started_spontaneous_slot, mood, extra_metadata={"source": "spontaneous_activity_commenced_fallback_snippet", "original_deviation_trigger_snippet": original_snippet})
-                    else: # No snippet at all to log here
-                         logger.info(f"No snippet (neither new nor original) to log for spontaneous activity {newly_started_spontaneous_slot.id}")
-                    return # End the tick, spontaneous activity is now the focus
-                else: # report_spontaneous_activity failed to return a new slot
-                    logger.warning("Firmament: ChronosEngine failed to start spontaneous activity. Original snippet (if any) will be logged against original context.")
-                    if original_snippet: # Log original snippet if spontaneous op failed
-                       await self._store_activity_log(original_snippet, context_slot_for_initial_snippet, mood, extra_metadata={"deviation_attempt_failed": True})
-            else: # Incomplete deviation data from LLM
-                logger.warning(f"Firmament: LLM deviation data incomplete: {deviation_data}. Logging original snippet if any.")
-                if original_snippet: # Log original snippet if deviation data was bad
-                    await self._store_activity_log(original_snippet, context_slot_for_initial_snippet, mood, extra_metadata={"deviation_data_incomplete": True})
-
-        elif original_snippet: # No deviation_data, but we have an original_snippet. This is the "normal" path.
-            await self._store_activity_log(original_snippet, context_slot_for_initial_snippet, mood)
-
-        # Fall through to NPC interaction only if no snippet was generated at all (original_snippet is None)
-        # AND no spontaneous activity was successfully started (newly_started_spontaneous_slot is None).
-        if not original_snippet and not newly_started_spontaneous_slot:
-            logger.info("FirmamentModule: No snippet generated and no successful deviation. Checking for NPC interaction.")
-            npc_context_slot = context_slot_for_initial_snippet # This is the original (or dummy) slot
-            if self._is_npc_interaction_warranted(npc_context_slot, None):
-                # ... (rest of NPC logic as it was, ensure it uses npc_context_slot) ...
-                npc_profile_to_use: Optional[NPCProfile] = None
+        # Check for NPC interaction.
+        # The condition `if not original_snippet and not newly_started_spontaneous_slot:` from the old code
+        # effectively means "if Pathos is not busy with a self-generated thought/action".
+        # Since self-generated thoughts are removed, we can simplify this to always check for NPC interactions
+        # if Firmament is not currently handling an ongoing Firmament-initiated spontaneous task (which is not a concept here anymore).
+        # For now, we'll just check if NPC interaction is warranted based on the current context.
+        logger.debug("FirmamentModule: Checking for NPC interaction in simulation tick.")
+        if self._is_npc_interaction_warranted(npc_context_slot, None): # None for intention, as this is a general check
+            npc_profile_to_use: Optional[NPCProfile] = None
                 interaction_source_description = "activity"
 
                 if npc_context_slot and npc_context_slot.activity_details and isinstance(npc_context_slot.activity_details.metadata, dict): # Check if metadata exists
@@ -406,111 +268,254 @@ class FirmamentModule:
                         }
                         entry_data = {"type": "npc_dialogue_event", "content": dialogue_data["summary"] or "A brief NPC interaction occurred.", "metadata": event_metadata, "salience": random.uniform(0.4, 0.65)}
                         if self.ethos_core: await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
-                else: logger.debug("FirmamentModule: No NPC profile for interaction during idle/no-snippet tick.")
+                else:
+                    logger.debug("FirmamentModule: No specific or generic NPC profile identified for interaction in this tick.")
+        else:
+            logger.debug("FirmamentModule: NPC interaction not warranted in this tick.")
+
+        # Add other environmental simulations here if necessary.
+
         logger.debug("FirmamentModule: Simulation tick finished.")
 
 
     async def receive_subconscious_intention(self, intention: str, metadata: Dict[str, Any]):
         if not self.fm_config.get("enable_firmament", False): return
         logger.info(f"FirmamentModule: Received intention: '{intention}'. Metadata: {metadata}")
+
         original_intention_memory_id: Optional[str] = None
         if self.ethos_core:
             try:
                 current_time = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID) or datetime.now(timezone.utc)
-                entry_data = {"type": "received_subconscious_intention", "content": intention, "metadata": {"source": "subconscious_node_intention", "original_metadata": metadata, "received_at_firmament_timestamp": current_time.isoformat()}, "salience": random.uniform(0.5, 0.7)}
+                entry_data = {
+                    "type": "received_subconscious_intention",
+                    "content": intention,
+                    "metadata": {
+                        "source": "subconscious_node_intention",
+                        "original_metadata": metadata, # Contains mood from subconscious, etc.
+                        "received_at_firmament_timestamp": current_time.isoformat()
+                    },
+                    "salience": random.uniform(0.5, 0.7)
+                }
                 memory_entry = await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
-                if memory_entry and hasattr(memory_entry, 'id') and memory_entry.id: original_intention_memory_id = memory_entry.id
-            except Exception as e: logger.error(f"FirmamentModule: Error storing intention: {e}", exc_info=True)
+                if memory_entry and hasattr(memory_entry, 'id') and memory_entry.id:
+                    original_intention_memory_id = memory_entry.id
+            except Exception as e:
+                logger.error(f"FirmamentModule: Error storing received intention as memory: {e}", exc_info=True)
 
+        current_mood_from_subconscious = metadata.get("mood_snapshot") # Mood at the time of intention
+        current_activity_slot_before_new_action = await self._get_current_activity_slot()
+        newly_started_spontaneous_slot: Optional[ActivitySlot] = None
+
+        # --- Decision Making for Action (Heuristic) ---
+        # For now, assume most impulses are candidates for action and lead to a new Chronos task.
+        # A more complex decision logic could be added here later.
+        actionable_intention = True # Simple assumption for now
+
+        if actionable_intention and self.chronos_engine:
+            new_activity_title = intention[:120] # Cap length for Chronos
+            new_activity_description = f"Acting on a subconscious intention: {intention}"
+            estimated_duration = timedelta(minutes=self.fm_config.get("intention_based_activity_duration_minutes", 15))
+            new_activity_type: ActivityType = self.fm_config.get("intention_based_activity_type", "reflective") # type: ignore
+
+            current_slot_id_to_interrupt = None
+            if current_activity_slot_before_new_action and current_activity_slot_before_new_action.slot_name != "AdHocFirmamentActivity":
+                current_slot_id_to_interrupt = current_activity_slot_before_new_action.id
+
+            logger.info(f"Firmament: Attempting to report spontaneous activity from intention: '{new_activity_title}'")
+            try:
+                newly_started_spontaneous_slot = await self.chronos_engine.report_spontaneous_activity(
+                    user_id=PATHOS_USER_ID,
+                    current_slot_id_if_any=current_slot_id_to_interrupt,
+                    new_activity_title=new_activity_title,
+                    new_activity_description=new_activity_description,
+                    estimated_duration=estimated_duration,
+                    new_activity_type=new_activity_type,
+                    metadata={"source": "firmament_subconscious_driven", "original_intention": intention}
+                )
+                if newly_started_spontaneous_slot:
+                    logger.info(f"Firmament: ChronosEngine started spontaneous activity from intention: {newly_started_spontaneous_slot.activity_title} (ID: {newly_started_spontaneous_slot.id})")
+                else:
+                    logger.warning(f"Firmament: ChronosEngine did not return a new slot for spontaneous activity from intention '{new_activity_title}'.")
+            except Exception as e:
+                logger.error(f"Firmament: Error calling report_spontaneous_activity: {e}", exc_info=True)
+
+        # --- Simulate and Log Pathos Acting on the Intention ---
         try:
-            await self._simulate_intention_consequence(intention, metadata, original_intention_memory_id)
-        except Exception as e: logger.error(f"FirmamentModule: Error in _simulate_intention_consequence: {e}", exc_info=True)
+            # Pass mood from subconscious metadata, and the newly created slot if any
+            await self._simulate_intention_consequence(
+                intention,
+                source_metadata=metadata,
+                original_intention_memory_id=original_intention_memory_id,
+                current_mood_override=current_mood_from_subconscious,
+                newly_created_slot_context=newly_started_spontaneous_slot
+            )
+        except Exception as e:
+            logger.error(f"FirmamentModule: Error in _simulate_intention_consequence call: {e}", exc_info=True)
 
-    async def _simulate_intention_consequence(self, intention: str, source_metadata: Dict[str, Any], original_intention_memory_id: Optional[str], current_mood_override: Optional[Dict[str,Any]] = None):
-        logger.info(f"FirmamentModule: Simulating consequence for intention (ID: {original_intention_memory_id}): '{intention[:100]}...'")
-        if not self.http_client: logger.error("FirmamentModule: HTTP client not available."); return
 
-        current_activity_slot = await self._get_current_activity_slot()
-        current_mood = current_mood_override if current_mood_override else await self._get_current_mood()
-        if not current_mood: current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0}
+    async def _simulate_intention_consequence(
+        self,
+        intention: str,
+        source_metadata: Dict[str, Any],
+        original_intention_memory_id: Optional[str],
+        current_mood_override: Optional[Dict[str, Any]] = None,
+        newly_created_slot_context: Optional[ActivitySlot] = None # If a new slot was made for this intention
+    ):
+        logger.info(f"FirmamentModule: Simulating consequence for intention (MemID: {original_intention_memory_id}): '{intention[:100]}...'")
+        if not self.http_client:
+            logger.error("FirmamentModule: HTTP client not available for simulating intention consequence.")
+            return
 
-        # NPC Dialogue (if warranted by intention)
-        if self._is_npc_interaction_warranted(current_activity_slot, intention):
-            # ... (NPC dialogue logic as previously defined) ...
-            pass # Placeholder for brevity
+        # Determine context: the new slot if provided, otherwise the current (potentially pre-existing) slot.
+        context_activity_slot_for_simulation = newly_created_slot_context
+        if not context_activity_slot_for_simulation:
+            context_activity_slot_for_simulation = await self._get_current_activity_slot() # Might be None if idle
 
-        # Pathos's personal action simulation
-        activity_context_for_prompt = "Currently idle."
-        if current_activity_slot:
-            location_detail = f" at {current_activity_slot.activity_details.location_context}" if current_activity_slot.activity_details and current_activity_slot.activity_details.location_context else ""
-            activity_context_for_prompt = f"Currently in '{current_activity_slot.activity_title}' (slot: '{current_activity_slot.slot_name}'){location_detail}."
+        current_mood = current_mood_override # Use mood from intention time
+        if not current_mood: # Fallback if not in metadata
+            current_mood = await self._get_current_mood()
+        if not current_mood: # Fallback if Ethos fails
+            current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0, "impulsiveness": 0.5}
 
-        dream_influence_text = None # Placeholder, assumes oneiros_module might not be present or used here
+
+        # --- NPC Dialogue (if warranted by intention and context) ---
+        # This check might need refinement based on whether we are in a new slot or existing one.
+        # For now, use the determined context_activity_slot_for_simulation.
+        if self._is_npc_interaction_warranted(context_activity_slot_for_simulation, intention):
+            logger.info(f"Firmament: NPC interaction warranted by intention '{intention[:50]}...' during slot {context_activity_slot_for_simulation.id if context_activity_slot_for_simulation else 'N/A'}")
+            # ... (Full NPC dialogue simulation logic - assumed to be complex and pre-existing)
+            # This would involve determining NPC, calling LLM for dialogue, storing results.
+            # For now, we'll skip the full simulation to keep this change focused.
+            pass # Placeholder for brevity. Actual NPC simulation is complex.
+
+        # --- Pathos's Personal Action Simulation (LLM call to describe Pathos acting) ---
+        activity_context_for_prompt = "Currently idle or in a new context due to the intention."
+        if context_activity_slot_for_simulation:
+            location_detail = f" at {context_activity_slot_for_simulation.activity_details.location_context}" if context_activity_slot_for_simulation.activity_details and context_activity_slot_for_simulation.activity_details.location_context else ""
+            activity_context_for_prompt = f"Currently in '{context_activity_slot_for_simulation.activity_title}' (slot: '{context_activity_slot_for_simulation.slot_name}'){location_detail}."
+            if newly_created_slot_context and newly_created_slot_context.id == context_activity_slot_for_simulation.id:
+                 activity_context_for_prompt = f"Just started '{context_activity_slot_for_simulation.activity_title}' due to the intention{location_detail}."
+
+
+        dream_influence_text = None
         if self.oneiros_module:
             try:
                 recent_dream_summary = self.oneiros_module.get_last_dream_summary(max_age_hours=8)
-                if recent_dream_summary: dream_influence_text = f"Dream Influence: '{recent_dream_summary[:100]}...'"
-            except Exception: pass
+                if recent_dream_summary:
+                    dream_influence_text = f"Dream Influence: '{recent_dream_summary[:100]}...'"
+            except Exception as e:
+                logger.warning(f"Firmament: Error getting dream summary for intention simulation: {e}", exc_info=False)
 
-        system_prompt = ("Pathos acts on an intention. Describe his reaction/action. 1-3 sentences, max 50 words. Observational.")
+        system_prompt = ("Pathos acts on or reflects on an internal intention. Describe his immediate reaction, micro-action, or internal thought process in response. 1-2 concise sentences, max 40 words. Focus on being observational and immersive.")
         user_prompt_parts = [
-            f"Intention: "{intention}"",
-            f"Mood: Valence={current_mood.get('valence', 0.0):.2f}, Arousal={current_mood.get('arousal', 0.0):.2f} ({current_mood.get('name', 'unknown')}).",
-            dream_influence_text if dream_influence_text else "No notable dream influence.",
-            f"Context: {activity_context_for_prompt}",
-            "Simulated action/reaction:"
+            f"Pathos's internal intention: \"{intention}\"",
+            f"His current mood: Valence={current_mood.get('valence', 0.0):.2f}, Arousal={current_mood.get('arousal', 0.0):.2f} (Name: {current_mood.get('name', 'unknown')}).",
+            dream_influence_text if dream_influence_text else "No notable recent dream influence.",
+            f"His current situation: {activity_context_for_prompt}",
+            "Describe his brief, immediate simulated action/reflection (1-2 sentences):"
         ]
         user_prompt = "\n".join(filter(None, user_prompt_parts))
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
         simulated_action_snippet: Optional[str] = None
         try:
-            simulated_action_snippet = await self._call_llm_api(messages, self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE"), max_tokens_override=100)
+            simulated_action_snippet = await self._call_llm_api(
+                messages,
+                self.fm_config.get("firmament_llm_role", "LOGOS_TECHNE"), # Use standard firmament LLM
+                max_tokens_override=70, # Shorter snippet
+                temperature_override=0.6 # Slightly less random for this
+            )
             if simulated_action_snippet:
-                if simulated_action_snippet.startswith('"') and simulated_action_snippet.endswith('"'): simulated_action_snippet = simulated_action_snippet[1:-1]
-                if simulated_action_snippet.startswith("'") and simulated_action_snippet.endswith("'"): simulated_action_snippet = simulated_action_snippet[1:-1]
-                logger.info(f"FirmamentModule: Simulated action for intention: '{simulated_action_snippet}'")
-                slot_for_log = current_activity_slot if current_activity_slot else self._create_dummy_activity_slot_for_context(f"Simulated: {intention[:50]}...")
-                await self._store_activity_log(simulated_action_snippet, slot_for_log, current_mood, original_intention_memory_id)
-        except Exception as e: logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)
+                # Basic cleanup
+                if simulated_action_snippet.startswith('"') and simulated_action_snippet.endswith('"'):
+                    simulated_action_snippet = simulated_action_snippet[1:-1]
+                if simulated_action_snippet.startswith("'") and simulated_action_snippet.endswith("'"):
+                    simulated_action_snippet = simulated_action_snippet[1:-1]
 
-        # LLM-based Status Classification
-        determined_outcome_status = 'partially_completed'
-        if current_activity_slot and current_activity_slot.slot_name != "AdHocFirmamentActivity" and self.chronos_engine and self.fm_config.get("enable_llm_status_classification", False):
-            logger.debug(f"Attempting LLM status classification for slot: {current_activity_slot.id}")
-            slot_title = current_activity_slot.activity_title
-            slot_desc = current_activity_slot.activity_details.description if current_activity_slot.activity_details else 'N/A'
-            slot_sub_focus = current_activity_slot.activity_details.sub_focus if current_activity_slot.activity_details else 'N/A'
-            classifier_system_prompt = ("Classify action outcome relative to scheduled activity. JSON: {'outcome_status': 'status', 'reasoning': 'brief reason'}. Statuses: 'completed', 'partially_completed', 'interrupted'.")
+                logger.info(f"FirmamentModule: Simulated action/reflection for intention: '{simulated_action_snippet}'")
+
+                # Log this simulated action snippet against the appropriate context
+                slot_to_log_against = context_activity_slot_for_simulation if context_activity_slot_for_simulation else self._create_dummy_activity_slot_for_context(f"Simulated action for: {intention[:50]}...")
+                await self._store_activity_log(
+                    simulated_action_snippet,
+                    slot_to_log_against,
+                    current_mood, # Mood at time of intention
+                    original_intention_memory_id,
+                    extra_metadata={"source_subconscious_intention_text": intention[:200]} # Add part of intention for context
+                )
+            else:
+                logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
+
+        except Exception as e:
+            logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)
+
+        # --- LLM-based Status Classification of the *original* slot (if any, and if no new slot was made) ---
+        # This part should only run if:
+        # 1. A new spontaneous slot was NOT created for this intention.
+        # 2. There was an original, pre-existing activity slot.
+        # 3. LLM-based classification is enabled.
+
+        # Fetch the original slot again, in case it was modified by NPC interactions if that logic were active
+        original_activity_slot_for_status_update = await self._get_current_activity_slot()
+
+        if not newly_created_slot_context and \
+           original_activity_slot_for_status_update and \
+           original_activity_slot_for_status_update.slot_name != "AdHocFirmamentActivity" and \
+           self.chronos_engine and \
+           self.fm_config.get("enable_llm_status_classification", False):
+
+            logger.debug(f"Attempting LLM status classification for original slot: {original_activity_slot_for_status_update.id} (since no new slot was created for this intention).")
+            slot_title = original_activity_slot_for_status_update.activity_title
+            slot_desc = original_activity_slot_for_status_update.activity_details.description if original_activity_slot_for_status_update.activity_details else 'N/A'
+            slot_sub_focus = original_activity_slot_for_status_update.activity_details.sub_focus if original_activity_slot_for_status_update.activity_details else 'N/A'
+
+            determined_outcome_status = 'partially_completed' # Default if LLM fails
+            classifier_system_prompt = ("Classify the outcome of the scheduled activity given Pathos's intention and simulated action. Respond with JSON: {\"outcome_status\": \"status\", \"reasoning\": \"brief reason\"}. Valid statuses: 'completed', 'partially_completed', 'interrupted', 'derailed', 'focused_within'.")
             classifier_user_prompt = (
-                f"Scheduled: '{slot_title}' (Desc: '{slot_desc}', Focus: '{slot_sub_focus}').\n"
-                f"Intention: "{intention}"\nSimulated Action: "{simulated_action_snippet or 'N/A'}"\nJSON Response:"
+                f"Pathos was scheduled for: '{slot_title}' (Desc: '{slot_desc}', Focus: '{slot_sub_focus}').\n"
+                f"He then had an internal intention: \"{intention}\"\n"
+                f"His simulated action/reflection on this intention was: \"{simulated_action_snippet or 'N/A'}\"\n"
+                f"Based on this, how did the *original scheduled activity* progress? If the intention was unrelated and he likely continued the task, use 'focused_within' or 'completed'. If the intention distracted him, use 'partially_completed' or 'interrupted'. If he abandoned it for something else implicitly, use 'derailed'.\nJSON Response:"
             )
             messages_class = [{"role": "system", "content": classifier_system_prompt}, {"role": "user", "content": classifier_user_prompt}]
-            llm_response_str = await self._call_llm_api(messages_class, FIRMAMENT_STATUS_CLASSIFIER_LLM_ROLE, max_tokens_override=100, temperature_override=0.2)
+
+            llm_response_str = await self._call_llm_api(messages_class, FIRMAMENT_STATUS_CLASSIFIER_LLM_ROLE, max_tokens_override=100, temperature_override=0.3)
             if llm_response_str:
                 try:
                     json_start = llm_response_str.find('{'); json_end = llm_response_str.rfind('}')
                     if json_start != -1 and json_end != -1 and json_end > json_start:
                         parsed_response = json.loads(llm_response_str[json_start : json_end+1])
                         status_llm = parsed_response.get("outcome_status")
-                        if status_llm in ['completed', 'partially_completed', 'interrupted']: determined_outcome_status = status_llm
-                        logger.info(f"LLM classified slot {current_activity_slot.id} as '{determined_outcome_status}'. Reason: {parsed_response.get('reasoning', 'N/A')}")
-                    else: logger.warning(f"No valid JSON in LLM status response: {llm_response_str}")
-                except Exception as e_parse: logger.warning(f"Error parsing LLM status response '{llm_response_str}': {e_parse}")
-            else: logger.warning(f"No LLM status response for slot {current_activity_slot.id}.")
-        elif current_activity_slot and current_activity_slot.slot_name != "AdHocFirmamentActivity":
-             logger.debug("LLM status classification disabled or no valid slot. Defaulting to 'partially_completed'.")
+                        # Add 'derailed' and 'focused_within' to valid outcomes from this specific classification
+                        if status_llm in ['completed', 'partially_completed', 'interrupted', 'derailed', 'focused_within']:
+                            determined_outcome_status = status_llm
+                        logger.info(f"LLM classified original slot {original_activity_slot_for_status_update.id} as '{determined_outcome_status}'. Reason: {parsed_response.get('reasoning', 'N/A')}")
+                    else:
+                        logger.warning(f"No valid JSON in LLM status response for original slot: {llm_response_str}")
+                except Exception as e_parse:
+                    logger.warning(f"Error parsing LLM status response '{llm_response_str}' for original slot: {e_parse}")
+            else:
+                logger.warning(f"No LLM status response for original slot {original_activity_slot_for_status_update.id}.")
 
-        if current_activity_slot and current_activity_slot.slot_name != "AdHocFirmamentActivity" and self.chronos_engine:
+            # Report outcome for the original slot
             event_time_dt = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID) or datetime.now(timezone.utc)
             await self.chronos_engine.report_activity_outcome(
-                slot_id=current_activity_slot.id, actual_end_time=event_time_dt.time(),
-                status=determined_outcome_status,
-                outcome_metadata={"source": "firmament_intention_consequence", "intention_text": intention, "simulated_action_snippet": simulated_action_snippet or "N/A"}
+                slot_id=original_activity_slot_for_status_update.id,
+                actual_end_time=event_time_dt.time(), # Or could be start_time if truly interrupted at onset
+                status=determined_outcome_status, # type: ignore
+                outcome_metadata={
+                    "source": "firmament_intention_consequence_on_original_slot",
+                    "triggering_intention_text": intention,
+                    "simulated_action_snippet_for_intention": simulated_action_snippet or "N/A"
+                }
             )
+        elif not newly_created_slot_context and original_activity_slot_for_status_update and original_activity_slot_for_status_update.slot_name != "AdHocFirmamentActivity":
+             logger.debug("LLM status classification disabled or other conditions not met for original slot. No outcome reported for it by this function.")
+        elif newly_created_slot_context:
+            logger.debug(f"A new spontaneous slot {newly_created_slot_context.id} was created for this intention. Original slot status (if any) handled by report_spontaneous_activity.")
         elif not simulated_action_snippet:
-            logger.warning(f"FirmamentModule: No simulated action snippet for intention, and no current slot to update.")
+            logger.warning(f"FirmamentModule: No simulated action snippet for intention, and no current slot to update or new slot created.")
+
 
     async def _simulate_npc_dialogue(self, npc_profile: 'NPCProfile', initial_dialogue_context: str, pathos_mood: Dict[str, Any], max_exchanges: int = 2) -> Optional[Dict[str, Any]]:
         # ... (Full NPC dialogue simulation logic - assumed to be correct from previous state)
