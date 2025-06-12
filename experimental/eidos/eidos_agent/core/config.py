@@ -91,6 +91,12 @@ class EthosConfig(TypedDict, total=False):
     daily_summary_max_memories: Optional[int]
     daily_summary_lookback_hours: Optional[int]
     personality_bias_profile_json: Optional[str] # Added for Hexus personality bias
+    reflection_llm_role: str
+    reflection_memory_query_limit: int
+    reflection_max_memories_for_llm: int
+    reflection_min_salience_for_consideration: float
+    reflection_significant_event_salience_threshold: float
+    reflection_lookback_days: int
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -335,6 +341,12 @@ class Config:
         "daily_summary_max_memories": int(os.getenv("ETHOS_DAILY_SUMMARY_MAX_MEMORIES", "30")),
         "daily_summary_lookback_hours": int(os.getenv("ETHOS_DAILY_SUMMARY_LOOKBACK_HOURS", "18")),
         "personality_bias_profile_json": os.getenv("EIDOS_PERSONALITY_BIAS_PROFILE_JSON"), # Added
+        "reflection_llm_role": os.getenv("ETHOS_REFLECTION_LLM_ROLE", "LOGOS_TECHNE"),
+        "reflection_memory_query_limit": int(os.getenv("ETHOS_REFLECTION_MEMORY_QUERY_LIMIT", "50")),
+        "reflection_max_memories_for_llm": int(os.getenv("ETHOS_REFLECTION_MAX_MEMORIES_FOR_LLM", "15")),
+        "reflection_min_salience_for_consideration": float(os.getenv("ETHOS_REFLECTION_MIN_SALIENCE_FOR_CONSIDERATION", "0.3")),
+        "reflection_significant_event_salience_threshold": float(os.getenv("ETHOS_REFLECTION_SIGNIFICANT_EVENT_SALIENCE_THRESHOLD", "0.7")),
+        "reflection_lookback_days": int(os.getenv("ETHOS_REFLECTION_LOOKBACK_DAYS", "3")),
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None

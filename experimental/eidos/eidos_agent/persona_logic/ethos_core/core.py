@@ -156,7 +156,9 @@ HEXUS_EVENT_DEFINITIONS = {
     "INTENTION_ACTION_GENERAL_SUCCESS": {"contentment": 0.01, "joy": 0.005},
     "INTENTION_ACTION_FAILURE": {"stress": 0.02, "resentment": 0.01, "ambition": -0.005},
     # General Engagement
-    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005} # Smallest default bump
+    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
+    # Reflection Cycle
+    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02} # Positive effect of reflection
 }
 
 class EthosCore:
@@ -1275,6 +1277,176 @@ class EthosCore:
         self._save_task_last_run_time("EthosReflection", now)
         logger.info(f"--- Ethos: Reflection Cycle Finished (Placeholder) ---")
 
+    async def run_reflection_cycle(self):
+        """
+        Performs a reflection cycle:
+        1. Fetches recent relevant memories.
+        2. Filters and selects the most salient/significant ones.
+        3. Formats them for an LLM.
+        4. Calls an LLM to generate insights based on these memories.
+        5. Stores these insights as new memories.
+        6. Updates Hexus scores based on the reflection.
+        """
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Reflection Cycle at {now.isoformat()} ---")
+
+        # 1. Retrieve Configuration
+        reflection_llm_role = self.ethos_config.get('reflection_llm_role', "LOGOS_TECHNE")
+        query_limit = self.ethos_config.get('reflection_memory_query_limit', 50)
+        max_memories_for_llm = self.ethos_config.get('reflection_max_memories_for_llm', 15)
+        min_salience_for_consideration = self.ethos_config.get('reflection_min_salience_for_consideration', 0.3)
+        significant_event_threshold = self.ethos_config.get('reflection_significant_event_salience_threshold', 0.7)
+        lookback_days = self.ethos_config.get('reflection_lookback_days', 3)
+
+        # 2. Fetch Memories
+        memories_for_reflection = await self._get_memories_for_reflection(lookback_days, query_limit)
+        if not memories_for_reflection:
+            logger.info("Reflection Cycle: No memories found for reflection period. Cycle ending.")
+            self.last_reflection_time = now # Still update time to avoid immediate re-run
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # 3. Filter and Select Salient Memories
+        # Filter by min_salience
+        considered_memories = [
+            mem for mem in memories_for_reflection
+            if mem.get('salience', 0.0) >= min_salience_for_consideration
+        ]
+
+        if not considered_memories:
+            logger.info(f"Reflection Cycle: No memories met minimum salience ({min_salience_for_consideration}). Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # Prioritize: simple scoring - significant events and feedback get higher priority
+        def get_priority_score(memory: MemoryEntry) -> float:
+            score = memory.get('salience', 0.0)
+            if memory.get('type') == 'feedback':
+                score += 0.5 # Boost feedback
+            if memory.get('salience', 0.0) >= significant_event_threshold:
+                score += 0.3 # Boost very salient events
+            # Negative feedback could also be prioritized if needed by adding more conditions
+            return score
+
+        considered_memories.sort(key=get_priority_score, reverse=True)
+        selected_memories = considered_memories[:max_memories_for_llm]
+        source_memory_ids = [mem.get('id') for mem in selected_memories if mem.get('id')]
+
+        if not selected_memories:
+            logger.info("Reflection Cycle: No memories selected for LLM after prioritization. Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        logger.info(f"Reflection Cycle: Selected {len(selected_memories)} memories for LLM prompt.")
+
+        # 4. Format Memories for LLM Prompt
+        formatted_memory_strings = []
+        for mem in selected_memories:
+            ts_str = mem.get('timestamp', "Unknown time")
+            try: # Format timestamp nicely
+                ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                formatted_ts = ts_dt.strftime("%Y-%m-%d %H:%M UTC")
+            except ValueError:
+                formatted_ts = ts_str
+
+            content_snippet = (mem.get('content', '') or "")[:150] + "..." if len(mem.get('content', '') or "") > 150 else mem.get('content', '')
+            mood_info = ""
+            if mem_meta := mem.get('metadata'):
+                if mood_at_res := mem_meta.get('mood_at_response'): # from chat_interaction
+                    mood_name = mood_at_res.get('name', 'unknown')
+                    mood_info = f" (Mood: {mood_name}, V:{mood_at_res.get('valence',0):.1f}, A:{mood_at_res.get('arousal',0):.1f})"
+                elif mem_meta.get('mood_valence_at_time') is not None: # from firmament_activity_log
+                    mood_info = f" (Mood: {mem_meta.get('mood_name_at_time', 'unknown')}, V:{mem_meta.get('mood_valence_at_time',0):.1f}, A:{mem_meta.get('mood_arousal_at_time',0):.1f})"
+
+            formatted_memory_strings.append(
+                f"- Timestamp: {formatted_ts}, Type: {mem.get('type')}, Salience: {mem.get('salience', 0.0):.2f}{mood_info}\n  Content: {content_snippet}"
+            )
+        memories_block_for_prompt = "\n".join(formatted_memory_strings)
+
+        # 5. Construct LLM Prompt
+        system_prompt = (
+            "You are a reflective journaling assistant for an AI named Pathos. "
+            "Review the following list of recent experiences, thoughts, and feedback. "
+            "Identify 2-3 key insights, self-observations, or lessons learned from these memories. "
+            "Focus on patterns, significant events, or areas for growth or understanding. "
+            "Insights should be concise and actionable or thought-provoking for Pathos. "
+            "Your output MUST be a JSON object containing a single key \"insights\" which is a list of strings. "
+            "Example: {\"insights\": [\"Insight text 1.\", \"Insight text 2.\"]}"
+        )
+        user_prompt = (
+            "Here is a selection of Pathos's recent memories for reflection:\n\n"
+            f"{memories_block_for_prompt}\n\n"
+            "Please generate 2-3 concise insights based on these memories, in the specified JSON format."
+        )
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+        # 6. Call LLM for Reflection
+        llm_response_str = await self._call_llm_for_internal_task(messages, reflection_llm_role)
+
+        if not llm_response_str or not llm_response_str.strip():
+            logger.warning("Reflection Cycle: LLM call returned no content. Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # 7. Process LLM Response and Store Insights
+        try:
+            # Attempt to find JSON block within potentially messy LLM output
+            json_match = re.search(r'\{[\s\S]*\}', llm_response_str)
+            if not json_match:
+                logger.error(f"Reflection Cycle: No JSON object found in LLM response. Raw response: {llm_response_str}")
+                self.last_reflection_time = now
+                self._save_task_last_run_time("EthosReflection", now)
+                return
+
+            parsed_response = json.loads(json_match.group(0))
+
+            if isinstance(parsed_response, dict) and "insights" in parsed_response and isinstance(parsed_response["insights"], list):
+                insights = parsed_response["insights"]
+                if not insights:
+                    logger.info("Reflection Cycle: LLM generated an empty list of insights.")
+                else:
+                    logger.info(f"Reflection Cycle: LLM generated {len(insights)} insights.")
+                    current_hexus_snapshot = self.get_hexus_scores() # Get current scores to associate with insight
+                    for insight_text in insights:
+                        if not isinstance(insight_text, str) or not insight_text.strip():
+                            logger.warning(f"Reflection Cycle: Skipping empty or invalid insight: {insight_text}")
+                            continue
+
+                        new_insight_entry_data = {
+                            "type": "reflection_insight",
+                            "content": insight_text.strip(),
+                            "metadata": {
+                                "source_reflection_cycle_timestamp": now.isoformat(),
+                                "source_memory_ids": source_memory_ids,
+                                "hexus_at_reflection": current_hexus_snapshot,
+                                "user_id": PATHOS_USER_ID # Insight belongs to Pathos
+                            },
+                            "salience": 0.85, # Insights are highly salient
+                            "user_id": PATHOS_USER_ID
+                        }
+                        await self.add_memory_entry(new_insight_entry_data, user_id_context=PATHOS_USER_ID)
+                        logger.info(f"Reflection Cycle: Stored insight - '{insight_text[:100]}...'")
+
+                    # 8. Hexus Score Updates (Simplified First Pass)
+                    await self.process_event_for_hexus_update("REFLECTION_CYCLE_COMPLETED_INSIGHTS", payload={"num_insights": len(insights)})
+
+            else:
+                logger.error(f"Reflection Cycle: LLM response JSON does not match expected structure ('insights' list). Raw response: {llm_response_str}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Reflection Cycle: Failed to parse LLM response as JSON: {e}. Raw response: {llm_response_str}")
+        except Exception as e_proc:
+            logger.error(f"Reflection Cycle: Error processing LLM response or storing insights: {e_proc}", exc_info=True)
+
+        # 9. Update Timestamps
+        self.last_reflection_time = now
+        self._save_task_last_run_time("EthosReflection", now)
+        logger.info(f"--- Ethos: Reflection Cycle Finished at {now.isoformat()} ---")
+
+
     async def run_managed_forgetting(self): # ADDED METHOD (Placeholder)
         """Placeholder for the managed forgetting process."""
         if not self.config.ENABLE_MANAGED_FORGETTING:
@@ -1365,6 +1537,50 @@ class EthosCore:
         self.last_hexus_decay_time = now
         self._save_task_last_run_time("HexusDecay", now)
         logger.info(f"--- Ethos: Hexus Decay Cycle Finished (Duration processed: {time_elapsed_seconds:.2f}s) ---")
+
+    async def _get_memories_for_reflection(self, lookback_days: int, query_limit: int) -> List[MemoryEntry]:
+        """
+        Fetches a broad range of memories within a given lookback period for reflection.
+        """
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot fetch memories for reflection.")
+            return []
+
+        now_utc = datetime.now(timezone.utc)
+        start_time_dt = now_utc - timedelta(days=lookback_days)
+
+        relevant_memory_types = [
+            'chat_interaction',
+            'firmament_activity_log',
+            'feedback',
+            'received_subconscious_intention',
+            'npc_dialogue_event',
+            'learned_correction',
+            'reflection_insight', # Include past insights
+            'aspiration',         # Pathos's own aspirations
+            'world_knowledge'     # Recently acquired/verified world knowledge
+        ]
+
+        logger.debug(f"EthosCore: Fetching memories for reflection. Lookback: {lookback_days} days (from {start_time_dt.isoformat()}), Limit: {query_limit}, Types: {relevant_memory_types}")
+
+        try:
+            # Using PATHOS_USER_ID to get Pathos's own experiences and general knowledge.
+            # Specific user interactions are part of 'chat_interaction' and will be included if they involve PATHOS_USER_ID (implicitly handled by how they are stored).
+            # The MemoryStorage method get_memories_by_time_range_and_types should ideally handle user_id filtering if applicable for each type.
+            # For reflection, we are primarily interested in Pathos's own cognitive stream and direct experiences.
+            fetched_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+                user_id=PATHOS_USER_ID, # Focus on Pathos's own context for self-reflection
+                start_time=start_time_dt,
+                end_time=now_utc,
+                types=relevant_memory_types,
+                limit=query_limit,
+                sort_by_salience_then_recency=False # Default sort is timestamp descending
+            )
+            logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for reflection.")
+            return fetched_memories
+        except Exception as e:
+            logger.error(f"EthosCore: Error fetching memories for reflection: {e}", exc_info=True)
+            return []
 
     async def get_background_tasks(self) -> List[asyncio.Task]:
         """Create and return background tasks for EthosCore operations."""
