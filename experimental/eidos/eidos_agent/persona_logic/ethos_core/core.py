@@ -57,12 +57,45 @@ MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE = 0.1
 MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE = 0.05
 MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE = -0.15
 MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE = 0.05
-HEXUS_MIN = -1.0
+HEXUS_MIN = -1.0 # Note: New Hexus scores are 0.0 to 1.0. This constant might need review if used for clamping.
 HEXUS_MAX = 1.0
 DEFAULT_HEXUS_SCORES = {
-    "general_caution": 0.0,
-    "user_engagement_proactivity": 0.0,
-    "brevity_preference": 0.0
+    "joy": 0.5,                        # 0.0 (none) to 1.0 (max)
+    "stress": 0.2,                     # 0.0 (none) to 1.0 (max)
+    "curiosity": 0.6,                  # 0.0 (none) to 1.0 (max)
+    "loneliness": 0.3,                 # 0.0 (none) to 1.0 (max)
+    "ambition": 0.5,                   # 0.0 (none) to 1.0 (max)
+    "tiredness": 0.2,                  # 0.0 (none) to 1.0 (max)
+    "comfort": 0.6,                    # 0.0 (none) to 1.0 (max)
+    "focus": 0.7,                      # 0.0 (none) to 1.0 (max)
+    "impulsiveness": 0.3,              # 0.0 (none) to 1.0 (max)
+    "resentment": 0.1,                 # 0.0 (none) to 1.0 (max)
+    "contentment": 0.5,                # 0.0 (none) to 1.0 (max)
+    "melancholy": 0.2,                 # 0.0 (none) to 1.0 (max)
+    "craving_connection": 0.4,         # 0.0 (none) to 1.0 (max)
+    # Existing ones, adjust if their range/meaning changes, or remove if superseded
+    "general_caution": 0.3,            # Assuming 0-1 scale now, previously 0.0
+    "user_engagement_proactivity": 0.4,# Assuming 0-1 scale now, previously 0.0
+    "brevity_preference": 0.5          # Assuming 0-1 scale now, previously 0.0
+}
+
+HEXUS_BASELINES = {
+    "joy": 0.4,
+    "stress": 0.1,
+    "curiosity": 0.5,
+    "loneliness": 0.2,
+    "ambition": 0.3,
+    "tiredness": 0.1,
+    "comfort": 0.5,
+    "focus": 0.5,
+    "impulsiveness": 0.2,
+    "resentment": 0.05,
+    "contentment": 0.5,
+    "melancholy": 0.1,
+    "craving_connection": 0.3,
+    "general_caution": 0.2, # Baseline for pre-existing
+    "user_engagement_proactivity": 0.2, # Baseline for pre-existing
+    "brevity_preference": 0.5 # Baseline for pre-existing
 }
 
 class EthosCore:
@@ -74,8 +107,8 @@ class EthosCore:
         self.task_last_run_times_file_path = self.memory_storage.memory_db_path.parent / TASK_LAST_RUN_TIMES_FILENAME
         self._task_last_run_times_cache: Dict[str, datetime] = self._load_task_last_run_times()
 
-        self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE}
-        self.last_mood_update_time: datetime = datetime.now(timezone.utc)
+        # self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE} # Removed
+        # self.last_mood_update_time: datetime = datetime.now(timezone.utc) # Removed
         self.persona_directives: List[str] = self._load_persona_from_file()
         self.hexus_scores: Dict[str, float] = self._load_hexus_scores()
 
@@ -432,54 +465,92 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-    def update_mood_on_interaction(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
-        if not self.config.ENABLE_MOOD_SIMULATION:
+    def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
+        """
+        Processes user interaction details to update relevant Hexus scores.
+        """
+        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
         
-        try:
-            valence_shift, arousal_shift = 0.0, 0.0
-            
-            # Base shift for successful interaction (assuming if this is called, interaction was somewhat successful)
-            valence_shift += MOOD_SHIFT_VALENCE_SUCCESS
-            arousal_shift += MOOD_SHIFT_AROUSAL_SUCCESS
+        logger.debug(f"Processing interaction for Hexus update. Input: '{user_input_text[:50]}...'")
 
-            if image_provided:
-                valence_shift += 0.05  # Slightly more positive for engaging with an image
-                arousal_shift += 0.02
-            if document_provided:
-                valence_shift += 0.03
-                arousal_shift += 0.01
-            
-            input_lower = (user_input_text or "").lower()
-            # More nuanced keyword lists
-            positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant']
-            negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good']
-            question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me']
+        input_lower = (user_input_text or "").lower()
+
+        # Define keyword lists (can be expanded and refined)
+        positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant', 'appreciate it']
+        negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good', "didn't work", 'frustrating']
+        question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me', 'can you', 'could you']
+        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this'] # Could indicate stress or need for focus
+
+        # Base interaction effect (general engagement)
+        self._apply_hexus_change('user_engagement_proactivity', 0.01, "general interaction") # Small bump for any interaction
+        self._apply_hexus_change('focus', 0.02, "general interaction")
+
+        if image_provided:
+            self._apply_hexus_change('curiosity', 0.03, "image provided by user")
+            self._apply_hexus_change('focus', 0.01, "image provided by user")
+        if document_provided:
+            self._apply_hexus_change('curiosity', 0.02, "document provided by user")
+            self._apply_hexus_change('focus', 0.03, "document provided by user")
+
+        # Keyword-based adjustments
+        if any(kw in input_lower for kw in positive_keywords):
+            self._apply_hexus_change('joy', 0.15, "positive keywords in user input")
+            self._apply_hexus_change('contentment', 0.1, "positive keywords in user input")
+            self._apply_hexus_change('stress', -0.05, "positive keywords in user input")
+            self._apply_hexus_change('resentment', -0.02, "positive keywords in user input")
+
+        if any(kw in input_lower for kw in negative_keywords):
+            self._apply_hexus_change('stress', 0.15, "negative keywords in user input")
+            self._apply_hexus_change('resentment', 0.1, "negative keywords in user input")
+            self._apply_hexus_change('joy', -0.1, "negative keywords in user input")
+            self._apply_hexus_change('contentment', -0.05, "negative keywords in user input")
+            self._apply_hexus_change('focus', 0.05, "negative keywords indicating a problem to solve")
 
 
-            if any(kw in input_lower for kw in positive_keywords):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
-            
-            if any(kw in input_lower for kw in negative_keywords):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE # This is additive, so a negative value
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            
-            if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
-                arousal_shift += 0.03 # Questions increase arousal
-                valence_shift += 0.01 # Mildly positive due to engagement
+        if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
+            self._apply_hexus_change('curiosity', 0.05, "user asked a question")
+            self._apply_hexus_change('focus', 0.03, "user asked a question, requires focus")
+            self._apply_hexus_change('user_engagement_proactivity', 0.02, "user asked a question")
 
-            # Update current_mood (ensure it's clamped)
-            self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood.get('valence', MOOD_VALENCE_BASELINE) + valence_shift))
-            self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood.get('arousal', MOOD_AROUSAL_BASELINE) + arousal_shift))
-            
-            self.last_mood_update_time = datetime.now(timezone.utc) # Update timestamp
-            
-            logger.debug(f"Mood updated after interaction: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f} (Shifts: v={valence_shift:+.3f}, a={arousal_shift:+.3f})")
 
-        except Exception as e:
-            logger.error(f"Error updating mood on interaction: {e}", exc_info=True)    
-    
+        if any(kw in input_lower for kw in problem_keywords):
+            self._apply_hexus_change('stress', 0.05, "user mentioned a problem/issue")
+            self._apply_hexus_change('focus', 0.05, "user mentioned a problem, requires focus")
+
+        # Example: Length of interaction (very simplified)
+        if pathos_response_text and len(pathos_response_text) > 200: # Longer, more involved response
+            self._apply_hexus_change('focus', 0.02, "generated a detailed response")
+            self._apply_hexus_change('tiredness', 0.01, "generated a detailed response")
+        elif pathos_response_text and len(pathos_response_text) < 50: # Short response
+             self._apply_hexus_change('brevity_preference', 0.01, "generated a brief response")
+
+
+    def _apply_hexus_change(self, dimension_name: str, change_amount: float, reason: Optional[str] = None):
+        """
+        Applies a change to a specified Hexus score dimension, clamps it, and logs the change.
+        """
+        if dimension_name not in self.hexus_scores:
+            logger.warning(f"Hexus update: Dimension '{dimension_name}' not found in self.hexus_scores. Cannot apply change.")
+            return
+
+        original_value = self.hexus_scores[dimension_name]
+        new_value = original_value + change_amount
+
+        # Clamp the new value (assuming all Hexus scores are 0.0 to 1.0)
+        clamped_value = max(0.0, min(1.0, new_value))
+
+        if abs(clamped_value - original_value) > 1e-4: # Only log and save if change is significant
+            self.hexus_scores[dimension_name] = clamped_value
+            log_message = f"Hexus score '{dimension_name}' changed by {change_amount:+.3f} to {clamped_value:.3f}."
+            if reason:
+                log_message += f" Reason: {reason}."
+            logger.info(log_message)
+            self._save_hexus_scores() # Persist changes immediately
+        else:
+            logger.debug(f"Hexus score '{dimension_name}' change {change_amount:+.3f} not significant enough to alter value from {original_value:.3f}.")
+
+
     async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
         dream_source_filter = "oneiros_dream_cycle" # Filter by source metadata
@@ -1125,19 +1196,70 @@ class EthosCore:
         self._save_task_last_run_time("EthosForgetting", now)
         logger.info("--- Ethos: Managed Forgetting Cycle Finished (Placeholder) ---")
 
-    async def run_hexus_decay(self): # ADDED METHOD (Placeholder)
-        """Placeholder for Hexus score decay over time."""
+    async def run_hexus_decay(self):
+        """
+        Applies decay to Hexus scores, moving them towards their defined baselines.
+        This method is called periodically by _periodic_hexus_decay_task.
+        """
         now = datetime.now(timezone.utc)
-        logger.debug("--- Ethos: Running Hexus Decay (Placeholder) ---")
-        # Actual Hexus decay logic would go here.
-        # For example, scores might slowly revert to a baseline.
-        decay_factor = 0.99 # Example
-        for key in self.hexus_scores:
-            self.hexus_scores[key] *= decay_factor
-        self._save_hexus_scores()
+        logger.info("--- Ethos: Running Hexus Decay Cycle ---")
+
+        decay_rate_per_cycle = self.ethos_config.get('hexus_decay_rate_per_cycle', 0.005)
+        # hexus_decay_interval_seconds = self.ethos_config.get('hexus_decay_interval_seconds', 3600.0) # Not directly used in per-cycle formula
+
+        # Activity-aware decay - Placeholder for future enhancement
+        # current_activity_type = None
+        # if self.chronos_engine:
+        #     try:
+        #         # This would ideally be an async call if ChronosEngine methods are async,
+        #         # but run_hexus_decay is currently synchronous.
+        #         # pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
+        #         # current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
+        #         # if current_activity_slot:
+        #         # current_activity_type = current_activity_slot.activity_type
+        #         logger.debug("EthosCore Hexus Decay: Activity-aware adjustments (placeholder).")
+        #     except Exception as e:
+        #         logger.warning(f"EthosCore Hexus Decay: Could not get current activity for awareness: {e}")
+        # else:
+        #     logger.debug("EthosCore Hexus Decay: ChronosEngine not available for activity-aware decay.")
+
+
+        changed_scores = False
+        for key, current_value in list(self.hexus_scores.items()): # Iterate over a copy if modifying
+            baseline = HEXUS_BASELINES.get(key)
+
+            if baseline is None:
+                logger.warning(f"Hexus decay: No baseline defined for '{key}'. Skipping decay for this score.")
+                continue
+
+            # Simplified activity-aware baseline adjustment (placeholder)
+            # effective_baseline = baseline
+            # if current_activity_type == 'resting' or current_activity_type == 'sleeping':
+            #     if key == 'stress': effective_baseline = 0.05
+            #     if key == 'tiredness': effective_baseline = 0.0
+            # elif current_activity_type == 'working':
+            #     if key == 'focus': effective_baseline = 0.8 # Decay towards higher focus if working
+            #     if key == 'tiredness': effective_baseline = 0.3 # Tiredness might settle higher if working
+
+            new_value = current_value - (current_value - baseline) * decay_rate_per_cycle
+
+            # Clamping (assuming all Hexus scores are 0.0 to 1.0)
+            clamped_new_value = max(0.0, min(1.0, new_value))
+
+            if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
+                self.hexus_scores[key] = clamped_new_value
+                changed_scores = True
+                logger.debug(f"Hexus decay: '{key}' changed from {current_value:.3f} to {clamped_new_value:.3f} (baseline: {baseline:.3f})")
+
+        if changed_scores:
+            self._save_hexus_scores()
+            logger.info(f"Hexus scores updated and saved after decay. Current scores: { {k: round(v, 3) for k,v in self.hexus_scores.items()} }")
+        else:
+            logger.info("Hexus decay cycle: No significant changes to Hexus scores.")
+
         self.last_hexus_decay_time = now
         self._save_task_last_run_time("HexusDecay", now)
-        logger.debug(f"--- Ethos: Hexus Decay Finished (Placeholder). Scores: {self.hexus_scores} ---")
+        logger.info(f"--- Ethos: Hexus Decay Cycle Finished ---")
 
     async def get_background_tasks(self) -> List[asyncio.Task]:
         """Create and return background tasks for EthosCore operations."""
@@ -1413,40 +1535,95 @@ class EthosCore:
             logger.error(f"Error in chronos_bridge_add_event: {e}", exc_info=True)
             return None
             
-    def get_current_mood(self) -> Dict[str, float]: # ADDED METHOD
-        """Returns the current mood state of Pathos."""
-        if not self.config.ENABLE_MOOD_SIMULATION:
-            return {"valence": 0.0, "arousal": 0.0, "simulation_disabled": True}
-        return self.current_mood
+    def get_current_mood(self) -> Dict[str, Any]:
+        """
+        Derives a simplified valence/arousal representation from Hexus scores.
+        Also includes all Hexus scores for more detailed context if needed.
+        Returns a dictionary that includes 'valence', 'arousal', 'name' (derived),
+        and a 'hexus_snapshot' of all current Hexus scores.
+        """
+        if not self.config.ENABLE_MOOD_SIMULATION: # Keep this check if Hexus is part of mood simulation
+            return {"valence": 0.0, "arousal": 0.0, "name": "neutral", "simulation_disabled": True, "hexus_snapshot": self.hexus_scores.copy()}
 
-    async def update_mood_state(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+        # Simple derivation:
+        # Valence: influenced by joy, contentment vs. stress, resentment, melancholy
+        # Arousal: influenced by curiosity, focus, ambition, impulsiveness vs. tiredness
+
+        joy_val = self.hexus_scores.get("joy", 0.0)
+        contentment_val = self.hexus_scores.get("contentment", 0.0)
+        stress_val = self.hexus_scores.get("stress", 0.0)
+        resentment_val = self.hexus_scores.get("resentment", 0.0)
+        melancholy_val = self.hexus_scores.get("melancholy", 0.0)
+
+        curiosity_val = self.hexus_scores.get("curiosity", 0.0)
+        focus_val = self.hexus_scores.get("focus", 0.0)
+        ambition_val = self.hexus_scores.get("ambition", 0.0)
+        impulsiveness_val = self.hexus_scores.get("impulsiveness", 0.0)
+        tiredness_val = self.hexus_scores.get("tiredness", 0.0)
+
+        derived_valence = (joy_val + contentment_val) - (stress_val + resentment_val + melancholy_val)
+        derived_arousal = (curiosity_val + focus_val + ambition_val + impulsiveness_val) / 2.0 - tiredness_val
+
+        # Clamp derived valence/arousal to -1.0 to 1.0 for consistency if used by other systems expecting that range.
+        derived_valence = max(-1.0, min(1.0, derived_valence))
+        derived_arousal = max(-1.0, min(1.0, derived_arousal))
+
+        # Determine a qualitative name (simplified)
+        mood_name = "neutral"
+        if derived_valence > 0.3:
+            if derived_arousal > 0.3: mood_name = "excited"
+            else: mood_name = "pleased"
+        elif derived_valence < -0.3:
+            if derived_arousal > 0.3: mood_name = "agitated"
+            else: mood_name = "displeased"
+        elif derived_arousal > 0.5: mood_name = "engaged"
+        elif derived_arousal < -0.5: mood_name = "calm"
+
+
+        return {
+            "valence": derived_valence,
+            "arousal": derived_arousal,
+            "name": mood_name, # Simplified qualitative name
+            "simulation_disabled": False, # Assuming if this runs, simulation is enabled
+            "hexus_snapshot": self.hexus_scores.copy() # Include all current Hexus scores
+        }
+
+    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
         """
-        Updates Pathos's mood based on an event.
-        This is a simplified placeholder. A more complex MoodEngine would live here.
+        Updates Hexus scores based on various system or feedback events.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION:
+        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to mood sim enable flag
             return
 
-        valence_shift, arousal_shift = 0.0, 0.0
+        logger.debug(f"Processing event '{event_type}' for Hexus update. Payload: {payload}")
 
         if event_type == 'feedback':
             fb_type = payload.get('feedback_type') if payload else None
             rating = payload.get('rating') if payload else None
+            reason = f"feedback event (type: {fb_type}, rating: {rating})"
+
             if fb_type == 'positive' or (rating is not None and rating > 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
+                self._apply_hexus_change('joy', 0.1, reason)
+                self._apply_hexus_change('contentment', 0.1, reason)
+                self._apply_hexus_change('stress', -0.05, reason)
             elif fb_type == 'negative' or (rating is not None and rating < 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            elif fb_type == 'correction': # Corrections might be slightly negative initially but lead to positive if learned
-                valence_shift -= 0.05 
-                arousal_shift += 0.03
-        # Add other event_types: 'successful_tool_use', 'failed_tool_use', 'new_learning', 'dream_recalled' etc.
+                self._apply_hexus_change('stress', 0.1, reason)
+                self._apply_hexus_change('resentment', 0.05, reason)
+                self._apply_hexus_change('joy', -0.1, reason)
+                self._apply_hexus_change('contentment', -0.05, reason)
+            elif fb_type == 'correction':
+                self._apply_hexus_change('curiosity', 0.05, reason) # Learning from correction
+                self._apply_hexus_change('stress', 0.02, f"initial reaction to correction ({payload.get('text','')[:30]}...)")
+
+        # Example: Add other event_types for tool usage, new learnings, etc.
+        # elif event_type == 'successful_tool_use':
+        #     tool_name = payload.get('tool_name', 'unknown_tool')
+        #     self._apply_hexus_change('focus', 0.05, f"successful use of {tool_name}")
+        #     self._apply_hexus_change('contentment', 0.03, f"successful use of {tool_name}")
         
-        self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['valence'] + valence_shift))
-        self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + arousal_shift))
-        self.last_mood_update_time = datetime.now(timezone.utc)
-        logger.debug(f"Mood updated due to '{event_type}'. New mood: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f}")
+        # elif event_type == 'new_learning_achieved':
+        #     self._apply_hexus_change('curiosity', 0.1, "new learning achieved")
+        #     self._apply_hexus_change('joy', 0.05, "new learning achieved")
 
     async def retrieve_relevant_past_interactions(
         self,

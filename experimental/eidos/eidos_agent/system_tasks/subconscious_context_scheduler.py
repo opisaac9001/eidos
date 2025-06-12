@@ -215,45 +215,37 @@ def perform_scheduled_subconscious_context_sync():
             else:
                 logger.warning("Scheduler: Scheduled context (conversation/action) sync with subconscious node failed or partially failed.")
 
-            # Simulate fetching mood from EthosCore and sync it
-            if _ethos_core_instance and _ethos_core_instance.mood_engine and _main_event_loop:
+            # Fetch Hexus scores from EthosCore and sync them
+            if _ethos_core_instance: # No need for main_event_loop here as get_current_mood is sync
                 try:
-                    logger.debug("Scheduler: Attempting to fetch real Eidos mood via run_coroutine_threadsafe...")
-                    # This assumes EthosCore has a mood_engine with an async get_current_mood_snapshot method
-                    coro_mood = _ethos_core_instance.mood_engine.get_current_mood_snapshot()
-                    future_mood = asyncio.run_coroutine_threadsafe(coro_mood, _main_event_loop)
-                    current_eidos_mood = future_mood.result(timeout=5) # Timeout for mood fetching
+                    logger.debug("Scheduler: Attempting to fetch current Hexus scores from EthosCore...")
+                    # EthosCore.get_current_mood() returns a dict including 'hexus_snapshot'
+                    current_eidos_mood_data = _ethos_core_instance.get_current_mood()
+                    hexus_snapshot_to_sync = current_eidos_mood_data.get("hexus_snapshot")
 
-                    if current_eidos_mood:
-                        logger.info(f"Scheduler: Fetched Eidos mood for sync: {current_eidos_mood}")
-                        sync_mood_success = sync_mood_to_subconscious(current_eidos_mood)
+                    if hexus_snapshot_to_sync and isinstance(hexus_snapshot_to_sync, dict):
+                        logger.info(f"Scheduler: Fetched Eidos Hexus snapshot for sync: {hexus_snapshot_to_sync}")
+                        sync_mood_success = sync_mood_to_subconscious(hexus_snapshot_to_sync)
                         if sync_mood_success:
-                            logger.info("Scheduler: Mood synced to subconscious node successfully.")
+                            logger.info("Scheduler: Hexus snapshot synced to subconscious node successfully.")
                         else:
-                            logger.warning("Scheduler: Mood sync to subconscious node failed.")
+                            logger.warning("Scheduler: Hexus snapshot sync to subconscious node failed.")
+                    elif current_eidos_mood_data.get("simulation_disabled"):
+                        logger.info("Scheduler: Mood/Hexus simulation is disabled in EthosCore. Not syncing Hexus.")
                     else:
-                        logger.warning("Scheduler: EthosCore mood engine returned no mood data.")
+                        logger.warning("Scheduler: EthosCore.get_current_mood() did not return a valid 'hexus_snapshot'. Current data: {current_eidos_mood_data}")
 
-                except AttributeError:
-                     logger.warning("Scheduler: EthosCore.mood_engine or get_current_mood_snapshot method not found. Using simulated mood.")
-                     # Fallback to simulated mood if mood_engine or method is missing
-                     simulated_eidos_mood = {
-                        "impulsiveness": round(random.uniform(0.2, 0.8), 2),
-                        "proactivity": round(random.uniform(0.3, 0.7), 2),
-                        "valence": round(random.uniform(-0.5, 0.5), 2),
-                        "focus": round(random.uniform(0.1, 0.9), 2)
-                     }
-                     logger.info(f"Scheduler: Using simulated Eidos mood for sync: {simulated_eidos_mood}")
-                     sync_mood_success = sync_mood_to_subconscious(simulated_eidos_mood) # type: ignore
-                     if sync_mood_success: logger.info("Scheduler: Simulated mood synced to subconscious node successfully.")
-                     else: logger.warning("Scheduler: Simulated mood sync to subconscious node failed.")
-
-                except asyncio.TimeoutError:
-                    logger.error("Scheduler: Timeout fetching real Eidos mood.")
                 except Exception as e_mood:
-                    logger.error(f"Scheduler: Error fetching or syncing real Eidos mood: {e_mood}", exc_info=True)
+                    logger.error(f"Scheduler: Error fetching or syncing Eidos Hexus scores: {e_mood}", exc_info=True)
+                    # Fallback to sending a minimal simulated mood if there's an error fetching the real one
+                    logger.warning("Scheduler: Using minimal simulated Hexus scores for sync due to error.")
+                    simulated_hexus_fallback = { # Provide some basic Hexus scores
+                        "focus": random.uniform(0.3, 0.7),
+                        "curiosity": random.uniform(0.4, 0.8)
+                    }
+                    sync_mood_to_subconscious(simulated_hexus_fallback)
             else:
-                logger.warning("Scheduler: EthosCore instance, mood_engine, or event loop not available, skipping real mood sync.")
+                logger.warning("Scheduler: EthosCore instance not available, skipping Hexus scores sync.")
                 # Fallback to simulated mood if core components are missing
                 simulated_eidos_mood = {
                     "impulsiveness": round(random.uniform(0.2, 0.8), 2),

@@ -209,7 +209,32 @@ class FirmamentModule:
         logger.debug("FirmamentModule: Starting simulation tick.")
 
         activity_slot = await self._get_current_activity_slot() # Actual scheduled slot or None
-        mood = await self._get_current_mood() or {"name": "unknown", "valence": 0.0, "arousal": 0.0}
+        mood_dict = await self._get_current_mood() or {} # Ensure mood_dict is a dict
+        # Ensure ethos_core is available for Hexus updates
+        if not self.ethos_core:
+            logger.error("FirmamentModule: EthosCore not available, cannot apply Hexus changes in simulation tick.")
+            return
+
+        # --- Activity-Based Hexus Adjustments (Continuous) ---
+        if activity_slot and activity_slot.activity_type:
+            activity_type = activity_slot.activity_type.lower()
+            reason = f"ongoing {activity_type} activity"
+            if activity_type in ['resting', 'sleeping', 'leisure_passive']:
+                self.ethos_core._apply_hexus_change('tiredness', -0.02, reason)
+                self.ethos_core._apply_hexus_change('stress', -0.01, reason)
+                self.ethos_core._apply_hexus_change('comfort', 0.01, reason)
+            elif activity_type in ['work_deep', 'learning', 'work_focused']:
+                self.ethos_core._apply_hexus_change('focus', 0.01, reason)
+                self.ethos_core._apply_hexus_change('tiredness', 0.005, reason) # Slow increase or slower decay
+                self.ethos_core._apply_hexus_change('ambition', 0.002, reason)
+            elif activity_type in ['social', 'leisure_active']:
+                self.ethos_core._apply_hexus_change('joy', 0.01, reason)
+                self.ethos_core._apply_hexus_change('loneliness', -0.01, reason)
+                self.ethos_core._apply_hexus_change('craving_connection', -0.005, reason)
+            elif activity_type in ['chore', 'work_routine']:
+                self.ethos_core._apply_hexus_change('tiredness', 0.003, reason)
+                self.ethos_core._apply_hexus_change('contentment', 0.005, f"{reason} (sense of completion)")
+
 
         # Pathos's internal thought generation and deviation based on it is REMOVED from here.
         # That functionality is now driven by impulses from the subconscious node via receive_subconscious_intention.
@@ -278,11 +303,23 @@ class FirmamentModule:
                         "activity_slot_name_at_time": npc_context_slot.slot_name,
                         "activity_title_at_time": npc_context_slot.activity_title,
                         "location_at_time": npc_context_slot.activity_details.location_context if npc_context_slot.activity_details else "Unknown",
-                        "mood_name_at_time": mood.get("name"), "mood_valence_at_time": mood.get("valence"),
-                        "mood_arousal_at_time": mood.get("arousal"), "timestamp": current_time_for_memory.isoformat()
+                        "mood_name_at_time": mood_dict.get("name"), "mood_valence_at_time": mood_dict.get("valence"),
+                        "mood_arousal_at_time": mood_dict.get("arousal"), "timestamp": current_time_for_memory.isoformat()
                     }
                     entry_data = {"type": "npc_dialogue_event", "content": dialogue_data["summary"] or "A brief NPC interaction occurred.", "metadata": event_metadata, "salience": random.uniform(0.4, 0.65)}
-                    if self.ethos_core: await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
+                    if self.ethos_core:
+                        await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
+                        # Placeholder for Hexus changes based on NPC dialogue outcome
+                        logger.info("FirmamentModule: NPC Dialogue occurred. Placeholder for Hexus updates based on dialogue_data.")
+                        # Example (actual logic would parse dialogue_data):
+                        # if dialogue_data.get("outcome") == "positive":
+                        #     self.ethos_core._apply_hexus_change('joy', 0.1, "positive NPC interaction")
+                        #     self.ethos_core._apply_hexus_change('loneliness', -0.1, "positive NPC interaction")
+                        # elif dialogue_data.get("outcome") == "negative":
+                        #     self.ethos_core._apply_hexus_change('stress', 0.1, "negative NPC interaction")
+                        #     self.ethos_core._apply_hexus_change('resentment', 0.05, "negative NPC interaction")
+                        # if dialogue_data.get("new_facts_learned_by_pathos"):
+                        #     self.ethos_core._apply_hexus_change('curiosity', 0.05, "learned new info from NPC")
             else:
                 logger.info("FirmamentModule: No NPC profile determined (specific or generic). Skipping NPC dialogue simulation.")
         else:
@@ -390,7 +427,7 @@ class FirmamentModule:
         if not current_mood: # Fallback if not in metadata
             current_mood = await self._get_current_mood()
         if not current_mood: # Fallback if Ethos fails
-            current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0, "impulsiveness": 0.5}
+            current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0, "impulsiveness": 0.5, "hexus_snapshot": {}}
 
 
         # --- NPC Dialogue (if warranted by intention and context) ---
@@ -454,12 +491,31 @@ class FirmamentModule:
                 await self._store_activity_log(
                     simulated_action_snippet,
                     slot_to_log_against,
-                    current_mood, # Mood at time of intention
+                    current_mood, # Mood at time of intention (this now includes hexus_snapshot)
                     original_intention_memory_id,
                     extra_metadata={"source_subconscious_intention_text": intention[:200]} # Add part of intention for context
                 )
+
+                # Hexus updates based on simulated action from intention
+                if self.ethos_core:
+                    intention_lower = intention.lower()
+                    action_reason = f"simulated action for intention: {intention[:50]}..."
+                    if "curious" in intention_lower or "wonder" in intention_lower or "learn" in intention_lower:
+                        self.ethos_core._apply_hexus_change('curiosity', 0.05, action_reason)
+                    if "connect" in intention_lower or "talk to" in intention_lower or "social" in intention_lower:
+                        self.ethos_core._apply_hexus_change('craving_connection', 0.03, action_reason) # Small increase in drive, or joy if action implies success
+                        self.ethos_core._apply_hexus_change('joy', 0.02, action_reason)
+                    if "work on" in intention_lower or "focus on" in intention_lower or "task" in intention_lower or "project" in intention_lower:
+                        self.ethos_core._apply_hexus_change('focus', 0.05, action_reason)
+                        self.ethos_core._apply_hexus_change('ambition', 0.02, action_reason)
+                    # Generic positive outcome of acting on an intention
+                    self.ethos_core._apply_hexus_change('contentment', 0.01, action_reason)
+
             else:
                 logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
+                if self.ethos_core: # Minor stress/resentment if intention wasn't actionable by simulation
+                    self.ethos_core._apply_hexus_change('stress', 0.01, f"failed to simulate action for intention: {intention[:50]}...")
+
 
         except Exception as e:
             logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)
