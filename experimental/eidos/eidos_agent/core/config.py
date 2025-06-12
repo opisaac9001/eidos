@@ -99,6 +99,14 @@ class HomeAssistantConfig(TypedDict, total=False):
     timeout: int
     ha_weather_entity_id: Optional[str]
 
+class FirmamentModuleConfig(TypedDict, total=False):
+    enable_firmament: bool
+    firmament_llm_role: str
+    intention_based_activity_duration_minutes: int
+    intention_based_activity_type: str # Should be ActivityType literal if available
+    enable_llm_status_classification: bool
+    simulation_tick_interval_seconds: float # New field for scheduling
+
 class VoiceConfig(TypedDict, total=False):
     energy_threshold: int
     default_voice: str
@@ -237,6 +245,15 @@ class Config:
             "presence_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY") else None,
             "frequency_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_RESEARCH_TIKTOKEN_NAME", "cl100k_base") # Added
+        },
+        "FIRMAMENT_STATUS_CLASSIFIER": { # Added for Firmament
+            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_LOGOS_TECHNE_URL", "http://localhost:1234/v1")), # Default to LOGOS_TECHNE URL
+            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
+            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY", "lm-studio")), # Default to LOGOS_TECHNE API Key
+            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.3)),
+            "timeout": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIMEOUT", 10.0)),
+            "max_tokens": int(os.getenv("LLM_FIRMAMENT_CLASSIFIER_MAX_TOKENS", 256)),
+            "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIKTOKEN_NAME", "cl100k_base")
         }
     }
 
@@ -509,6 +526,14 @@ class Config:
     LLM_MAX_PROMPT_TOKENS_MAIN: int = int(os.getenv("LLM_MAX_PROMPT_TOKENS_MAIN", "7000")) # Max tokens for the entire prompt sent to Pathos LLM
     LLM_RESPONSE_BUFFER_TOKENS: int = int(os.getenv("LLM_RESPONSE_BUFFER_TOKENS", "1000")) # Reserved for LLM's response generation
 
+    FIRMAMENT: FirmamentModuleConfig = { # Default Firmament config
+        "enable_firmament": os.getenv("FIRMAMENT_ENABLE", "True").lower() == "true", # Changed default to "True"
+        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"),
+        "intention_based_activity_duration_minutes": int(os.getenv("FIRMAMENT_INTENTION_ACTIVITY_DURATION_MINUTES", "15")),
+        "intention_based_activity_type": os.getenv("FIRMAMENT_INTENTION_ACTIVITY_TYPE", "reflective"),
+        "enable_llm_status_classification": os.getenv("FIRMAMENT_ENABLE_LLM_STATUS_CLASSIFICATION", "True").lower() == "true",
+        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", "60.0")), # Default to 60 seconds
+    }
 
     @staticmethod
     def get_llm_config(role: str) -> Optional[LLMConfig]:
@@ -540,6 +565,8 @@ class Config:
     def get_admin_password() -> Optional[str]: return Config.EIDOS_ADMIN_PASSWORD
     @staticmethod
     def get_bookshelf_config() -> Optional[BookshelfConfig]: return Config.BOOKSHELF
+    @staticmethod
+    def get_firmament_module_config() -> FirmamentModuleConfig: return Config.FIRMAMENT
 
     @staticmethod
     def setup():

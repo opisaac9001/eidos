@@ -28,9 +28,43 @@ if not logger.handlers:
 
 # --- Client Functions ---
 
+def get_subconscious_thoughts_from_node() -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the current thoughts, mood, and summary from the subconscious node.
+    This is intended to be called by the Eidos agent.
+    """
+    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/current_thoughts"
+    default_response = {
+        "recent_thoughts": ["The subconscious node is quiet or initializing."],
+        "mood": {},
+        "summary": "No summary available from subconscious node."
+    }
+    try:
+        response = requests.get(url, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
+        return response.json()
+    except requests.exceptions.Timeout:
+        logger.warning(f"Timeout connecting to subconscious node at {url} for thoughts.")
+        return default_response
+    except requests.exceptions.ConnectionError:
+        logger.warning(f"Connection error when trying to reach subconscious node at {url} for thoughts.")
+        return default_response
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error {e.response.status_code} from subconscious node at {url} for thoughts: {e.response.text[:200]}")
+        return default_response
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON response for thoughts from subconscious node at {url}: {e}")
+        return default_response
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while fetching thoughts from {url}: {e}", exc_info=True)
+        return default_response
+
 def get_current_thoughts() -> Optional[Dict]:
     """
     Retrieves the current thoughts, mood, and summary from the subconscious node.
+    NOTE: This function seems to be a duplicate or predecessor of get_subconscious_thoughts_from_node.
+    It's kept for now if other parts of the system (like the client's own test script) use it,
+    but Eidos agent should prefer get_subconscious_thoughts_from_node.
 
     Returns:
         A dictionary containing 'recent_thoughts', 'mood', and 'summary' if successful,
@@ -42,11 +76,14 @@ def get_current_thoughts() -> Optional[Dict]:
         response = requests.get(url, timeout=DEFAULT_TIMEOUT)
         response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
         return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to get thoughts from subconscious node at {url}: {e}")
-        return default_response # Or return None, depending on how Eidos should handle this
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON response from subconscious node at {url}: {e}")
+    except requests.exceptions.RequestException as e: # General request exception
+        logger.error(f"Failed to get thoughts (via get_current_thoughts) from subconscious node at {url}: {e}")
+        return default_response
+    except json.JSONDecodeError as e: # Specific JSON decode error
+        logger.error(f"Failed to decode JSON response (via get_current_thoughts) from subconscious node at {url}: {e}")
+        return default_response
+    except Exception as e: # Catch-all for any other unexpected errors
+        logger.error(f"An unexpected error occurred in get_current_thoughts at {url}: {e}", exc_info=True)
         return default_response
 
 
@@ -169,13 +206,23 @@ if __name__ == '__main__':
     # Ensure the subconscious_node API server is running on http://localhost:8000
     logger.info("Testing subconscious client...")
 
-    thoughts_data = get_current_thoughts()
-    if thoughts_data:
-        logger.info(f"Current thoughts from Pathos: {thoughts_data.get('summary')}")
-        logger.info(f"Recent: {thoughts_data.get('recent_thoughts')}")
-        logger.info(f"Mood: {thoughts_data.get('mood')}")
-    else:
-        logger.warning("Could not retrieve thoughts from Pathos.")
+    logger.info("\n--- Testing get_subconscious_thoughts_from_node ---")
+    eidos_thoughts = get_subconscious_thoughts_from_node()
+    if eidos_thoughts:
+        logger.info(f"Eidos received thoughts: {eidos_thoughts.get('summary')}")
+        logger.info(f"Recent from Eidos perspective: {eidos_thoughts.get('recent_thoughts')}")
+        logger.info(f"Mood from Eidos perspective: {eidos_thoughts.get('mood')}")
+    else: # Should not happen if default_response is always returned on error
+        logger.warning("Eidos could not retrieve thoughts (received None). This indicates an issue in error handling.")
+
+    # Optional: Test the older get_current_thoughts if needed for compatibility checks
+    # logger.info("\n--- Testing get_current_thoughts (legacy/test usage) ---")
+    # legacy_thoughts_data = get_current_thoughts()
+    # if legacy_thoughts_data:
+    #     logger.info(f"Legacy thoughts: {legacy_thoughts_data.get('summary')}")
+    # else:
+    #     logger.warning("Legacy could not retrieve thoughts.")
+
 
     logger.info("\nAttempting to sync context...")
     conv_summary = "User said: 'Tell me about the weather.' Pathos responded: (Thinking about rain)"

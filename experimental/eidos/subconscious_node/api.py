@@ -103,6 +103,41 @@ async def get_thoughts():
         "summary": summary
     }
 
+class NodeControlStatePayload(BaseModel):
+    node_state: str
+    daily_summary: Optional[str] = None
+
+class MoodSyncPayload(BaseModel):
+    mood_aspects: Dict[str, float]
+
+@app.post("/control/state", response_model=MessageResponse, tags=["Node Control"])
+async def set_node_state(payload: NodeControlStatePayload):
+    """
+    Sets the operational state of the subconscious node.
+    Optionally accepts a daily summary when transitioning to a sleeping state.
+    """
+    # Placeholder: Actual state transition logic would go into context_store or a dedicated state manager
+    logger.info(f"Received request to change node state to: {payload.node_state}")
+    if payload.daily_summary:
+        logger.info(f"Received daily summary for dreaming: {payload.daily_summary[:100]}...")
+        # Placeholder: Store summary for dream generation
+        context_store.set_daily_summary(payload.daily_summary) # Assuming such a function exists or is added
+
+    # Simulate state change
+    context_store.set_node_state(payload.node_state) # Assuming such a function exists or is added
+    return {"message": f"Node state changed to {payload.node_state}", "context": payload.node_state}
+
+@app.post("/control/mood", response_model=MessageResponse, tags=["Node Control"])
+async def sync_external_mood(payload: MoodSyncPayload):
+    """
+    Receives a mood snapshot from an external source (e.g., Eidos main agent)
+    and updates the subconscious node's internal mood.
+    """
+    logger.info(f"Received mood sync data: {payload.mood_aspects}")
+    # Update the internal mood state of the subconscious node
+    mood.update_mood_from_snapshot(payload.mood_aspects) # Assuming mood.py has such a function
+    return {"message": "Mood snapshot synced with subconscious node", "data": payload.mood_aspects}
+
 @app.post("/v1/pathos/impulse", response_model=MessageResponse, tags=["External Integration (Placeholder)"])
 async def receive_impulse(payload: ImpulsePayload):
     """

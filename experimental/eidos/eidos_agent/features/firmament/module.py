@@ -224,30 +224,46 @@ class FirmamentModule:
         # Since self-generated thoughts are removed, we can simplify this to always check for NPC interactions
         # if Firmament is not currently handling an ongoing Firmament-initiated spontaneous task (which is not a concept here anymore).        # For now, we'll just check if NPC interaction is warranted based on the current context.
         logger.debug("FirmamentModule: Checking for NPC interaction in simulation tick.")
-        if self._is_npc_interaction_warranted(npc_context_slot, None): # None for intention, as this is a general check
+
+        is_npc_warranted = self._is_npc_interaction_warranted(npc_context_slot, None) # None for intention, as this is a general check
+        logger.info(f"FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: {is_npc_warranted}")
+
+        if is_npc_warranted:
             npc_profile_to_use: Optional[NPCProfile] = None
             interaction_source_description = "activity"
+            logger.info("FirmamentModule: NPC interaction is warranted by placeholder logic.")
 
             if npc_context_slot and npc_context_slot.activity_details and isinstance(npc_context_slot.activity_details.metadata, dict): # Check if metadata exists
                 specific_npc_id = npc_context_slot.activity_details.metadata.get('npc_id')
                 specific_npc_name = npc_context_slot.activity_details.metadata.get('npc_name')
                 if specific_npc_id or specific_npc_name:
                     if self.ethos_core: npc_profile_to_use = await self.ethos_core.get_npc_profile(npc_id=specific_npc_id, name=specific_npc_name)
-                    if npc_profile_to_use: interaction_source_description = f"activity with known NPC {npc_profile_to_use.name}"
+                    if npc_profile_to_use:
+                        interaction_source_description = f"activity with known NPC {npc_profile_to_use.name}"
+                        logger.info(f"FirmamentModule: Specific NPC profile '{npc_profile_to_use.name}' found from activity context.")
 
             if not npc_profile_to_use:
+                logger.debug("FirmamentModule: No specific NPC from activity, attempting to determine generic NPC.")
                 npc_profile_to_use = self._determine_generic_npc_profile_for_context(npc_context_slot, None)
-                if npc_profile_to_use: interaction_source_description = f"activity with generic NPC ({npc_profile_to_use.name})"
+                if npc_profile_to_use:
+                    interaction_source_description = f"activity with generic NPC ({npc_profile_to_use.name})"
+                    logger.info(f"FirmamentModule: _determine_generic_npc_profile_for_context (placeholder) returned profile: {npc_profile_to_use.name}")
+                else:
+                    logger.info("FirmamentModule: _determine_generic_npc_profile_for_context (placeholder) returned None.")
+
 
             if npc_profile_to_use:
+                logger.info(f"FirmamentModule: Proceeding with NPC profile: {npc_profile_to_use.name} for simulated dialogue.")
                 initial_dialogue_context = f"Pathos is currently in activity '{npc_context_slot.activity_title}'"
                 if npc_context_slot.activity_details and npc_context_slot.activity_details.location_context:
                     initial_dialogue_context += f" at {npc_context_slot.activity_details.location_context}."
                 else: initial_dialogue_context += "."
+                logger.debug(f"FirmamentModule: Initial dialogue context for simulation: {initial_dialogue_context}")
 
                 dialogue_data = await self._simulate_npc_dialogue(npc_profile_to_use, initial_dialogue_context, mood)
+                logger.info(f"FirmamentModule: _simulate_npc_dialogue (placeholder) returned: {dialogue_data}")
                 if dialogue_data and dialogue_data.get("transcript"):
-                    logger.info(f"FirmamentModule: Simulated NPC dialogue ({interaction_source_description}): {dialogue_data.get('summary')}")
+                    logger.info(f"FirmamentModule: Placeholder _simulate_npc_dialogue returned data with a transcript. Summary: {dialogue_data.get('summary')}")
                     self.last_npc_interaction_time = time.time()
                     # Full storage logic for NPC dialogue...
                     current_time_for_memory = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
@@ -268,9 +284,9 @@ class FirmamentModule:
                     entry_data = {"type": "npc_dialogue_event", "content": dialogue_data["summary"] or "A brief NPC interaction occurred.", "metadata": event_metadata, "salience": random.uniform(0.4, 0.65)}
                     if self.ethos_core: await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
             else:
-                logger.debug("FirmamentModule: No specific or generic NPC profile identified for interaction in this tick.")
+                logger.info("FirmamentModule: No NPC profile determined (specific or generic). Skipping NPC dialogue simulation.")
         else:
-            logger.debug("FirmamentModule: NPC interaction not warranted in this tick.")
+            logger.info("FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder).")
 
         # Add other environmental simulations here if necessary.
 

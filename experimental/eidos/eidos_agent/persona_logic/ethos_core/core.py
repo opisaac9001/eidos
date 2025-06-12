@@ -21,6 +21,7 @@ import pytz # Added import
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from eidos_agent.features.oneiros import OneirosModule # Updated import
+    from eidos_agent.features.firmament.module import FirmamentModule # Added FirmamentModule
     from eidos_agent.core.connection_manager import ConnectionManager
     from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
@@ -108,6 +109,7 @@ class EthosCore:
         self.pathos_interface: Optional['PathosInterface'] = None
         self.logos_core: Optional['LogosCore'] = None
         self.chronos_engine: Optional['ChronosEngine'] = None
+        self.firmament_module: Optional[FirmamentModule] = None # Added FirmamentModule attribute
 
         self.system_user_ids: List[Optional[str]] = [
             "unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing",
@@ -181,6 +183,10 @@ class EthosCore:
 
     def set_chronos_engine(self, chronos_engine_instance: 'ChronosEngine'):
         self.chronos_engine = chronos_engine_instance
+
+    def set_firmament_module(self, firmament_module: 'FirmamentModule'): # Added setter
+        self.firmament_module = firmament_module
+        logger.info("EthosCore: FirmamentModule instance set.")
 
     async def close(self):
         logger.info("EthosCore close called. Saving Hexus scores and closing memory connection.")
@@ -1158,9 +1164,45 @@ class EthosCore:
             name="EthosHexusDecayTask"
         )
         tasks.append(hexus_task)
+
+        # Create background task for Firmament simulation loop
+        if self.firmament_module and self.config.get_firmament_module_config().get("enable_firmament"):
+            logger.info("EthosCore: Adding Firmament simulation loop to background tasks.")
+            firmament_task = asyncio.create_task(
+                self._firmament_simulation_loop(),
+                name="FirmamentSimulationLoopTask"
+            )
+            tasks.append(firmament_task)
+        elif self.firmament_module: # Module exists but is disabled in config
+            logger.info("EthosCore: FirmamentModule is present but disabled by configuration. Simulation loop not started.")
+        # else: Firmament module not set at all, no message needed here
         
         logger.info(f"EthosCore created {len(tasks)} background tasks")
         return tasks
+
+    async def _firmament_simulation_loop(self):
+        """Dedicated loop for Firmament simulation ticks."""
+        if not self.firmament_module: # Should not happen if task is started correctly
+            logger.error("EthosCore: Firmament module not set, cannot start simulation loop.")
+            return
+
+        fm_config = self.config.get_firmament_module_config()
+        # Use the new tick_interval_seconds from FirmamentModuleConfig
+        tick_interval = fm_config.get("simulation_tick_interval_seconds", 60.0)
+        logger.info(f"EthosCore: Starting Firmament simulation loop with tick interval: {tick_interval}s.")
+
+        while True:
+            try:
+                await self.firmament_module.run_simulation_tick()
+                await asyncio.sleep(tick_interval)
+            except asyncio.CancelledError:
+                logger.info("EthosCore: Firmament simulation loop cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"EthosCore: Error in Firmament simulation loop: {e}", exc_info=True)
+                # Decide on backoff strategy or continue after a delay
+                await asyncio.sleep(tick_interval * 2) # Wait longer after an error
+
 
     async def _periodic_reflection_task(self):
         """Periodic task for running reflection cycles."""
