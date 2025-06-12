@@ -12,3 +12,4 @@ python-docx>=1.1.0      # For DOCX parsing in document_parser.py
 wolframalpha>=5.0.0     # For Wolfram Alpha queries in handler.py
 tiktoken
 python-multipart
+requests>=2.31.0        # For HTTP requests in subconscious_node

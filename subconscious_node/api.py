@@ -14,12 +14,15 @@ from fastapi import FastAPI
 import uvicorn # For running the app with Uvicorn
 from pydantic import BaseModel
 from typing import List, Dict
+import multiprocessing
+import signal
+import sys
 
-# Assuming context_store.py, mood.py, utils.py, thinker.py are in the same package/directory
-from . import context_store
-from . import mood
-from . import utils
-from . import thinker # To access monologue_buffer
+# Import local modules using absolute imports
+import context_store
+import mood
+import utils
+import thinker # To access monologue_buffer
 
 # --- FastAPI App Instance ---
 app = FastAPI(
@@ -120,8 +123,29 @@ async def root():
 # --- Main Block to Run the App ---
 if __name__ == '__main__':
     print("Starting Pathos Subconscious Node API server...")
-    # It's generally recommended to run thinker.py (monologue_loop) in a separate process.
-    # For simplicity in this single-file setup, we acknowledge it would run concurrently.
-    # If thinker.py is not running, /current_thoughts will show an empty buffer.
-    print("Note: The monologue_loop in thinker.py should be running in a separate process for the API to reflect live thoughts.")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+    # Function to start the monologue loop
+    def start_monologue_loop():
+        import thinker
+        thinker.monologue_loop()
+
+    # Start the monologue loop in a separate process
+    monologue_process = multiprocessing.Process(target=start_monologue_loop)
+    monologue_process.start()
+
+    # Ensure the process is terminated on exit
+    def signal_handler(sig, frame):
+        print("\nTerminating monologue loop...")
+        monologue_process.terminate()
+        monologue_process.join()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    finally:
+        print("Stopping monologue process...")
+        monologue_process.terminate()
+        monologue_process.join()

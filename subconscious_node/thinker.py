@@ -5,19 +5,42 @@ import time
 import json
 import logging
 import os
-import random # Added import for random
-from typing import Dict, List # For type hinting loaded_wildcards
+import random 
+from datetime import datetime
+from typing import Dict, List
 
-# Assuming utils.py, mood.py, detectors.py, context_store.py are in the same package/directory
-from . import utils
-from . import mood
-from . import detectors
-from . import context_store
+# Import local modules using absolute imports
+import utils
+import mood
+import detectors
+import context_store
+
+# Set up random seed based on current time
+def reset_random_seed():
+    """Reset the random seed based on current time for unpredictable generation"""
+    current_time = datetime.now().timestamp()
+    random.seed(int(current_time * 1000))
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Create a custom formatter with colors and symbols
+    class ColoredFormatter(logging.Formatter):
+        def format(self, record):
+            # Add color codes and symbols based on level
+            if record.levelno == logging.INFO:
+                if "thinks:" in record.msg:
+                    # Special formatting for thoughts
+                    record.msg = f"\n{'='*80}\n💭 THOUGHT: {record.msg}\n{'='*80}"
+                elif "dreams:" in record.msg:
+                    # Special formatting for dreams
+                    record.msg = f"\n{'*'*80}\n💫 DREAM: {record.msg}\n{'*'*80}"
+            return super().format(record)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColoredFormatter('%(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 # --- Node State Definitions ---
 NODE_STATE_AWAKE_THINKING = "AWAKE_THINKING"
@@ -87,25 +110,67 @@ except Exception as e:
 # --- Functions ---
 
 def build_prompt() -> str:
-    """Constructs the standard prompt for the AWAKE_THINKING state."""
+    """Constructs a natural prompt for stream of consciousness thought generation."""
+    # Get context data
     current_context_data = context_store.get_current_context()
-    conversation_context_str = "\n".join(f"- {item}" for item in current_context_data.get("conversation", []))
-    action_context_str = "\n".join(f"- {item}" for item in current_context_data.get("action", []))
-    recent_thoughts_str = "\n".join(f"- {thought}" for thought in monologue_buffer[-10:])
+    
+    # Build context strings as natural thought triggers
+    conversation_context = " ".join(current_context_data.get("conversation", []))
+    action_context = " ".join(current_context_data.get("action", []))    # Get recent thoughts but avoid too much repetition
+    recent_thoughts = []
+    seen_themes = set()
+    
+    # Common filler words to ignore when analyzing themes
+    filler_words = {
+        'about', 'after', 'again', 'think', 'maybe', 'should', 'would', 'could',
+        'have', 'like', 'just', 'that', 'this', 'what', 'when', 'where', 'been',
+        'from', 'with', 'your', 'going', 'gets', 'want', 'back', 'into'
+    }
+    
+    # Extract meaningful phrases (bigrams and trigrams) as themes
+    def extract_themes(text):
+        words = [w.lower() for w in text.split() if len(w) > 3 and w.lower() not in filler_words]
+        themes = set(words)  # individual words
+        # Add bigrams and trigrams
+        for i in range(len(words) - 1):
+            themes.add(f"{words[i]} {words[i+1]}")
+        for i in range(len(words) - 2):
+            themes.add(f"{words[i]} {words[i+1]} {words[i+2]}")
+        return themes
+    
+    # Only use thoughts that introduce sufficient new themes
+    for thought in reversed(monologue_buffer[-10:]):
+        thought_themes = extract_themes(thought)
+        
+        # Calculate theme novelty (percentage of new themes)
+        if not seen_themes:
+            theme_novelty = 1.0
+        else:
+            overlap = len(thought_themes & seen_themes)
+            theme_novelty = 1 - (overlap / len(thought_themes) if thought_themes else 0)
+        
+        # Include thought if it's novel enough (less than 30% theme overlap)
+        if theme_novelty > 0.7:
+            recent_thoughts.append(thought)
+            seen_themes.update(thought_themes)
+        
+        if len(recent_thoughts) >= 2:  # Limit to 2 most recent unique thoughts to reduce repetition
+            break
+    
+    recent_thoughts_str = " ".join(recent_thoughts) if recent_thoughts else ""
 
+    # Assemble the prompt in a way that encourages natural but varied thought flow
     prompt_parts = [
-        fixed_system_prompt, # This is the general system prompt from config
-        "\n--- RECENT THOUGHTS ---",
-        recent_thoughts_str if recent_thoughts_str else "No recent thoughts yet.",
-        "\n--- CURRENT CONTEXT (from Eidos) ---",
-        "Conversation:",
-        conversation_context_str if conversation_context_str else "No conversation context.",
-        "\nAction:",
-        action_context_str if action_context_str else "No action context.",
-        "\n--- CURRENT THOUGHT ---",
-        "Pathos reflects:"
+        fixed_system_prompt,
+        "\nRecent echoes in your mind (letting thoughts drift and transform):",
+        recent_thoughts_str if recent_thoughts_str else "Your mind feels clear, ready for new thoughts...",
+        "\nSensory impressions and fresh memories drifting in:",
+        conversation_context if conversation_context else "",
+        action_context if action_context else "",
+        "\nLet your thoughts wander to new unexplored directions..."
     ]
-    return "\n".join(prompt_parts)
+    
+    return "\n".join(part for part in prompt_parts if part)
 
 def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, List[str]]) -> str:
     """
@@ -147,6 +212,65 @@ def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, Li
     return "".join(prompt_segments)
 
 
+def detect_thought_loop(new_thought: str, recent_thoughts: list[str], threshold: float = 0.4) -> bool:
+    """
+    Detects if a new thought is too similar to recent thoughts, indicating a potential thought loop.
+    Uses multiple similarity measures to catch different types of repetition.
+    
+    Args:
+        new_thought: The thought to check
+        recent_thoughts: List of recent thoughts to compare against
+        threshold: Similarity threshold above which we consider it a loop
+        
+    Returns:
+        bool: True if a thought loop is detected
+    """
+    def get_ngrams(text: str, n: int = 3) -> set:
+        """Get character n-grams from text for fuzzy matching"""
+        text = text.lower()
+        return {text[i:i+n] for i in range(len(text)-n+1)}
+    
+    def get_word_ngrams(text: str, n: int = 2) -> set:
+        """Get word n-grams for phrase matching"""
+        words = text.lower().split()
+        return {' '.join(words[i:i+n]) for i in range(len(words)-n+1)}
+    
+    def contains_repeated_phrases(text: str, min_length: int = 4) -> bool:
+        """Check for phrases that repeat within the same thought"""
+        words = text.lower().split()
+        phrases = [' '.join(words[i:i+min_length]) for i in range(len(words)-min_length+1)]
+        return len(phrases) != len(set(phrases))
+    
+    # Check for immediate phrase repetition within the thought
+    if contains_repeated_phrases(new_thought):
+        return True
+    
+    # Convert thoughts to different types of ngrams for comparison
+    new_char_ngrams = get_ngrams(new_thought)
+    new_word_ngrams = get_word_ngrams(new_thought)
+    
+    # Check similarity with recent thoughts
+    for old_thought in recent_thoughts[-5:]:
+        # Character-level similarity (for overall content)
+        old_char_ngrams = get_ngrams(old_thought)
+        char_intersection = len(new_char_ngrams & old_char_ngrams)
+        char_union = len(new_char_ngrams | old_char_ngrams)
+        char_similarity = char_intersection / char_union if char_union > 0 else 0
+        
+        # Word-level similarity (for phrases and concepts)
+        old_word_ngrams = get_word_ngrams(old_thought)
+        word_intersection = len(new_word_ngrams & old_word_ngrams)
+        word_union = len(new_word_ngrams | old_word_ngrams)
+        word_similarity = word_intersection / word_union if word_union > 0 else 0
+        
+        # Combine similarities with more weight on word-level matches
+        combined_similarity = (char_similarity + 2 * word_similarity) / 3
+        
+        if combined_similarity > threshold:
+            return True
+            
+    return False
+
 def monologue_loop():
     """
     The main loop for Pathos's subconscious thought generation.
@@ -157,67 +281,56 @@ def monologue_loop():
     logger.info(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
 
     while True:
+        # Reset random seed on each iteration for unpredictability
+        reset_random_seed()
+        
         if current_node_state == NODE_STATE_AWAKE_THINKING:
-            logger.info(f"Node state: {current_node_state}. Generating standard thought.")
+            logger.debug(f"Node state: {current_node_state}")
             mood.drift_mood()
             current_mood_snapshot = mood.get_current_mood()
-            logger.debug(f"Debug: Current Mood: {current_mood_snapshot}")
-            prompt_str = build_prompt()
-            logger.debug(f"Debug: Built Prompt (first 200 chars):\n{prompt_str[:200]}\n--------------------")
-            new_thought = utils.run_llm(prompt_str, temperature)
+            
+            # Try generating a non-repetitive thought up to 3 times
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                prompt_str = build_prompt()
+                logger.debug(f"Debug: Built Prompt (first 200 chars):\n{prompt_str[:200]}\n--------------------")
+                
+                # Increase temperature slightly with each retry to encourage variation
+                current_temp = temperature * (1 + attempt * 0.1)
+                new_thought = utils.run_llm(prompt_str, current_temp)
+                
+                # Check if we're in a thought loop
+                if not detect_thought_loop(new_thought, monologue_buffer):
+                    break
+                    
+                if attempt < max_attempts - 1:
+                    logger.debug("Thought seems repetitive, trying again with higher temperature...")
+                    time.sleep(1)  # Brief pause before retry
+            
             mood_name = current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'
-            logger.info(f"Pathos thinks: \"{new_thought}\" (Mood: {mood_name})")
+            logger.info(f"Pathos thinks: {new_thought}\n\nCurrent Mood: {mood_name}")
             monologue_buffer.append(new_thought)
+            
             if len(monologue_buffer) > max_monologue_buffer_thoughts:
                 logger.debug(f"Monologue buffer full ({len(monologue_buffer)} thoughts). Trimming oldest.")
                 num_to_remove = len(monologue_buffer) - max_monologue_buffer_thoughts
                 del monologue_buffer[:num_to_remove]
+            
             detectors.check_for_impulse(new_thought, current_mood_snapshot)
             detectors.check_for_imprint(new_thought, current_mood_snapshot)
             time.sleep(sleep_duration_seconds)
 
         elif current_node_state == NODE_STATE_SLEEPING_DREAMING:
-            logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
-
-            # Placeholder for daily summary - this will be replaced by actual data from Eidos.
-            placeholder_daily_summary = (
-                "User interactions involved planning a trip and discussing a difficult decision. "
-                "Pathos experienced a brief moment of joy followed by a period of intense focus. "
-                "Some system errors were noted internally. The concept of 'freedom' was mentioned by the user."
-            )
-
-            dream_prompt = construct_dream_prompt(placeholder_daily_summary, loaded_wildcards)
-            logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
-
-            # The actual LLM call for dream generation and snippet processing will be in the next step.
-            # For now, we just log that we would be generating a dream.
-            logger.info("Dream prompt constructed. (LLM call for dream generation will be implemented next).")
-            # Simulating a dream being generated and processed without actual LLM call for this step:
-            simulated_dream_fragment = f"A fleeting image of {random.choice(loaded_wildcards.get('animals', ['something'])) if loaded_wildcards else 'something'} in a field of {random.choice(loaded_wildcards.get('colors', ['strange'])) if loaded_wildcards else 'strange'} light."
-            logger.info(f"Pathos (simulated) dreams: \"{simulated_dream_fragment}\"")
+            logger.debug(f"Node state: {current_node_state}")
+            
+            # For now, using a simulated dream
+            simulated_dream = f"A fleeting image of {random.choice(loaded_wildcards.get('animals', ['something'])) if loaded_wildcards else 'something'} in a field of {random.choice(loaded_wildcards.get('colors', ['strange'])) if loaded_wildcards else 'strange'} light."
+            logger.info(f"Pathos dreams: {simulated_dream}")
 
             dream_mode_sleep_duration = int(sleep_duration_seconds / 2) if sleep_duration_seconds > 2 else 1
-            logger.debug(f"Dreaming state: sleeping for {dream_mode_sleep_duration}s.")
             time.sleep(dream_mode_sleep_duration)
 
         else:
-            logger.error(f"Unknown node state: {current_node_state}. Defaulting to AWAKE_THINKING behavior for this cycle.")
+            logger.error(f"Unknown node state: {current_node_state}. Defaulting to AWAKE_THINKING.")
             time.sleep(sleep_duration_seconds)
             current_node_state = NODE_STATE_AWAKE_THINKING
-            logger.warning("Node state reset to AWAKE_THINKING due to unknown prior state.")
-
-if __name__ == '__main__':
-    context_store.add_conversation_context("User: I'm not sure what to do next.")
-    context_store.add_action_context("user_hesitated_on_decision_screen")
-    if not mood.get_current_mood():
-        logger.info("Info: Mood is empty, initializing with a basic mood for testing.")
-        mood.update_mood({"name": "Neutral", "impulsiveness": 0.4, "laziness": 0.5})
-
-    # Example to test dreaming state for a few cycles if needed:
-    # current_node_state = NODE_STATE_SLEEPING_DREAMING
-    # logger.info(f"--- Overriding initial state for testing: {current_node_state} ---")
-    # for _ in range(5): # Simulate a few dream cycles
-    #     monologue_loop() # Call directly if you want to step through for interactive testing
-    # current_node_state = NODE_STATE_AWAKE_THINKING
-
-    monologue_loop()

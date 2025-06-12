@@ -1,0 +1,15 @@
+# eidos_project/requirements.txt
+python-dotenv
+numpy
+spacy>=3.0.0,<4.0.0
+sentence-transformers>=2.2.0
+aiohttp>=3.8.0
+httpx>=0.23.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pypdf2>=3.0.0           # For PDF parsing in document_parser.py
+python-docx>=1.1.0      # For DOCX parsing in document_parser.py
+wolframalpha>=5.0.0     # For Wolfram Alpha queries in handler.py
+tiktoken
+python-multipart
+ragbits

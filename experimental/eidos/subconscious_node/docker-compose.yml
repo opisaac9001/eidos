@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  subconscious-node:
+    build: .
+    container_name: pathos-subconscious
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config.json:/app/config.json
+    restart: unless-stopped
+    networks:
+      - eidos-network
+
+networks:
+  eidos-network:
+    external: true
+    # Create with: docker network create eidos-network

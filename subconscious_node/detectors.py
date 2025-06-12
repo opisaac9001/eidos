@@ -14,13 +14,41 @@ import os
 import datetime
 import logging # Added logging
 import requests # Added requests
-
-# Assuming mood.py is in the same directory (or package)
-from .mood import get_current_mood
+import mood  # Import local modules using absolute imports
 
 # --- Constants and Configuration ---
 IMPULSE_KEYWORDS = ["i want", "maybe i should", "i should call", "i need to"]
-IMPRINT_KEYWORDS = ["realize", "understand", "remember", "come to terms with", "finally grasp"]
+
+# Core realization and understanding keywords that indicate potential significance
+IMPRINT_KEYWORDS = [
+    "realize", "understand", "figured out",
+    "discovered", "finally see", "makes sense now",
+    "never knew", "now I get",
+    "changed my perspective", "hit me"
+]
+
+# Words that signal genuine emotional or personal significance
+SIGNIFICANCE_BOOSTERS = [
+    "always felt", "never understood until now", 
+    "changed how I", "life-changing",
+    "deeply", "profound", "breakthrough",
+    "finally understand why I",
+    "explains so much about",
+    "connection between",
+    "pattern in my",
+    "root cause",
+    "deeper meaning",
+    "true reason"
+]
+
+# Phrases that suggest mundane or routine thoughts (used to filter out non-significant content)
+MUNDANE_FILTERS = [
+    "should eat", "need to buy", "forgot to", "left the",
+    "wonder if", "maybe later", "probably should",
+    "might be", "could try", "remember to",
+    "feels like", "looks like", "sounds like",
+    "kind of", "sort of", "bit like"
+]
 
 # Determine the absolute path to config.json relative to this file's directory
 # This ensures that the path is correct regardless of where the script is run from.
@@ -64,16 +92,82 @@ else:
 
 # --- Detector Functions ---
 
+def calculate_thought_significance(thought: str) -> float:
+    """
+    Calculate a significance score for a thought based on various criteria.
+    Returns a float between 0 and 1.
+    """
+    thought_lower = thought.lower()
+    score = 0.0
+    
+    # Check for explicit memory imprint tags first
+    if "<remember>" in thought and "</remember>" in thought:
+        score += 0.6
+
+    # Check for significant insight indicators
+    for keyword in IMPRINT_KEYWORDS:
+        if keyword in thought_lower:
+            score += 0.3
+            break
+
+    # Add score for each significance booster found
+    booster_count = 0
+    for booster in SIGNIFICANCE_BOOSTERS:
+        if booster in thought_lower:
+            score += 0.2
+            booster_count += 1
+            if booster_count >= 2:  # Cap the boost after 2 boosters
+                break
+
+    # Reduce score if mundane filters are present
+    mundane_count = 0
+    for filter_phrase in MUNDANE_FILTERS:
+        if filter_phrase in thought_lower:
+            score -= 0.15
+            mundane_count += 1
+            if mundane_count >= 2:  # Cap the reduction after 2 mundane phrases
+                break
+
+    # Check thought complexity and depth
+    sentences = thought.split('.')
+    if len(sentences) >= 3:  # Reward more complex, multi-part thoughts
+        score += 0.1
+    
+    # Normalize score to 0-1 range
+    return min(max(score, 0.0), 1.0)
+
+def extract_relevant_impulse(thought: str) -> str:
+    """
+    Extracts the actionable part of an impulse thought.
+    Returns the sentence or clause containing the impulse trigger.
+    """
+    thought_lower = thought.lower()
+    sentences = thought.replace("...", ".").split(".")
+    
+    for keyword in IMPULSE_KEYWORDS:
+        if keyword in thought_lower:
+            # Find the sentence containing the impulse
+            for sentence in sentences:
+                if keyword in sentence.lower():
+                    return sentence.strip()
+    
+    return thought
+
 def check_for_impulse(thought: str, current_mood_snapshot: dict) -> dict | None:
     """
     Checks if a thought qualifies as an impulse and POSTs it to Eidos API.
+    Only sends the relevant actionable part of the thought.
     """
     thought_lower = thought.lower()
     for keyword in IMPULSE_KEYWORDS:
         if keyword in thought_lower:
             if current_mood_snapshot.get("impulsiveness", 0) > impulse_threshold:
-                impulse_data_dict = { # Renamed for clarity
-                    "thought": thought,
+                # Extract the relevant part containing the impulse
+                relevant_thought = extract_relevant_impulse(thought)
+                
+                impulse_data_dict = {
+                    "thought": relevant_thought,
+                    "original_thought": thought,  # Keep the original for context
                     "mood_snapshot": current_mood_snapshot,
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                 }
@@ -92,42 +186,98 @@ def check_for_impulse(thought: str, current_mood_snapshot: dict) -> dict | None:
                 logger.debug(f"Impulse keyword \"{keyword}\" found in \"{thought}\", but impulsiveness ({current_mood_snapshot.get('impulsiveness', 0)}) not above threshold ({impulse_threshold}).")
     return None
 
+def extract_relevant_thought_segment(thought: str) -> str:
+    """
+    Extracts the most significant part of a thought, particularly looking for
+    content between <remember> tags or sentences containing significant keywords.
+    """
+    # First check for <remember> tags
+    if "<remember>" in thought and "</remember>" in thought:
+        start = thought.find("<remember>") + len("<remember>")
+        end = thought.find("</remember>")
+        return thought[start:end].strip()
+    
+    # Split into sentences, handling ellipsis
+    sentences = [s.strip() for s in thought.replace("...", ".").split(".") if s.strip()]
+    
+    max_score = 0
+    most_relevant_sentence = ""
+    
+    for sentence in sentences:
+        sentence_lower = sentence.lower()
+        score = 0
+        
+        # Check for insight keywords
+        if any(keyword in sentence_lower for keyword in IMPRINT_KEYWORDS):
+            score += 0.5
+        
+        # Check for significance boosters
+        for booster in SIGNIFICANCE_BOOSTERS:
+            if booster in sentence_lower:
+                score += 0.3
+        
+        # Reduce score for mundane content
+        for filter_phrase in MUNDANE_FILTERS:
+            if filter_phrase in sentence_lower:
+                score -= 0.2
+        
+        if score > max_score:
+            max_score = score
+            most_relevant_sentence = sentence
+
+    # Return the most significant sentence, or the original thought if no sentence was significant enough
+    return thought
+
 def check_for_imprint(thought: str, current_mood_snapshot: dict) -> dict | None:
     """
-    Checks if a thought qualifies as an imprint, appends to local `soft_memory.jsonl`,
-    and POSTs it to Eidos API.
+    Checks if a thought qualifies as an imprint using stricter criteria.
+    A thought must have sufficient significance and contextual relevance
+    to be remembered. Only stores and sends the most relevant part of the thought.
     """
-    thought_lower = thought.lower()
-    for keyword in IMPRINT_KEYWORDS:
-        if keyword in thought_lower:
-            imprint_data_dict = { # Renamed for clarity
-                "content": thought, # Field name matches Eidos ImprintData model
-                "mood": current_mood_snapshot,
-                "topics": ["placeholder_topic"],
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-            }
+    significance = calculate_thought_significance(thought)
+    significance_threshold = 0.6  # Increased threshold for memory imprint
+    
+    if significance >= significance_threshold:
+        # Extract the most relevant part of the thought
+        relevant_content = extract_relevant_thought_segment(thought)
+        
+        # Additional validation - check if the extracted content is too mundane
+        if any(filter_phrase in relevant_content.lower() for filter_phrase in MUNDANE_FILTERS):
+            logger.debug(f"Thought passed significance threshold but contains mundane content: \"{relevant_content[:50]}...\"")
+            return None
+            
+        imprint_data_dict = {
+            "content": relevant_content,
+            "original_thought": thought,
+            "mood": current_mood_snapshot,
+            "topics": ["placeholder_topic"],
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "significance": significance
+        }
 
-            logger.info(f"IMPRINT DETECTED: \"{thought[:50]}...\".")
+        logger.info(f"IMPRINT DETECTED: \"{thought[:50]}...\" (significance: {significance:.2f})")
 
-            # 1. Append to local soft_memory.jsonl
-            try:
-                with open(SOFT_MEMORY_FILE_PATH, 'a') as f:
-                    f.write(json.dumps(imprint_data_dict) + '\n')
-                logger.info(f"Successfully appended imprint to local file: {SOFT_MEMORY_FILE_PATH}")
-            except IOError as e:
-                logger.error(f"Could not write imprint to {SOFT_MEMORY_FILE_PATH}: {e}")
+        # 1. Append to local soft_memory.jsonl
+        try:
+            with open(SOFT_MEMORY_FILE_PATH, 'a') as f:
+                f.write(json.dumps(imprint_data_dict) + '\n')
+            logger.info(f"Successfully appended imprint to local file: {SOFT_MEMORY_FILE_PATH}")
+        except IOError as e:
+            logger.error(f"Could not write imprint to {SOFT_MEMORY_FILE_PATH}: {e}")
 
-            # 2. Send to Eidos API
-            target_url = f"{EIDOS_API_BASE_URL}/v1/pathos/memory/imprint"
-            logger.info(f"Attempting to send memory imprint to Eidos API: {target_url}")
-            try:
-                response = requests.post(target_url, json=imprint_data_dict, timeout=10)
-                response.raise_for_status()
-                logger.info(f"Successfully sent memory imprint to Eidos: \"{imprint_data_dict['content'][:50]}...\". Response: {response.status_code}")
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Failed to send memory imprint to Eidos API at {target_url}. Error: {e}")
+        # 2. Send to Eidos API
+        target_url = f"{EIDOS_API_BASE_URL}/v1/pathos/memory/imprint"
+        logger.info(f"Attempting to send memory imprint to Eidos API: {target_url}")
+        try:
+            response = requests.post(target_url, json=imprint_data_dict, timeout=10)
+            response.raise_for_status()
+            logger.info(f"Successfully sent memory imprint to Eidos: \"{imprint_data_dict['content'][:50]}...\". Response: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send memory imprint to Eidos API at {target_url}. Error: {e}")
 
-            return imprint_data_dict
+        return imprint_data_dict
+    else:
+        logger.debug(f"Thought not significant enough for imprint (score: {significance:.2f}): \"{thought[:50]}...\"")
     return None
 
 if __name__ == '__main__':

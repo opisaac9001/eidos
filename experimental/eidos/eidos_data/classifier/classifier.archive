@@ -1,0 +1,241 @@
+# eidos_agent/modules/processing/classifier.py
+
+import spacy
+from spacy.matcher import Matcher
+from typing import Dict, Any
+import logging
+import re
+
+from eidos_agent.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+# --- spaCy Model Loading ---
+NLP_MODEL = None
+SPACY_MATCHER = None
+try:
+    NLP_MODEL = spacy.load("en_core_web_sm")
+    SPACY_MATCHER = Matcher(NLP_MODEL.vocab)
+    logger.info("spaCy model 'en_core_web_sm' loaded for classification.")
+
+    # --- Define Matcher Patterns ---
+    # Order matters for how we process matches later. Define specific first.
+
+    # 1. Explicit Conversation Starters / Common Phrases
+    conversation_patterns = [
+        [{"LOWER": {"IN": ["hello", "hi", "hey", "greetings", "good morning", "good afternoon", "good evening"]}}],
+        [{"LOWER": "how"}, {"LOWER": "are"}, {"LOWER": "you"}],
+        [{"LOWER": "thank"}, {"LOWER": "you"}],
+        [{"LOWER": {"IN": ["okay", "ok", "got it", "understood"]}}],
+        [{"LOWER": "tell"}, {"LOWER": "me"}, {"LOWER": "about"}, {"LOWER": "yourself"}], # Specific case for self-reference
+        [{"LOWER": "what"}, {"LEMMA": "be"}, {"LOWER": "you"}], # What are you?
+        [{"LOWER": "who"}, {"LEMMA": "be"}, {"LOWER": "you"}], # Who are you?
+        [{"LOWER": "who"}, {"LEMMA": "create"}, {"LOWER": "you"}], # Who created you?
+        [{"LOWER": "what"}, {"LEMMA": "can"}, {"LOWER": "you"}, {"LEMMA": "do"}], # What can you do?
+        [{"LOWER": {"IN": ["that's", "thats", "it's", "its"]}}, {"LOWER": {"IN": ["interesting", "cool", "nice", "good"]}}], # Simple affirmations
+    ]
+    SPACY_MATCHER.add("CONVERSATION", conversation_patterns)
+
+    # 2. Home Assistant commands (Keep relatively specific)
+    ha_patterns = [
+        # Turn on/off lights/switches/fans/TVs/Speakers
+        [{"LOWER": {"IN": ["turn", "switch", "set", "activate", "deactivate"]}}, {"LOWER": {"IN": ["on", "off", "to"]}, "OP": "?"}, {"POS": "DET", "OP": "?"}, {"LOWER": {"IN": ["the", "my"]}, "OP": "?"}, {"LOWER": {"IN": ["light", "lights", "lamp", "lamps", "switch", "outlet", "fan", "fans", "tv", "television", "speaker", "speakers"]}}, {"LOWER": {"IN": ["on", "off", "to"]}, "OP": "?"}],
+        # Set temperature/brightness/volume/channel
+        [{"LOWER": {"IN": ["set", "change", "adjust"]}}, {"POS": "DET", "OP": "?"}, {"LOWER": {"IN": ["the", "my"]}, "OP": "?"}, {"LOWER": {"IN": ["temperature", "thermostat", "ac", "heat", "brightness", "volume", "channel"]}}],
+        # Specific HA terms/actions
+        [{"LOWER": {"IN": ["activate", "deactivate", "run", "trigger"]}}, {"LOWER": {"IN": ["scene", "automation"]}, "OP": "?"}],
+        [{"LOWER": {"IN": ["lock", "unlock"]}}, {"POS": "DET", "OP": "?"}, {"LOWER": {"IN": ["door", "doors", "lock", "locks"]}, "OP":"?"}],
+        # Reminders/Timers
+        [{"LOWER": "remind"}, {"LOWER": "me"}],
+        [{"LOWER": "set"}, {"LOWER": "a", "OP":"?"}, {"LOWER": "timer"}],
+        # HA Status queries - Require specific entity types
+        [{"LOWER": {"IN": ["what", "whats"]}}, {"LOWER": "is", "OP":"?"}, {"LOWER": "the", "OP":"?"}, {"LOWER": {"IN": ["status", "state", "setting"]}}, {"LOWER": "of", "OP":"?"}, {"POS": "DET", "OP": "?"}, {"LOWER": {"IN": ["light", "switch", "thermostat", "door", "lock", "fan"]}}], # Status of the light?
+        [{"LOWER": {"IN": ["what", "whats", "get", "show", "report"]}}, {"LOWER": {"IN": ["me", "us"]}, "OP":"?"}, {"LOWER": {"IN": ["the", "my"]}, "OP":"?"}, {"LOWER": {"IN": ["temperature", "humidity", "pressure"]}}, {"LOWER": "sensor", "OP":"?"}], # Get the temperature sensor
+        [{"LOWER": "is", "OP":"?"}, {"LOWER": {"IN": ["the", "my"]}, "OP":"?"}, {"LOWER": {"IN": ["light", "switch", "door", "fan", "ac", "lock", "sensor"]}}, {"LOWER": {"IN": ["on", "off", "open", "closed", "locked", "unlocked", "running", "active"]}, "OP":"?"}, {"TEXT": "?", "OP":"?"}],
+    ]
+    SPACY_MATCHER.add("HA_COMMAND", ha_patterns)
+
+    # 3. TIME/DATE Queries - Specific enough
+    time_patterns = [
+        [{"LOWER": {"IN": ["what", "whats"]}}, {"LOWER": "time"}, {"LOWER": "is", "OP": "?"}, {"LOWER": "it", "OP": "?"}, {"TEXT": "?", "OP":"?"}],
+        [{"LOWER": "current"}, {"LOWER": "time"}],
+        [{"LOWER": {"IN": ["what", "whats"]}}, {"LOWER": "the"}, {"LOWER": "date"}, {"LOWER": "today", "OP":"?"}, {"TEXT": "?", "OP":"?"}],
+        [{"LOWER": {"IN": ["what", "whats"]}}, {"LOWER": "day"}, {"LOWER": "is", "OP": "?"}, {"LOWER": "it", "OP": "?"}, {"LOWER": "today", "OP":"?"}, {"TEXT": "?", "OP":"?"}],
+    ]
+    SPACY_MATCHER.add("TIME_QUERY", time_patterns)
+
+# 4. MATH Queries - MUST include numbers and/or math operators/keywords
+    math_patterns = [
+         # Pattern requiring at least two numbers OR a number and a math operation word/symbol
+         # Example: 5 percent, 3 squared, 9 plus 10
+         [
+             {"IS_DIGIT": True},
+             {"LOWER": {"IN": ["plus", "minus", "times", "divided", "by", "percent", "power", "squared", "cubed"]}, "OP": "+"},
+             {"IS_DIGIT": True, "OP":"*"}
+         ],
+         # Example: 5 + 7, 10 * 3
+         [
+             {"IS_DIGIT": True},
+             {"TEXT": {"IN": ["+", "-", "*", "/", "^"]}},
+             {"IS_DIGIT": True}
+         ],
+         # Explicit calculation verbs followed by something containing numbers/symbols
+         # Example: calculate 15 * 22, compute the area with radius 5
+         [
+             {"LOWER": {"IN": ["calculate", "compute", "solve", "evaluate", "what's", "what is"]}},
+             {"TEXT": {"REGEX": r".*\d.*"}} # Ensure there's a digit somewhere after the verb
+         ],
+         # Starts with "what is" but REQUIRES numbers/math symbols soon after
+         # Example: what is 5?
+         [
+             {"LOWER": {"IN": ["what", "whats"]}},
+             {"LOWER": "is"},
+             {"IS_DIGIT": True}
+         ],
+         # Starts with "what is" followed by specific math terms and a number
+         # Example: what is the square root of 9?
+         [
+             {"LOWER": {"IN": ["what", "whats"]}},
+             {"LOWER": "is"},
+             {"POS": "DET", "OP":"?"},
+             {"LOWER": "the", "OP":"?"},
+             {"LOWER": {"IN": ["sum", "difference", "product", "quotient", "square", "cube", "root"]}},
+             {"LOWER": "of", "OP":"?"},
+             {"IS_DIGIT": True}
+         ],
+         # Specific math terms followed by "of" and a number
+         # Example: square root of 81, sin of 90
+         [
+             {"LOWER": {"IN": ["square", "cube", "root", "sin", "cos", "tan", "log"]}}, # Add more functions if needed
+             {"LOWER": "of"},
+             {"IS_DIGIT": True}
+         ],
+         # Handles "sum/difference/product/quotient of X and Y"
+         # Example: the sum of 4 and 9
+         [
+             {"POS": "DET", "OP": "?"}, # Optional "the"
+             {"LOWER": {"IN": ["sum", "difference", "product", "quotient"]}}, # Math term
+             {"LOWER": "of"}, # "of"
+             {"OP": "*"}, # Allow optional words like "the numbers"
+             {"IS_DIGIT": True}, # First number
+             {"OP": "*"}, # Allow optional words
+             {"LOWER": "and"}, # "and"
+             {"OP": "*"}, # Allow optional words
+             {"IS_DIGIT": True} # Second number
+         ],
+    ]
+    # This line adds all the above patterns to the matcher under the MATH_QUERY label
+    SPACY_MATCHER.add("MATH_QUERY", math_patterns)
+    # 5. WEATHER Queries - Focus on weather-specific terms
+    weather_patterns = [
+        # Explicitly use "weather" keyword
+        [{"LOWER": "weather"}, {"LOWER": {"IN": ["like", "in", "forecast", "outside", "for", "?"]}, "OP":"?"}], # Weather like, weather in, weather forecast, weather?
+        # Specific weather condition checks
+        [{"LOWER": "is"}, {"LOWER": "it"}, {"LOWER": {"IN": ["raining", "sunny", "cloudy", "cold", "hot", "windy", "snowing", "foggy", "clear"]}}, {"LOWER": "outside", "OP": "?"}, {"TEXT": "?", "OP":"?"}],
+        # Specific weather parameter queries
+        [{"LOWER": {"IN": ["what", "whats"]}}, {"LOWER": "the"}, {"LOWER": {"IN": ["temperature", "humidity", "wind", "pressure", "conditions", "forecast"]}}, {"LOWER": {"IN": ["outside", "in", "for"]}, "OP": "?"}],
+    ]
+    SPACY_MATCHER.add("WEATHER_QUERY", weather_patterns)
+
+    # 6. GENERIC_INFO_QUERY - Catch questions not otherwise matched (and not conversation)
+    # Made less greedy: requires question mark and specific start words, or "tell me about" structure.
+    generic_info_patterns = [
+         # Starts with Wh-word, ends with ?, minimum length to avoid just "what?"
+         [{"TAG": {"IN": ["WP", "WRB", "WDT"]}, "IS_SENT_START": True}, {}, {"OP":"+"}, {"TEXT": "?"}],
+         # Starts with auxiliary verb, ends with ?, minimum length
+         # [{"LEMMA": {"IN": ["be", "do", "can", "should", "will"]}, "IS_SENT_START": True}, {}, {"OP":"+"}, {"TEXT": "?"}], # Removed this as it matched "how are you?" too easily
+         # "Tell me about X" structure - ensure X is not "yourself" (handled by CONVERSATION pattern)
+         [{"LOWER": "tell"}, {"LOWER": "me"}, {"LOWER": "about"}, {"LOWER": {"NOT_IN": ["yourself", "you"]}}],
+    ]
+    SPACY_MATCHER.add("GENERIC_INFO_QUERY", generic_info_patterns)
+
+
+except OSError as e:
+    logger.error(f"spaCy model 'en_core_web_sm' not found. Error: {e}")
+    logger.error("Please ensure the environment is activated AND run: python -m spacy download en_core_web_sm")
+    NLP_MODEL = None
+    SPACY_MATCHER = None
+except Exception as e:
+     logger.error(f"Error loading spaCy model or creating matcher: {e}", exc_info=True)
+     NLP_MODEL = None
+     SPACY_MATCHER = None
+
+
+def classify_input(input_data: Dict[str, Any]) -> str:
+    """
+    Classifies text input using spaCy Matcher rules.
+    Returns a string classification. Defaults to 'conversation'.
+    Prioritizes specific matches over general ones.
+    """
+    input_type = input_data.get('type')
+    input_content = input_data.get('content')
+
+    if input_type == 'text' and isinstance(input_content, str):
+        if NLP_MODEL is None or SPACY_MATCHER is None:
+            logger.warning("spaCy unavailable for classification, defaulting to 'conversation'.")
+            return 'conversation'
+
+        # Basic check for very short inputs - likely conversational
+        if len(input_content.split()) < 3 and '?' not in input_content:
+             logger.debug("Input is very short and not a question, classifying as conversation.")
+             return 'conversation'
+
+        try:
+            doc = NLP_MODEL(input_content)
+            matches = SPACY_MATCHER(doc)
+        except Exception as e:
+             logger.error(f"Error processing text with spaCy: {e}", exc_info=True)
+             logger.warning("spaCy processing failed, defaulting classification to 'conversation'.")
+             return 'conversation'
+
+
+        if matches:
+            # Get all matched IDs
+            matched_ids = {NLP_MODEL.vocab.strings[match_id] for match_id, start, end in matches}
+            logger.debug(f"Matcher found patterns: {matched_ids}")
+
+            # --- Prioritization Logic ---
+            # 1. Check for explicit CONVERSATION patterns first
+            if "CONVERSATION" in matched_ids:
+                logger.debug("Classifying as 'conversation' due to explicit pattern match.")
+                return 'conversation'
+
+            # 2. Check for specific commands/queries
+            if "HA_COMMAND" in matched_ids:
+                logger.debug("Classifying as 'ha_command'.")
+                return 'ha_command'
+            if "TIME_QUERY" in matched_ids:
+                logger.debug("Classifying as 'TIME_QUERY'.")
+                return 'TIME_QUERY'
+            if "WEATHER_QUERY" in matched_ids:
+                logger.debug("Classifying as 'WEATHER_QUERY'.")
+                return 'WEATHER_QUERY'
+            if "MATH_QUERY" in matched_ids:
+                logger.debug("Classifying as 'MATH_QUERY'.")
+                return 'MATH_QUERY'
+            # Add WOLFRAM_QUERY check here if using explicit triggers
+
+            # 3. Check for GENERIC_INFO_QUERY (only if nothing more specific matched)
+            if "GENERIC_INFO_QUERY" in matched_ids:
+                logger.debug("Classifying as 'GENERIC_INFO_QUERY'.")
+                return 'GENERIC_INFO_QUERY'
+
+            # 4. Fallback if patterns matched but none were prioritized above
+            # This case *shouldn't* be reached if all patterns have a corresponding check,
+            # but acts as a safety net.
+            logger.warning(f"Patterns matched ({matched_ids}) but none were explicitly routed. Defaulting to 'conversation'.")
+            return 'conversation'
+
+        else:
+            # No patterns matched at all. Assume conversational.
+            logger.debug("No patterns matched. Defaulting classification to 'conversation'.")
+            return 'conversation'
+
+    elif input_type in ['voice', 'image', 'sensor']:
+        # Pass through non-text types for router handling
+        logger.debug(f"Input type '{input_type}' passed through classifier for router handling.")
+        return input_type
+    else:
+        # Handle unknown input types
+        logger.warning(f"Received unknown input type for classification: {input_type}")
+        return 'unknown'

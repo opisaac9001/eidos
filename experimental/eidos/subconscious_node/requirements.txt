@@ -1,0 +1,19 @@
+# Subconscious Node Dependencies
+# This file contains only the dependencies needed for the subconscious node to run independently
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# HTTP client for communicating with main Eidos system
+httpx>=0.25.0
+requests>=2.31.0
+
+# Data validation and parsing
+pydantic>=2.4.0
+
+# Logging and utilities
+python-json-logger>=2.0.7
+
+# Optional: For enhanced async support
+aiofiles>=23.2.0

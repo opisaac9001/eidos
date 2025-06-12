@@ -7,10 +7,11 @@ This module is responsible for:
 - Simulating mood changes over time (currently a placeholder).
 """
 import json
+import os
 
 # --- Global Variables ---
 current_mood = {}
-CONFIG_FILE_PATH = "subconscious_node/config.json"
+CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 
 # --- Initialization ---
 def _load_default_mood():
