@@ -1,1 +1,0 @@
-Error: Main Pathos system prompt not found.

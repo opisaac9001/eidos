@@ -1,1 +1,0 @@
-Extract user facts, world facts, and AI learnings from transcript.
