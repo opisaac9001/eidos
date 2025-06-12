@@ -217,23 +217,25 @@ class FirmamentModule:
 
         # --- Activity-Based Hexus Adjustments (Continuous) ---
         if activity_slot and activity_slot.activity_type:
-            activity_type = activity_slot.activity_type.lower()
-            reason = f"ongoing {activity_type} activity"
-            if activity_type in ['resting', 'sleeping', 'leisure_passive']:
-                self.ethos_core._apply_hexus_change('tiredness', -0.02, reason)
-                self.ethos_core._apply_hexus_change('stress', -0.01, reason)
-                self.ethos_core._apply_hexus_change('comfort', 0.01, reason)
-            elif activity_type in ['work_deep', 'learning', 'work_focused']:
-                self.ethos_core._apply_hexus_change('focus', 0.01, reason)
-                self.ethos_core._apply_hexus_change('tiredness', 0.005, reason) # Slow increase or slower decay
-                self.ethos_core._apply_hexus_change('ambition', 0.002, reason)
-            elif activity_type in ['social', 'leisure_active']:
-                self.ethos_core._apply_hexus_change('joy', 0.01, reason)
-                self.ethos_core._apply_hexus_change('loneliness', -0.01, reason)
-                self.ethos_core._apply_hexus_change('craving_connection', -0.005, reason)
-            elif activity_type in ['chore', 'work_routine']:
-                self.ethos_core._apply_hexus_change('tiredness', 0.003, reason)
-                self.ethos_core._apply_hexus_change('contentment', 0.005, f"{reason} (sense of completion)")
+            activity_type_lower = activity_slot.activity_type.lower()
+            event_name: Optional[str] = None
+            if activity_type_lower in ['resting', 'sleeping', 'leisure_passive']:
+                event_name = "ACTIVITY_EFFECT_RESTING"
+            elif activity_type_lower in ['work_deep', 'learning', 'work_focused']:
+                event_name = "ACTIVITY_EFFECT_WORK_DEEP"
+            elif activity_type_lower in ['social', 'leisure_active']:
+                event_name = "ACTIVITY_EFFECT_SOCIAL"
+            elif activity_type_lower in ['chore', 'work_routine']:
+                event_name = "ACTIVITY_EFFECT_WORK_ROUTINE"
+            # Add more mappings as needed, e.g., for 'learning'
+            elif activity_type_lower == 'learning': # Explicitly
+                 event_name = "ACTIVITY_EFFECT_LEARNING"
+
+            if event_name:
+                # Magnitude multiplier could be small for per-tick effects
+                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, magnitude_multiplier=0.1)) # Example: 10% of defined delta per tick
+            else:
+                logger.debug(f"FirmamentModule: No specific continuous Hexus event defined for activity type: {activity_type_lower}")
 
 
         # Pathos's internal thought generation and deviation based on it is REMOVED from here.
@@ -310,16 +312,11 @@ class FirmamentModule:
                     if self.ethos_core:
                         await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
                         # Placeholder for Hexus changes based on NPC dialogue outcome
-                        logger.info("FirmamentModule: NPC Dialogue occurred. Placeholder for Hexus updates based on dialogue_data.")
-                        # Example (actual logic would parse dialogue_data):
-                        # if dialogue_data.get("outcome") == "positive":
-                        #     self.ethos_core._apply_hexus_change('joy', 0.1, "positive NPC interaction")
-                        #     self.ethos_core._apply_hexus_change('loneliness', -0.1, "positive NPC interaction")
-                        # elif dialogue_data.get("outcome") == "negative":
-                        #     self.ethos_core._apply_hexus_change('stress', 0.1, "negative NPC interaction")
-                        #     self.ethos_core._apply_hexus_change('resentment', 0.05, "negative NPC interaction")
-                        # if dialogue_data.get("new_facts_learned_by_pathos"):
-                        #     self.ethos_core._apply_hexus_change('curiosity', 0.05, "learned new info from NPC")
+                        logger.info("FirmamentModule: NPC Dialogue occurred. Placeholder for Hexus updates using event system.")
+                        # Example (actual logic would parse dialogue_data and choose an event):
+                        # npc_interaction_event = "NPC_INTERACTION_POSITIVE" # or "NPC_INTERACTION_NEGATIVE", "NPC_LEARNED_INFO"
+                        # npc_payload = {"npc_id": npc_profile_to_use.npc_id, "summary": dialogue_data.get("summary")}
+                        # asyncio.create_task(self.ethos_core.process_event_for_hexus_update(npc_interaction_event, payload=npc_payload))
             else:
                 logger.info("FirmamentModule: No NPC profile determined (specific or generic). Skipping NPC dialogue simulation.")
         else:
@@ -499,23 +496,25 @@ class FirmamentModule:
                 # Hexus updates based on simulated action from intention
                 if self.ethos_core:
                     intention_lower = intention.lower()
-                    action_reason = f"simulated action for intention: {intention[:50]}..."
+                    event_name: Optional[str] = None
+                    payload = {"intention_text": intention[:100]} # Basic payload
+
                     if "curious" in intention_lower or "wonder" in intention_lower or "learn" in intention_lower:
-                        self.ethos_core._apply_hexus_change('curiosity', 0.05, action_reason)
-                    if "connect" in intention_lower or "talk to" in intention_lower or "social" in intention_lower:
-                        self.ethos_core._apply_hexus_change('craving_connection', 0.03, action_reason) # Small increase in drive, or joy if action implies success
-                        self.ethos_core._apply_hexus_change('joy', 0.02, action_reason)
-                    if "work on" in intention_lower or "focus on" in intention_lower or "task" in intention_lower or "project" in intention_lower:
-                        self.ethos_core._apply_hexus_change('focus', 0.05, action_reason)
-                        self.ethos_core._apply_hexus_change('ambition', 0.02, action_reason)
-                    # Generic positive outcome of acting on an intention
-                    self.ethos_core._apply_hexus_change('contentment', 0.01, action_reason)
+                        event_name = "INTENTION_ACTION_CURIOSITY"
+                    elif "connect" in intention_lower or "talk to" in intention_lower or "social" in intention_lower:
+                        event_name = "INTENTION_ACTION_SOCIAL"
+                    elif "work on" in intention_lower or "focus on" in intention_lower or "task" in intention_lower or "project" in intention_lower:
+                        event_name = "INTENTION_ACTION_TASK"
+                    else:
+                        event_name = "INTENTION_ACTION_GENERAL_SUCCESS" # Default to general success if specific type not matched
+
+                    if event_name:
+                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=payload))
 
             else:
                 logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
-                if self.ethos_core: # Minor stress/resentment if intention wasn't actionable by simulation
-                    self.ethos_core._apply_hexus_change('stress', 0.01, f"failed to simulate action for intention: {intention[:50]}...")
-
+                if self.ethos_core:
+                    asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_FAILURE", payload={"intention_text": intention[:100]}))
 
         except Exception as e:
             logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)

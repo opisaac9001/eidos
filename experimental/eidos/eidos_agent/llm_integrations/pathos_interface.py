@@ -217,21 +217,32 @@ class PathosInterface:
 
                     # Assuming tool execution was successful if we have a "tool" role message with its ID.
                     # More precise success checking would require changes in ToolOrchestrator's output.
-                    reason = f"successful use of tool: {tool_name}"
+                    event_name: Optional[str] = None
+                    event_payload: Dict[str, Any] = {"tool_name": tool_name} # Basic payload
+
                     if tool_name == "web_search":
-                        self.ethos_core._apply_hexus_change('curiosity', 0.05, reason)
-                        self.ethos_core._apply_hexus_change('focus', 0.03, reason)
+                        event_name = "TOOL_SUCCESS_WEB_SEARCH"
                     elif tool_name == "add_pathos_event_to_calendar":
-                        # Check if it's a leisure/social event - requires parsing arguments
-                        # For now, apply a general positive change for scheduling
-                        self.ethos_core._apply_hexus_change('ambition', 0.03, reason)
-                        self.ethos_core._apply_hexus_change('contentment', 0.02, reason) # Sense of accomplishment
+                        # Ideally, parse arguments to determine if it's work or leisure
+                        # For now, default to a generic or work-related event
+                        event_name = "TOOL_SUCCESS_ADD_EVENT_WORK"
+                        # Example for future:
+                        # try:
+                        #     args = json.loads(tc.get("function", {}).get("arguments", "{}"))
+                        #     if "leisure" in args.get("event_type", "").lower() or "social" in args.get("event_type", "").lower():
+                        #         event_name = "TOOL_SUCCESS_ADD_EVENT_LEISURE"
+                        # except json.JSONDecodeError:
+                        #     pass
                     elif tool_name == "fetch_weather":
-                        self.ethos_core._apply_hexus_change('curiosity', 0.01, reason) # Mild curiosity satisfaction
+                        event_name = "TOOL_SUCCESS_FETCH_WEATHER"
                     # Add other tool mappings here
-                    # Example:
-                    # elif tool_name == "another_tool":
-                    #     self.ethos_core._apply_hexus_change('joy', 0.02, reason)
+                    else:
+                        event_name = "TOOL_SUCCESS_GENERIC" # Fallback for unmapped successful tools
+
+                    if event_name:
+                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=event_payload))
+
+                    # TODO: Add handling for TOOL_FAILURE_GENERIC if ToolOrchestrator provides failure info
 
 
         if not final_pathos_response_text and not llm_error_occurred and not (final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls")):
@@ -436,9 +447,16 @@ class PathosInterface:
                 {"type": "feedback", "content": feedback_content_str, "metadata": memory_metadata, "salience": 1.2},
                 user_id_context=feedback_user_id
             )
-            if self.config.ENABLE_MOOD_SIMULATION:
-                mood_update_payload = {"feedback_type": feedback_data.get("feedback_type"), "rating": feedback_data.get("rating")}
-                await self.ethos_core.update_mood_state('feedback', mood_update_payload)
+            if self.config.ENABLE_MOOD_SIMULATION: # This flag now gates Hexus updates too
+                # Determine feedback event name
+                feedback_type_str = str(feedback_data.get("feedback_type", "unknown")).upper()
+                event_name = f"USER_FEEDBACK_{feedback_type_str}"
+                if event_name not in self.ethos_core.HEXUS_EVENT_DEFINITIONS: # Accessing class variable for check
+                    logger.warning(f"Undefined Hexus feedback event '{event_name}'. Defaulting or skipping.")
+                    # Potentially default to a generic feedback event or skip
+                    event_name = "USER_FEEDBACK_POSITIVE" if feedback_data.get("rating", 0) > 0 else "USER_FEEDBACK_NEGATIVE" # Simplified default
+
+                await self.ethos_core.process_event_for_hexus_update(event_name, payload=feedback_data)
         else:
             logger.error("EthosCore not available in PathosInterface, cannot process feedback.")
 

@@ -90,6 +90,7 @@ class EthosConfig(TypedDict, total=False):
     curiosity_notification_llm_role: str # From broken
     daily_summary_max_memories: Optional[int]
     daily_summary_lookback_hours: Optional[int]
+    personality_bias_profile_json: Optional[str] # Added for Hexus personality bias
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -333,6 +334,7 @@ class Config:
         "curiosity_notification_llm_role": os.getenv("ETHOS_CURIOSITY_NOTIFICATION_LLM_ROLE", "LOGOS_TECHNE"),
         "daily_summary_max_memories": int(os.getenv("ETHOS_DAILY_SUMMARY_MAX_MEMORIES", "30")),
         "daily_summary_lookback_hours": int(os.getenv("ETHOS_DAILY_SUMMARY_LOOKBACK_HOURS", "18")),
+        "personality_bias_profile_json": os.getenv("EIDOS_PERSONALITY_BIAS_PROFILE_JSON"), # Added
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None

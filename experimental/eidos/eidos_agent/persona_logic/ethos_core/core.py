@@ -98,6 +98,67 @@ HEXUS_BASELINES = {
     "brevity_preference": 0.5 # Baseline for pre-existing
 }
 
+HEXUS_DECAY_RATES = { # Decay rate per hour
+    "joy": 0.1,
+    "stress": 0.25,
+    "curiosity": 0.05,
+    "loneliness": 0.08,
+    "ambition": 0.05,
+    "tiredness": 0.3, # Assumes decay when not actively resting. Resting itself would have direct Hexus changes.
+    "comfort": 0.1,
+    "focus": 0.15,
+    "impulsiveness": 0.1,
+    "resentment": 0.02, # Decays very slowly
+    "contentment": 0.05,
+    "melancholy": 0.05,
+    "craving_connection": 0.1,
+    "general_caution": 0.1,
+    "user_engagement_proactivity": 0.1,
+    "brevity_preference": 0.1
+}
+
+HEXUS_EVENT_DEFINITIONS = {
+    # User Feedback
+    "USER_FEEDBACK_POSITIVE": {"joy": 0.1, "contentment": 0.1, "stress": -0.05, "resentment": -0.02},
+    "USER_FEEDBACK_NEGATIVE": {"stress": 0.1, "resentment": 0.05, "joy": -0.1, "contentment": -0.05},
+    "USER_FEEDBACK_CORRECTION": {"stress": 0.03, "curiosity": 0.02}, # Learning from being corrected
+    # User Input Analysis
+    "USER_INPUT_POSITIVE_KEYWORD": {"joy": 0.02, "contentment": 0.01},
+    "USER_INPUT_NEGATIVE_KEYWORD": {"stress": 0.02, "resentment": 0.01},
+    "USER_INPUT_QUESTION": {"curiosity": 0.01, "focus": 0.01, "user_engagement_proactivity": 0.01},
+    "USER_INPUT_PROBLEM_STATEMENT": {"stress": 0.03, "focus": 0.03, "user_engagement_proactivity": 0.05},
+    # Pathos Response Characteristics
+    "INTERACTION_SHORT_RESPONSE_GIVEN": {"brevity_preference": 0.01},
+    "INTERACTION_LONG_RESPONSE_GIVEN": {"brevity_preference": -0.01, "tiredness": 0.005}, # Slight tiredness from long response
+    # Content Provided by User
+    "PROVIDED_IMAGE_TO_PATHOS": {"curiosity": 0.02, "focus": 0.01},
+    "PROVIDED_DOCUMENT_TO_PATHOS": {"curiosity": 0.03, "focus": 0.02},
+    # Tool Usage
+    "TOOL_SUCCESS_WEB_SEARCH": {"curiosity": 0.05, "focus": 0.02, "contentment": 0.01},
+    "TOOL_SUCCESS_ADD_EVENT_LEISURE": {"joy": 0.05, "ambition": 0.01, "contentment": 0.03},
+    "TOOL_SUCCESS_ADD_EVENT_WORK": {"ambition": 0.03, "focus": 0.02, "contentment": 0.02},
+    "TOOL_SUCCESS_FETCH_WEATHER": {"curiosity": 0.01, "contentment": 0.005}, # Added for weather tool
+    "TOOL_SUCCESS_GENERIC": {"contentment": 0.02, "focus": 0.01}, # Generic success
+    "TOOL_FAILURE_GENERIC": {"stress": 0.03, "resentment": 0.01, "focus": -0.02},
+    # Activity Effects (per tick/cycle of Firmament's run_simulation_tick)
+    "ACTIVITY_EFFECT_RESTING": {"tiredness": -0.02, "stress": -0.01, "comfort": 0.01, "focus": -0.01},
+    "ACTIVITY_EFFECT_WORK_DEEP": {"focus": 0.01, "ambition": 0.005, "tiredness": 0.005, "stress": 0.002},
+    "ACTIVITY_EFFECT_WORK_ROUTINE": {"focus": 0.005, "tiredness": 0.003, "contentment": 0.002},
+    "ACTIVITY_EFFECT_LEARNING": {"curiosity": 0.01, "focus": 0.005, "ambition": 0.002},
+    "ACTIVITY_EFFECT_SOCIAL": {"joy": 0.01, "loneliness": -0.01, "craving_connection": -0.005, "stress": -0.005},
+    "ACTIVITY_EFFECT_LEISURE_ACTIVE": {"joy": 0.015, "tiredness": 0.005, "stress": -0.01},
+    "ACTIVITY_EFFECT_LEISURE_PASSIVE": {"comfort": 0.01, "tiredness": -0.005},
+    "ACTIVITY_EFFECT_CHORE": {"tiredness": 0.005, "contentment": 0.005, "stress": 0.002},
+    # Firmament Intention Simulation Outcomes
+    "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
+    "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
+    "INTENTION_ACTION_TASK": {"focus": 0.02, "ambition": 0.02, "contentment": 0.01},
+    "INTENTION_ACTION_GENERAL_SUCCESS": {"contentment": 0.01, "joy": 0.005},
+    "INTENTION_ACTION_FAILURE": {"stress": 0.02, "resentment": 0.01, "ambition": -0.005},
+    # General Engagement
+    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005} # Smallest default bump
+}
+
 class EthosCore:
     def __init__(self, config: Config):
         self.config = config
@@ -110,7 +171,30 @@ class EthosCore:
         # self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE} # Removed
         # self.last_mood_update_time: datetime = datetime.now(timezone.utc) # Removed
         self.persona_directives: List[str] = self._load_persona_from_file()
-        self.hexus_scores: Dict[str, float] = self._load_hexus_scores()
+        self.hexus_scores: Dict[str, float] = self._load_hexus_scores() # Load first
+
+        self.personality_bias_profile: Optional[Dict[str, float]] = None
+        personality_bias_json_str = self.ethos_config.get('personality_bias_profile_json')
+        if personality_bias_json_str:
+            try:
+                self.personality_bias_profile = json.loads(personality_bias_json_str)
+                if not isinstance(self.personality_bias_profile, dict):
+                    logger.warning(f"Personality bias profile is not a valid dictionary: {self.personality_bias_profile}. Disabling bias.")
+                    self.personality_bias_profile = None
+                else:
+                    logger.info(f"Successfully parsed personality bias profile: {self.personality_bias_profile}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse EIDOS_PERSONALITY_BIAS_PROFILE_JSON: {e}. Personality bias will not be applied.")
+                self.personality_bias_profile = None
+
+        self._apply_initial_personality_bias() # Then apply bias
+        # The first save of Hexus scores (if file didn't exist or was updated by _load_hexus_scores)
+        # will happen within _load_hexus_scores if it calls _save_hexus_scores.
+        # If _load_hexus_scores doesn't save when it uses defaults, we might need an explicit save here.
+        # Re-checking _load_hexus_scores: it calls _save_hexus_scores(defaults) if file not found or invalid.
+        # This means the biased scores will be saved if a new file is created.
+        # If an existing file is loaded, the bias is applied in memory but not saved until the next _save_hexus_scores call.
+        # This is generally fine, as subsequent updates will save the biased scores.
 
         now_utc_init = datetime.now(timezone.utc)
         reflection_interval = self.ethos_config.get('reflection_interval_seconds', 86400.0)
@@ -473,6 +557,7 @@ class EthosCore:
             return
         
         logger.debug(f"Processing interaction for Hexus update. Input: '{user_input_text[:50]}...'")
+        self.process_event_for_hexus_update("GENERAL_INTERACTION")
 
         input_lower = (user_input_text or "").lower()
 
@@ -480,51 +565,29 @@ class EthosCore:
         positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant', 'appreciate it']
         negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good', "didn't work", 'frustrating']
         question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me', 'can you', 'could you']
-        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this'] # Could indicate stress or need for focus
-
-        # Base interaction effect (general engagement)
-        self._apply_hexus_change('user_engagement_proactivity', 0.01, "general interaction") # Small bump for any interaction
-        self._apply_hexus_change('focus', 0.02, "general interaction")
+        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this']
 
         if image_provided:
-            self._apply_hexus_change('curiosity', 0.03, "image provided by user")
-            self._apply_hexus_change('focus', 0.01, "image provided by user")
+            self.process_event_for_hexus_update("PROVIDED_IMAGE_TO_PATHOS")
         if document_provided:
-            self._apply_hexus_change('curiosity', 0.02, "document provided by user")
-            self._apply_hexus_change('focus', 0.03, "document provided by user")
+            self.process_event_for_hexus_update("PROVIDED_DOCUMENT_TO_PATHOS")
 
-        # Keyword-based adjustments
         if any(kw in input_lower for kw in positive_keywords):
-            self._apply_hexus_change('joy', 0.15, "positive keywords in user input")
-            self._apply_hexus_change('contentment', 0.1, "positive keywords in user input")
-            self._apply_hexus_change('stress', -0.05, "positive keywords in user input")
-            self._apply_hexus_change('resentment', -0.02, "positive keywords in user input")
+            self.process_event_for_hexus_update("USER_INPUT_POSITIVE_KEYWORD")
 
         if any(kw in input_lower for kw in negative_keywords):
-            self._apply_hexus_change('stress', 0.15, "negative keywords in user input")
-            self._apply_hexus_change('resentment', 0.1, "negative keywords in user input")
-            self._apply_hexus_change('joy', -0.1, "negative keywords in user input")
-            self._apply_hexus_change('contentment', -0.05, "negative keywords in user input")
-            self._apply_hexus_change('focus', 0.05, "negative keywords indicating a problem to solve")
-
+            self.process_event_for_hexus_update("USER_INPUT_NEGATIVE_KEYWORD")
 
         if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
-            self._apply_hexus_change('curiosity', 0.05, "user asked a question")
-            self._apply_hexus_change('focus', 0.03, "user asked a question, requires focus")
-            self._apply_hexus_change('user_engagement_proactivity', 0.02, "user asked a question")
-
+            self.process_event_for_hexus_update("USER_INPUT_QUESTION")
 
         if any(kw in input_lower for kw in problem_keywords):
-            self._apply_hexus_change('stress', 0.05, "user mentioned a problem/issue")
-            self._apply_hexus_change('focus', 0.05, "user mentioned a problem, requires focus")
+            self.process_event_for_hexus_update("USER_INPUT_PROBLEM_STATEMENT")
 
-        # Example: Length of interaction (very simplified)
-        if pathos_response_text and len(pathos_response_text) > 200: # Longer, more involved response
-            self._apply_hexus_change('focus', 0.02, "generated a detailed response")
-            self._apply_hexus_change('tiredness', 0.01, "generated a detailed response")
-        elif pathos_response_text and len(pathos_response_text) < 50: # Short response
-             self._apply_hexus_change('brevity_preference', 0.01, "generated a brief response")
-
+        if pathos_response_text and len(pathos_response_text) > 200:
+            self.process_event_for_hexus_update("INTERACTION_LONG_RESPONSE_GIVEN")
+        elif pathos_response_text and len(pathos_response_text) < 50:
+            self.process_event_for_hexus_update("INTERACTION_SHORT_RESPONSE_GIVEN")
 
     def _apply_hexus_change(self, dimension_name: str, change_amount: float, reason: Optional[str] = None):
         """
@@ -550,6 +613,35 @@ class EthosCore:
         else:
             logger.debug(f"Hexus score '{dimension_name}' change {change_amount:+.3f} not significant enough to alter value from {original_value:.3f}.")
 
+    def _apply_initial_personality_bias(self):
+        """
+        Applies the personality bias to the initial Hexus scores upon EthosCore initialization.
+        This method should be called after Hexus scores are loaded or defaulted.
+        """
+        if not self.personality_bias_profile:
+            logger.info("No personality bias profile loaded. Initial Hexus scores remain unmodified by bias.")
+            return
+
+        logger.info("Applying initial personality bias to Hexus scores...")
+        for dimension, bias_value in self.personality_bias_profile.items():
+            if not isinstance(bias_value, (int, float)):
+                logger.warning(f"Invalid bias value '{bias_value}' for dimension '{dimension}' in profile. Skipping.")
+                continue
+
+            if dimension in self.hexus_scores:
+                original_value = self.hexus_scores[dimension]
+                biased_value = original_value + bias_value
+                clamped_value = max(0.0, min(1.0, biased_value)) # Assuming 0-1 range for all Hexus
+
+                if abs(clamped_value - original_value) > 1e-4: # If bias made a difference
+                    self.hexus_scores[dimension] = clamped_value
+                    logger.info(f"Personality bias for '{dimension}': {bias_value:+.2f}. Score: {original_value:.2f} -> {clamped_value:.2f}")
+                else:
+                    logger.debug(f"Personality bias for '{dimension}' ({bias_value:+.2f}) did not significantly change score from {original_value:.2f} after clamping.")
+            else:
+                logger.warning(f"Dimension '{dimension}' from personality bias profile not found in current Hexus scores. Bias not applied for this dimension.")
+        # Note: No _save_hexus_scores() here. It's called by _load_hexus_scores if it creates a new file,
+        # or will be called by subsequent updates. This ensures bias is applied before first use.
 
     async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
@@ -1202,12 +1294,20 @@ class EthosCore:
         This method is called periodically by _periodic_hexus_decay_task.
         """
         now = datetime.now(timezone.utc)
-        logger.info("--- Ethos: Running Hexus Decay Cycle ---")
+        time_elapsed_since_last_decay = now - self.last_hexus_decay_time
+        time_elapsed_seconds = time_elapsed_since_last_decay.total_seconds()
 
-        decay_rate_per_cycle = self.ethos_config.get('hexus_decay_rate_per_cycle', 0.005)
-        # hexus_decay_interval_seconds = self.ethos_config.get('hexus_decay_interval_seconds', 3600.0) # Not directly used in per-cycle formula
+        if time_elapsed_seconds < 1.0: # Avoid too frequent calculations or if time hasn't advanced
+            logger.debug(f"Hexus decay: Insufficient time ({time_elapsed_seconds:.2f}s) since last decay. Skipping.")
+            return
 
-        # Activity-aware decay - Placeholder for future enhancement
+        logger.info(f"--- Ethos: Running Hexus Decay Cycle (Time elapsed: {time_elapsed_seconds:.2f}s) ---")
+
+        # The 'hexus_decay_rate_per_cycle' from config is now superseded by per-dimension hourly rates
+        # and actual time elapsed.
+        # We retain hexus_decay_interval_seconds from config as the *intended* call frequency for the task.
+
+        # Activity-aware decay - Placeholder for future enhancement (remains placeholder)
         # current_activity_type = None
         # if self.chronos_engine:
         #     try:
@@ -1232,16 +1332,21 @@ class EthosCore:
                 logger.warning(f"Hexus decay: No baseline defined for '{key}'. Skipping decay for this score.")
                 continue
 
-            # Simplified activity-aware baseline adjustment (placeholder)
-            # effective_baseline = baseline
-            # if current_activity_type == 'resting' or current_activity_type == 'sleeping':
-            #     if key == 'stress': effective_baseline = 0.05
-            #     if key == 'tiredness': effective_baseline = 0.0
-            # elif current_activity_type == 'working':
-            #     if key == 'focus': effective_baseline = 0.8 # Decay towards higher focus if working
-            #     if key == 'tiredness': effective_baseline = 0.3 # Tiredness might settle higher if working
+            dimension_decay_rate_per_hour = HEXUS_DECAY_RATES.get(key)
+            if dimension_decay_rate_per_hour is None:
+                logger.warning(f"Hexus decay: No hourly decay rate defined for '{key}'. Skipping decay for this score.")
+                continue
 
-            new_value = current_value - (current_value - baseline) * decay_rate_per_cycle
+            # Activity-aware adjustments would modify baseline or dimension_decay_rate_per_hour here
+            # For example:
+            # effective_baseline = baseline
+            # effective_rate_per_hour = dimension_decay_rate_per_hour
+            # if current_activity_type == 'resting':
+            #     if key == 'tiredness': effective_rate_per_hour *= 2.0 # Tiredness decays faster when resting
+            #     if key == 'stress': effective_rate_per_hour *= 1.5
+
+            decay_amount_for_cycle = (current_value - baseline) * dimension_decay_rate_per_hour * (time_elapsed_seconds / 3600.0)
+            new_value = current_value - decay_amount_for_cycle
 
             # Clamping (assuming all Hexus scores are 0.0 to 1.0)
             clamped_new_value = max(0.0, min(1.0, new_value))
@@ -1249,17 +1354,17 @@ class EthosCore:
             if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
                 self.hexus_scores[key] = clamped_new_value
                 changed_scores = True
-                logger.debug(f"Hexus decay: '{key}' changed from {current_value:.3f} to {clamped_new_value:.3f} (baseline: {baseline:.3f})")
+                logger.debug(f"Hexus decay for '{key}': {current_value:.3f} -> {clamped_new_value:.3f} (baseline: {baseline:.2f}, rate/hr: {dimension_decay_rate_per_hour:.3f}, dt: {time_elapsed_seconds:.0f}s). Change: {decay_amount_for_cycle:+.4f}")
 
         if changed_scores:
             self._save_hexus_scores()
             logger.info(f"Hexus scores updated and saved after decay. Current scores: { {k: round(v, 3) for k,v in self.hexus_scores.items()} }")
         else:
-            logger.info("Hexus decay cycle: No significant changes to Hexus scores.")
+            logger.info("Hexus decay cycle: No significant changes to Hexus scores this cycle.")
 
         self.last_hexus_decay_time = now
         self._save_task_last_run_time("HexusDecay", now)
-        logger.info(f"--- Ethos: Hexus Decay Cycle Finished ---")
+        logger.info(f"--- Ethos: Hexus Decay Cycle Finished (Duration processed: {time_elapsed_seconds:.2f}s) ---")
 
     async def get_background_tasks(self) -> List[asyncio.Task]:
         """Create and return background tasks for EthosCore operations."""
@@ -1591,39 +1696,32 @@ class EthosCore:
     async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
         """
         Updates Hexus scores based on various system or feedback events.
+        Uses the HEXUS_EVENT_DEFINITIONS mapping.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to mood sim enable flag
+        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
 
-        logger.debug(f"Processing event '{event_type}' for Hexus update. Payload: {payload}")
+        logger.debug(f"Processing Hexus event: '{event_name}' with magnitude multiplier: {magnitude_multiplier}")
 
-        if event_type == 'feedback':
-            fb_type = payload.get('feedback_type') if payload else None
-            rating = payload.get('rating') if payload else None
-            reason = f"feedback event (type: {fb_type}, rating: {rating})"
+        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_name)
 
-            if fb_type == 'positive' or (rating is not None and rating > 0):
-                self._apply_hexus_change('joy', 0.1, reason)
-                self._apply_hexus_change('contentment', 0.1, reason)
-                self._apply_hexus_change('stress', -0.05, reason)
-            elif fb_type == 'negative' or (rating is not None and rating < 0):
-                self._apply_hexus_change('stress', 0.1, reason)
-                self._apply_hexus_change('resentment', 0.05, reason)
-                self._apply_hexus_change('joy', -0.1, reason)
-                self._apply_hexus_change('contentment', -0.05, reason)
-            elif fb_type == 'correction':
-                self._apply_hexus_change('curiosity', 0.05, reason) # Learning from correction
-                self._apply_hexus_change('stress', 0.02, f"initial reaction to correction ({payload.get('text','')[:30]}...)")
+        if not event_definition:
+            logger.warning(f"Hexus event '{event_name}' not found in HEXUS_EVENT_DEFINITIONS.")
+            return
 
-        # Example: Add other event_types for tool usage, new learnings, etc.
-        # elif event_type == 'successful_tool_use':
-        #     tool_name = payload.get('tool_name', 'unknown_tool')
-        #     self._apply_hexus_change('focus', 0.05, f"successful use of {tool_name}")
-        #     self._apply_hexus_change('contentment', 0.03, f"successful use of {tool_name}")
+        reason_for_change = f"event: {event_name}"
+        if payload: # Optionally include payload summary in reason for more detailed logging
+            payload_summary = {k: (str(v)[:30] + '...' if isinstance(v, str) and len(v) > 30 else v) for k,v in payload.items()}
+            reason_for_change += f" (payload: {payload_summary})"
+
+
+        for dimension, delta in event_definition.items():
+            self._apply_hexus_change(dimension, delta * magnitude_multiplier, reason_for_change)
         
-        # elif event_type == 'new_learning_achieved':
-        #     self._apply_hexus_change('curiosity', 0.1, "new learning achieved")
-        #     self._apply_hexus_change('joy', 0.05, "new learning achieved")
+        # Specific handling for feedback event to extract more detailed reason if needed
+        if event_name == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+             self._apply_hexus_change('stress', HEXUS_EVENT_DEFINITIONS["USER_FEEDBACK_CORRECTION"].get('stress',0.03) * magnitude_multiplier, f"initial reaction to correction text: {payload.get('text','')[:30]}...")
+
 
     async def retrieve_relevant_past_interactions(
         self,
