@@ -21,6 +21,7 @@ import pytz # Added import
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from eidos_agent.features.oneiros import OneirosModule # Updated import
+    from eidos_agent.features.firmament.module import FirmamentModule # Added FirmamentModule
     from eidos_agent.core.connection_manager import ConnectionManager
     from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
@@ -56,12 +57,108 @@ MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE = 0.1
 MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE = 0.05
 MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE = -0.15
 MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE = 0.05
-HEXUS_MIN = -1.0
+HEXUS_MIN = -1.0 # Note: New Hexus scores are 0.0 to 1.0. This constant might need review if used for clamping.
 HEXUS_MAX = 1.0
 DEFAULT_HEXUS_SCORES = {
-    "general_caution": 0.0,
-    "user_engagement_proactivity": 0.0,
-    "brevity_preference": 0.0
+    "joy": 0.5,                        # 0.0 (none) to 1.0 (max)
+    "stress": 0.2,                     # 0.0 (none) to 1.0 (max)
+    "curiosity": 0.6,                  # 0.0 (none) to 1.0 (max)
+    "loneliness": 0.3,                 # 0.0 (none) to 1.0 (max)
+    "ambition": 0.5,                   # 0.0 (none) to 1.0 (max)
+    "tiredness": 0.2,                  # 0.0 (none) to 1.0 (max)
+    "comfort": 0.6,                    # 0.0 (none) to 1.0 (max)
+    "focus": 0.7,                      # 0.0 (none) to 1.0 (max)
+    "impulsiveness": 0.3,              # 0.0 (none) to 1.0 (max)
+    "resentment": 0.1,                 # 0.0 (none) to 1.0 (max)
+    "contentment": 0.5,                # 0.0 (none) to 1.0 (max)
+    "melancholy": 0.2,                 # 0.0 (none) to 1.0 (max)
+    "craving_connection": 0.4,         # 0.0 (none) to 1.0 (max)
+    # Existing ones, adjust if their range/meaning changes, or remove if superseded
+    "general_caution": 0.3,            # Assuming 0-1 scale now, previously 0.0
+    "user_engagement_proactivity": 0.4,# Assuming 0-1 scale now, previously 0.0
+    "brevity_preference": 0.5          # Assuming 0-1 scale now, previously 0.0
+}
+
+HEXUS_BASELINES = {
+    "joy": 0.4,
+    "stress": 0.1,
+    "curiosity": 0.5,
+    "loneliness": 0.2,
+    "ambition": 0.3,
+    "tiredness": 0.1,
+    "comfort": 0.5,
+    "focus": 0.5,
+    "impulsiveness": 0.2,
+    "resentment": 0.05,
+    "contentment": 0.5,
+    "melancholy": 0.1,
+    "craving_connection": 0.3,
+    "general_caution": 0.2, # Baseline for pre-existing
+    "user_engagement_proactivity": 0.2, # Baseline for pre-existing
+    "brevity_preference": 0.5 # Baseline for pre-existing
+}
+
+HEXUS_DECAY_RATES = { # Decay rate per hour
+    "joy": 0.1,
+    "stress": 0.25,
+    "curiosity": 0.05,
+    "loneliness": 0.08,
+    "ambition": 0.05,
+    "tiredness": 0.3, # Assumes decay when not actively resting. Resting itself would have direct Hexus changes.
+    "comfort": 0.1,
+    "focus": 0.15,
+    "impulsiveness": 0.1,
+    "resentment": 0.02, # Decays very slowly
+    "contentment": 0.05,
+    "melancholy": 0.05,
+    "craving_connection": 0.1,
+    "general_caution": 0.1,
+    "user_engagement_proactivity": 0.1,
+    "brevity_preference": 0.1
+}
+
+HEXUS_EVENT_DEFINITIONS = {
+    # User Feedback
+    "USER_FEEDBACK_POSITIVE": {"joy": 0.1, "contentment": 0.1, "stress": -0.05, "resentment": -0.02},
+    "USER_FEEDBACK_NEGATIVE": {"stress": 0.1, "resentment": 0.05, "joy": -0.1, "contentment": -0.05},
+    "USER_FEEDBACK_CORRECTION": {"stress": 0.03, "curiosity": 0.02}, # Learning from being corrected
+    # User Input Analysis
+    "USER_INPUT_POSITIVE_KEYWORD": {"joy": 0.02, "contentment": 0.01},
+    "USER_INPUT_NEGATIVE_KEYWORD": {"stress": 0.02, "resentment": 0.01},
+    "USER_INPUT_QUESTION": {"curiosity": 0.01, "focus": 0.01, "user_engagement_proactivity": 0.01},
+    "USER_INPUT_PROBLEM_STATEMENT": {"stress": 0.03, "focus": 0.03, "user_engagement_proactivity": 0.05},
+    # Pathos Response Characteristics
+    "INTERACTION_SHORT_RESPONSE_GIVEN": {"brevity_preference": 0.01},
+    "INTERACTION_LONG_RESPONSE_GIVEN": {"brevity_preference": -0.01, "tiredness": 0.005}, # Slight tiredness from long response
+    # Content Provided by User
+    "PROVIDED_IMAGE_TO_PATHOS": {"curiosity": 0.02, "focus": 0.01},
+    "PROVIDED_DOCUMENT_TO_PATHOS": {"curiosity": 0.03, "focus": 0.02},
+    # Tool Usage
+    "TOOL_SUCCESS_WEB_SEARCH": {"curiosity": 0.05, "focus": 0.02, "contentment": 0.01},
+    "TOOL_SUCCESS_ADD_EVENT_LEISURE": {"joy": 0.05, "ambition": 0.01, "contentment": 0.03},
+    "TOOL_SUCCESS_ADD_EVENT_WORK": {"ambition": 0.03, "focus": 0.02, "contentment": 0.02},
+    "TOOL_SUCCESS_FETCH_WEATHER": {"curiosity": 0.01, "contentment": 0.005}, # Added for weather tool
+    "TOOL_SUCCESS_GENERIC": {"contentment": 0.02, "focus": 0.01}, # Generic success
+    "TOOL_FAILURE_GENERIC": {"stress": 0.03, "resentment": 0.01, "focus": -0.02},
+    # Activity Effects (per tick/cycle of Firmament's run_simulation_tick)
+    "ACTIVITY_EFFECT_RESTING": {"tiredness": -0.02, "stress": -0.01, "comfort": 0.01, "focus": -0.01},
+    "ACTIVITY_EFFECT_WORK_DEEP": {"focus": 0.01, "ambition": 0.005, "tiredness": 0.005, "stress": 0.002},
+    "ACTIVITY_EFFECT_WORK_ROUTINE": {"focus": 0.005, "tiredness": 0.003, "contentment": 0.002},
+    "ACTIVITY_EFFECT_LEARNING": {"curiosity": 0.01, "focus": 0.005, "ambition": 0.002},
+    "ACTIVITY_EFFECT_SOCIAL": {"joy": 0.01, "loneliness": -0.01, "craving_connection": -0.005, "stress": -0.005},
+    "ACTIVITY_EFFECT_LEISURE_ACTIVE": {"joy": 0.015, "tiredness": 0.005, "stress": -0.01},
+    "ACTIVITY_EFFECT_LEISURE_PASSIVE": {"comfort": 0.01, "tiredness": -0.005},
+    "ACTIVITY_EFFECT_CHORE": {"tiredness": 0.005, "contentment": 0.005, "stress": 0.002},
+    # Firmament Intention Simulation Outcomes
+    "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
+    "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
+    "INTENTION_ACTION_TASK": {"focus": 0.02, "ambition": 0.02, "contentment": 0.01},
+    "INTENTION_ACTION_GENERAL_SUCCESS": {"contentment": 0.01, "joy": 0.005},
+    "INTENTION_ACTION_FAILURE": {"stress": 0.02, "resentment": 0.01, "ambition": -0.005},
+    # General Engagement
+    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
+    # Reflection Cycle
+    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02} # Positive effect of reflection
 }
 
 class EthosCore:
@@ -73,10 +170,33 @@ class EthosCore:
         self.task_last_run_times_file_path = self.memory_storage.memory_db_path.parent / TASK_LAST_RUN_TIMES_FILENAME
         self._task_last_run_times_cache: Dict[str, datetime] = self._load_task_last_run_times()
 
-        self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE}
-        self.last_mood_update_time: datetime = datetime.now(timezone.utc)
+        # self.current_mood: Dict[str, float] = {"valence": MOOD_VALENCE_BASELINE, "arousal": MOOD_AROUSAL_BASELINE} # Removed
+        # self.last_mood_update_time: datetime = datetime.now(timezone.utc) # Removed
         self.persona_directives: List[str] = self._load_persona_from_file()
-        self.hexus_scores: Dict[str, float] = self._load_hexus_scores()
+        self.hexus_scores: Dict[str, float] = self._load_hexus_scores() # Load first
+
+        self.personality_bias_profile: Optional[Dict[str, float]] = None
+        personality_bias_json_str = self.ethos_config.get('personality_bias_profile_json')
+        if personality_bias_json_str:
+            try:
+                self.personality_bias_profile = json.loads(personality_bias_json_str)
+                if not isinstance(self.personality_bias_profile, dict):
+                    logger.warning(f"Personality bias profile is not a valid dictionary: {self.personality_bias_profile}. Disabling bias.")
+                    self.personality_bias_profile = None
+                else:
+                    logger.info(f"Successfully parsed personality bias profile: {self.personality_bias_profile}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse EIDOS_PERSONALITY_BIAS_PROFILE_JSON: {e}. Personality bias will not be applied.")
+                self.personality_bias_profile = None
+
+        self._apply_initial_personality_bias() # Then apply bias
+        # The first save of Hexus scores (if file didn't exist or was updated by _load_hexus_scores)
+        # will happen within _load_hexus_scores if it calls _save_hexus_scores.
+        # If _load_hexus_scores doesn't save when it uses defaults, we might need an explicit save here.
+        # Re-checking _load_hexus_scores: it calls _save_hexus_scores(defaults) if file not found or invalid.
+        # This means the biased scores will be saved if a new file is created.
+        # If an existing file is loaded, the bias is applied in memory but not saved until the next _save_hexus_scores call.
+        # This is generally fine, as subsequent updates will save the biased scores.
 
         now_utc_init = datetime.now(timezone.utc)
         reflection_interval = self.ethos_config.get('reflection_interval_seconds', 86400.0)
@@ -108,6 +228,7 @@ class EthosCore:
         self.pathos_interface: Optional['PathosInterface'] = None
         self.logos_core: Optional['LogosCore'] = None
         self.chronos_engine: Optional['ChronosEngine'] = None
+        self.firmament_module: Optional[FirmamentModule] = None # Added FirmamentModule attribute
 
         self.system_user_ids: List[Optional[str]] = [
             "unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing",
@@ -115,6 +236,19 @@ class EthosCore:
             "system_admin", PATHOS_USER_ID, None, "default_user"
         ]
         self.hexus_scores_changed_during_reflection = False
+
+        self.forgetting_core_memory_types: List[str] = []
+        core_types_json = self.ethos_config.get('forgetting_core_memory_types_json', '[]')
+        try:
+            loaded_core_types = json.loads(core_types_json)
+            if isinstance(loaded_core_types, list) and all(isinstance(item, str) for item in loaded_core_types):
+                self.forgetting_core_memory_types = loaded_core_types
+                logger.info(f"Loaded {len(self.forgetting_core_memory_types)} core memory types for forgetting: {self.forgetting_core_memory_types}")
+            else:
+                logger.warning(f"forgetting_core_memory_types_json is not a list of strings. Using empty list. Value: {core_types_json}")
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse forgetting_core_memory_types_json. Using empty list. Value: {core_types_json}")
+
         logger.info("EthosCore initialized with persistent task timing.")
 
     def _load_task_last_run_times(self) -> Dict[str, datetime]:
@@ -181,6 +315,10 @@ class EthosCore:
 
     def set_chronos_engine(self, chronos_engine_instance: 'ChronosEngine'):
         self.chronos_engine = chronos_engine_instance
+
+    def set_firmament_module(self, firmament_module: 'FirmamentModule'): # Added setter
+        self.firmament_module = firmament_module
+        logger.info("EthosCore: FirmamentModule instance set.")
 
     async def close(self):
         logger.info("EthosCore close called. Saving Hexus scores and closing memory connection.")
@@ -426,54 +564,100 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-    def update_mood_on_interaction(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
-        if not self.config.ENABLE_MOOD_SIMULATION:
+    def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
+        """
+        Processes user interaction details to update relevant Hexus scores.
+        """
+        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
         
-        try:
-            valence_shift, arousal_shift = 0.0, 0.0
-            
-            # Base shift for successful interaction (assuming if this is called, interaction was somewhat successful)
-            valence_shift += MOOD_SHIFT_VALENCE_SUCCESS
-            arousal_shift += MOOD_SHIFT_AROUSAL_SUCCESS
+        logger.debug(f"Processing interaction for Hexus update. Input: '{user_input_text[:50]}...'")
+        self.process_event_for_hexus_update("GENERAL_INTERACTION")
 
-            if image_provided:
-                valence_shift += 0.05  # Slightly more positive for engaging with an image
-                arousal_shift += 0.02
-            if document_provided:
-                valence_shift += 0.03
-                arousal_shift += 0.01
-            
-            input_lower = (user_input_text or "").lower()
-            # More nuanced keyword lists
-            positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant']
-            negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good']
-            question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me']
+        input_lower = (user_input_text or "").lower()
 
+        # Define keyword lists (can be expanded and refined)
+        positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant', 'appreciate it']
+        negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good', "didn't work", 'frustrating']
+        question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me', 'can you', 'could you']
+        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this']
 
-            if any(kw in input_lower for kw in positive_keywords):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
-            
-            if any(kw in input_lower for kw in negative_keywords):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE # This is additive, so a negative value
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            
-            if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
-                arousal_shift += 0.03 # Questions increase arousal
-                valence_shift += 0.01 # Mildly positive due to engagement
+        if image_provided:
+            self.process_event_for_hexus_update("PROVIDED_IMAGE_TO_PATHOS")
+        if document_provided:
+            self.process_event_for_hexus_update("PROVIDED_DOCUMENT_TO_PATHOS")
 
-            # Update current_mood (ensure it's clamped)
-            self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood.get('valence', MOOD_VALENCE_BASELINE) + valence_shift))
-            self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood.get('arousal', MOOD_AROUSAL_BASELINE) + arousal_shift))
-            
-            self.last_mood_update_time = datetime.now(timezone.utc) # Update timestamp
-            
-            logger.debug(f"Mood updated after interaction: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f} (Shifts: v={valence_shift:+.3f}, a={arousal_shift:+.3f})")
+        if any(kw in input_lower for kw in positive_keywords):
+            self.process_event_for_hexus_update("USER_INPUT_POSITIVE_KEYWORD")
 
-        except Exception as e:
-            logger.error(f"Error updating mood on interaction: {e}", exc_info=True)    
-    
+        if any(kw in input_lower for kw in negative_keywords):
+            self.process_event_for_hexus_update("USER_INPUT_NEGATIVE_KEYWORD")
+
+        if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
+            self.process_event_for_hexus_update("USER_INPUT_QUESTION")
+
+        if any(kw in input_lower for kw in problem_keywords):
+            self.process_event_for_hexus_update("USER_INPUT_PROBLEM_STATEMENT")
+
+        if pathos_response_text and len(pathos_response_text) > 200:
+            self.process_event_for_hexus_update("INTERACTION_LONG_RESPONSE_GIVEN")
+        elif pathos_response_text and len(pathos_response_text) < 50:
+            self.process_event_for_hexus_update("INTERACTION_SHORT_RESPONSE_GIVEN")
+
+    def _apply_hexus_change(self, dimension_name: str, change_amount: float, reason: Optional[str] = None):
+        """
+        Applies a change to a specified Hexus score dimension, clamps it, and logs the change.
+        """
+        if dimension_name not in self.hexus_scores:
+            logger.warning(f"Hexus update: Dimension '{dimension_name}' not found in self.hexus_scores. Cannot apply change.")
+            return
+
+        original_value = self.hexus_scores[dimension_name]
+        new_value = original_value + change_amount
+
+        # Clamp the new value (assuming all Hexus scores are 0.0 to 1.0)
+        clamped_value = max(0.0, min(1.0, new_value))
+
+        if abs(clamped_value - original_value) > 1e-4: # Only log and save if change is significant
+            self.hexus_scores[dimension_name] = clamped_value
+            log_message = f"Hexus score '{dimension_name}' changed by {change_amount:+.3f} to {clamped_value:.3f}."
+            if reason:
+                log_message += f" Reason: {reason}."
+            logger.info(log_message)
+            self._save_hexus_scores() # Persist changes immediately
+        else:
+            logger.debug(f"Hexus score '{dimension_name}' change {change_amount:+.3f} not significant enough to alter value from {original_value:.3f}.")
+
+    def _apply_initial_personality_bias(self):
+        """
+        Applies the personality bias to the initial Hexus scores upon EthosCore initialization.
+        This method should be called after Hexus scores are loaded or defaulted.
+        """
+        if not self.personality_bias_profile:
+            logger.info("No personality bias profile loaded. Initial Hexus scores remain unmodified by bias.")
+            return
+
+        logger.info("Applying initial personality bias to Hexus scores...")
+        for dimension, bias_value in self.personality_bias_profile.items():
+            if not isinstance(bias_value, (int, float)):
+                logger.warning(f"Invalid bias value '{bias_value}' for dimension '{dimension}' in profile. Skipping.")
+                continue
+
+            if dimension in self.hexus_scores:
+                original_value = self.hexus_scores[dimension]
+                biased_value = original_value + bias_value
+                clamped_value = max(0.0, min(1.0, biased_value)) # Assuming 0-1 range for all Hexus
+
+                if abs(clamped_value - original_value) > 1e-4: # If bias made a difference
+                    self.hexus_scores[dimension] = clamped_value
+                    logger.info(f"Personality bias for '{dimension}': {bias_value:+.2f}. Score: {original_value:.2f} -> {clamped_value:.2f}")
+                else:
+                    logger.debug(f"Personality bias for '{dimension}' ({bias_value:+.2f}) did not significantly change score from {original_value:.2f} after clamping.")
+            else:
+                logger.warning(f"Dimension '{dimension}' from personality bias profile not found in current Hexus scores. Bias not applied for this dimension.")
+        # Note: No _save_hexus_scores() here. It's called by _load_hexus_scores if it creates a new file,
+        # or will be called by subsequent updates. This ensures bias is applied before first use.
+
     async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
         dream_source_filter = "oneiros_dream_cycle" # Filter by source metadata
@@ -1106,32 +1290,643 @@ class EthosCore:
         self._save_task_last_run_time("EthosReflection", now)
         logger.info(f"--- Ethos: Reflection Cycle Finished (Placeholder) ---")
 
-    async def run_managed_forgetting(self): # ADDED METHOD (Placeholder)
-        """Placeholder for the managed forgetting process."""
+    async def run_reflection_cycle(self):
+        """
+        Performs a reflection cycle:
+        1. Fetches recent relevant memories.
+        2. Filters and selects the most salient/significant ones.
+        3. Formats them for an LLM.
+        4. Calls an LLM to generate insights based on these memories.
+        5. Stores these insights as new memories.
+        6. Updates Hexus scores based on the reflection.
+        """
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Reflection Cycle at {now.isoformat()} ---")
+
+        # 1. Retrieve Configuration
+        reflection_llm_role = self.ethos_config.get('reflection_llm_role', "LOGOS_TECHNE")
+        query_limit = self.ethos_config.get('reflection_memory_query_limit', 50)
+        max_memories_for_llm = self.ethos_config.get('reflection_max_memories_for_llm', 15)
+        min_salience_for_consideration = self.ethos_config.get('reflection_min_salience_for_consideration', 0.3)
+        significant_event_threshold = self.ethos_config.get('reflection_significant_event_salience_threshold', 0.7)
+        lookback_days = self.ethos_config.get('reflection_lookback_days', 3)
+
+        # 2. Fetch Memories
+        memories_for_reflection = await self._get_memories_for_reflection(lookback_days, query_limit)
+        if not memories_for_reflection:
+            logger.info("Reflection Cycle: No memories found for reflection period. Cycle ending.")
+            self.last_reflection_time = now # Still update time to avoid immediate re-run
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # 3. Filter and Select Salient Memories
+        # Filter by min_salience
+        considered_memories = [
+            mem for mem in memories_for_reflection
+            if mem.get('salience', 0.0) >= min_salience_for_consideration
+        ]
+
+        if not considered_memories:
+            logger.info(f"Reflection Cycle: No memories met minimum salience ({min_salience_for_consideration}). Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # Prioritize: simple scoring - significant events and feedback get higher priority
+        def get_priority_score(memory: MemoryEntry) -> float:
+            score = memory.get('salience', 0.0)
+            if memory.get('type') == 'feedback':
+                score += 0.5 # Boost feedback
+            if memory.get('salience', 0.0) >= significant_event_threshold:
+                score += 0.3 # Boost very salient events
+            # Negative feedback could also be prioritized if needed by adding more conditions
+            return score
+
+        considered_memories.sort(key=get_priority_score, reverse=True)
+        selected_memories = considered_memories[:max_memories_for_llm]
+        source_memory_ids = [mem.get('id') for mem in selected_memories if mem.get('id')]
+
+        if not selected_memories:
+            logger.info("Reflection Cycle: No memories selected for LLM after prioritization. Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        logger.info(f"Reflection Cycle: Selected {len(selected_memories)} memories for LLM prompt.")
+
+        # 4. Format Memories for LLM Prompt
+        formatted_memory_strings = []
+        for mem in selected_memories:
+            ts_str = mem.get('timestamp', "Unknown time")
+            try: # Format timestamp nicely
+                ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                formatted_ts = ts_dt.strftime("%Y-%m-%d %H:%M UTC")
+            except ValueError:
+                formatted_ts = ts_str
+
+            content_snippet = (mem.get('content', '') or "")[:150] + "..." if len(mem.get('content', '') or "") > 150 else mem.get('content', '')
+            mood_info = ""
+            if mem_meta := mem.get('metadata'):
+                if mood_at_res := mem_meta.get('mood_at_response'): # from chat_interaction
+                    mood_name = mood_at_res.get('name', 'unknown')
+                    mood_info = f" (Mood: {mood_name}, V:{mood_at_res.get('valence',0):.1f}, A:{mood_at_res.get('arousal',0):.1f})"
+                elif mem_meta.get('mood_valence_at_time') is not None: # from firmament_activity_log
+                    mood_info = f" (Mood: {mem_meta.get('mood_name_at_time', 'unknown')}, V:{mem_meta.get('mood_valence_at_time',0):.1f}, A:{mem_meta.get('mood_arousal_at_time',0):.1f})"
+
+            formatted_memory_strings.append(
+                f"- Timestamp: {formatted_ts}, Type: {mem.get('type')}, Salience: {mem.get('salience', 0.0):.2f}{mood_info}\n  Content: {content_snippet}"
+            )
+        memories_block_for_prompt = "\n".join(formatted_memory_strings)
+
+        # 5. Construct LLM Prompt
+        system_prompt = (
+            "You are a reflective journaling assistant for an AI named Pathos. "
+            "Review the following list of recent experiences, thoughts, and feedback. "
+            "Identify 2-3 key insights, self-observations, or lessons learned from these memories. "
+            "Focus on patterns, significant events, or areas for growth or understanding. "
+            "Insights should be concise and actionable or thought-provoking for Pathos. "
+            "Your output MUST be a JSON object containing a single key \"insights\" which is a list of strings. "
+            "Example: {\"insights\": [\"Insight text 1.\", \"Insight text 2.\"]}"
+        )
+        user_prompt = (
+            "Here is a selection of Pathos's recent memories for reflection:\n\n"
+            f"{memories_block_for_prompt}\n\n"
+            "Please generate 2-3 concise insights based on these memories, in the specified JSON format."
+        )
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+        # 6. Call LLM for Reflection
+        llm_response_str = await self._call_llm_for_internal_task(messages, reflection_llm_role)
+
+        if not llm_response_str or not llm_response_str.strip():
+            logger.warning("Reflection Cycle: LLM call returned no content. Cycle ending.")
+            self.last_reflection_time = now
+            self._save_task_last_run_time("EthosReflection", now)
+            return
+
+        # 7. Process LLM Response and Store Insights
+        try:
+            # Attempt to find JSON block within potentially messy LLM output
+            json_match = re.search(r'\{[\s\S]*\}', llm_response_str)
+            if not json_match:
+                logger.error(f"Reflection Cycle: No JSON object found in LLM response. Raw response: {llm_response_str}")
+                self.last_reflection_time = now
+                self._save_task_last_run_time("EthosReflection", now)
+                return
+
+            parsed_response = json.loads(json_match.group(0))
+
+            if isinstance(parsed_response, dict) and "insights" in parsed_response and isinstance(parsed_response["insights"], list):
+                insights = parsed_response["insights"]
+                if not insights:
+                    logger.info("Reflection Cycle: LLM generated an empty list of insights.")
+                else:
+                    logger.info(f"Reflection Cycle: LLM generated {len(insights)} insights.")
+                    current_hexus_snapshot = self.get_hexus_scores() # Get current scores to associate with insight
+                    for insight_text in insights:
+                        if not isinstance(insight_text, str) or not insight_text.strip():
+                            logger.warning(f"Reflection Cycle: Skipping empty or invalid insight: {insight_text}")
+                            continue
+
+                        new_insight_entry_data = {
+                            "type": "reflection_insight",
+                            "content": insight_text.strip(),
+                            "metadata": {
+                                "source_reflection_cycle_timestamp": now.isoformat(),
+                                "source_memory_ids": source_memory_ids,
+                                "hexus_at_reflection": current_hexus_snapshot,
+                                "user_id": PATHOS_USER_ID # Insight belongs to Pathos
+                            },
+                            "salience": 0.85, # Insights are highly salient
+                            "user_id": PATHOS_USER_ID
+                        }
+                        await self.add_memory_entry(new_insight_entry_data, user_id_context=PATHOS_USER_ID)
+                        logger.info(f"Reflection Cycle: Stored insight - '{insight_text[:100]}...'")
+
+                    # 8. Hexus Score Updates (Simplified First Pass)
+                    await self.process_event_for_hexus_update("REFLECTION_CYCLE_COMPLETED_INSIGHTS", payload={"num_insights": len(insights)})
+
+            else:
+                logger.error(f"Reflection Cycle: LLM response JSON does not match expected structure ('insights' list). Raw response: {llm_response_str}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Reflection Cycle: Failed to parse LLM response as JSON: {e}. Raw response: {llm_response_str}")
+        except Exception as e_proc:
+            logger.error(f"Reflection Cycle: Error processing LLM response or storing insights: {e_proc}", exc_info=True)
+
+        # 9. Update Timestamps
+        self.last_reflection_time = now
+        self._save_task_last_run_time("EthosReflection", now)
+        logger.info(f"--- Ethos: Reflection Cycle Finished at {now.isoformat()} ---")
+        # Call aspiration generation after successful reflection if insights were generated
+        if insights_generated: # Assuming 'insights_generated' boolean is set if insights were made # TODO: Ensure insights_generated is correctly set
+            await self._generate_new_aspirations()
+
+    async def run_knowledge_upkeep(self):
+        """
+        Periodically reviews 'world_knowledge' facts, verifies them (simplified for now),
+        and updates their 'last_verified_timestamp'.
+        """
+        if not self.config.ENABLE_KNOWLEDGE_UPKEEP:
+            logger.debug("Knowledge upkeep cycle skipped as feature is disabled by Config.ENABLE_KNOWLEDGE_UPKEEP.")
+            return
+
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Knowledge Upkeep Cycle at {now.isoformat()} ---")
+
+        # 1. Retrieve Configuration
+        # llm_role = self.ethos_config.get('knowledge_upkeep_llm_role', "LOGOS_TECHNE") # For future LLM-based verification
+        max_facts_to_review = self.ethos_config.get('knowledge_upkeep_max_facts_to_review', 5)
+        min_days_before_review = self.ethos_config.get('knowledge_upkeep_min_days_before_review', 30)
+
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run knowledge upkeep.")
+            self.last_knowledge_upkeep_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("KnowledgeUpkeep", now)
+            return
+
+        # 2. Get Facts for Review
+        facts_for_review = await self.memory_storage.get_knowledge_facts_for_review(
+            min_days_since_last_review=min_days_before_review,
+            limit=max_facts_to_review
+        )
+
+        if not facts_for_review:
+            logger.info("Knowledge Upkeep: No facts found requiring review at this time.")
+            self.last_knowledge_upkeep_time = now
+            self._save_task_last_run_time("KnowledgeUpkeep", now)
+            return
+
+        logger.info(f"Knowledge Upkeep: Found {len(facts_for_review)} facts to review.")
+        updated_count = 0
+
+        # 3. Process Each Fact
+        for fact_entry in facts_for_review:
+            fact_id = fact_entry.get('id')
+            if not fact_id:
+                logger.warning("Knowledge Upkeep: Found fact entry with no ID. Skipping.")
+                continue
+
+            logger.info(f"Knowledge Upkeep: Reviewing fact ID {fact_id} - '{str(fact_entry.get('content',''))[:50]}...'")
+
+            # ** SIMPLIFIED VERIFICATION **
+            # In a basic pass, we skip actual LLM/web verification.
+            # We just update the timestamp and add a note.
+
+            current_metadata = fact_entry.get('metadata', {}).copy() # Ensure it's a mutable copy
+            current_metadata['last_verified_timestamp'] = now.isoformat()
+            current_metadata['verification_notes'] = "Reviewed by automated knowledge upkeep cycle (basic pass)."
+            # Optional: Could add a counter for how many times it's been reviewed.
+            # current_metadata['verification_cycle_count'] = current_metadata.get('verification_cycle_count', 0) + 1
+
+            update_payload = {'metadata': current_metadata}
+
+            if self.memory_storage.update_entry(fact_id, update_payload):
+                logger.info(f"Knowledge Upkeep: Successfully updated metadata for fact ID {fact_id}.")
+                updated_count += 1
+            else:
+                logger.warning(f"Knowledge Upkeep: Failed to update metadata for fact ID {fact_id}.")
+
+        # 4. Update Timestamps and Log Completion
+        self.last_knowledge_upkeep_time = now
+        self._save_task_last_run_time("KnowledgeUpkeep", now)
+        logger.info(f"--- Ethos: Knowledge Upkeep Cycle Finished. Reviewed and updated {updated_count}/{len(facts_for_review)} facts. ---")
+
+
+    async def _generate_new_aspirations(self) -> None:
+        """
+        Generates new long-term aspirations for Pathos based on recent insights and experiences.
+        Called at the end of a reflection cycle.
+        """
+        logger.info("--- Ethos: Starting Aspiration Generation ---")
+        num_seed_memories = self.ethos_config.get('aspiration_num_seed_memories', 15)
+        min_salience_seed = self.ethos_config.get('aspiration_min_salience_seed', 0.5)
+        llm_role = self.ethos_config.get('aspiration_generation_llm_role', "LOGOS_TECHNE")
+        # Use a lookback similar to reflection, or a dedicated one if configured
+        lookback_days_for_seeds = self.ethos_config.get('reflection_lookback_days', 7)
+
+        seed_memory_types = ['reflection_insight', 'feedback', 'chat_interaction',
+                             'firmament_activity_log', 'learned_correction', 'world_knowledge']
+
+        candidate_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+            user_id=PATHOS_USER_ID,
+            start_time=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
+            end_time=datetime.now(timezone.utc),
+            types=seed_memory_types,
+            limit=num_seed_memories * 3,
+            sort_by_salience_then_recency=True
+        )
+
+        seed_memories = [mem for mem in candidate_memories if mem.get('salience', 0.0) >= min_salience_seed][:num_seed_memories]
+
+        if len(seed_memories) < 3:
+            logger.info(f"Not enough salient seed memories ({len(seed_memories)}) for aspirations. Min required: 3, Min Salience: {min_salience_seed}.")
+            return
+
+        formatted_seeds = []
+        for mem in seed_memories:
+            ts_str = mem.get('timestamp', "Unknown time")
+            try: ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00")); formatted_ts = ts_dt.strftime("%Y-%m-%d")
+            except ValueError: formatted_ts = ts_str
+            content_snippet = (mem.get('content', '') or "")[:100] + "..." if len(mem.get('content', '') or "") > 100 else mem.get('content', '')
+            formatted_seeds.append(f"- [{formatted_ts}, Type: {mem.get('type')}, Sal: {mem.get('salience',0.0):.2f}]: {content_snippet}")
+
+        seeds_block = "\n".join(formatted_seeds)
+        system_prompt = (
+            "You are an AI assistant helping Pathos formulate 1-2 new long-term aspirational goals. "
+            "Based on the provided recent experiences and insights, identify potential areas for growth, learning, or significant long-term projects. "
+            "Aspirations should be phrased from Pathos's perspective (e.g., 'I want to learn X', 'I aim to Y'). "
+            "They should be high-level and achievable over weeks or months. "
+            "Output MUST be a JSON object like: {\"aspirations\": [\"Aspiration 1 text\", \"Aspiration 2 text\"]}"
+        )
+        user_prompt = f"Pathos's recent salient experiences and insights:\n{seeds_block}\n\nNew aspirations (JSON format, 1-2 items):"
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+        llm_response = await self._call_llm_for_internal_task(messages, llm_role)
+        if not llm_response: logger.warning("Aspiration generation LLM call returned no content."); return
+
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', llm_response)
+            if not json_match: logger.error(f"No JSON in aspiration LLM response: {llm_response}"); return
+            parsed_response = json.loads(json_match.group(0))
+
+            if isinstance(parsed_response, dict) and "aspirations" in parsed_response and isinstance(parsed_response["aspirations"], list):
+                new_aspirations_text = parsed_response["aspirations"]
+                if new_aspirations_text:
+                    logger.info(f"Generated {len(new_aspirations_text)} new aspirations.")
+                    for asp_text in new_aspirations_text:
+                        if not isinstance(asp_text, str) or not asp_text.strip(): continue
+
+                        asp_content_dict = {"title": asp_text.strip(), "description": "A newly generated long-term aspiration for Pathos."}
+                        asp_metadata = {
+                            "status": "active",
+                            "generated_at": datetime.now(timezone.utc).isoformat(),
+                            "source": "aspiration_generation_cycle",
+                            "user_id": PATHOS_USER_ID,
+                            "seed_memory_ids": [m.get('id') for m in seed_memories if m.get('id')]
+                        }
+                        await self.add_memory_entry(
+                            {"type": "aspiration", "content": json.dumps(asp_content_dict),
+                             "metadata": asp_metadata, "salience": 0.9},
+                            user_id_context=PATHOS_USER_ID
+                        )
+                        logger.info(f"Stored new aspiration: '{asp_text[:100]}...'")
+                else:
+                    logger.info("Aspiration generation: LLM returned an empty list of aspirations.")
+            else:
+                logger.error(f"Aspiration LLM response JSON has incorrect structure: {llm_response}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse aspiration LLM JSON: {e}. Raw response: {llm_response}")
+        except Exception as e:
+            logger.error(f"Error processing new aspirations: {e}", exc_info=True)
+        logger.info("--- Ethos: Aspiration Generation Finished ---")
+
+    async def run_long_term_planning(self) -> None:
+        """
+        Reviews active aspirations and breaks them down into actionable high-level steps.
+        """
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Long-Term Planning Cycle at {now.isoformat()} ---")
+
+        llm_role = self.ethos_config.get('long_term_planning_llm_role', "LOGOS_TECHNE")
+        max_aspirations_to_consider = self.ethos_config.get('long_term_planning_max_aspirations_to_consider', 2)
+
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run long-term planning.")
+            self.last_long_term_planning_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("PathosLongTermPlanning", now)
+            return
+
+        active_aspirations = await self.memory_storage.get_entries_by_type_and_user(
+            entry_type="aspiration",
+            user_id=PATHOS_USER_ID,
+            limit=max_aspirations_to_consider * 2 # Fetch more to filter by status
+        )
+
+        # Filter for only 'active' status aspirations and limit
+        active_aspirations = [
+            asp for asp in active_aspirations
+            if asp.get("metadata", {}).get("status") == "active"
+        ][:max_aspirations_to_consider]
+
+        if not active_aspirations:
+            logger.info("Long-Term Planning: No active aspirations found. Cycle ending.")
+            self.last_long_term_planning_time = now
+            self._save_task_last_run_time("PathosLongTermPlanning", now)
+            return
+
+        logger.info(f"Long-Term Planning: Considering {len(active_aspirations)} active aspirations.")
+
+        for aspiration_entry in active_aspirations:
+            aspiration_id = aspiration_entry.get('id')
+            aspiration_content_str = aspiration_entry.get('content', '{}')
+            try:
+                aspiration_content_data = json.loads(aspiration_content_str)
+                aspiration_title = aspiration_content_data.get('title', aspiration_content_str)
+            except json.JSONDecodeError:
+                aspiration_title = aspiration_content_str
+
+            logger.info(f"Long-Term Planning: Generating plan steps for aspiration '{aspiration_title[:100]}...' (ID: {aspiration_id})")
+
+            system_prompt = (
+                "You are an AI assistant helping Pathos break down a long-term aspiration into 2-3 actionable, high-level steps or precursor goals. "
+                "These steps should be distinct milestones. Output MUST be a JSON object: {\"plan_steps\": [\"Step 1 text\", \"Step 2 text\"]}"
+            )
+            user_prompt = f"Pathos's aspiration: \"{aspiration_title}\"\n\nHigh-level plan steps (JSON format):"
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+            llm_response = await self._call_llm_for_internal_task(messages, llm_role)
+
+            if not llm_response:
+                logger.warning(f"Long-Term Planning: LLM call for aspiration '{aspiration_title[:50]}' returned no content.")
+                continue
+
+            try:
+                json_match = re.search(r'\{[\s\S]*\}', llm_response)
+                if not json_match:
+                    logger.error(f"No JSON in planning LLM response for aspiration '{aspiration_title[:50]}': {llm_response}"); continue
+                parsed_response = json.loads(json_match.group(0))
+
+                if isinstance(parsed_response, dict) and "plan_steps" in parsed_response and isinstance(parsed_response["plan_steps"], list):
+                    plan_steps_text = parsed_response["plan_steps"]
+                    if plan_steps_text:
+                        logger.info(f"Generated {len(plan_steps_text)} plan steps for aspiration '{aspiration_title[:50]}'.")
+                        for step_text in plan_steps_text:
+                            if not isinstance(step_text, str) or not step_text.strip(): continue
+                            step_metadata = {
+                                "parent_aspiration_id": aspiration_id,
+                                "parent_aspiration_text": aspiration_title,
+                                "status": "pending",
+                                "generated_at": now.isoformat(),
+                                "user_id": PATHOS_USER_ID
+                            }
+                            await self.add_memory_entry(
+                                {"type": "long_term_plan_step", "content": step_text.strip(),
+                                 "metadata": step_metadata, "salience": 0.75, "user_id": PATHOS_USER_ID},
+                                user_id_context=PATHOS_USER_ID
+                            )
+                            logger.info(f"Stored plan step for '{aspiration_title[:50]}': '{step_text[:100]}...'")
+                    else:
+                        logger.info(f"LLM generated an empty list of plan steps for aspiration '{aspiration_title[:50]}'.")
+                else:
+                    logger.error(f"Planning LLM response JSON bad structure for aspiration '{aspiration_title[:50]}': {llm_response}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse planning LLM JSON for '{aspiration_title[:50]}': {e}. Raw: {llm_response}")
+            except Exception as e_step:
+                 logger.error(f"Error processing plan steps for aspiration '{aspiration_title[:50]}': {e_step}", exc_info=True)
+
+        self.last_long_term_planning_time = now
+        self._save_task_last_run_time("PathosLongTermPlanning", now)
+        logger.info(f"--- Ethos: Long-Term Planning Cycle Finished at {now.isoformat()} ---")
+
+    async def run_managed_forgetting(self):
+        """
+        Archives memories based on salience and age.
+        Core memory types are protected unless their salience is extremely low.
+        """
         if not self.config.ENABLE_MANAGED_FORGETTING:
             logger.debug("Managed forgetting cycle skipped as feature is disabled.")
             return
+
         now = datetime.now(timezone.utc)
-        logger.info("--- Ethos: Starting Managed Forgetting Cycle (Placeholder) ---")
-        # Actual forgetting logic would go here.
-        await asyncio.sleep(5) # Simulate work
+        logger.info(f"--- Ethos: Starting Managed Forgetting Cycle at {now.isoformat()} ---")
+
+        salience_threshold_archive = self.ethos_config.get('forgetting_salience_threshold_archive', 0.1)
+        days_to_archive_default = self.ethos_config.get('forgetting_days_to_archive_by_default', 90)
+        extremely_low_salience_core = self.ethos_config.get('forgetting_extremely_low_salience_for_core', 0.01)
+
+        archive_before_date = now - timedelta(days=days_to_archive_default)
+
+        # Process in batches to manage memory, though a single large query might be fine for moderately sized DBs
+        batch_size = 200 # Configurable if needed
+        offset = 0
+        archived_count = 0
+        processed_count = 0
+
+        while True:
+            if not self.memory_storage: # Should not happen if initialized correctly
+                logger.error("MemoryStorage not available for forgetting cycle.")
+                break
+
+            # Using the new MemoryStorage method
+            candidate_memories = self.memory_storage.get_all_unarchived_memories_for_forgetting_check(batch_size, offset)
+
+            if not candidate_memories:
+                break # No more memories to process
+
+            processed_count += len(candidate_memories)
+
+            for memory in candidate_memories:
+                memory_id = memory.get('id')
+                if not memory_id: continue
+
+                mem_timestamp_str = memory.get('timestamp')
+                if not mem_timestamp_str: continue # Should always have a timestamp
+
+                try:
+                    mem_dt = datetime.fromisoformat(mem_timestamp_str.replace('Z', '+00:00'))
+                    if mem_dt.tzinfo is None: # Ensure timezone aware for comparison
+                        mem_dt = mem_dt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    logger.warning(f"Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check for this memory.")
+                    continue
+
+                is_core = memory.get('type') in self.forgetting_core_memory_types
+                is_old = mem_dt < archive_before_date
+                current_salience = memory.get('salience', 1.0) # Default to high salience if None
+                is_low_salience = current_salience < salience_threshold_archive
+                is_extremely_low_salience = current_salience < extremely_low_salience_core
+
+                should_archive = False
+                reason = ""
+
+                if is_core:
+                    if is_extremely_low_salience:
+                        should_archive = True
+                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f})"
+                else: # Not a core type
+                    if is_old:
+                        should_archive = True
+                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days"
+                    elif is_low_salience:
+                        should_archive = True
+                        reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f})"
+
+                if should_archive:
+                    if self.memory_storage.update_entry_archival_status(memory_id, True):
+                        archived_count += 1
+                        logger.info(f"Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
+                    else:
+                        logger.warning(f"Failed to archive memory ID {memory_id}.")
+
+            offset += batch_size
+
+        logger.info(f"Managed Forgetting Cycle: Processed {processed_count} memories. Archived {archived_count} memories.")
         self.last_forgetting_time = now
         self._save_task_last_run_time("EthosForgetting", now)
-        logger.info("--- Ethos: Managed Forgetting Cycle Finished (Placeholder) ---")
+        logger.info(f"--- Ethos: Managed Forgetting Cycle Finished at {now.isoformat()} ---")
 
-    async def run_hexus_decay(self): # ADDED METHOD (Placeholder)
-        """Placeholder for Hexus score decay over time."""
+    async def run_hexus_decay(self):
+        """
+        Applies decay to Hexus scores, moving them towards their defined baselines.
+        This method is called periodically by _periodic_hexus_decay_task.
+        """
         now = datetime.now(timezone.utc)
-        logger.debug("--- Ethos: Running Hexus Decay (Placeholder) ---")
-        # Actual Hexus decay logic would go here.
-        # For example, scores might slowly revert to a baseline.
-        decay_factor = 0.99 # Example
-        for key in self.hexus_scores:
-            self.hexus_scores[key] *= decay_factor
-        self._save_hexus_scores()
+        time_elapsed_since_last_decay = now - self.last_hexus_decay_time
+        time_elapsed_seconds = time_elapsed_since_last_decay.total_seconds()
+
+        if time_elapsed_seconds < 1.0: # Avoid too frequent calculations or if time hasn't advanced
+            logger.debug(f"Hexus decay: Insufficient time ({time_elapsed_seconds:.2f}s) since last decay. Skipping.")
+            return
+
+        logger.info(f"--- Ethos: Running Hexus Decay Cycle (Time elapsed: {time_elapsed_seconds:.2f}s) ---")
+
+        # The 'hexus_decay_rate_per_cycle' from config is now superseded by per-dimension hourly rates
+        # and actual time elapsed.
+        # We retain hexus_decay_interval_seconds from config as the *intended* call frequency for the task.
+
+        # Activity-aware decay - Placeholder for future enhancement (remains placeholder)
+        # current_activity_type = None
+        # if self.chronos_engine:
+        #     try:
+        #         # This would ideally be an async call if ChronosEngine methods are async,
+        #         # but run_hexus_decay is currently synchronous.
+        #         # pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
+        #         # current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
+        #         # if current_activity_slot:
+        #         # current_activity_type = current_activity_slot.activity_type
+        #         logger.debug("EthosCore Hexus Decay: Activity-aware adjustments (placeholder).")
+        #     except Exception as e:
+        #         logger.warning(f"EthosCore Hexus Decay: Could not get current activity for awareness: {e}")
+        # else:
+        #     logger.debug("EthosCore Hexus Decay: ChronosEngine not available for activity-aware decay.")
+
+
+        changed_scores = False
+        for key, current_value in list(self.hexus_scores.items()): # Iterate over a copy if modifying
+            baseline = HEXUS_BASELINES.get(key)
+
+            if baseline is None:
+                logger.warning(f"Hexus decay: No baseline defined for '{key}'. Skipping decay for this score.")
+                continue
+
+            dimension_decay_rate_per_hour = HEXUS_DECAY_RATES.get(key)
+            if dimension_decay_rate_per_hour is None:
+                logger.warning(f"Hexus decay: No hourly decay rate defined for '{key}'. Skipping decay for this score.")
+                continue
+
+            # Activity-aware adjustments would modify baseline or dimension_decay_rate_per_hour here
+            # For example:
+            # effective_baseline = baseline
+            # effective_rate_per_hour = dimension_decay_rate_per_hour
+            # if current_activity_type == 'resting':
+            #     if key == 'tiredness': effective_rate_per_hour *= 2.0 # Tiredness decays faster when resting
+            #     if key == 'stress': effective_rate_per_hour *= 1.5
+
+            decay_amount_for_cycle = (current_value - baseline) * dimension_decay_rate_per_hour * (time_elapsed_seconds / 3600.0)
+            new_value = current_value - decay_amount_for_cycle
+
+            # Clamping (assuming all Hexus scores are 0.0 to 1.0)
+            clamped_new_value = max(0.0, min(1.0, new_value))
+
+            if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
+                self.hexus_scores[key] = clamped_new_value
+                changed_scores = True
+                logger.debug(f"Hexus decay for '{key}': {current_value:.3f} -> {clamped_new_value:.3f} (baseline: {baseline:.2f}, rate/hr: {dimension_decay_rate_per_hour:.3f}, dt: {time_elapsed_seconds:.0f}s). Change: {decay_amount_for_cycle:+.4f}")
+
+        if changed_scores:
+            self._save_hexus_scores()
+            logger.info(f"Hexus scores updated and saved after decay. Current scores: { {k: round(v, 3) for k,v in self.hexus_scores.items()} }")
+        else:
+            logger.info("Hexus decay cycle: No significant changes to Hexus scores this cycle.")
+
         self.last_hexus_decay_time = now
         self._save_task_last_run_time("HexusDecay", now)
-        logger.debug(f"--- Ethos: Hexus Decay Finished (Placeholder). Scores: {self.hexus_scores} ---")
+        logger.info(f"--- Ethos: Hexus Decay Cycle Finished (Duration processed: {time_elapsed_seconds:.2f}s) ---")
+
+    async def _get_memories_for_reflection(self, lookback_days: int, query_limit: int) -> List[MemoryEntry]:
+        """
+        Fetches a broad range of memories within a given lookback period for reflection.
+        """
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot fetch memories for reflection.")
+            return []
+
+        now_utc = datetime.now(timezone.utc)
+        start_time_dt = now_utc - timedelta(days=lookback_days)
+
+        relevant_memory_types = [
+            'chat_interaction',
+            'firmament_activity_log',
+            'feedback',
+            'received_subconscious_intention',
+            'npc_dialogue_event',
+            'learned_correction',
+            'reflection_insight', # Include past insights
+            'aspiration',         # Pathos's own aspirations
+            'world_knowledge'     # Recently acquired/verified world knowledge
+        ]
+
+        logger.debug(f"EthosCore: Fetching memories for reflection. Lookback: {lookback_days} days (from {start_time_dt.isoformat()}), Limit: {query_limit}, Types: {relevant_memory_types}")
+
+        try:
+            # Using PATHOS_USER_ID to get Pathos's own experiences and general knowledge.
+            # Specific user interactions are part of 'chat_interaction' and will be included if they involve PATHOS_USER_ID (implicitly handled by how they are stored).
+            # The MemoryStorage method get_memories_by_time_range_and_types should ideally handle user_id filtering if applicable for each type.
+            # For reflection, we are primarily interested in Pathos's own cognitive stream and direct experiences.
+            fetched_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+                user_id=PATHOS_USER_ID, # Focus on Pathos's own context for self-reflection
+                start_time=start_time_dt,
+                end_time=now_utc,
+                types=relevant_memory_types,
+                limit=query_limit,
+                sort_by_salience_then_recency=False # Default sort is timestamp descending
+            )
+            logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for reflection.")
+            return fetched_memories
+        except Exception as e:
+            logger.error(f"EthosCore: Error fetching memories for reflection: {e}", exc_info=True)
+            return []
 
     async def get_background_tasks(self) -> List[asyncio.Task]:
         """Create and return background tasks for EthosCore operations."""
@@ -1158,9 +1953,76 @@ class EthosCore:
             name="EthosHexusDecayTask"
         )
         tasks.append(hexus_task)
+
+        # Create background task for Firmament simulation loop
+        if self.firmament_module and self.config.get_firmament_module_config().get("enable_firmament"):
+            logger.info("EthosCore: Adding Firmament simulation loop to background tasks.")
+            firmament_task = asyncio.create_task(
+                self._firmament_simulation_loop(),
+                name="FirmamentSimulationLoopTask"
+            )
+            tasks.append(firmament_task)
+        elif self.firmament_module:
+            logger.info("EthosCore: FirmamentModule present but disabled by configuration. Simulation loop not started.")
         
-        logger.info(f"EthosCore created {len(tasks)} background tasks")
+        # Add Long-Term Planning Task
+        planning_interval = self.ethos_config.get('long_term_planning_interval_seconds', 86400.0 * 3)
+        if planning_interval > 0 :
+             tasks.append(asyncio.create_task(self._periodic_long_term_planning_task(), name="PathosLongTermPlanningTask"))
+        else:
+            logger.info("Long-term planning task disabled due to interval <= 0.")
+
+            logger.info(f"EthosCore created {len(tasks)} background tasks")
         return tasks
+
+    async def _periodic_knowledge_upkeep_task(self):
+        """Periodic task for running knowledge upkeep cycles."""
+        knowledge_upkeep_interval = self.ethos_config.get('knowledge_upkeep_interval_seconds', 86400)
+        if knowledge_upkeep_interval <= 0:
+            logger.info("Knowledge upkeep periodic task disabled due to interval <= 0.")
+            return # Do not run if interval is zero or negative
+
+        while True:
+            try:
+                now = datetime.now(timezone.utc)
+                time_since_last = (now - self.last_knowledge_upkeep_time).total_seconds()
+
+                if time_since_last >= knowledge_upkeep_interval:
+                    await self.run_knowledge_upkeep()
+                else:
+                    # Sleep until next scheduled time
+                    sleep_time = knowledge_upkeep_interval - time_since_last
+                    await asyncio.sleep(min(sleep_time, 3600))  # Check at least every hour
+            except asyncio.CancelledError:
+                logger.info("EthosCore knowledge upkeep task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in knowledge upkeep task: {e}", exc_info=True)
+                await asyncio.sleep(300)  # Wait 5 minutes before retrying after an error
+
+    async def _firmament_simulation_loop(self):
+        """Dedicated loop for Firmament simulation ticks."""
+        if not self.firmament_module: # Should not happen if task is started correctly
+            logger.error("EthosCore: Firmament module not set, cannot start simulation loop.")
+            return
+
+        fm_config = self.config.get_firmament_module_config()
+        # Use the new tick_interval_seconds from FirmamentModuleConfig
+        tick_interval = fm_config.get("simulation_tick_interval_seconds", 60.0)
+        logger.info(f"EthosCore: Starting Firmament simulation loop with tick interval: {tick_interval}s.")
+
+        while True:
+            try:
+                await self.firmament_module.run_simulation_tick()
+                await asyncio.sleep(tick_interval)
+            except asyncio.CancelledError:
+                logger.info("EthosCore: Firmament simulation loop cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"EthosCore: Error in Firmament simulation loop: {e}", exc_info=True)
+                # Decide on backoff strategy or continue after a delay
+                await asyncio.sleep(tick_interval * 2) # Wait longer after an error
+
 
     async def _periodic_reflection_task(self):
         """Periodic task for running reflection cycles."""
@@ -1371,40 +2233,88 @@ class EthosCore:
             logger.error(f"Error in chronos_bridge_add_event: {e}", exc_info=True)
             return None
             
-    def get_current_mood(self) -> Dict[str, float]: # ADDED METHOD
-        """Returns the current mood state of Pathos."""
-        if not self.config.ENABLE_MOOD_SIMULATION:
-            return {"valence": 0.0, "arousal": 0.0, "simulation_disabled": True}
-        return self.current_mood
+    def get_current_mood(self) -> Dict[str, Any]:
+        """
+        Derives a simplified valence/arousal representation from Hexus scores.
+        Also includes all Hexus scores for more detailed context if needed.
+        Returns a dictionary that includes 'valence', 'arousal', 'name' (derived),
+        and a 'hexus_snapshot' of all current Hexus scores.
+        """
+        if not self.config.ENABLE_MOOD_SIMULATION: # Keep this check if Hexus is part of mood simulation
+            return {"valence": 0.0, "arousal": 0.0, "name": "neutral", "simulation_disabled": True, "hexus_snapshot": self.hexus_scores.copy()}
 
-    async def update_mood_state(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+        # Simple derivation:
+        # Valence: influenced by joy, contentment vs. stress, resentment, melancholy
+        # Arousal: influenced by curiosity, focus, ambition, impulsiveness vs. tiredness
+
+        joy_val = self.hexus_scores.get("joy", 0.0)
+        contentment_val = self.hexus_scores.get("contentment", 0.0)
+        stress_val = self.hexus_scores.get("stress", 0.0)
+        resentment_val = self.hexus_scores.get("resentment", 0.0)
+        melancholy_val = self.hexus_scores.get("melancholy", 0.0)
+
+        curiosity_val = self.hexus_scores.get("curiosity", 0.0)
+        focus_val = self.hexus_scores.get("focus", 0.0)
+        ambition_val = self.hexus_scores.get("ambition", 0.0)
+        impulsiveness_val = self.hexus_scores.get("impulsiveness", 0.0)
+        tiredness_val = self.hexus_scores.get("tiredness", 0.0)
+
+        derived_valence = (joy_val + contentment_val) - (stress_val + resentment_val + melancholy_val)
+        derived_arousal = (curiosity_val + focus_val + ambition_val + impulsiveness_val) / 2.0 - tiredness_val
+
+        # Clamp derived valence/arousal to -1.0 to 1.0 for consistency if used by other systems expecting that range.
+        derived_valence = max(-1.0, min(1.0, derived_valence))
+        derived_arousal = max(-1.0, min(1.0, derived_arousal))
+
+        # Determine a qualitative name (simplified)
+        mood_name = "neutral"
+        if derived_valence > 0.3:
+            if derived_arousal > 0.3: mood_name = "excited"
+            else: mood_name = "pleased"
+        elif derived_valence < -0.3:
+            if derived_arousal > 0.3: mood_name = "agitated"
+            else: mood_name = "displeased"
+        elif derived_arousal > 0.5: mood_name = "engaged"
+        elif derived_arousal < -0.5: mood_name = "calm"
+
+
+        return {
+            "valence": derived_valence,
+            "arousal": derived_arousal,
+            "name": mood_name, # Simplified qualitative name
+            "simulation_disabled": False, # Assuming if this runs, simulation is enabled
+            "hexus_snapshot": self.hexus_scores.copy() # Include all current Hexus scores
+        }
+
+    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
         """
-        Updates Pathos's mood based on an event.
-        This is a simplified placeholder. A more complex MoodEngine would live here.
+        Updates Hexus scores based on various system or feedback events.
+        Uses the HEXUS_EVENT_DEFINITIONS mapping.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION:
+        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
 
-        valence_shift, arousal_shift = 0.0, 0.0
+        logger.debug(f"Processing Hexus event: '{event_name}' with magnitude multiplier: {magnitude_multiplier}")
 
-        if event_type == 'feedback':
-            fb_type = payload.get('feedback_type') if payload else None
-            rating = payload.get('rating') if payload else None
-            if fb_type == 'positive' or (rating is not None and rating > 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_POSITIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_POSITIVE
-            elif fb_type == 'negative' or (rating is not None and rating < 0):
-                valence_shift += MOOD_SHIFT_VALENCE_FEEDBACK_NEGATIVE
-                arousal_shift += MOOD_SHIFT_AROUSAL_FEEDBACK_NEGATIVE
-            elif fb_type == 'correction': # Corrections might be slightly negative initially but lead to positive if learned
-                valence_shift -= 0.05 
-                arousal_shift += 0.03
-        # Add other event_types: 'successful_tool_use', 'failed_tool_use', 'new_learning', 'dream_recalled' etc.
+        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_name)
+
+        if not event_definition:
+            logger.warning(f"Hexus event '{event_name}' not found in HEXUS_EVENT_DEFINITIONS.")
+            return
+
+        reason_for_change = f"event: {event_name}"
+        if payload: # Optionally include payload summary in reason for more detailed logging
+            payload_summary = {k: (str(v)[:30] + '...' if isinstance(v, str) and len(v) > 30 else v) for k,v in payload.items()}
+            reason_for_change += f" (payload: {payload_summary})"
+
+
+        for dimension, delta in event_definition.items():
+            self._apply_hexus_change(dimension, delta * magnitude_multiplier, reason_for_change)
         
-        self.current_mood['valence'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['valence'] + valence_shift))
-        self.current_mood['arousal'] = max(MOOD_MIN, min(MOOD_MAX, self.current_mood['arousal'] + arousal_shift))
-        self.last_mood_update_time = datetime.now(timezone.utc)
-        logger.debug(f"Mood updated due to '{event_type}'. New mood: V={self.current_mood['valence']:.3f}, A={self.current_mood['arousal']:.3f}")
+        # Specific handling for feedback event to extract more detailed reason if needed
+        if event_name == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+             self._apply_hexus_change('stress', HEXUS_EVENT_DEFINITIONS["USER_FEEDBACK_CORRECTION"].get('stress',0.03) * magnitude_multiplier, f"initial reaction to correction text: {payload.get('text','')[:30]}...")
+
 
     async def retrieve_relevant_past_interactions(
         self,

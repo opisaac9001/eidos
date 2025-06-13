@@ -61,6 +61,8 @@ class EthosConfig(TypedDict, total=False):
     summarization_llm_role: str
     interaction_log_analysis_llm_role: str
     knowledge_upkeep_llm_role: str
+    knowledge_upkeep_max_facts_to_review: int
+    knowledge_upkeep_min_days_before_review: int
     aspiration_generation_llm_role: str # From broken
     long_term_planning_llm_role: str # From broken
     scheduler_llm_role: str # From broken (for Chronos)
@@ -90,6 +92,17 @@ class EthosConfig(TypedDict, total=False):
     curiosity_notification_llm_role: str # From broken
     daily_summary_max_memories: Optional[int]
     daily_summary_lookback_hours: Optional[int]
+    personality_bias_profile_json: Optional[str] # Added for Hexus personality bias
+    reflection_llm_role: str
+    reflection_memory_query_limit: int
+    reflection_max_memories_for_llm: int
+    reflection_min_salience_for_consideration: float
+    reflection_significant_event_salience_threshold: float
+    reflection_lookback_days: int
+    forgetting_salience_threshold_archive: float
+    forgetting_days_to_archive_by_default: int
+    forgetting_core_memory_types_json: str
+    forgetting_extremely_low_salience_for_core: float
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -98,6 +111,14 @@ class HomeAssistantConfig(TypedDict, total=False):
     allowed_domains: List[str]
     timeout: int
     ha_weather_entity_id: Optional[str]
+
+class FirmamentModuleConfig(TypedDict, total=False):
+    enable_firmament: bool
+    firmament_llm_role: str
+    intention_based_activity_duration_minutes: int
+    intention_based_activity_type: str # Should be ActivityType literal if available
+    enable_llm_status_classification: bool
+    simulation_tick_interval_seconds: float # New field for scheduling
 
 class VoiceConfig(TypedDict, total=False):
     energy_threshold: int
@@ -119,6 +140,11 @@ class OneirosConfig(TypedDict, total=False):
     dream_llm_presence_penalty: Optional[float]
     dream_llm_frequency_penalty: Optional[float]
     dream_llm_max_tokens: Optional[int]
+    oneiros_sleep_start_hour_local: int
+    oneiros_sleep_end_hour_local: int
+    oneiros_dream_frequency_min_minutes: int
+    oneiros_dream_frequency_max_minutes: int
+    oneiros_check_interval_seconds: int # Renamed from dream_interval_seconds
 
 class AisthesisConfig(TypedDict, total=False):
     mqtt_broker_url: Optional[str]
@@ -237,6 +263,15 @@ class Config:
             "presence_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_PRESENCE_PENALTY") else None,
             "frequency_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_RESEARCH_TIKTOKEN_NAME", "cl100k_base") # Added
+        },
+        "FIRMAMENT_STATUS_CLASSIFIER": { # Added for Firmament
+            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_LOGOS_TECHNE_URL", "http://localhost:1234/v1")), # Default to LOGOS_TECHNE URL
+            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
+            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY", "lm-studio")), # Default to LOGOS_TECHNE API Key
+            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.3)),
+            "timeout": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIMEOUT", 10.0)),
+            "max_tokens": int(os.getenv("LLM_FIRMAMENT_CLASSIFIER_MAX_TOKENS", 256)),
+            "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIKTOKEN_NAME", "cl100k_base")
         }
     }
 
@@ -289,8 +324,10 @@ class Config:
         "summarization_max_memories_per_cluster": int(os.getenv("ETHOS_SUMMARIZATION_MAX_MEMORIES_PER_CLUSTER", 15)),
         "summarization_max_text_length_for_prompt": int(os.getenv("ETHOS_SUMMARIZATION_MAX_TEXT_LENGTH_FOR_PROMPT", 10000)),
         "summarization_max_days_to_consider": int(os.getenv("ETHOS_SUMMARIZATION_MAX_DAYS_TO_CONSIDER", 30)),
-        "knowledge_upkeep_interval_seconds": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS", 86400)),
         "knowledge_upkeep_llm_role": os.getenv("ETHOS_KNOWLEDGE_UPKEEP_LLM_ROLE", "LOGOS_TECHNE"),
+        "knowledge_upkeep_max_facts_to_review": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_MAX_FACTS", "5")),
+        "knowledge_upkeep_min_days_before_review": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_MIN_DAYS_REVIEW", "30")),
+        "knowledge_upkeep_interval_seconds": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS", "86400")),
         "knowledge_upkeep_volatile_tags": json.loads(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_VOLATILE_TAGS", '[]')),
         "proactive_immediate_greeting_grace_minutes": int(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_GRACE_MINUTES", 15)),
         "proactive_immediate_greeting_chance": float(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_CHANCE", 0.75)),
@@ -302,7 +339,7 @@ class Config:
         "pathos_home_timezone": os.getenv("ETHOS_PATHOS_HOME_TIMEZONE", "UTC"),
         "scheduler_llm_role": os.getenv("ETHOS_SCHEDULER_LLM_ROLE", "LOGOS_TECHNE"),
         "aspiration_generation_llm_role": os.getenv("ETHOS_ASPIRATION_LLM_ROLE", "LOGOS_TECHNE"),
-        "aspiration_num_seed_memories": int(os.getenv("ETHOS_ASPIRATION_NUM_SEED_MEMORIES", 5)),
+        "aspiration_num_seed_memories": int(os.getenv("ETHOS_ASPIRATION_NUM_SEED_MEMORIES", "15")), # Changed default from 5 to 15
         "aspiration_min_salience_seed": float(os.getenv("ETHOS_ASPIRATION_MIN_SALIENCE_SEED", 0.6)),
         "long_term_planning_llm_role": os.getenv("ETHOS_LONG_TERM_PLANNING_LLM_ROLE", "LOGOS_TECHNE"),
         "long_term_planning_interval_seconds": float(os.getenv("ETHOS_LONG_TERM_PLANNING_INTERVAL_SECONDS", 86400.0 * 3)),
@@ -316,6 +353,17 @@ class Config:
         "curiosity_notification_llm_role": os.getenv("ETHOS_CURIOSITY_NOTIFICATION_LLM_ROLE", "LOGOS_TECHNE"),
         "daily_summary_max_memories": int(os.getenv("ETHOS_DAILY_SUMMARY_MAX_MEMORIES", "30")),
         "daily_summary_lookback_hours": int(os.getenv("ETHOS_DAILY_SUMMARY_LOOKBACK_HOURS", "18")),
+        "personality_bias_profile_json": os.getenv("EIDOS_PERSONALITY_BIAS_PROFILE_JSON"), # Added
+        "reflection_llm_role": os.getenv("ETHOS_REFLECTION_LLM_ROLE", "LOGOS_TECHNE"),
+        "reflection_memory_query_limit": int(os.getenv("ETHOS_REFLECTION_MEMORY_QUERY_LIMIT", "50")),
+        "reflection_max_memories_for_llm": int(os.getenv("ETHOS_REFLECTION_MAX_MEMORIES_FOR_LLM", "15")),
+        "reflection_min_salience_for_consideration": float(os.getenv("ETHOS_REFLECTION_MIN_SALIENCE_FOR_CONSIDERATION", "0.3")),
+        "reflection_significant_event_salience_threshold": float(os.getenv("ETHOS_REFLECTION_SIGNIFICANT_EVENT_SALIENCE_THRESHOLD", "0.7")),
+        "reflection_lookback_days": int(os.getenv("ETHOS_REFLECTION_LOOKBACK_DAYS", "3")),
+        "forgetting_salience_threshold_archive": float(os.getenv("ETHOS_FORGETTING_SALIENCE_THRESHOLD_ARCHIVE", "0.1")),
+        "forgetting_days_to_archive_by_default": int(os.getenv("ETHOS_FORGETTING_DAYS_TO_ARCHIVE_DEFAULT", "90")),
+        "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight"]'),
+        "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")),
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None
@@ -363,6 +411,11 @@ class Config:
         "dream_llm_presence_penalty": float(os.getenv("ONEIROS_DREAM_LLM_PRESENCE_PENALTY")) if os.getenv("ONEIROS_DREAM_LLM_PRESENCE_PENALTY") else None,
         "dream_llm_frequency_penalty": float(os.getenv("ONEIROS_DREAM_LLM_FREQUENCY_PENALTY")) if os.getenv("ONEIROS_DREAM_LLM_FREQUENCY_PENALTY") else None,
         "dream_llm_max_tokens": int(os.getenv("ONEIROS_DREAM_LLM_MAX_TOKENS")) if os.getenv("ONEIROS_DREAM_LLM_MAX_TOKENS") else None,
+        "oneiros_sleep_start_hour_local": int(os.getenv("ONEIROS_SLEEP_START_HOUR_LOCAL", "23")),
+        "oneiros_sleep_end_hour_local": int(os.getenv("ONEIROS_SLEEP_END_HOUR_LOCAL", "7")),
+        "oneiros_dream_frequency_min_minutes": int(os.getenv("ONEIROS_DREAM_FREQUENCY_MIN_MINUTES", "60")),
+        "oneiros_dream_frequency_max_minutes": int(os.getenv("ONEIROS_DREAM_FREQUENCY_MAX_MINUTES", "180")),
+        "oneiros_check_interval_seconds": int(os.getenv("ONEIROS_CHECK_INTERVAL_SECONDS", "300")), # Renamed and new default
     }
     IMAGE_OUTPUT_DIR = Path(ONEIROS["image_output_dir"])
 
@@ -509,6 +562,14 @@ class Config:
     LLM_MAX_PROMPT_TOKENS_MAIN: int = int(os.getenv("LLM_MAX_PROMPT_TOKENS_MAIN", "7000")) # Max tokens for the entire prompt sent to Pathos LLM
     LLM_RESPONSE_BUFFER_TOKENS: int = int(os.getenv("LLM_RESPONSE_BUFFER_TOKENS", "1000")) # Reserved for LLM's response generation
 
+    FIRMAMENT: FirmamentModuleConfig = { # Default Firmament config
+        "enable_firmament": os.getenv("FIRMAMENT_ENABLE", "True").lower() == "true", # Changed default to "True"
+        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"),
+        "intention_based_activity_duration_minutes": int(os.getenv("FIRMAMENT_INTENTION_ACTIVITY_DURATION_MINUTES", "15")),
+        "intention_based_activity_type": os.getenv("FIRMAMENT_INTENTION_ACTIVITY_TYPE", "reflective"),
+        "enable_llm_status_classification": os.getenv("FIRMAMENT_ENABLE_LLM_STATUS_CLASSIFICATION", "True").lower() == "true",
+        "simulation_tick_interval_seconds": float(os.getenv("FIRMAMENT_SIMULATION_TICK_INTERVAL_SECONDS", "60.0")), # Default to 60 seconds
+    }
 
     @staticmethod
     def get_llm_config(role: str) -> Optional[LLMConfig]:
@@ -540,6 +601,8 @@ class Config:
     def get_admin_password() -> Optional[str]: return Config.EIDOS_ADMIN_PASSWORD
     @staticmethod
     def get_bookshelf_config() -> Optional[BookshelfConfig]: return Config.BOOKSHELF
+    @staticmethod
+    def get_firmament_module_config() -> FirmamentModuleConfig: return Config.FIRMAMENT
 
     @staticmethod
     def setup():

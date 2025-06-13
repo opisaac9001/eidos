@@ -9,28 +9,16 @@ import time
 import logging
 import threading
 from typing import Optional, TYPE_CHECKING # For type hinting scheduler_timer
-import asyncio # For asyncio.run()
+import asyncio # For asyncio.run() and event loop management
 from datetime import datetime, timezone # For time check
 import random # For mood simulation
 
-# Attempt to import from subconscious client
-try:
-    from eidos_agent.features.subconscious_interface_to_node.subconscious.client import sync_recent_context, send_node_control_command, sync_mood_to_subconscious
-except ImportError:
-    logging.warning("subconscious_context_scheduler: Could not import client functions. Using placeholders for testing.")
-    # Placeholder functions if the import fails
-    def sync_recent_context(conversation: str, current_action: str) -> bool:
-        print(f"Placeholder sync_recent_context: Conv='{conversation[:50]}...', Action='{current_action}'")
-        return True
-
-    def send_node_control_command(node_state: str, daily_summary: Optional[str] = None) -> bool:
-        print(f"Placeholder send_node_control_command: State='{node_state}', Summary='{daily_summary[:50] if daily_summary else 'N/A'}'")
-        return True
-
-    def sync_mood_to_subconscious(mood_snapshot: dict) -> bool:
-        print(f"Placeholder sync_mood_to_subconscious: Mood='{mood_snapshot}'")
-        return True
-
+# Import client functions directly - assuming client.py is now correct and available
+from eidos_agent.features.subconscious_interface_to_node.subconscious.client import (
+    sync_recent_context,
+    send_node_control_command,
+    sync_mood_to_subconscious
+)
 
 if TYPE_CHECKING:
     from eidos_agent.persona_logic.ethos_core.core import EthosCore
@@ -44,6 +32,7 @@ if not logger.handlers:
 scheduler_stop_event = threading.Event()
 scheduler_timer: Optional[threading.Timer] = None
 _ethos_core_instance: Optional['EthosCore'] = None
+_main_event_loop: Optional[asyncio.AbstractEventLoop] = None
 
 SCHEDULER_STATE = {
     'is_subconscious_sleeping': False,
@@ -51,14 +40,15 @@ SCHEDULER_STATE = {
 }
 
 # --- Initialization ---
-def init_scheduler(ethos_core_input: 'EthosCore'):
+def init_scheduler(ethos_core_input: 'EthosCore', main_event_loop: asyncio.AbstractEventLoop):
     '''
-    Initializes the scheduler with necessary module instances.
+    Initializes the scheduler with necessary module instances and the main event loop.
     Called from main.py during startup.
     '''
-    global _ethos_core_instance
+    global _ethos_core_instance, _main_event_loop
     _ethos_core_instance = ethos_core_input
-    logger.info("SubconsciousContextScheduler initialized with EthosCore instance.")
+    _main_event_loop = main_event_loop
+    logger.info("SubconsciousContextScheduler initialized with EthosCore instance and main event loop.")
 
 # --- Data Retrieval Functions ---
 
@@ -66,26 +56,23 @@ def get_latest_conversation_summary() -> str:
     """
     Retrieves a summary of the latest conversation from EthosCore.
     """
-    if not _ethos_core_instance:
-        logger.warning("Scheduler (conv_summary): EthosCore instance not available.")
-        return "Conversation summary: Unknown (EthosCore not available)"
+    if not _ethos_core_instance or not _main_event_loop:
+        logger.warning("Scheduler (conv_summary): EthosCore instance or event loop not available.")
+        return "Conversation summary: Unknown (EthosCore or event loop not available)"
     try:
-        # This call needs to happen in a running event loop or be handled carefully
-        # if this scheduler is in a separate thread.
         logger.debug("Scheduler (conv_summary): Attempting to retrieve recent memories.")
-        recent_memories = asyncio.run(
-            _ethos_core_instance.retrieve_relevant_memories(
+        coro = _ethos_core_instance.retrieve_relevant_memories(
                 query="recent conversation snippets", # Generic query
                 top_k=3,
                 min_salience=0.1,
                 allowed_types=["user_interaction", "llm_response", "dialogue_summary"],
                 user_id_context="pathos_agent_internal" # TODO: Use constant
             )
-        )
+        future = asyncio.run_coroutine_threadsafe(coro, _main_event_loop)
+        recent_memories = future.result(timeout=10) # Add timeout
+
         if recent_memories:
             summary_parts = [mem.get('content', '') for mem in recent_memories]
-            # Assuming memories are returned newest first, might want to reverse for chronological summary
-            # summary_parts.reverse()
             full_summary = " ".join(filter(None, summary_parts)).strip()
             if not full_summary:
                  return "No content in recent conversation memories."
@@ -93,14 +80,12 @@ def get_latest_conversation_summary() -> str:
             return (full_summary[:max_len] + '...') if len(full_summary) > max_len else full_summary
         else:
             return "No recent conversation memories found to summarize."
-    except RuntimeError as e_run:
-        if "cannot run event loop while another loop is running" in str(e_run).lower() or \
-           "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
-            logger.error(f"Scheduler (conv_summary): asyncio.run() conflict. Details: {e_run}")
-            return "Conversation summary: Error due to asyncio conflict."
-        else:
-            logger.error(f"Scheduler (conv_summary): Runtime error retrieving memories: {e_run}", exc_info=True)
-            return "Conversation summary: Error retrieving memories."
+    except asyncio.TimeoutError:
+        logger.error("Scheduler (conv_summary): Timeout waiting for retrieve_relevant_memories.")
+        return "Conversation summary: Timeout retrieving memories."
+    except Exception as e: # Catch other exceptions like RuntimeError from result() if coro failed
+        logger.error(f"Scheduler (conv_summary): Error retrieving memories: {e}", exc_info=True)
+        return "Conversation summary: Failed to generate due to error."
     except Exception as e:
         logger.error(f"Scheduler (conv_summary): Unexpected error retrieving memories: {e}", exc_info=True)
         return "Conversation summary: Failed to generate due to unexpected error."
@@ -109,21 +94,26 @@ def get_current_eidos_action() -> str:
     """
     Retrieves Eidos agent's current action from ChronosEngine via EthosCore.
     """
-    if not _ethos_core_instance or not _ethos_core_instance.chronos_engine:
-        logger.warning("Scheduler (eidos_action): EthosCore or ChronosEngine instance not available.")
-        return "Eidos action: Unknown (EthosCore/ChronosEngine not available)"
+    if not _ethos_core_instance or not _ethos_core_instance.chronos_engine or not _main_event_loop:
+        logger.warning("Scheduler (eidos_action): EthosCore, ChronosEngine or event loop not available.")
+        return "Eidos action: Unknown (Core components or event loop not available)"
     try:
         logger.debug("Scheduler (eidos_action): Attempting to get current Pathos time and activity.")
         pathos_user_id = "pathos_agent_internal" # TODO: Use constant
 
         # Getting local datetime for user
-        pathos_now = asyncio.run(_ethos_core_instance.get_local_datetime_for_user(pathos_user_id))
+        coro_time = _ethos_core_instance.get_local_datetime_for_user(pathos_user_id)
+        future_time = asyncio.run_coroutine_threadsafe(coro_time, _main_event_loop)
+        pathos_now = future_time.result(timeout=5) # Add timeout
+
         if not pathos_now:
             logger.warning("Scheduler (eidos_action): Could not retrieve Pathos's current local time.")
             return "Eidos action: Unknown (Could not get Pathos time)"
 
         # Getting current activity
-        activity_slot = asyncio.run(_ethos_core_instance.chronos_engine.get_current_activity(pathos_now))
+        coro_activity = _ethos_core_instance.chronos_engine.get_current_activity(pathos_now)
+        future_activity = asyncio.run_coroutine_threadsafe(coro_activity, _main_event_loop)
+        activity_slot = future_activity.result(timeout=5) # Add timeout
 
         if activity_slot:
             sub_focus_text = 'general'
@@ -132,18 +122,12 @@ def get_current_eidos_action() -> str:
             return f"Pathos is currently: '{activity_slot.activity_title}' (Focus: {sub_focus_text})"
         else:
             return "Pathos is currently idle or between activities."
-
-    except RuntimeError as e_run:
-        if "cannot run event loop while another loop is running" in str(e_run).lower() or \
-           "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
-            logger.error(f"Scheduler (eidos_action): asyncio.run() conflict. Details: {e_run}")
-            return "Eidos action: Error due to asyncio conflict."
-        else:
-            logger.error(f"Scheduler (eidos_action): Runtime error getting current action: {e_run}", exc_info=True)
-            return "Eidos action: Error getting current action."
-    except Exception as e:
-        logger.error(f"Scheduler (eidos_action): Unexpected error getting current action: {e}", exc_info=True)
-        return "Eidos action: Failed to get due to unexpected error."
+    except asyncio.TimeoutError:
+        logger.error("Scheduler (eidos_action): Timeout waiting for ChronosEngine activity.")
+        return "Eidos action: Timeout getting current action."
+    except Exception as e: # Catch other exceptions
+        logger.error(f"Scheduler (eidos_action): Error getting current action: {e}", exc_info=True)
+        return "Eidos action: Failed to get due to error."
 
 # --- Scheduled Task Implementation ---
 
@@ -173,27 +157,25 @@ def perform_scheduled_subconscious_context_sync():
         if not SCHEDULER_STATE.get('is_subconscious_sleeping', False):
             logger.info("Scheduler: Night time. Attempting to transition subconscious to SLEEPING_DREAMING state.")
             daily_summary = "Pathos experienced a day of various activities and thoughts. (Fallback summary)"
-            if _ethos_core_instance:
+            if _ethos_core_instance and _main_event_loop:
                 logger.info("Scheduler: Attempting to generate real daily summary from EthosCore...")
                 try:
-                    logger.debug("Scheduler: Calling asyncio.run(EthosCore.generate_daily_experiential_summary())...")
-                    summary_text = asyncio.run(_ethos_core_instance.generate_daily_experiential_summary())
+                    logger.debug("Scheduler: Calling EthosCore.generate_daily_experiential_summary() via run_coroutine_threadsafe...")
+                    coro_summary = _ethos_core_instance.generate_daily_experiential_summary()
+                    future_summary = asyncio.run_coroutine_threadsafe(coro_summary, _main_event_loop)
+                    summary_text = future_summary.result(timeout=30) # Longer timeout for summary generation
+
                     if summary_text:
                         daily_summary = summary_text
                         logger.info("Scheduler: Successfully generated real daily summary from EthosCore.")
                     else:
                         logger.warning("Scheduler: EthosCore returned empty summary, using fallback.")
-                except RuntimeError as e_run:
-                    if "cannot run event loop while another loop is running" in str(e_run).lower() or \
-                       "asyncio.run() cannot be called from a running event loop" in str(e_run).lower():
-                        logger.error(f"Scheduler: asyncio.run() conflict. Cannot generate real daily summary from sync thread. Error: {e_run}")
-                        logger.error("Scheduler: THIS IS A KNOWN ISSUE. Consider refactoring scheduler to be async or use loop.call_soon_threadsafe if main loop is accessible.")
-                    else:
-                        logger.error(f"Scheduler: Error generating real daily summary: {e_run}", exc_info=True)
+                except asyncio.TimeoutError:
+                    logger.error("Scheduler: Timeout generating real daily summary from EthosCore.")
                 except Exception as e_sum_gen:
-                    logger.error(f"Scheduler: Unexpected error during daily summary generation: {e_sum_gen}", exc_info=True)
+                    logger.error(f"Scheduler: Error during daily summary generation: {e_sum_gen}", exc_info=True)
             else:
-                logger.warning("Scheduler: EthosCore instance not available. Using fallback daily summary.")
+                logger.warning("Scheduler: EthosCore instance or event loop not available. Using fallback daily summary.")
 
             logger.info(f"Scheduler: Sending command to transition subconscious to SLEEPING_DREAMING with summary: {daily_summary[:100]}...")
             success_sleep_command = send_node_control_command(node_state="SLEEPING_DREAMING", daily_summary=daily_summary)
@@ -233,25 +215,46 @@ def perform_scheduled_subconscious_context_sync():
             else:
                 logger.warning("Scheduler: Scheduled context (conversation/action) sync with subconscious node failed or partially failed.")
 
-            # Simulate fetching mood from EthosCore and sync it
-            if _ethos_core_instance:
-                # In a real scenario, this would be:
-                # current_eidos_mood = asyncio.run(_ethos_core_instance.mood_engine.get_current_mood_snapshot())
-                # For now, simulate:
+            # Fetch Hexus scores from EthosCore and sync them
+            if _ethos_core_instance: # No need for main_event_loop here as get_current_mood is sync
+                try:
+                    logger.debug("Scheduler: Attempting to fetch current Hexus scores from EthosCore...")
+                    # EthosCore.get_current_mood() returns a dict including 'hexus_snapshot'
+                    current_eidos_mood_data = _ethos_core_instance.get_current_mood()
+                    hexus_snapshot_to_sync = current_eidos_mood_data.get("hexus_snapshot")
+
+                    if hexus_snapshot_to_sync and isinstance(hexus_snapshot_to_sync, dict):
+                        logger.info(f"Scheduler: Fetched Eidos Hexus snapshot for sync: {hexus_snapshot_to_sync}")
+                        sync_mood_success = sync_mood_to_subconscious(hexus_snapshot_to_sync)
+                        if sync_mood_success:
+                            logger.info("Scheduler: Hexus snapshot synced to subconscious node successfully.")
+                        else:
+                            logger.warning("Scheduler: Hexus snapshot sync to subconscious node failed.")
+                    elif current_eidos_mood_data.get("simulation_disabled"):
+                        logger.info("Scheduler: Mood/Hexus simulation is disabled in EthosCore. Not syncing Hexus.")
+                    else:
+                        logger.warning("Scheduler: EthosCore.get_current_mood() did not return a valid 'hexus_snapshot'. Current data: {current_eidos_mood_data}")
+
+                except Exception as e_mood:
+                    logger.error(f"Scheduler: Error fetching or syncing Eidos Hexus scores: {e_mood}", exc_info=True)
+                    # Fallback to sending a minimal simulated mood if there's an error fetching the real one
+                    logger.warning("Scheduler: Using minimal simulated Hexus scores for sync due to error.")
+                    simulated_hexus_fallback = { # Provide some basic Hexus scores
+                        "focus": random.uniform(0.3, 0.7),
+                        "curiosity": random.uniform(0.4, 0.8)
+                    }
+                    sync_mood_to_subconscious(simulated_hexus_fallback)
+            else:
+                logger.warning("Scheduler: EthosCore instance not available, skipping Hexus scores sync.")
+                # Fallback to simulated mood if core components are missing
                 simulated_eidos_mood = {
                     "impulsiveness": round(random.uniform(0.2, 0.8), 2),
                     "proactivity": round(random.uniform(0.3, 0.7), 2),
-                    "valence": round(random.uniform(-0.5, 0.5), 2), # Example additional mood aspect
-                    "focus": round(random.uniform(0.1, 0.9), 2) # Another example
                 }
-                logger.info(f"Scheduler: Simulated Eidos mood for sync: {simulated_eidos_mood}")
+                logger.info(f"Scheduler: Using basic simulated Eidos mood for sync: {simulated_eidos_mood}")
                 sync_mood_success = sync_mood_to_subconscious(simulated_eidos_mood)
-                if sync_mood_success:
-                    logger.info("Scheduler: Mood synced to subconscious node successfully.")
-                else:
-                    logger.warning("Scheduler: Mood sync to subconscious node failed.")
-            else:
-                logger.warning("Scheduler: EthosCore instance not available, skipping mood sync.")
+                if sync_mood_success: logger.info("Scheduler: Basic simulated mood synced to subconscious node successfully.")
+                else: logger.warning("Scheduler: Basic simulated mood sync to subconscious node failed.")
         else:
             logger.info("Scheduler: Skipping context and mood sync as subconscious_node is (or failed to transition from) sleeping.")
 
@@ -333,30 +336,92 @@ if __name__ == '__main__':
     start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
 
     # Let the scheduler run for a few cycles
-    # For example, let it run for (test_interval_minutes * 60 * 3.5) seconds to see about 3 executions
-    run_duration_seconds = int(test_interval_minutes * 60 * 3.5) # Approx 3 cycles
-    if run_duration_seconds < 1: run_duration_seconds = 1 # ensure at least 1 second sleep for very short intervals
+    # --- Mocking for Test Run ---
+    class MockEthosCore:
+        def __init__(self):
+            self.chronos_engine = MockChronosEngine()
+            self.mood_engine = MockMoodEngine() # Added mood engine
 
-    print(f"ChronosEngine Test: Main thread sleeping for {run_duration_seconds} seconds to observe scheduler...")
+        async def retrieve_relevant_memories(self, query, top_k, min_salience, allowed_types, user_id_context):
+            print(f"MockEthosCore: retrieve_relevant_memories called with query='{query}'")
+            await asyncio.sleep(0.01) # Simulate async work
+            return [{"content": "Test memory 1"}, {"content": "Another conversation bit"}]
 
-    # Loop with shorter sleeps to check stop_event more frequently if needed for other tests
-    # but for this simple case, one sleep is fine.
-    for _ in range(run_duration_seconds):
-        if scheduler_stop_event.is_set(): # Should not be set here unless something external stops it
-            break
-        time.sleep(1)
+        async def get_local_datetime_for_user(self, user_id):
+            print(f"MockEthosCore: get_local_datetime_for_user called for user_id='{user_id}'")
+            await asyncio.sleep(0.01)
+            return datetime.now(timezone.utc)
 
-    print("\nChronosEngine Test: Woke up. Requesting scheduler stop...")
-    stop_subconscious_sync_scheduler()
+        async def generate_daily_experiential_summary(self):
+            print("MockEthosCore: generate_daily_experiential_summary called")
+            await asyncio.sleep(0.02) # Simulate longer work
+            return "This was a mock day full of mock experiences."
 
-    # Give a moment for the last timer to be properly cancelled and threads to clean up if any
-    time.sleep(0.2)
+    class MockChronosEngine:
+        async def get_current_activity(self, pathos_now):
+            print(f"MockChronosEngine: get_current_activity called for time {pathos_now}")
+            await asyncio.sleep(0.01)
+            # Simulate finding an activity or not
+            if random.choice([True, False]):
+                return MockActivitySlot("Mock Activity", "mock_focus")
+            return None
 
-    print("\n--- Testing restart behavior (should log warning if not stopped properly or start if stopped) ---")
-    # Attempt to start again (if it was properly stopped, this should work)
-    start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
-    time.sleep(1) # Let it run for a very short time
-    stop_subconscious_sync_scheduler()
+    class MockMoodEngine: # Added mock mood engine
+        async def get_current_mood_snapshot(self):
+            print("MockMoodEngine: get_current_mood_snapshot called")
+            await asyncio.sleep(0.01)
+            return {"valence": random.uniform(-1,1), "arousal": random.uniform(0,1)}
 
 
-    logger.info("ChronosEngine: --- Test Run Finished ---")
+    class MockActivitySlot:
+        def __init__(self, title, sub_focus):
+            self.activity_title = title
+            self.activity_details = MockActivityDetails(sub_focus)
+
+    class MockActivityDetails:
+        def __init__(self, sub_focus):
+            self.sub_focus = sub_focus
+    # --- End Mocking ---
+
+    async def main_test_loop():
+        global _main_event_loop # Allow modification for test
+        _main_event_loop = asyncio.get_running_loop()
+
+        logger.info("ChronosEngine: --- Test Run for Periodic Scheduler (with Mocks) ---")
+        mock_ethos = MockEthosCore()
+        init_scheduler(mock_ethos, _main_event_loop) # type: ignore
+
+        test_interval_minutes = 0.1 # 6 seconds for quick testing
+
+        print(f"\n--- Starting scheduler with interval: {test_interval_minutes} minutes ({test_interval_minutes*60} seconds) ---")
+        start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
+
+        run_duration_seconds = int(test_interval_minutes * 60 * 3.5)
+        if run_duration_seconds < 1: run_duration_seconds = 1
+
+        print(f"ChronosEngine Test: Main thread (async test loop) waiting for {run_duration_seconds} seconds to observe scheduler...")
+        await asyncio.sleep(run_duration_seconds)
+
+        print("\nChronosEngine Test: Woke up. Requesting scheduler stop...")
+        stop_subconscious_sync_scheduler()
+        await asyncio.sleep(0.2) # Give time for cleanup
+
+        print("\n--- Testing restart behavior ---")
+        start_subconscious_sync_scheduler(interval_minutes=test_interval_minutes)
+        await asyncio.sleep(1)
+        stop_subconscious_sync_scheduler()
+        await asyncio.sleep(0.2)
+
+        logger.info("ChronosEngine: --- Test Run Finished ---")
+
+    # Setup for running the async main_test_loop
+    # This part replaces the old if __name__ == '__main__': block
+    try:
+        asyncio.run(main_test_loop())
+    except KeyboardInterrupt:
+        logger.info("Test run interrupted by user.")
+    finally:
+        # Ensure scheduler is stopped if test is exited prematurely
+        if scheduler_timer and scheduler_timer.is_alive():
+            stop_subconscious_sync_scheduler()
+            logger.info("Cleaned up scheduler on exit from test.")

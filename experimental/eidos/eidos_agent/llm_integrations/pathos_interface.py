@@ -194,6 +194,57 @@ class PathosInterface:
             final_pathos_response_text = final_assistant_message_payload_for_response["content"]
 
         final_pathos_response_text = re.sub(r"<think>.*?</think>\s*", "", final_pathos_response_text, flags=re.DOTALL).strip()
+
+        # Process Hexus updates based on successful tool calls
+        if self.ethos_core and final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls"):
+            tool_calls_data = final_assistant_message_payload_for_response.get("tool_calls")
+            # Need to find corresponding tool results in full_history_for_interaction_log
+            # This part is a bit complex as results are separate messages.
+            # For simplicity, we'll iterate through tool_calls and assume success if a result for that call_id exists later.
+            # A more robust way would be to have tool_orchestrator return explicit success/failure per tool.
+
+            # Create a map of tool_call_id to tool_name
+            tool_call_name_map = {}
+            if isinstance(tool_calls_data, list):
+                for tc in tool_calls_data:
+                    if isinstance(tc, dict) and tc.get("id") and tc.get("function"):
+                        tool_call_name_map[tc["id"]] = tc["function"].get("name")
+
+            for message in full_history_for_interaction_log:
+                if message.get("role") == "tool" and (tool_call_id := message.get("tool_call_id")):
+                    tool_name = tool_call_name_map.get(tool_call_id)
+                    if not tool_name: continue # Should not happen if history is consistent
+
+                    # Assuming tool execution was successful if we have a "tool" role message with its ID.
+                    # More precise success checking would require changes in ToolOrchestrator's output.
+                    event_name: Optional[str] = None
+                    event_payload: Dict[str, Any] = {"tool_name": tool_name} # Basic payload
+
+                    if tool_name == "web_search":
+                        event_name = "TOOL_SUCCESS_WEB_SEARCH"
+                    elif tool_name == "add_pathos_event_to_calendar":
+                        # Ideally, parse arguments to determine if it's work or leisure
+                        # For now, default to a generic or work-related event
+                        event_name = "TOOL_SUCCESS_ADD_EVENT_WORK"
+                        # Example for future:
+                        # try:
+                        #     args = json.loads(tc.get("function", {}).get("arguments", "{}"))
+                        #     if "leisure" in args.get("event_type", "").lower() or "social" in args.get("event_type", "").lower():
+                        #         event_name = "TOOL_SUCCESS_ADD_EVENT_LEISURE"
+                        # except json.JSONDecodeError:
+                        #     pass
+                    elif tool_name == "fetch_weather":
+                        event_name = "TOOL_SUCCESS_FETCH_WEATHER"
+                    # Add other tool mappings here
+                    else:
+                        event_name = "TOOL_SUCCESS_GENERIC" # Fallback for unmapped successful tools
+
+                    if event_name:
+                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=event_payload))
+
+                    # TODO: Add handling for TOOL_FAILURE_GENERIC if ToolOrchestrator provides failure info
+
+
         if not final_pathos_response_text and not llm_error_occurred and not (final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls")):
              final_pathos_response_text = "Understood."
 
@@ -206,7 +257,9 @@ class PathosInterface:
                 asyncio.create_task(self.send_sentence_to_tts_and_notify_client(sentence=sentence, user_id=user_id_for_response, sequence_num=tts_sequence_num, forced_chunk_id=forced_chunk_id))
                 tts_sequence_num += 1
 
-        if self.ethos_core: self.ethos_core.update_mood_on_interaction(user_input, final_pathos_response_text, bool(image_data_b64), bool(document_text))
+        if self.ethos_core:
+            # Changed from update_mood_on_interaction to process_interaction_for_hexus_update
+            self.ethos_core.process_interaction_for_hexus_update(user_input, final_pathos_response_text, bool(image_data_b64), bool(document_text))
 
         tool_calls_for_metadata = final_assistant_message_payload_for_response.get("tool_calls") if final_assistant_message_payload_for_response else None
         conversation_id = kwargs.get("conversation_id", "unknown_conv_id")
@@ -234,8 +287,8 @@ class PathosInterface:
 
         response_metadata["tool_calls_from_pathos"] = tool_calls_for_metadata
         response_metadata["error_flag"] = llm_error_occurred
-        response_metadata["mood_at_response"] = current_mood
-        response_metadata["hexus_scores"] = hexus_scores
+        response_metadata["mood_at_response"] = self.ethos_core.get_current_mood() if self.ethos_core else {} # Updated to use new get_current_mood()
+        response_metadata["hexus_scores"] = self.ethos_core.get_hexus_scores() if self.ethos_core else {} # Ensure this is up-to-date
         response_metadata["retrieved_memory_ids"] = [m['id'] for m in retrieved_memories if isinstance(m, dict) and 'id' in m]
         if llm_usage_data:
             response_metadata["prompt_tokens_from_llm"] = llm_usage_data.get("prompt_tokens")
@@ -394,9 +447,16 @@ class PathosInterface:
                 {"type": "feedback", "content": feedback_content_str, "metadata": memory_metadata, "salience": 1.2},
                 user_id_context=feedback_user_id
             )
-            if self.config.ENABLE_MOOD_SIMULATION:
-                mood_update_payload = {"feedback_type": feedback_data.get("feedback_type"), "rating": feedback_data.get("rating")}
-                await self.ethos_core.update_mood_state('feedback', mood_update_payload)
+            if self.config.ENABLE_MOOD_SIMULATION: # This flag now gates Hexus updates too
+                # Determine feedback event name
+                feedback_type_str = str(feedback_data.get("feedback_type", "unknown")).upper()
+                event_name = f"USER_FEEDBACK_{feedback_type_str}"
+                if event_name not in self.ethos_core.HEXUS_EVENT_DEFINITIONS: # Accessing class variable for check
+                    logger.warning(f"Undefined Hexus feedback event '{event_name}'. Defaulting or skipping.")
+                    # Potentially default to a generic feedback event or skip
+                    event_name = "USER_FEEDBACK_POSITIVE" if feedback_data.get("rating", 0) > 0 else "USER_FEEDBACK_NEGATIVE" # Simplified default
+
+                await self.ethos_core.process_event_for_hexus_update(event_name, payload=feedback_data)
         else:
             logger.error("EthosCore not available in PathosInterface, cannot process feedback.")
 
@@ -412,7 +472,7 @@ class PathosInterface:
         self,
         original_user_input: str,
         pathos_response: str,
-        mood_at_response: Dict[str, float],
+        mood_at_response: Dict[str, Any], # Changed from Dict[str, float] to Dict[str, Any] to accommodate new mood structure
         retrieved_memories: List[Dict[str, Any]],
         full_history_for_pathos: List[Dict[str, Any]],
         error: bool = False,

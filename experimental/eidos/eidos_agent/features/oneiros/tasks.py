@@ -21,32 +21,50 @@ async def oneiros_processing_task(
         logger.info("OneirosProcessingTask: OneirosModule is disabled in main config. Task will not run.")
         return
 
+    # processing_interval_seconds is now used as the check frequency for _is_time_to_dream
+    # It's distinct from dream frequency itself, which is managed within _is_time_to_dream
     if processing_interval_seconds <= 0:
-        logger.error(f"OneirosProcessingTask: Invalid processing_interval_seconds ({processing_interval_seconds}s). Must be positive. Task will not run.")
-        return
+        logger.warning(f"OneirosProcessingTask: Invalid processing_interval_seconds ({processing_interval_seconds}s). Using default 60s.")
+        check_interval_seconds = 60.0
+    else:
+        check_interval_seconds = float(processing_interval_seconds)
 
-    logger.info(f"OneirosProcessingTask started. Check interval: {processing_interval_seconds} seconds.")
+
+    logger.info(f"Oneiros Dream Scheduling Task started. Check interval: {check_interval_seconds} seconds.")
 
     while True:
         try:
-            await asyncio.sleep(processing_interval_seconds)
+            await asyncio.sleep(check_interval_seconds)
 
-            is_sleeping = subconscious_scheduler_state.get('is_subconscious_sleeping', False)
-            has_fragments = oneiros_module.has_pending_fragments()
+            if not oneiros_module.ethos_core:
+                logger.error("OneirosProcessingTask: EthosCore not available in OneirosModule. Cannot determine Pathos local time.")
+                continue
 
+            # Get current Pathos local time
+            # Assuming PATHOS_USER_ID is accessible or defined appropriately for EthosCore context
+            # If PATHOS_USER_ID needs to be imported here:
+            # from eidos_agent.persona_logic.chronos_engine.engine import PATHOS_USER_ID
+            current_pathos_local_time = await oneiros_module.ethos_core.get_local_datetime_for_user("pathos_agent_internal") # Use a constant or config for user ID
 
-            if is_sleeping and has_fragments:
-                logger.info("OneirosProcessingTask: Subconscious is sleeping and fragments pending. Starting processing.")
+            if oneiros_module._is_time_to_dream(current_pathos_local_time):
+                logger.info("OneirosProcessingTask: Conditions met for generating a dream.")
+                try:
+                    await oneiros_module.run_dream_cycle()
+                    logger.info("OneirosProcessingTask: OneirosModule.run_dream_cycle() completed.")
+                except Exception as e_dream_cycle:
+                    logger.error(f"OneirosProcessingTask: Error during OneirosModule.run_dream_cycle: {e_dream_cycle}", exc_info=True)
+            else:
+                logger.debug("OneirosProcessingTask: Conditions not met for generating a dream in this cycle.")
+
+            # Logic for processing received fragments (if any) can remain separate or be integrated
+            # For now, keeping it separate as per subtask focus on time-based scheduling.
+            if subconscious_scheduler_state.get('is_subconscious_sleeping', False) and oneiros_module.has_pending_fragments():
+                logger.info("OneirosProcessingTask: Subconscious is sleeping and fragments pending. Starting fragment processing.")
                 try:
                     await oneiros_module.process_received_dream_fragments()
                     logger.info("OneirosProcessingTask: OneirosModule.process_received_dream_fragments() completed.")
-                except Exception as e_process:
-                    logger.error(f"OneirosProcessingTask: Error during OneirosModule.process_received_dream_fragments: {e_process}", exc_info=True)
-            else:
-                logger.debug(
-                    f"OneirosProcessingTask: Conditions not met for dream processing. "
-                    f"Is sleeping: {is_sleeping}, Has fragments: {has_fragments}."
-                )
+                except Exception as e_process_frag:
+                    logger.error(f"OneirosProcessingTask: Error during OneirosModule.process_received_dream_fragments: {e_process_frag}", exc_info=True)
 
         except asyncio.CancelledError:
             logger.info("OneirosProcessingTask: Task cancelled. Shutting down.")

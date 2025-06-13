@@ -19,6 +19,8 @@ from eidos_agent.core.config import Config, OneirosConfig, LLMConfig
 from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.logger import get_logger
+# Import for pushing dream to subconscious node
+from eidos_agent.features.subconscious_interface_to_node.subconscious.client import push_dream_fragment_to_node
 
 logger = get_logger(__name__)
 
@@ -29,6 +31,8 @@ class OneirosModule:
         self.config = config
         self.oneiros_config: OneirosConfig = config.get_oneiros_config()
         self.ethos_core = ethos_core
+        self.last_dream_time: Optional[datetime] = None # For frequency calculation
+        self.next_dream_interval_seconds: Optional[int] = None # For frequency calculation
 
         dream_llm_role_str = self.oneiros_config.get('dream_llm_role', 'PATHOS')
         # Ensure dream_llm_role_str is a valid Literal for get_llm_config if it expects strict literals
@@ -53,6 +57,78 @@ class OneirosModule:
 
 
         logger.info("OneirosModule initialized.")
+        self.received_dream_fragments: List[Dict[str, Any]] = [] # Ensure this is initialized if has_pending_fragments is used.
+
+    def _is_time_to_dream(self, current_pathos_local_time: datetime) -> bool:
+        """
+        Determines if it's time to generate a new dream based on Pathos's local time
+        and dream frequency settings.
+        """
+        if not self.config.ENABLE_ONEIROS:
+            return False
+
+        sleep_start_hour = self.oneiros_config.get('oneiros_sleep_start_hour_local', 23)
+        sleep_end_hour = self.oneiros_config.get('oneiros_sleep_end_hour_local', 7)
+        current_hour = current_pathos_local_time.hour
+
+        is_sleep_time = False
+        if sleep_start_hour <= sleep_end_hour:  # Not overnight (e.g., 9 AM to 5 PM - unusual for sleep)
+            is_sleep_time = sleep_start_hour <= current_hour < sleep_end_hour
+        else:  # Overnight (e.g., 11 PM to 7 AM)
+            is_sleep_time = current_hour >= sleep_start_hour or current_hour < sleep_end_hour
+
+        if not is_sleep_time:
+            logger.debug(f"Oneiros: Not time to dream. Current local hour {current_hour} is outside sleep window ({sleep_start_hour}-{sleep_end_hour}).")
+            return False
+
+        logger.debug(f"Oneiros: Pathos is in sleep window ({sleep_start_hour}-{sleep_end_hour}). Current local hour: {current_hour}.")
+
+        min_freq_mins = self.oneiros_config.get('oneiros_dream_frequency_min_minutes', 60)
+        max_freq_mins = self.oneiros_config.get('oneiros_dream_frequency_max_minutes', 180)
+
+        if self.last_dream_time is None: # First dream cycle since start or after a dream
+            # For the very first dream, or first after a successful dream, make it sooner.
+            # Dividing by 2 is arbitrary; could be a fixed shorter interval or a fraction of min_freq.
+            self.next_dream_interval_seconds = random.randint(min_freq_mins * 60, max_freq_mins * 60) // 2
+            logger.info(f"Oneiros: First dream check or previous dream completed. Next dream attempt in approx {self.next_dream_interval_seconds / 60:.1f} minutes.")
+            # For the very first dream, we can allow it immediately if last_dream_time is None.
+            # The actual dream cycle will then set last_dream_time.
+            # However, to respect the initial interval, we should only return True if an interval has passed
+            # or if we decide the first dream can happen "now".
+            # Let's assume the first dream after starting the module during sleep time can happen if an initial interval passes.
+            # If last_dream_time is truly None (first ever run), then this logic is fine.
+            # If a dream just completed, last_dream_time would be set, and this block isn't hit.
+            # This logic is a bit tricky. Let's simplify: if last_dream_time is None, it means we haven't dreamt yet.
+            # We set an interval, and the *next* check will see if that interval passed.
+            # For the very first dream, we can make it happen sooner.
+            # If last_dream_time is None, it's the first check.
+            # We will set an initial (potentially shorter) interval and then the regular check applies.
+            # So, if last_dream_time is None, it's *not* yet time, but we've set the interval for the *next* check.
+            # This seems more robust than returning True immediately.
+            # The task implies "If self.last_dream_time is None ... return True"
+            # Let's follow that for now, understanding it means the first dream check in sleep window triggers a dream.
+            logger.info(f"Oneiros: First dream cycle during this sleep period. Allowing dream generation.")
+            return True
+
+
+        # Convert current_pathos_local_time to UTC if last_dream_time is UTC
+        # Assuming self.last_dream_time is stored as UTC after a dream occurs
+        current_pathos_utc = current_pathos_local_time.astimezone(timezone.utc)
+        time_since_last_dream_seconds = (current_pathos_utc - self.last_dream_time).total_seconds()
+
+        if self.next_dream_interval_seconds is None: # Should have been set if last_dream_time is not None
+            self.next_dream_interval_seconds = random.randint(min_freq_mins * 60, max_freq_mins * 60)
+            logger.info(f"Oneiros: Next dream interval was not set. Calculated new interval: {self.next_dream_interval_seconds / 60:.1f} minutes.")
+
+
+        if time_since_last_dream_seconds >= self.next_dream_interval_seconds:
+            logger.info(f"Oneiros: Time to dream! {time_since_last_dream_seconds / 60:.1f}m since last dream >= interval {self.next_dream_interval_seconds / 60:.1f}m.")
+            # self.next_dream_interval_seconds = None # Reset for next calculation after this dream
+            return True
+        else:
+            remaining_time = self.next_dream_interval_seconds - time_since_last_dream_seconds
+            logger.debug(f"Oneiros: Not yet time for next dream. {time_since_last_dream_seconds / 60:.1f}m passed. {remaining_time / 60:.1f}m remaining until next dream attempt.")
+            return False
 
     def _expand_wildcards(self, text: str) -> str:
         wildcard_base_dir_str = self.oneiros_config.get('wildcard_files_dir')
@@ -333,6 +409,17 @@ class OneirosModule:
                     user_id_context=target_user_id_for_queued_point
                 )
                 logger.info(f"Oneiros: Dream output stored as queued discussion point for user '{target_user_id_for_queued_point}'. Image: {image_path}")
+
+                # Push dream to subconscious node
+                logger.debug(f"Oneiros: Attempting to push dream fragment to subconscious node: '{dream_output[:100]}...'")
+                push_success = await asyncio.to_thread(push_dream_fragment_to_node, dream_output)
+                if push_success:
+                    logger.info("Oneiros: Successfully pushed dream fragment to subconscious node.")
+                else:
+                    logger.warning("Oneiros: Failed to push dream fragment to subconscious node.")
+
+                self.last_dream_time = datetime.now(timezone.utc) # Update last dream time
+                self.next_dream_interval_seconds = None # Reset for next calculation
             elif dream_output:
                  logger.error("Oneiros: Dream output generated but EthosCore is not available to store it.")
             else:
