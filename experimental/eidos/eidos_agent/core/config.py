@@ -61,6 +61,8 @@ class EthosConfig(TypedDict, total=False):
     summarization_llm_role: str
     interaction_log_analysis_llm_role: str
     knowledge_upkeep_llm_role: str
+    knowledge_upkeep_max_facts_to_review: int
+    knowledge_upkeep_min_days_before_review: int
     aspiration_generation_llm_role: str # From broken
     long_term_planning_llm_role: str # From broken
     scheduler_llm_role: str # From broken (for Chronos)
@@ -97,6 +99,10 @@ class EthosConfig(TypedDict, total=False):
     reflection_min_salience_for_consideration: float
     reflection_significant_event_salience_threshold: float
     reflection_lookback_days: int
+    forgetting_salience_threshold_archive: float
+    forgetting_days_to_archive_by_default: int
+    forgetting_core_memory_types_json: str
+    forgetting_extremely_low_salience_for_core: float
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -318,8 +324,10 @@ class Config:
         "summarization_max_memories_per_cluster": int(os.getenv("ETHOS_SUMMARIZATION_MAX_MEMORIES_PER_CLUSTER", 15)),
         "summarization_max_text_length_for_prompt": int(os.getenv("ETHOS_SUMMARIZATION_MAX_TEXT_LENGTH_FOR_PROMPT", 10000)),
         "summarization_max_days_to_consider": int(os.getenv("ETHOS_SUMMARIZATION_MAX_DAYS_TO_CONSIDER", 30)),
-        "knowledge_upkeep_interval_seconds": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS", 86400)),
         "knowledge_upkeep_llm_role": os.getenv("ETHOS_KNOWLEDGE_UPKEEP_LLM_ROLE", "LOGOS_TECHNE"),
+        "knowledge_upkeep_max_facts_to_review": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_MAX_FACTS", "5")),
+        "knowledge_upkeep_min_days_before_review": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_MIN_DAYS_REVIEW", "30")),
+        "knowledge_upkeep_interval_seconds": int(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_INTERVAL_SECONDS", "86400")),
         "knowledge_upkeep_volatile_tags": json.loads(os.getenv("ETHOS_KNOWLEDGE_UPKEEP_VOLATILE_TAGS", '[]')),
         "proactive_immediate_greeting_grace_minutes": int(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_GRACE_MINUTES", 15)),
         "proactive_immediate_greeting_chance": float(os.getenv("ETHOS_PROACTIVE_IMMEDIATE_GREETING_CHANCE", 0.75)),
@@ -331,7 +339,7 @@ class Config:
         "pathos_home_timezone": os.getenv("ETHOS_PATHOS_HOME_TIMEZONE", "UTC"),
         "scheduler_llm_role": os.getenv("ETHOS_SCHEDULER_LLM_ROLE", "LOGOS_TECHNE"),
         "aspiration_generation_llm_role": os.getenv("ETHOS_ASPIRATION_LLM_ROLE", "LOGOS_TECHNE"),
-        "aspiration_num_seed_memories": int(os.getenv("ETHOS_ASPIRATION_NUM_SEED_MEMORIES", 5)),
+        "aspiration_num_seed_memories": int(os.getenv("ETHOS_ASPIRATION_NUM_SEED_MEMORIES", "15")), # Changed default from 5 to 15
         "aspiration_min_salience_seed": float(os.getenv("ETHOS_ASPIRATION_MIN_SALIENCE_SEED", 0.6)),
         "long_term_planning_llm_role": os.getenv("ETHOS_LONG_TERM_PLANNING_LLM_ROLE", "LOGOS_TECHNE"),
         "long_term_planning_interval_seconds": float(os.getenv("ETHOS_LONG_TERM_PLANNING_INTERVAL_SECONDS", 86400.0 * 3)),
@@ -352,6 +360,10 @@ class Config:
         "reflection_min_salience_for_consideration": float(os.getenv("ETHOS_REFLECTION_MIN_SALIENCE_FOR_CONSIDERATION", "0.3")),
         "reflection_significant_event_salience_threshold": float(os.getenv("ETHOS_REFLECTION_SIGNIFICANT_EVENT_SALIENCE_THRESHOLD", "0.7")),
         "reflection_lookback_days": int(os.getenv("ETHOS_REFLECTION_LOOKBACK_DAYS", "3")),
+        "forgetting_salience_threshold_archive": float(os.getenv("ETHOS_FORGETTING_SALIENCE_THRESHOLD_ARCHIVE", "0.1")),
+        "forgetting_days_to_archive_by_default": int(os.getenv("ETHOS_FORGETTING_DAYS_TO_ARCHIVE_DEFAULT", "90")),
+        "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight"]'),
+        "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")),
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None

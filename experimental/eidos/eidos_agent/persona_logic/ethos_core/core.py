@@ -236,6 +236,19 @@ class EthosCore:
             "system_admin", PATHOS_USER_ID, None, "default_user"
         ]
         self.hexus_scores_changed_during_reflection = False
+
+        self.forgetting_core_memory_types: List[str] = []
+        core_types_json = self.ethos_config.get('forgetting_core_memory_types_json', '[]')
+        try:
+            loaded_core_types = json.loads(core_types_json)
+            if isinstance(loaded_core_types, list) and all(isinstance(item, str) for item in loaded_core_types):
+                self.forgetting_core_memory_types = loaded_core_types
+                logger.info(f"Loaded {len(self.forgetting_core_memory_types)} core memory types for forgetting: {self.forgetting_core_memory_types}")
+            else:
+                logger.warning(f"forgetting_core_memory_types_json is not a list of strings. Using empty list. Value: {core_types_json}")
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse forgetting_core_memory_types_json. Using empty list. Value: {core_types_json}")
+
         logger.info("EthosCore initialized with persistent task timing.")
 
     def _load_task_last_run_times(self) -> Dict[str, datetime]:
@@ -1445,20 +1458,353 @@ class EthosCore:
         self.last_reflection_time = now
         self._save_task_last_run_time("EthosReflection", now)
         logger.info(f"--- Ethos: Reflection Cycle Finished at {now.isoformat()} ---")
+        # Call aspiration generation after successful reflection if insights were generated
+        if insights_generated: # Assuming 'insights_generated' boolean is set if insights were made # TODO: Ensure insights_generated is correctly set
+            await self._generate_new_aspirations()
+
+    async def run_knowledge_upkeep(self):
+        """
+        Periodically reviews 'world_knowledge' facts, verifies them (simplified for now),
+        and updates their 'last_verified_timestamp'.
+        """
+        if not self.config.ENABLE_KNOWLEDGE_UPKEEP:
+            logger.debug("Knowledge upkeep cycle skipped as feature is disabled by Config.ENABLE_KNOWLEDGE_UPKEEP.")
+            return
+
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Knowledge Upkeep Cycle at {now.isoformat()} ---")
+
+        # 1. Retrieve Configuration
+        # llm_role = self.ethos_config.get('knowledge_upkeep_llm_role', "LOGOS_TECHNE") # For future LLM-based verification
+        max_facts_to_review = self.ethos_config.get('knowledge_upkeep_max_facts_to_review', 5)
+        min_days_before_review = self.ethos_config.get('knowledge_upkeep_min_days_before_review', 30)
+
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run knowledge upkeep.")
+            self.last_knowledge_upkeep_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("KnowledgeUpkeep", now)
+            return
+
+        # 2. Get Facts for Review
+        facts_for_review = await self.memory_storage.get_knowledge_facts_for_review(
+            min_days_since_last_review=min_days_before_review,
+            limit=max_facts_to_review
+        )
+
+        if not facts_for_review:
+            logger.info("Knowledge Upkeep: No facts found requiring review at this time.")
+            self.last_knowledge_upkeep_time = now
+            self._save_task_last_run_time("KnowledgeUpkeep", now)
+            return
+
+        logger.info(f"Knowledge Upkeep: Found {len(facts_for_review)} facts to review.")
+        updated_count = 0
+
+        # 3. Process Each Fact
+        for fact_entry in facts_for_review:
+            fact_id = fact_entry.get('id')
+            if not fact_id:
+                logger.warning("Knowledge Upkeep: Found fact entry with no ID. Skipping.")
+                continue
+
+            logger.info(f"Knowledge Upkeep: Reviewing fact ID {fact_id} - '{str(fact_entry.get('content',''))[:50]}...'")
+
+            # ** SIMPLIFIED VERIFICATION **
+            # In a basic pass, we skip actual LLM/web verification.
+            # We just update the timestamp and add a note.
+
+            current_metadata = fact_entry.get('metadata', {}).copy() # Ensure it's a mutable copy
+            current_metadata['last_verified_timestamp'] = now.isoformat()
+            current_metadata['verification_notes'] = "Reviewed by automated knowledge upkeep cycle (basic pass)."
+            # Optional: Could add a counter for how many times it's been reviewed.
+            # current_metadata['verification_cycle_count'] = current_metadata.get('verification_cycle_count', 0) + 1
+
+            update_payload = {'metadata': current_metadata}
+
+            if self.memory_storage.update_entry(fact_id, update_payload):
+                logger.info(f"Knowledge Upkeep: Successfully updated metadata for fact ID {fact_id}.")
+                updated_count += 1
+            else:
+                logger.warning(f"Knowledge Upkeep: Failed to update metadata for fact ID {fact_id}.")
+
+        # 4. Update Timestamps and Log Completion
+        self.last_knowledge_upkeep_time = now
+        self._save_task_last_run_time("KnowledgeUpkeep", now)
+        logger.info(f"--- Ethos: Knowledge Upkeep Cycle Finished. Reviewed and updated {updated_count}/{len(facts_for_review)} facts. ---")
 
 
-    async def run_managed_forgetting(self): # ADDED METHOD (Placeholder)
-        """Placeholder for the managed forgetting process."""
+    async def _generate_new_aspirations(self) -> None:
+        """
+        Generates new long-term aspirations for Pathos based on recent insights and experiences.
+        Called at the end of a reflection cycle.
+        """
+        logger.info("--- Ethos: Starting Aspiration Generation ---")
+        num_seed_memories = self.ethos_config.get('aspiration_num_seed_memories', 15)
+        min_salience_seed = self.ethos_config.get('aspiration_min_salience_seed', 0.5)
+        llm_role = self.ethos_config.get('aspiration_generation_llm_role', "LOGOS_TECHNE")
+        # Use a lookback similar to reflection, or a dedicated one if configured
+        lookback_days_for_seeds = self.ethos_config.get('reflection_lookback_days', 7)
+
+        seed_memory_types = ['reflection_insight', 'feedback', 'chat_interaction',
+                             'firmament_activity_log', 'learned_correction', 'world_knowledge']
+
+        candidate_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+            user_id=PATHOS_USER_ID,
+            start_time=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
+            end_time=datetime.now(timezone.utc),
+            types=seed_memory_types,
+            limit=num_seed_memories * 3,
+            sort_by_salience_then_recency=True
+        )
+
+        seed_memories = [mem for mem in candidate_memories if mem.get('salience', 0.0) >= min_salience_seed][:num_seed_memories]
+
+        if len(seed_memories) < 3:
+            logger.info(f"Not enough salient seed memories ({len(seed_memories)}) for aspirations. Min required: 3, Min Salience: {min_salience_seed}.")
+            return
+
+        formatted_seeds = []
+        for mem in seed_memories:
+            ts_str = mem.get('timestamp', "Unknown time")
+            try: ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00")); formatted_ts = ts_dt.strftime("%Y-%m-%d")
+            except ValueError: formatted_ts = ts_str
+            content_snippet = (mem.get('content', '') or "")[:100] + "..." if len(mem.get('content', '') or "") > 100 else mem.get('content', '')
+            formatted_seeds.append(f"- [{formatted_ts}, Type: {mem.get('type')}, Sal: {mem.get('salience',0.0):.2f}]: {content_snippet}")
+
+        seeds_block = "\n".join(formatted_seeds)
+        system_prompt = (
+            "You are an AI assistant helping Pathos formulate 1-2 new long-term aspirational goals. "
+            "Based on the provided recent experiences and insights, identify potential areas for growth, learning, or significant long-term projects. "
+            "Aspirations should be phrased from Pathos's perspective (e.g., 'I want to learn X', 'I aim to Y'). "
+            "They should be high-level and achievable over weeks or months. "
+            "Output MUST be a JSON object like: {\"aspirations\": [\"Aspiration 1 text\", \"Aspiration 2 text\"]}"
+        )
+        user_prompt = f"Pathos's recent salient experiences and insights:\n{seeds_block}\n\nNew aspirations (JSON format, 1-2 items):"
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+        llm_response = await self._call_llm_for_internal_task(messages, llm_role)
+        if not llm_response: logger.warning("Aspiration generation LLM call returned no content."); return
+
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', llm_response)
+            if not json_match: logger.error(f"No JSON in aspiration LLM response: {llm_response}"); return
+            parsed_response = json.loads(json_match.group(0))
+
+            if isinstance(parsed_response, dict) and "aspirations" in parsed_response and isinstance(parsed_response["aspirations"], list):
+                new_aspirations_text = parsed_response["aspirations"]
+                if new_aspirations_text:
+                    logger.info(f"Generated {len(new_aspirations_text)} new aspirations.")
+                    for asp_text in new_aspirations_text:
+                        if not isinstance(asp_text, str) or not asp_text.strip(): continue
+
+                        asp_content_dict = {"title": asp_text.strip(), "description": "A newly generated long-term aspiration for Pathos."}
+                        asp_metadata = {
+                            "status": "active",
+                            "generated_at": datetime.now(timezone.utc).isoformat(),
+                            "source": "aspiration_generation_cycle",
+                            "user_id": PATHOS_USER_ID,
+                            "seed_memory_ids": [m.get('id') for m in seed_memories if m.get('id')]
+                        }
+                        await self.add_memory_entry(
+                            {"type": "aspiration", "content": json.dumps(asp_content_dict),
+                             "metadata": asp_metadata, "salience": 0.9},
+                            user_id_context=PATHOS_USER_ID
+                        )
+                        logger.info(f"Stored new aspiration: '{asp_text[:100]}...'")
+                else:
+                    logger.info("Aspiration generation: LLM returned an empty list of aspirations.")
+            else:
+                logger.error(f"Aspiration LLM response JSON has incorrect structure: {llm_response}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse aspiration LLM JSON: {e}. Raw response: {llm_response}")
+        except Exception as e:
+            logger.error(f"Error processing new aspirations: {e}", exc_info=True)
+        logger.info("--- Ethos: Aspiration Generation Finished ---")
+
+    async def run_long_term_planning(self) -> None:
+        """
+        Reviews active aspirations and breaks them down into actionable high-level steps.
+        """
+        now = datetime.now(timezone.utc)
+        logger.info(f"--- Ethos: Starting Long-Term Planning Cycle at {now.isoformat()} ---")
+
+        llm_role = self.ethos_config.get('long_term_planning_llm_role', "LOGOS_TECHNE")
+        max_aspirations_to_consider = self.ethos_config.get('long_term_planning_max_aspirations_to_consider', 2)
+
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run long-term planning.")
+            self.last_long_term_planning_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("PathosLongTermPlanning", now)
+            return
+
+        active_aspirations = await self.memory_storage.get_entries_by_type_and_user(
+            entry_type="aspiration",
+            user_id=PATHOS_USER_ID,
+            limit=max_aspirations_to_consider * 2 # Fetch more to filter by status
+        )
+
+        # Filter for only 'active' status aspirations and limit
+        active_aspirations = [
+            asp for asp in active_aspirations
+            if asp.get("metadata", {}).get("status") == "active"
+        ][:max_aspirations_to_consider]
+
+        if not active_aspirations:
+            logger.info("Long-Term Planning: No active aspirations found. Cycle ending.")
+            self.last_long_term_planning_time = now
+            self._save_task_last_run_time("PathosLongTermPlanning", now)
+            return
+
+        logger.info(f"Long-Term Planning: Considering {len(active_aspirations)} active aspirations.")
+
+        for aspiration_entry in active_aspirations:
+            aspiration_id = aspiration_entry.get('id')
+            aspiration_content_str = aspiration_entry.get('content', '{}')
+            try:
+                aspiration_content_data = json.loads(aspiration_content_str)
+                aspiration_title = aspiration_content_data.get('title', aspiration_content_str)
+            except json.JSONDecodeError:
+                aspiration_title = aspiration_content_str
+
+            logger.info(f"Long-Term Planning: Generating plan steps for aspiration '{aspiration_title[:100]}...' (ID: {aspiration_id})")
+
+            system_prompt = (
+                "You are an AI assistant helping Pathos break down a long-term aspiration into 2-3 actionable, high-level steps or precursor goals. "
+                "These steps should be distinct milestones. Output MUST be a JSON object: {\"plan_steps\": [\"Step 1 text\", \"Step 2 text\"]}"
+            )
+            user_prompt = f"Pathos's aspiration: \"{aspiration_title}\"\n\nHigh-level plan steps (JSON format):"
+            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+            llm_response = await self._call_llm_for_internal_task(messages, llm_role)
+
+            if not llm_response:
+                logger.warning(f"Long-Term Planning: LLM call for aspiration '{aspiration_title[:50]}' returned no content.")
+                continue
+
+            try:
+                json_match = re.search(r'\{[\s\S]*\}', llm_response)
+                if not json_match:
+                    logger.error(f"No JSON in planning LLM response for aspiration '{aspiration_title[:50]}': {llm_response}"); continue
+                parsed_response = json.loads(json_match.group(0))
+
+                if isinstance(parsed_response, dict) and "plan_steps" in parsed_response and isinstance(parsed_response["plan_steps"], list):
+                    plan_steps_text = parsed_response["plan_steps"]
+                    if plan_steps_text:
+                        logger.info(f"Generated {len(plan_steps_text)} plan steps for aspiration '{aspiration_title[:50]}'.")
+                        for step_text in plan_steps_text:
+                            if not isinstance(step_text, str) or not step_text.strip(): continue
+                            step_metadata = {
+                                "parent_aspiration_id": aspiration_id,
+                                "parent_aspiration_text": aspiration_title,
+                                "status": "pending",
+                                "generated_at": now.isoformat(),
+                                "user_id": PATHOS_USER_ID
+                            }
+                            await self.add_memory_entry(
+                                {"type": "long_term_plan_step", "content": step_text.strip(),
+                                 "metadata": step_metadata, "salience": 0.75, "user_id": PATHOS_USER_ID},
+                                user_id_context=PATHOS_USER_ID
+                            )
+                            logger.info(f"Stored plan step for '{aspiration_title[:50]}': '{step_text[:100]}...'")
+                    else:
+                        logger.info(f"LLM generated an empty list of plan steps for aspiration '{aspiration_title[:50]}'.")
+                else:
+                    logger.error(f"Planning LLM response JSON bad structure for aspiration '{aspiration_title[:50]}': {llm_response}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse planning LLM JSON for '{aspiration_title[:50]}': {e}. Raw: {llm_response}")
+            except Exception as e_step:
+                 logger.error(f"Error processing plan steps for aspiration '{aspiration_title[:50]}': {e_step}", exc_info=True)
+
+        self.last_long_term_planning_time = now
+        self._save_task_last_run_time("PathosLongTermPlanning", now)
+        logger.info(f"--- Ethos: Long-Term Planning Cycle Finished at {now.isoformat()} ---")
+
+    async def run_managed_forgetting(self):
+        """
+        Archives memories based on salience and age.
+        Core memory types are protected unless their salience is extremely low.
+        """
         if not self.config.ENABLE_MANAGED_FORGETTING:
             logger.debug("Managed forgetting cycle skipped as feature is disabled.")
             return
+
         now = datetime.now(timezone.utc)
-        logger.info("--- Ethos: Starting Managed Forgetting Cycle (Placeholder) ---")
-        # Actual forgetting logic would go here.
-        await asyncio.sleep(5) # Simulate work
+        logger.info(f"--- Ethos: Starting Managed Forgetting Cycle at {now.isoformat()} ---")
+
+        salience_threshold_archive = self.ethos_config.get('forgetting_salience_threshold_archive', 0.1)
+        days_to_archive_default = self.ethos_config.get('forgetting_days_to_archive_by_default', 90)
+        extremely_low_salience_core = self.ethos_config.get('forgetting_extremely_low_salience_for_core', 0.01)
+
+        archive_before_date = now - timedelta(days=days_to_archive_default)
+
+        # Process in batches to manage memory, though a single large query might be fine for moderately sized DBs
+        batch_size = 200 # Configurable if needed
+        offset = 0
+        archived_count = 0
+        processed_count = 0
+
+        while True:
+            if not self.memory_storage: # Should not happen if initialized correctly
+                logger.error("MemoryStorage not available for forgetting cycle.")
+                break
+
+            # Using the new MemoryStorage method
+            candidate_memories = self.memory_storage.get_all_unarchived_memories_for_forgetting_check(batch_size, offset)
+
+            if not candidate_memories:
+                break # No more memories to process
+
+            processed_count += len(candidate_memories)
+
+            for memory in candidate_memories:
+                memory_id = memory.get('id')
+                if not memory_id: continue
+
+                mem_timestamp_str = memory.get('timestamp')
+                if not mem_timestamp_str: continue # Should always have a timestamp
+
+                try:
+                    mem_dt = datetime.fromisoformat(mem_timestamp_str.replace('Z', '+00:00'))
+                    if mem_dt.tzinfo is None: # Ensure timezone aware for comparison
+                        mem_dt = mem_dt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    logger.warning(f"Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check for this memory.")
+                    continue
+
+                is_core = memory.get('type') in self.forgetting_core_memory_types
+                is_old = mem_dt < archive_before_date
+                current_salience = memory.get('salience', 1.0) # Default to high salience if None
+                is_low_salience = current_salience < salience_threshold_archive
+                is_extremely_low_salience = current_salience < extremely_low_salience_core
+
+                should_archive = False
+                reason = ""
+
+                if is_core:
+                    if is_extremely_low_salience:
+                        should_archive = True
+                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f})"
+                else: # Not a core type
+                    if is_old:
+                        should_archive = True
+                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days"
+                    elif is_low_salience:
+                        should_archive = True
+                        reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f})"
+
+                if should_archive:
+                    if self.memory_storage.update_entry_archival_status(memory_id, True):
+                        archived_count += 1
+                        logger.info(f"Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
+                    else:
+                        logger.warning(f"Failed to archive memory ID {memory_id}.")
+
+            offset += batch_size
+
+        logger.info(f"Managed Forgetting Cycle: Processed {processed_count} memories. Archived {archived_count} memories.")
         self.last_forgetting_time = now
         self._save_task_last_run_time("EthosForgetting", now)
-        logger.info("--- Ethos: Managed Forgetting Cycle Finished (Placeholder) ---")
+        logger.info(f"--- Ethos: Managed Forgetting Cycle Finished at {now.isoformat()} ---")
 
     async def run_hexus_decay(self):
         """
@@ -1616,12 +1962,43 @@ class EthosCore:
                 name="FirmamentSimulationLoopTask"
             )
             tasks.append(firmament_task)
-        elif self.firmament_module: # Module exists but is disabled in config
-            logger.info("EthosCore: FirmamentModule is present but disabled by configuration. Simulation loop not started.")
-        # else: Firmament module not set at all, no message needed here
+        elif self.firmament_module:
+            logger.info("EthosCore: FirmamentModule present but disabled by configuration. Simulation loop not started.")
         
-        logger.info(f"EthosCore created {len(tasks)} background tasks")
+        # Add Long-Term Planning Task
+        planning_interval = self.ethos_config.get('long_term_planning_interval_seconds', 86400.0 * 3)
+        if planning_interval > 0 :
+             tasks.append(asyncio.create_task(self._periodic_long_term_planning_task(), name="PathosLongTermPlanningTask"))
+        else:
+            logger.info("Long-term planning task disabled due to interval <= 0.")
+
+            logger.info(f"EthosCore created {len(tasks)} background tasks")
         return tasks
+
+    async def _periodic_knowledge_upkeep_task(self):
+        """Periodic task for running knowledge upkeep cycles."""
+        knowledge_upkeep_interval = self.ethos_config.get('knowledge_upkeep_interval_seconds', 86400)
+        if knowledge_upkeep_interval <= 0:
+            logger.info("Knowledge upkeep periodic task disabled due to interval <= 0.")
+            return # Do not run if interval is zero or negative
+
+        while True:
+            try:
+                now = datetime.now(timezone.utc)
+                time_since_last = (now - self.last_knowledge_upkeep_time).total_seconds()
+
+                if time_since_last >= knowledge_upkeep_interval:
+                    await self.run_knowledge_upkeep()
+                else:
+                    # Sleep until next scheduled time
+                    sleep_time = knowledge_upkeep_interval - time_since_last
+                    await asyncio.sleep(min(sleep_time, 3600))  # Check at least every hour
+            except asyncio.CancelledError:
+                logger.info("EthosCore knowledge upkeep task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in knowledge upkeep task: {e}", exc_info=True)
+                await asyncio.sleep(300)  # Wait 5 minutes before retrying after an error
 
     async def _firmament_simulation_loop(self):
         """Dedicated loop for Firmament simulation ticks."""

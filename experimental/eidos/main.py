@@ -270,19 +270,20 @@ async def lifespan(app_instance: FastAPI):
 
 
             # Launch Subconscious Node Process
-            subconscious_process = await launch_subconscious_node_process()
-            if subconscious_process:
-                logger.info("Lifespan: Subconscious Node process launched.")
-                if await check_subconscious_api_health():
+            # Note: orchestrator functions are synchronous, removed await.
+            subconscious_process_obj = launch_subconscious_node_process()
+            if subconscious_process_obj: # Check if process object was returned
+                logger.info(f"Lifespan: Subconscious Node process launch attempted (PID: {subconscious_process_obj.pid if subconscious_process_obj else 'Unknown'}).")
+                if check_subconscious_api_health():
                     logger.info("Lifespan: Subconscious Node API is healthy.")
-                    if await initialize_subconscious_node_state("AWAKE_THINKING"): # Example state
+                    if initialize_subconscious_node_state(): # AWAKE_THINKING is default
                         logger.info("Lifespan: Subconscious Node state initialized.")
                     else:
                         logger.error("Lifespan: Failed to initialize Subconscious Node state.")
                 else:
                     logger.error("Lifespan: Subconscious Node API health check failed.")
             else:
-                logger.error("Lifespan: Failed to launch Subconscious Node process.")
+                logger.error("Lifespan: Failed to launch Subconscious Node process (launch_subconscious_node_process returned None).")
 
             # Launch Oneiros Processing Task
             if oneiros_module and Config.ENABLE_ONEIROS: # Check if oneiros is enabled
@@ -328,14 +329,11 @@ async def lifespan(app_instance: FastAPI):
         if ethos_core: await ethos_core.close()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()
         # Terminate Subconscious Node Process
-        if 'subconscious_process' in locals() and subconscious_process: # Check if subconscious_process was defined
-            await terminate_subconscious_node_process(subconscious_process)
-            logger.info("Lifespan: Subconscious Node process terminated.")
-        elif SUBCONSCIOUS_NODE_STATE and SUBCONSCIOUS_NODE_STATE.get("process_id"): # Check if process_id is in global state
-             logger.info(f"Lifespan: Attempting to terminate subconscious node process with PID: {SUBCONSCIOUS_NODE_STATE.get('process_id')}")
-             await terminate_subconscious_node_process(SUBCONSCIOUS_NODE_STATE.get("process_id")) # Pass PID directly
-        else:
-            logger.info("Lifespan: Subconscious Node process was not launched or PID not found, skipping termination.")
+        # Note: orchestrator function is synchronous, removed await.
+        # It also manages its own process reference internally.
+        logger.info("Lifespan: Attempting to terminate Subconscious Node process...")
+        terminate_subconscious_node_process()
+        # The function logs success/failure internally.
 
         TEMP_AUDIO_CACHE.clear()
         logger.info("--- Eidos System Shutdown Complete ---")
