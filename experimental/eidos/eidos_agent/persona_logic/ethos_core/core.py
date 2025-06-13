@@ -748,7 +748,13 @@ class EthosCore:
         try:
             min_salience = float(min_salience) # Ensure it's float
             # Fetch more candidates initially for better filtering and sorting
-            similar_results = self.memory_storage.find_similar(query, top_k * 5, allowed_types, 0.3) # threshold 0.3 is example
+            similar_results = self.memory_storage.find_similar(
+                query_text=query,
+                top_k=top_k * 5,
+                allowed_types=allowed_types,
+                threshold=0.3, # This is a fixed threshold; consider if it should be configurable
+                include_archived=False # Explicitly stating default for clarity
+            )
             
             all_candidates = [entry for _, entry in similar_results]
             
@@ -1548,13 +1554,15 @@ class EthosCore:
         seed_memory_types = ['reflection_insight', 'feedback', 'chat_interaction',
                              'firmament_activity_log', 'learned_correction', 'world_knowledge']
 
-        candidate_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+        # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
+        # The default sort of get_memories_for_summary (salience then recency) matches the intent.
+        candidate_memories = await self.memory_storage.get_memories_for_summary(
             user_id=PATHOS_USER_ID,
-            start_time=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
-            end_time=datetime.now(timezone.utc),
+            start_time_utc=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
+            end_time_utc=datetime.now(timezone.utc),
             types=seed_memory_types,
-            limit=num_seed_memories * 3,
-            sort_by_salience_then_recency=True
+            limit=num_seed_memories * 3
+            # include_archived defaults to False
         )
 
         seed_memories = [mem for mem in candidate_memories if mem.get('salience', 0.0) >= min_salience_seed][:num_seed_memories]
@@ -1721,59 +1729,96 @@ class EthosCore:
 
     async def run_managed_forgetting(self):
         """
-        Archives memories based on salience and age.
-        Core memory types are protected unless their salience is extremely low.
+        Manages memory decay and archival.
+        1. Decays salience of unaccessed memories.
+        2. Archives memories based on age and salience thresholds.
+        Core memory types have different archival rules.
         """
         if not self.config.ENABLE_MANAGED_FORGETTING:
-            logger.debug("Managed forgetting cycle skipped as feature is disabled.")
+            logger.debug("Managed forgetting cycle skipped as feature is disabled by Config.ENABLE_MANAGED_FORGETTING.")
             return
 
         now = datetime.now(timezone.utc)
         logger.info(f"--- Ethos: Starting Managed Forgetting Cycle at {now.isoformat()} ---")
 
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run managed forgetting.")
+            self.last_forgetting_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("EthosForgetting", now)
+            return
+
+        # a. Salience Decay Step
+        decay_rate = self.ethos_config.get('forgetting_salience_decay_rate_per_day', 0.01)
+        min_floor = self.ethos_config.get('forgetting_min_salience_for_decay', 0.05)
+        # days_since_accessed_threshold for decay is handled by memory_storage method's default (1 day)
+
+        logger.info(f"Managed Forgetting: Starting salience decay. Rate: {decay_rate}/day, Floor: {min_floor}.")
+        try:
+            decayed_count = await asyncio.to_thread(
+                self.memory_storage.decay_salience_for_unaccessed_memories,
+                decay_rate,
+                min_floor,
+                self.forgetting_core_memory_types # Already parsed in __init__
+            )
+            logger.info(f"Managed Forgetting: Salience decay step completed. {decayed_count} memories had their salience decayed.")
+        except Exception as e_decay:
+            logger.error(f"Managed Forgetting: Error during salience decay step: {e_decay}", exc_info=True)
+            # Decide if we should continue to archival or stop the cycle
+            # For now, let's continue to archival, but log the error.
+
+        # b. Archival Step
+        logger.info("Managed Forgetting: Starting archival step.")
         salience_threshold_archive = self.ethos_config.get('forgetting_salience_threshold_archive', 0.1)
         days_to_archive_default = self.ethos_config.get('forgetting_days_to_archive_by_default', 90)
         extremely_low_salience_core = self.ethos_config.get('forgetting_extremely_low_salience_for_core', 0.01)
 
         archive_before_date = now - timedelta(days=days_to_archive_default)
 
-        # Process in batches to manage memory, though a single large query might be fine for moderately sized DBs
+        archived_count = 0
+        processed_for_archival_count = 0
         batch_size = 200 # Configurable if needed
         offset = 0
-        archived_count = 0
-        processed_count = 0
 
         while True:
-            if not self.memory_storage: # Should not happen if initialized correctly
-                logger.error("MemoryStorage not available for forgetting cycle.")
+            candidate_memories_for_archive: List[MemoryEntry] = []
+            try:
+                candidate_memories_for_archive = await asyncio.to_thread(
+                    self.memory_storage.get_all_unarchived_memories_for_forgetting_check,
+                    batch_size,
+                    offset
+                )
+            except Exception as e_fetch_archive:
+                logger.error(f"Managed Forgetting: Error fetching memories for archival check (offset {offset}): {e_fetch_archive}", exc_info=True)
+                break # Stop if fetching fails
+
+            if not candidate_memories_for_archive:
                 break
 
-            # Using the new MemoryStorage method
-            candidate_memories = self.memory_storage.get_all_unarchived_memories_for_forgetting_check(batch_size, offset)
+            processed_for_archival_count += len(candidate_memories_for_archive)
+            offset += batch_size # Prepare for next batch
 
-            if not candidate_memories:
-                break # No more memories to process
-
-            processed_count += len(candidate_memories)
-
-            for memory in candidate_memories:
+            for memory in candidate_memories_for_archive:
                 memory_id = memory.get('id')
-                if not memory_id: continue
+                if not memory_id:
+                    logger.warning("Managed Forgetting: Found memory without ID during archival check. Skipping.")
+                    continue
 
                 mem_timestamp_str = memory.get('timestamp')
-                if not mem_timestamp_str: continue # Should always have a timestamp
+                if not mem_timestamp_str:
+                    logger.warning(f"Managed Forgetting: Memory {memory_id} missing timestamp. Skipping archival check.")
+                    continue
 
                 try:
                     mem_dt = datetime.fromisoformat(mem_timestamp_str.replace('Z', '+00:00'))
                     if mem_dt.tzinfo is None: # Ensure timezone aware for comparison
                         mem_dt = mem_dt.replace(tzinfo=timezone.utc)
                 except ValueError:
-                    logger.warning(f"Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check for this memory.")
+                    logger.warning(f"Managed Forgetting: Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check.")
                     continue
 
                 is_core = memory.get('type') in self.forgetting_core_memory_types
                 is_old = mem_dt < archive_before_date
-                current_salience = memory.get('salience', 1.0) # Default to high salience if None
+                current_salience = float(memory.get('salience', 1.0) or 1.0) # Default to high salience if None
                 is_low_salience = current_salience < salience_threshold_archive
                 is_extremely_low_salience = current_salience < extremely_low_salience_core
 
@@ -1783,25 +1828,37 @@ class EthosCore:
                 if is_core:
                     if is_extremely_low_salience:
                         should_archive = True
-                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f})"
+                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f} < {extremely_low_salience_core})"
                 else: # Not a core type
-                    if is_old:
+                    if is_old and is_low_salience: # Must be both old AND low salience for non-core
                         should_archive = True
-                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days"
-                    elif is_low_salience:
-                        should_archive = True
-                        reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f})"
+                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days AND low salience ({current_salience:.3f} < {salience_threshold_archive})"
+                    elif is_old and not is_low_salience: # Old but not low salience - don't archive yet based on age alone.
+                        pass # logger.debug(f"Memory {memory_id} is old but salience {current_salience:.3f} is not below threshold {salience_threshold_archive}.")
+                    elif is_low_salience: # Low salience but not necessarily old
+                         should_archive = True
+                         reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f} < {salience_threshold_archive})"
 
                 if should_archive:
-                    if self.memory_storage.update_entry_archival_status(memory_id, True):
+                    update_success = False
+                    try:
+                        update_success = await asyncio.to_thread(
+                            self.memory_storage.update_entry_archival_status,
+                            memory_id,
+                            True
+                        )
+                    except Exception as e_archive_update:
+                         logger.error(f"Managed Forgetting: Error calling update_entry_archival_status for {memory_id}: {e_archive_update}", exc_info=True)
+
+                    if update_success:
                         archived_count += 1
-                        logger.info(f"Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
+                        logger.info(f"Managed Forgetting: Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
                     else:
-                        logger.warning(f"Failed to archive memory ID {memory_id}.")
+                        logger.warning(f"Managed Forgetting: Failed to archive memory ID {memory_id} via MemoryStorage call.")
 
-            offset += batch_size
+        logger.info(f"Managed Forgetting: Archival step. Processed {processed_for_archival_count} memories. Archived {archived_count} memories.")
 
-        logger.info(f"Managed Forgetting Cycle: Processed {processed_count} memories. Archived {archived_count} memories.")
+        # c. Update Timestamps
         self.last_forgetting_time = now
         self._save_task_last_run_time("EthosForgetting", now)
         logger.info(f"--- Ethos: Managed Forgetting Cycle Finished at {now.isoformat()} ---")
@@ -1914,13 +1971,14 @@ class EthosCore:
             # Specific user interactions are part of 'chat_interaction' and will be included if they involve PATHOS_USER_ID (implicitly handled by how they are stored).
             # The MemoryStorage method get_memories_by_time_range_and_types should ideally handle user_id filtering if applicable for each type.
             # For reflection, we are primarily interested in Pathos's own cognitive stream and direct experiences.
-            fetched_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+            # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
+            fetched_memories = await self.memory_storage.get_memories_for_summary(
                 user_id=PATHOS_USER_ID, # Focus on Pathos's own context for self-reflection
-                start_time=start_time_dt,
-                end_time=now_utc,
+                start_time_utc=start_time_dt,
+                end_time_utc=now_utc,
                 types=relevant_memory_types,
-                limit=query_limit,
-                sort_by_salience_then_recency=False # Default sort is timestamp descending
+                limit=query_limit
+                # include_archived defaults to False, which is fine here
             )
             logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for reflection.")
             return fetched_memories
@@ -2286,7 +2344,7 @@ class EthosCore:
             "hexus_snapshot": self.hexus_scores.copy() # Include all current Hexus scores
         }
 
-    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None, magnitude_multiplier: float = 1.0):
         """
         Updates Hexus scores based on various system or feedback events.
         Uses the HEXUS_EVENT_DEFINITIONS mapping.
@@ -2294,15 +2352,15 @@ class EthosCore:
         if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
 
-        logger.debug(f"Processing Hexus event: '{event_name}' with magnitude multiplier: {magnitude_multiplier}")
+        logger.debug(f"Processing Hexus event: '{event_type}' with magnitude multiplier: {magnitude_multiplier}")
 
-        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_name)
+        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_type)
 
         if not event_definition:
-            logger.warning(f"Hexus event '{event_name}' not found in HEXUS_EVENT_DEFINITIONS.")
+            logger.warning(f"Hexus event '{event_type}' not found in HEXUS_EVENT_DEFINITIONS.")
             return
 
-        reason_for_change = f"event: {event_name}"
+        reason_for_change = f"event: {event_type}"
         if payload: # Optionally include payload summary in reason for more detailed logging
             payload_summary = {k: (str(v)[:30] + '...' if isinstance(v, str) and len(v) > 30 else v) for k,v in payload.items()}
             reason_for_change += f" (payload: {payload_summary})"
@@ -2312,7 +2370,7 @@ class EthosCore:
             self._apply_hexus_change(dimension, delta * magnitude_multiplier, reason_for_change)
         
         # Specific handling for feedback event to extract more detailed reason if needed
-        if event_name == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+        if event_type == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
              self._apply_hexus_change('stress', HEXUS_EVENT_DEFINITIONS["USER_FEEDBACK_CORRECTION"].get('stress',0.03) * magnitude_multiplier, f"initial reaction to correction text: {payload.get('text','')[:30]}...")
 
 

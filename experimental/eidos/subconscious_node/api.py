@@ -140,16 +140,32 @@ async def set_node_state(payload: NodeControlStatePayload):
     Sets the operational state of the subconscious node.
     Optionally accepts a daily summary when transitioning to a sleeping state.
     """
-    # Placeholder: Actual state transition logic would go into context_store or a dedicated state manager
+    # Directly update thinker's state variables
     logger.info(f"Received request to change node state to: {payload.node_state}")
-    if payload.daily_summary:
-        logger.info(f"Received daily summary for dreaming: {payload.daily_summary[:100]}...")
-        # Placeholder: Store summary for dream generation
-        context_store.set_daily_summary(payload.daily_summary) # Assuming such a function exists or is added
 
-    # Simulate state change
-    context_store.set_node_state(payload.node_state) # Assuming such a function exists or is added
-    return {"message": f"Node state changed to {payload.node_state}", "context": payload.node_state}
+    # Ensure thinker module is accessible. It's imported at the top level of api.py
+    # so it should be fine, but direct access to module globals like this can sometimes be tricky
+    # if not managed carefully (e.g. if thinker itself reloads its state from somewhere else).
+    # For this structure, thinker.py defines current_node_state as a global.
+    from . import thinker # Ensure thinker module is loaded/referenced correctly.
+
+    thinker.current_node_state = payload.node_state
+    logger.info(f"Node state in thinker module updated to: {thinker.current_node_state}")
+
+    if payload.daily_summary is not None: # Check for None explicitly if it's Optional
+        logger.info(f"Received daily summary for dreaming: {payload.daily_summary[:100]}...")
+        thinker.current_daily_summary_for_dreaming = payload.daily_summary
+        logger.info(f"Daily summary in thinker module updated.")
+    else:
+        # If daily_summary is not provided, and the state is not SLEEPING_DREAMING,
+        # it might be appropriate to clear any existing summary.
+        # However, if state is changing TO SLEEPING_DREAMING and no summary is provided,
+        # thinker.py's dream prompt construction already has a fallback.
+        # For simplicity, only update if provided. If state changes away from dreaming,
+        # thinker loop should ideally handle not using an old summary.
+        pass
+
+    return {"message": f"Node state set to {payload.node_state}", "context": payload.node_state}
 
 @app.post("/control/mood", response_model=MessageResponse, tags=["Node Control"])
 async def sync_external_mood(payload: MoodSyncPayload):

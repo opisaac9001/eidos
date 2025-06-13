@@ -232,8 +232,9 @@ class FirmamentModule:
                  event_name = "ACTIVITY_EFFECT_LEARNING"
 
             if event_name:
-                # Magnitude multiplier could be small for per-tick effects
-                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, magnitude_multiplier=0.1)) # Example: 10% of defined delta per tick
+                # Magnitude multiplier was removed from process_event_for_hexus_update.
+                # If scaling is needed, event definitions in EthosCore should be adjusted.
+                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name))
             else:
                 logger.debug(f"FirmamentModule: No specific continuous Hexus event defined for activity type: {activity_type_lower}")
 
