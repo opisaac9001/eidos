@@ -209,7 +209,34 @@ class FirmamentModule:
         logger.debug("FirmamentModule: Starting simulation tick.")
 
         activity_slot = await self._get_current_activity_slot() # Actual scheduled slot or None
-        mood = await self._get_current_mood() or {"name": "unknown", "valence": 0.0, "arousal": 0.0}
+        mood_dict = await self._get_current_mood() or {} # Ensure mood_dict is a dict
+        # Ensure ethos_core is available for Hexus updates
+        if not self.ethos_core:
+            logger.error("FirmamentModule: EthosCore not available, cannot apply Hexus changes in simulation tick.")
+            return
+
+        # --- Activity-Based Hexus Adjustments (Continuous) ---
+        if activity_slot and activity_slot.activity_type:
+            activity_type_lower = activity_slot.activity_type.lower()
+            event_name: Optional[str] = None
+            if activity_type_lower in ['resting', 'sleeping', 'leisure_passive']:
+                event_name = "ACTIVITY_EFFECT_RESTING"
+            elif activity_type_lower in ['work_deep', 'learning', 'work_focused']:
+                event_name = "ACTIVITY_EFFECT_WORK_DEEP"
+            elif activity_type_lower in ['social', 'leisure_active']:
+                event_name = "ACTIVITY_EFFECT_SOCIAL"
+            elif activity_type_lower in ['chore', 'work_routine']:
+                event_name = "ACTIVITY_EFFECT_WORK_ROUTINE"
+            # Add more mappings as needed, e.g., for 'learning'
+            elif activity_type_lower == 'learning': # Explicitly
+                 event_name = "ACTIVITY_EFFECT_LEARNING"
+
+            if event_name:
+                # Magnitude multiplier could be small for per-tick effects
+                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, magnitude_multiplier=0.1)) # Example: 10% of defined delta per tick
+            else:
+                logger.debug(f"FirmamentModule: No specific continuous Hexus event defined for activity type: {activity_type_lower}")
+
 
         # Pathos's internal thought generation and deviation based on it is REMOVED from here.
         # That functionality is now driven by impulses from the subconscious node via receive_subconscious_intention.
@@ -224,30 +251,46 @@ class FirmamentModule:
         # Since self-generated thoughts are removed, we can simplify this to always check for NPC interactions
         # if Firmament is not currently handling an ongoing Firmament-initiated spontaneous task (which is not a concept here anymore).        # For now, we'll just check if NPC interaction is warranted based on the current context.
         logger.debug("FirmamentModule: Checking for NPC interaction in simulation tick.")
-        if self._is_npc_interaction_warranted(npc_context_slot, None): # None for intention, as this is a general check
+
+        is_npc_warranted = self._is_npc_interaction_warranted(npc_context_slot, None) # None for intention, as this is a general check
+        logger.info(f"FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: {is_npc_warranted}")
+
+        if is_npc_warranted:
             npc_profile_to_use: Optional[NPCProfile] = None
             interaction_source_description = "activity"
+            logger.info("FirmamentModule: NPC interaction is warranted by placeholder logic.")
 
             if npc_context_slot and npc_context_slot.activity_details and isinstance(npc_context_slot.activity_details.metadata, dict): # Check if metadata exists
                 specific_npc_id = npc_context_slot.activity_details.metadata.get('npc_id')
                 specific_npc_name = npc_context_slot.activity_details.metadata.get('npc_name')
                 if specific_npc_id or specific_npc_name:
                     if self.ethos_core: npc_profile_to_use = await self.ethos_core.get_npc_profile(npc_id=specific_npc_id, name=specific_npc_name)
-                    if npc_profile_to_use: interaction_source_description = f"activity with known NPC {npc_profile_to_use.name}"
+                    if npc_profile_to_use:
+                        interaction_source_description = f"activity with known NPC {npc_profile_to_use.name}"
+                        logger.info(f"FirmamentModule: Specific NPC profile '{npc_profile_to_use.name}' found from activity context.")
 
             if not npc_profile_to_use:
+                logger.debug("FirmamentModule: No specific NPC from activity, attempting to determine generic NPC.")
                 npc_profile_to_use = self._determine_generic_npc_profile_for_context(npc_context_slot, None)
-                if npc_profile_to_use: interaction_source_description = f"activity with generic NPC ({npc_profile_to_use.name})"
+                if npc_profile_to_use:
+                    interaction_source_description = f"activity with generic NPC ({npc_profile_to_use.name})"
+                    logger.info(f"FirmamentModule: _determine_generic_npc_profile_for_context (placeholder) returned profile: {npc_profile_to_use.name}")
+                else:
+                    logger.info("FirmamentModule: _determine_generic_npc_profile_for_context (placeholder) returned None.")
+
 
             if npc_profile_to_use:
+                logger.info(f"FirmamentModule: Proceeding with NPC profile: {npc_profile_to_use.name} for simulated dialogue.")
                 initial_dialogue_context = f"Pathos is currently in activity '{npc_context_slot.activity_title}'"
                 if npc_context_slot.activity_details and npc_context_slot.activity_details.location_context:
                     initial_dialogue_context += f" at {npc_context_slot.activity_details.location_context}."
                 else: initial_dialogue_context += "."
+                logger.debug(f"FirmamentModule: Initial dialogue context for simulation: {initial_dialogue_context}")
 
                 dialogue_data = await self._simulate_npc_dialogue(npc_profile_to_use, initial_dialogue_context, mood)
+                logger.info(f"FirmamentModule: _simulate_npc_dialogue (placeholder) returned: {dialogue_data}")
                 if dialogue_data and dialogue_data.get("transcript"):
-                    logger.info(f"FirmamentModule: Simulated NPC dialogue ({interaction_source_description}): {dialogue_data.get('summary')}")
+                    logger.info(f"FirmamentModule: Placeholder _simulate_npc_dialogue returned data with a transcript. Summary: {dialogue_data.get('summary')}")
                     self.last_npc_interaction_time = time.time()
                     # Full storage logic for NPC dialogue...
                     current_time_for_memory = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
@@ -262,15 +305,22 @@ class FirmamentModule:
                         "activity_slot_name_at_time": npc_context_slot.slot_name,
                         "activity_title_at_time": npc_context_slot.activity_title,
                         "location_at_time": npc_context_slot.activity_details.location_context if npc_context_slot.activity_details else "Unknown",
-                        "mood_name_at_time": mood.get("name"), "mood_valence_at_time": mood.get("valence"),
-                        "mood_arousal_at_time": mood.get("arousal"), "timestamp": current_time_for_memory.isoformat()
+                        "mood_name_at_time": mood_dict.get("name"), "mood_valence_at_time": mood_dict.get("valence"),
+                        "mood_arousal_at_time": mood_dict.get("arousal"), "timestamp": current_time_for_memory.isoformat()
                     }
                     entry_data = {"type": "npc_dialogue_event", "content": dialogue_data["summary"] or "A brief NPC interaction occurred.", "metadata": event_metadata, "salience": random.uniform(0.4, 0.65)}
-                    if self.ethos_core: await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
+                    if self.ethos_core:
+                        await self.ethos_core.add_memory_entry(entry_data=entry_data, user_id_context=PATHOS_USER_ID)
+                        # Placeholder for Hexus changes based on NPC dialogue outcome
+                        logger.info("FirmamentModule: NPC Dialogue occurred. Placeholder for Hexus updates using event system.")
+                        # Example (actual logic would parse dialogue_data and choose an event):
+                        # npc_interaction_event = "NPC_INTERACTION_POSITIVE" # or "NPC_INTERACTION_NEGATIVE", "NPC_LEARNED_INFO"
+                        # npc_payload = {"npc_id": npc_profile_to_use.npc_id, "summary": dialogue_data.get("summary")}
+                        # asyncio.create_task(self.ethos_core.process_event_for_hexus_update(npc_interaction_event, payload=npc_payload))
             else:
-                logger.debug("FirmamentModule: No specific or generic NPC profile identified for interaction in this tick.")
+                logger.info("FirmamentModule: No NPC profile determined (specific or generic). Skipping NPC dialogue simulation.")
         else:
-            logger.debug("FirmamentModule: NPC interaction not warranted in this tick.")
+            logger.info("FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder).")
 
         # Add other environmental simulations here if necessary.
 
@@ -374,7 +424,7 @@ class FirmamentModule:
         if not current_mood: # Fallback if not in metadata
             current_mood = await self._get_current_mood()
         if not current_mood: # Fallback if Ethos fails
-            current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0, "impulsiveness": 0.5}
+            current_mood = {"name": "neutral", "valence": 0.0, "arousal": 0.0, "impulsiveness": 0.5, "hexus_snapshot": {}}
 
 
         # --- NPC Dialogue (if warranted by intention and context) ---
@@ -438,12 +488,33 @@ class FirmamentModule:
                 await self._store_activity_log(
                     simulated_action_snippet,
                     slot_to_log_against,
-                    current_mood, # Mood at time of intention
+                    current_mood, # Mood at time of intention (this now includes hexus_snapshot)
                     original_intention_memory_id,
                     extra_metadata={"source_subconscious_intention_text": intention[:200]} # Add part of intention for context
                 )
+
+                # Hexus updates based on simulated action from intention
+                if self.ethos_core:
+                    intention_lower = intention.lower()
+                    event_name: Optional[str] = None
+                    payload = {"intention_text": intention[:100]} # Basic payload
+
+                    if "curious" in intention_lower or "wonder" in intention_lower or "learn" in intention_lower:
+                        event_name = "INTENTION_ACTION_CURIOSITY"
+                    elif "connect" in intention_lower or "talk to" in intention_lower or "social" in intention_lower:
+                        event_name = "INTENTION_ACTION_SOCIAL"
+                    elif "work on" in intention_lower or "focus on" in intention_lower or "task" in intention_lower or "project" in intention_lower:
+                        event_name = "INTENTION_ACTION_TASK"
+                    else:
+                        event_name = "INTENTION_ACTION_GENERAL_SUCCESS" # Default to general success if specific type not matched
+
+                    if event_name:
+                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=payload))
+
             else:
                 logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
+                if self.ethos_core:
+                    asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_FAILURE", payload={"intention_text": intention[:100]}))
 
         except Exception as e:
             logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)

@@ -56,6 +56,8 @@ from eidos_agent.persona_logic.chronos_engine import (
 )
 # Updated import for chat_storage_router
 from eidos_agent.api.routers.chat_storage_router import router as chat_storage_router
+from eidos_agent.features.firmament.module import FirmamentModule # Firmament import
+from eidos_agent.features.firmament.handler import set_firmament_module_instance # Firmament handler import
 # Removed chat_storage init import, it's done in lifespan
 from eidos_agent.api.routers.pathos_hooks_router import router as pathos_hooks_router # Renamed to avoid conflict
 from eidos_agent.api.routers.tts_router import router as tts_api_router
@@ -79,6 +81,13 @@ from eidos_agent.api.routers.websocket_router import init_websocket_router # Imp
 
 from eidos_agent.features.oneiros.tasks import oneiros_processing_task
 from eidos_agent.system_tasks.subconscious_context_scheduler import SCHEDULER_STATE, init_scheduler as init_subconscious_scheduler
+from eidos_agent.core.subconscious_orchestrator import (
+    launch_subconscious_node_process,
+    initialize_subconscious_node_state,
+    check_subconscious_api_health,
+    terminate_subconscious_node_process,
+    SUBCONSCIOUS_NODE_STATE
+)
 
 # --- Global Variables ---
 ethos_core: Optional[EthosCore] = None
@@ -126,9 +135,10 @@ async def warm_vllm_cache(pathos_if: PathosInterface, static_system_prompt: str)
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
-    global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance
+    global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance, SUBCONSCIOUS_NODE_STATE # Added firmament_module
     # ha_service: Optional[HomeAssistantService] = None # Removed
     owm_service: Optional[OpenWeatherMapService] = None
+    firmament_module: Optional[FirmamentModule] = None # Initialize firmament_module variable
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
         logger.info("Lifespan: Starting core component initialization...")
@@ -230,27 +240,66 @@ async def lifespan(app_instance: FastAPI):
             logger.error("ConnectionManager (manager) is None, WebSocket router not initialized.")
 
         if ethos_core:
-            background_tasks = await ethos_core.get_background_tasks()
-            # Initialize subconscious_context_scheduler after ethos_core is ready
-            init_subconscious_scheduler(ethos_core) # Assuming this function exists and is imported
-            logger.info("Lifespan: Subconscious context scheduler initialized with EthosCore.")
+            # Initialize Firmament Module (after EthosCore, ChronosEngine, OneirosModule)
+            if Config.FIRMAMENT.get("enable_firmament") and chronos_engine_instance and oneiros_module:
+                try:
+                    firmament_module = FirmamentModule(Config, ethos_core, chronos_engine_instance, oneiros_module)
+                    await firmament_module.start() # Call start method
+                    set_firmament_module_instance(firmament_module) # Link to handler
+                    ethos_core.set_firmament_module(firmament_module) # Link to EthosCore for background task
+                    logger.info("Lifespan: FirmamentModule initialized, started, and linked.")
+                except Exception as e_firmament:
+                    logger.error(f"Lifespan: Failed to initialize or start FirmamentModule: {e_firmament}", exc_info=True)
+                    firmament_module = None # Ensure it's None if init fails
+            elif Config.FIRMAMENT.get("enable_firmament"):
+                logger.warning("Lifespan: FirmamentModule enabled in config, but dependencies (ChronosEngine or OneirosModule) are missing. Firmament will not be initialized.")
 
+
+            background_tasks = await ethos_core.get_background_tasks() # EthosCore now potentially adds Firmament task
+            # Initialize subconscious_context_scheduler after ethos_core is ready
+            try:
+                current_loop = asyncio.get_running_loop()
+                init_subconscious_scheduler(ethos_core, current_loop) # Pass the running event loop
+                logger.info("Lifespan: Subconscious context scheduler initialized with EthosCore and event loop.")
+            except RuntimeError as e_loop: # pragma: no cover
+                logger.error(f"Lifespan: Could not get running event loop for subconscious scheduler: {e_loop}", exc_info=True)
+                # Decide if this is critical enough to stop startup
+                # For now, we'll log an error and continue, scheduler might not work.
+            except Exception as e_sched_init: # pragma: no cover
+                logger.error(f"Lifespan: Failed to initialize subconscious_context_scheduler: {e_sched_init}", exc_info=True)
+
+
+            # Launch Subconscious Node Process
+            # Note: orchestrator functions are synchronous, removed await.
+            subconscious_process_obj = launch_subconscious_node_process()
+            if subconscious_process_obj: # Check if process object was returned
+                logger.info(f"Lifespan: Subconscious Node process launch attempted (PID: {subconscious_process_obj.pid if subconscious_process_obj else 'Unknown'}).")
+                if check_subconscious_api_health():
+                    logger.info("Lifespan: Subconscious Node API is healthy.")
+                    if initialize_subconscious_node_state(): # AWAKE_THINKING is default
+                        logger.info("Lifespan: Subconscious Node state initialized.")
+                    else:
+                        logger.error("Lifespan: Failed to initialize Subconscious Node state.")
+                else:
+                    logger.error("Lifespan: Subconscious Node API health check failed.")
+            else:
+                logger.error("Lifespan: Failed to launch Subconscious Node process (launch_subconscious_node_process returned None).")
 
             # Launch Oneiros Processing Task
             if oneiros_module and Config.ENABLE_ONEIROS: # Check if oneiros is enabled
                 try:
-                    # Get interval from config, provide a default if not found
-                    oneiros_processing_interval = Config.ONEIROS.get('dream_processing_interval_seconds', 30 * 60) # Default 30 mins
-                    if not isinstance(oneiros_processing_interval, (int, float)) or oneiros_processing_interval <= 0: # Validate interval
-                        logger.warning(f"Lifespan: Invalid Oneiros dream_processing_interval_seconds ({oneiros_processing_interval}). Using default 1800s.")
-                        oneiros_processing_interval = 1800
+                    # Get interval from the renamed config key
+                    oneiros_check_interval = Config.ONEIROS.get('oneiros_check_interval_seconds', 300) # Default 5 mins (300s)
+                    if not isinstance(oneiros_check_interval, (int, float)) or oneiros_check_interval <= 0: # Validate interval
+                        logger.warning(f"Lifespan: Invalid Oneiros oneiros_check_interval_seconds ({oneiros_check_interval}). Using default 300s.")
+                        oneiros_check_interval = 300
 
-                    logger.info(f"Lifespan: Launching Oneiros processing task with interval {oneiros_processing_interval}s.")
+                    logger.info(f"Lifespan: Launching Oneiros processing task with check interval {oneiros_check_interval}s.")
                     oneiros_proc_task = asyncio.create_task(
-                        oneiros_processing_task(
+                        oneiros_processing_task( # This task is defined in eidos_agent.features.oneiros.tasks
                             oneiros_module=oneiros_module,
-                            subconscious_scheduler_state=SCHEDULER_STATE,
-                            processing_interval_seconds=int(oneiros_processing_interval)
+                            subconscious_scheduler_state=SCHEDULER_STATE, # For checking if Pathos is sleeping
+                            processing_interval_seconds=int(oneiros_check_interval) # This param name is used by the task
                         )
                     )
                     background_tasks.append(oneiros_proc_task) # Add to existing list for shutdown handling
@@ -275,9 +324,17 @@ async def lifespan(app_instance: FastAPI):
         if logos_core: await logos_core.close()
         # if ha_service: await ha_service.disconnect() # Removed
         if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
+        if firmament_module: await firmament_module.close() # Close FirmamentModule
         if oneiros_module: await oneiros_module.close()
         if ethos_core: await ethos_core.close()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()
+        # Terminate Subconscious Node Process
+        # Note: orchestrator function is synchronous, removed await.
+        # It also manages its own process reference internally.
+        logger.info("Lifespan: Attempting to terminate Subconscious Node process...")
+        terminate_subconscious_node_process()
+        # The function logs success/failure internally.
+
         TEMP_AUDIO_CACHE.clear()
         logger.info("--- Eidos System Shutdown Complete ---")
     except Exception as e_lifespan_main:

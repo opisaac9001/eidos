@@ -217,10 +217,16 @@ class PromptBuilder:
         if document_text: memory_query_parts.append("[Document content attached]")
         retrieved_memories_raw: List[MemoryEntry] = []
         if self.ethos_core:
+            min_salience_for_retrieval = float(self.config.ETHOS.get('retrieval_min_salience_for_pathos_context', 0.1))
+            # Ensure ETHOS config key exists or add it to Config.ETHOS if this is a new key.
+            # For now, assuming it might exist or 0.1 is a safe default.
+
             retrieved_memories_raw = await self.ethos_core.retrieve_relevant_memories(
-                " ".join(memory_query_parts),
-                top_k=Config.get_nested_value(self.config.ETHOS, ['retrieval_limit_for_pathos_context'], 3), # self.config
+                query=" ".join(memory_query_parts),
+                top_k=Config.get_nested_value(self.config.ETHOS, ['retrieval_limit_for_pathos_context'], 3),
+                min_salience=min_salience_for_retrieval,
                 user_id_context=user_id
+                # allowed_types can be added here if needed, e.g., allowed_types=['interaction', 'document_chunk']
             )
 
         # New logic for formatting memories, potentially using summaries:

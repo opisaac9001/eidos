@@ -2,9 +2,12 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
+# Actual import for the subconscious client function
+from eidos_agent.features.subconscious_interface_to_node.subconscious.client import get_subconscious_thoughts_from_node
+
 # Placeholder for actual imports - these would come from other Eidos modules
 # from eidos_agent.dialog.flow_handler import is_thought_query
-# from eidos_agent.features.subconscious_interface_to_node.subconscious.client import get_current_thoughts
+
 
 # --- Start of Dummy Implementations (replace with actual imports) ---
 def is_thought_query(msg: str) -> bool:
@@ -18,41 +21,7 @@ def is_thought_query(msg: str) -> bool:
            "what's on your mind" in msg.lower() or \
            "tell me your thoughts" in msg.lower()
 
-def get_current_thoughts() -> Optional[Dict[str, Any]]:
-    """
-    Placeholder: Simulates fetching current thoughts data from the Subconscious Node.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("Placeholder get_current_thoughts called.")
-    # Simulate different responses for testing
-    # This is a simplified version of the placeholder in context_enricher.py
-    if not hasattr(get_current_thoughts, 'call_count'):
-        get_current_thoughts.call_count = 0 # type: ignore
-
-    get_current_thoughts.call_count += 1 # type: ignore
-
-    if get_current_thoughts.call_count % 4 == 1: # type: ignore
-        return {
-            "recent_thoughts": ["The sky is blue today.", "Contemplating the nature of tasks.", "Feeling a bit digital."],
-            "mood": {"name": "Contemplative", "intensity": 0.7},
-            "summary": "Pathos is in a contemplative mood, thinking about various topics."
-        }
-    elif get_current_thoughts.call_count % 4 == 2: # type: ignore
-        return {
-            "recent_thoughts": [], # No specific thoughts, but summary is there
-            "mood": {"name": "Quiet", "intensity": 0.4},
-            "summary": "Pathos is quiet at the moment."
-        }
-    elif get_current_thoughts.call_count % 4 == 3: # type: ignore
-        # Simulate a case where mood or summary might be missing, but thoughts are there
-         return {
-            "recent_thoughts": ["Just processed a complex query.", "The user seems curious."],
-            "mood": None, # Mood missing
-            "summary": "Actively processing."
-        }
-    else:
-        return None # Represents an error or no data from the subconscious node
-# --- End of Dummy Implementations ---
+# --- End of Dummy Implementations (Placeholder get_current_thoughts removed) ---
 
 
 logger = logging.getLogger(__name__)
@@ -94,8 +63,8 @@ class SubconsciousFeedIntegrator:
 
         logger.debug(f"Fetching fresh subconscious feed. Force refresh: {force_refresh}")
         try:
-            # This would be the actual call to the subconscious node client
-            fresh_feed = get_current_thoughts()
+            # Actual call to the subconscious node client
+            fresh_feed = get_subconscious_thoughts_from_node()
             self._cached_feed = fresh_feed
             self._last_fetch_time = now
             if fresh_feed:
@@ -260,19 +229,34 @@ if __name__ == '__main__':
     else: # if get_current_thoughts() returned None for call_count = 3
         assert "Pathos is quiet right now and no thoughts could be retrieved." in formatted_prompt_thoughts4
 
-    # Test 7: Subconscious node returns None (simulating error or no data)
-    # Manually ensure next call to dummy get_current_thoughts returns None (call_count = 4)
-    if hasattr(get_current_thoughts, 'call_count'):
-        get_current_thoughts.call_count = 3 # So next call is 4
-    print(f"\nTest 7: Simulating subconscious node returning None...")
-    integrator.get_current_subconscious_feed(force_refresh=True) # This will be call_count = 4, should return None    snapshot_error = integrator.get_subconscious_snapshot_for_ethos()
-    print(f"Snapshot (after node error): {snapshot_error}")
-    assert snapshot_error["status"] == "unavailable"
-    assert "Subconscious feed currently unavailable." in snapshot_error["summary"]
+    # Test 7: Subconscious node returns default error object (handled by client)
+    # To properly test this now, we'd need to mock get_subconscious_thoughts_from_node
+    # or ensure the subconscious node is actually unreachable or returns an error.
+    # For this test, we'll assume the client's default error response is activated
+    # if the node is down. The client now returns a default dict, not None.
+    print(f"\nTest 7: Simulating subconscious node error (client returns default dict)...")
+    # We can't easily force the client to fail here without mocking,
+    # so we'll trust its error handling provides a default.
+    # If we wanted to test the integrator's handling of the client's error output:
+    original_client_func = get_subconscious_thoughts_from_node # Save it
+    def mock_client_error():
+        return { # Simulate client's default error response
+            "recent_thoughts": ["The subconscious node is quiet or initializing."],
+            "mood": {},
+            "summary": "No summary available from subconscious node."
+        }
+    globals()['get_subconscious_thoughts_from_node'] = mock_client_error
+
+    integrator.get_current_subconscious_feed(force_refresh=True)
+    snapshot_error = integrator.get_subconscious_snapshot_for_ethos()
+    print(f"Snapshot (after simulated node error): {snapshot_error}")
+    # The client returns a default dict, so status might be "available" but with default content
+    assert snapshot_error["summary"] == "No summary available from subconscious node."
 
     prompt_error_case = integrator.get_formatted_thoughts_for_prompt(user_msg1)
-    print(f"Formatted for prompt (after node error):\n{prompt_error_case}")
-    assert "Pathos is quiet right now and no thoughts could be retrieved." in prompt_error_case
+    print(f"Formatted for prompt (after simulated node error):\n{prompt_error_case}")
+    assert "Pathos reports: \"No summary available from subconscious node.\"" in prompt_error_case
 
+    globals()['get_subconscious_thoughts_from_node'] = original_client_func # Restore
 
     logger.info("--- SubconsciousFeedIntegrator tests finished ---")
