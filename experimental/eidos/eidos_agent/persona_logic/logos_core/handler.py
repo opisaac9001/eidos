@@ -259,44 +259,146 @@ class LogosCore:
             return report
         except Exception as e: logger.error(f"Error in deep research synthesis: {e}", exc_info=True); return json.dumps({"error": f"Synthesis error: {e}"})
 
-    async def execute_get_news_headlines(self) -> str: # From broken
+    async def execute_get_news(self, query: Optional[str] = None, category: Optional[str] = None, max_articles_to_process: int = 3) -> List[Dict[str, Any]]:
         if not self.news_config or not self.news_config.get('enabled') or not self.news_config.get('api_key'):
-            logger.warning("News API not configured or enabled for execute_get_news_headlines.") # Added logger
-            return json.dumps({"error": "News service unavailable."})
-        try:
-            headlines = await self._fetch_news_headlines_with_details(self.news_config)
-            if headlines:
-                parts = ["Top News Headlines:"]
-                for item in headlines:
-                    title = item.get('title', 'N/A')
-                    snippet_content = item.get('snippet', '')
-                    # Create snippet_text separately
-                    snippet_text = f" (Snippet: {snippet_content[:50]}...)" if snippet_content else ""
-                    parts.append(f"- {title}{snippet_text}")
-                
-                logger.info(f"Successfully fetched and formatted {len(headlines)} news headlines.") # Added logger
-                return "\n".join(parts)
+            logger.warning("News API not configured or enabled for execute_get_news.")
+            return []
+
+        temp_news_config_dict = self.news_config.copy()
+        if query:
+            temp_news_config_dict['search_keywords'] = query
+            temp_news_config_dict.pop('categories', None)
+        elif category:
+            temp_news_config_dict['categories'] = category
+            temp_news_config_dict.pop('search_keywords', None)
+
+        fetched_articles: List[Dict[str, str]] = await self._fetch_news_headlines_with_details(temp_news_config_dict) # type: ignore
+
+        if not fetched_articles:
+            logger.info("No news articles found by _fetch_news_headlines_with_details.")
+            return []
+
+        processed_articles: List[Dict[str, Any]] = []
+
+        # Determine how many articles to fully process with LLM
+        # Use the smaller of max_articles_to_process or the actual number of fetched articles
+        num_to_fully_process = min(len(fetched_articles), max_articles_to_process)
+        articles_to_process_fully = fetched_articles[:num_to_fully_process]
+
+        for article_data in articles_to_process_fully:
+            title = article_data.get("title", "N/A")
+            content_for_summary = article_data.get("content_for_summary", "")
+            original_description = article_data.get("original_description", "")
+            source_name = article_data.get("source_name", "Unknown Source")
+            url = article_data.get("url", "#")
+            published_at = article_data.get("published_at", "")
+
+            summary = original_description
+            if content_for_summary.strip() and self.logos_techne_config:
+                try:
+                    summarize_prompt = f"Summarize the following news article content in 1-2 concise sentences: {content_for_summary}"
+                    llm_summary = await self._call_logos_llm(
+                        llm_config=self.logos_techne_config,
+                        prompt_text=summarize_prompt
+                    )
+                    if llm_summary and not llm_summary.startswith("["):
+                        summary = llm_summary
+                    else:
+                        logger.warning(f"Summarization failed for article '{title}'. Using original. LLM output: {llm_summary}")
+                except Exception as e_summ:
+                    logger.error(f"Error during summarization for article '{title}': {e_summ}", exc_info=True)
             
-            logger.info("No news headlines found by _fetch_news_headlines_with_details.") # Added logger
-            return json.dumps({"status": "success", "message": "No recent news headlines found."})
-        except Exception as e:
-            logger.error(f"Error getting news headlines: {e}", exc_info=True)
-            return json.dumps({"error": f"Error fetching news: {str(e)}"})
-    async def _fetch_news_headlines_with_details(self, news_api_config: NewsApiConfig) -> List[Dict[str, str]]: # From broken
+            text_for_sentiment = summary if summary != original_description and summary.strip() else content_for_summary
+            classified_sentiment = "neutral_interesting"
+
+            if text_for_sentiment.strip() and self.logos_techne_config:
+                try:
+                    sentiment_prompt = f"Classify the sentiment of the following news text as 'positive', 'negative', 'neutral_interesting', or 'concerning'. Respond with only one of these four labels. News: {text_for_sentiment}"
+                    llm_sentiment_label = await self._call_logos_llm(
+                        llm_config=self.logos_techne_config,
+                        prompt_text=sentiment_prompt
+                    )
+                    if llm_sentiment_label:
+                        cleaned_label = llm_sentiment_label.lower().strip().replace("'", "").replace('"',"").splitlines()[0] # Take first line
+                        valid_sentiments = ['positive', 'negative', 'neutral_interesting', 'concerning']
+                        if cleaned_label in valid_sentiments:
+                            classified_sentiment = cleaned_label
+                        else:
+                            logger.warning(f"Sentiment classification for article '{title}' returned invalid label: '{llm_sentiment_label}'. Defaulting.")
+                    else:
+                        logger.warning(f"Sentiment classification for article '{title}' returned no label. Defaulting.")
+                except Exception as e_sent:
+                    logger.error(f"Error during sentiment classification for article '{title}': {e_sent}", exc_info=True)
+
+            processed_articles.append({
+                "title": title,
+                "summary": summary,
+                "source_name": source_name,
+                "url": url,
+                "published_at": published_at,
+                "classified_sentiment": classified_sentiment,
+                "original_description": original_description
+            })
+
+        # Add remaining fetched articles (beyond max_articles_to_process) with minimal processing
+        # This ensures the tool can still return more articles if the initial fetch limit (from config) was higher.
+        if len(fetched_articles) > num_to_fully_process:
+            for article_data in fetched_articles[num_to_fully_process:]:
+                 processed_articles.append({
+                    "title": article_data.get("title", "N/A"),
+                    "summary": article_data.get("original_description", ""),
+                    "source_name": article_data.get("source_name", "Unknown Source"),
+                    "url": article_data.get("url", "#"),
+                    "published_at": article_data.get("published_at", ""),
+                    "classified_sentiment": "neutral_interesting", # Default for non-processed
+                    "original_description": article_data.get("original_description", "")
+                })
+
+        logger.info(f"LogosCore execute_get_news: Fully processed {len(articles_to_process_fully)} articles, added {len(processed_articles) - len(articles_to_process_fully)} more with basic info.")
+        return processed_articles
+
+    async def _fetch_news_headlines_with_details(self, news_api_config: NewsApiConfig) -> List[Dict[str, str]]:
         if not news_api_config or not news_api_config.get('enabled') or not news_api_config.get('api_key'): return []
-        params: Dict[str, Any] = {"api_token": news_api_config['api_key'], "locale": news_api_config.get('default_locale', 'us'), "language": news_api_config.get('default_language', 'en'), "limit": news_api_config.get('limit', 5), "snippet_len": 150}
+
+        params: Dict[str, Any] = {
+            "api_token": news_api_config['api_key'],
+            "locale": news_api_config.get('default_locale', 'us'),
+            "language": news_api_config.get('default_language', 'en'),
+            "limit": news_api_config.get('limit', 5),
+            "snippet_len": 250  # Increased snippet length
+        }
         endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/top"
-        if kw := news_api_config.get('search_keywords'): params['search'] = kw; endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all"
-        elif cat := news_api_config.get('categories'): params['categories'] = cat
-        if src_ids := news_api_config.get('include_source_ids'): params['source_ids'] = src_ids; endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all"
-        if excl_doms := news_api_config.get('exclude_source_ids'): params['exclude_domains'] = excl_doms
+
+        # Handle query vs category for endpoint and params
+        if query_keywords := news_api_config.get('search_keywords'): # Use 'search_keywords' from the passed config
+            params['search'] = query_keywords
+            endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all"
+        elif category_val := news_api_config.get('categories'): # Use 'categories' from the passed config
+            params['categories'] = category_val
+            # Keep endpoint as /v1/news/top for categories unless specifically overridden
+
+        if src_ids := news_api_config.get('include_source_ids'):
+            params['source_ids'] = src_ids
+            endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all" # Search all if source_ids specified
+        if excl_doms := news_api_config.get('exclude_source_ids'):
+            params['exclude_domains'] = excl_doms
+
         articles: List[Dict[str, str]] = []
         try:
             resp = await self.http_client.get(endpoint, params=params, timeout=float(news_api_config.get('timeout', 15)))
             resp.raise_for_status(); data = resp.json()
-            for article in data.get("data", []):
-                if isinstance(article, dict) and (title := article.get("title", "").strip()) and (url := article.get("url", "#").strip()):
-                    articles.append({"title": title, "url": url, "snippet": (article.get("snippet", article.get("description", ""))).strip()})
+            for article_data in data.get("data", []): # Renamed to article_data for clarity
+                if isinstance(article_data, dict) and (title := article_data.get("title", "").strip()) and (url := article_data.get("url", "#").strip()):
+                    articles.append({
+                        "title": title,
+                        "url": url,
+                        # Prefer description for original_description, fallback to snippet
+                        "original_description": (article_data.get("description") or article_data.get("snippet", "")).strip(),
+                        # Prefer snippet for summarization base (often longer), fallback to description
+                        "content_for_summary": (article_data.get("snippet") or article_data.get("description", "")).strip(),
+                        "published_at": article_data.get("published_at", ""),
+                        "source_name": article_data.get("source", "unknown_source") # Use 'source' field from API as source_name
+                    })
             return articles
         except Exception as e: logger.error(f"Error fetching news from TheNewsAPI: {e}", exc_info=True); return []
 
@@ -331,15 +433,65 @@ class LogosCore:
         await self.ethos_core.add_memory_entry({"type": "daily_briefing", "content": briefing, "metadata": {"generation_timestamp_utc": now_utc.isoformat(), "briefing_date": today_date, "briefing_format_version": "panel_v1", "generated_for_user_context": user_id_context or "system"}}, user_id_context="system_briefing")
         return briefing
 
-    async def get_or_generate_daily_briefing(self, user_id_context: Optional[str] = None) -> Dict[str, Any]: # From broken
-        if not self.ethos_core: return {"success": False, "message": "EthosCore not accessible."}
+    async def get_or_generate_daily_briefing(self, user_id_context: Optional[str] = None) -> Dict[str, Any]:
+        if not self.ethos_core: return {"success": False, "message": "EthosCore not accessible.", "classified_sentiment": "neutral"}
+
+        briefing_content_str: Optional[str] = None
+        source_message: str = "Unknown"
+
         try:
-            if existing := await self.ethos_core.get_todays_briefing(): return {"success": True, "briefing_content": existing, "message": "Briefing retrieved."}
-        except Exception as e: logger.error(f"Error checking existing briefing: {e}", exc_info=True)
-        try:
-            if new_briefing := await self.generate_daily_briefing(user_id_context=user_id_context): return {"success": True, "briefing_content": new_briefing, "message": "Briefing generated."}
-            return {"success": False, "message": "Failed to generate briefing."}
-        except Exception as e: logger.error(f"Error generating new briefing: {e}", exc_info=True); return {"success": False, "message": f"Error: {e}"}
+            # get_todays_briefing from EthosCore returns the content string of the briefing memory
+            existing_briefing_content = await self.ethos_core.get_todays_briefing() # This is already just the content
+            if existing_briefing_content:
+                briefing_content_str = existing_briefing_content
+                source_message = "Briefing retrieved from memory."
+                logger.info(f"LogosCore: Retrieved existing daily briefing for user_id_context '{user_id_context}'.")
+        except Exception as e:
+            logger.error(f"LogosCore: Error checking for existing briefing: {e}", exc_info=True)
+            # Proceed to generate a new one if fetching fails
+
+        if briefing_content_str is None:
+            try:
+                logger.info(f"LogosCore: No existing briefing found or error fetching. Generating new briefing for user_id_context '{user_id_context}'.")
+                briefing_content_str = await self.generate_daily_briefing(user_id_context=user_id_context)
+                if briefing_content_str:
+                    source_message = "Briefing newly generated."
+                    logger.info(f"LogosCore: Successfully generated new daily briefing for user_id_context '{user_id_context}'.")
+                else:
+                    logger.error(f"LogosCore: Failed to generate new briefing for user_id_context '{user_id_context}'.")
+                    return {"success": False, "message": "Failed to generate new briefing.", "classified_sentiment": "neutral"}
+            except Exception as e:
+                logger.error(f"LogosCore: Error generating new briefing: {e}", exc_info=True)
+                return {"success": False, "message": f"Error generating new briefing: {e}", "classified_sentiment": "neutral"}
+
+        # At this point, briefing_content_str should hold the briefing text
+        classified_sentiment = "neutral" # Default
+        if briefing_content_str and self.logos_techne_config:
+            try:
+                sentiment_prompt = f"Classify the overall sentiment of the following daily briefing text as 'positive', 'negative', or 'neutral'. Respond with only one of these three labels. Briefing: {briefing_content_str[:1500]}" # Limit length for safety
+                llm_sentiment_label = await self._call_logos_llm(
+                    llm_config=self.logos_techne_config,
+                    prompt_text=sentiment_prompt
+                )
+                if llm_sentiment_label:
+                    cleaned_label = llm_sentiment_label.lower().strip().replace("'", "").replace('"',"").splitlines()[0]
+                    valid_sentiments = ['positive', 'negative', 'neutral']
+                    if cleaned_label in valid_sentiments:
+                        classified_sentiment = cleaned_label
+                        logger.info(f"LogosCore: Classified briefing sentiment as '{classified_sentiment}'.")
+                    else:
+                        logger.warning(f"LogosCore: Briefing sentiment classification returned invalid label: '{llm_sentiment_label}'. Defaulting to neutral.")
+                else:
+                    logger.warning("LogosCore: Briefing sentiment classification returned no label. Defaulting to neutral.")
+            except Exception as e_sent:
+                logger.error(f"LogosCore: Error during briefing sentiment classification: {e_sent}", exc_info=True)
+
+        return {
+            "success": True,
+            "briefing_content": briefing_content_str,
+            "message": source_message,
+            "classified_sentiment": classified_sentiment
+        }
 
     async def _call_logos_llm(self, llm_config: LLMConfig, prompt_text: Optional[str] = None, llm_messages_for_synthesis: Optional[List[Dict[str,Any]]] = None) -> str: # From broken
         if not llm_config or not llm_config.get('url'): raise ValueError("LLM config (URL) missing for LogosCore.")

@@ -158,8 +158,120 @@ HEXUS_EVENT_DEFINITIONS = {
     # General Engagement
     "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
     # Reflection Cycle
-    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02} # Positive effect of reflection
+    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02}, # Positive effect of reflection
+    # News Consumption Events
+    "NEWS_CONSUMED_POSITIVE": {"joy": 0.05, "contentment": 0.03, "curiosity": 0.02, "user_engagement_proactivity": 0.01},
+    "NEWS_CONSUMED_NEGATIVE": {"stress": 0.1, "melancholy": 0.05, "resentment": 0.02, "general_caution": 0.03},
+    "NEWS_CONSUMED_NEUTRAL_INTERESTING": {"curiosity": 0.05, "focus": 0.01},
+    "NEWS_CONSUMED_CONCERNING": {"stress": 0.05, "general_caution": 0.05, "melancholy": 0.02},
+    # Daily Briefing Overall Sentiment (Objective, direct trigger from LogosCore)
+    "BRIEFING_OVERALL_POSITIVE": {"contentment": 0.03, "focus": 0.02, "joy": 0.02},
+    "BRIEFING_OVERALL_NEGATIVE": {"stress": 0.05, "melancholy": 0.03, "general_caution": 0.02},
+    "BRIEFING_OVERALL_NEUTRAL": {"focus": 0.01}
+    #
+    # Subjective News Reaction Events (these are now handled by HEXUS_SUBJECTIVE_REACTION_DEFINITIONS)
+    # "NEWS_REACTION_PERSONALLY_POSITIVE": {"joy": 0.1, "contentment": 0.05, "ambition": 0.02},
+    # "NEWS_REACTION_PERSONALLY_NEGATIVE": {"stress": 0.15, "resentment": 0.05, "joy": -0.05, "melancholy": 0.05},
+    # "NEWS_REACTION_VALIDATING": {"contentment": 0.1, "focus": 0.05, "stress": -0.03},
+    # "NEWS_REACTION_CONCERNING_PERSONAL": {"stress": 0.1, "general_caution": 0.1, "focus": -0.05},
+    # "NEWS_REACTION_CONTRADICTORY": {"stress": 0.05, "curiosity": 0.05, "focus": -0.03},
+    # "NEWS_REACTION_MOTIVATING": {"ambition": 0.1, "focus": 0.05, "joy": 0.03, "tiredness": -0.02},
+    # "NEWS_REACTION_IRRELEVANT": {},
+    # "NEWS_REACTION_INTERESTING_DEEPER": {"curiosity": 0.15, "focus": 0.05, "user_engagement_proactivity": 0.03},
+    # "NEWS_REACTION_ANGER_FRUSTRATION": {"stress": 0.1, "resentment": 0.1, "impulsiveness": 0.05},
+    # "NEWS_REACTION_SADDNESS_EMPATHY": {"melancholy": 0.1, "loneliness": 0.05, "craving_connection": 0.03},
+    # "NEWS_REACTION_HOPEFUL_OPTIMISTIC": {"joy": 0.1, "ambition": 0.05, "contentment": 0.05}
 }
+
+# New dictionary for generalized subjective reactions
+HEXUS_SUBJECTIVE_REACTION_DEFINITIONS: Dict[str, Dict[str, float]] = {
+    "REACTION_ACCOMPLISHED": {"contentment": 0.15, "joy": 0.1, "stress": -0.05, "ambition": 0.05},
+    "REACTION_FRUSTRATED_SETBACK": {"stress": 0.15, "resentment": 0.1, "joy": -0.05, "ambition": -0.05, "focus": -0.05},
+    "REACTION_ENGAGED_LEARNING": {"curiosity": 0.1, "focus": 0.1, "joy": 0.03, "ambition": 0.02},
+    "REACTION_VALIDATED_CONFIRMED": {"contentment": 0.1, "focus": 0.05, "stress": -0.03, "joy": 0.05},
+    "REACTION_STRESSED_CONCERNED": {"stress": 0.1, "general_caution": 0.1, "melancholy": 0.03, "focus": -0.05},
+    "REACTION_CALM_RECHARGED": {"stress": -0.1, "comfort": 0.15, "contentment": 0.05, "tiredness": -0.1},
+    "REACTION_SOCIALLY_CONNECTED": {"joy": 0.15, "loneliness": -0.15, "craving_connection": -0.1, "contentment": 0.05},
+    "REACTION_SOCIALLY_DISCONNECTED": {"loneliness": 0.15, "craving_connection": 0.1, "joy": -0.05, "melancholy": 0.05},
+    "REACTION_BORED_UNSTIMULATED": {"curiosity": -0.1, "focus": -0.1, "tiredness": 0.05, "impulsiveness": 0.05},
+    "REACTION_AMUSED_ENTERTAINED": {"joy": 0.1, "stress": -0.05, "contentment": 0.03},
+    "REACTION_FEELING_SAFE_SECURE": {"comfort": 0.15, "stress": -0.1, "general_caution": -0.05},
+    "REACTION_FEELING_HOPEFUL_OPTIMISTIC": {"joy": 0.15, "ambition": 0.1, "contentment": 0.05, "stress": -0.05},
+    "REACTION_FEELING_SAD_EMPATHETIC": {"melancholy": 0.1, "loneliness": 0.05, "craving_connection": 0.03, "joy": -0.03},
+    "REACTION_FEELING_ANGER_IRRITATION": {"stress": 0.1, "resentment": 0.15, "impulsiveness": 0.05, "joy": -0.05},
+    "REACTION_CURIOSITY_PIQUED": {"curiosity": 0.15, "focus": 0.05, "user_engagement_proactivity": 0.03}, # Same as NEWS_REACTION_INTERESTING_DEEPER
+    "REACTION_MOTIVATED_DRIVEN": {"ambition": 0.15, "focus": 0.1, "joy": 0.05, "tiredness": -0.05}, # Stronger than NEWS_REACTION_MOTIVATING
+    "REACTION_INDIFFERENT_UNEFFECTED": {} # No Hexus change
+}
+
+
+HEXUS_ACTIVITY_MODIFIERS: Dict[str, Dict[str, Dict[str, float]]] = {
+    "resting": {
+        "stress": {"baseline_shift": -0.1, "rate_multiplier": 1.5},
+        "tiredness": {"baseline_shift": -0.2, "rate_multiplier": 2.0},
+        "comfort": {"baseline_shift": 0.1},
+        "focus": {"rate_multiplier": 1.2}
+    },
+    "sleeping": { # Similar to resting, potentially stronger effects
+        "stress": {"baseline_shift": -0.15, "rate_multiplier": 1.8},
+        "tiredness": {"baseline_shift": -0.3, "rate_multiplier": 2.5},
+        "comfort": {"baseline_shift": 0.15},
+        "focus": {"rate_multiplier": 1.5},
+        "curiosity": {"rate_multiplier": 1.3}
+    },
+    "work_deep": { # Assuming "work_deep" or "work_focused" can be used as activity_type
+        "focus": {"baseline_shift": 0.15, "rate_multiplier": 0.7},
+        "tiredness": {"baseline_shift": 0.05, "rate_multiplier": 0.9}, # Less decay towards a slightly higher baseline (work is tiring)
+        "ambition": {"rate_multiplier": 0.9},
+        "stress": {"baseline_shift": 0.05, "rate_multiplier": 0.9}
+    },
+    "work_focused": { # Alias for work_deep if used
+        "focus": {"baseline_shift": 0.15, "rate_multiplier": 0.7},
+        "tiredness": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "ambition": {"rate_multiplier": 0.9},
+        "stress": {"baseline_shift": 0.05, "rate_multiplier": 0.9}
+    },
+    "social": { # Could also be "leisure_active" if that's the primary type for social
+        "joy": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "loneliness": {"baseline_shift": -0.2, "rate_multiplier": 1.5},
+        "craving_connection": {"baseline_shift": -0.2, "rate_multiplier": 1.5},
+        "stress": {"baseline_shift": -0.05, "rate_multiplier": 1.1} # Good social interaction reduces stress
+    },
+    "leisure_active": { # If this is used for social or active hobbies
+        "joy": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "loneliness": {"baseline_shift": -0.1, "rate_multiplier": 1.2}, # May vary depending on solo/group
+        "tiredness": {"rate_multiplier": 0.9}, # Active leisure can still be tiring but decay slower
+        "stress": {"baseline_shift": -0.1, "rate_multiplier": 1.3}
+    },
+    "work_routine": { # Could also cover "chore" type activities
+        "tiredness": {"baseline_shift": 0.02, "rate_multiplier": 1.0},
+        "contentment": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "focus": {"rate_multiplier": 1.1} # Routine might make focus decay slightly faster
+    },
+    "chore": {
+        "tiredness": {"baseline_shift": 0.03, "rate_multiplier": 1.0},
+        "contentment": {"baseline_shift": 0.03, "rate_multiplier": 0.95},
+        "stress": {"baseline_shift": 0.01} # Chores can be slightly stressful
+    },
+    "learning": {
+        "curiosity": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "focus": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "tiredness": {"baseline_shift": 0.03, "rate_multiplier": 0.95}
+    },
+    "leisure_passive": { # e.g., reading, watching TV
+        "stress": {"baseline_shift": -0.05, "rate_multiplier": 1.2},
+        "comfort": {"baseline_shift": 0.1},
+        "tiredness": {"rate_multiplier": 1.1}, # Can still get tired, focus might wane
+        "focus": {"rate_multiplier": 1.15}
+    },
+    "reflective": { # For activities like journaling, planning, or self-reflection
+        "focus": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "contentment": {"baseline_shift": 0.05},
+        "stress": {"baseline_shift": -0.02, "rate_multiplier": 1.1} # Can sometimes be slightly stressful
+    }
+    # Add other activity types as defined in chronos_engine/models.py ActivityType as needed
+}
+
 
 class EthosCore:
     def __init__(self, config: Config):
@@ -974,14 +1086,46 @@ class EthosCore:
 
     async def get_todays_briefing_context_for_prompt(self, user_id: str) -> str:
         try:
-            if not self.logos_core: return "Briefing service unavailable (LogosCore missing)."
-            briefing_data = await self.logos_core.get_or_generate_daily_briefing(user_id_context=user_id) 
+            if not self.logos_core:
+                logger.warning("EthosCore: LogosCore not available for get_todays_briefing_context_for_prompt.")
+                return "Briefing service unavailable (LogosCore missing)."
+
+            briefing_data = await self.logos_core.get_or_generate_daily_briefing(user_id_context=user_id)
+
+            briefing_content_for_prompt = "No briefing available for Pathos today."
             if briefing_data and briefing_data.get('success') and briefing_data.get('briefing_content'):
-                content = str(briefing_data['briefing_content'])
+                content_str = str(briefing_data['briefing_content'])
                 max_len = self.ethos_config.get('briefing_context_max_length_for_prompt', 1500)
-                return f"Today's Briefing Highlights (Pathos's context, shared with user '{user_id}'):\n{content[:max_len] + '...' if len(content) > max_len else content}"
-            return "No briefing available for Pathos today."
-        except Exception as e: logger.error(f"Error getting briefing context for prompt: {e}", exc_info=True); return "Briefing information temporarily unavailable (error)"    
+                briefing_content_for_prompt = f"Today's Briefing Highlights (Pathos's context, shared with user '{user_id}'):\n{content_str[:max_len] + '...' if len(content_str) > max_len else content_str}"
+
+                # Trigger Hexus update based on classified sentiment
+                classified_sentiment = briefing_data.get('classified_sentiment')
+                if classified_sentiment:
+                    event_name: Optional[str] = None
+                    if classified_sentiment == 'positive':
+                        event_name = "BRIEFING_OVERALL_POSITIVE"
+                    elif classified_sentiment == 'negative':
+                        event_name = "BRIEFING_OVERALL_NEGATIVE"
+                    elif classified_sentiment == 'neutral':
+                        event_name = "BRIEFING_OVERALL_NEUTRAL"
+
+                    if event_name:
+                        logger.debug(f"EthosCore: Triggering Hexus event '{event_name}' based on briefing sentiment '{classified_sentiment}'.")
+                        # Run as a task to not block the prompt context retrieval
+                        asyncio.create_task(self.process_event_for_hexus_update(
+                            event_name,
+                            payload={"briefing_source": briefing_data.get("source", "unknown")}
+                        ))
+                    else:
+                        logger.warning(f"EthosCore: Unknown classified sentiment for briefing: {classified_sentiment}")
+                else:
+                    logger.debug("EthosCore: No classified sentiment found in briefing_data to trigger Hexus update.")
+
+            return briefing_content_for_prompt
+
+        except Exception as e:
+            logger.error(f"Error getting briefing context for prompt: {e}", exc_info=True)
+            return "Briefing information temporarily unavailable (error)"
     
     async def get_pathos_aspirations_context_for_prompt(self) -> str:
         try:
@@ -1878,52 +2022,73 @@ class EthosCore:
 
         logger.info(f"--- Ethos: Running Hexus Decay Cycle (Time elapsed: {time_elapsed_seconds:.2f}s) ---")
 
+        # --- Determine Current Activity ---
+        current_activity_type: Optional[str] = None
+        if self.chronos_engine:
+            try:
+                pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
+                current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
+                if current_activity_slot and current_activity_slot.activity_type:
+                    current_activity_type = current_activity_slot.activity_type.lower() # Store as lower for easier matching
+                    logger.debug(f"Hexus decay: Current activity type for Pathos: {current_activity_type}")
+                else:
+                    logger.debug("Hexus decay: No specific current activity found for Pathos or activity_type is None.")
+            except Exception as e:
+                logger.warning(f"Hexus decay: Could not get current activity for awareness: {e}", exc_info=True)
+        else:
+            logger.warning("Hexus decay: ChronosEngine not available. Decay will not be activity-aware.")
+
         # The 'hexus_decay_rate_per_cycle' from config is now superseded by per-dimension hourly rates
         # and actual time elapsed.
         # We retain hexus_decay_interval_seconds from config as the *intended* call frequency for the task.
 
-        # Activity-aware decay - Placeholder for future enhancement (remains placeholder)
-        # current_activity_type = None
-        # if self.chronos_engine:
-        #     try:
-        #         # This would ideally be an async call if ChronosEngine methods are async,
-        #         # but run_hexus_decay is currently synchronous.
-        #         # pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
-        #         # current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
-        #         # if current_activity_slot:
-        #         # current_activity_type = current_activity_slot.activity_type
-        #         logger.debug("EthosCore Hexus Decay: Activity-aware adjustments (placeholder).")
-        #     except Exception as e:
-        #         logger.warning(f"EthosCore Hexus Decay: Could not get current activity for awareness: {e}")
-        # else:
-        #     logger.debug("EthosCore Hexus Decay: ChronosEngine not available for activity-aware decay.")
-
+        # Activity-aware decay - Placeholder for future enhancement.
+        # The fetched current_activity_type can be used here to adjust baselines or decay rates.
 
         changed_scores = False
         for key, current_value in list(self.hexus_scores.items()): # Iterate over a copy if modifying
-            baseline = HEXUS_BASELINES.get(key)
+            standard_baseline = HEXUS_BASELINES.get(key)
+            standard_rate_per_hour = HEXUS_DECAY_RATES.get(key)
 
-            if baseline is None:
-                logger.warning(f"Hexus decay: No baseline defined for '{key}'. Skipping decay for this score.")
+            if standard_baseline is None:
+                logger.warning(f"Hexus decay: No standard baseline defined for '{key}'. Skipping decay for this score.")
+                continue
+            if standard_rate_per_hour is None:
+                logger.warning(f"Hexus decay: No standard hourly decay rate defined for '{key}'. Skipping decay for this score.")
                 continue
 
-            dimension_decay_rate_per_hour = HEXUS_DECAY_RATES.get(key)
-            if dimension_decay_rate_per_hour is None:
-                logger.warning(f"Hexus decay: No hourly decay rate defined for '{key}'. Skipping decay for this score.")
-                continue
+            effective_baseline = standard_baseline
+            effective_rate_per_hour = standard_rate_per_hour
 
-            # Activity-aware adjustments would modify baseline or dimension_decay_rate_per_hour here
-            # For example:
-            # effective_baseline = baseline
-            # effective_rate_per_hour = dimension_decay_rate_per_hour
-            # if current_activity_type == 'resting':
-            #     if key == 'tiredness': effective_rate_per_hour *= 2.0 # Tiredness decays faster when resting
-            #     if key == 'stress': effective_rate_per_hour *= 1.5
+            modifier_applied_log_msg = ""
 
-            decay_amount_for_cycle = (current_value - baseline) * dimension_decay_rate_per_hour * (time_elapsed_seconds / 3600.0)
+            if current_activity_type and current_activity_type in HEXUS_ACTIVITY_MODIFIERS:
+                activity_mods = HEXUS_ACTIVITY_MODIFIERS[current_activity_type]
+                if key in activity_mods:
+                    dimension_mods = activity_mods[key]
+
+                    if "baseline_shift" in dimension_mods:
+                        shift = dimension_mods["baseline_shift"]
+                        effective_baseline += shift
+                        # Clamp effective_baseline, assuming Hexus baselines are also within 0-1
+                        effective_baseline = max(0.0, min(1.0, effective_baseline))
+                        modifier_applied_log_msg += f" baseline_shift: {shift:+.2f} -> {effective_baseline:.2f};"
+
+                    if "rate_multiplier" in dimension_mods:
+                        multiplier = dimension_mods["rate_multiplier"]
+                        effective_rate_per_hour *= multiplier
+                        # Ensure rate doesn't become negative, though multipliers usually positive
+                        effective_rate_per_hour = max(0.0, effective_rate_per_hour)
+                        modifier_applied_log_msg += f" rate_multiplier: {multiplier:.2f} -> {effective_rate_per_hour:.3f};"
+
+            if modifier_applied_log_msg:
+                logger.debug(f"Hexus decay for '{key}' (Activity: {current_activity_type}): Modifiers applied ->{modifier_applied_log_msg}")
+
+            # Use effective_baseline and effective_rate_per_hour in decay calculation
+            decay_amount_for_cycle = (current_value - effective_baseline) * effective_rate_per_hour * (time_elapsed_seconds / 3600.0)
             new_value = current_value - decay_amount_for_cycle
 
-            # Clamping (assuming all Hexus scores are 0.0 to 1.0)
+            # Clamping Hexus scores (assuming all Hexus scores are 0.0 to 1.0)
             clamped_new_value = max(0.0, min(1.0, new_value))
 
             if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
@@ -2354,10 +2519,20 @@ class EthosCore:
 
         logger.debug(f"Processing Hexus event: '{event_type}' with magnitude multiplier: {magnitude_multiplier}")
 
-        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_type)
+        event_definition = None
+        # Prioritize subjective reaction definitions
+        if event_type in HEXUS_SUBJECTIVE_REACTION_DEFINITIONS:
+            event_definition = HEXUS_SUBJECTIVE_REACTION_DEFINITIONS[event_type]
+            logger.debug(f"Found Hexus event '{event_type}' in HEXUS_SUBJECTIVE_REACTION_DEFINITIONS.")
+        elif event_type in HEXUS_EVENT_DEFINITIONS: # Fallback to direct event definitions
+            event_definition = HEXUS_EVENT_DEFINITIONS[event_type]
+            logger.debug(f"Found Hexus event '{event_type}' in HEXUS_EVENT_DEFINITIONS.")
 
-        if not event_definition:
-            logger.warning(f"Hexus event '{event_type}' not found in HEXUS_EVENT_DEFINITIONS.")
+        if not event_definition: # If event_definition is an empty dict (like for REACTION_INDIFFERENT_UNEFFECTED), it's valid.
+            if event_definition is None: # Only warn if not found in either and not intentionally empty
+                 logger.warning(f"Hexus event '{event_type}' not found in subjective or direct definitions.")
+            else: # It was an empty dict, meaning no Hexus change intended
+                 logger.debug(f"Hexus event '{event_type}' is defined as no-op (empty definition). No Hexus scores changed.")
             return
 
         reason_for_change = f"event: {event_type}"
