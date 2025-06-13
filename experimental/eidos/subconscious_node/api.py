@@ -61,8 +61,32 @@ class MessageResponse(BaseModel):
     context: str | None = None
     data: Dict | None = None
 
+class DreamFragmentInject(BaseModel):
+    content: str
+
 
 # --- API Endpoints ---
+
+@app.post("/inject/dream_fragment", response_model=MessageResponse, tags=["Context Injection"])
+async def inject_dream_fragment(data: DreamFragmentInject):
+    """
+    Injects a dream fragment from Eidos (Oneiros) into the subconscious node's dream buffer.
+    """
+    # Access global dream_buffer and max_dream_buffer_fragments from thinker module
+    # This requires thinker's globals to be accessible here.
+    # Ensure thinker is imported or its state is managed in a shared way if this becomes complex.
+    from . import thinker
+
+    thinker.dream_buffer.append(data.content)
+    logger.info(f"Received dream fragment: '{data.content[:100]}...'. Dream buffer size: {len(thinker.dream_buffer)}")
+
+    if len(thinker.dream_buffer) > thinker.max_dream_buffer_fragments:
+        num_to_remove = len(thinker.dream_buffer) - thinker.max_dream_buffer_fragments
+        del thinker.dream_buffer[:num_to_remove]
+        logger.info(f"Trimmed {num_to_remove} oldest dream fragments. Dream buffer size now: {len(thinker.dream_buffer)}")
+
+    return {"message": "Dream fragment injected successfully."}
+
 
 @app.post("/inject/conversation", response_model=MessageResponse, tags=["Context Injection"])
 async def inject_conversation(data: ContextInject):

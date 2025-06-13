@@ -28,7 +28,8 @@ current_node_state = NODE_STATE_IDLE # Start in IDLE, loop started by API call
 
 # --- Global Variables & Thread Management ---
 monologue_buffer: list[str] = []
-dream_buffer: list[str] = [] # Buffer for storing dream fragments
+dream_buffer: list[str] = [] # Buffer for storing dream fragments from Oneiros
+max_dream_buffer_fragments: int = 10 # Default, will be overridden by config
 current_daily_summary_for_dreaming: str | None = None # Populated by Eidos control command
 CONFIG_FILE_PATH = "subconscious_node/config.json"
 loaded_wildcards: Dict[str, List[str]] = {} # Ensure type hint matches load_wildcards return
@@ -42,12 +43,14 @@ DEFAULT_SYSTEM_PROMPT = "You are Pathos, an inner voice..."
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_SLEEP_DURATION = 30
 DEFAULT_MAX_THOUGHTS = 100
+DEFAULT_MAX_DREAM_FRAGMENTS = 10 # Default for new config
 DEFAULT_WILDCARD_PATH = "../wildcards/"
 
 fixed_system_prompt = DEFAULT_SYSTEM_PROMPT
 temperature = DEFAULT_TEMPERATURE
 sleep_duration_seconds = DEFAULT_SLEEP_DURATION
 max_monologue_buffer_thoughts = DEFAULT_MAX_THOUGHTS
+# max_dream_buffer_fragments is initialized above and loaded from config below
 wildcard_folder_path = DEFAULT_WILDCARD_PATH
 
 try:
@@ -65,6 +68,9 @@ try:
         monologue_loop_settings = config_data.get("monologue_loop_settings", {})
         sleep_duration_seconds = int(monologue_loop_settings.get("sleep_duration_seconds", DEFAULT_SLEEP_DURATION))
         max_monologue_buffer_thoughts = int(monologue_loop_settings.get("max_monologue_buffer_thoughts", DEFAULT_MAX_THOUGHTS))
+        # Load max_dream_buffer_fragments
+        max_dream_buffer_fragments = int(monologue_loop_settings.get("max_dream_buffer_fragments", DEFAULT_MAX_DREAM_FRAGMENTS))
+
 
         wildcard_folder_path = config_data.get("wildcard_folder_path", DEFAULT_WILDCARD_PATH)
         logger.info(f"Configuration loaded successfully from {config_path_abs}")
@@ -166,8 +172,7 @@ def monologue_loop():
     logger.info("Pathos Subconscious Node: Monologue Loop starting...")
     logger.info(f"Initial Node State: {current_node_state}")
     logger.info(f"Settings: Temp={temperature}, Sleep={sleep_duration_seconds}s, MaxThoughts={max_monologue_buffer_thoughts}")
-    # Max dream fragments can be configured separately if needed, using max_monologue_buffer_thoughts for now.
-    max_dream_buffer_fragments = max_monologue_buffer_thoughts
+    # max_dream_buffer_fragments is now loaded from config
 
     while not stop_monologue_event.is_set():
         if current_node_state == NODE_STATE_AWAKE_THINKING:
@@ -198,32 +203,44 @@ def monologue_loop():
             if stop_monologue_event.is_set(): break
             logger.info(f"Node state: {current_node_state}. Constructing dream prompt.")
             mood.drift_mood() # Mood can also drift during sleep, perhaps more erratically
+            dream_fragment = None
 
-            summary_for_prompt = current_daily_summary_for_dreaming
-            if summary_for_prompt is None:
-                logger.warning("Daily summary for dreaming is None. Using a fallback message for dream prompt.")
-                summary_for_prompt = "The day's events are a blur, like faded photographs."
+            if dream_buffer: # Check if Oneiros has supplied any dreams
+                dream_fragment = dream_buffer.pop(0) # Get the oldest Oneiros dream
+                logger.info(f"Pathos (from Oneiros dream_buffer) dreams: \"{dream_fragment}\"")
+                # No need to append to dream_buffer here as it's already from there.
+                # Also, no need to call LLM.
+            else:
+                logger.info("Oneiros dream_buffer is empty. Generating fallback dream internally.")
+                summary_for_prompt = current_daily_summary_for_dreaming
+                if summary_for_prompt is None:
+                    logger.warning("Daily summary for dreaming is None. Using a fallback message for dream prompt.")
+                    summary_for_prompt = "The day's events are a blur, like faded photographs."
 
-            dream_prompt = construct_dream_prompt(summary_for_prompt, loaded_wildcards)
-            logger.debug(f"Constructed Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
+                dream_prompt = construct_dream_prompt(summary_for_prompt, loaded_wildcards)
+                logger.debug(f"Constructed Fallback Dream Prompt (first 300 chars):\n{dream_prompt[:300]}\n--------------------")
 
-            # Use a slightly higher temperature for dreaming, capped at a reasonable value (e.g., 1.0 or 1.1)
-            dream_temperature = min(temperature + 0.15, 1.1)
-            logger.debug(f"Using temperature {dream_temperature} for dream generation.")
+                dream_temperature = min(temperature + 0.15, 1.1)
+                logger.debug(f"Using temperature {dream_temperature} for fallback dream generation.")
 
-            dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
+                dream_fragment = utils.run_llm(dream_prompt, dream_temperature)
 
+                if dream_fragment:
+                    logger.info(f"Pathos (fallback internal generation) dreams: \"{dream_fragment}\"")
+                    # Note: We are not adding internally generated dreams to the dream_buffer,
+                    # as dream_buffer is for Oneiros-provided dreams.
+                    # If thinker's own dreams should also be potentially re-accessible or detected,
+                    # they could be added to monologue_buffer or a different buffer.
+                    # For now, they are just logged.
+                else:
+                    logger.warning("LLM returned empty dream fragment for fallback.")
+
+            # Common logic for any dream generated (Oneiros or fallback)
             if dream_fragment:
-                logger.info(f"Pathos dreams: \"{dream_fragment}\"")
-                dream_buffer.append(dream_fragment)
-                if len(dream_buffer) > max_dream_buffer_fragments:
-                    logger.debug(f"Dream buffer full ({len(dream_buffer)} fragments). Trimming oldest.")
-                    num_to_remove_dreams = len(dream_buffer) - max_dream_buffer_fragments
-                    del dream_buffer[:num_to_remove_dreams]
                 # Optionally, pass to a specialized detector for dream content later
                 # detectors.check_for_dream_imprint(dream_fragment, mood.get_current_mood())
-            else:
-                logger.warning("LLM returned empty dream fragment.")
+                pass
+
 
             # Dreams might occur more rapidly or with different pacing than thoughts
             dream_mode_sleep_duration = int(sleep_duration_seconds / 1.5) if sleep_duration_seconds > 3 else 2

@@ -287,18 +287,18 @@ async def lifespan(app_instance: FastAPI):
             # Launch Oneiros Processing Task
             if oneiros_module and Config.ENABLE_ONEIROS: # Check if oneiros is enabled
                 try:
-                    # Get interval from config, provide a default if not found
-                    oneiros_processing_interval = Config.ONEIROS.get('dream_processing_interval_seconds', 30 * 60) # Default 30 mins
-                    if not isinstance(oneiros_processing_interval, (int, float)) or oneiros_processing_interval <= 0: # Validate interval
-                        logger.warning(f"Lifespan: Invalid Oneiros dream_processing_interval_seconds ({oneiros_processing_interval}). Using default 1800s.")
-                        oneiros_processing_interval = 1800
+                    # Get interval from the renamed config key
+                    oneiros_check_interval = Config.ONEIROS.get('oneiros_check_interval_seconds', 300) # Default 5 mins (300s)
+                    if not isinstance(oneiros_check_interval, (int, float)) or oneiros_check_interval <= 0: # Validate interval
+                        logger.warning(f"Lifespan: Invalid Oneiros oneiros_check_interval_seconds ({oneiros_check_interval}). Using default 300s.")
+                        oneiros_check_interval = 300
 
-                    logger.info(f"Lifespan: Launching Oneiros processing task with interval {oneiros_processing_interval}s.")
+                    logger.info(f"Lifespan: Launching Oneiros processing task with check interval {oneiros_check_interval}s.")
                     oneiros_proc_task = asyncio.create_task(
-                        oneiros_processing_task(
+                        oneiros_processing_task( # This task is defined in eidos_agent.features.oneiros.tasks
                             oneiros_module=oneiros_module,
-                            subconscious_scheduler_state=SCHEDULER_STATE,
-                            processing_interval_seconds=int(oneiros_processing_interval)
+                            subconscious_scheduler_state=SCHEDULER_STATE, # For checking if Pathos is sleeping
+                            processing_interval_seconds=int(oneiros_check_interval) # This param name is used by the task
                         )
                     )
                     background_tasks.append(oneiros_proc_task) # Add to existing list for shutdown handling

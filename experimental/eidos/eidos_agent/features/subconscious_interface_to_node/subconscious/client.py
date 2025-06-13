@@ -201,6 +201,36 @@ def sync_mood_to_subconscious(mood_snapshot: Dict[str, float]) -> bool:
         logger.error(f"An unexpected error occurred during mood sync: {e}")
         return False
 
+def push_dream_fragment_to_node(dream_content: str) -> bool:
+    """
+    Pushes a single dream fragment (string) to the subconscious node.
+    """
+    url = f"{SUBCONSCIOUS_NODE_BASE_URL}/inject/dream_fragment"
+    payload = {"content": dream_content}
+
+    logger.debug(f"Pushing dream fragment to subconscious node: '{dream_content[:100]}...' at {url}")
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()  # Raises HTTPError for bad responses (4XX or 5XX)
+        try:
+            response_data = response.json()
+            logger.info(f"Dream fragment push successful. Response: {response_data.get('message', 'No message field.')}")
+        except json.JSONDecodeError:
+            logger.info(f"Dream fragment push successful (status {response.status_code}), but no valid JSON response body.")
+        return True
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout pushing dream fragment to subconscious node at {url}.")
+        return False
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error pushing dream fragment to subconscious node at {url}.")
+        return False
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error {e.response.status_code} pushing dream fragment to subconscious node at {url}: {e.response.text[:200]}")
+        return False
+    except Exception as e:
+        logger.error(f"An unexpected error occurred pushing dream fragment: {e}", exc_info=True)
+        return False
+
 # --- Example Usage (for testing) ---
 if __name__ == '__main__':
     # Ensure the subconscious_node API server is running on http://localhost:8000
@@ -277,6 +307,20 @@ if __name__ == '__main__':
     #     logger.info("Correctly handled non-existent server for sync_recent_context.")
     # else:
     #     logger.error("sync_recent_context reported success with non-existent server.")
+
+    logger.info("\nAttempting to push a dream fragment...")
+    dream_push_success = push_dream_fragment_to_node("A fleeting image of a clock without hands.")
+    if dream_push_success:
+        logger.info("Dream fragment pushed successfully (test).")
+    else:
+        logger.warning("Dream fragment push failed (test).")
+
+    dream_push_success_2 = push_dream_fragment_to_node("The scent of old books and distant rain.")
+    if dream_push_success_2:
+        logger.info("Second dream fragment pushed successfully (test).")
+    else:
+        logger.warning("Second dream fragment push failed (test).")
+
 
     # To use httpx for async operations, you would do something like:
     # import httpx

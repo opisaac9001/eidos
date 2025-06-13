@@ -134,6 +134,11 @@ class OneirosConfig(TypedDict, total=False):
     dream_llm_presence_penalty: Optional[float]
     dream_llm_frequency_penalty: Optional[float]
     dream_llm_max_tokens: Optional[int]
+    oneiros_sleep_start_hour_local: int
+    oneiros_sleep_end_hour_local: int
+    oneiros_dream_frequency_min_minutes: int
+    oneiros_dream_frequency_max_minutes: int
+    oneiros_check_interval_seconds: int # Renamed from dream_interval_seconds
 
 class AisthesisConfig(TypedDict, total=False):
     mqtt_broker_url: Optional[str]
@@ -394,6 +399,11 @@ class Config:
         "dream_llm_presence_penalty": float(os.getenv("ONEIROS_DREAM_LLM_PRESENCE_PENALTY")) if os.getenv("ONEIROS_DREAM_LLM_PRESENCE_PENALTY") else None,
         "dream_llm_frequency_penalty": float(os.getenv("ONEIROS_DREAM_LLM_FREQUENCY_PENALTY")) if os.getenv("ONEIROS_DREAM_LLM_FREQUENCY_PENALTY") else None,
         "dream_llm_max_tokens": int(os.getenv("ONEIROS_DREAM_LLM_MAX_TOKENS")) if os.getenv("ONEIROS_DREAM_LLM_MAX_TOKENS") else None,
+        "oneiros_sleep_start_hour_local": int(os.getenv("ONEIROS_SLEEP_START_HOUR_LOCAL", "23")),
+        "oneiros_sleep_end_hour_local": int(os.getenv("ONEIROS_SLEEP_END_HOUR_LOCAL", "7")),
+        "oneiros_dream_frequency_min_minutes": int(os.getenv("ONEIROS_DREAM_FREQUENCY_MIN_MINUTES", "60")),
+        "oneiros_dream_frequency_max_minutes": int(os.getenv("ONEIROS_DREAM_FREQUENCY_MAX_MINUTES", "180")),
+        "oneiros_check_interval_seconds": int(os.getenv("ONEIROS_CHECK_INTERVAL_SECONDS", "300")), # Renamed and new default
     }
     IMAGE_OUTPUT_DIR = Path(ONEIROS["image_output_dir"])
 
