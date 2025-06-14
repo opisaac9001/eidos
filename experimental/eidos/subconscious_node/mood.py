@@ -41,6 +41,66 @@ def get_current_mood() -> dict:
   """
   return current_mood.copy() # Return a copy to prevent direct modification
 
+def get_brief_mood_description() -> str:
+  """
+  Provides a brief textual description of the current mood based on various dimensions.
+  """
+  # Use .get(key, 0.0) to safely access mood dimensions, defaulting to neutral if key is missing.
+  mood_name = current_mood.get("name")
+  if mood_name and isinstance(mood_name, str) and mood_name.strip():
+    return mood_name.strip()
+
+  impulsiveness = current_mood.get("impulsiveness", 0.0)
+  laziness = current_mood.get("laziness", 0.0)
+  proactivity = current_mood.get("proactivity", 0.0)
+  extroversion = current_mood.get("extroversion", 0.0)
+  introversion = current_mood.get("introversion", 0.0)
+  # Define thresholds (these could be constants if used elsewhere)
+  HIGH = 0.7
+  LOW = 0.3
+  MID = 0.5 # For general states
+
+  # 1. Single dimension checks (prioritized)
+  if proactivity > HIGH and laziness < LOW:
+    return "Feeling productive and energetic."
+  elif laziness > HIGH and proactivity < LOW:
+    return "Feeling pretty sluggish and unmotivated."
+  elif extroversion > HIGH and introversion < LOW:
+    return "Feeling outgoing and sociable."
+  elif introversion > HIGH and extroversion < LOW:
+    return "Feeling quiet and introspective."
+  elif impulsiveness > HIGH: # This is a standalone check as per requirements
+    return "Feeling a bit impulsive today."
+
+  # 2. Combination checks (if no strong single dimension dominates)
+  # These are for when one dimension is high but its counterpart isn't necessarily low.
+  elif proactivity > HIGH:
+    return "Motivated to do something."
+  elif laziness > HIGH:
+    return "Feeling quite lazy."
+  elif extroversion > HIGH:
+    return "Leaning towards being sociable."
+  elif introversion > HIGH:
+    return "Feeling like keeping to myself."
+
+  # 3. General states (if specific thresholds not met clearly but still leaning one way)
+  elif impulsiveness > MID: # Using MID for "a bit restless"
+    return "A bit restless."
+  elif proactivity > MID:
+    return "Generally feeling capable."
+  # For extroversion/introversion, it's tricky if both are mid.
+  # Let's consider if one is notably higher than the other, even if not > HIGH.
+  # Or if one is mid and the other is low.
+  elif extroversion > MID and introversion < MID: # More extroverted than introverted
+      return "Open to interaction."
+  elif introversion > MID and extroversion < MID: # More introverted than extroverted
+      return "Content with my own thoughts."
+  # If both are around mid, or both high/low without clear dominance from above rules,
+  # it might be a mixed state or closer to neutral.
+
+  # Fallback default
+  return "Feeling thoughtful" # Default if no specific strong moods detected by above heuristics
+
 def update_mood(new_mood_aspects: dict) -> dict:
   """
   Updates the current mood with new aspects.
