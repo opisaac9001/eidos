@@ -77,6 +77,7 @@ DEFAULT_HEXUS_SCORES = {
     "general_caution": 0.3,            # Assuming 0-1 scale now, previously 0.0
     "user_engagement_proactivity": 0.4,# Assuming 0-1 scale now, previously 0.0
     "brevity_preference": 0.5          # Assuming 0-1 scale now, previously 0.0
+
 }
 
 HEXUS_BASELINES = {
@@ -159,7 +160,202 @@ HEXUS_EVENT_DEFINITIONS = {
     "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
     # Reflection Cycle
     "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02} # Positive effect of reflection
+
 }
+
+HEXUS_BASELINES = {
+    "joy": 0.4,
+    "stress": 0.1,
+    "curiosity": 0.5,
+    "loneliness": 0.2,
+    "ambition": 0.3,
+    "tiredness": 0.1,
+    "comfort": 0.5,
+    "focus": 0.5,
+    "impulsiveness": 0.2,
+    "resentment": 0.05,
+    "contentment": 0.5,
+    "melancholy": 0.1,
+    "craving_connection": 0.3,
+    "general_caution": 0.2, # Baseline for pre-existing
+    "user_engagement_proactivity": 0.2, # Baseline for pre-existing
+    "brevity_preference": 0.5 # Baseline for pre-existing
+}
+
+HEXUS_DECAY_RATES = { # Decay rate per hour
+    "joy": 0.1,
+    "stress": 0.25,
+    "curiosity": 0.05,
+    "loneliness": 0.08,
+    "ambition": 0.05,
+    "tiredness": 0.3, # Assumes decay when not actively resting. Resting itself would have direct Hexus changes.
+    "comfort": 0.1,
+    "focus": 0.15,
+    "impulsiveness": 0.1,
+    "resentment": 0.02, # Decays very slowly
+    "contentment": 0.05,
+    "melancholy": 0.05,
+    "craving_connection": 0.1,
+    "general_caution": 0.1,
+    "user_engagement_proactivity": 0.1,
+    "brevity_preference": 0.1
+}
+
+HEXUS_EVENT_DEFINITIONS = {
+    # User Feedback
+    "USER_FEEDBACK_POSITIVE": {"joy": 0.1, "contentment": 0.1, "stress": -0.05, "resentment": -0.02},
+    "USER_FEEDBACK_NEGATIVE": {"stress": 0.1, "resentment": 0.05, "joy": -0.1, "contentment": -0.05},
+    "USER_FEEDBACK_CORRECTION": {"stress": 0.03, "curiosity": 0.02}, # Learning from being corrected
+    # User Input Analysis
+    "USER_INPUT_POSITIVE_KEYWORD": {"joy": 0.02, "contentment": 0.01},
+    "USER_INPUT_NEGATIVE_KEYWORD": {"stress": 0.02, "resentment": 0.01},
+    "USER_INPUT_QUESTION": {"curiosity": 0.01, "focus": 0.01, "user_engagement_proactivity": 0.01},
+    "USER_INPUT_PROBLEM_STATEMENT": {"stress": 0.03, "focus": 0.03, "user_engagement_proactivity": 0.05},
+    # Pathos Response Characteristics
+    "INTERACTION_SHORT_RESPONSE_GIVEN": {"brevity_preference": 0.01},
+    "INTERACTION_LONG_RESPONSE_GIVEN": {"brevity_preference": -0.01, "tiredness": 0.005}, # Slight tiredness from long response
+    # Content Provided by User
+    "PROVIDED_IMAGE_TO_PATHOS": {"curiosity": 0.02, "focus": 0.01},
+    "PROVIDED_DOCUMENT_TO_PATHOS": {"curiosity": 0.03, "focus": 0.02},
+    # Tool Usage
+    "TOOL_SUCCESS_WEB_SEARCH": {"curiosity": 0.05, "focus": 0.02, "contentment": 0.01},
+    "TOOL_SUCCESS_ADD_EVENT_LEISURE": {"joy": 0.05, "ambition": 0.01, "contentment": 0.03},
+    "TOOL_SUCCESS_ADD_EVENT_WORK": {"ambition": 0.03, "focus": 0.02, "contentment": 0.02},
+    "TOOL_SUCCESS_FETCH_WEATHER": {"curiosity": 0.01, "contentment": 0.005}, # Added for weather tool
+    "TOOL_SUCCESS_GENERIC": {"contentment": 0.02, "focus": 0.01}, # Generic success
+    "TOOL_FAILURE_GENERIC": {"stress": 0.03, "resentment": 0.01, "focus": -0.02},
+    # Activity Effects (per tick/cycle of Firmament's run_simulation_tick)
+    "ACTIVITY_EFFECT_RESTING": {"tiredness": -0.02, "stress": -0.01, "comfort": 0.01, "focus": -0.01},
+    "ACTIVITY_EFFECT_WORK_DEEP": {"focus": 0.01, "ambition": 0.005, "tiredness": 0.005, "stress": 0.002},
+    "ACTIVITY_EFFECT_WORK_ROUTINE": {"focus": 0.005, "tiredness": 0.003, "contentment": 0.002},
+    "ACTIVITY_EFFECT_LEARNING": {"curiosity": 0.01, "focus": 0.005, "ambition": 0.002},
+    "ACTIVITY_EFFECT_SOCIAL": {"joy": 0.01, "loneliness": -0.01, "craving_connection": -0.005, "stress": -0.005},
+    "ACTIVITY_EFFECT_LEISURE_ACTIVE": {"joy": 0.015, "tiredness": 0.005, "stress": -0.01},
+    "ACTIVITY_EFFECT_LEISURE_PASSIVE": {"comfort": 0.01, "tiredness": -0.005},
+    "ACTIVITY_EFFECT_CHORE": {"tiredness": 0.005, "contentment": 0.005, "stress": 0.002},
+    # Firmament Intention Simulation Outcomes
+    "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
+    "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
+    "INTENTION_ACTION_TASK": {"focus": 0.02, "ambition": 0.02, "contentment": 0.01},
+    "INTENTION_ACTION_GENERAL_SUCCESS": {"contentment": 0.01, "joy": 0.005},
+    "INTENTION_ACTION_FAILURE": {"stress": 0.02, "resentment": 0.01, "ambition": -0.005},
+    # General Engagement
+    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
+    # Reflection Cycle
+    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02}, # Positive effect of reflection
+    # News Consumption Events
+    "NEWS_CONSUMED_POSITIVE": {"joy": 0.05, "contentment": 0.03, "curiosity": 0.02, "user_engagement_proactivity": 0.01},
+    "NEWS_CONSUMED_NEGATIVE": {"stress": 0.1, "melancholy": 0.05, "resentment": 0.02, "general_caution": 0.03},
+    "NEWS_CONSUMED_NEUTRAL_INTERESTING": {"curiosity": 0.05, "focus": 0.01},
+    "NEWS_CONSUMED_CONCERNING": {"stress": 0.05, "general_caution": 0.05, "melancholy": 0.02},
+    # Daily Briefing Overall Sentiment (Objective, direct trigger from LogosCore)
+    "BRIEFING_OVERALL_POSITIVE": {"contentment": 0.03, "focus": 0.02, "joy": 0.02},
+    "BRIEFING_OVERALL_NEGATIVE": {"stress": 0.05, "melancholy": 0.03, "general_caution": 0.02},
+    "BRIEFING_OVERALL_NEUTRAL": {"focus": 0.01}
+    #
+    # Subjective News Reaction Events (these are now handled by HEXUS_SUBJECTIVE_REACTION_DEFINITIONS)
+    # "NEWS_REACTION_PERSONALLY_POSITIVE": {"joy": 0.1, "contentment": 0.05, "ambition": 0.02},
+    # "NEWS_REACTION_PERSONALLY_NEGATIVE": {"stress": 0.15, "resentment": 0.05, "joy": -0.05, "melancholy": 0.05},
+    # "NEWS_REACTION_VALIDATING": {"contentment": 0.1, "focus": 0.05, "stress": -0.03},
+    # "NEWS_REACTION_CONCERNING_PERSONAL": {"stress": 0.1, "general_caution": 0.1, "focus": -0.05},
+    # "NEWS_REACTION_CONTRADICTORY": {"stress": 0.05, "curiosity": 0.05, "focus": -0.03},
+    # "NEWS_REACTION_MOTIVATING": {"ambition": 0.1, "focus": 0.05, "joy": 0.03, "tiredness": -0.02},
+    # "NEWS_REACTION_IRRELEVANT": {},
+    # "NEWS_REACTION_INTERESTING_DEEPER": {"curiosity": 0.15, "focus": 0.05, "user_engagement_proactivity": 0.03},
+    # "NEWS_REACTION_ANGER_FRUSTRATION": {"stress": 0.1, "resentment": 0.1, "impulsiveness": 0.05},
+    # "NEWS_REACTION_SADDNESS_EMPATHY": {"melancholy": 0.1, "loneliness": 0.05, "craving_connection": 0.03},
+    # "NEWS_REACTION_HOPEFUL_OPTIMISTIC": {"joy": 0.1, "ambition": 0.05, "contentment": 0.05}
+}
+
+# New dictionary for generalized subjective reactions
+HEXUS_SUBJECTIVE_REACTION_DEFINITIONS: Dict[str, Dict[str, float]] = {
+    "REACTION_ACCOMPLISHED": {"contentment": 0.15, "joy": 0.1, "stress": -0.05, "ambition": 0.05},
+    "REACTION_FRUSTRATED_SETBACK": {"stress": 0.15, "resentment": 0.1, "joy": -0.05, "ambition": -0.05, "focus": -0.05},
+    "REACTION_ENGAGED_LEARNING": {"curiosity": 0.1, "focus": 0.1, "joy": 0.03, "ambition": 0.02},
+    "REACTION_VALIDATED_CONFIRMED": {"contentment": 0.1, "focus": 0.05, "stress": -0.03, "joy": 0.05},
+    "REACTION_STRESSED_CONCERNED": {"stress": 0.1, "general_caution": 0.1, "melancholy": 0.03, "focus": -0.05},
+    "REACTION_CALM_RECHARGED": {"stress": -0.1, "comfort": 0.15, "contentment": 0.05, "tiredness": -0.1},
+    "REACTION_SOCIALLY_CONNECTED": {"joy": 0.15, "loneliness": -0.15, "craving_connection": -0.1, "contentment": 0.05},
+    "REACTION_SOCIALLY_DISCONNECTED": {"loneliness": 0.15, "craving_connection": 0.1, "joy": -0.05, "melancholy": 0.05},
+    "REACTION_BORED_UNSTIMULATED": {"curiosity": -0.1, "focus": -0.1, "tiredness": 0.05, "impulsiveness": 0.05},
+    "REACTION_AMUSED_ENTERTAINED": {"joy": 0.1, "stress": -0.05, "contentment": 0.03},
+    "REACTION_FEELING_SAFE_SECURE": {"comfort": 0.15, "stress": -0.1, "general_caution": -0.05},
+    "REACTION_FEELING_HOPEFUL_OPTIMISTIC": {"joy": 0.15, "ambition": 0.1, "contentment": 0.05, "stress": -0.05},
+    "REACTION_FEELING_SAD_EMPATHETIC": {"melancholy": 0.1, "loneliness": 0.05, "craving_connection": 0.03, "joy": -0.03},
+    "REACTION_FEELING_ANGER_IRRITATION": {"stress": 0.1, "resentment": 0.15, "impulsiveness": 0.05, "joy": -0.05},
+    "REACTION_CURIOSITY_PIQUED": {"curiosity": 0.15, "focus": 0.05, "user_engagement_proactivity": 0.03}, # Same as NEWS_REACTION_INTERESTING_DEEPER
+    "REACTION_MOTIVATED_DRIVEN": {"ambition": 0.15, "focus": 0.1, "joy": 0.05, "tiredness": -0.05}, # Stronger than NEWS_REACTION_MOTIVATING
+    "REACTION_INDIFFERENT_UNEFFECTED": {} # No Hexus change
+}
+
+
+HEXUS_ACTIVITY_MODIFIERS: Dict[str, Dict[str, Dict[str, float]]] = {
+    "resting": {
+        "stress": {"baseline_shift": -0.1, "rate_multiplier": 1.5},
+        "tiredness": {"baseline_shift": -0.2, "rate_multiplier": 2.0},
+        "comfort": {"baseline_shift": 0.1},
+        "focus": {"rate_multiplier": 1.2}
+    },
+    "sleeping": { # Similar to resting, potentially stronger effects
+        "stress": {"baseline_shift": -0.15, "rate_multiplier": 1.8},
+        "tiredness": {"baseline_shift": -0.3, "rate_multiplier": 2.5},
+        "comfort": {"baseline_shift": 0.15},
+        "focus": {"rate_multiplier": 1.5},
+        "curiosity": {"rate_multiplier": 1.3}
+    },
+    "work_deep": { # Assuming "work_deep" or "work_focused" can be used as activity_type
+        "focus": {"baseline_shift": 0.15, "rate_multiplier": 0.7},
+        "tiredness": {"baseline_shift": 0.05, "rate_multiplier": 0.9}, # Less decay towards a slightly higher baseline (work is tiring)
+        "ambition": {"rate_multiplier": 0.9},
+        "stress": {"baseline_shift": 0.05, "rate_multiplier": 0.9}
+    },
+    "work_focused": { # Alias for work_deep if used
+        "focus": {"baseline_shift": 0.15, "rate_multiplier": 0.7},
+        "tiredness": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "ambition": {"rate_multiplier": 0.9},
+        "stress": {"baseline_shift": 0.05, "rate_multiplier": 0.9}
+    },
+    "social": { # Could also be "leisure_active" if that's the primary type for social
+        "joy": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "loneliness": {"baseline_shift": -0.2, "rate_multiplier": 1.5},
+        "craving_connection": {"baseline_shift": -0.2, "rate_multiplier": 1.5},
+        "stress": {"baseline_shift": -0.05, "rate_multiplier": 1.1} # Good social interaction reduces stress
+    },
+    "leisure_active": { # If this is used for social or active hobbies
+        "joy": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "loneliness": {"baseline_shift": -0.1, "rate_multiplier": 1.2}, # May vary depending on solo/group
+        "tiredness": {"rate_multiplier": 0.9}, # Active leisure can still be tiring but decay slower
+        "stress": {"baseline_shift": -0.1, "rate_multiplier": 1.3}
+    },
+    "work_routine": { # Could also cover "chore" type activities
+        "tiredness": {"baseline_shift": 0.02, "rate_multiplier": 1.0},
+        "contentment": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "focus": {"rate_multiplier": 1.1} # Routine might make focus decay slightly faster
+    },
+    "chore": {
+        "tiredness": {"baseline_shift": 0.03, "rate_multiplier": 1.0},
+        "contentment": {"baseline_shift": 0.03, "rate_multiplier": 0.95},
+        "stress": {"baseline_shift": 0.01} # Chores can be slightly stressful
+    },
+    "learning": {
+        "curiosity": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "focus": {"baseline_shift": 0.1, "rate_multiplier": 0.8},
+        "tiredness": {"baseline_shift": 0.03, "rate_multiplier": 0.95}
+    },
+    "leisure_passive": { # e.g., reading, watching TV
+        "stress": {"baseline_shift": -0.05, "rate_multiplier": 1.2},
+        "comfort": {"baseline_shift": 0.1},
+        "tiredness": {"rate_multiplier": 1.1}, # Can still get tired, focus might wane
+        "focus": {"rate_multiplier": 1.15}
+    },
+    "reflective": { # For activities like journaling, planning, or self-reflection
+        "focus": {"baseline_shift": 0.05, "rate_multiplier": 0.9},
+        "contentment": {"baseline_shift": 0.05},
+        "stress": {"baseline_shift": -0.02, "rate_multiplier": 1.1} # Can sometimes be slightly stressful
+    }
+    # Add other activity types as defined in chronos_engine/models.py ActivityType as needed
+}
+
 
 class EthosCore:
     def __init__(self, config: Config):
@@ -564,45 +760,63 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-    def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
+no
+    async def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
         """
-        Processes user interaction details to update relevant Hexus scores.
+        Determines Pathos's subjective reaction to a user interaction and updates Hexus scores.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
+        if not self.config.ENABLE_MOOD_SIMULATION:
+            logger.debug("Hexus updates for interactions skipped (ENABLE_MOOD_SIMULATION is false).")
             return
-        
-        logger.debug(f"Processing interaction for Hexus update. Input: '{user_input_text[:50]}...'")
-        self.process_event_for_hexus_update("GENERAL_INTERACTION")
+        if not self.logos_core:
+            logger.error("LogosCore not available in EthosCore. Cannot determine subjective reaction for interaction.")
+            return
 
-        input_lower = (user_input_text or "").lower()
+        logger.debug(f"Determining subjective reaction for interaction. Input: '{user_input_text[:50]}...'")
 
-        # Define keyword lists (can be expanded and refined)
-        positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant', 'appreciate it']
-        negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good', "didn't work", 'frustrating']
-        question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me', 'can you', 'could you']
-        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this']
-
+        event_description = "User interaction"
+        event_data_summary_parts = [f"User: {user_input_text}"]
+        if pathos_response_text:
+            event_data_summary_parts.append(f"Pathos: {pathos_response_text}")
         if image_provided:
-            self.process_event_for_hexus_update("PROVIDED_IMAGE_TO_PATHOS")
+            event_data_summary_parts.append("[Image was provided by user]")
         if document_provided:
-            self.process_event_for_hexus_update("PROVIDED_DOCUMENT_TO_PATHOS")
+            event_data_summary_parts.append("[Document was provided by user]")
+        event_data_summary = "\n".join(event_data_summary_parts)
 
-        if any(kw in input_lower for kw in positive_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_POSITIVE_KEYWORD")
+        current_hexus_scores = self.get_hexus_scores()
+        persona_directives = self.get_persona_directives()[:3] # Use first 3 directives
+        available_reactions = list(HEXUS_SUBJECTIVE_REACTION_DEFINITIONS.keys())
 
-        if any(kw in input_lower for kw in negative_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_NEGATIVE_KEYWORD")
+        try:
+            subjective_reaction_type = await self.logos_core.determine_subjective_reaction(
+                event_description=event_description,
+                event_data_summary=event_data_summary,
+                current_hexus_scores=current_hexus_scores,
+                persona_directives=persona_directives,
+                available_reactions=available_reactions
+            )
 
-        if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
-            self.process_event_for_hexus_update("USER_INPUT_QUESTION")
+            logger.info(f"Subjective reaction to user interaction determined as: {subjective_reaction_type}")
 
-        if any(kw in input_lower for kw in problem_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_PROBLEM_STATEMENT")
+            payload = {
+                "user_input": user_input_text[:200], # Log a snippet
+                "pathos_response": pathos_response_text[:200] if pathos_response_text else None,
+                "image_provided": image_provided,
+                "document_provided": document_provided
+            }
+            await self.process_event_for_hexus_update(subjective_reaction_type, payload=payload)
 
-        if pathos_response_text and len(pathos_response_text) > 200:
-            self.process_event_for_hexus_update("INTERACTION_LONG_RESPONSE_GIVEN")
-        elif pathos_response_text and len(pathos_response_text) < 50:
-            self.process_event_for_hexus_update("INTERACTION_SHORT_RESPONSE_GIVEN")
+            # Still apply a very small, general interaction effect directly if desired,
+            # or rely solely on the subjective reaction. For now, let's keep it.
+            # This represents the basic engagement of interaction itself.
+            await self.process_event_for_hexus_update("GENERAL_INTERACTION", payload={"source": "direct_interaction_processing"})
+
+        except Exception as e:
+            logger.error(f"Error during subjective reaction processing for interaction: {e}", exc_info=True)
+            # Optionally, trigger a generic/error Hexus event here
+            await self.process_event_for_hexus_update("REACTION_INDIFFERENT_UNEFFECTED", payload={"error_in_subjective_reaction": str(e)})
+
 
     def _apply_hexus_change(self, dimension_name: str, change_amount: float, reason: Optional[str] = None):
         """
@@ -657,6 +871,7 @@ class EthosCore:
                 logger.warning(f"Dimension '{dimension}' from personality bias profile not found in current Hexus scores. Bias not applied for this dimension.")
         # Note: No _save_hexus_scores() here. It's called by _load_hexus_scores if it creates a new file,
         # or will be called by subsequent updates. This ensures bias is applied before first use.
+
 
     async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
@@ -748,7 +963,13 @@ class EthosCore:
         try:
             min_salience = float(min_salience) # Ensure it's float
             # Fetch more candidates initially for better filtering and sorting
-            similar_results = self.memory_storage.find_similar(query, top_k * 5, allowed_types, 0.3) # threshold 0.3 is example
+            similar_results = self.memory_storage.find_similar(
+                query_text=query,
+                top_k=top_k * 5,
+                allowed_types=allowed_types,
+                threshold=0.3, # This is a fixed threshold; consider if it should be configurable
+                include_archived=False # Explicitly stating default for clarity
+            )
             
             all_candidates = [entry for _, entry in similar_results]
             
@@ -968,14 +1189,55 @@ class EthosCore:
 
     async def get_todays_briefing_context_for_prompt(self, user_id: str) -> str:
         try:
-            if not self.logos_core: return "Briefing service unavailable (LogosCore missing)."
-            briefing_data = await self.logos_core.get_or_generate_daily_briefing(user_id_context=user_id) 
+            if not self.logos_core:
+                logger.warning("EthosCore: LogosCore not available for get_todays_briefing_context_for_prompt.")
+                return "Briefing service unavailable (LogosCore missing)."
+
+            # Call LogosCore to get briefing data, which now includes classified_sentiment
+            briefing_data = await self.logos_core.get_or_generate_daily_briefing(user_id_context=user_id)
+
+            briefing_content_for_prompt = "No briefing available for Pathos today." # Default
+
             if briefing_data and briefing_data.get('success') and briefing_data.get('briefing_content'):
-                content = str(briefing_data['briefing_content'])
+                content_str = str(briefing_data['briefing_content'])
+                # Ensure content_str is not None before formatting; briefing_data.get already handles this.
                 max_len = self.ethos_config.get('briefing_context_max_length_for_prompt', 1500)
-                return f"Today's Briefing Highlights (Pathos's context, shared with user '{user_id}'):\n{content[:max_len] + '...' if len(content) > max_len else content}"
-            return "No briefing available for Pathos today."
-        except Exception as e: logger.error(f"Error getting briefing context for prompt: {e}", exc_info=True); return "Briefing information temporarily unavailable (error)"    
+                briefing_content_for_prompt = f"Today's Briefing Highlights (Pathos's context, shared with user '{user_id}'):\n{content_str[:max_len] + '...' if len(content_str) > max_len else content_str}"
+
+                # Trigger Hexus update based on classified sentiment from briefing_data
+                classified_sentiment = briefing_data.get('classified_sentiment') # This is new
+                if classified_sentiment:
+                    event_name: Optional[str] = None
+                    if classified_sentiment == 'positive':
+                        event_name = "BRIEFING_OVERALL_POSITIVE"
+                    elif classified_sentiment == 'negative':
+                        event_name = "BRIEFING_OVERALL_NEGATIVE"
+                    elif classified_sentiment == 'neutral': # Ensure 'neutral' is handled
+                        event_name = "BRIEFING_OVERALL_NEUTRAL"
+
+                    if event_name:
+                        logger.debug(f"EthosCore: Triggering Hexus event '{event_name}' based on briefing sentiment '{classified_sentiment}'.")
+                        # Since get_todays_briefing_context_for_prompt is async, direct await is fine.
+                        # If this method were sync, asyncio.create_task would be appropriate.
+                        await self.process_event_for_hexus_update(
+                            event_type=event_name, # Ensure param name matches definition
+                            payload={"briefing_source": briefing_data.get("source", "unknown"), "user_id": user_id}
+                        )
+                    else:
+                        # This case should ideally not be hit if LogosCore always returns a valid default.
+                        logger.warning(f"EthosCore: Unknown or unhandled classified sentiment for briefing: '{classified_sentiment}'")
+                else:
+                    logger.debug("EthosCore: No classified sentiment found in briefing_data to trigger Hexus update.")
+            else:
+                 # Log if briefing_data indicates failure or no content
+                 logger.info(f"EthosCore: Briefing data not successful or content missing. Success: {briefing_data.get('success')}, Content Present: {bool(briefing_data.get('briefing_content'))}")
+
+
+            return briefing_content_for_prompt
+
+        except Exception as e:
+            logger.error(f"Error getting briefing context for prompt: {e}", exc_info=True)
+            return "Briefing information temporarily unavailable (error)"
     
     async def get_pathos_aspirations_context_for_prompt(self) -> str:
         try:
@@ -1548,13 +1810,17 @@ class EthosCore:
         seed_memory_types = ['reflection_insight', 'feedback', 'chat_interaction',
                              'firmament_activity_log', 'learned_correction', 'world_knowledge']
 
-        candidate_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+
+        # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
+        # The default sort of get_memories_for_summary (salience then recency) matches the intent.
+        candidate_memories = await self.memory_storage.get_memories_for_summary(
             user_id=PATHOS_USER_ID,
-            start_time=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
-            end_time=datetime.now(timezone.utc),
+            start_time_utc=datetime.now(timezone.utc) - timedelta(days=lookback_days_for_seeds),
+            end_time_utc=datetime.now(timezone.utc),
             types=seed_memory_types,
-            limit=num_seed_memories * 3,
-            sort_by_salience_then_recency=True
+            limit=num_seed_memories * 3
+            # include_archived defaults to False
+
         )
 
         seed_memories = [mem for mem in candidate_memories if mem.get('salience', 0.0) >= min_salience_seed][:num_seed_memories]
@@ -1721,15 +1987,47 @@ class EthosCore:
 
     async def run_managed_forgetting(self):
         """
-        Archives memories based on salience and age.
-        Core memory types are protected unless their salience is extremely low.
-        """
+
+        Manages memory decay and archival.
+        1. Decays salience of unaccessed memories.
+        2. Archives memories based on age and salience thresholds.
+        Core memory types have different archival rules.
+
         if not self.config.ENABLE_MANAGED_FORGETTING:
-            logger.debug("Managed forgetting cycle skipped as feature is disabled.")
+            logger.debug("Managed forgetting cycle skipped as feature is disabled by Config.ENABLE_MANAGED_FORGETTING.")
             return
 
         now = datetime.now(timezone.utc)
         logger.info(f"--- Ethos: Starting Managed Forgetting Cycle at {now.isoformat()} ---")
+
+
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot run managed forgetting.")
+            self.last_forgetting_time = now # Update time to prevent immediate re-run on error
+            self._save_task_last_run_time("EthosForgetting", now)
+            return
+
+        # a. Salience Decay Step
+        decay_rate = self.ethos_config.get('forgetting_salience_decay_rate_per_day', 0.01)
+        min_floor = self.ethos_config.get('forgetting_min_salience_for_decay', 0.05)
+        # days_since_accessed_threshold for decay is handled by memory_storage method's default (1 day)
+
+        logger.info(f"Managed Forgetting: Starting salience decay. Rate: {decay_rate}/day, Floor: {min_floor}.")
+        try:
+            decayed_count = await asyncio.to_thread(
+                self.memory_storage.decay_salience_for_unaccessed_memories,
+                decay_rate,
+                min_floor,
+                self.forgetting_core_memory_types # Already parsed in __init__
+            )
+            logger.info(f"Managed Forgetting: Salience decay step completed. {decayed_count} memories had their salience decayed.")
+        except Exception as e_decay:
+            logger.error(f"Managed Forgetting: Error during salience decay step: {e_decay}", exc_info=True)
+            # Decide if we should continue to archival or stop the cycle
+            # For now, let's continue to archival, but log the error.
+
+        # b. Archival Step
+        logger.info("Managed Forgetting: Starting archival step.")
 
         salience_threshold_archive = self.ethos_config.get('forgetting_salience_threshold_archive', 0.1)
         days_to_archive_default = self.ethos_config.get('forgetting_days_to_archive_by_default', 90)
@@ -1737,43 +2035,56 @@ class EthosCore:
 
         archive_before_date = now - timedelta(days=days_to_archive_default)
 
-        # Process in batches to manage memory, though a single large query might be fine for moderately sized DBs
+
+        archived_count = 0
+        processed_for_archival_count = 0
         batch_size = 200 # Configurable if needed
         offset = 0
-        archived_count = 0
-        processed_count = 0
 
         while True:
-            if not self.memory_storage: # Should not happen if initialized correctly
-                logger.error("MemoryStorage not available for forgetting cycle.")
+            candidate_memories_for_archive: List[MemoryEntry] = []
+            try:
+                candidate_memories_for_archive = await asyncio.to_thread(
+                    self.memory_storage.get_all_unarchived_memories_for_forgetting_check,
+                    batch_size,
+                    offset
+                )
+            except Exception as e_fetch_archive:
+                logger.error(f"Managed Forgetting: Error fetching memories for archival check (offset {offset}): {e_fetch_archive}", exc_info=True)
+                break # Stop if fetching fails
+
+            if not candidate_memories_for_archive:
                 break
 
-            # Using the new MemoryStorage method
-            candidate_memories = self.memory_storage.get_all_unarchived_memories_for_forgetting_check(batch_size, offset)
+            processed_for_archival_count += len(candidate_memories_for_archive)
+            offset += batch_size # Prepare for next batch
 
-            if not candidate_memories:
-                break # No more memories to process
-
-            processed_count += len(candidate_memories)
-
-            for memory in candidate_memories:
+            for memory in candidate_memories_for_archive:
                 memory_id = memory.get('id')
-                if not memory_id: continue
+                if not memory_id:
+                    logger.warning("Managed Forgetting: Found memory without ID during archival check. Skipping.")
+                    continue
 
                 mem_timestamp_str = memory.get('timestamp')
-                if not mem_timestamp_str: continue # Should always have a timestamp
+                if not mem_timestamp_str:
+                    logger.warning(f"Managed Forgetting: Memory {memory_id} missing timestamp. Skipping archival check.")
+
 
                 try:
                     mem_dt = datetime.fromisoformat(mem_timestamp_str.replace('Z', '+00:00'))
                     if mem_dt.tzinfo is None: # Ensure timezone aware for comparison
                         mem_dt = mem_dt.replace(tzinfo=timezone.utc)
                 except ValueError:
-                    logger.warning(f"Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check for this memory.")
+
+                    logger.warning(f"Managed Forgetting: Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check.")
+
                     continue
 
                 is_core = memory.get('type') in self.forgetting_core_memory_types
                 is_old = mem_dt < archive_before_date
-                current_salience = memory.get('salience', 1.0) # Default to high salience if None
+
+                current_salience = float(memory.get('salience', 1.0) or 1.0) # Default to high salience if None
+
                 is_low_salience = current_salience < salience_threshold_archive
                 is_extremely_low_salience = current_salience < extremely_low_salience_core
 
@@ -1783,25 +2094,39 @@ class EthosCore:
                 if is_core:
                     if is_extremely_low_salience:
                         should_archive = True
-                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f})"
+
+                        reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f} < {extremely_low_salience_core})"
                 else: # Not a core type
-                    if is_old:
+                    if is_old and is_low_salience: # Must be both old AND low salience for non-core
                         should_archive = True
-                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days"
-                    elif is_low_salience:
-                        should_archive = True
-                        reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f})"
+                        reason = f"non-core type '{memory.get('type')}' older than {days_to_archive_default} days AND low salience ({current_salience:.3f} < {salience_threshold_archive})"
+                    elif is_old and not is_low_salience: # Old but not low salience - don't archive yet based on age alone.
+                        pass # logger.debug(f"Memory {memory_id} is old but salience {current_salience:.3f} is not below threshold {salience_threshold_archive}.")
+                    elif is_low_salience: # Low salience but not necessarily old
+                         should_archive = True
+                         reason = f"non-core type '{memory.get('type')}' with low salience ({current_salience:.3f} < {salience_threshold_archive})"
 
                 if should_archive:
-                    if self.memory_storage.update_entry_archival_status(memory_id, True):
+                    update_success = False
+                    try:
+                        update_success = await asyncio.to_thread(
+                            self.memory_storage.update_entry_archival_status,
+                            memory_id,
+                            True
+                        )
+                    except Exception as e_archive_update:
+                         logger.error(f"Managed Forgetting: Error calling update_entry_archival_status for {memory_id}: {e_archive_update}", exc_info=True)
+
+                    if update_success:
                         archived_count += 1
-                        logger.info(f"Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
+                        logger.info(f"Managed Forgetting: Archived memory ID {memory_id} ({memory.get('type')}, Sal: {current_salience:.2f}, Age: {(now - mem_dt).days}d). Reason: {reason}.")
                     else:
-                        logger.warning(f"Failed to archive memory ID {memory_id}.")
+                        logger.warning(f"Managed Forgetting: Failed to archive memory ID {memory_id} via MemoryStorage call.")
 
-            offset += batch_size
+        logger.info(f"Managed Forgetting: Archival step. Processed {processed_for_archival_count} memories. Archived {archived_count} memories.")
 
-        logger.info(f"Managed Forgetting Cycle: Processed {processed_count} memories. Archived {archived_count} memories.")
+        # c. Update Timestamps
+
         self.last_forgetting_time = now
         self._save_task_last_run_time("EthosForgetting", now)
         logger.info(f"--- Ethos: Managed Forgetting Cycle Finished at {now.isoformat()} ---")
@@ -1821,52 +2146,77 @@ class EthosCore:
 
         logger.info(f"--- Ethos: Running Hexus Decay Cycle (Time elapsed: {time_elapsed_seconds:.2f}s) ---")
 
+
+        # --- Determine Current Activity ---
+        current_activity_type: Optional[str] = None
+        if self.chronos_engine:
+            try:
+                pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
+                current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
+                if current_activity_slot and current_activity_slot.activity_type:
+                    current_activity_type = current_activity_slot.activity_type.lower() # Store as lower for easier matching
+                    logger.debug(f"Hexus decay: Current activity type for Pathos: {current_activity_type}")
+                else:
+                    logger.debug("Hexus decay: No specific current activity found for Pathos or activity_type is None.")
+            except Exception as e:
+                logger.warning(f"Hexus decay: Could not get current activity for awareness: {e}", exc_info=True)
+        else:
+            logger.warning("Hexus decay: ChronosEngine not available. Decay will not be activity-aware.")
+
+
         # The 'hexus_decay_rate_per_cycle' from config is now superseded by per-dimension hourly rates
         # and actual time elapsed.
         # We retain hexus_decay_interval_seconds from config as the *intended* call frequency for the task.
 
-        # Activity-aware decay - Placeholder for future enhancement (remains placeholder)
-        # current_activity_type = None
-        # if self.chronos_engine:
-        #     try:
-        #         # This would ideally be an async call if ChronosEngine methods are async,
-        #         # but run_hexus_decay is currently synchronous.
-        #         # pathos_local_now = await self.get_local_datetime_for_user(PATHOS_USER_ID)
-        #         # current_activity_slot = await self.chronos_engine.get_current_activity(pathos_local_now)
-        #         # if current_activity_slot:
-        #         # current_activity_type = current_activity_slot.activity_type
-        #         logger.debug("EthosCore Hexus Decay: Activity-aware adjustments (placeholder).")
-        #     except Exception as e:
-        #         logger.warning(f"EthosCore Hexus Decay: Could not get current activity for awareness: {e}")
-        # else:
-        #     logger.debug("EthosCore Hexus Decay: ChronosEngine not available for activity-aware decay.")
 
+        # Activity-aware decay - Placeholder for future enhancement.
+        # The fetched current_activity_type can be used here to adjust baselines or decay rates.
 
         changed_scores = False
         for key, current_value in list(self.hexus_scores.items()): # Iterate over a copy if modifying
-            baseline = HEXUS_BASELINES.get(key)
+            standard_baseline = HEXUS_BASELINES.get(key)
+            standard_rate_per_hour = HEXUS_DECAY_RATES.get(key)
 
-            if baseline is None:
-                logger.warning(f"Hexus decay: No baseline defined for '{key}'. Skipping decay for this score.")
+            if standard_baseline is None:
+                logger.warning(f"Hexus decay: No standard baseline defined for '{key}'. Skipping decay for this score.")
+                continue
+            if standard_rate_per_hour is None:
+                logger.warning(f"Hexus decay: No standard hourly decay rate defined for '{key}'. Skipping decay for this score.")
                 continue
 
-            dimension_decay_rate_per_hour = HEXUS_DECAY_RATES.get(key)
-            if dimension_decay_rate_per_hour is None:
-                logger.warning(f"Hexus decay: No hourly decay rate defined for '{key}'. Skipping decay for this score.")
-                continue
+            effective_baseline = standard_baseline
+            effective_rate_per_hour = standard_rate_per_hour
 
-            # Activity-aware adjustments would modify baseline or dimension_decay_rate_per_hour here
-            # For example:
-            # effective_baseline = baseline
-            # effective_rate_per_hour = dimension_decay_rate_per_hour
-            # if current_activity_type == 'resting':
-            #     if key == 'tiredness': effective_rate_per_hour *= 2.0 # Tiredness decays faster when resting
-            #     if key == 'stress': effective_rate_per_hour *= 1.5
+            modifier_applied_log_msg = ""
 
-            decay_amount_for_cycle = (current_value - baseline) * dimension_decay_rate_per_hour * (time_elapsed_seconds / 3600.0)
+            if current_activity_type and current_activity_type in HEXUS_ACTIVITY_MODIFIERS:
+                activity_mods = HEXUS_ACTIVITY_MODIFIERS[current_activity_type]
+                if key in activity_mods:
+                    dimension_mods = activity_mods[key]
+
+                    if "baseline_shift" in dimension_mods:
+                        shift = dimension_mods["baseline_shift"]
+                        effective_baseline += shift
+                        # Clamp effective_baseline, assuming Hexus baselines are also within 0-1
+                        effective_baseline = max(0.0, min(1.0, effective_baseline))
+                        modifier_applied_log_msg += f" baseline_shift: {shift:+.2f} -> {effective_baseline:.2f};"
+
+                    if "rate_multiplier" in dimension_mods:
+                        multiplier = dimension_mods["rate_multiplier"]
+                        effective_rate_per_hour *= multiplier
+                        # Ensure rate doesn't become negative, though multipliers usually positive
+                        effective_rate_per_hour = max(0.0, effective_rate_per_hour)
+                        modifier_applied_log_msg += f" rate_multiplier: {multiplier:.2f} -> {effective_rate_per_hour:.3f};"
+
+            if modifier_applied_log_msg:
+                logger.debug(f"Hexus decay for '{key}' (Activity: {current_activity_type}): Modifiers applied ->{modifier_applied_log_msg}")
+
+            # Use effective_baseline and effective_rate_per_hour in decay calculation
+            decay_amount_for_cycle = (current_value - effective_baseline) * effective_rate_per_hour * (time_elapsed_seconds / 3600.0)
             new_value = current_value - decay_amount_for_cycle
 
-            # Clamping (assuming all Hexus scores are 0.0 to 1.0)
+            # Clamping Hexus scores (assuming all Hexus scores are 0.0 to 1.0)
+
             clamped_new_value = max(0.0, min(1.0, new_value))
 
             if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
@@ -1914,13 +2264,16 @@ class EthosCore:
             # Specific user interactions are part of 'chat_interaction' and will be included if they involve PATHOS_USER_ID (implicitly handled by how they are stored).
             # The MemoryStorage method get_memories_by_time_range_and_types should ideally handle user_id filtering if applicable for each type.
             # For reflection, we are primarily interested in Pathos's own cognitive stream and direct experiences.
-            fetched_memories = await self.memory_storage.get_memories_by_time_range_and_types(
+
+            # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
+            fetched_memories = await self.memory_storage.get_memories_for_summary(
                 user_id=PATHOS_USER_ID, # Focus on Pathos's own context for self-reflection
-                start_time=start_time_dt,
-                end_time=now_utc,
+                start_time_utc=start_time_dt,
+                end_time_utc=now_utc,
                 types=relevant_memory_types,
-                limit=query_limit,
-                sort_by_salience_then_recency=False # Default sort is timestamp descending
+                limit=query_limit
+                # include_archived defaults to False, which is fine here
+
             )
             logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for reflection.")
             return fetched_memories
@@ -2234,6 +2587,7 @@ class EthosCore:
             return None
             
     def get_current_mood(self) -> Dict[str, Any]:
+
         """
         Derives a simplified valence/arousal representation from Hexus scores.
         Also includes all Hexus scores for more detailed context if needed.
@@ -2286,7 +2640,7 @@ class EthosCore:
             "hexus_snapshot": self.hexus_scores.copy() # Include all current Hexus scores
         }
 
-    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+    async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None, magnitude_multiplier: float = 1.0):
         """
         Updates Hexus scores based on various system or feedback events.
         Uses the HEXUS_EVENT_DEFINITIONS mapping.
@@ -2294,15 +2648,26 @@ class EthosCore:
         if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
             return
 
-        logger.debug(f"Processing Hexus event: '{event_name}' with magnitude multiplier: {magnitude_multiplier}")
+        logger.debug(f"Processing Hexus event: '{event_type}' with magnitude multiplier: {magnitude_multiplier}")
 
-        event_definition = HEXUS_EVENT_DEFINITIONS.get(event_name)
+        event_definition = None
+        # Prioritize subjective reaction definitions
+        if event_type in HEXUS_SUBJECTIVE_REACTION_DEFINITIONS:
+            event_definition = HEXUS_SUBJECTIVE_REACTION_DEFINITIONS[event_type]
+            logger.debug(f"Found Hexus event '{event_type}' in HEXUS_SUBJECTIVE_REACTION_DEFINITIONS.")
+        elif event_type in HEXUS_EVENT_DEFINITIONS: # Fallback to direct event definitions
+            event_definition = HEXUS_EVENT_DEFINITIONS[event_type]
+            logger.debug(f"Found Hexus event '{event_type}' in HEXUS_EVENT_DEFINITIONS.")
 
-        if not event_definition:
-            logger.warning(f"Hexus event '{event_name}' not found in HEXUS_EVENT_DEFINITIONS.")
+        if not event_definition: # If event_definition is an empty dict (like for REACTION_INDIFFERENT_UNEFFECTED), it's valid.
+            if event_definition is None: # Only warn if not found in either and not intentionally empty
+                 logger.warning(f"Hexus event '{event_type}' not found in subjective or direct definitions.")
+            else: # It was an empty dict, meaning no Hexus change intended
+                 logger.debug(f"Hexus event '{event_type}' is defined as no-op (empty definition). No Hexus scores changed.")
             return
 
-        reason_for_change = f"event: {event_name}"
+        reason_for_change = f"event: {event_type}"
+
         if payload: # Optionally include payload summary in reason for more detailed logging
             payload_summary = {k: (str(v)[:30] + '...' if isinstance(v, str) and len(v) > 30 else v) for k,v in payload.items()}
             reason_for_change += f" (payload: {payload_summary})"
@@ -2312,7 +2677,9 @@ class EthosCore:
             self._apply_hexus_change(dimension, delta * magnitude_multiplier, reason_for_change)
         
         # Specific handling for feedback event to extract more detailed reason if needed
-        if event_name == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+
+        if event_type == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+
              self._apply_hexus_change('stress', HEXUS_EVENT_DEFINITIONS["USER_FEEDBACK_CORRECTION"].get('stress',0.03) * magnitude_multiplier, f"initial reaction to correction text: {payload.get('text','')[:30]}...")
 
 

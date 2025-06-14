@@ -191,8 +191,13 @@ class MemoryStorage:
         entry_id = str(entry_data.get('id', uuid.uuid4())); content = str(entry_data['content'])
         entry_type = str(entry_data['type']); timestamp = entry_data.get('timestamp', datetime.now(timezone.utc).isoformat())
         metadata = entry_data.get('metadata', {}); salience = entry_data.get('salience')
-        summary_llm = entry_data.get('summary_llm'); timestamp_last_salience_update = entry_data.get('timestamp_last_salience_update')
-        last_accessed_ts = entry_data.get('last_accessed_ts'); access_count = entry_data.get('access_count', 0)
+
+        summary_llm = entry_data.get('summary_llm')
+        # Default timestamp_last_salience_update to the creation timestamp if not provided
+        timestamp_last_salience_update = entry_data.get('timestamp_last_salience_update', timestamp)
+        last_accessed_ts = entry_data.get('last_accessed_ts') # Remains NULL if not provided
+        access_count = entry_data.get('access_count', 0)
+
         is_archived_bool = entry_data.get('is_archived', False)
         is_archived_int = 1 if is_archived_bool else 0
         archived_at = entry_data.get('archived_at')
@@ -235,15 +240,30 @@ class MemoryStorage:
             cursor.execute(sql, tuple(params)); row = cursor.fetchone()
             if row:
                 entry = self._row_to_entry(row)
-                if not entry.get('is_archived'):
-                    current_access_count = entry.get('access_count', 0)
-                    updates = {"last_accessed_ts": datetime.now(timezone.utc).isoformat(), "access_count": current_access_count + 1}
-                    # Use a direct SQL update for access stats to avoid re-embedding and complex update_entry logic here
+
+                if not entry.get('is_archived'): # Only update access stats for non-archived memories
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    current_access_count = entry.get('access_count', 0) or 0
+                    new_access_count = current_access_count + 1
+
+                    current_salience = float(entry.get('salience', 0.0) or 0.0)
+                    salience_boost = float(self.ethos_config.get('forgetting_memory_access_salience_boost', 0.01)) # Default 0.01 if not in config
+                    new_salience = min(1.0, current_salience + salience_boost)
+
                     try:
-                        cursor.execute("UPDATE memories SET last_accessed_ts = ?, access_count = ? WHERE id = ?",
-                                       (updates["last_accessed_ts"], updates["access_count"], entry_id))
+                        cursor.execute(
+                            "UPDATE memories SET last_accessed_ts = ?, access_count = ?, salience = ? WHERE id = ?",
+                            (now_iso, new_access_count, new_salience, entry_id)
+                        )
                         conn.commit()
-                    except sqlite3.Error as e_acc: logger.error(f"Failed to update access stats directly for memory {entry_id}: {e_acc}")
+                        logger.debug(f"Updated access stats for memory {entry_id}: last_accessed_ts={now_iso}, access_count={new_access_count}, new_salience={new_salience:.3f}")
+                        # Update entry object in memory for caller consistency
+                        entry['last_accessed_ts'] = now_iso
+                        entry['access_count'] = new_access_count
+                        entry['salience'] = new_salience
+                    except sqlite3.Error as e_acc:
+                        logger.error(f"Failed to update access stats and salience for memory {entry_id}: {e_acc}")
+
                 return entry
             return None
         except sqlite3.Error as e: logger.error(f"SQLite error in get_entry {entry_id}: {e}", exc_info=True); return None
@@ -306,7 +326,53 @@ class MemoryStorage:
                 sim = np.dot(query_emb, entry_emb) / (norm_q * norm_e) if norm_q > 1e-6 and norm_e > 1e-6 else 0.0
                 if sim >= threshold: sims.append((float(sim), entry))
             except Exception as e: logger.warning(f"Could not calc similarity for entry {entry['id']}: {e}")
-        return sorted(sims, key=lambda item: item[0], reverse=True)[:top_k]
+
+
+        final_results_with_scores = sorted(sims, key=lambda item: item[0], reverse=True)[:top_k]
+
+        # Update last_accessed_ts and salience for the returned entries
+        if final_results_with_scores:
+            entry_ids_to_update_access = [entry['id'] for _, entry in final_results_with_scores if not entry.get('is_archived')]
+            if entry_ids_to_update_access:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                salience_boost = float(self.ethos_config.get('forgetting_memory_access_salience_boost', 0.01))
+
+                updates_for_db: List[Tuple[str, int, float, str]] = []
+
+                # First, fetch current salience and access_count for entries to be updated
+                current_stats_sql = f"SELECT id, salience, access_count FROM memories WHERE id IN ({','.join('?' for _ in entry_ids_to_update_access)})"
+                cursor.execute(current_stats_sql, tuple(entry_ids_to_update_access))
+                stats_rows = cursor.fetchall()
+                stats_map = {row['id']: {'salience': float(row['salience'] or 0.0) , 'access_count': int(row['access_count'] or 0)} for row in stats_rows}
+
+                for entry_id in entry_ids_to_update_access:
+                    current_sal = stats_map.get(entry_id, {}).get('salience', 0.0)
+                    current_acc_count = stats_map.get(entry_id, {}).get('access_count', 0)
+
+                    new_sal = min(1.0, current_sal + salience_boost)
+                    new_acc_count = current_acc_count + 1
+                    updates_for_db.append((now_iso, new_acc_count, new_sal, entry_id))
+
+                if updates_for_db:
+                    try:
+                        update_sql = "UPDATE memories SET last_accessed_ts = ?, access_count = ?, salience = ? WHERE id = ?"
+                        cursor.executemany(update_sql, updates_for_db)
+                        conn.commit()
+                        logger.debug(f"Bulk updated access stats for {len(entry_ids_to_update_access)} memories from find_similar.")
+                        # Update entry objects in memory for caller consistency
+                        for i, (score, entry) in enumerate(final_results_with_scores):
+                            if entry['id'] in entry_ids_to_update_access: # if it was eligible for update
+                                matching_update = next((upd for upd in updates_for_db if upd[3] == entry['id']), None)
+                                if matching_update:
+                                    final_results_with_scores[i][1]['last_accessed_ts'] = matching_update[0]
+                                    final_results_with_scores[i][1]['access_count'] = matching_update[1]
+                                    final_results_with_scores[i][1]['salience'] = matching_update[2]
+                    except sqlite3.Error as e_bulk_upd:
+                        logger.error(f"Error bulk updating access stats in find_similar: {e_bulk_upd}")
+                        conn.rollback()
+
+        return final_results_with_scores
+
 
     def get_memories_for_summary(self, user_id: str, start_time_utc: datetime, end_time_utc: datetime, types: List[str], limit: int = 30, include_archived: bool = False) -> List[MemoryEntry]:
         conn = self._get_connection(); cursor = conn.cursor(); entries: List[MemoryEntry] = []
@@ -514,12 +580,14 @@ class MemoryStorage:
         try: cursor.execute("SELECT json_extract('{\"k\":\"v\"}', '$.k')")
         except sqlite3.OperationalError: can_use_json_extract = False
 
+
         base_query = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (is_archived = 0 OR is_archived IS NULL)"
         sql_query, params = "", []
         fetch_limit = limit * 2 if limit > 0 else 10
 
         # Simplified system user ID list for this context
         _core_system_ids_for_qdp = ["system_oneiros", None, PATHOS_USER_ID]
+
 
 
         if can_use_json_extract:
@@ -598,6 +666,7 @@ class MemoryStorage:
             # Fetch more if we need to filter in Python, e.g., limit * 5 or a fixed larger number
             limit = limit * 5 # Fetch more to filter in Python
 
+
         params.append(limit)
 
         # Adjust params for the first placeholder if type was hardcoded
@@ -612,7 +681,7 @@ class MemoryStorage:
         try:
             cursor.execute(sql_query, tuple(actual_params))
             rows = cursor.fetchall()
-
+            
             current_time_utc = datetime.now(timezone.utc)
 
             for row_data_raw in rows:
@@ -651,6 +720,113 @@ class MemoryStorage:
         except sqlite3.Error as e:
             logger.error(f"Error retrieving knowledge facts for review: {e}", exc_info=True)
             return []
+
+    def decay_salience_for_unaccessed_memories(
+        self,
+        decay_rate_per_day: float,
+        min_salience_floor: float,
+        core_memory_types: List[str],
+        days_since_accessed_threshold: int = 1
+    ) -> int:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        updated_count = 0
+        batch_size = 100 # Process in batches
+        offset = 0
+
+        while True:
+            select_sql_parts = [
+                "SELECT id, salience, type, timestamp_last_salience_update FROM memories",
+                "WHERE (is_archived = 0 OR is_archived IS NULL)",
+            ]
+            params: List[Any] = []
+
+            if core_memory_types:
+                placeholders = ','.join('?' for _ in core_memory_types)
+                select_sql_parts.append(f"AND type NOT IN ({placeholders})")
+                params.extend(core_memory_types)
+
+            select_sql_parts.append(
+                f"AND (last_accessed_ts IS NULL OR JULIANDAY('now') - JULIANDAY(last_accessed_ts) >= ?)"
+            )
+            params.append(days_since_accessed_threshold)
+
+            select_sql_parts.append("LIMIT ? OFFSET ?")
+            params.extend([batch_size, offset])
+
+            select_sql = " ".join(select_sql_parts)
+
+            try:
+                cursor.execute(select_sql, tuple(params))
+                rows = cursor.fetchall()
+            except sqlite3.Error as e:
+                logger.error(f"Error selecting memories for salience decay: {e}", exc_info=True)
+                break # Stop processing if there's a DB error
+
+            if not rows:
+                break # No more memories to process
+
+            memories_to_update: List[Tuple[float, str, str]] = [] # (new_salience, new_last_salience_update_ts, id)
+
+            for row in rows:
+                entry_id, current_salience, entry_type, ts_last_salience_update_str = row['id'], row['salience'], row['type'], row['timestamp_last_salience_update']
+
+                if current_salience is None: # Should not happen for non-archived, but good check
+                    logger.debug(f"Skipping salience decay for memory {entry_id} due to NULL current_salience.")
+                    continue
+
+                if not ts_last_salience_update_str: # If never updated, use original timestamp for calculation
+                    # This requires another query or joining, for simplicity, we'll skip if this critical field is missing
+                    # Or, EthosCore side could ensure it's set on creation.
+                    # For now, if it's NULL, we can't calculate days_diff accurately.
+                    # The add_entry now defaults it to creation timestamp, so this should be rare for new entries.
+                    logger.warning(f"Skipping salience decay for memory {entry_id} due to missing timestamp_last_salience_update.")
+                    continue
+
+                try:
+                    ts_last_update = datetime.fromisoformat(ts_last_salience_update_str.replace("Z", "+00:00"))
+                    if ts_last_update.tzinfo is None: # Ensure timezone aware
+                        ts_last_update = ts_last_update.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    logger.warning(f"Invalid timestamp_last_salience_update format for memory {entry_id}: '{ts_last_salience_update_str}'. Skipping.")
+                    continue
+
+                now_utc = datetime.now(timezone.utc)
+                days_diff = (now_utc - ts_last_update).total_seconds() / (24 * 60 * 60)
+
+                if days_diff < 1.0: # Only decay if at least a full day has passed
+                    continue
+
+                # Calculate decayed salience: S_new = S_old * (1 - rate)^days
+                new_salience = float(current_salience) * ((1.0 - decay_rate_per_day) ** days_diff)
+
+                # Apply min_salience_floor: only if current_salience was above floor
+                if float(current_salience) > min_salience_floor:
+                    new_salience = max(new_salience, min_salience_floor)
+
+                # Clamp between 0.0 and 1.0
+                new_salience = max(0.0, min(1.0, new_salience))
+
+                # Check if salience changed significantly
+                if abs(new_salience - float(current_salience)) > 1e-4: # Using a small epsilon
+                    memories_to_update.append((new_salience, now_utc.isoformat(), entry_id))
+
+            if memories_to_update:
+                update_sql = "UPDATE memories SET salience = ?, timestamp_last_salience_update = ? WHERE id = ?"
+                try:
+                    cursor.executemany(update_sql, memories_to_update)
+                    conn.commit()
+                    updated_count += len(memories_to_update)
+                    logger.info(f"Salience decay: Updated {len(memories_to_update)} memories in this batch.")
+                except sqlite3.Error as e:
+                    logger.error(f"Error batch updating salience: {e}", exc_info=True)
+                    conn.rollback() # Rollback this batch on error
+
+            offset += batch_size
+
+        logger.info(f"Salience decay process finished. Total memories updated: {updated_count}.")
+        return updated_count
+
 
 # Notes on changes made in this overwrite:
 # - Added is_archived and archived_at to _ensure_db_exists and relevant MemoryEntry type hints.

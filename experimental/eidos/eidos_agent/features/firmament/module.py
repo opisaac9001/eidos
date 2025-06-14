@@ -232,8 +232,11 @@ class FirmamentModule:
                  event_name = "ACTIVITY_EFFECT_LEARNING"
 
             if event_name:
-                # Magnitude multiplier could be small for per-tick effects
-                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, magnitude_multiplier=0.1)) # Example: 10% of defined delta per tick
+
+                # Magnitude multiplier was removed from process_event_for_hexus_update.
+                # If scaling is needed, event definitions in EthosCore should be adjusted.
+                asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name))
+
             else:
                 logger.debug(f"FirmamentModule: No specific continuous Hexus event defined for activity type: {activity_type_lower}")
 
@@ -493,31 +496,55 @@ class FirmamentModule:
                     extra_metadata={"source_subconscious_intention_text": intention[:200]} # Add part of intention for context
                 )
 
-                # Hexus updates based on simulated action from intention
-                if self.ethos_core:
-                    intention_lower = intention.lower()
-                    event_name: Optional[str] = None
-                    payload = {"intention_text": intention[:100]} # Basic payload
 
-                    if "curious" in intention_lower or "wonder" in intention_lower or "learn" in intention_lower:
-                        event_name = "INTENTION_ACTION_CURIOSITY"
-                    elif "connect" in intention_lower or "talk to" in intention_lower or "social" in intention_lower:
-                        event_name = "INTENTION_ACTION_SOCIAL"
-                    elif "work on" in intention_lower or "focus on" in intention_lower or "task" in intention_lower or "project" in intention_lower:
-                        event_name = "INTENTION_ACTION_TASK"
-                    else:
-                        event_name = "INTENTION_ACTION_GENERAL_SUCCESS" # Default to general success if specific type not matched
+                # Hexus updates based on Pathos's subjective reaction to the intention and its simulated consequence
+                if self.ethos_core and self.ethos_core.logos_core:
+                    event_description = f"Simulated consequence of internal intention: {intention[:50]}..."
+                    # simulated_action_snippet is generated *after* this block, so we use the intention itself for data summary
+                    event_data_summary = f"Intention: {intention}\nSimulated Action/Reflection on Intention: {simulated_action_snippet or 'Pending/None'}"
 
-                    if event_name:
-                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=payload))
+                    current_hexus_scores = self.ethos_core.get_hexus_scores()
+                    persona_directives = self.ethos_core.get_persona_directives()[:3]
 
-            else:
+                    # Hardcoded list for now, ideally fetched from EthosCore or a shared constant
+                    available_reactions = [
+                        "REACTION_ACCOMPLISHED", "REACTION_FRUSTRATED_SETBACK", "REACTION_ENGAGED_LEARNING",
+                        "REACTION_VALIDATED_CONFIRMED", "REACTION_STRESSED_CONCERNED", "REACTION_CALM_RECHARGED",
+                        "REACTION_SOCIALLY_CONNECTED", "REACTION_SOCIALLY_DISCONNECTED", "REACTION_BORED_UNSTIMULATED",
+                        "REACTION_AMUSED_ENTERTAINED", "REACTION_FEELING_SAFE_SECURE", "REACTION_FEELING_HOPEFUL_OPTIMISTIC",
+                        "REACTION_FEELING_SAD_EMPATHETIC", "REACTION_FEELING_ANGER_IRRITATION", "REACTION_CURIOSITY_PIQUED",
+                        "REACTION_MOTIVATED_DRIVEN", "REACTION_INDIFFERENT_UNEFFECTED"
+                    ]
+
+                    subjective_reaction_type = await self.ethos_core.logos_core.determine_subjective_reaction(
+                        event_description=event_description,
+                        event_data_summary=event_data_summary,
+                        current_hexus_scores=current_hexus_scores,
+                        persona_directives=persona_directives,
+                        available_reactions=available_reactions
+                    )
+
+                    await self.ethos_core.process_event_for_hexus_update(
+                        event_type=subjective_reaction_type, # This will now be like "REACTION_ACCOMPLISHED"
+                        payload={"intention": intention[:100], "simulated_action_snippet": simulated_action_snippet[:100] if simulated_action_snippet else "N/A"}
+                    )
+                elif not self.ethos_core.logos_core:
+                    logger.warning("FirmamentModule: LogosCore not available on EthosCore instance. Cannot determine subjective Hexus reaction to intention.")
+                    # Fallback to a generic direct event if subjective determination fails
+                    if self.ethos_core: # Still try to log a simpler event if ethos_core exists
+                         asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_GENERAL_SUCCESS", payload={"intention_text": intention[:100]}))
+
+            else: # simulated_action_snippet was None
                 logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
                 if self.ethos_core:
+                    # Fallback to a generic direct event if subjective determination fails
+
                     asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_FAILURE", payload={"intention_text": intention[:100]}))
 
         except Exception as e:
-            logger.error(f"Error during intention action simulation LLM call: {e}", exc_info=True)
+            logger.error(f"Error during intention action simulation LLM call or subjective reaction: {e}", exc_info=True)
+            if self.ethos_core: # Fallback on general error
+                asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_FAILURE", payload={"intention_text": intention[:100], "error": str(e)}))
 
         # --- LLM-based Status Classification of the *original* slot (if any, and if no new slot was made) ---
         # This part should only run if:

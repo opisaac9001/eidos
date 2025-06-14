@@ -35,8 +35,9 @@ class EthosConfig(TypedDict, total=False):
     embedding_max_text_length: int
     reflection_interval_seconds: int
     forgetting_interval_seconds: int
-    salience_decay_rate_per_day: float
-    min_salience_for_decay: float
+    forgetting_salience_decay_rate_per_day: float # Renamed
+    forgetting_min_salience_for_decay: float # Renamed
+    forgetting_memory_access_salience_boost: float # Added
     user_fact_salience_floor: float
     mood_decay_rate_per_hour: float
     feedback_salience_boost: float
@@ -99,10 +100,12 @@ class EthosConfig(TypedDict, total=False):
     reflection_min_salience_for_consideration: float
     reflection_significant_event_salience_threshold: float
     reflection_lookback_days: int
-    forgetting_salience_threshold_archive: float
-    forgetting_days_to_archive_by_default: int
-    forgetting_core_memory_types_json: str
-    forgetting_extremely_low_salience_for_core: float
+    forgetting_salience_threshold_archive: float # Existing
+    forgetting_days_to_archive_by_default: int # Existing
+    forgetting_core_memory_types_json: str # Existing
+    forgetting_extremely_low_salience_for_core: float # Existing
+    retrieval_min_salience_for_pathos_context: float
+
 
 
 class HomeAssistantConfig(TypedDict, total=False):
@@ -296,8 +299,9 @@ class Config:
         "embedding_max_text_length": int(os.getenv("ETHOS_EMBEDDING_MAX_TEXT_LENGTH", 2560)),
         "reflection_interval_seconds": int(os.getenv("ETHOS_REFLECTION_INTERVAL_SECONDS", 86400)),
         "forgetting_interval_seconds": int(os.getenv("ETHOS_FORGETTING_INTERVAL_SECONDS", 43200)),
-        "salience_decay_rate_per_day": float(os.getenv("ETHOS_SALIENCE_DECAY_RATE_PER_DAY", 0.01)),
-        "min_salience_for_decay": float(os.getenv("ETHOS_MIN_SALIENCE_FOR_DECAY", 0.01)),
+        "forgetting_salience_decay_rate_per_day": float(os.getenv("ETHOS_FORGETTING_SALIENCE_DECAY_RATE_DAY", "0.01")), # Renamed & new default
+        "forgetting_min_salience_for_decay": float(os.getenv("ETHOS_FORGETTING_MIN_SALIENCE_DECAY_FLOOR", "0.05")), # Renamed & new default
+        "forgetting_memory_access_salience_boost": float(os.getenv("ETHOS_FORGETTING_MEMORY_ACCESS_SALIENCE_BOOST", "0.1")), # Added
         "user_fact_salience_floor": float(os.getenv("ETHOS_USER_FACT_SALIENCE_FLOOR", 1.0)),
         "mood_decay_rate_per_hour": float(os.getenv("ETHOS_MOOD_DECAY_RATE_PER_HOUR", 0.05)),
         "feedback_salience_boost": float(os.getenv("ETHOS_FEEDBACK_SALIENCE_BOOST", 0.5)),
@@ -360,10 +364,11 @@ class Config:
         "reflection_min_salience_for_consideration": float(os.getenv("ETHOS_REFLECTION_MIN_SALIENCE_FOR_CONSIDERATION", "0.3")),
         "reflection_significant_event_salience_threshold": float(os.getenv("ETHOS_REFLECTION_SIGNIFICANT_EVENT_SALIENCE_THRESHOLD", "0.7")),
         "reflection_lookback_days": int(os.getenv("ETHOS_REFLECTION_LOOKBACK_DAYS", "3")),
-        "forgetting_salience_threshold_archive": float(os.getenv("ETHOS_FORGETTING_SALIENCE_THRESHOLD_ARCHIVE", "0.1")),
-        "forgetting_days_to_archive_by_default": int(os.getenv("ETHOS_FORGETTING_DAYS_TO_ARCHIVE_DEFAULT", "90")),
-        "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight"]'),
-        "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")),
+        "forgetting_salience_threshold_archive": float(os.getenv("ETHOS_FORGETTING_SALIENCE_THRESHOLD_ARCHIVE", "0.1")), # Existing
+        "forgetting_days_to_archive_by_default": int(os.getenv("ETHOS_FORGETTING_DAYS_TO_ARCHIVE_DEFAULT", "90")), # Existing
+        "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight", "learned_correction"]'), # Updated default
+        "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")), # Existing
+        "retrieval_min_salience_for_pathos_context": float(os.getenv("ETHOS_RETRIEVAL_MIN_SALIENCE_PATHOS", "0.1")),
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None
