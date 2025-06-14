@@ -41,6 +41,21 @@ def get_current_mood() -> dict:
   """
   return current_mood.copy() # Return a copy to prevent direct modification
 
+def get_brief_mood_description() -> str:
+  """
+  Provides a brief textual description of the current mood.
+
+  Checks for a 'name' in the mood dictionary, otherwise provides a generic description.
+  """
+  if "name" in current_mood and current_mood["name"]:
+    return str(current_mood["name"])
+  # Example of summarizing based on dominant values (can be expanded)
+  if current_mood.get("laziness", 0) > 0.7:
+    return "Feeling quite lazy"
+  if current_mood.get("proactivity", 0) > 0.7:
+    return "Feeling proactive"
+  return "Feeling thoughtful"
+
 def update_mood(new_mood_aspects: dict) -> dict:
   """
   Updates the current mood with new aspects.

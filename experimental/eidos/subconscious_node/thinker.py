@@ -6,12 +6,14 @@ import json
 import logging
 import os
 import random
+from datetime import datetime # Added datetime import
 import threading # Added for thread management
 from typing import Dict, List, Optional # Added Optional for monologue_thread type hint
 
 # Assuming utils.py, mood.py, detectors.py, context_store.py are in the same package/directory
 from . import utils
 from . import mood
+from .mood import get_brief_mood_description # Added import
 from . import detectors
 from . import context_store
 
@@ -101,28 +103,80 @@ except Exception as e:
 # --- Functions ---
 
 def build_prompt() -> str:
-    """Constructs the standard prompt for the AWAKE_THINKING state."""
+    """Constructs the prompt for the AWAKE_THINKING state using new context variables."""
     current_context_data = context_store.get_current_context()
-    conversation_context_str = "\n".join(f"- {item}" for item in current_context_data.get("conversation", []))
-    action_context_str = "\n".join(f"- {item}" for item in current_context_data.get("action", []))
-    recent_thoughts_str = "\n".join(f"- {thought}" for thought in monologue_buffer[-10:])
 
-    prompt_parts = [
-        fixed_system_prompt, # This is the general system prompt from config
-        "\n--- RECENT THOUGHTS ---",
-        recent_thoughts_str if recent_thoughts_str else "No recent thoughts yet.",
-        "\n--- CURRENT CONTEXT (from Eidos) ---",
-        "Conversation:",
-        conversation_context_str if conversation_context_str else "No conversation context.",
-        "\nAction:",
-        action_context_str if action_context_str else "No action context.",
-        "\n--- RECENT SIGNIFICANT MEMORIES (from Eidos, if any) ---",
-        # Placeholder for now. Eidos will inject context directly into conversation/action for now.
-        "No specific significant memories explicitly recalled by Pathos at this moment, relying on current context.",
-        "\n--- CURRENT THOUGHT ---",
-        "Pathos reflects:"
-    ]
-    return "\n".join(prompt_parts)
+    # Fetch brief mood description
+    brief_mood_description = get_brief_mood_description() # Use the new function from mood.py
+
+    # Determine brief_activity
+    action_context = current_context_data.get("action", [])
+    if action_context:
+        brief_activity = str(action_context[-1]) # Get the last action
+    else:
+        brief_activity = "Idle" # Default if no action context
+
+    # Determine short_trigger_or_event
+    conversation_context = current_context_data.get("conversation", [])
+    if conversation_context:
+        short_trigger_or_event = str(conversation_context[-1]) # Last conversation item
+    elif action_context:
+        short_trigger_or_event = str(action_context[-1]) # Last action item if no conversation
+    else:
+        short_trigger_or_event = "A quiet moment" # Default
+
+    # Determine time_of_day
+    time_of_day = datetime.now().strftime("%I:%M %p") # e.g., "03:45 PM"
+
+    # The fixed_system_prompt is loaded from config and contains the placeholders
+    # {{brief_activity}}, {{short_trigger_or_event}}, {{brief_mood_description}}, {{time_of_day}}
+
+    prompt = fixed_system_prompt # Start with the base prompt from config
+    prompt = prompt.replace("{{brief_activity}}", brief_activity)
+    prompt = prompt.replace("{{short_trigger_or_event}}", short_trigger_or_event)
+    prompt = prompt.replace("{{brief_mood_description}}", brief_mood_description)
+    prompt = prompt.replace("{{time_of_day}}", time_of_day)
+
+    # Append recent thoughts if any, or a placeholder
+    recent_thoughts_str = "\n".join(f"- {thought}" for thought in monologue_buffer[-10:])
+    if not recent_thoughts_str:
+        recent_thoughts_str = "No recent thoughts to reflect on."
+
+    # Append a section for recent thoughts and a final prompt for the LLM to continue.
+    # This part can be adjusted based on how the LLM is expected to use the recent thoughts.
+    # For now, let's just ensure the core prompt is populated and add a simple continuation.
+    # The original prompt structure had "Pathos reflects:", which is a good continuation.
+    # The new system prompt is a complete entity, so we might not need to append much more *to* it,
+    # but rather ensure it's correctly formatted and the LLM knows where to start its generation.
+    # The system prompt itself should guide the LLM. If the LLM needs explicit recent thoughts *after* the system prompt,
+    # that structure would need to be defined. Given the new system prompt is quite comprehensive,
+    # let's assume it's enough and the LLM will generate based on it.
+    # However, including recent thoughts for context is often useful.
+    # Let's add a small section for recent thoughts after the main system prompt.
+
+    # Pathos's internal monologue often loops or refers to recent mental states.
+    # So, providing a few recent thoughts can be beneficial.
+    # The new system prompt is quite long, so we need to be careful about total prompt length.
+    # Let's integrate recent thoughts more subtly if the system prompt is meant to be all-encompassing.
+    # The prompt asks the LLM to "think about ... conversations he had... problems he's stuck on... ongoing fixations"
+    # Recent thoughts are a direct example of these.
+    # For now, let's return the populated system prompt. If testing reveals the LLM needs more direct
+    # priming for *what to say next*, we can add a "Pathos reflects:" or similar,
+    # and potentially a concise list of very recent thoughts.
+    # The new prompt ends with "Time: {{time_of_day}}". The LLM should take it from there.
+
+    # Let's append a very brief "Recent internal chatter:" section for the LLM to pick up on.
+    # This is somewhat redundant with "Recent memory" in the prompt but more direct.
+    # Keeping it concise.
+
+    # Final check on prompt structure: The new system prompt is designed to BE the prompt.
+    # It includes "You are the internal monologue... You think about: ... Context: ..."
+    # So, the output of this function should be JUST that prompt, filled in.
+    # No need for "Pathos reflects:" or "--- RECENT THOUGHTS ---" if the system prompt is self-contained.
+    # The prompt itself asks the LLM to generate the thoughts.
+
+    # Let's assume the `fixed_system_prompt` is the entire structure.
+    return prompt
 
 def construct_dream_prompt(daily_summary_text: str, wildcards_dict: Dict[str, List[str]]) -> str:
     """
