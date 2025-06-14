@@ -118,23 +118,39 @@ def build_prompt() -> str:
 
     # Determine short_trigger_or_event
     conversation_context = current_context_data.get("conversation", [])
-    if conversation_context:
-        short_trigger_or_event = str(conversation_context[-1]) # Last conversation item
-    elif action_context:
-        short_trigger_or_event = str(action_context[-1]) # Last action item if no conversation
+    # action_context is already defined above for brief_activity
+    if len(conversation_context) >= 2:
+        short_trigger_or_event = f"Recent conversation snippet: \"{'; '.join(conversation_context[-2:])}\""
+    elif len(conversation_context) == 1:
+        short_trigger_or_event = f"Last thing said: \"{conversation_context[-1]}\""
+    elif action_context: # This is the existing fallback from previous logic
+        short_trigger_or_event = f"Recent action: {action_context[-1]}"
     else:
-        short_trigger_or_event = "A quiet moment" # Default
+        short_trigger_or_event = "A quiet moment." # Default
 
     # Determine time_of_day
     time_of_day = datetime.now().strftime("%I:%M %p") # e.g., "03:45 PM"
 
+    # Format fixations
+    fixations = current_context_data.get("fixations", [])
+    if fixations:
+        fixations_str = "Currently mulling over: " + ", ".join(fixations) + "."
+    else:
+        fixations_str = "No specific fixations right now."
+
+    # Format body state
+    body_state = current_context_data.get("body_state", {})
+    physical_state_description = f"Energy: {body_state.get('energy_level', 'Unknown')}, Hunger: {body_state.get('hunger_level', 'Unknown')}, Tired: {'Yes' if body_state.get('is_tired') else 'No'}"
+
     # The fixed_system_prompt is loaded from config and contains the placeholders
-    # {{brief_activity}}, {{short_trigger_or_event}}, {{brief_mood_description}}, {{time_of_day}}
+    # {{brief_activity}}, {{short_trigger_or_event}}, {{brief_mood_description}}, {{time_of_day}}, {{current_fixations}}, {{physical_state_description}}
 
     prompt = fixed_system_prompt # Start with the base prompt from config
     prompt = prompt.replace("{{brief_activity}}", brief_activity)
     prompt = prompt.replace("{{short_trigger_or_event}}", short_trigger_or_event)
     prompt = prompt.replace("{{brief_mood_description}}", brief_mood_description)
+    prompt = prompt.replace("{{current_fixations}}", fixations_str)
+    prompt = prompt.replace("{{physical_state_description}}", physical_state_description)
     prompt = prompt.replace("{{time_of_day}}", time_of_day)
 
     # Append recent thoughts if any, or a placeholder
@@ -237,6 +253,23 @@ def monologue_loop():
             current_mood_snapshot = mood.get_current_mood()
             logger.debug(f"Debug: Current Mood: {current_mood_snapshot}")
             prompt_str = build_prompt()
+
+            # --- Pacing Modifier Logic ---
+            pacing_modifiers = [
+                " Keep this thought very brief, just a fleeting notion.",
+                " Let this thought wander a bit longer, explore it more deeply.",
+                " What's a quick, almost subconscious reaction to this current context?",
+                " Just a short, passing thought.",
+                " Elaborate on that a little."
+            ]
+            apply_modifier_chance = 0.2 # 20% chance to apply a modifier
+
+            if random.random() < apply_modifier_chance:
+                modifier_chosen = random.choice(pacing_modifiers)
+                prompt_str += modifier_chosen
+                logger.debug(f"Applied pacing modifier: {modifier_chosen}")
+            # --- End Pacing Modifier Logic ---
+
             logger.debug(f"Debug: Built Prompt (first 200 chars):\n{prompt_str[:200]}\n--------------------")
             new_thought = utils.run_llm(prompt_str, temperature)
             mood_name = current_mood_snapshot.get('name', 'default') if isinstance(current_mood_snapshot, dict) else 'default'
