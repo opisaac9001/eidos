@@ -2,7 +2,7 @@ from typing import Optional, List, Dict, Any, Union
 import uuid
 from datetime import datetime, timezone
 
-from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
+from eidos_agent.persona_logic.ethos_core import MemoryEntry
 from eidos_agent.utils.logger import get_logger # Corrected logger import
 
 logger = get_logger(__name__)
