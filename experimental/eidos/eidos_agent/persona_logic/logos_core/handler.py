@@ -17,10 +17,8 @@ except ImportError:
     ZoneInfo = None
 
 from eidos_agent.core.config import Config, LLMConfig, WolframAlphaConfig, NewsApiConfig
-# EthosCore imports are already updated to persona_logic in this file
 from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.services.web_search import WebSearchService
-# Removed HomeAssistantService import
 from eidos_agent.services.openweathermap import OpenWeatherMapService
 from eidos_agent.utils.document_parser import parse_document, SUPPORTED_EXTENSIONS
 from eidos_agent.utils.text_splitter import chunk_text_by_char
@@ -33,14 +31,13 @@ from eidos_agent.features.simulation.module import initiate_simulated_interactio
 logger = get_logger(__name__)
 
 class LogosCore:
-    def __init__(self, config: Config, ethos_core: EthosCore, owm_service: Optional[OpenWeatherMapService] = None): # Removed ha_service
+    def __init__(self, config: Config, ethos_core: EthosCore, owm_service: Optional[OpenWeatherMapService] = None):
         self.config = config
         self.ethos_core = ethos_core
-        # self.ha_service = ha_service # Removed
         self.owm_service = owm_service
 
         self.logos_techne_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_TECHNE')
-        self.logos_vision_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_VISION_CONTEXT') # For image description fallback
+        self.logos_vision_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_VISION_CONTEXT')
         self.logos_research_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_DEEP_RESEARCH')
         
         knowledge_upkeep_llm_role = config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE')
@@ -74,19 +71,16 @@ class LogosCore:
         else: logger.info("News API disabled or not configured in LogosCore.")
 
         logger.info("LogosCore initialized.")
-        # Removed HomeAssistantService check log
         if self.owm_service and self.owm_service.is_available: logger.info("LogosCore has OpenWeatherMapService.")
         else: logger.warning("LogosCore does NOT have OpenWeatherMapService.")
 
     async def close(self):
         if self.http_client and not self.http_client.is_closed: await self.http_client.aclose()
         if self.web_search_service: await self.web_search_service.close()
-        # No ha_service.close() needed
         logger.info("LogosCore resources closed.")
 
     async def initialize_services(self):
         logger.info("LogosCore initialize_services called.")
-        # No ha_service.connect() needed
 
     async def process_uploaded_document(self, file_content: bytes, filename: str, user_id: Optional[str] = None) -> Dict[str, Any]:
          logger.info(f"LogosCore processing doc: '{filename}' ({len(file_content)} bytes) for user '{user_id or 'unknown'}'.")
@@ -113,7 +107,7 @@ class LogosCore:
              return {"success": True, "message": f"Stored '{filename}' ({len(chunks)} chunks) for RAG.", "doc_id": final_doc_id, "num_chunks": len(chunks)}
          except Exception as e: logger.error(f"Error adding doc '{filename}' to RAG: {e}", exc_info=True); return {"success": False, "message": "System error adding document to RAG."}
 
-    async def execute_get_time(self, location: Optional[str] = None) -> str: # From broken (more robust)
+    async def execute_get_time(self, location: Optional[str] = None) -> str:
         try:
             final_time_str = ""; utc_now = datetime.now(timezone.utc); utc_fallback = utc_now.strftime('%A, %B %d, %Y at %I:%M:%S %p %Z (%z)')
             if location:
@@ -129,21 +123,14 @@ class LogosCore:
             return final_time_str
         except Exception as e: logger.error(f"Error in execute_get_time: {e}", exc_info=True); return json.dumps({"error": f"Error determining time: {e}"})
 
-    async def execute_describe_image(self, image_data_b64: str, prompt_from_llm: str) -> str: # Kept for fallback
+    async def execute_describe_image(self, image_data_b64: str, prompt_from_llm: str) -> str:
         logger.info(f"LogosCore: Describing image. User prompt: '{prompt_from_llm[:50]}...'")
         if not self.config.ENABLE_VISION_PROCESSING: return json.dumps({"error": "Vision processing disabled."})
-        
-        # This method should use LOGOS_VISION_CONTEXT if the main Pathos LLM is not multimodal.
-        # If Pathos LLM is multimodal, this method might not be called by PathosInterface.
-        vision_llm_config = self.logos_vision_config # Use the dedicated vision LLM config
+        vision_llm_config = self.logos_vision_config
         if not vision_llm_config or not vision_llm_config.get('url'):
             return json.dumps({"error": "LOGOS_VISION_CONTEXT LLM not configured."})
-
         messages_payload = [{"role": "user", "content": [{"type": "text", "text": prompt_from_llm},{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data_b64}"}}]}]
-        
-        # Use the _call_logos_llm helper, ensuring it uses the vision_llm_config
         description = await self._call_logos_llm(vision_llm_config, llm_messages_for_synthesis=messages_payload)
-        
         if description and not description.startswith("["):
             logger.info(f"Vision LLM provided description: {description[:100]}...")
             return description
@@ -151,12 +138,12 @@ class LogosCore:
             logger.warning(f"Vision LLM description failed or returned error: {description}")
             return json.dumps({"error": description or "Failed to get description from vision model."})
 
-    async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]: # From broken
+    async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]:
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return None
         if not query or not isinstance(query, str) or not query.strip(): return []
         return await self.web_search_service.perform_search(query)
 
-    async def execute_math_calculation(self, expression: str) -> str: # From broken
+    async def execute_math_calculation(self, expression: str) -> str:
         if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return json.dumps({"error": "Calculation service (Wolfram Alpha) unavailable."})
         if not expression or not isinstance(expression, str) or not expression.strip(): return json.dumps({"error": "No valid expression provided."})
         wa_res = await self.query_wolfram_alpha(expression)
@@ -165,7 +152,7 @@ class LogosCore:
             return cleaned if cleaned else "[Calculation resulted in empty response]"
         return json.dumps({"error": wa_res.get('message', 'Calculation failed.')})
 
-    async def execute_get_weather(self, location: str, user_id_context: Optional[str] = None) -> Dict[str, Any]: # From broken (more robust)
+    async def execute_get_weather(self, location: str, user_id_context: Optional[str] = None) -> Dict[str, Any]:
         if not location or not location.strip(): return {"success": False, "error": "No valid location provided.", "location": location}
         if self.owm_service and self.owm_service.is_available:
             owm_res = await self.owm_service.get_current_weather(location)
@@ -180,8 +167,7 @@ class LogosCore:
                             except json.JSONDecodeError: pass
                         if should_store: await self.execute_store_user_fact("derived_iana_timezone", iana_tz, f"IANA timezone from OWM for '{location}'.", user_id_context)
                 return owm_res
-        # Removed Home Assistant weather fetching block
-        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return {"success": False, "error": "No weather service available (excluding HA).", "location": location} # Modified error message slightly
+        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return {"success": False, "error": "No weather service available (excluding HA).", "location": location}
         wa_res = await self.query_wolfram_alpha(f"weather in {location}"); data = {"location": location}; success = False; err_msg = None
         if wa_res.get('success') and (raw_resp := wa_res.get('raw_response')):
             query_res = raw_resp.get('queryresult', {})
@@ -218,7 +204,7 @@ class LogosCore:
         if success: data.setdefault('source', "Wolfram Alpha"); return {"success": True, "weather_data": data}
         else: return {"success": False, "error": err_msg or "Unknown error processing Wolfram Alpha weather.", "location": location, "message": wa_res.get('message')}
 
-    async def execute_store_user_fact(self, attribute_name: str, attribute_value: str, user_statement_context: str, user_id: str) -> str: # From broken
+    async def execute_store_user_fact(self, attribute_name: str, attribute_value: str, user_statement_context: str, user_id: str) -> str:
         norm_attr_name = attribute_name.lower().replace(" ", "_").strip()
         if not norm_attr_name: return json.dumps({"error": "Attribute name cannot be empty."})
         content = {"attribute": norm_attr_name, "value": attribute_value, "original_user_statement": user_statement_context, "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()}
@@ -226,7 +212,7 @@ class LogosCore:
         try: await self.ethos_core.add_memory_entry(entry_data, user_id_context=user_id); return json.dumps({"status": "success", "message": f"Noted: your {attribute_name} is {attribute_value}."})
         except Exception as e: logger.error(f"Error storing user fact for '{user_id}': {e}", exc_info=True); return json.dumps({"error": f"Failed to store user fact: {e}"})
 
-    async def execute_store_world_fact(self, fact_statement: str, source_description: str, topic_tags: Optional[List[str]] = None, confidence_level: float = 0.8) -> str: # From broken
+    async def execute_store_world_fact(self, fact_statement: str, source_description: str, topic_tags: Optional[List[str]] = None, confidence_level: float = 0.8) -> str:
         if topic_tags is None: topic_tags = []
         try: confidence = max(0.0, min(1.0, float(confidence_level)))
         except (ValueError, TypeError): confidence = 0.8
@@ -235,7 +221,7 @@ class LogosCore:
         try: await self.ethos_core.add_memory_entry(entry_data, user_id_context="world_knowledge_store"); return json.dumps({"status": "success", "message": f"Noted fact: '{fact_statement[:70]}...'."})
         except Exception as e: logger.error(f"Error storing world fact: {e}", exc_info=True); return json.dumps({"error": f"Failed to store world fact: {e}"})
 
-    async def execute_deep_research(self, research_query: str, num_searches_to_perform: int = 3) -> str: # From broken
+    async def execute_deep_research(self, research_query: str, num_searches_to_perform: int = 3) -> str:
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return json.dumps({"error": "Web search unavailable for deep research."})
         llm_config = self.logos_research_config
         if not llm_config or not llm_config.get('url'): return json.dumps({"error": "Deep research LLM (LOGOS_DEEP_RESEARCH) not configured."})
@@ -280,8 +266,6 @@ class LogosCore:
 
         processed_articles: List[Dict[str, Any]] = []
 
-        # Determine how many articles to fully process with LLM
-        # Use the smaller of max_articles_to_process or the actual number of fetched articles
         num_to_fully_process = min(len(fetched_articles), max_articles_to_process)
         articles_to_process_fully = fetched_articles[:num_to_fully_process]
 
@@ -340,8 +324,6 @@ class LogosCore:
                 "original_description": original_description
             })
 
-        # Add remaining fetched articles (beyond max_articles_to_process) with minimal processing
-        # This ensures the tool can still return more articles if the initial fetch limit (from config) was higher.
         if len(fetched_articles) > num_to_fully_process:
             for article_data in fetched_articles[num_to_fully_process:]:
                  processed_articles.append({
@@ -350,7 +332,7 @@ class LogosCore:
                     "source_name": article_data.get("source_name", "Unknown Source"),
                     "url": article_data.get("url", "#"),
                     "published_at": article_data.get("published_at", ""),
-                    "classified_sentiment": "neutral_interesting", # Default for non-processed
+                    "classified_sentiment": "neutral_interesting",
                     "original_description": article_data.get("original_description", "")
                 })
 
@@ -365,21 +347,19 @@ class LogosCore:
             "locale": news_api_config.get('default_locale', 'us'),
             "language": news_api_config.get('default_language', 'en'),
             "limit": news_api_config.get('limit', 5),
-            "snippet_len": 250  # Increased snippet length
+            "snippet_len": 250
         }
         endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/top"
 
-        # Handle query vs category for endpoint and params
-        if query_keywords := news_api_config.get('search_keywords'): # Use 'search_keywords' from the passed config
+        if query_keywords := news_api_config.get('search_keywords'):
             params['search'] = query_keywords
             endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all"
-        elif category_val := news_api_config.get('categories'): # Use 'categories' from the passed config
+        elif category_val := news_api_config.get('categories'):
             params['categories'] = category_val
-            # Keep endpoint as /v1/news/top for categories unless specifically overridden
 
         if src_ids := news_api_config.get('include_source_ids'):
             params['source_ids'] = src_ids
-            endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all" # Search all if source_ids specified
+            endpoint = f"{news_api_config['base_url'].rstrip('/')}/v1/news/all"
         if excl_doms := news_api_config.get('exclude_source_ids'):
             params['exclude_domains'] = excl_doms
 
@@ -387,22 +367,20 @@ class LogosCore:
         try:
             resp = await self.http_client.get(endpoint, params=params, timeout=float(news_api_config.get('timeout', 15)))
             resp.raise_for_status(); data = resp.json()
-            for article_data in data.get("data", []): # Renamed to article_data for clarity
+            for article_data in data.get("data", []):
                 if isinstance(article_data, dict) and (title := article_data.get("title", "").strip()) and (url := article_data.get("url", "#").strip()):
                     articles.append({
                         "title": title,
                         "url": url,
-                        # Prefer description for original_description, fallback to snippet
                         "original_description": (article_data.get("description") or article_data.get("snippet", "")).strip(),
-                        # Prefer snippet for summarization base (often longer), fallback to description
                         "content_for_summary": (article_data.get("snippet") or article_data.get("description", "")).strip(),
                         "published_at": article_data.get("published_at", ""),
-                        "source_name": article_data.get("source", "unknown_source") # Use 'source' field from API as source_name
+                        "source_name": article_data.get("source", "unknown_source")
                     })
             return articles
         except Exception as e: logger.error(f"Error fetching news from TheNewsAPI: {e}", exc_info=True); return []
 
-    async def generate_daily_briefing(self, user_id_context: Optional[str] = None) -> Optional[str]: # From broken (more robust)
+    async def generate_daily_briefing(self, user_id_context: Optional[str] = None) -> Optional[str]:
         now_utc = datetime.now(timezone.utc); today_date = now_utc.strftime('%Y-%m-%d')
         local_time_display = now_utc.strftime('%A, %B %d, %Y, %I:%M %p %Z')
         if self.ethos_core and user_id_context and user_id_context not in ["system_briefing", "unknown_user", "api_guest_user", None, "system_oneiros", "system_document", "world_knowledge_store", "system_reflection"]:
@@ -423,9 +401,13 @@ class LogosCore:
             if wd.get('wind_speed'): weather_parts.append(f"- Wind: {wd.get('wind_speed')}")
         else: weather_parts.append(f"- Weather for {weather_loc}: {weather_res.get('error', 'Unavailable')}")
         if self.news_config and self.news_config.get('enabled'):
-            if headlines := await self._fetch_news_headlines_with_details(self.news_config):
-                for item in headlines:
-                    snippet = item.get('snippet', ''); news_parts.append(f"- [{item['title']}]({item['url']})")
+            briefing_news_config = self.news_config.copy()
+            briefing_news_config.pop('search_keywords', None)
+            briefing_news_config['categories'] = briefing_news_config.get('categories', 'general')
+
+            if headlines := await self._fetch_news_headlines_with_details(briefing_news_config): # type: ignore
+                for item in headlines[:3]:
+                    snippet = item.get('original_description', ''); news_parts.append(f"- [{item['title']}]({item['url']})")
                     if snippet: news_parts.append(f"  - _{snippet[:97] + '...' if len(snippet) > 100 else snippet}_")
             else: news_parts.append("- No top headlines found.")
         else: news_parts.append("- News service disabled.")
@@ -434,25 +416,23 @@ class LogosCore:
         return briefing
 
     async def get_or_generate_daily_briefing(self, user_id_context: Optional[str] = None) -> Dict[str, Any]:
-        if not self.ethos_core: return {"success": False, "message": "EthosCore not accessible.", "classified_sentiment": "neutral"}
+        if not self.ethos_core:
+            logger.warning("LogosCore: EthosCore not accessible for get_or_generate_daily_briefing.")
+            return {"success": False, "message": "EthosCore not accessible.", "classified_sentiment": "neutral"}
 
         briefing_content_str: Optional[str] = None
         source_message: str = "Unknown"
+        classified_sentiment: str = "neutral" # Default sentiment
 
         try:
             # get_todays_briefing from EthosCore returns the content string of the briefing memory
-            existing_briefing_content = await self.ethos_core.get_todays_briefing() # This is already just the content
+            existing_briefing_content = await self.ethos_core.get_todays_briefing()
             if existing_briefing_content:
                 briefing_content_str = existing_briefing_content
                 source_message = "Briefing retrieved from memory."
                 logger.info(f"LogosCore: Retrieved existing daily briefing for user_id_context '{user_id_context}'.")
-        except Exception as e:
-            logger.error(f"LogosCore: Error checking for existing briefing: {e}", exc_info=True)
-            # Proceed to generate a new one if fetching fails
-
-        if briefing_content_str is None:
-            try:
-                logger.info(f"LogosCore: No existing briefing found or error fetching. Generating new briefing for user_id_context '{user_id_context}'.")
+            else: # No existing briefing, so generate one
+                logger.info(f"LogosCore: No existing briefing found. Generating new briefing for user_id_context '{user_id_context}'.")
                 briefing_content_str = await self.generate_daily_briefing(user_id_context=user_id_context)
                 if briefing_content_str:
                     source_message = "Briefing newly generated."
@@ -460,12 +440,11 @@ class LogosCore:
                 else:
                     logger.error(f"LogosCore: Failed to generate new briefing for user_id_context '{user_id_context}'.")
                     return {"success": False, "message": "Failed to generate new briefing.", "classified_sentiment": "neutral"}
-            except Exception as e:
-                logger.error(f"LogosCore: Error generating new briefing: {e}", exc_info=True)
-                return {"success": False, "message": f"Error generating new briefing: {e}", "classified_sentiment": "neutral"}
+        except Exception as e: # Catch errors from either fetching existing or generating new
+            logger.error(f"LogosCore: Error in briefing retrieval or generation phase: {e}", exc_info=True)
+            return {"success": False, "message": f"Error in briefing retrieval/generation: {e}", "classified_sentiment": "neutral"}
 
-        # At this point, briefing_content_str should hold the briefing text
-        classified_sentiment = "neutral" # Default
+        # Perform sentiment classification on the obtained briefing_content_str
         if briefing_content_str and self.logos_techne_config:
             try:
                 sentiment_prompt = f"Classify the overall sentiment of the following daily briefing text as 'positive', 'negative', or 'neutral'. Respond with only one of these three labels. Briefing: {briefing_content_str[:1500]}" # Limit length for safety
@@ -474,26 +453,37 @@ class LogosCore:
                     prompt_text=sentiment_prompt
                 )
                 if llm_sentiment_label:
-                    cleaned_label = llm_sentiment_label.lower().strip().replace("'", "").replace('"',"").splitlines()[0]
-                    valid_sentiments = ['positive', 'negative', 'neutral']
-                    if cleaned_label in valid_sentiments:
-                        classified_sentiment = cleaned_label
+                    # More robust parsing for the label
+                    cleaned_label = llm_sentiment_label.lower().strip().replace("'", "").replace('"',"")
+                    first_word_match = re.match(r"^(positive|negative|neutral)\b", cleaned_label)
+                    if first_word_match:
+                        classified_sentiment = first_word_match.group(1)
                         logger.info(f"LogosCore: Classified briefing sentiment as '{classified_sentiment}'.")
                     else:
-                        logger.warning(f"LogosCore: Briefing sentiment classification returned invalid label: '{llm_sentiment_label}'. Defaulting to neutral.")
+                        logger.warning(f"LogosCore: Briefing sentiment classification returned non-standard label: '{llm_sentiment_label}'. Defaulting to neutral.")
+                        classified_sentiment = "neutral" # Explicitly set default on parse fail
                 else:
                     logger.warning("LogosCore: Briefing sentiment classification returned no label. Defaulting to neutral.")
+                    classified_sentiment = "neutral" # Explicitly set default on no label
             except Exception as e_sent:
                 logger.error(f"LogosCore: Error during briefing sentiment classification: {e_sent}", exc_info=True)
+                classified_sentiment = "neutral" # Default on error
+        elif not briefing_content_str:
+             logger.info("LogosCore: No briefing content to classify sentiment for.")
+             # classified_sentiment remains "neutral" (default)
+        elif not self.logos_techne_config:
+            logger.warning("LogosCore: LOGOS_TECHNE LLM not configured. Cannot classify briefing sentiment. Defaulting to neutral.")
+            # classified_sentiment remains "neutral" (default)
 
         return {
             "success": True,
             "briefing_content": briefing_content_str,
             "message": source_message,
+            "source": source_message,
             "classified_sentiment": classified_sentiment
         }
 
-    async def _call_logos_llm(self, llm_config: LLMConfig, prompt_text: Optional[str] = None, llm_messages_for_synthesis: Optional[List[Dict[str,Any]]] = None) -> str: # From broken
+    async def _call_logos_llm(self, llm_config: LLMConfig, prompt_text: Optional[str] = None, llm_messages_for_synthesis: Optional[List[Dict[str,Any]]] = None) -> str:
         if not llm_config or not llm_config.get('url'): raise ValueError("LLM config (URL) missing for LogosCore.")
         if not prompt_text and not llm_messages_for_synthesis: raise ValueError("prompt_text or llm_messages_for_synthesis required.")
         api_url = f"{llm_config['url']}/chat/completions"; response = None
@@ -520,7 +510,7 @@ class LogosCore:
         except json.JSONDecodeError as e: response_text = response.text[:500] if response and hasattr(response, 'text') else 'N/A'; raise ValueError(f"Invalid JSON from LLM: {e}. Response: {response_text}") from e
         except Exception as e: logger.error(f"Error processing LLM response: {e}", exc_info=True); raise RuntimeError(f"Failed to process LLM response: {e}") from e
 
-    async def query_wolfram_alpha(self, query: str) -> Dict[str, Any]: # From broken (more robust parsing)
+    async def query_wolfram_alpha(self, query: str) -> Dict[str, Any]:
         if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return {"success": False, "message": "Wolfram Alpha unavailable."}
         encoded_query = urllib.parse.quote_plus(query); pod_ids, primary_titles = [], []
         if "time in" in query.lower() or "current time" in query.lower(): pod_ids, primary_titles = ["CurrentTimeInLocation:CurrentTime", "Input"], ["Current time"]
@@ -567,7 +557,7 @@ class LogosCore:
         except json.JSONDecodeError as e: response_text = resp.text[:500] if 'resp' in locals() and hasattr(resp, 'text') else 'N/A'; return {"success": False, "message": f"Invalid JSON from Wolfram Alpha: {e}. Response: {response_text}", "raw_response": None}
         except Exception as e: logger.error(f"Error processing Wolfram Alpha response: {e}", exc_info=True); return {"success": False, "message": f"Error processing Wolfram Alpha data: {e}", "raw_response": None}
 
-    async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]: # From broken
+    async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]:
         fact_id, original_statement = fact_entry.get('id', 'unknown'), fact_entry.get('content')
         if not original_statement: return {"status": "unverifiable", "reason": "Original fact content empty."}
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return {"status": "unverifiable", "reason": "Web search unavailable."}
@@ -611,3 +601,82 @@ class LogosCore:
         logger.info("LogosCore: Ending simulated interaction.")
         result = await simulation_module.end_simulated_interaction()
         return json.dumps(result)
+
+    async def determine_subjective_reaction(
+        self,
+        event_description: str,
+        event_data_summary: Optional[str],
+        current_hexus_scores: Dict[str, float],
+        persona_directives: List[str],
+        available_reactions: List[str]
+    ) -> str:
+        """
+        Determines Pathos's subjective reaction to an event using an LLM call.
+        """
+        default_reaction = "REACTION_INDIFFERENT_UNEFFECTED"
+
+        if not self.logos_techne_config:
+            logger.error("LogosCore: LOGOS_TECHNE LLM not configured. Cannot determine subjective reaction.")
+            return default_reaction
+
+        # Construct Persona Directives string for prompt (first 3-5)
+        persona_directives_str_parts = []
+        for i, directive in enumerate(persona_directives[:3]): # Using first 3 for brevity
+            persona_directives_str_parts.append(f"- {directive}")
+        if not persona_directives_str_parts:
+            persona_directives_str_parts.append("- N/A (No specific persona directives provided for this decision)")
+        persona_directives_for_prompt = "\n".join(persona_directives_str_parts)
+
+        system_prompt = "You are an AI assistant helping to determine Pathos's personal, subjective reaction to an event. Pathos has a defined persona and current internal Hexus state."
+
+        user_prompt_parts = [
+            f"An event has occurred: **{event_description}**\n",
+            f"Relevant data for this event: **{event_data_summary if event_data_summary else 'N/A'}**\n",
+            "Pathos's current internal state (Hexus scores):",
+            f"{json.dumps(current_hexus_scores, indent=2)}\n",
+            "Pathos's core persona directives include:",
+            persona_directives_for_prompt + "\n",
+            "Considering all this, what is Pathos's single most fitting *subjective and personal* reaction to this event? ",
+            f"Choose ONLY ONE from the following list and respond with only the chosen reaction string (e.g., REACTION_VALIDATED_CONFIRMED):\n",
+            f"{', '.join(available_reactions)}"
+        ]
+        user_prompt = "\n".join(user_prompt_parts)
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        logger.debug(f"LogosCore: Determining subjective reaction. Event: '{event_description}'. Data: '{event_data_summary}'. Hexus: {current_hexus_scores}. Persona Directives: {persona_directives_subset_for_log if persona_directives else 'N/A'}. Available Reactions: {available_reactions}")
+
+        raw_llm_response: Optional[str] = None
+        try:
+            raw_llm_response = await self._call_logos_llm(
+                llm_config=self.logos_techne_config,
+                llm_messages_for_synthesis=messages, # Using the correct parameter name
+                # Not passing prompt_text as llm_messages_for_synthesis is used
+            ) # Temperature defaults to 0.1, max_tokens to 1024 in _call_logos_llm
+              # Override for this specific call if needed, e.g. by enhancing _call_logos_llm or passing more params.
+              # For now, we'll rely on _call_logos_llm's defaults or its own config-driven values.
+              # A specific temperature and max_tokens for this task would be:
+              # temperature_override=0.4, max_tokens_override=50 (approx)
+
+            if raw_llm_response:
+                logger.debug(f"LogosCore: Raw LLM response for subjective reaction: '{raw_llm_response}'")
+                # Basic parsing: strip whitespace, remove potential quotes, take first line
+                # More robust parsing might be needed if LLM is inconsistent
+                parsed_reaction = raw_llm_response.strip().replace('"', '').replace("'", "").splitlines()[0].strip()
+
+                if parsed_reaction in available_reactions:
+                    logger.info(f"LogosCore: Determined subjective reaction: '{parsed_reaction}' for event: '{event_description}'")
+                    return parsed_reaction
+                else:
+                    logger.warning(f"LogosCore: LLM returned an invalid or unexpected reaction: '{parsed_reaction}'. Falling back. Raw: '{raw_llm_response}'")
+                    return default_reaction
+            else:
+                logger.warning(f"LogosCore: LLM returned no response for subjective reaction. Falling back. Event: '{event_description}'")
+                return default_reaction
+
+        except Exception as e:
+            logger.error(f"LogosCore: Error during LLM call for subjective reaction: {e}", exc_info=True)
+            return default_reaction

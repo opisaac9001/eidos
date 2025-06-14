@@ -676,45 +676,62 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-    def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
+    async def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
         """
-        Processes user interaction details to update relevant Hexus scores.
+        Determines Pathos's subjective reaction to a user interaction and updates Hexus scores.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION: # Assuming Hexus updates are tied to this flag
+        if not self.config.ENABLE_MOOD_SIMULATION:
+            logger.debug("Hexus updates for interactions skipped (ENABLE_MOOD_SIMULATION is false).")
             return
-        
-        logger.debug(f"Processing interaction for Hexus update. Input: '{user_input_text[:50]}...'")
-        self.process_event_for_hexus_update("GENERAL_INTERACTION")
+        if not self.logos_core:
+            logger.error("LogosCore not available in EthosCore. Cannot determine subjective reaction for interaction.")
+            return
 
-        input_lower = (user_input_text or "").lower()
+        logger.debug(f"Determining subjective reaction for interaction. Input: '{user_input_text[:50]}...'")
 
-        # Define keyword lists (can be expanded and refined)
-        positive_keywords = ['thank', 'thanks', 'good', 'great', 'awesome', 'helpful', 'nice', 'love', 'like', 'excellent', 'perfect', 'wonderful', 'amazing', 'fantastic', 'cool', 'brilliant', 'appreciate it']
-        negative_keywords = ['bad', 'wrong', 'terrible', 'awful', 'hate', 'dislike', 'stupid', 'useless', 'annoying', 'incorrect', 'fail', 'sucks', 'not good', "didn't work", 'frustrating']
-        question_keywords = ['?', 'what', 'who', 'where', 'when', 'why', 'how', 'explain', 'tell me', 'can you', 'could you']
-        problem_keywords = ['problem', 'issue', 'error', 'broken', 'help me with this']
-
+        event_description = "User interaction"
+        event_data_summary_parts = [f"User: {user_input_text}"]
+        if pathos_response_text:
+            event_data_summary_parts.append(f"Pathos: {pathos_response_text}")
         if image_provided:
-            self.process_event_for_hexus_update("PROVIDED_IMAGE_TO_PATHOS")
+            event_data_summary_parts.append("[Image was provided by user]")
         if document_provided:
-            self.process_event_for_hexus_update("PROVIDED_DOCUMENT_TO_PATHOS")
+            event_data_summary_parts.append("[Document was provided by user]")
+        event_data_summary = "\n".join(event_data_summary_parts)
 
-        if any(kw in input_lower for kw in positive_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_POSITIVE_KEYWORD")
+        current_hexus_scores = self.get_hexus_scores()
+        persona_directives = self.get_persona_directives()[:3] # Use first 3 directives
+        available_reactions = list(HEXUS_SUBJECTIVE_REACTION_DEFINITIONS.keys())
 
-        if any(kw in input_lower for kw in negative_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_NEGATIVE_KEYWORD")
+        try:
+            subjective_reaction_type = await self.logos_core.determine_subjective_reaction(
+                event_description=event_description,
+                event_data_summary=event_data_summary,
+                current_hexus_scores=current_hexus_scores,
+                persona_directives=persona_directives,
+                available_reactions=available_reactions
+            )
 
-        if any(kw in input_lower for kw in question_keywords) or (user_input_text and user_input_text.strip().endswith('?')):
-            self.process_event_for_hexus_update("USER_INPUT_QUESTION")
+            logger.info(f"Subjective reaction to user interaction determined as: {subjective_reaction_type}")
 
-        if any(kw in input_lower for kw in problem_keywords):
-            self.process_event_for_hexus_update("USER_INPUT_PROBLEM_STATEMENT")
+            payload = {
+                "user_input": user_input_text[:200], # Log a snippet
+                "pathos_response": pathos_response_text[:200] if pathos_response_text else None,
+                "image_provided": image_provided,
+                "document_provided": document_provided
+            }
+            await self.process_event_for_hexus_update(subjective_reaction_type, payload=payload)
 
-        if pathos_response_text and len(pathos_response_text) > 200:
-            self.process_event_for_hexus_update("INTERACTION_LONG_RESPONSE_GIVEN")
-        elif pathos_response_text and len(pathos_response_text) < 50:
-            self.process_event_for_hexus_update("INTERACTION_SHORT_RESPONSE_GIVEN")
+            # Still apply a very small, general interaction effect directly if desired,
+            # or rely solely on the subjective reaction. For now, let's keep it.
+            # This represents the basic engagement of interaction itself.
+            await self.process_event_for_hexus_update("GENERAL_INTERACTION", payload={"source": "direct_interaction_processing"})
+
+        except Exception as e:
+            logger.error(f"Error during subjective reaction processing for interaction: {e}", exc_info=True)
+            # Optionally, trigger a generic/error Hexus event here
+            await self.process_event_for_hexus_update("REACTION_INDIFFERENT_UNEFFECTED", payload={"error_in_subjective_reaction": str(e)})
+
 
     def _apply_hexus_change(self, dimension_name: str, change_amount: float, reason: Optional[str] = None):
         """
@@ -1090,36 +1107,45 @@ class EthosCore:
                 logger.warning("EthosCore: LogosCore not available for get_todays_briefing_context_for_prompt.")
                 return "Briefing service unavailable (LogosCore missing)."
 
+            # Call LogosCore to get briefing data, which now includes classified_sentiment
             briefing_data = await self.logos_core.get_or_generate_daily_briefing(user_id_context=user_id)
 
-            briefing_content_for_prompt = "No briefing available for Pathos today."
+            briefing_content_for_prompt = "No briefing available for Pathos today." # Default
+
             if briefing_data and briefing_data.get('success') and briefing_data.get('briefing_content'):
                 content_str = str(briefing_data['briefing_content'])
+                # Ensure content_str is not None before formatting; briefing_data.get already handles this.
                 max_len = self.ethos_config.get('briefing_context_max_length_for_prompt', 1500)
                 briefing_content_for_prompt = f"Today's Briefing Highlights (Pathos's context, shared with user '{user_id}'):\n{content_str[:max_len] + '...' if len(content_str) > max_len else content_str}"
 
-                # Trigger Hexus update based on classified sentiment
-                classified_sentiment = briefing_data.get('classified_sentiment')
+                # Trigger Hexus update based on classified sentiment from briefing_data
+                classified_sentiment = briefing_data.get('classified_sentiment') # This is new
                 if classified_sentiment:
                     event_name: Optional[str] = None
                     if classified_sentiment == 'positive':
                         event_name = "BRIEFING_OVERALL_POSITIVE"
                     elif classified_sentiment == 'negative':
                         event_name = "BRIEFING_OVERALL_NEGATIVE"
-                    elif classified_sentiment == 'neutral':
+                    elif classified_sentiment == 'neutral': # Ensure 'neutral' is handled
                         event_name = "BRIEFING_OVERALL_NEUTRAL"
 
                     if event_name:
                         logger.debug(f"EthosCore: Triggering Hexus event '{event_name}' based on briefing sentiment '{classified_sentiment}'.")
-                        # Run as a task to not block the prompt context retrieval
-                        asyncio.create_task(self.process_event_for_hexus_update(
-                            event_name,
-                            payload={"briefing_source": briefing_data.get("source", "unknown")}
-                        ))
+                        # Since get_todays_briefing_context_for_prompt is async, direct await is fine.
+                        # If this method were sync, asyncio.create_task would be appropriate.
+                        await self.process_event_for_hexus_update(
+                            event_type=event_name, # Ensure param name matches definition
+                            payload={"briefing_source": briefing_data.get("source", "unknown"), "user_id": user_id}
+                        )
                     else:
-                        logger.warning(f"EthosCore: Unknown classified sentiment for briefing: {classified_sentiment}")
+                        # This case should ideally not be hit if LogosCore always returns a valid default.
+                        logger.warning(f"EthosCore: Unknown or unhandled classified sentiment for briefing: '{classified_sentiment}'")
                 else:
                     logger.debug("EthosCore: No classified sentiment found in briefing_data to trigger Hexus update.")
+            else:
+                 # Log if briefing_data indicates failure or no content
+                 logger.info(f"EthosCore: Briefing data not successful or content missing. Success: {briefing_data.get('success')}, Content Present: {bool(briefing_data.get('briefing_content'))}")
+
 
             return briefing_content_for_prompt
 
