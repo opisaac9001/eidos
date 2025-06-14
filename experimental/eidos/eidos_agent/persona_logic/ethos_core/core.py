@@ -77,6 +77,90 @@ DEFAULT_HEXUS_SCORES = {
     "general_caution": 0.3,            # Assuming 0-1 scale now, previously 0.0
     "user_engagement_proactivity": 0.4,# Assuming 0-1 scale now, previously 0.0
     "brevity_preference": 0.5          # Assuming 0-1 scale now, previously 0.0
+
+}
+
+HEXUS_BASELINES = {
+    "joy": 0.4,
+    "stress": 0.1,
+    "curiosity": 0.5,
+    "loneliness": 0.2,
+    "ambition": 0.3,
+    "tiredness": 0.1,
+    "comfort": 0.5,
+    "focus": 0.5,
+    "impulsiveness": 0.2,
+    "resentment": 0.05,
+    "contentment": 0.5,
+    "melancholy": 0.1,
+    "craving_connection": 0.3,
+    "general_caution": 0.2, # Baseline for pre-existing
+    "user_engagement_proactivity": 0.2, # Baseline for pre-existing
+    "brevity_preference": 0.5 # Baseline for pre-existing
+}
+
+HEXUS_DECAY_RATES = { # Decay rate per hour
+    "joy": 0.1,
+    "stress": 0.25,
+    "curiosity": 0.05,
+    "loneliness": 0.08,
+    "ambition": 0.05,
+    "tiredness": 0.3, # Assumes decay when not actively resting. Resting itself would have direct Hexus changes.
+    "comfort": 0.1,
+    "focus": 0.15,
+    "impulsiveness": 0.1,
+    "resentment": 0.02, # Decays very slowly
+    "contentment": 0.05,
+    "melancholy": 0.05,
+    "craving_connection": 0.1,
+    "general_caution": 0.1,
+    "user_engagement_proactivity": 0.1,
+    "brevity_preference": 0.1
+}
+
+HEXUS_EVENT_DEFINITIONS = {
+    # User Feedback
+    "USER_FEEDBACK_POSITIVE": {"joy": 0.1, "contentment": 0.1, "stress": -0.05, "resentment": -0.02},
+    "USER_FEEDBACK_NEGATIVE": {"stress": 0.1, "resentment": 0.05, "joy": -0.1, "contentment": -0.05},
+    "USER_FEEDBACK_CORRECTION": {"stress": 0.03, "curiosity": 0.02}, # Learning from being corrected
+    # User Input Analysis
+    "USER_INPUT_POSITIVE_KEYWORD": {"joy": 0.02, "contentment": 0.01},
+    "USER_INPUT_NEGATIVE_KEYWORD": {"stress": 0.02, "resentment": 0.01},
+    "USER_INPUT_QUESTION": {"curiosity": 0.01, "focus": 0.01, "user_engagement_proactivity": 0.01},
+    "USER_INPUT_PROBLEM_STATEMENT": {"stress": 0.03, "focus": 0.03, "user_engagement_proactivity": 0.05},
+    # Pathos Response Characteristics
+    "INTERACTION_SHORT_RESPONSE_GIVEN": {"brevity_preference": 0.01},
+    "INTERACTION_LONG_RESPONSE_GIVEN": {"brevity_preference": -0.01, "tiredness": 0.005}, # Slight tiredness from long response
+    # Content Provided by User
+    "PROVIDED_IMAGE_TO_PATHOS": {"curiosity": 0.02, "focus": 0.01},
+    "PROVIDED_DOCUMENT_TO_PATHOS": {"curiosity": 0.03, "focus": 0.02},
+    # Tool Usage
+    "TOOL_SUCCESS_WEB_SEARCH": {"curiosity": 0.05, "focus": 0.02, "contentment": 0.01},
+    "TOOL_SUCCESS_ADD_EVENT_LEISURE": {"joy": 0.05, "ambition": 0.01, "contentment": 0.03},
+    "TOOL_SUCCESS_ADD_EVENT_WORK": {"ambition": 0.03, "focus": 0.02, "contentment": 0.02},
+    "TOOL_SUCCESS_FETCH_WEATHER": {"curiosity": 0.01, "contentment": 0.005}, # Added for weather tool
+    "TOOL_SUCCESS_GENERIC": {"contentment": 0.02, "focus": 0.01}, # Generic success
+    "TOOL_FAILURE_GENERIC": {"stress": 0.03, "resentment": 0.01, "focus": -0.02},
+    # Activity Effects (per tick/cycle of Firmament's run_simulation_tick)
+    "ACTIVITY_EFFECT_RESTING": {"tiredness": -0.02, "stress": -0.01, "comfort": 0.01, "focus": -0.01},
+    "ACTIVITY_EFFECT_WORK_DEEP": {"focus": 0.01, "ambition": 0.005, "tiredness": 0.005, "stress": 0.002},
+    "ACTIVITY_EFFECT_WORK_ROUTINE": {"focus": 0.005, "tiredness": 0.003, "contentment": 0.002},
+    "ACTIVITY_EFFECT_LEARNING": {"curiosity": 0.01, "focus": 0.005, "ambition": 0.002},
+    "ACTIVITY_EFFECT_SOCIAL": {"joy": 0.01, "loneliness": -0.01, "craving_connection": -0.005, "stress": -0.005},
+    "ACTIVITY_EFFECT_LEISURE_ACTIVE": {"joy": 0.015, "tiredness": 0.005, "stress": -0.01},
+    "ACTIVITY_EFFECT_LEISURE_PASSIVE": {"comfort": 0.01, "tiredness": -0.005},
+    "ACTIVITY_EFFECT_CHORE": {"tiredness": 0.005, "contentment": 0.005, "stress": 0.002},
+    # Firmament Intention Simulation Outcomes
+    "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
+    "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
+    "INTENTION_ACTION_TASK": {"focus": 0.02, "ambition": 0.02, "contentment": 0.01},
+    "INTENTION_ACTION_GENERAL_SUCCESS": {"contentment": 0.01, "joy": 0.005},
+    "INTENTION_ACTION_FAILURE": {"stress": 0.02, "resentment": 0.01, "ambition": -0.005},
+    # General Engagement
+    "GENERAL_INTERACTION": {"user_engagement_proactivity": 0.005, "focus": 0.005}, # Smallest default bump
+    # Reflection Cycle
+    "REFLECTION_CYCLE_COMPLETED_INSIGHTS": {"contentment": 0.05, "focus": 0.02, "curiosity": 0.02} # Positive effect of reflection
+
 }
 
 HEXUS_BASELINES = {
@@ -676,6 +760,7 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
+no
     async def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
         """
         Determines Pathos's subjective reaction to a user interaction and updates Hexus scores.
@@ -786,6 +871,7 @@ class EthosCore:
                 logger.warning(f"Dimension '{dimension}' from personality bias profile not found in current Hexus scores. Bias not applied for this dimension.")
         # Note: No _save_hexus_scores() here. It's called by _load_hexus_scores if it creates a new file,
         # or will be called by subsequent updates. This ensures bias is applied before first use.
+
 
     async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
@@ -1724,6 +1810,7 @@ class EthosCore:
         seed_memory_types = ['reflection_insight', 'feedback', 'chat_interaction',
                              'firmament_activity_log', 'learned_correction', 'world_knowledge']
 
+
         # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
         # The default sort of get_memories_for_summary (salience then recency) matches the intent.
         candidate_memories = await self.memory_storage.get_memories_for_summary(
@@ -1733,6 +1820,7 @@ class EthosCore:
             types=seed_memory_types,
             limit=num_seed_memories * 3
             # include_archived defaults to False
+
         )
 
         seed_memories = [mem for mem in candidate_memories if mem.get('salience', 0.0) >= min_salience_seed][:num_seed_memories]
@@ -1899,17 +1987,19 @@ class EthosCore:
 
     async def run_managed_forgetting(self):
         """
+
         Manages memory decay and archival.
         1. Decays salience of unaccessed memories.
         2. Archives memories based on age and salience thresholds.
         Core memory types have different archival rules.
-        """
+
         if not self.config.ENABLE_MANAGED_FORGETTING:
             logger.debug("Managed forgetting cycle skipped as feature is disabled by Config.ENABLE_MANAGED_FORGETTING.")
             return
 
         now = datetime.now(timezone.utc)
         logger.info(f"--- Ethos: Starting Managed Forgetting Cycle at {now.isoformat()} ---")
+
 
         if not self.memory_storage:
             logger.error("EthosCore: MemoryStorage not available. Cannot run managed forgetting.")
@@ -1938,11 +2028,13 @@ class EthosCore:
 
         # b. Archival Step
         logger.info("Managed Forgetting: Starting archival step.")
+
         salience_threshold_archive = self.ethos_config.get('forgetting_salience_threshold_archive', 0.1)
         days_to_archive_default = self.ethos_config.get('forgetting_days_to_archive_by_default', 90)
         extremely_low_salience_core = self.ethos_config.get('forgetting_extremely_low_salience_for_core', 0.01)
 
         archive_before_date = now - timedelta(days=days_to_archive_default)
+
 
         archived_count = 0
         processed_for_archival_count = 0
@@ -1976,19 +2068,23 @@ class EthosCore:
                 mem_timestamp_str = memory.get('timestamp')
                 if not mem_timestamp_str:
                     logger.warning(f"Managed Forgetting: Memory {memory_id} missing timestamp. Skipping archival check.")
-                    continue
+
 
                 try:
                     mem_dt = datetime.fromisoformat(mem_timestamp_str.replace('Z', '+00:00'))
                     if mem_dt.tzinfo is None: # Ensure timezone aware for comparison
                         mem_dt = mem_dt.replace(tzinfo=timezone.utc)
                 except ValueError:
+
                     logger.warning(f"Managed Forgetting: Could not parse timestamp for memory {memory_id}: {mem_timestamp_str}. Skipping archival check.")
+
                     continue
 
                 is_core = memory.get('type') in self.forgetting_core_memory_types
                 is_old = mem_dt < archive_before_date
+
                 current_salience = float(memory.get('salience', 1.0) or 1.0) # Default to high salience if None
+
                 is_low_salience = current_salience < salience_threshold_archive
                 is_extremely_low_salience = current_salience < extremely_low_salience_core
 
@@ -1998,6 +2094,7 @@ class EthosCore:
                 if is_core:
                     if is_extremely_low_salience:
                         should_archive = True
+
                         reason = f"core type '{memory.get('type')}' with extremely low salience ({current_salience:.3f} < {extremely_low_salience_core})"
                 else: # Not a core type
                     if is_old and is_low_salience: # Must be both old AND low salience for non-core
@@ -2029,6 +2126,7 @@ class EthosCore:
         logger.info(f"Managed Forgetting: Archival step. Processed {processed_for_archival_count} memories. Archived {archived_count} memories.")
 
         # c. Update Timestamps
+
         self.last_forgetting_time = now
         self._save_task_last_run_time("EthosForgetting", now)
         logger.info(f"--- Ethos: Managed Forgetting Cycle Finished at {now.isoformat()} ---")
@@ -2048,6 +2146,7 @@ class EthosCore:
 
         logger.info(f"--- Ethos: Running Hexus Decay Cycle (Time elapsed: {time_elapsed_seconds:.2f}s) ---")
 
+
         # --- Determine Current Activity ---
         current_activity_type: Optional[str] = None
         if self.chronos_engine:
@@ -2064,9 +2163,11 @@ class EthosCore:
         else:
             logger.warning("Hexus decay: ChronosEngine not available. Decay will not be activity-aware.")
 
+
         # The 'hexus_decay_rate_per_cycle' from config is now superseded by per-dimension hourly rates
         # and actual time elapsed.
         # We retain hexus_decay_interval_seconds from config as the *intended* call frequency for the task.
+
 
         # Activity-aware decay - Placeholder for future enhancement.
         # The fetched current_activity_type can be used here to adjust baselines or decay rates.
@@ -2115,6 +2216,7 @@ class EthosCore:
             new_value = current_value - decay_amount_for_cycle
 
             # Clamping Hexus scores (assuming all Hexus scores are 0.0 to 1.0)
+
             clamped_new_value = max(0.0, min(1.0, new_value))
 
             if abs(clamped_new_value - current_value) > 1e-4: # Only update if change is significant
@@ -2162,6 +2264,7 @@ class EthosCore:
             # Specific user interactions are part of 'chat_interaction' and will be included if they involve PATHOS_USER_ID (implicitly handled by how they are stored).
             # The MemoryStorage method get_memories_by_time_range_and_types should ideally handle user_id filtering if applicable for each type.
             # For reflection, we are primarily interested in Pathos's own cognitive stream and direct experiences.
+
             # Changed to get_memories_for_summary, removed sort_by_salience_then_recency
             fetched_memories = await self.memory_storage.get_memories_for_summary(
                 user_id=PATHOS_USER_ID, # Focus on Pathos's own context for self-reflection
@@ -2170,6 +2273,7 @@ class EthosCore:
                 types=relevant_memory_types,
                 limit=query_limit
                 # include_archived defaults to False, which is fine here
+
             )
             logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for reflection.")
             return fetched_memories
@@ -2483,6 +2587,7 @@ class EthosCore:
             return None
             
     def get_current_mood(self) -> Dict[str, Any]:
+
         """
         Derives a simplified valence/arousal representation from Hexus scores.
         Also includes all Hexus scores for more detailed context if needed.
@@ -2562,6 +2667,7 @@ class EthosCore:
             return
 
         reason_for_change = f"event: {event_type}"
+
         if payload: # Optionally include payload summary in reason for more detailed logging
             payload_summary = {k: (str(v)[:30] + '...' if isinstance(v, str) and len(v) > 30 else v) for k,v in payload.items()}
             reason_for_change += f" (payload: {payload_summary})"
@@ -2571,7 +2677,9 @@ class EthosCore:
             self._apply_hexus_change(dimension, delta * magnitude_multiplier, reason_for_change)
         
         # Specific handling for feedback event to extract more detailed reason if needed
+
         if event_type == "USER_FEEDBACK_CORRECTION" and payload and payload.get('text'):
+
              self._apply_hexus_change('stress', HEXUS_EVENT_DEFINITIONS["USER_FEEDBACK_CORRECTION"].get('stress',0.03) * magnitude_multiplier, f"initial reaction to correction text: {payload.get('text','')[:30]}...")
 
 

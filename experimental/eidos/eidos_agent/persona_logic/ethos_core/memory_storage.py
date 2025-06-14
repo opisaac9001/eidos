@@ -191,11 +191,13 @@ class MemoryStorage:
         entry_id = str(entry_data.get('id', uuid.uuid4())); content = str(entry_data['content'])
         entry_type = str(entry_data['type']); timestamp = entry_data.get('timestamp', datetime.now(timezone.utc).isoformat())
         metadata = entry_data.get('metadata', {}); salience = entry_data.get('salience')
+
         summary_llm = entry_data.get('summary_llm')
         # Default timestamp_last_salience_update to the creation timestamp if not provided
         timestamp_last_salience_update = entry_data.get('timestamp_last_salience_update', timestamp)
         last_accessed_ts = entry_data.get('last_accessed_ts') # Remains NULL if not provided
         access_count = entry_data.get('access_count', 0)
+
         is_archived_bool = entry_data.get('is_archived', False)
         is_archived_int = 1 if is_archived_bool else 0
         archived_at = entry_data.get('archived_at')
@@ -238,6 +240,7 @@ class MemoryStorage:
             cursor.execute(sql, tuple(params)); row = cursor.fetchone()
             if row:
                 entry = self._row_to_entry(row)
+
                 if not entry.get('is_archived'): # Only update access stats for non-archived memories
                     now_iso = datetime.now(timezone.utc).isoformat()
                     current_access_count = entry.get('access_count', 0) or 0
@@ -260,6 +263,7 @@ class MemoryStorage:
                         entry['salience'] = new_salience
                     except sqlite3.Error as e_acc:
                         logger.error(f"Failed to update access stats and salience for memory {entry_id}: {e_acc}")
+
                 return entry
             return None
         except sqlite3.Error as e: logger.error(f"SQLite error in get_entry {entry_id}: {e}", exc_info=True); return None
@@ -323,6 +327,7 @@ class MemoryStorage:
                 if sim >= threshold: sims.append((float(sim), entry))
             except Exception as e: logger.warning(f"Could not calc similarity for entry {entry['id']}: {e}")
 
+
         final_results_with_scores = sorted(sims, key=lambda item: item[0], reverse=True)[:top_k]
 
         # Update last_accessed_ts and salience for the returned entries
@@ -367,6 +372,7 @@ class MemoryStorage:
                         conn.rollback()
 
         return final_results_with_scores
+
 
     def get_memories_for_summary(self, user_id: str, start_time_utc: datetime, end_time_utc: datetime, types: List[str], limit: int = 30, include_archived: bool = False) -> List[MemoryEntry]:
         conn = self._get_connection(); cursor = conn.cursor(); entries: List[MemoryEntry] = []
@@ -574,12 +580,14 @@ class MemoryStorage:
         try: cursor.execute("SELECT json_extract('{\"k\":\"v\"}', '$.k')")
         except sqlite3.OperationalError: can_use_json_extract = False
 
+
         base_query = "SELECT * FROM memories WHERE type = 'queued_discussion_point' AND (is_archived = 0 OR is_archived IS NULL)"
         sql_query, params = "", []
         fetch_limit = limit * 2 if limit > 0 else 10
 
         # Simplified system user ID list for this context
         _core_system_ids_for_qdp = ["system_oneiros", None, PATHOS_USER_ID]
+
 
 
         if can_use_json_extract:
@@ -657,6 +665,7 @@ class MemoryStorage:
             sql_query += " ORDER BY timestamp ASC LIMIT ?"
             # Fetch more if we need to filter in Python, e.g., limit * 5 or a fixed larger number
             limit = limit * 5 # Fetch more to filter in Python
+
 
         params.append(limit)
 
@@ -817,6 +826,7 @@ class MemoryStorage:
 
         logger.info(f"Salience decay process finished. Total memories updated: {updated_count}.")
         return updated_count
+
 
 # Notes on changes made in this overwrite:
 # - Added is_archived and archived_at to _ensure_db_exists and relevant MemoryEntry type hints.

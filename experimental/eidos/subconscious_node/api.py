@@ -140,6 +140,7 @@ async def set_node_state(payload: NodeControlStatePayload):
     Sets the operational state of the subconscious node.
     Optionally accepts a daily summary when transitioning to a sleeping state.
     """
+
     # Directly update thinker's state variables
     logger.info(f"Received request to change node state to: {payload.node_state}")
 
@@ -166,6 +167,7 @@ async def set_node_state(payload: NodeControlStatePayload):
         pass
 
     return {"message": f"Node state set to {payload.node_state}", "context": payload.node_state}
+
 
 @app.post("/control/mood", response_model=MessageResponse, tags=["Node Control"])
 async def sync_external_mood(payload: MoodSyncPayload):

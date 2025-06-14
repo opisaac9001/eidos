@@ -232,9 +232,11 @@ class FirmamentModule:
                  event_name = "ACTIVITY_EFFECT_LEARNING"
 
             if event_name:
+
                 # Magnitude multiplier was removed from process_event_for_hexus_update.
                 # If scaling is needed, event definitions in EthosCore should be adjusted.
                 asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name))
+
             else:
                 logger.debug(f"FirmamentModule: No specific continuous Hexus event defined for activity type: {activity_type_lower}")
 
@@ -494,6 +496,7 @@ class FirmamentModule:
                     extra_metadata={"source_subconscious_intention_text": intention[:200]} # Add part of intention for context
                 )
 
+
                 # Hexus updates based on Pathos's subjective reaction to the intention and its simulated consequence
                 if self.ethos_core and self.ethos_core.logos_core:
                     event_description = f"Simulated consequence of internal intention: {intention[:50]}..."
@@ -535,6 +538,7 @@ class FirmamentModule:
                 logger.warning(f"FirmamentModule: LLM returned no snippet for intention action simulation: {intention[:100]}")
                 if self.ethos_core:
                     # Fallback to a generic direct event if subjective determination fails
+
                     asyncio.create_task(self.ethos_core.process_event_for_hexus_update("INTENTION_ACTION_FAILURE", payload={"intention_text": intention[:100]}))
 
         except Exception as e:

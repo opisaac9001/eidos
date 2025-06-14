@@ -107,6 +107,7 @@ class EthosConfig(TypedDict, total=False):
     retrieval_min_salience_for_pathos_context: float
 
 
+
 class HomeAssistantConfig(TypedDict, total=False):
     url: str
     token: str
