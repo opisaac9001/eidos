@@ -9,10 +9,7 @@ try:
 except ImportError:
     pass # File not yet moved
 
-try:
-    from .memory_storage import MemoryStorage, MemoryEntry
-except ImportError:
-    pass # File not yet moved
+from .memory_storage import MemoryStorage, MemoryEntry
 
 # Add other key classes from ethos_core if they should be easily importable
 # e.g., from .mood_engine import MoodEngine (if it exists)

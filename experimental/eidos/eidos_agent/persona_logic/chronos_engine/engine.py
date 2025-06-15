@@ -197,7 +197,7 @@ class ChronosEngine:
         llm_generated_data: Optional[Dict[str, Any]] = None
         if llm_config:
             current_mood = self.ethos_core.get_current_mood()
-            recent_memories = await self.ethos_core.retrieve_relevant_memories("recent user interactions or Pathos's recent thoughts", 1, PATHOS_USER_ID, ['interaction', 'queued_discussion_point'])
+            recent_memories = await self.ethos_core.retrieve_relevant_memories(query="recent user interactions or Pathos's recent thoughts", top_k=1, allowed_types=['interaction', 'queued_discussion_point'], user_id_context=PATHOS_USER_ID)
             context_str = f"- {recent_memories[0].get('content', '')[:100]}..." if recent_memories else "No specific recent context."
             valid_types_str = ", ".join(ActivityType.__args__) # type: ignore
 
@@ -343,7 +343,7 @@ class ChronosEngine:
 
         if new_schedule:
             new_schedule.sort(key=lambda x: x.start_time)
-            try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+            try: await asyncio.to_thread(self.memory_storage.save_schedule_to_db, new_schedule, PATHOS_USER_ID)
             except Exception as e: logger.error(f"Error saving schedule to DB for {target_date}: {e}", exc_info=True); new_schedule = []
         else: logger.warning(f"No activities generated for schedule on {target_date}.")
         return new_schedule
@@ -355,7 +355,7 @@ class ChronosEngine:
             if self._cache_date == target_date and PATHOS_USER_ID in self._todays_schedule_cache and self._todays_schedule_cache[PATHOS_USER_ID]:
                 schedule_to_check = self._todays_schedule_cache[PATHOS_USER_ID]
             else:
-                schedule_to_check = await self.memory_storage.load_schedule_from_db(target_date, PATHOS_USER_ID)
+                schedule_to_check = await asyncio.to_thread(self.memory_storage.load_schedule_from_db, target_date, PATHOS_USER_ID)
                 if not schedule_to_check: schedule_to_check = await self.generate_schedule_for_date(target_date)
                 if schedule_to_check: self._todays_schedule_cache[PATHOS_USER_ID] = schedule_to_check; self._cache_date = target_date
                 else: return None
@@ -369,7 +369,7 @@ class ChronosEngine:
         async with self._schedule_generation_lock:
             if self._cache_date == today and PATHOS_USER_ID in self._todays_schedule_cache and self._todays_schedule_cache[PATHOS_USER_ID]:
                 return self._todays_schedule_cache[PATHOS_USER_ID]
-            schedule = await self.memory_storage.load_schedule_from_db(today, PATHOS_USER_ID)
+            schedule = await asyncio.to_thread(self.memory_storage.load_schedule_from_db, today, PATHOS_USER_ID)
             if not schedule: schedule = await self.generate_schedule_for_date(today)
             self._todays_schedule_cache[PATHOS_USER_ID] = schedule if schedule else []
             self._cache_date = today
@@ -436,7 +436,7 @@ class ChronosEngine:
 
             if not todays_schedule:
                 logger.warning(f"report_activity_outcome: Could not load schedule for date {target_date} to update slot {slot_id}. Saving only the updated slot.")
-                await self.memory_storage.save_schedule_to_db([slot_to_update], user_id)
+                await asyncio.to_thread(self.memory_storage.save_schedule_to_db, [slot_to_update], user_id)
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
                      self._todays_schedule_cache[user_id] = [slot_to_update]
                 return
@@ -615,9 +615,12 @@ class ChronosEngine:
                                 await self.memory_storage.add_event_to_db(event_to_update)
                             else:
                                 logger.debug(f"Checking complex event {event_to_update.id} ('{event_to_update.title}') for completion.")
-                                related_slots = await self.memory_storage.get_slots_for_event(
-                                    event_id=event_to_update.id, user_id=event_to_update.user_id,
-                                    event_start_date=event_to_update.start_date, event_end_date=event_to_update.end_date
+                                related_slots = await asyncio.to_thread(
+                                    self.memory_storage.get_slots_for_event,
+                                    event_id=event_to_update.id,
+                                    user_id=event_to_update.user_id,
+                                    event_start_date=event_to_update.start_date,
+                                    event_end_date=event_to_update.end_date
                                 )
                                 if related_slots:
                                     all_relevant_slots_done = True
@@ -662,7 +665,7 @@ class ChronosEngine:
                 else: logger.debug(f"Slot {slot_to_update.id} completed, but no source_event_id in metadata.")
 
             if overall_schedule_has_changed:
-                await self.memory_storage.save_schedule_to_db(todays_schedule, user_id)
+                await asyncio.to_thread(self.memory_storage.save_schedule_to_db, todays_schedule, user_id)
                 logger.info(f"Saved updates for slot {slot_id} (and potentially subsequent slots/event) to DB for {target_date}.")
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
                     self._todays_schedule_cache[user_id] = todays_schedule
@@ -751,7 +754,7 @@ class ChronosEngine:
 
             final_schedule_for_day.sort(key=lambda s: s.start_time)
 
-            await self.memory_storage.save_schedule_to_db(final_schedule_for_day, user_id)
+            await asyncio.to_thread(self.memory_storage.save_schedule_to_db, final_schedule_for_day, user_id)
             self._todays_schedule_cache[user_id] = final_schedule_for_day
             self._cache_date = current_date_val
             logger.info(f"Integrated spontaneous slot {new_spontaneous_slot.id} into schedule for {current_date_val} and saved.")

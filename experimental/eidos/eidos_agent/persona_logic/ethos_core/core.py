@@ -760,7 +760,6 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-no
     async def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
         """
         Determines Pathos's subjective reaction to a user interaction and updates Hexus scores.
@@ -2439,6 +2438,34 @@ no
             except Exception as e:
                 logger.error(f"Error in hexus decay task: {e}", exc_info=True)
                 await asyncio.sleep(60)  # Wait before retrying
+
+    async def _periodic_long_term_planning_task(self):
+        """Periodic task for running long-term planning cycles."""
+        # Default to 3 days if not specified
+        planning_interval = self.ethos_config.get('long_term_planning_interval_seconds', 86400.0 * 3)
+        if planning_interval <= 0:
+            logger.info("Long-term planning periodic task disabled due to interval <= 0.")
+            return # Do not run if interval is zero or negative
+
+        while True:
+            try:
+                now = datetime.now(timezone.utc)
+                time_since_last = (now - self.last_long_term_planning_time).total_seconds()
+
+                if time_since_last >= planning_interval:
+                    await self.run_long_term_planning()
+                    # self.run_long_term_planning() already updates self.last_long_term_planning_time
+                    # and saves it via _save_task_last_run_time
+                else:
+                    # Sleep until next scheduled time
+                    sleep_time = planning_interval - time_since_last
+                    await asyncio.sleep(min(sleep_time, 3600))  # Check at least every hour
+            except asyncio.CancelledError:
+                logger.info("EthosCore long-term planning task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in long-term planning task: {e}", exc_info=True)
+                await asyncio.sleep(300)  # Wait 5 minutes before retrying after an error
 
     async def generate_daily_experiential_summary(self, user_id: str = PATHOS_USER_ID) -> str:
         '''

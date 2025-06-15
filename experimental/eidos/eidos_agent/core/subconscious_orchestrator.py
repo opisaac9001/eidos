@@ -4,7 +4,7 @@ import time
 import logging
 import requests # For health check
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional # Ensure Literal is added
 
 # Assuming the client is in this structure, adjust if necessary
 from eidos_agent.features.subconscious_interface_to_node.subconscious.client import (
@@ -12,6 +12,9 @@ from eidos_agent.features.subconscious_interface_to_node.subconscious.client imp
     send_node_control_command,
     DEFAULT_TIMEOUT as CLIENT_DEFAULT_TIMEOUT
 )
+
+# Define possible states for the subconscious node
+SUBCONSCIOUS_NODE_STATE = Literal["AWAKE_THINKING", "SLEEPING_DREAMING"]
 
 logger = logging.getLogger(__name__)
 subconscious_process: Optional[subprocess.Popen] = None

@@ -147,6 +147,214 @@ class MemoryStorage:
             conn.commit(); logger.info("DB tables ensured.")
         except sqlite3.Error as e: logger.error(f"Error ensuring DB tables: {e}", exc_info=True); conn.rollback(); raise
 
+    def load_schedule_from_db(self, target_date: date, user_id: str) -> List[ActivitySlot]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        schedule_items: List[ActivitySlot] = []
+        try:
+            sql = """
+                SELECT id, user_id, date, start_time, end_time, slot_name,
+                       activity_title, activity_type, activity_details, generated_at,
+                       status, actual_start_time, actual_end_time, deviation_reason,
+                       original_scheduled_start_time, original_scheduled_end_time
+                FROM daily_schedule_items
+                WHERE date = ? AND user_id = ?
+                ORDER BY start_time ASC
+            """
+            cursor.execute(sql, (target_date.isoformat(), user_id))
+            rows = cursor.fetchall()
+
+            for row_data in rows:
+                row = dict(row_data) # Convert sqlite3.Row to dict for easier access
+
+                # Parse activity_details JSON
+                activity_details_obj = ActivitySlotDetails() # Default empty
+                if details_str := row.get('activity_details'):
+                    try:
+                        details_json = json.loads(details_str)
+                        activity_details_obj = ActivitySlotDetails(**details_json)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Could not parse activity_details JSON for schedule item {row.get('id')}: {e}. Details: '{details_str[:100]}...'")
+                    except TypeError as te: # Catches pydantic.ValidationError if fields are wrong
+                        logger.warning(f"Type error parsing activity_details for schedule item {row.get('id')}: {te}. Details: '{details_str[:100]}...'")
+
+
+                # Helper to parse time strings, returning None if invalid
+                def _parse_time(time_str: Optional[str]) -> Optional[time]:
+                    if not time_str: return None
+                    try: return time.fromisoformat(time_str)
+                    except ValueError: logger.warning(f"Invalid time format '{time_str}' for schedule item {row.get('id')}."); return None
+
+                activity_slot = ActivitySlot(
+                    id=str(row['id']),
+                    user_id=str(row['user_id']),
+                    date=date.fromisoformat(str(row['date'])),
+                    start_time=_parse_time(str(row['start_time'])) or time(0,0), # Fallback to midnight if parse fails
+                    end_time=_parse_time(str(row['end_time'])) or time(23,59),   # Fallback to end of day
+                    slot_name=row.get('slot_name'),
+                    activity_title=str(row['activity_title']),
+                    activity_type=str(row['activity_type']), # Assuming ActivityType is string-based or pydantic handles conversion
+                    activity_details=activity_details_obj,
+                    generated_at=datetime.fromisoformat(str(row['generated_at']).replace("Z", "+00:00")),
+                    status=row.get('status', 'pending'),
+                    actual_start_time=_parse_time(row.get('actual_start_time')),
+                    actual_end_time=_parse_time(row.get('actual_end_time')),
+                    deviation_reason=row.get('deviation_reason'),
+                    original_scheduled_start_time=_parse_time(row.get('original_scheduled_start_time')),
+                    original_scheduled_end_time=_parse_time(row.get('original_scheduled_end_time')),
+                )
+                schedule_items.append(activity_slot)
+
+            logger.info(f"Loaded {len(schedule_items)} schedule items for user '{user_id}' on date '{target_date.isoformat()}'.")
+
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error loading schedule for user '{user_id}' on '{target_date.isoformat()}': {e}", exc_info=True)
+        except Exception as e_gen: # Catch other potential errors like date/time parsing
+            logger.error(f"General error loading schedule for user '{user_id}' on '{target_date.isoformat()}': {e_gen}", exc_info=True)
+
+        return schedule_items
+
+    def save_schedule_to_db(self, schedule_items: List[ActivitySlot], user_id: str) -> bool:
+        if not schedule_items:
+            logger.info(f"No schedule items provided to save for user '{user_id}'. Skipping DB operation.")
+            return True # No items to save, operation is trivially successful
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Determine unique dates to clear existing entries
+        unique_dates = sorted(list(set(item.date for item in schedule_items)))
+
+        try:
+            conn.execute("BEGIN")
+
+            for slot_date in unique_dates:
+                delete_sql = "DELETE FROM daily_schedule_items WHERE user_id = ? AND date = ?"
+                cursor.execute(delete_sql, (user_id, slot_date.isoformat()))
+                logger.info(f"Cleared existing schedule items for user '{user_id}' on date '{slot_date.isoformat()}'.")
+
+            insert_sql = """
+                INSERT INTO daily_schedule_items (
+                    id, user_id, date, start_time, end_time, slot_name,
+                    activity_title, activity_type, activity_details, generated_at,
+                    status, actual_start_time, actual_end_time, deviation_reason,
+                    original_scheduled_start_time, original_scheduled_end_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
+            items_to_insert = []
+            for item in schedule_items:
+                try:
+                    # Ensure activity_details is a dict before attempting model_dump_json
+                    details_json_str = item.activity_details.model_dump_json(exclude_none=True) if isinstance(item.activity_details, ActivitySlotDetails) else "{}"
+                except Exception as e_ser: # Catch potential errors during serialization
+                    logger.error(f"Error serializing ActivitySlotDetails for slot {item.id}: {e_ser}", exc_info=True)
+                    details_json_str = "{}" # Fallback to empty JSON
+
+                items_to_insert.append((
+                    item.id,
+                    item.user_id, # Should match the user_id parameter
+                    item.date.isoformat(),
+                    item.start_time.isoformat(),
+                    item.end_time.isoformat(),
+                    item.slot_name,
+                    item.activity_title,
+                    str(item.activity_type), # Ensure it's a string if it's an Enum/Literal
+                    details_json_str,
+                    item.generated_at.isoformat(),
+                    str(item.status), # Ensure it's a string
+                    item.actual_start_time.isoformat() if item.actual_start_time else None,
+                    item.actual_end_time.isoformat() if item.actual_end_time else None,
+                    item.deviation_reason,
+                    item.original_scheduled_start_time.isoformat() if item.original_scheduled_start_time else None,
+                    item.original_scheduled_end_time.isoformat() if item.original_scheduled_end_time else None,
+                ))
+
+            cursor.executemany(insert_sql, items_to_insert)
+            conn.commit()
+            logger.info(f"Successfully saved/updated {len(schedule_items)} schedule items for user '{user_id}' covering {len(unique_dates)} dates.")
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error saving schedule for user '{user_id}': {e}", exc_info=True)
+            if conn: conn.rollback()
+            return False
+        except Exception as e_gen:
+            logger.error(f"General error saving schedule for user '{user_id}': {e_gen}", exc_info=True)
+            if conn: conn.rollback()
+            return False
+
+    def get_events_for_date_range(self, user_id: str, start_date: date, end_date: date) -> List[PathosEvent]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        events: List[PathosEvent] = []
+        try:
+            sql = """
+                SELECT id, user_id, title, start_date, end_date, event_type,
+                       description, location, details, created_at, specific_time,
+                       status, actual_start_datetime, actual_end_datetime
+                FROM pathos_events
+                WHERE user_id = ? AND start_date <= ? AND end_date >= ?
+                ORDER BY start_date ASC, specific_time ASC NULLS FIRST
+            """
+            # Parameters: user_id, end_date of the query range, start_date of the query range
+            cursor.execute(sql, (user_id, end_date.isoformat(), start_date.isoformat()))
+            rows = cursor.fetchall()
+
+            for row_data in rows:
+                row = dict(row_data)
+
+                details_obj = PathosEventDetails() # Default empty
+                if details_str := row.get('details'):
+                    try:
+                        details_json = json.loads(details_str)
+                        details_obj = PathosEventDetails(**details_json)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Could not parse PathosEventDetails JSON for event {row.get('id')}: {e}. Details: '{details_str[:100]}...'")
+                    except TypeError as te: # Catches pydantic.ValidationError
+                        logger.warning(f"Type error parsing PathosEventDetails for event {row.get('id')}: {te}. Details: '{details_str[:100]}...'")
+
+                def _parse_optional_datetime(dt_str: Optional[str]) -> Optional[datetime]:
+                    if not dt_str: return None
+                    try:
+                        # Ensure timezone awareness, assuming stored as UTC
+                        dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+                        if dt.tzinfo is None: return dt.replace(tzinfo=timezone.utc)
+                        return dt.astimezone(timezone.utc)
+                    except ValueError: logger.warning(f"Invalid datetime format '{dt_str}' for event {row.get('id')}."); return None
+
+                def _parse_optional_time(t_str: Optional[str]) -> Optional[time]:
+                    if not t_str: return None
+                    try: return time.fromisoformat(str(t_str))
+                    except ValueError: logger.warning(f"Invalid time format '{t_str}' for event {row.get('id')}."); return None
+
+                event = PathosEvent(
+                    id=str(row['id']),
+                    user_id=str(row['user_id']),
+                    title=str(row['title']),
+                    start_date=date.fromisoformat(str(row['start_date'])),
+                    end_date=date.fromisoformat(str(row['end_date'])),
+                    event_type=str(row['event_type']), # Assuming EventType is string-based or pydantic handles
+                    description=row.get('description'),
+                    location=row.get('location'),
+                    details=details_obj,
+                    created_at=_parse_optional_datetime(str(row['created_at'])) or datetime.now(timezone.utc), # Fallback for created_at
+                    specific_time=_parse_optional_time(row.get('specific_time')),
+                    status=row.get('status', 'planned'),
+                    actual_start_datetime=_parse_optional_datetime(row.get('actual_start_datetime')),
+                    actual_end_datetime=_parse_optional_datetime(row.get('actual_end_datetime')),
+                )
+                events.append(event)
+
+            logger.info(f"Loaded {len(events)} events for user '{user_id}' between '{start_date.isoformat()}' and '{end_date.isoformat()}'.")
+
+        except sqlite3.Error as e:
+            logger.error(f"SQLite error loading events for user '{user_id}': {e}", exc_info=True)
+        except Exception as e_gen:
+            logger.error(f"General error loading events for user '{user_id}': {e_gen}", exc_info=True)
+
+        return events
+
     def update_entry_archival_status(self, memory_id: str, is_archived: bool) -> bool:
         conn = self._get_connection(); cursor = conn.cursor()
         archived_at_value = datetime.now(timezone.utc).isoformat() if is_archived else None
@@ -497,7 +705,7 @@ class MemoryStorage:
             # This part might need adjustment based on how Config().system_user_ids is meant to be accessed.
             # For now, directly using a list similar to EthosCore's definition.
             _sys_ids_for_dreams = ["system_oneiros", None] # Simplified
-            if user_id_context and user_id_context not in _sys_ids_for_dreams and not any(s_id for s_id in ["system_admin", PATHOS_USER_ID] if s_id == user_id_context):
+            if user_id_context and user_id_context not in _sys_ids_for_dreams and not any(s_id for s_id in ["system_admin", "pathos_agent_internal"] if s_id == user_id_context):
                 sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = 'system_oneiros')"
                 params.extend([user_id_context])
             else: sql += " AND json_extract(metadata, '$.user_id') = 'system_oneiros'"
@@ -511,7 +719,7 @@ class MemoryStorage:
                     if meta.get('source') != dream_source_filter: continue
                     entry_uid = meta.get('user_id')
                     _sys_ids_for_dreams_py = ["system_oneiros", None]
-                    is_general_system_user = any(s_id for s_id in ["system_admin", PATHOS_USER_ID] if s_id == user_id_context)
+                    is_general_system_user = any(s_id for s_id in ["system_admin", "pathos_agent_internal"] if s_id == user_id_context)
                     if user_id_context and user_id_context not in _sys_ids_for_dreams_py and not is_general_system_user:
                         if not (entry_uid == user_id_context or entry_uid == "system_oneiros"): continue
                     elif entry_uid != "system_oneiros": continue # For system users or None context, only system_oneiros dreams
@@ -530,12 +738,12 @@ class MemoryStorage:
         except sqlite3.OperationalError: can_use_json = False
 
         # This system_user_ids check should ideally use a shared constant or Config method.
-        _temp_system_ids = ["system_oneiros", "system_document", "system_briefing", "system_reflection", "world_knowledge_store", "system_knowledge_upkeep", "system_curiosity", "system_admin", PATHOS_USER_ID, None, "default_user"]
+        _temp_system_ids = ["system_oneiros", "system_document", "system_briefing", "system_reflection", "world_knowledge_store", "system_knowledge_upkeep", "system_curiosity", "system_admin", "pathos_agent_internal", None, "default_user"]
 
         if can_use_json:
             if user_id_context and user_id_context not in _temp_system_ids:
-                sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = ?)"; params.extend([user_id_context, PATHOS_USER_ID])
-            else: sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL)"; params.append(PATHOS_USER_ID)
+                sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') = ?)"; params.extend([user_id_context, "pathos_agent_internal"])
+            else: sql += " AND (json_extract(metadata, '$.user_id') = ? OR json_extract(metadata, '$.user_id') IS NULL)"; params.append("pathos_agent_internal")
 
         needs_python_filter = not can_use_json and user_id_context is not None
         fetch_limit = limit * 5 if needs_python_filter else limit
@@ -547,8 +755,8 @@ class MemoryStorage:
                 if needs_python_filter:
                     entry_uid = entry.get('metadata', {}).get('user_id')
                     if user_id_context and user_id_context not in _temp_system_ids:
-                        if not (entry_uid == user_id_context or entry_uid == PATHOS_USER_ID): continue
-                    elif not (entry_uid == PATHOS_USER_ID or entry_uid is None): continue
+                        if not (entry_uid == user_id_context or entry_uid == "pathos_agent_internal"): continue
+                    elif not (entry_uid == "pathos_agent_internal" or entry_uid is None): continue
                 learnings.append(entry)
             return learnings[:limit]
         except Exception as e: logger.error(f"Error retrieving learnings: {e}", exc_info=True); return []
@@ -586,7 +794,7 @@ class MemoryStorage:
         fetch_limit = limit * 2 if limit > 0 else 10
 
         # Simplified system user ID list for this context
-        _core_system_ids_for_qdp = ["system_oneiros", None, PATHOS_USER_ID]
+        _core_system_ids_for_qdp = ["system_oneiros", None, "pathos_agent_internal"]
 
 
 

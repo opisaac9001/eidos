@@ -200,7 +200,7 @@ class FirmamentModule:
             user_id=PATHOS_USER_ID, date=now_dt.date(),
             start_time=now_dt.time(), end_time=(now_dt + timedelta(minutes=1)).time(),
             slot_name="AdHocFirmamentActivity", activity_title=title_context[:100],
-            activity_type="internal_processing", activity_details=dummy_details,
+            activity_type="other", activity_details=dummy_details,
             generated_at=now_dt
         )
 
