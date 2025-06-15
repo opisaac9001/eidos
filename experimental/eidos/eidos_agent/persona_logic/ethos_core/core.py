@@ -760,7 +760,6 @@ class EthosCore:
         
         return datetime.now(timezone.utc)
     
-no
     async def process_interaction_for_hexus_update(self, user_input_text: str, pathos_response_text: Optional[str], image_provided: bool, document_provided: bool):
         """
         Determines Pathos's subjective reaction to a user interaction and updates Hexus scores.
