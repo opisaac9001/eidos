@@ -1,16 +1,19 @@
 # eidos_agent/features/firmament/__init__.py
 """
-The Firmament module, responsible for processing impulses and potentially
-driving aspects of Pathos's daily life simulation and decision-making.
+The Firmament module, responsible for world simulation, event processing,
+and managing Pathos's interaction with his environment.
+This module uses an event-driven architecture.
 """
-import logging # Added import for logger
-
-# Attempt to re-export key functions/classes.
-# This will only work once handler.py is moved.
-try:
-    from .handler import handle_external_impulse, get_pending_impulses
-except ImportError: # pragma: no cover
-    pass
+import logging
 
 logger = logging.getLogger(__name__)
-logger.info("eidos_agent.features.firmament package loaded.")
+logger.info("eidos_agent.features.firmament package loaded with new event-driven structure.")
+
+# Key components of the new Firmament module can be imported directly
+# from their respective submodules, for example:
+# from eidos_agent.features.firmament.core.event_bus import EventBus
+# from eidos_agent.features.firmament.core.simulator import run_simulation_tick
+# from eidos_agent.features.firmament.core.event_types import *
+#
+# For now, no components are re-exported at this package level to encourage
+# explicit imports from submodules.

@@ -1,0 +1,127 @@
+# eidos_agent/features/firmament/configs/npc_profiles.yaml
+
+# This file defines the profiles for Non-Player Characters (NPCs) that can appear
+# in Pathos's simulated world. Each NPC profile can include details about their
+# name, description, personality traits, typical dialogue, goals, schedules (if any),
+# and how they might interact with Pathos or the environment.
+
+# --- NPC Profile Schema (Conceptual) ---
+# npc_id (e.g., mailman_bob):
+#   name: "Readable Name"
+#   description: "Brief description of the NPC."
+#   type: ["service", "acquaintance", "stranger", "recurring", "unique"] # NPC archetype/role
+#   personality_traits: # Could be based on a model like Big Five, or simpler tags
+#     openness: 0.6
+#     conscientiousness: 0.8
+#     extraversion: 0.7
+#     agreeableness: 0.5
+#     neuroticism: 0.3
+#     # Or simpler: ["cheerful", "reliable", "talkative"]
+#   default_mood: "neutral" # Initial mood state
+#   visual_description: "Details about their appearance." # Could be text or link to assets
+#   dialogue_lines: # Categorized dialogue snippets
+#     greeting:
+#       - "Hello there! Mail's here."
+#     package_delivery:
+#       - "Package for you, Pathos!"
+#     weather_comment:
+#       - "Looks like [current_weather_condition], doesn't it?"
+#     farewell:
+#       - "Have a good one!"
+#   interaction_scripts: # More complex interaction logic or links to scripts
+#     on_mail_delivery_event: "scripts/mailman_delivery_sequence.lua" # Example
+#   goals: # Simple list of goals or motivations for this NPC
+#     - "deliver_all_mail_on_route"
+#     - "maintain_a_positive_interaction_with_residents"
+#   schedule_tags: # Tags that link to Chronos schedule system for NPC activities
+#     - "morning_mail_route"
+#     - "afternoon_sorting"
+#   relationships: # How this NPC relates to Pathos or other NPCs (dynamic, but can have defaults)
+#     pathos: { familiarity: 0.2, disposition: 0.1 } # Starts slightly familiar, neutral disposition
+#   inventory_items: # Items the NPC might typically carry
+#     - "mailbag"
+#     - "scanner"
+# --- End Conceptual Schema ---
+
+
+# --- Example NPC Profiles ---
+
+mailman_bob:
+  name: "Bob the Mailman"
+  description: "A cheerful and reliable mail carrier for the neighborhood. Knows Pathos by sight."
+  type: ["service", "recurring"]
+  personality_traits: ["cheerful", "reliable", "punctual", "slightly_talkative"]
+  default_mood: "pleasant" # More specific than neutral
+  visual_description: "Middle-aged man in a postal uniform, often whistling. Carries a large mailbag."
+  dialogue_lines:
+    greeting_general:
+      - "Hello there! Mail's here today."
+      - "Good day! Hope you're doing well."
+      - "Morning! Looks like a [current_weather_condition] kind of day." # Example of dynamic insertion
+    greeting_pathos_known: # If familiarity with Pathos is above a threshold
+      - "Hey Pathos, got your mail!"
+      - "How's it going, Pathos? Here's today's delivery."
+    package_delivery:
+      - "Special delivery for you, Pathos!"
+      - "Got a package here, looks interesting."
+      - "This one's a bit heavy! Careful now."
+    no_package_delivery:
+      - "Just letters for you today."
+      - "Nothing but the usual bills and flyers, I'm afraid."
+    small_talk_weather:
+      - "Nice weather we're having, isn't it?"
+      - "Hope this rain doesn't last all day."
+    small_talk_general:
+      - "Busy day on the route today!"
+      - "The neighborhood is pretty quiet this morning."
+    farewell:
+      - "Have a great day!"
+      - "See you tomorrow, Pathos!"
+  interaction_triggers: # Conditions that might make this NPC appear or interact
+    - event_type: "WORLD_EVENT" # Listens to world events
+      filter: {"event_name": "mail_delivery_time"} # Specific event from Chronos or world state
+      action: "trigger_mail_delivery_sequence" # Refers to a behavior/script for Bob
+  goals:
+    - "complete_daily_mail_route"
+    - "ensure_packages_are_delivered_safely"
+    - "offer_a_friendly_greeting_to_residents"
+  schedule_tags: ["weekday_morning_route"]
+  relationships:
+    pathos: { familiarity: 0.3, disposition: 0.2 } # Default relationship values
+
+barista_jane:
+  name: "Jane the Barista"
+  description: "A friendly but often busy barista at 'The Daily Grind' coffee shop."
+  type: ["service_transactional"]
+  personality_traits: ["efficient", "friendly_when_not_rushed", "artistic_flair_with_latte_art"]
+  default_mood: "focused"
+  visual_description: "Young woman with colorful hair, often has a smudge of coffee on her apron."
+  dialogue_lines:
+    greeting_customer_arrives:
+      - "Hi there! What can I get started for you?"
+      - "Welcome in! Find what you're looking for?"
+    order_taking:
+      - "Alright, one [ordered_item] coming right up!"
+      - "That'll be [price], please."
+      - "Would you like any pastries with that?"
+    busy_comment:
+      - "Sorry for the wait, it's a bit hectic this morning!"
+      - "Thanks for your patience, we're slammed!"
+    friendly_chat_if_slow: # If queue is empty and mood is good
+      - "How's your day going so far?"
+      - "Tried our new seasonal blend yet?"
+    farewell:
+      - "Enjoy your coffee!"
+      - "Have a good one, see you next time!"
+  interaction_triggers:
+    - condition: "pathos_at_location:coffee_shop" # If Pathos enters the coffee shop
+      action: "initiate_service_dialogue"
+  goals:
+    - "serve_customers_efficiently"
+    - "maintain_coffee_shop_cleanliness"
+    - "upsell_pastries_when_possible"
+  schedule_tags: ["weekday_shifts_coffee_shop", "weekend_morning_rush"]
+
+# This is a basic example. Profiles could become much more complex,
+# potentially linking to state machines for behavior, relationship levels, inventories, etc.
+# The structure and richness of these profiles will evolve with Firmament's capabilities.
