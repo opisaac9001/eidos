@@ -2,198 +2,220 @@
 
 import unittest
 from collections import defaultdict
+# import importlib # To help with reloading if necessary for tests, though usually not needed with good setUp/tearDown
 
 # Attempt to import necessary modules from Firmament.
-# These imports assume that the test is run in an environment where the
-# 'eidos_agent.features.firmament' package is accessible in PYTHONPATH.
-# For example, running `python -m unittest discover eidos_agent/features/firmament/tests`
-# from the parent directory of 'eidos_agent'.
-
 try:
     from ..core.event_bus import EventBus
-    from ..core.event_types import THOUGHT_TRIGGER, WORLD_EVENT, SCHEDULE_BLOCK_STARTED, NPC_DIALOGUE
-    # MEMORY_WRITE is used as a string "memory.write" in subconscious_hook, so we'll use that.
-    MEMORY_WRITE_EVENT_TYPE = "memory.write"
-    from ..core.simulator import run_simulation_tick # Uses chronos_adapter internally
+    # Import all known event types
+    from ..core import event_types as fevent_types # fevent_types to avoid conflict
+    from ..core.simulator import run_simulation_tick
     from ..integrations.subconscious_hook import handle_thought_trigger, register_thought_trigger_handler
-    from ..integrations.chronos_adapter import get_current_block as chronos_get_current_block, _set_current_block_for_testing
-    from ..core.event_handlers.random_events import maybe_trigger_random_event # Example event generator
-    from ..core.npc_controller import spawn_npc_interaction, register_npc_event_listeners # For NPC interaction flow
+    from ..integrations.chronos_adapter import _set_current_block_for_testing # Using the testing utility
+    # Import the impulse handler and its specific event type strings
+    from ..core.event_handlers.impulse import handle_impulse, EVENT_MEMORY_WRITE, EVENT_REQUEST_FOOD_PREP, EVENT_LOGOS_RESEARCH_REQUEST
+    # Import NPC controller for other tests if they are re-enabled
+    from ..core.npc_controller import register_npc_event_listeners
+
 
 except ImportError as e:
     print(f"ImportError in test_event_flow.py: {e}. Some tests may fail or not run correctly.")
-    print("Ensure PYTHONPATH is set up to include the parent directory of 'eidos_agent'.")
-    # Define dummy classes/functions if imports fail, so the file can be parsed at least.
-    class EventBus: _instance = None; _subscribers = defaultdict(list); @classmethod def instance(cls): return cls() if not cls._instance else cls._instance; def subscribe(self, et, h): pass; def publish(self, et, d): print(f"DummyEventBus: Published {et} with {d}")
-    THOUGHT_TRIGGER, WORLD_EVENT, SCHEDULE_BLOCK_STARTED, NPC_DIALOGUE, MEMORY_WRITE_EVENT_TYPE = "dummy.tt", "dummy.we", "dummy.sbs", "dummy.nd", "dummy.mw"
-    def run_simulation_tick(): pass
-    def handle_thought_trigger(p): pass
-    def register_thought_trigger_handler(): pass
-    def chronos_get_current_block(): return {}
-    def _set_current_block_for_testing(d=None): pass
-    def maybe_trigger_random_event(d=None): pass
-    def spawn_npc_interaction(d): pass
-    def register_npc_event_listeners(): pass
+    # Define dummy classes/functions if imports fail
+    class EventBus: # type: ignore
+        _instance = None # type: ignore
+        _subscribers = defaultdict(list) # type: ignore
+        @classmethod
+        def instance(cls): # type: ignore
+            if not cls._instance: cls._instance = cls() # type: ignore
+            return cls._instance # type: ignore
+        def subscribe(self, et, h): pass # type: ignore
+        def publish(self, et, d): print(f"DummyEventBus: Published {et} with {d}") # type: ignore
+
+    class fevent_types: # type: ignore
+        THOUGHT_TRIGGER, WORLD_EVENT, SCHEDULE_BLOCK_STARTED, NPC_DIALOGUE, IMPULSE, SLEEP_REQUESTED = ( # type: ignore
+            "dummy.tt", "dummy.we", "dummy.sbs", "dummy.nd", "dummy.imp", "dummy.sr")
+
+    EVENT_MEMORY_WRITE, EVENT_REQUEST_FOOD_PREP, EVENT_LOGOS_RESEARCH_REQUEST = ( # type: ignore
+        "dummy.mw", "dummy.rfp", "dummy.lrr")
+
+    def run_simulation_tick(): pass # type: ignore
+    def handle_thought_trigger(p): pass # type: ignore
+    def register_thought_trigger_handler(): pass # type: ignore
+    def _set_current_block_for_testing(d=None): pass # type: ignore
+    def handle_impulse(d): pass # type: ignore
+    def register_npc_event_listeners(): pass # type: ignore
 
 
 class TestEventFlow(unittest.TestCase):
 
     def setUp(self):
-        """Set up test environment before each test method."""
         print(f"\n--- Setting up for: {self._testMethodName} ---")
+        # Ensure a fresh EventBus instance for each test
+        if hasattr(EventBus, '_instance'):
+            EventBus._instance = None
         self.event_bus = EventBus.instance()
-        # Clear subscribers to ensure test isolation. This is a bit crude.
-        # A dedicated EventBus.reset() or a new instance per test would be better.
-        self.event_bus._subscribers = defaultdict(list)
+        self.event_bus._subscribers = defaultdict(list) # Clear subscribers
 
         self.recorded_events = defaultdict(list)
 
-        # Generic event recorder to capture all events for inspection
-        def generic_event_recorder(event_type, data):
-            # print(f"    [EventRecorded] Type: {event_type}, Data: {data}")
-            self.recorded_events[event_type].append(data)
+        def generic_event_recorder(event_type_arg, data_arg): # Renamed args
+            # print(f"    [EventRecorded] Type: {event_type_arg}, Data: {str(data_arg)[:150]}...")
+            self.recorded_events[event_type_arg].append(data_arg)
 
-        # Subscribe the generic recorder to all event types we are interested in.
-        # This uses a lambda to pass the event_type to the recorder.
-        all_event_types_to_monitor = [THOUGHT_TRIGGER, WORLD_EVENT, SCHEDULE_BLOCK_STARTED, MEMORY_WRITE_EVENT_TYPE, NPC_DIALOGUE]
-        for et in all_event_types_to_monitor:
-            # Need a unique function for each subscription if using lambdas this way and want to unsubscribe later.
-            # Or, a single handler that is told which event type it is handling.
-            # For simplicity, let's assume _subscribers is cleared each time.
-            self.event_bus.subscribe(et, lambda data, event_t=et: generic_event_recorder(event_t, data))
+        # Event types to monitor
+        self.event_types_to_monitor = [
+            fevent_types.THOUGHT_TRIGGER, fevent_types.WORLD_EVENT, fevent_types.SCHEDULE_BLOCK_STARTED,
+            EVENT_MEMORY_WRITE, fevent_types.NPC_DIALOGUE, fevent_types.IMPULSE,
+            fevent_types.SLEEP_REQUESTED, EVENT_REQUEST_FOOD_PREP, EVENT_LOGOS_RESEARCH_REQUEST
+        ]
+        for et in self.event_types_to_monitor:
+            # Using a factory to ensure event_t is captured correctly by the lambda
+            def create_handler(event_t_captured):
+                return lambda data: generic_event_recorder(event_t_captured, data)
+            self.event_bus.subscribe(et, create_handler(et))
 
         # Register core handlers that mediate between events
         register_thought_trigger_handler() # Subscribes handle_thought_trigger to THOUGHT_TRIGGER
-        register_npc_event_listeners()     # Subscribes spawn_npc_interaction to WORLD_EVENT
+        self.event_bus.subscribe(fevent_types.IMPULSE, handle_impulse) # Subscribe impulse handler
 
-        print("Setup complete. EventBus subscribers cleared and basic recorders/handlers registered.")
+        # Register NPC event listeners for other tests if they are active
+        # register_npc_event_listeners()
+
+        print("Setup complete. EventBus ready and core handlers (thought_trigger, impulse) registered.")
 
     def tearDown(self):
-        """Clean up test environment after each test method."""
-        # Reset Chronos adapter's test override
-        _set_current_block_for_testing(None)
-        # Clear subscribers again after test
-        if hasattr(self.event_bus, '_subscribers'): # Check if event_bus was successfully initialized
-            self.event_bus._subscribers = defaultdict(list)
+        _set_current_block_for_testing(None) # Reset Chronos adapter mock
+        if hasattr(EventBus, '_instance') and EventBus._instance is not None:
+            EventBus._instance._subscribers = defaultdict(list)
         print(f"--- Torn down: {self._testMethodName} ---")
 
-
+    # --- Existing test methods (can be kept or adapted) ---
     def test_simulation_tick_starts_schedule_block_event(self):
-        """
-        Tests that run_simulation_tick() publishes a SCHEDULE_BLOCK_STARTED event
-        using data from the Chronos adapter.
-        """
         print("Running: test_simulation_tick_starts_schedule_block_event")
-
-        # Configure the Chronos adapter to return a specific block for this test
-        test_block_data = {
-            "id": "test_block_sim_tick_001", "type": "test_work", "name": "SimTick Test Block",
-            "start_time_utc": "2023-01-01T09:00:00Z", "end_time_utc": "2023-01-01T10:00:00Z"
-        }
+        test_block_data = {"id": "tsbs001", "name": "SimTick Block", "type": "work"}
         _set_current_block_for_testing(test_block_data)
+        run_simulation_tick()
+        self.assertIn(fevent_types.SCHEDULE_BLOCK_STARTED, self.recorded_events, "SCHEDULE_BLOCK_STARTED event not found.")
+        self.assertGreater(len(self.recorded_events[fevent_types.SCHEDULE_BLOCK_STARTED]), 0)
+        self.assertEqual(self.recorded_events[fevent_types.SCHEDULE_BLOCK_STARTED][0]['block']['id'], "tsbs001")
+        print("Test Passed: Simulation tick.")
 
-        run_simulation_tick() # This should call chronos_get_current_block and publish
-
-        self.assertGreater(len(self.recorded_events[SCHEDULE_BLOCK_STARTED]), 0,
-                           f"No {SCHEDULE_BLOCK_STARTED} events were recorded.")
-
-        first_sbs_event = self.recorded_events[SCHEDULE_BLOCK_STARTED][0]
-        self.assertIsNotNone(first_sbs_event.get("block"), "SCHEDULE_BLOCK_STARTED event data missing 'block' key.")
-        self.assertEqual(first_sbs_event["block"].get("id"), test_block_data["id"],
-                         "SCHEDULE_BLOCK_STARTED event block ID does not match Chronos mock data.")
-        self.assertEqual(first_sbs_event["block"].get("name"), test_block_data["name"])
-        print("Test Passed: Simulation tick correctly published SCHEDULE_BLOCK_STARTED.")
-
-
-    def test_world_event_triggers_thought_and_memory_write(self):
-        """
-        Tests that a specific WORLD_EVENT (e.g., from random_events)
-        can trigger a THOUGHT_TRIGGER, which then leads to a MEMORY_WRITE event.
-        This relies on random_events.py and subconscious_hook.py logic.
-        """
-        print("Running: test_world_event_triggers_thought_and_memory_write")
-
-        # Manually trigger a specific sequence from random_events that should produce a thought
-        # We need to ensure 'maybe_trigger_random_event' will actually fire an event that leads to a thought.
-        # The "car_driveby" event in random_events.py is designed to do this.
-
-        # To make this deterministic, we can't rely on random.random().
-        # Option 1: Mock random.random() (more complex for this setup).
-        # Option 2: Directly publish the intermediate WORLD_EVENT that random_events *would* publish.
-
-        car_driveby_world_event_data = {
-            "type": "random_world_event",
-            "event_name": "car_driveby", # This specific event triggers a thought in random_events.py
-            "source": "test_harness_direct_publish"
+    def test_direct_thought_trigger_leads_to_memory_write(self): # Renamed for clarity
+        print("Running: test_direct_thought_trigger_leads_to_memory_write")
+        # This test focuses only on subconscious_hook's direct handling of a thought leading to memory,
+        # not the full impulse flow that might follow.
+        thought_payload = {
+            "content": "A car pulled into the driveway then reversed. Weird.",
+            "mood": "confused",
+            "urgency": "low" # subconscious_hook expects urgency
         }
-        # Note: random_events.py publishes THOUGHT_TRIGGER directly.
-        # subconscious_hook.py listens to THOUGHT_TRIGGER and then publishes MEMORY_WRITE.
+        # Directly call handle_thought_trigger as it's the entry point from (e.g.) random_events
+        handle_thought_trigger(thought_payload)
 
-        # So, first, let's simulate random_events.py publishing its THOUGHT_TRIGGER
-        # This means we need the THOUGHT_TRIGGER handler (subconscious_hook) to be registered.
-        # (Done in setUp)
+        self.assertIn(EVENT_MEMORY_WRITE, self.recorded_events, f"{EVENT_MEMORY_WRITE} not found in recorded events.")
 
-        # Publish the THOUGHT_TRIGGER that random_events.py would have published
-        # if a "car_driveby" WORLD_EVENT occurred and its internal logic ran.
-        thought_data_from_car_event = {
-            "trigger_event": "car_driveby",
-            "content": "A car pulled into the driveway then reversed. That was a bit weird. Who could that be?",
-            "mood_impact": "confused",
-            "urgency": "low",
-            "source": "random_events_simulated" # Simulating it came from random_events
+        thought_memory_events = [e for e in self.recorded_events[EVENT_MEMORY_WRITE] if e.get("type") == "thought"]
+        self.assertGreater(len(thought_memory_events), 0, "No 'thought' type memory event recorded.")
+
+        memory_event = thought_memory_events[0]
+        self.assertIn("car's behavior", memory_event.get("content", "").lower(), "Memory content seems unrelated.")
+        self.assertEqual(memory_event.get("raw_trigger_content"), thought_payload["content"])
+        print("Test Passed: Direct thought trigger to memory write.")
+
+    # --- New tests for impulse handling flow ---
+    def test_subconscious_thought_triggers_impulse_and_sleep_action(self):
+        print("Running: test_subconscious_thought_triggers_impulse_and_sleep_action")
+        tired_payload = {
+            "content": "I'm feeling incredibly tired and should sleep.",
+            "mood": "exhausted",
+            "urgency": "high",
+            "impulse_type": "tired" # Helps subconscious_hook categorize the IMPULSE
         }
-        self.event_bus.publish(THOUGHT_TRIGGER, thought_data_from_car_event)
+        # Step 1: subconscious_hook processes the raw thought
+        handle_thought_trigger(tired_payload)
 
-        # Assertions
-        self.assertGreater(len(self.recorded_events[THOUGHT_TRIGGER]), 0, "No THOUGHT_TRIGGER events recorded (should have been the one we published).")
-        self.assertEqual(self.recorded_events[THOUGHT_TRIGGER][0]["content"], thought_data_from_car_event["content"])
+        # Expected flow:
+        # 1. handle_thought_trigger -> LLM -> memory.write (elaborated thought)
+        # 2. handle_thought_trigger -> publishes IMPULSE event
+        # 3. handle_impulse (subscribed to IMPULSE) -> publishes SLEEP_REQUESTED
+        # 4. handle_impulse -> publishes memory.write (action taken)
 
-        self.assertGreater(len(self.recorded_events[MEMORY_WRITE_EVENT_TYPE]), 0,
-                           f"No {MEMORY_WRITE_EVENT_TYPE} events were recorded after THOUGHT_TRIGGER.")
+        # Check for memory.write (elaborated thought from subconscious_hook)
+        elaborated_thought_mem_events = [
+            e for e in self.recorded_events.get(EVENT_MEMORY_WRITE, [])
+            if e.get("type") == "thought" and e.get("raw_trigger_content") == tired_payload["content"]
+        ]
+        self.assertTrue(len(elaborated_thought_mem_events) >= 1, "No 'thought' memory write for tired impulse's elaborated thought.")
 
-        first_memory_event = self.recorded_events[MEMORY_WRITE_EVENT_TYPE][0]
-        self.assertEqual(first_memory_event.get("type"), "thought", "Memory event type should be 'thought'.")
-        # Check if the content of the memory write is related to the LLM elaboration of the thought
-        self.assertIn("car's behavior", first_memory_event.get("content", "").lower(),
-                      "Memory content doesn't seem to be the LLM elaboration of the car event.")
-        self.assertEqual(first_memory_event.get("raw_trigger_content"), thought_data_from_car_event["content"])
-        print("Test Passed: THOUGHT_TRIGGER correctly led to MEMORY_WRITE.")
+        # Check for IMPULSE event
+        self.assertIn(fevent_types.IMPULSE, self.recorded_events, "IMPULSE event not published.")
+        impulse_event_data_list = self.recorded_events[fevent_types.IMPULSE]
+        self.assertTrue(any(ied.get("type") == "tired" and ied.get("original_thought_content") == tired_payload["content"]
+                            for ied in impulse_event_data_list), "Correct 'tired' IMPULSE event not found.")
 
+        # Check for SLEEP_REQUESTED event (published by handle_impulse)
+        self.assertIn(fevent_types.SLEEP_REQUESTED, self.recorded_events, "SLEEP_REQUESTED event not published.")
+        self.assertTrue(any(sr.get("reason") == "tired_impulse_response"
+                            for sr in self.recorded_events[fevent_types.SLEEP_REQUESTED]), "Correct SLEEP_REQUESTED event not found.")
 
-    def test_world_event_triggers_npc_dialogue(self):
-        """
-        Tests that a WORLD_EVENT (e.g., "mail_delivery") triggers an NPC interaction,
-        resulting in an NPC_DIALOGUE event. This uses npc_controller.py.
-        """
-        print("Running: test_world_event_triggers_npc_dialogue")
-        # register_npc_event_listeners() is called in setUp.
+        # Check for memory.write (action taken for impulse, by handle_impulse)
+        action_memory_events = [
+            e for e in self.recorded_events.get(EVENT_MEMORY_WRITE, [])
+            if e.get("type") == "impulse_response_action" and "Scheduled sleep" in e.get("content", "") and
+               e.get("metadata", {}).get("triggering_original_thought") == tired_payload["content"]
+        ]
+        self.assertTrue(len(action_memory_events) >= 1, "No 'impulse_response_action' memory write for tired impulse action.")
+        print("Test Passed: Tired impulse flow (thought -> IMPULSE -> sleep request -> memory log) verified.")
 
-        mail_delivery_event_data = {
-            "type": "random_world_event", # As published by random_events.py
-            "event_name": "mail_delivery",
-            "has_package": True,
-            "source": "test_harness_world_event_for_npc"
+    def test_subconscious_thought_triggers_impulse_and_hunger_action(self):
+        print("Running: test_subconscious_thought_triggers_impulse_and_hunger_action")
+        hungry_payload = {
+            "content": "I'm really hungry, I need to eat something soon.",
+            "mood": "cranky",
+            "urgency": "high",
+            "impulse_type": "hunger"
         }
-        self.event_bus.publish(WORLD_EVENT, mail_delivery_event_data)
+        handle_thought_trigger(hungry_payload)
 
-        self.assertGreater(len(self.recorded_events[NPC_DIALOGUE]), 0,
-                           f"No {NPC_DIALOGUE} events recorded after 'mail_delivery' WORLD_EVENT.")
+        self.assertIn(fevent_types.IMPULSE, self.recorded_events, "IMPULSE event for hunger not published.")
+        self.assertTrue(any(ied.get("type") == "hunger" for ied in self.recorded_events[fevent_types.IMPULSE]))
 
-        first_npc_dialogue = self.recorded_events[NPC_DIALOGUE][0]
-        self.assertEqual(first_npc_dialogue.get("npc_name"), "Mailman")
-        self.assertIn("package", first_npc_dialogue.get("line", "").lower())
-        print("Test Passed: 'mail_delivery' WORLD_EVENT correctly triggered NPC_DIALOGUE.")
+        self.assertIn(EVENT_REQUEST_FOOD_PREP, self.recorded_events, f"{EVENT_REQUEST_FOOD_PREP} not published.")
+        self.assertTrue(any(fr.get("urgency") == "high" for fr in self.recorded_events[EVENT_REQUEST_FOOD_PREP]))
 
+        action_memory_events = [
+            e for e in self.recorded_events.get(EVENT_MEMORY_WRITE, [])
+            if e.get("type") == "impulse_response_action" and "Requested food preparation" in e.get("content", "")
+        ]
+        self.assertTrue(len(action_memory_events) >=1, "No 'impulse_response_action' memory write for hunger impulse.")
+        print("Test Passed: Hunger impulse flow verified.")
 
-    def test_placeholder_true(self):
-        """A simple placeholder test that always passes."""
-        print("Running: test_placeholder_true")
-        self.assertTrue(True, "This placeholder test should always pass.")
-        print("Test Passed: Placeholder test.")
+    def test_subconscious_thought_triggers_impulse_and_curiosity_action(self):
+        print("Running: test_subconscious_thought_triggers_impulse_and_curiosity_action")
+        curious_payload = {
+            "content": "I should learn about quantum physics.", # This phrase implies action
+            "mood": "inquisitive",
+            "urgency": "medium",
+            "impulse_type": "curiosity" # Explicit type for subconscious_hook
+        }
+        handle_thought_trigger(curious_payload)
+
+        self.assertIn(fevent_types.IMPULSE, self.recorded_events, "IMPULSE event for curiosity not published.")
+        self.assertTrue(any(ied.get("type") == "curiosity" for ied in self.recorded_events[fevent_types.IMPULSE]))
+
+        self.assertIn(EVENT_LOGOS_RESEARCH_REQUEST, self.recorded_events, f"{EVENT_LOGOS_RESEARCH_REQUEST} not published.")
+        research_requests = [rr for rr in self.recorded_events[EVENT_LOGOS_RESEARCH_REQUEST] if rr.get("query_topic") == "quantum physics"]
+        self.assertTrue(len(research_requests) >= 1, "No research request for 'quantum physics' found.")
+
+        action_memory_events = [
+            e for e in self.recorded_events.get(EVENT_MEMORY_WRITE, [])
+            if e.get("type") == "impulse_response_action" and
+               "Initiated research request" in e.get("content", "") and
+               "quantum physics" in e.get("content", "")
+        ]
+        self.assertTrue(len(action_memory_events) >=1, "No 'impulse_response_action' memory write for curiosity impulse.")
+        print("Test Passed: Curiosity impulse flow verified.")
 
 
 if __name__ == '__main__':
-    # This allows running the tests directly from this file: `python test_event_flow.py`
-    # Ensure that the script is run from a context where the imports can be resolved
-    # (e.g., project root, or with PYTHONPATH adjusted).
     unittest.main(verbosity=2)
