@@ -1,0 +1,8 @@
+THOUGHT_TRIGGER = "thought.trigger"
+WORLD_EVENT = "world.random"
+MOOD_UPDATED = "ethos.mood_update"
+SCHEDULE_BLOCK_STARTED = "chronos.schedule_started"
+SCHEDULE_BLOCK_ENDED = "chronos.schedule_ended"
+IMPULSE = "subconscious.impulse"
+SLEEP_REQUESTED = "availability.request_sleep"
+NPC_DIALOGUE = "npc.say"
