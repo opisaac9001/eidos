@@ -1,0 +1,461 @@
+2025-06-15 05:43:45,972 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 05:43:45,972 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 05:43:45,980 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 05:43:45,980 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 05:43:45,980 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 05:43:45,981 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 05:43:45,982 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/eidos/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1161, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1082, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1443, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 788, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 413, in main
+    run(
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 580, in run
+    server.run()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 66, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 70, in serve
+    await self._serve(sockets)
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 77, in _serve
+    config.load()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/config.py", line 435, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 130, in <module>
+    class NodeControlStatePayload(BaseModel):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 132, in NodeControlStatePayload
+    daily_summary: Optional[str] = None
+                   ^^^^^^^^
+NameError: name 'Optional' is not defined
+2025-06-15 05:51:52,714 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 05:51:52,714 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 05:51:52,715 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 05:51:52,715 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 05:51:52,715 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 05:51:52,716 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 05:51:52,716 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/eidos/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1161, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1082, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1443, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 788, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 413, in main
+    run(
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 580, in run
+    server.run()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 66, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 70, in serve
+    await self._serve(sockets)
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 77, in _serve
+    config.load()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/config.py", line 435, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 130, in <module>
+    class NodeControlStatePayload(BaseModel):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 132, in NodeControlStatePayload
+    daily_summary: Optional[str] = None
+                   ^^^^^^^^
+NameError: name 'Optional' is not defined
+2025-06-15 06:02:34,711 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 06:02:34,712 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 06:02:34,713 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 06:02:34,713 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 06:02:34,713 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 06:02:34,714 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 06:02:34,714 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+Traceback (most recent call last):
+  File "/root/miniconda3/envs/eidos/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1161, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1082, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 1443, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/click/core.py", line 788, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 413, in main
+    run(
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/main.py", line 580, in run
+    server.run()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 66, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 70, in serve
+    await self._serve(sockets)
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/server.py", line 77, in _serve
+    config.load()
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/config.py", line 435, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 130, in <module>
+    class NodeControlStatePayload(BaseModel):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/api.py", line 132, in NodeControlStatePayload
+    daily_summary: Optional[str] = None
+                   ^^^^^^^^
+NameError: name 'Optional' is not defined
+2025-06-15 06:53:00,501 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 06:53:00,501 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 06:53:00,591 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 06:53:00,591 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 06:53:00,591 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 06:53:00,592 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 06:53:00,592 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1262]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1262]
+2025-06-15 07:06:57,308 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 07:06:57,308 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 07:06:57,313 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 07:06:57,313 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 07:06:57,313 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 07:06:57,314 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 07:06:57,314 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1303]
+INFO:     Waiting for application startup.
+2025-06-15 07:06:57,330 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 07:06:57,331 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 07:06:57,331 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 07:06:57,331 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 07:06:57,331 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 07:06:57,331 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 07:30:45,822 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 07:30:45,822 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 07:30:45,822 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 07:30:45,823 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 07:30:45,823 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1303]
+2025-06-15 07:31:04,190 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=True
+2025-06-15 07:31:04,190 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 07:31:04,191 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 07:31:04,191 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 07:31:04,191 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 07:31:04,192 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 07:31:04,192 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1352]
+INFO:     Waiting for application startup.
+2025-06-15 07:31:04,207 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 07:31:04,208 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 07:31:04,208 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 07:31:04,208 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 07:31:04,208 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 07:31:04,208 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 07:46:24,756 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 07:46:24,756 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 07:46:24,756 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 07:46:24,756 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 07:46:24,756 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1352]
+2025-06-15 07:46:42,657 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 07:46:42,657 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 07:46:42,658 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 07:46:42,658 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 07:46:42,659 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 07:46:42,659 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 07:46:42,660 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1395]
+INFO:     Waiting for application startup.
+2025-06-15 07:46:42,675 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 07:46:42,675 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 07:46:42,675 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 07:46:42,675 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 07:46:42,676 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 07:46:42,676 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 07:50:49,484 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 07:50:49,484 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 07:50:49,484 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 07:50:49,484 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 07:50:49,485 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1395]
+2025-06-15 07:51:15,646 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 07:51:15,646 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 07:51:15,647 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 07:51:15,647 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 07:51:15,648 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 07:51:15,648 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 07:51:15,649 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1422]
+INFO:     Waiting for application startup.
+2025-06-15 07:51:15,664 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 07:51:15,664 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 07:51:15,665 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 07:51:15,665 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 07:51:15,665 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 07:51:15,665 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:06:33,637 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:06:33,637 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:06:33,638 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:06:33,638 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:06:33,638 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1422]
+2025-06-15 08:07:05,189 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:1234/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:07:05,189 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:07:05,190 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:07:05,190 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:07:05,190 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:07:05,191 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:07:05,191 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1466]
+INFO:     Waiting for application startup.
+2025-06-15 08:07:05,206 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:07:05,207 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:07:05,207 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:07:05,207 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:07:05,207 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:07:05,207 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:10:08,517 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:10:08,517 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:10:08,517 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:10:08,517 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:10:08,517 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1466]
+2025-06-15 08:10:26,769 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11343/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:10:26,769 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:10:26,770 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:10:26,770 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:10:26,771 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:10:26,771 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:10:26,772 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1492]
+INFO:     Waiting for application startup.
+2025-06-15 08:10:26,788 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:10:26,788 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:10:26,788 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:10:26,788 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:10:26,788 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:10:26,789 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:12:23,828 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:12:23,828 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:12:23,829 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:12:23,829 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:12:23,829 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1492]
+2025-06-15 08:12:43,641 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:12:43,641 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:12:43,642 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:12:43,642 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:12:43,642 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:12:43,643 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:12:43,643 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1519]
+INFO:     Waiting for application startup.
+2025-06-15 08:12:43,659 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:12:43,659 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:12:43,659 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:12:43,660 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:12:43,660 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:12:43,660 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:40:01,096 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:40:01,096 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:40:01,096 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:40:01,096 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:40:01,097 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1519]
+2025-06-15 08:40:20,572 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', Model='llama3.2', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:40:20,572 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:40:20,573 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:40:20,573 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:40:20,573 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:40:20,575 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:40:20,575 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1567]
+INFO:     Waiting for application startup.
+2025-06-15 08:40:20,594 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:40:20,594 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:40:20,595 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:40:20,595 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:40:20,595 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:40:20,595 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:54:13,579 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:54:13,579 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:54:13,579 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:54:13,579 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:54:13,579 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1567]
+2025-06-15 08:54:30,091 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', Model='llama3.2', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:54:30,091 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:54:30,092 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:54:30,146 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:54:30,146 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:54:30,147 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:54:30,147 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1609]
+INFO:     Waiting for application startup.
+2025-06-15 08:54:30,162 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:54:30,162 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:54:30,162 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:54:30,162 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:54:30,163 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:54:30,163 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=30s, MaxThoughts=100
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 08:58:00,086 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 08:58:00,087 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 08:58:00,087 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 08:58:00,087 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 08:58:00,087 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1609]
+2025-06-15 08:58:20,249 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', Model='llama3.2', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-06-15 08:58:20,249 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-06-15 08:58:20,250 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/experimental/eidos/subconscious_node/config.json
+2025-06-15 08:58:20,250 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-06-15 08:58:20,250 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/experimental/eidos/wildcards
+2025-06-15 08:58:20,251 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-06-15 08:58:20,251 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [1636]
+INFO:     Waiting for application startup.
+2025-06-15 08:58:20,267 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-06-15 08:58:20,268 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-06-15 08:58:20,268 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-06-15 08:58:20,268 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-06-15 08:58:20,268 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-06-15 08:58:20,268 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=5s, MaxThoughts=1000
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-06-15 09:00:18,924 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-06-15 09:00:18,924 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-06-15 09:00:18,924 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-06-15 09:00:18,925 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-06-15 09:00:18,925 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1636]

@@ -1,0 +1,4 @@
+2025-06-15 04:51:38,706 - eidos_agent.utils.logger - INFO - Logging configured. Log file: /root/eidos/eidosproject/eidos/experimental/eidos/logs/eidos_20250615_045138.log. Console Level: INFO (logger.py:85)
+2025-06-15 04:51:38,706 - eidos_agent.utils.logger - DEBUG - Debug level logging is active. (logger.py:87)
+2025-06-15 04:51:38,707 - eidos_agent.persona_logic - INFO - eidos_agent.persona_logic package loaded. (__init__.py:20)
+2025-06-15 04:52:03,393 - datasets - INFO - PyTorch version 2.7.1 available. (config.py:54)

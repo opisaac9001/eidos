@@ -1,0 +1,117 @@
+2025-06-15 05:31:24,789 - eidos_agent.utils.logger - INFO - Logging configured. Log file: /root/eidos/eidosproject/eidos/experimental/eidos/logs/eidos_20250615_053124.log. Console Level: DEBUG (logger.py:85)
+2025-06-15 05:31:24,789 - eidos_agent.utils.logger - DEBUG - Debug level logging is active. (logger.py:87)
+2025-06-15 05:31:24,789 - eidos_agent.core.connection_manager - INFO - ConnectionManager initialized. (connection_manager.py:10)
+2025-06-15 05:31:24,789 - main - INFO - MAIN.PY GLOBAL: TEMP_AUDIO_CACHE initialized. ID: 140082555339136 (main.py:103)
+2025-06-15 05:31:24,789 - main - INFO - MAIN.PY GLOBAL: TEMP_AUDIO_CACHE_LOCK initialized. ID: 140082557047568 (main.py:105)
+2025-06-15 05:31:24,810 - main - INFO - --- Initializing Eidos System for API (Lifespan Startup) --- (main.py:142)
+2025-06-15 05:31:24,810 - main - INFO - Lifespan: Starting core component initialization... (main.py:144)
+2025-06-15 05:31:24,840 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'summary_llm' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,844 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'timestamp_last_salience_update' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,849 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'last_accessed_ts' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,860 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'access_count' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,865 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'is_archived' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,869 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Added 'archived_at' column to memories table. (memory_storage.py:118)
+2025-06-15 05:31:24,906 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - DB tables ensured. (memory_storage.py:147)
+2025-06-15 05:31:24,906 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - MemoryStorage initialized. DB: eidos_memories/memory.sqlite (embedder deferred) (memory_storage.py:60)
+2025-06-15 05:31:24,906 - eidos_agent.persona_logic.ethos_core.core - INFO - Task last run times file not found at eidos_memories/task_last_run_times.json. Tasks will run based on defaults. (core.py:469)
+2025-06-15 05:31:24,906 - eidos_agent.persona_logic.ethos_core.core - INFO - Loading persona directives from: /root/eidos/eidosproject/eidos/experimental/eidos/persona/pathos_directives.txt (core.py:527)
+2025-06-15 05:31:24,906 - eidos_agent.utils.prompt_loader - INFO - Successfully loaded system prompt 'pathos_directives' from /root/eidos/eidosproject/eidos/experimental/eidos/system_prompts/pathos_directives.txt (prompt_loader.py:38)
+2025-06-15 05:31:24,906 - eidos_agent.persona_logic.ethos_core.core - INFO - Successfully loaded 0 persona directives. (core.py:543)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - INFO - Hexus state file not found at eidos_memories/hexus_state.json. Using default scores and creating file. (core.py:571)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - INFO - Hexus scores saved to eidos_memories/hexus_state.json (core.py:588)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - INFO - No personality bias profile loaded. Initial Hexus scores remain unmodified by bias. (core.py:850)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'EthosReflection'. Setting initial to: 2025-06-14T07:31:02.675455+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'EthosForgetting'. Setting initial to: 2025-06-14T18:23:09.873233+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'HexusDecay'. Setting initial to: 2025-06-15T04:33:47.496324+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'KnowledgeUpkeep'. Setting initial to: 2025-06-14T05:47:43.344316+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'InteractionLogAnalysis'. Setting initial to: 2025-06-14T07:27:45.899968+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'PathosLongTermPlanning'. Setting initial to: 2025-06-12T06:53:45.135584+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'OneirosDreamCycle'. Setting initial to: 2025-06-14T23:35:52.227696+00:00 (core.py:500)
+2025-06-15 05:31:24,907 - eidos_agent.persona_logic.ethos_core.core - INFO - Loaded 5 core memory types for forgetting: ['persona_directive', 'user_fact', 'aspiration', 'reflection_insight', 'learned_correction'] (core.py:442)
+2025-06-15 05:31:24,908 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore initialized with persistent task timing. (core.py:448)
+2025-06-15 05:31:24,908 - eidos_agent.api.routers.chat_storage_router - INFO - Chat Storage Router initialized with EthosCore instance. (chat_storage_router.py:21)
+2025-06-15 05:31:25,255 - eidos_agent.services.openweathermap - INFO - OpenWeatherMapService initialized. (openweathermap.py:31)
+2025-06-15 05:31:25,336 - eidos_agent.features.oneiros.module - INFO - OneirosModule: Stable Diffusion URL configured and image dreams enabled. (module.py:54)
+2025-06-15 05:31:25,337 - eidos_agent.features.oneiros.module - INFO - OneirosModule initialized. (module.py:59)
+2025-06-15 05:31:25,417 - eidos_agent.persona_logic.logos_core.handler - INFO - Web Search disabled in LogosCore. (handler.py:61)
+2025-06-15 05:31:25,417 - eidos_agent.persona_logic.logos_core.handler - INFO - News API enabled for LogosCore (Daily Briefing). (handler.py:70)
+2025-06-15 05:31:25,417 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore initialized. (handler.py:73)
+2025-06-15 05:31:25,418 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore has OpenWeatherMapService. (handler.py:74)
+2025-06-15 05:31:25,418 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore initialize_services called. (handler.py:83)
+2025-06-15 05:31:25,418 - eidos_agent.persona_logic.chronos_engine.engine - INFO - ChronosEngine initialized. (engine.py:63)
+2025-06-15 05:31:25,418 - main - INFO - Lifespan: ChronosEngine initialized and set in EthosCore. (main.py:165)
+2025-06-15 05:31:25,418 - eidos_agent.features.subconscious_interface_to_node.subconscious_feed_integrator - INFO - SubconsciousFeedIntegrator initialized with cache duration: 60.0s (subconscious_feed_integrator.py:45)
+2025-06-15 05:31:25,418 - eidos_agent.llm_integrations.prompt_builder - INFO - SubconsciousFeedIntegrator initialized in PromptBuilder. (prompt_builder.py:135)
+2025-06-15 05:31:25,418 - eidos_agent.llm_integrations.prompt_builder - INFO - PromptBuilder initialized. (prompt_builder.py:140)
+2025-06-15 05:31:25,499 - eidos_agent.llm_integrations.llm_client - INFO - LLMClient initialized. (llm_client.py:28)
+2025-06-15 05:31:25,499 - eidos_agent.llm_integrations.tool_orchestrator - INFO - ToolOrchestrator initialized. (tool_orchestrator.py:44)
+2025-06-15 05:31:25,499 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface initialized with PromptBuilder, LLMClient, and ToolOrchestrator. (pathos_interface.py:69)
+2025-06-15 05:31:25,499 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface: Audio cache and lock set. (pathos_interface.py:93)
+2025-06-15 05:31:25,500 - eidos_agent.core.input_router - INFO - InputRouter initialized (Direct Vision Processing Strategy with User ID passthrough). (input_router.py:31)
+2025-06-15 05:31:25,580 - eidos_agent.services.external_tts_service - INFO - ExternalTTSService (Kokoro Adapter) initialized to use API at: http://100.93.141.73:8880/v1/audio/speech (external_tts_service.py:20)
+2025-06-15 05:31:25,580 - eidos_agent.llm_integrations.pathos_interface - INFO - ExternalTTSService instance set in PathosInterface. (pathos_interface.py:89)
+2025-06-15 05:31:26,799 - main - INFO - LLM Check: SUCCESS - Role 'PATHOS' (Model: pathos-mistral) is responding. (main.py:384)
+2025-06-15 05:31:55,316 - main - INFO - LLM Check: SUCCESS - Role 'LOGOS_TECHNE (Summarization/Reflection/Upkeep)' (Model: internvl3-8b) is responding. (main.py:384)
+2025-06-15 05:31:56,206 - main - INFO - LLM Check: SUCCESS - Role 'ONEIROS_DREAM_LLM' (Model: pathos-mistral) is responding. (main.py:384)
+2025-06-15 05:31:56,423 - main - INFO - LLM Check: SUCCESS - Role 'KNOWLEDGE_UPKEEP_LLM' (Model: internvl3-8b) is responding. (main.py:384)
+2025-06-15 05:31:56,424 - eidos_agent.utils.prompt_loader - INFO - Successfully loaded system prompt 'main_pathos_llm_system_prompt' from /root/eidos/eidosproject/eidos/experimental/eidos/system_prompts/main_pathos_llm_system_prompt.txt (prompt_loader.py:38)
+2025-06-15 05:31:56,425 - main - INFO - Attempting to warm VLLM cache with static prompt for Pathos LLM. Target URL base: http://100.97.184.113:8000/v1, Target Model: pathos-mistral (main.py:116)
+2025-06-15 05:31:56,426 - main - DEBUG - Warming VLLM cache: POST to http://100.97.184.113:8000/v1/chat/completions with model pathos-mistral (main.py:127)
+2025-06-15 05:32:00,119 - main - INFO - VLLM cache warming request sent successfully for Pathos model 'pathos-mistral' at http://100.97.184.113:8000/v1/chat/completions. (main.py:132)
+2025-06-15 05:32:00,119 - eidos_agent.api.routers.tts_router - INFO - TTS Router initialized with ExternalTTSService instance and audio cache. (tts_router.py:34)
+2025-06-15 05:32:00,119 - eidos_agent.api.routers.oai_compatible_router - INFO - OpenAI Compatible Router initialized with Eidos core components. (oai_compatible_router.py:68)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.utility_router - INFO - Utility Router initialized with Eidos core components. (utility_router.py:42)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.user_profile_router - INFO - User Profile Router initialized with Eidos core components. (user_profile_router.py:36)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.agent_actions_router - INFO - Agent Actions Router initialized with Eidos core components. (agent_actions_router.py:37)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.memory_management_router - INFO - Memory Management Router initialized with Eidos core components. (memory_management_router.py:28)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.agent_state_router - INFO - Agent State Router initialized with Eidos EthosCore component. (agent_state_router.py:33)
+2025-06-15 05:32:00,120 - eidos_agent.api.routers.pathos_chronos_router - INFO - Pathos Chronos Router initialized with Eidos core components. (pathos_chronos_router.py:32)
+2025-06-15 05:32:00,121 - eidos_agent.api.routers.websocket_router - INFO - WebSocket Router initialized with ConnectionManager. (websocket_router.py:19)
+2025-06-15 05:32:00,204 - eidos_agent.features.firmament.module - INFO - FirmamentModule initialized with Firmament LLM role 'LOGOS_TECHNE'. HTTP client ready. (module.py:64)
+2025-06-15 05:32:00,204 - eidos_agent.features.firmament.module - INFO - FirmamentModule started and ready. (module.py:72)
+2025-06-15 05:32:00,205 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: FirmamentModule instance set. (core.py:517)
+2025-06-15 05:32:00,205 - main - INFO - Lifespan: FirmamentModule initialized, started, and linked. (main.py:250)
+2025-06-15 05:32:00,205 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: Adding Firmament simulation loop to background tasks. (core.py:2311)
+2025-06-15 05:32:00,205 - main - CRITICAL - --- System Initialization Failed Critically in Lifespan ---: 'EthosCore' object has no attribute '_periodic_long_term_planning_task' (main.py:341)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/main.py", line 258, in lifespan
+    background_tasks = await ethos_core.get_background_tasks() # EthosCore now potentially adds Firmament task
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2323, in get_background_tasks
+    tasks.append(asyncio.create_task(self._periodic_long_term_planning_task(), name="PathosLongTermPlanningTask"))
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EthosCore' object has no attribute '_periodic_long_term_planning_task'
+2025-06-15 05:32:00,217 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: Starting Firmament simulation loop with tick interval: 60.0s. (core.py:2364)
+2025-06-15 05:32:00,217 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:32:00,219 - eidos_agent.features.firmament.module - ERROR - FirmamentModule: Error getting current activity slot: 'MemoryStorage' object has no attribute 'load_schedule_from_db' (module.py:157)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/features/firmament/module.py", line 155, in _get_current_activity_slot
+    return await self.chronos_engine.get_current_activity(current_pathos_time)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 358, in get_current_activity
+    schedule_to_check = await self.memory_storage.load_schedule_from_db(target_date, PATHOS_USER_ID)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'load_schedule_from_db'
+2025-06-15 05:32:00,221 - eidos_agent.persona_logic.ethos_core.core - ERROR - EthosCore: Error in Firmament simulation loop: 1 validation error for ActivitySlot
+activity_type
+  Input should be 'work', 'intellectual', 'reflective', 'creative', 'leisure', 'maintenance', 'travel', 'event_related', 'social', 'learning', 'planning' or 'other' [type=literal_error, input_value='internal_processing', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/literal_error (core.py:2374)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2368, in _firmament_simulation_loop
+    await self.firmament_module.run_simulation_tick()
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/features/firmament/module.py", line 249, in run_simulation_tick
+    npc_context_slot = activity_slot if activity_slot else self._create_dummy_activity_slot_for_context("Idle / Between Activities")
+                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/features/firmament/module.py", line 199, in _create_dummy_activity_slot_for_context
+    return ActivitySlot(
+           ^^^^^^^^^^^^^
+  File "/root/miniconda3/envs/eidos/lib/python3.11/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ActivitySlot
+activity_type
+  Input should be 'work', 'intellectual', 'reflective', 'creative', 'leisure', 'maintenance', 'travel', 'event_related', 'social', 'learning', 'planning' or 'other' [type=literal_error, input_value='internal_processing', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/literal_error
+2025-06-15 05:32:00,225 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore forgetting task cancelled (core.py:2415)
+2025-06-15 05:32:00,225 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore reflection task cancelled (core.py:2394)
+2025-06-15 05:32:00,225 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore hexus decay task cancelled (core.py:2436)

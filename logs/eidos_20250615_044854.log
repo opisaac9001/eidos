@@ -1,0 +1,3 @@
+2025-06-15 04:48:54,053 - eidos_agent.utils.logger - INFO - Logging configured. Log file: /root/eidos/eidosproject/eidos/experimental/eidos/logs/eidos_20250615_044854.log. Console Level: INFO (logger.py:85)
+2025-06-15 04:48:54,053 - eidos_agent.utils.logger - DEBUG - Debug level logging is active. (logger.py:87)
+2025-06-15 04:48:54,054 - eidos_agent.persona_logic - INFO - eidos_agent.persona_logic package loaded. (__init__.py:20)

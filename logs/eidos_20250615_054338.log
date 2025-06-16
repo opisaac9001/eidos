@@ -1,0 +1,851 @@
+2025-06-15 05:43:38,507 - eidos_agent.utils.logger - INFO - Logging configured. Log file: /root/eidos/eidosproject/eidos/experimental/eidos/logs/eidos_20250615_054338.log. Console Level: DEBUG (logger.py:85)
+2025-06-15 05:43:38,507 - eidos_agent.utils.logger - DEBUG - Debug level logging is active. (logger.py:87)
+2025-06-15 05:43:38,508 - eidos_agent.core.connection_manager - INFO - ConnectionManager initialized. (connection_manager.py:10)
+2025-06-15 05:43:38,508 - main - INFO - MAIN.PY GLOBAL: TEMP_AUDIO_CACHE initialized. ID: 129436893932416 (main.py:103)
+2025-06-15 05:43:38,508 - main - INFO - MAIN.PY GLOBAL: TEMP_AUDIO_CACHE_LOCK initialized. ID: 129436409589392 (main.py:105)
+2025-06-15 05:43:38,529 - main - INFO - --- Initializing Eidos System for API (Lifespan Startup) --- (main.py:142)
+2025-06-15 05:43:38,529 - main - INFO - Lifespan: Starting core component initialization... (main.py:144)
+2025-06-15 05:43:38,530 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - DB tables ensured. (memory_storage.py:147)
+2025-06-15 05:43:38,530 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - MemoryStorage initialized. DB: eidos_memories/memory.sqlite (embedder deferred) (memory_storage.py:60)
+2025-06-15 05:43:38,530 - eidos_agent.persona_logic.ethos_core.core - INFO - Task last run times file not found at eidos_memories/task_last_run_times.json. Tasks will run based on defaults. (core.py:469)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - INFO - Loading persona directives from: /root/eidos/eidosproject/eidos/experimental/eidos/persona/pathos_directives.txt (core.py:527)
+2025-06-15 05:43:38,531 - eidos_agent.utils.prompt_loader - INFO - Successfully loaded system prompt 'pathos_directives' from /root/eidos/eidosproject/eidos/experimental/eidos/system_prompts/pathos_directives.txt (prompt_loader.py:38)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - INFO - Successfully loaded 0 persona directives. (core.py:543)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - INFO - Successfully loaded and validated Hexus scores from eidos_memories/hexus_state.json (core.py:564)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - INFO - No personality bias profile loaded. Initial Hexus scores remain unmodified by bias. (core.py:850)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'EthosReflection'. Setting initial to: 2025-06-14T06:31:19.257357+00:00 (core.py:500)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'EthosForgetting'. Setting initial to: 2025-06-14T17:50:33.478223+00:00 (core.py:500)
+2025-06-15 05:43:38,531 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'HexusDecay'. Setting initial to: 2025-06-15T04:47:49.217151+00:00 (core.py:500)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'KnowledgeUpkeep'. Setting initial to: 2025-06-14T07:12:38.316028+00:00 (core.py:500)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'InteractionLogAnalysis'. Setting initial to: 2025-06-14T08:05:51.023061+00:00 (core.py:500)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'PathosLongTermPlanning'. Setting initial to: 2025-06-12T06:43:20.967510+00:00 (core.py:500)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - DEBUG - No persisted last run time for 'OneirosDreamCycle'. Setting initial to: 2025-06-14T23:54:28.671508+00:00 (core.py:500)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - INFO - Loaded 5 core memory types for forgetting: ['persona_directive', 'user_fact', 'aspiration', 'reflection_insight', 'learned_correction'] (core.py:442)
+2025-06-15 05:43:38,532 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore initialized with persistent task timing. (core.py:448)
+2025-06-15 05:43:38,532 - eidos_agent.api.routers.chat_storage_router - INFO - Chat Storage Router initialized with EthosCore instance. (chat_storage_router.py:21)
+2025-06-15 05:43:38,593 - eidos_agent.services.openweathermap - INFO - OpenWeatherMapService initialized. (openweathermap.py:31)
+2025-06-15 05:43:38,624 - eidos_agent.features.oneiros.module - INFO - OneirosModule: Stable Diffusion URL configured and image dreams enabled. (module.py:54)
+2025-06-15 05:43:38,624 - eidos_agent.features.oneiros.module - INFO - OneirosModule initialized. (module.py:59)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.logos_core.handler - INFO - Web Search disabled in LogosCore. (handler.py:61)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.logos_core.handler - INFO - News API enabled for LogosCore (Daily Briefing). (handler.py:70)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore initialized. (handler.py:73)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore has OpenWeatherMapService. (handler.py:74)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore initialize_services called. (handler.py:83)
+2025-06-15 05:43:38,656 - eidos_agent.persona_logic.chronos_engine.engine - INFO - ChronosEngine initialized. (engine.py:63)
+2025-06-15 05:43:38,656 - main - INFO - Lifespan: ChronosEngine initialized and set in EthosCore. (main.py:165)
+2025-06-15 05:43:38,656 - eidos_agent.features.subconscious_interface_to_node.subconscious_feed_integrator - INFO - SubconsciousFeedIntegrator initialized with cache duration: 60.0s (subconscious_feed_integrator.py:45)
+2025-06-15 05:43:38,656 - eidos_agent.llm_integrations.prompt_builder - INFO - SubconsciousFeedIntegrator initialized in PromptBuilder. (prompt_builder.py:135)
+2025-06-15 05:43:38,656 - eidos_agent.llm_integrations.prompt_builder - INFO - PromptBuilder initialized. (prompt_builder.py:140)
+2025-06-15 05:43:38,688 - eidos_agent.llm_integrations.llm_client - INFO - LLMClient initialized. (llm_client.py:28)
+2025-06-15 05:43:38,688 - eidos_agent.llm_integrations.tool_orchestrator - INFO - ToolOrchestrator initialized. (tool_orchestrator.py:44)
+2025-06-15 05:43:38,688 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface initialized with PromptBuilder, LLMClient, and ToolOrchestrator. (pathos_interface.py:69)
+2025-06-15 05:43:38,688 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface: Audio cache and lock set. (pathos_interface.py:93)
+2025-06-15 05:43:38,688 - eidos_agent.core.input_router - INFO - InputRouter initialized (Direct Vision Processing Strategy with User ID passthrough). (input_router.py:31)
+2025-06-15 05:43:38,719 - eidos_agent.services.external_tts_service - INFO - ExternalTTSService (Kokoro Adapter) initialized to use API at: http://100.93.141.73:8880/v1/audio/speech (external_tts_service.py:20)
+2025-06-15 05:43:38,719 - eidos_agent.llm_integrations.pathos_interface - INFO - ExternalTTSService instance set in PathosInterface. (pathos_interface.py:89)
+2025-06-15 05:43:39,557 - main - INFO - LLM Check: SUCCESS - Role 'PATHOS' (Model: pathos-mistral) is responding. (main.py:384)
+2025-06-15 05:43:40,068 - main - INFO - LLM Check: SUCCESS - Role 'LOGOS_TECHNE (Summarization/Reflection/Upkeep)' (Model: internvl3-8b) is responding. (main.py:384)
+2025-06-15 05:43:40,892 - main - INFO - LLM Check: SUCCESS - Role 'ONEIROS_DREAM_LLM' (Model: pathos-mistral) is responding. (main.py:384)
+2025-06-15 05:43:41,113 - main - INFO - LLM Check: SUCCESS - Role 'KNOWLEDGE_UPKEEP_LLM' (Model: internvl3-8b) is responding. (main.py:384)
+2025-06-15 05:43:41,114 - eidos_agent.utils.prompt_loader - INFO - Successfully loaded system prompt 'main_pathos_llm_system_prompt' from /root/eidos/eidosproject/eidos/experimental/eidos/system_prompts/main_pathos_llm_system_prompt.txt (prompt_loader.py:38)
+2025-06-15 05:43:41,115 - main - INFO - Attempting to warm VLLM cache with static prompt for Pathos LLM. Target URL base: http://100.97.184.113:8000/v1, Target Model: pathos-mistral (main.py:116)
+2025-06-15 05:43:41,115 - main - DEBUG - Warming VLLM cache: POST to http://100.97.184.113:8000/v1/chat/completions with model pathos-mistral (main.py:127)
+2025-06-15 05:43:44,780 - main - INFO - VLLM cache warming request sent successfully for Pathos model 'pathos-mistral' at http://100.97.184.113:8000/v1/chat/completions. (main.py:132)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.tts_router - INFO - TTS Router initialized with ExternalTTSService instance and audio cache. (tts_router.py:34)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.oai_compatible_router - INFO - OpenAI Compatible Router initialized with Eidos core components. (oai_compatible_router.py:68)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.utility_router - INFO - Utility Router initialized with Eidos core components. (utility_router.py:42)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.user_profile_router - INFO - User Profile Router initialized with Eidos core components. (user_profile_router.py:36)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.agent_actions_router - INFO - Agent Actions Router initialized with Eidos core components. (agent_actions_router.py:37)
+2025-06-15 05:43:44,780 - eidos_agent.api.routers.memory_management_router - INFO - Memory Management Router initialized with Eidos core components. (memory_management_router.py:28)
+2025-06-15 05:43:44,781 - eidos_agent.api.routers.agent_state_router - INFO - Agent State Router initialized with Eidos EthosCore component. (agent_state_router.py:33)
+2025-06-15 05:43:44,781 - eidos_agent.api.routers.pathos_chronos_router - INFO - Pathos Chronos Router initialized with Eidos core components. (pathos_chronos_router.py:32)
+2025-06-15 05:43:44,781 - eidos_agent.api.routers.websocket_router - INFO - WebSocket Router initialized with ConnectionManager. (websocket_router.py:19)
+2025-06-15 05:43:44,862 - eidos_agent.features.firmament.module - INFO - FirmamentModule initialized with Firmament LLM role 'LOGOS_TECHNE'. HTTP client ready. (module.py:64)
+2025-06-15 05:43:44,862 - eidos_agent.features.firmament.module - INFO - FirmamentModule started and ready. (module.py:72)
+2025-06-15 05:43:44,862 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: FirmamentModule instance set. (core.py:517)
+2025-06-15 05:43:44,862 - main - INFO - Lifespan: FirmamentModule initialized, started, and linked. (main.py:250)
+2025-06-15 05:43:44,862 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: Adding Firmament simulation loop to background tasks. (core.py:2311)
+2025-06-15 05:43:44,863 - eidos_agent.system_tasks.subconscious_context_scheduler - INFO - SubconsciousContextScheduler initialized with EthosCore instance and main event loop. (subconscious_context_scheduler.py:51)
+2025-06-15 05:43:44,863 - main - INFO - Lifespan: Subconscious context scheduler initialized with EthosCore and event loop. (main.py:263)
+2025-06-15 05:43:44,863 - eidos_agent.core.subconscious_orchestrator - INFO - Launching Subconscious Node API: uvicorn subconscious_node.api:app --host=0.0.0.0 --port=8000 (subconscious_orchestrator.py:61)
+2025-06-15 05:43:44,863 - eidos_agent.core.subconscious_orchestrator - INFO - Subconscious Node CWD: /root/eidos/eidosproject/eidos/experimental/eidos (subconscious_orchestrator.py:62)
+2025-06-15 05:43:44,863 - eidos_agent.core.subconscious_orchestrator - INFO - Subconscious Node stdout log: logs/subconscious_stdout.log (subconscious_orchestrator.py:63)
+2025-06-15 05:43:44,863 - eidos_agent.core.subconscious_orchestrator - INFO - Subconscious Node stderr log: logs/subconscious_stderr.log (subconscious_orchestrator.py:64)
+2025-06-15 05:43:44,866 - eidos_agent.core.subconscious_orchestrator - INFO - Subconscious Node process started with PID: 1048. (subconscious_orchestrator.py:75)
+2025-06-15 05:43:44,866 - main - INFO - Lifespan: Subconscious Node process launch attempted (PID: 1048). (main.py:276)
+2025-06-15 05:43:44,866 - eidos_agent.core.subconscious_orchestrator - INFO - Checking Subconscious Node API health at http://100.126.35.60:8000/ for up to 30s... (subconscious_orchestrator.py:140)
+2025-06-15 05:43:44,998 - eidos_agent.core.subconscious_orchestrator - DEBUG - Health Check: API not yet healthy (Attempt: 1). Error: HTTPConnectionPool(host='100.126.35.60', port=8000): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x75b8c273bbd0>: Failed to establish a new connection: [Errno 111] Connection refused')) (subconscious_orchestrator.py:160)
+2025-06-15 05:43:46,999 - eidos_agent.core.subconscious_orchestrator - ERROR - Health Check: Subconscious node process terminated prematurely (PID: 1048). Exit code: 1 (subconscious_orchestrator.py:144)
+2025-06-15 05:43:46,999 - main - ERROR - Lifespan: Subconscious Node API health check failed. (main.py:284)
+2025-06-15 05:43:46,999 - main - INFO - Lifespan: Launching Oneiros processing task with check interval 300s. (main.py:297)
+2025-06-15 05:43:46,999 - main - INFO - Lifespan: oneiros_processing_task added to background tasks. (main.py:306)
+2025-06-15 05:43:46,999 - main - INFO - --- Eidos System Initialized Successfully --- (main.py:314)
+2025-06-15 05:43:47,000 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: Starting Firmament simulation loop with tick interval: 60.0s. (core.py:2364)
+2025-06-15 05:43:47,000 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:43:47,003 - eidos_agent.features.oneiros.tasks - INFO - Oneiros Dream Scheduling Task started. Check interval: 300.0 seconds. (tasks.py:33)
+2025-06-15 05:43:47,004 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:43:47,005 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:43:47,007 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:43:50,091 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:43:52,663 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 285). Cleaned: {
+  "activity_title": "Client Consultation Session",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Engaging in a focused client consultation to discuss project progress and address any concerns.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Project Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:43:52,664 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:43:55,256 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:43:57,805 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:44:00,521 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:44:03,163 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:44:05,713 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:44:08,356 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:44:08,357 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:44:08,357 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:44:08,358 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:44:08,358 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:44:08,358 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:45:08,358 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:45:08,359 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:45:08,359 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:45:08,360 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:11,457 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:13,961 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 274). Cleaned: {
+  "activity_title": "Client Consultation and Strategy Planning",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Engaging in detailed client consultation to refine project strategies.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Project Strategy Development",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:45:13,962 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:16,589 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:19,240 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:21,919 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:24,460 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:27,020 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:45:29,778 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:45:29,779 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:45:29,780 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:45:29,780 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:45:29,780 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:45:29,780 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:46:29,780 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:46:29,781 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:46:29,781 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:46:29,782 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:32,768 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:35,372 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:37,998 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:40,472 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 276). Cleaned: {
+  "activity_title": "Organize Tech Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically categorize and update technical documentation to enhance accessibility.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Documentation Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:46:40,472 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:43,152 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:45,719 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:48,262 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:46:50,879 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:46:50,880 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:46:50,880 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:46:50,880 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:46:50,880 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:46:50,881 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:47:49,218 - eidos_agent.persona_logic.ethos_core.core - INFO - --- Ethos: Running Hexus Decay Cycle (Time elapsed: 3600.00s) --- (core.py:2146)
+2025-06-15 05:47:49,218 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:47:49,219 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:47:49,219 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:47:50,881 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:47:52,157 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:47:54,758 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:47:57,339 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:47:59,917 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 65 (char 321). Cleaned: {
+  "activity_title": "Organize and Update Tech Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Pathos will meticulously organize existing tech documentation, ensuring clarity and accessibility for future reference.",
+    "mood_influence": {"valence_shift": -0.15, "arousal_shift": +0.2},
+    "sub_focus": "Documentation Management",
+    "location_context": "Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:47:59,918 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:02,527 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:05,116 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:07,654 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:10,383 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:48:10,384 - eidos_agent.persona_logic.ethos_core.core - DEBUG - Hexus decay: No specific current activity found for Pathos or activity_type is None. (core.py:2159)
+2025-06-15 05:48:10,384 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error in hexus decay task: name 'baseline' is not defined (core.py:2439)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2430, in _periodic_hexus_decay_task
+    await self.run_hexus_decay()
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2224, in run_hexus_decay
+    logger.debug(f"Hexus decay for '{key}': {current_value:.3f} -> {clamped_new_value:.3f} (baseline: {baseline:.2f}, rate/hr: {dimension_decay_rate_per_hour:.3f}, dt: {time_elapsed_seconds:.0f}s). Change: {decay_amount_for_cycle:+.4f}")
+                                                                                                       ^^^^^^^^
+NameError: name 'baseline' is not defined
+2025-06-15 05:48:10,386 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:48:10,387 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:48:10,387 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:13,025 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:15,804 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:18,367 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:20,861 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 292). Cleaned: {
+  "activity_title": "Organizing Project Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically organizing and updating project documentation to ensure clarity and accessibility.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Documentation Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:48:20,861 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:23,396 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:25,936 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:28,477 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:48:31,161 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:48:31,162 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:48:31,162 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:48:31,162 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:48:31,162 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:48:31,163 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:48:47,004 - eidos_agent.features.oneiros.module - DEBUG - Oneiros: Not time to dream. Current local hour 22 is outside sleep window (23-7). (module.py:81)
+2025-06-15 05:48:47,004 - eidos_agent.features.oneiros.tasks - DEBUG - OneirosProcessingTask: Conditions not met for generating a dream in this cycle. (tasks.py:57)
+2025-06-15 05:49:10,386 - eidos_agent.persona_logic.ethos_core.core - INFO - --- Ethos: Running Hexus Decay Cycle (Time elapsed: 3681.17s) --- (core.py:2146)
+2025-06-15 05:49:10,387 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:49:10,387 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:49:10,388 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:13,365 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:15,940 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 65 (char 287). Cleaned: {
+  "activity_title": "Client Consultation Session",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Engaging in a focused client consultation to address technical challenges and provide solutions.",
+    "mood_influence": {"valence_shift": -0.15, "arousal_shift": +0.2},
+    "sub_focus": "Technical problem-solving",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:49:15,940 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:18,557 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:21,038 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 292). Cleaned: {
+  "activity_title": "Organizing Project Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically organizing and updating project documentation to ensure clarity and accessibility.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Documentation Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:49:21,039 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:23,686 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:26,265 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:28,774 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:31,164 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:49:31,473 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:49:31,474 - eidos_agent.persona_logic.ethos_core.core - DEBUG - Hexus decay: No specific current activity found for Pathos or activity_type is None. (core.py:2159)
+2025-06-15 05:49:31,474 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error in hexus decay task: name 'baseline' is not defined (core.py:2439)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2430, in _periodic_hexus_decay_task
+    await self.run_hexus_decay()
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2224, in run_hexus_decay
+    logger.debug(f"Hexus decay for '{key}': {current_value:.3f} -> {clamped_new_value:.3f} (baseline: {baseline:.2f}, rate/hr: {dimension_decay_rate_per_hour:.3f}, dt: {time_elapsed_seconds:.0f}s). Change: {decay_amount_for_cycle:+.4f}")
+                                                                                                       ^^^^^^^^
+NameError: name 'baseline' is not defined
+2025-06-15 05:49:31,476 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:49:31,476 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:49:31,477 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:34,172 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:36,755 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:39,318 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:41,809 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 257). Cleaned: {
+  "activity_title": "Organize Project Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically arrange and update project files for easy access.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "File management and organization",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:49:41,809 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:44,486 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:47,069 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:49,585 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:49:52,309 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:49:52,310 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:49:52,311 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:49:52,311 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:49:52,311 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:49:52,311 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:50:31,475 - eidos_agent.persona_logic.ethos_core.core - INFO - --- Ethos: Running Hexus Decay Cycle (Time elapsed: 3762.26s) --- (core.py:2146)
+2025-06-15 05:50:31,476 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:50:31,476 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:50:31,477 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:33,478 - eidos_agent.persona_logic.ethos_core.core - INFO - --- Ethos: Starting Managed Forgetting Cycle at 2025-06-15T05:50:33.478589+00:00 --- (core.py:2000)
+2025-06-15 05:50:33,478 - eidos_agent.persona_logic.ethos_core.core - INFO - Managed Forgetting: Starting salience decay. Rate: 0.01/day, Floor: 0.05. (core.py:2014)
+2025-06-15 05:50:33,479 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Salience decay process finished. Total memories updated: 0. (memory_storage.py:894)
+2025-06-15 05:50:33,479 - eidos_agent.persona_logic.ethos_core.core - INFO - Managed Forgetting: Salience decay step completed. 0 memories had their salience decayed. (core.py:2022)
+2025-06-15 05:50:33,480 - eidos_agent.persona_logic.ethos_core.core - INFO - Managed Forgetting: Starting archival step. (core.py:2029)
+2025-06-15 05:50:33,480 - eidos_agent.persona_logic.ethos_core.core - INFO - Managed Forgetting: Archival step. Processed 0 memories. Archived 0 memories. (core.py:2125)
+2025-06-15 05:50:33,481 - eidos_agent.persona_logic.ethos_core.core - DEBUG - Saved last run time for 'EthosForgetting' (2025-06-15T05:50:33.478589+00:00) (core.py:485)
+2025-06-15 05:50:33,481 - eidos_agent.persona_logic.ethos_core.core - INFO - --- Ethos: Managed Forgetting Cycle Finished at 2025-06-15T05:50:33.478589+00:00 --- (core.py:2131)
+2025-06-15 05:50:34,501 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:37,047 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 289). Cleaned: {
+  "activity_title": "Client Consultation Session",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Engaging in a focused client consultation to discuss project updates and address technical queries.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Project Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:50:37,048 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:39,616 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:42,168 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 269). Cleaned: {
+  "activity_title": "Organize Project Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically categorize and update project files to enhance accessibility.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "File organization and digital archiving",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:50:42,169 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:44,649 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:47,136 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:49,649 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:52,311 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Starting simulation tick. (module.py:209)
+2025-06-15 05:50:52,368 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await self.memory_storage.save_schedule_to_db(new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:50:52,369 - eidos_agent.persona_logic.ethos_core.core - DEBUG - Hexus decay: No specific current activity found for Pathos or activity_type is None. (core.py:2159)
+2025-06-15 05:50:52,369 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error in hexus decay task: name 'baseline' is not defined (core.py:2439)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2430, in _periodic_hexus_decay_task
+    await self.run_hexus_decay()
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 2224, in run_hexus_decay
+    logger.debug(f"Hexus decay for '{key}': {current_value:.3f} -> {clamped_new_value:.3f} (baseline: {baseline:.2f}, rate/hr: {dimension_decay_rate_per_hour:.3f}, dt: {time_elapsed_seconds:.0f}s). Change: {decay_amount_for_cycle:+.4f}")
+                                                                                                       ^^^^^^^^
+NameError: name 'baseline' is not defined
+2025-06-15 05:50:52,370 - eidos_agent.persona_logic.ethos_core.memory_storage - INFO - Loaded 0 schedule items for user 'pathos_agent_internal' on date '2025-06-14'. (memory_storage.py:208)
+2025-06-15 05:50:52,371 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error fetching events for 2025-06-14: 'MemoryStorage' object has no attribute 'get_events_for_date_range' (engine.py:269)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 268, in generate_schedule_for_date
+    active_events = await self.memory_storage.get_events_for_date_range(PATHOS_USER_ID, target_date, target_date)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'get_events_for_date_range'
+2025-06-15 05:50:52,371 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:55,187 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:50:57,752 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 285). Cleaned: {
+  "activity_title": "Client Consultation Session",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Engaging in a focused client consultation to discuss project progress and address any concerns.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "Project Management",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:50:57,753 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:00,336 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:02,917 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Failed to decode JSON from Chronos LLM: Expecting value: line 6 column 64 (char 280). Cleaned: {
+  "activity_title": "Organize Project Documentation",
+  "activity_type": "work",
+  "activity_details": {
+    "description": "Systematically categorize and update project files to ensure clarity and accessibility.",
+    "mood_influence": {"valence_shift": -0.1, "arousal_shift": +0.2},
+    "sub_focus": "File organization and digital filing",
+    "location_context": "Pathos's Home Office"
+  }
+} (engine.py:145)
+2025-06-15 05:51:02,918 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:05,548 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:08,067 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:10,580 - eidos_agent.persona_logic.ethos_core.core - ERROR - Error retrieving relevant memories: could not convert string to float: 'pathos_agent_internal' (core.py:1021)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/ethos_core/core.py", line 963, in retrieve_relevant_memories
+    min_salience = float(min_salience) # Ensure it's float
+                   ^^^^^^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'pathos_agent_internal'
+2025-06-15 05:51:13,144 - eidos_agent.persona_logic.chronos_engine.engine - ERROR - Error saving schedule to DB for 2025-06-14: 'MemoryStorage' object has no attribute 'save_schedule_to_db' (engine.py:347)
+Traceback (most recent call last):
+  File "/root/eidos/eidosproject/eidos/experimental/eidos/eidos_agent/persona_logic/chronos_engine/engine.py", line 346, in generate_schedule_for_date
+    try: await asyncio.to_thread(self.memory_storage.save_schedule_to_db, new_schedule, PATHOS_USER_ID)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MemoryStorage' object has no attribute 'save_schedule_to_db'
+2025-06-15 05:51:13,146 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Checking for NPC interaction in simulation tick. (module.py:256)
+2025-06-15 05:51:13,146 - eidos_agent.features.firmament.module - DEBUG - Placeholder for _is_npc_interaction_warranted (module.py:628)
+2025-06-15 05:51:13,146 - eidos_agent.features.firmament.module - INFO - FirmamentModule: _is_npc_interaction_warranted (placeholder) returned: False (module.py:259)
+2025-06-15 05:51:13,146 - eidos_agent.features.firmament.module - INFO - FirmamentModule: NPC interaction not warranted in this tick (based on _is_npc_interaction_warranted placeholder). (module.py:326)
+2025-06-15 05:51:13,146 - eidos_agent.features.firmament.module - DEBUG - FirmamentModule: Simulation tick finished. (module.py:330)
+2025-06-15 05:51:23,858 - main - INFO - --- Shutting Down Eidos System --- (main.py:316)
+2025-06-15 05:51:23,859 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore reflection task cancelled (core.py:2394)
+2025-06-15 05:51:23,859 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore forgetting task cancelled (core.py:2415)
+2025-06-15 05:51:23,859 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore: Firmament simulation loop cancelled. (core.py:2371)
+2025-06-15 05:51:23,859 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore long-term planning task cancelled (core.py:2464)
+2025-06-15 05:51:23,859 - eidos_agent.features.oneiros.tasks - INFO - OneirosProcessingTask: Task cancelled. Shutting down. (tasks.py:70)
+2025-06-15 05:51:23,860 - eidos_agent.core.connection_manager - INFO - ConnectionManager: Closing all active WebSocket connections... (connection_manager.py:95)
+2025-06-15 05:51:23,860 - eidos_agent.core.connection_manager - INFO - ConnectionManager: All WebSocket connections processed for closure. (connection_manager.py:115)
+2025-06-15 05:51:23,860 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface: HTTP client closed. (pathos_interface.py:467)
+2025-06-15 05:51:23,860 - eidos_agent.llm_integrations.pathos_interface - INFO - PathosInterface closed. (pathos_interface.py:469)
+2025-06-15 05:51:23,861 - eidos_agent.persona_logic.logos_core.handler - INFO - LogosCore resources closed. (handler.py:80)
+2025-06-15 05:51:23,861 - eidos_agent.services.openweathermap - INFO - OpenWeatherMapService HTTP client closed. (openweathermap.py:124)
+2025-06-15 05:51:23,861 - eidos_agent.features.firmament.module - INFO - FirmamentModule HTTP client closed. (module.py:82)
+2025-06-15 05:51:23,861 - eidos_agent.features.oneiros.module - INFO - OneirosModule resources closed. (module.py:443)
+2025-06-15 05:51:23,861 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore close called. Saving Hexus scores and closing memory connection. (core.py:520)
+2025-06-15 05:51:23,862 - eidos_agent.persona_logic.ethos_core.core - INFO - Hexus scores saved to eidos_memories/hexus_state.json (core.py:588)
+2025-06-15 05:51:23,863 - eidos_agent.persona_logic.ethos_core.memory_storage - DEBUG - SQLite connection closed. (memory_storage.py:91)
+2025-06-15 05:51:23,863 - eidos_agent.persona_logic.ethos_core.core - INFO - EthosCore resources released. (core.py:524)
+2025-06-15 05:51:23,863 - eidos_agent.services.external_tts_service - INFO - ExternalTTSService HTTP client closed. (external_tts_service.py:176)
+2025-06-15 05:51:23,863 - main - INFO - Lifespan: Attempting to terminate Subconscious Node process... (main.py:334)
+2025-06-15 05:51:23,863 - eidos_agent.core.subconscious_orchestrator - INFO - Subconscious Node process not running or already terminated. (subconscious_orchestrator.py:119)
+2025-06-15 05:51:23,863 - main - INFO - --- Eidos System Shutdown Complete --- (main.py:339)
