@@ -1,168 +1,173 @@
 # eidos_agent/features/firmament/core/simulator.py
 
-# Import EventBus and relevant event types
 from .event_bus import EventBus
-from .event_types import SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED # Added SCHEDULE_BLOCK_ENDED
+from .event_types import SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED
 
-# Import the actual get_current_block from chronos_adapter
-# This makes the simulator dependent on the integrations layer.
 try:
     from ..integrations.chronos_adapter import get_current_block
-    # Import the testing utility from chronos_adapter for the __main__ block
-    from ..integrations.chronos_adapter import _set_current_block_for_testing
+    from ..integrations.chronos_adapter import _set_current_block_for_testing # For __main__
 except ImportError: # pragma: no cover
     print("CRITICAL: Could not import from chronos_adapter. Simulator will not function correctly.")
-    # Define placeholders if import fails, to allow parsing but highlight issues.
-    def get_current_block():
-        print("Warning: Using dummy get_current_block due to ImportError.")
-        return {"id": "dummy_block_import_error", "name": "Dummy Block", "type": "error"}
-    def _set_current_block_for_testing(data=None): # type: ignore
-        print("Warning: Dummy _set_current_block_for_testing due to ImportError.")
+    def get_current_block(): return {"id": "dummy_block_import_error", "name": "Dummy Block", "type": "error"} # type: ignore
+    def _set_current_block_for_testing(data=None): pass # type: ignore
+
+# Import for random event triggering
+try:
+    from ..core.event_handlers.random_events import maybe_trigger_random_event
+except ImportError: # pragma: no cover
+    print("CRITICAL: Could not import from random_events. Simulator will not trigger random events.")
+    def maybe_trigger_random_event(): # type: ignore
+        print("Warning: Using dummy maybe_trigger_random_event due to ImportError.")
         pass
 
 
-# Module-level variable to store the data of the currently active schedule block
-# Its 'id' field is primarily used for comparison.
 _current_active_block_data: dict | None = None
 
 def run_simulation_tick():
     """
     Runs a single tick of the simulation.
-    Fetches the current schedule block from Chronos, compares it with the previously
-    active block, and publishes SCHEDULE_BLOCK_ENDED and/or SCHEDULE_BLOCK_STARTED
-    events if the block has changed.
+    Handles schedule block transitions and may trigger random world events.
     """
     global _current_active_block_data
 
     # print(f"Simulator: Tick. Prev active block ID: {_current_active_block_data.get('id') if _current_active_block_data else 'None'}")
 
-    new_block_data = get_current_block() # Uses the imported chronos_adapter function
+    # --- Schedule Block Transition Logic ---
+    new_block_data = get_current_block()
 
     # Validate the structure of the new_block_data. Minimally, it needs an 'id'.
     if not isinstance(new_block_data, dict) or not new_block_data.get("id"):
         # print(f"Simulator: Invalid or missing block data from Chronos adapter (received: {new_block_data}).")
-        # If there was an active block, and now the new block data is invalid/None,
-        # it implies the previously active block might have ended without a new one starting.
         if _current_active_block_data:
             # print(f"Simulator: Current block data from Chronos is invalid/None. Ending previous block '{_current_active_block_data.get('id')}'.")
             EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "new_block_data_invalid_or_none"})
-            _current_active_block_data = None # Clear current block as its status is unknown
-        return
+            _current_active_block_data = None
+        # Even if block data is invalid, random events can still occur.
+    else: # New block data is valid
+        new_block_id = new_block_data.get("id")
+        previous_block_id = _current_active_block_data.get("id") if _current_active_block_data else None
 
-    new_block_id = new_block_data.get("id") # Already checked new_block_data.get("id") is not None
-    previous_block_id = _current_active_block_data.get("id") if _current_active_block_data else None
+        if new_block_id != previous_block_id:
+            # print(f"Simulator: Block change detected. New ID: {new_block_id}, Previous ID: {previous_block_id}")
+            if _current_active_block_data:
+                EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "block_changed"})
 
-    if new_block_id != previous_block_id:
-        # print(f"Simulator: Block change detected. New ID: {new_block_id}, Previous ID: {previous_block_id}")
-        if _current_active_block_data: # If there was a previous block active
-            # print(f"Simulator: Publishing {SCHEDULE_BLOCK_ENDED} for old block: ID {_current_active_block_data.get('id')}, Name '{_current_active_block_data.get('name', 'N/A')}'")
-            EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "block_changed"})
+            EventBus.instance().publish(SCHEDULE_BLOCK_STARTED, {"block": new_block_data})
+            _current_active_block_data = new_block_data
 
-        # print(f"Simulator: Publishing {SCHEDULE_BLOCK_STARTED} for new block: ID {new_block_id}, Name '{new_block_data.get('name', 'N/A')}'")
-        EventBus.instance().publish(SCHEDULE_BLOCK_STARTED, {"block": new_block_data})
-        _current_active_block_data = new_block_data # Update the current active block
-    # else:
-        # print(f"Simulator: Block {new_block_id} is the same as previous. No start/end events needed.")
-        # Optionally, publish a SCHEDULE_BLOCK_CONTINUING event here if needed for some logic
-        pass
+    # --- Random World Event Triggering ---
+    # This is called on every tick. maybe_trigger_random_event has its own internal probability logic.
+    # print("Simulator: Considering random world event...") # Optional debug print
+    if 'maybe_trigger_random_event' in globals() and callable(globals()['maybe_trigger_random_event']):
+        maybe_trigger_random_event()
+    # print("Simulator: Tick finished.")
 
 
 if __name__ == '__main__':
+    import unittest.mock # For patching random calls in test
+    from collections import defaultdict # For EventBus mock subscribers
+
     # Test setup
-    _test_events_captured = [] # Stores {"type": event_type, "data": data_arg}
-    def test_event_handler(event_type_arg, data_arg): # Renamed for clarity
-        block_info = data_arg.get('block', {})
-        print(f"    [TestEventHandler] Event: {event_type_arg}, "
-              f"Block ID: {block_info.get('id', 'N/A')}, "
-              f"Block Name: {block_info.get('name', 'N/A')}, "
-              f"Reason: {data_arg.get('reason', 'N/A')}")
+    _test_events_captured = []
+    def test_event_handler(event_type_arg, data_arg):
+        # Simplified print for this combined test
+        # print(f"    [TestEventHandler] Event: {event_type_arg}, Data: {str(data_arg)[:100]}")
         _test_events_captured.append({"type": event_type_arg, "data": data_arg})
 
-    # Reset and get a fresh EventBus instance for testing
-    if hasattr(EventBus, '_instance'): # Check if singleton attribute exists
-        EventBus._instance = None # Reset singleton
+    # Ensure EventBus is reset for testing
+    if hasattr(EventBus, '_instance'):
+        EventBus._instance = None
     test_bus = EventBus.instance()
-    # Using a factory to ensure event_type_arg is captured correctly by the lambda
+    # Clear subscribers just in case, though new instance should be clean
+    if hasattr(test_bus, '_subscribers'):
+         test_bus._subscribers = defaultdict(list)
+
+
     def create_handler_for_test(event_type_to_capture):
         return lambda data: test_event_handler(event_type_to_capture, data)
 
+    # Subscribe to events relevant for these tests
     test_bus.subscribe(SCHEDULE_BLOCK_STARTED, create_handler_for_test(SCHEDULE_BLOCK_STARTED))
     test_bus.subscribe(SCHEDULE_BLOCK_ENDED, create_handler_for_test(SCHEDULE_BLOCK_ENDED))
 
-    print("--- Testing Simulator run_simulation_tick() with block transitions ---")
+    # For random event part, need WORLD_EVENT and THOUGHT_TRIGGER
+    # Assuming these are defined in .event_types correctly
+    try:
+        from .event_types import WORLD_EVENT, THOUGHT_TRIGGER
+        test_bus.subscribe(WORLD_EVENT, create_handler_for_test(WORLD_EVENT))
+        test_bus.subscribe(THOUGHT_TRIGGER, create_handler_for_test(THOUGHT_TRIGGER))
+    except ImportError: # pragma: no cover
+        print("Warning: Could not import WORLD_EVENT, THOUGHT_TRIGGER for __main__ test capture.")
+        WORLD_EVENT, THOUGHT_TRIGGER = "dummy.world", "dummy.thought" # Define dummies if import fails
 
-    # --- Tick 1: First block (e.g., Morning Routine) ---
-    _current_active_block_data = None # Reset simulator's internal state for test consistency
+    # For memory writes resulting from thoughts (from subconscious_hook)
+    try:
+        from ..core.event_handlers.impulse import EVENT_MEMORY_WRITE
+        test_bus.subscribe(EVENT_MEMORY_WRITE, create_handler_for_test(EVENT_MEMORY_WRITE))
+    except ImportError: # pragma: no cover
+        print("Warning: Could not import EVENT_MEMORY_WRITE for __main__ test capture.")
+        EVENT_MEMORY_WRITE = "dummy.memory_write"
+
+
+    # Register subconscious_hook.handle_thought_trigger to process THOUGHT_TRIGGER events
+    # This is needed to see the memory.write events resulting from random thoughts
+    try:
+        from ..integrations.subconscious_hook import register_thought_trigger_handler
+        if 'register_thought_trigger_handler' in globals() and callable(globals()['register_thought_trigger_handler']):
+            register_thought_trigger_handler()
+    except ImportError: # pragma: no cover
+        print("Warning: Could not import/register subconscious_hook for __main__ test.")
+
+
+    print("--- Testing Simulator run_simulation_tick() with schedule AND random events ---")
+    _current_active_block_data = None # Reset global state for this test run
+
+    # --- Tick 1: Start Block A, and force a random event ---
     _test_events_captured.clear()
     block1_data = {"id": "block_morning_001", "name": "Morning Routine", "type": "routine"}
-    _set_current_block_for_testing(block1_data) # Configure chronos_adapter mock
-    print("\nTick 1: Expect SCHEDULE_BLOCK_STARTED for Morning Routine")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 1, f"Tick 1: Expected 1 event, got {len(_test_events_captured)}"
-    assert _test_events_captured[0]["type"] == SCHEDULE_BLOCK_STARTED, "Tick 1: Event should be SCHEDULE_BLOCK_STARTED"
-    assert _test_events_captured[0]["data"]["block"]["id"] == "block_morning_001", "Tick 1: Incorrect block ID"
-    print("Tick 1: Correctly started 'Morning Routine'.")
+    _set_current_block_for_testing(block1_data)
+    print("\nTick 1 (Morning Routine start + specific random event 'phone_buzzes_on_table'):")
 
-    # --- Tick 2: Same block, no new events expected ---
-    _test_events_captured.clear()
-    # chronos_adapter still returns block1_data (no change to _set_current_block_for_testing)
-    print("\nTick 2: Expect no new start/end events (Morning Routine continues)")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 0, f"Tick 2: Expected 0 events for same block, got {len(_test_events_captured)}"
-    print("Tick 2: Correctly no new events for same block.")
+    # Patch random.random to ensure event triggers, and random.choice to pick a specific event
+    with unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.random', return_value=0.05) as mock_rand_val, \
+         unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.choice', side_effect=lambda pool: "phone_buzzes_on_table" if pool[0] == "car_driveby" else random.choice(pool)) as mock_rand_choice:
+        run_simulation_tick()
 
-    # --- Tick 3: New block (e.g., Work Focus) ---
+    # Check for SCHEDULE_BLOCK_STARTED
+    sbs_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_STARTED]
+    assert len(sbs_events) == 1, f"Tick 1: SCHEDULE_BLOCK_STARTED for Morning Routine missing. Events: {_test_events_captured}"
+    assert sbs_events[0]["data"]["block"]["id"] == "block_morning_001"
+
+    # Check for random event (phone_buzzes_on_table was chosen by mock)
+    world_events = [e for e in _test_events_captured if e["type"] == WORLD_EVENT]
+    assert len(world_events) == 1, f"Tick 1: WORLD_EVENT (phone_buzzes) missing. Events: {_test_events_captured}"
+    assert world_events[0]["data"]["event_name"] == "phone_buzzes_on_table"
+
+    thought_events = [e for e in _test_events_captured if e["type"] == THOUGHT_TRIGGER]
+    assert len(thought_events) == 1, f"Tick 1: THOUGHT_TRIGGER for phone_buzzes missing. Events: {_test_events_captured}"
+    assert "phone just buzzed" in thought_events[0]["data"]["content"].lower()
+    print("Tick 1: Morning Routine started, 'phone_buzzes_on_table' random event triggered with thought.")
+
+
+    # --- Tick 2: Transition to Block B, and force NO random event ---
     _test_events_captured.clear()
     block2_data = {"id": "block_work_002", "name": "Work Focus Session", "type": "work"}
     _set_current_block_for_testing(block2_data)
-    print("\nTick 3: Expect ENDED for Morning Routine, STARTED for Work Focus")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 2, f"Tick 3: Expected 2 events, got {len(_test_events_captured)}"
-    assert _test_events_captured[0]["type"] == SCHEDULE_BLOCK_ENDED, "Tick 3: First event should be SCHEDULE_BLOCK_ENDED"
-    assert _test_events_captured[0]["data"]["block"]["id"] == "block_morning_001", "Tick 3: Ended wrong block"
-    assert _test_events_captured[0]["data"]["reason"] == "block_changed", "Tick 3: Incorrect reason for block end"
-    assert _test_events_captured[1]["type"] == SCHEDULE_BLOCK_STARTED, "Tick 3: Second event should be SCHEDULE_BLOCK_STARTED"
-    assert _test_events_captured[1]["data"]["block"]["id"] == "block_work_002", "Tick 3: Started wrong block"
-    print("Tick 3: Correctly transitioned from 'Morning Routine' to 'Work Focus Session'.")
+    print("\nTick 2 (Work Focus start + NO random event):")
+    # This time, let random event not fire by making random.random return > probability
+    with unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.random', return_value=0.5) as mock_rand_val:
+        run_simulation_tick()
 
-    # --- Tick 4: Chronos returns invalid data (None) ---
-    _test_events_captured.clear()
-    _set_current_block_for_testing(None) # Simulate Chronos returning None
-    print("\nTick 4: Expect ENDED for Work Focus (due to invalid new block), no new STARTED")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 1, f"Tick 4: Expected 1 event (ended), got {len(_test_events_captured)}"
-    assert _test_events_captured[0]["type"] == SCHEDULE_BLOCK_ENDED, "Tick 4: Event should be SCHEDULE_BLOCK_ENDED"
-    assert _test_events_captured[0]["data"]["block"]["id"] == "block_work_002", "Tick 4: Ended wrong block"
-    assert _test_events_captured[0]["data"]["reason"] == "new_block_data_invalid_or_none", "Tick 4: Incorrect reason for block end"
-    assert _current_active_block_data is None, "Tick 4: _current_active_block_data should be None after invalid new block"
-    print("Tick 4: Correctly ended 'Work Focus' when Chronos returned invalid data.")
+    sbe_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_ENDED]
+    sbs_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_STARTED]
+    world_events = [e for e in _test_events_captured if e["type"] == WORLD_EVENT]
 
-    # --- Tick 5: Chronos returns a new block after being None ---
-    _test_events_captured.clear()
-    block3_data = {"id": "block_evening_003", "name": "Evening Relaxation", "type": "leisure"}
-    _set_current_block_for_testing(block3_data)
-    print("\nTick 5: Expect STARTED for Evening Relaxation (no previous block was active)")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 1, f"Tick 5: Expected 1 event, got {len(_test_events_captured)}"
-    assert _test_events_captured[0]["type"] == SCHEDULE_BLOCK_STARTED, "Tick 5: Event should be SCHEDULE_BLOCK_STARTED"
-    assert _test_events_captured[0]["data"]["block"]["id"] == "block_evening_003", "Tick 5: Started wrong block"
-    assert _current_active_block_data["id"] == "block_evening_003", "Tick 5: _current_active_block_data not updated"
-    print("Tick 5: Correctly started 'Evening Relaxation' after a period of no valid block.")
+    assert len(sbe_events) == 1 and sbe_events[0]["data"]["block"]["id"] == "block_morning_001", f"Tick 2: Morning Routine ENDED event missing. Events: {_test_events_captured}"
+    assert len(sbs_events) == 1 and sbs_events[0]["data"]["block"]["id"] == "block_work_002", f"Tick 2: Work Focus STARTED event missing. Events: {_test_events_captured}"
+    assert len(world_events) == 0, f"Tick 2: WORLD_EVENT should NOT have been triggered. Events: {_test_events_captured}"
+    print("Tick 2: Transitioned to Work Focus, no random event occurred as expected.")
 
-    # --- Tick 6: Chronos returns invalid data (empty dict) ---
-    _test_events_captured.clear()
-    _set_current_block_for_testing({}) # Simulate Chronos returning {}
-    print("\nTick 6: Expect ENDED for Evening Relaxation (due to invalid new block), no new STARTED")
-    run_simulation_tick()
-    assert len(_test_events_captured) == 1, f"Tick 6: Expected 1 event (ended), got {len(_test_events_captured)}"
-    assert _test_events_captured[0]["type"] == SCHEDULE_BLOCK_ENDED, "Tick 6: Event should be SCHEDULE_BLOCK_ENDED"
-    assert _test_events_captured[0]["data"]["block"]["id"] == "block_evening_003", "Tick 6: Ended wrong block"
-    assert _test_events_captured[0]["data"]["reason"] == "new_block_data_invalid_or_none", "Tick 6: Incorrect reason for block end"
-    assert _current_active_block_data is None, "Tick 6: _current_active_block_data should be None after invalid new block"
-    print("Tick 6: Correctly ended 'Evening Relaxation' when Chronos returned empty dict.")
-
-
-    # Final reset of chronos_adapter mock and simulator state
+    # Clean up global state for subsequent tests if any were part of a larger suite
     _set_current_block_for_testing(None)
     _current_active_block_data = None
-    print("\n--- Simulator testing finished ---")
+    print("\n--- Simulator with random events testing finished ---")
