@@ -267,11 +267,26 @@ class Config:
             "frequency_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_RESEARCH_TIKTOKEN_NAME", "cl100k_base") # Added
         },
-        "FIRMAMENT_STATUS_CLASSIFIER": { # Added for Firmament
-            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_LOGOS_TECHNE_URL", "http://localhost:1234/v1")), # Default to LOGOS_TECHNE URL
-            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
-            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY", "lm-studio")), # Default to LOGOS_TECHNE API Key
-            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.3)),
+
+        # New dedicated LLM role for Firmament's general use
+        "FIRMAMENT_PRIMARY": {
+            "url": os.getenv("LLM_FIRMAMENT_PRIMARY_URL", "http://localhost:1234/v1"), # Sensible default if often local
+            "model": os.getenv("LLM_FIRMAMENT_PRIMARY_MODEL"), # Allow specific model for Firmament
+            "api_key": os.getenv("LLM_FIRMAMENT_PRIMARY_API_KEY", "ollama"), # Default to common local key if any
+            "temperature": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TEMP", 0.6)), # Slightly different temp
+            "timeout": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TIMEOUT", 15.0)), # Potentially longer timeout
+            "max_tokens": int(os.getenv("LLM_FIRMAMENT_PRIMARY_MAX_TOKENS", 1536)), # Different token limit
+            "top_p": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TOP_P", 0.9)) if os.getenv("LLM_FIRMAMENT_PRIMARY_TOP_P") else None,
+            "presence_penalty": float(os.getenv("LLM_FIRMAMENT_PRIMARY_PRESENCE_PENALTY", 0.1)) if os.getenv("LLM_FIRMAMENT_PRIMARY_PRESENCE_PENALTY") else None,
+            "frequency_penalty": float(os.getenv("LLM_FIRMAMENT_PRIMARY_FREQUENCY_PENALTY", 0.1)) if os.getenv("LLM_FIRMAMENT_PRIMARY_FREQUENCY_PENALTY") else None,
+            "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_PRIMARY_TIKTOKEN_NAME", "cl100k_base")
+        },
+
+        "FIRMAMENT_STATUS_CLASSIFIER": { # This existing Firmament-related role can remain, or also use dedicated vars
+            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_FIRMAMENT_PRIMARY_URL", "http://localhost:1234/v1")),
+            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_FIRMAMENT_PRIMARY_MODEL")),
+            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_FIRMAMENT_PRIMARY_API_KEY", "ollama")),
+            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.2)), # Lower temp for classification
             "timeout": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIMEOUT", 10.0)),
             "max_tokens": int(os.getenv("LLM_FIRMAMENT_CLASSIFIER_MAX_TOKENS", 256)),
             "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIKTOKEN_NAME", "cl100k_base")
@@ -569,7 +584,8 @@ class Config:
 
     FIRMAMENT: FirmamentModuleConfig = { # Default Firmament config
         "enable_firmament": os.getenv("FIRMAMENT_ENABLE", "True").lower() == "true", # Changed default to "True"
-        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"),
+        # IMPORTANT CHANGE HERE: Default firmament_llm_role to the new dedicated role
+        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "FIRMAMENT_PRIMARY"),
         "intention_based_activity_duration_minutes": int(os.getenv("FIRMAMENT_INTENTION_ACTIVITY_DURATION_MINUTES", "15")),
         "intention_based_activity_type": os.getenv("FIRMAMENT_INTENTION_ACTIVITY_TYPE", "reflective"),
         "enable_llm_status_classification": os.getenv("FIRMAMENT_ENABLE_LLM_STATUS_CLASSIFICATION", "True").lower() == "true",
