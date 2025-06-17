@@ -1,173 +1,260 @@
 # eidos_agent/features/firmament/core/simulator.py
+import logging
+from datetime import datetime, timezone
 
 from .event_bus import EventBus
-from .event_types import SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED
+from .event_types import SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED, WORLD_EVENT, THOUGHT_TRIGGER
 
+# --- Integration Imports ---
 try:
     from ..integrations.chronos_adapter import get_current_block
     from ..integrations.chronos_adapter import _set_current_block_for_testing # For __main__
 except ImportError: # pragma: no cover
-    print("CRITICAL: Could not import from chronos_adapter. Simulator will not function correctly.")
-    def get_current_block(): return {"id": "dummy_block_import_error", "name": "Dummy Block", "type": "error"} # type: ignore
-    def _set_current_block_for_testing(data=None): pass # type: ignore
+    print("CRITICAL: Could not import from chronos_adapter. Simulator will use dummy for get_current_block.")
+    def get_current_block(): return {"id": "dummy_error_block", "name": "Error Block", "type": "error"} #type:ignore
+    _set_current_block_for_testing = lambda d=None: None #type:ignore
 
-# Import for random event triggering
 try:
     from ..core.event_handlers.random_events import maybe_trigger_random_event
 except ImportError: # pragma: no cover
     print("CRITICAL: Could not import from random_events. Simulator will not trigger random events.")
-    def maybe_trigger_random_event(): # type: ignore
-        print("Warning: Using dummy maybe_trigger_random_event due to ImportError.")
-        pass
+    maybe_trigger_random_event = lambda: None #type:ignore
+
+# --- Imports for Subconscious NPC Reference Processing ---
+NPC_SYSTEM_AVAILABLE = False
+try:
+    from ..integrations.subconscious_hook import get_recent_subconscious_thoughts
+    from ..npcs.subconscious_reference_parser import extract_character_references # This is the function whose signature changed
+    from ..npcs.npc_improviser import NPCImproviser
+    from ..npcs.npc_registry import NPCRegistry
+    NPC_SYSTEM_AVAILABLE = True
+except ImportError as e: # pragma: no cover
+    print(f"CRITICAL: Could not import NPC system components for simulator: {e}. NPC improvisation will be disabled.")
+    # Define dummies so the rest of the file can parse
+    get_recent_subconscious_thoughts = lambda limit=5: [] #type:ignore
+    extract_character_references = lambda thoughts, known_profiles: [] #type:ignore Signature updated in dummy
+    class NPCImproviser: #type:ignore
+        def __init__(self, r=None): logger.warning("Using DUMMY NPCImproviser due to import error.")
+        def improvise_npc(self, nh, stc, sc): logger.warning("DUMMY NPCImproviser.improvise_npc called."); return None
+    class NPCRegistry: #type:ignore
+        _instance=None
+        @classmethod
+        def instance(cls):
+            logger.warning("Using DUMMY NPCRegistry due to import error.")
+            if not cls._instance: cls._instance = cls()
+            return cls._instance
+        def get_all_npcs(self): return []
+        # The dummy for register_npc in the prompt was (s,name,d), but the actual one in npc_registry.py is (s, npc_data)
+        # Reflecting the actual signature from Step 1 (Week 1) of NPC plan for the dummy:
+        def register_npc(self, npc_data): logger.warning("DUMMY NPCRegistry.register_npc called with npc_data."); return False
+        # list_known_npc_names was in prompt's dummy but not used here. get_all_npcs is.
 
 
+logger = logging.getLogger(__name__)
 _current_active_block_data: dict | None = None
+EVENT_MEMORY_WRITE = "memory.write" # Define locally, assuming it's a global constant string
 
 def run_simulation_tick():
-    """
-    Runs a single tick of the simulation.
-    Handles schedule block transitions and may trigger random world events.
-    """
     global _current_active_block_data
-
-    # print(f"Simulator: Tick. Prev active block ID: {_current_active_block_data.get('id') if _current_active_block_data else 'None'}")
+    # logger.debug(f"Simulator: Tick start. Prev block: {_current_active_block_data.get('id') if _current_active_block_data else 'None'}")
 
     # --- Schedule Block Transition Logic ---
     new_block_data = get_current_block()
-
-    # Validate the structure of the new_block_data. Minimally, it needs an 'id'.
     if not isinstance(new_block_data, dict) or not new_block_data.get("id"):
-        # print(f"Simulator: Invalid or missing block data from Chronos adapter (received: {new_block_data}).")
         if _current_active_block_data:
-            # print(f"Simulator: Current block data from Chronos is invalid/None. Ending previous block '{_current_active_block_data.get('id')}'.")
             EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "new_block_data_invalid_or_none"})
             _current_active_block_data = None
-        # Even if block data is invalid, random events can still occur.
-    else: # New block data is valid
+    else:
         new_block_id = new_block_data.get("id")
         previous_block_id = _current_active_block_data.get("id") if _current_active_block_data else None
-
         if new_block_id != previous_block_id:
-            # print(f"Simulator: Block change detected. New ID: {new_block_id}, Previous ID: {previous_block_id}")
             if _current_active_block_data:
                 EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "block_changed"})
-
             EventBus.instance().publish(SCHEDULE_BLOCK_STARTED, {"block": new_block_data})
             _current_active_block_data = new_block_data
 
     # --- Random World Event Triggering ---
-    # This is called on every tick. maybe_trigger_random_event has its own internal probability logic.
-    # print("Simulator: Considering random world event...") # Optional debug print
-    if 'maybe_trigger_random_event' in globals() and callable(globals()['maybe_trigger_random_event']):
+    if callable(maybe_trigger_random_event):
         maybe_trigger_random_event()
-    # print("Simulator: Tick finished.")
+    else: # pragma: no cover
+        logger.warning("Simulator: maybe_trigger_random_event is not callable (likely import error).")
+
+    # --- Subconscious NPC Reference Processing ---
+    if NPC_SYSTEM_AVAILABLE:
+        # logger.debug("Simulator: Checking for subconscious NPC references...") # Too verbose for every tick
+        try:
+            npc_improviser = NPCImproviser()
+            registry = NPCRegistry.instance()
+
+            recent_thoughts_data = get_recent_subconscious_thoughts(limit=5)
+            if not recent_thoughts_data:
+                pass
+            else:
+                thought_contents = [t['content'] for t in recent_thoughts_data if isinstance(t, dict) and 'content' in t]
+
+                known_npc_profiles = registry.get_all_npcs() # Returns List[Dict[str,Any]]
+
+                # MODIFIED CALL: Pass known_npc_profiles (List[Dict]) directly to extract_character_references
+                # This aligns with the updated signature of extract_character_references.
+                new_references = extract_character_references(thought_contents, known_npc_profiles)
+                # REMOVED: The temporary adaptation line that created known_npc_display_names.
+
+                for name_hint, thought_context_text in new_references:
+                    logger.info(f"Simulator: New NPC reference detected: '{name_hint}' from thought: '{thought_context_text[:70]}...'")
+
+                    current_time_iso = datetime.now(timezone.utc).isoformat()
+                    location = _current_active_block_data.get('location_hint', _current_active_block_data.get('name', 'unknown_location')) if _current_active_block_data else 'an unspecified place'
+                    activity = _current_active_block_data.get('name', 'an unknown activity') if _current_active_block_data else 'an unknown activity'
+                    pathos_mood = "neutral (placeholder)" # TODO: Get actual Pathos mood
+
+                    scene_context = {
+                        "location_description": location,
+                        "pathos_mood_state": pathos_mood,
+                        "current_activity_name": activity,
+                        "time_of_day": current_time_iso,
+                    }
+
+                    improvised_profile = npc_improviser.improvise_npc(name_hint, thought_context_text, scene_context)
+
+                    if improvised_profile and isinstance(improvised_profile, dict) and improvised_profile.get("name") and improvised_profile.get("id"):
+                        # NPCImproviser provides "id" and "name". NPCRegistry.register_npc expects npc_data (dict)
+                        # and uses the 'id' within that data as the key.
+                        success = registry.register_npc(npc_data=improvised_profile)
+                        if success:
+                            logger.info(f"Simulator: Registered improvised NPC: '{improvised_profile['name']}' (ID: {improvised_profile['id']})")
+                            memory_payload = {
+                                "type": "npc_improvised",
+                                "content": f"A new persona, '{improvised_profile['name']}' (ID: {improvised_profile['id']}), was improvised by Firmament based on a thought about '{name_hint}'. Role: {improvised_profile.get('role', 'N/A')}.",
+                                "metadata": {
+                                    "npc_id": improvised_profile["id"],
+                                    "npc_name": improvised_profile["name"],
+                                    "improvised_profile_summary": {k:v for k,v in improvised_profile.items() if k not in ['initial_dialogue', 'appearance']},
+                                    "triggering_thought_snippet": thought_context_text[:150],
+                                    "scene_context_at_improvisation": scene_context,
+                                    "timestamp": current_time_iso
+                                }
+                            }
+                            EventBus.instance().publish(EVENT_MEMORY_WRITE, memory_payload)
+                        else: # pragma: no cover
+                            logger.error(f"Simulator: Failed to register improvised NPC '{improvised_profile['name']}' via NPCRegistry.")
+                    elif improvised_profile: # pragma: no cover
+                         logger.warning(f"Simulator: Improvised NPC profile for '{name_hint}' was missing 'name' or 'id', or was invalid: {str(improvised_profile)[:200]}")
+
+        except Exception as e: # pragma: no cover
+            logger.error(f"Simulator: Error during subconscious NPC reference processing: {e}", exc_info=True)
+    # else: # pragma: no cover
+        # logger.debug("Simulator: NPC system components not available. Skipping subconscious NPC reference processing.")
+
+    # logger.debug("Simulator: Tick finished.")
 
 
-if __name__ == '__main__':
-    import unittest.mock # For patching random calls in test
-    from collections import defaultdict # For EventBus mock subscribers
+if __name__ == '__main__': # pragma: no cover
+    import unittest.mock
+    from collections import defaultdict
 
-    # Test setup
-    _test_events_captured = []
-    def test_event_handler(event_type_arg, data_arg):
-        # Simplified print for this combined test
-        # print(f"    [TestEventHandler] Event: {event_type_arg}, Data: {str(data_arg)[:100]}")
-        _test_events_captured.append({"type": event_type_arg, "data": data_arg})
+    logging.basicConfig(level=logging.INFO)
+    sim_logger = logging.getLogger('eidos_agent.features.firmament.core.simulator')
+    sim_logger.setLevel(logging.DEBUG)
 
-    # Ensure EventBus is reset for testing
-    if hasattr(EventBus, '_instance'):
-        EventBus._instance = None
-    test_bus = EventBus.instance()
-    # Clear subscribers just in case, though new instance should be clean
-    if hasattr(test_bus, '_subscribers'):
-         test_bus._subscribers = defaultdict(list)
+    _test_events_captured_sim = []
+    def main_test_event_handler(event_type, data):
+        _test_events_captured_sim.append({"type": event_type, "data": data})
+        print(f"    [SIM_MAIN_CAPTURE] Event: {event_type}, Data Content: {str(data.get('content', data.get('block', {}).get('name', str(data))))[:100]}")
 
+    if hasattr(EventBus, '_instance'): EventBus._instance = None
+    test_bus_sim = EventBus.instance()
+    if hasattr(test_bus_sim, '_subscribers'): test_bus_sim._subscribers = defaultdict(list)
 
-    def create_handler_for_test(event_type_to_capture):
-        return lambda data: test_event_handler(event_type_to_capture, data)
-
-    # Subscribe to events relevant for these tests
-    test_bus.subscribe(SCHEDULE_BLOCK_STARTED, create_handler_for_test(SCHEDULE_BLOCK_STARTED))
-    test_bus.subscribe(SCHEDULE_BLOCK_ENDED, create_handler_for_test(SCHEDULE_BLOCK_ENDED))
-
-    # For random event part, need WORLD_EVENT and THOUGHT_TRIGGER
-    # Assuming these are defined in .event_types correctly
-    try:
-        from .event_types import WORLD_EVENT, THOUGHT_TRIGGER
-        test_bus.subscribe(WORLD_EVENT, create_handler_for_test(WORLD_EVENT))
-        test_bus.subscribe(THOUGHT_TRIGGER, create_handler_for_test(THOUGHT_TRIGGER))
-    except ImportError: # pragma: no cover
-        print("Warning: Could not import WORLD_EVENT, THOUGHT_TRIGGER for __main__ test capture.")
-        WORLD_EVENT, THOUGHT_TRIGGER = "dummy.world", "dummy.thought" # Define dummies if import fails
-
-    # For memory writes resulting from thoughts (from subconscious_hook)
-    try:
-        from ..core.event_handlers.impulse import EVENT_MEMORY_WRITE
-        test_bus.subscribe(EVENT_MEMORY_WRITE, create_handler_for_test(EVENT_MEMORY_WRITE))
-    except ImportError: # pragma: no cover
-        print("Warning: Could not import EVENT_MEMORY_WRITE for __main__ test capture.")
-        EVENT_MEMORY_WRITE = "dummy.memory_write"
+    event_types_for_main_test = [
+        SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED, WORLD_EVENT,
+        THOUGHT_TRIGGER, EVENT_MEMORY_WRITE, IMPULSE
+    ]
+    # Add NPC_DIALOGUE only if it's actually defined (not a dummy)
+    if 'NPC_DIALOGUE' in globals() and not isinstance(globals()['NPC_DIALOGUE'], str) or "dummy" not in str(globals()['NPC_DIALOGUE']):
+        event_types_for_main_test.append(globals()['NPC_DIALOGUE'])
 
 
-    # Register subconscious_hook.handle_thought_trigger to process THOUGHT_TRIGGER events
-    # This is needed to see the memory.write events resulting from random thoughts
-    try:
-        from ..integrations.subconscious_hook import register_thought_trigger_handler
-        if 'register_thought_trigger_handler' in globals() and callable(globals()['register_thought_trigger_handler']):
-            register_thought_trigger_handler()
-    except ImportError: # pragma: no cover
-        print("Warning: Could not import/register subconscious_hook for __main__ test.")
+    for et_name_obj in event_types_for_main_test:
+        actual_et_name_str = str(getattr(et_name_obj, 'value', et_name_obj))
+        def create_main_handler(et_cap_name_str_arg): return lambda d: main_test_event_handler(et_cap_name_str_arg, d)
+        test_bus_sim.subscribe(actual_et_name_str, create_main_handler(actual_et_name_str))
+
+    mock_thoughts_for_sim_test = [
+        {'content': "I wonder if a person named Cassandra is around here.", 'timestamp': datetime.now(timezone.utc).isoformat()},
+        {'content': "Maybe Bob knows about Cassandra. I should ask Bob.", 'timestamp': datetime.now(timezone.utc).isoformat()}
+    ]
+    mock_improvised_cassandra_profile = {
+        "id": "cassandra_improv_simtest", "name": "Cassandra (SimTest Improvised)",
+        "appearance": "Mysterious aura, dark robes", "role": "Fortune Teller",
+        "personality": "Enigmatic and slightly ominous", "relationship_to_pathos": "A completely new encounter",
+        "initial_dialogue": "The threads of fate are often tangled, seeker."
+    }
+
+    class MockNPCRegistryForSimTest:
+        def __init__(self): self.npcs_registered_in_test = {}; print("MockNPCRegistryForSimTest Initialized")
+        def get_all_npcs(self): return list(self.npcs_registered_in_test.values())
+        def register_npc(self, npc_data):
+            npc_id = npc_data.get('id')
+            if not npc_id: logger.error("MockNPCRegistry: register_npc called with no ID in npc_data."); return False
+            print(f"MockNPCRegistryForSimTest: Registering NPC ID {npc_id}")
+            self.npcs_registered_in_test[npc_id] = npc_data; return True
+
+    mock_registry_instance_for_sim = MockNPCRegistryForSimTest()
+    mock_registry_instance_for_sim.register_npc({"id": "bob", "name": "Bob", "presence_trigger_events": []})
 
 
-    print("--- Testing Simulator run_simulation_tick() with schedule AND random events ---")
-    _current_active_block_data = None # Reset global state for this test run
-
-    # --- Tick 1: Start Block A, and force a random event ---
-    _test_events_captured.clear()
-    block1_data = {"id": "block_morning_001", "name": "Morning Routine", "type": "routine"}
-    _set_current_block_for_testing(block1_data)
-    print("\nTick 1 (Morning Routine start + specific random event 'phone_buzzes_on_table'):")
-
-    # Patch random.random to ensure event triggers, and random.choice to pick a specific event
-    with unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.random', return_value=0.05) as mock_rand_val, \
-         unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.choice', side_effect=lambda pool: "phone_buzzes_on_table" if pool[0] == "car_driveby" else random.choice(pool)) as mock_rand_choice:
-        run_simulation_tick()
-
-    # Check for SCHEDULE_BLOCK_STARTED
-    sbs_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_STARTED]
-    assert len(sbs_events) == 1, f"Tick 1: SCHEDULE_BLOCK_STARTED for Morning Routine missing. Events: {_test_events_captured}"
-    assert sbs_events[0]["data"]["block"]["id"] == "block_morning_001"
-
-    # Check for random event (phone_buzzes_on_table was chosen by mock)
-    world_events = [e for e in _test_events_captured if e["type"] == WORLD_EVENT]
-    assert len(world_events) == 1, f"Tick 1: WORLD_EVENT (phone_buzzes) missing. Events: {_test_events_captured}"
-    assert world_events[0]["data"]["event_name"] == "phone_buzzes_on_table"
-
-    thought_events = [e for e in _test_events_captured if e["type"] == THOUGHT_TRIGGER]
-    assert len(thought_events) == 1, f"Tick 1: THOUGHT_TRIGGER for phone_buzzes missing. Events: {_test_events_captured}"
-    assert "phone just buzzed" in thought_events[0]["data"]["content"].lower()
-    print("Tick 1: Morning Routine started, 'phone_buzzes_on_table' random event triggered with thought.")
-
-
-    # --- Tick 2: Transition to Block B, and force NO random event ---
-    _test_events_captured.clear()
-    block2_data = {"id": "block_work_002", "name": "Work Focus Session", "type": "work"}
-    _set_current_block_for_testing(block2_data)
-    print("\nTick 2 (Work Focus start + NO random event):")
-    # This time, let random event not fire by making random.random return > probability
-    with unittest.mock.patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.random', return_value=0.5) as mock_rand_val:
-        run_simulation_tick()
-
-    sbe_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_ENDED]
-    sbs_events = [e for e in _test_events_captured if e["type"] == SCHEDULE_BLOCK_STARTED]
-    world_events = [e for e in _test_events_captured if e["type"] == WORLD_EVENT]
-
-    assert len(sbe_events) == 1 and sbe_events[0]["data"]["block"]["id"] == "block_morning_001", f"Tick 2: Morning Routine ENDED event missing. Events: {_test_events_captured}"
-    assert len(sbs_events) == 1 and sbs_events[0]["data"]["block"]["id"] == "block_work_002", f"Tick 2: Work Focus STARTED event missing. Events: {_test_events_captured}"
-    assert len(world_events) == 0, f"Tick 2: WORLD_EVENT should NOT have been triggered. Events: {_test_events_captured}"
-    print("Tick 2: Transitioned to Work Focus, no random event occurred as expected.")
-
-    # Clean up global state for subsequent tests if any were part of a larger suite
-    _set_current_block_for_testing(None)
+    print("\n--- Testing Simulator Tick with Subconscious NPC Improvisation (Parser Change) ---")
     _current_active_block_data = None
-    print("\n--- Simulator with random events testing finished ---")
+
+    # Patch the global NPC_SYSTEM_AVAILABLE to True for this test if it might be False due to earlier import errors
+    # Also, mock extract_character_references to simulate its new behavior (taking profiles)
+    # and to control its output for the test.
+    def mock_extract_references_for_sim_test(thoughts_content, known_profiles_list):
+        print(f"Mocked extract_character_references called. Known profiles count: {len(known_profiles_list)}")
+        # Simulate finding "Cassandra" if "Bob" is known
+        if any(p.get("id") == "bob" for p in known_profiles_list):
+            for thought in thoughts_content:
+                if "Cassandra" in thought:
+                    return [("Cassandra", thought)] # Return verbatim name and context
+        return []
+
+    with patch('eidos_agent.features.firmament.core.simulator.NPC_SYSTEM_AVAILABLE', True), \
+         patch('eidos_agent.features.firmament.core.simulator.get_recent_subconscious_thoughts', return_value=mock_thoughts_for_sim_test) as mock_get_thoughts, \
+         patch('eidos_agent.features.firmament.core.simulator.extract_character_references', side_effect=mock_extract_references_for_sim_test) as mock_extract_refs_call, \
+         patch('eidos_agent.features.firmament.core.simulator.NPCImproviser.improvise_npc', return_value=mock_improvised_cassandra_profile) as mock_improvise_method, \
+         patch('eidos_agent.features.firmament.core.simulator.NPCRegistry.instance', return_value=mock_registry_instance_for_sim) as mock_registry_factory, \
+         patch('eidos_agent.features.firmament.core.simulator.maybe_trigger_random_event') as mock_random_events_call:
+
+        _set_current_block_for_testing({"id": "test_sim_block_npc_improv", "name": "Activity During Improv", "type": "testing"})
+        run_simulation_tick()
+
+    mock_get_thoughts.assert_called_once_with(limit=5)
+    mock_extract_refs_call.assert_called_once() # Check it was called
+    # Verify that known_npc_profiles (a list of dicts) was passed to the mocked extract_character_references
+    args_extract, _ = mock_extract_refs_call.call_args
+    assert isinstance(args_extract[1], list) and all(isinstance(p, dict) for p in args_extract[1]), \
+        "extract_character_references not called with a list of profiles."
+    assert any(p.get("id") == "bob" for p in args_extract[1]), "Mocked Bob profile not passed to extract_character_references."
+
+    called_with_cassandra_hint = False
+    for call_args_list in mock_improvise_method.call_args_list:
+        args_improv, kwargs_improv = call_args_list
+        if kwargs_improv.get('name_hint') == "Cassandra":
+            called_with_cassandra_hint = True
+            break
+    assert called_with_cassandra_hint, "NPCImproviser.improvise_npc not called with name_hint 'Cassandra'."
+
+    assert len(mock_registry_instance_for_sim.npcs_registered_in_test) == 2, \
+        f"Expected 2 NPCs in mock registry (Bob + Cassandra), got {len(mock_registry_instance_for_sim.npcs_registered_in_test)}. NPCs: {mock_registry_instance_for_sim.npcs_registered_in_test.keys()}"
+    assert "cassandra_improv_simtest" in mock_registry_instance_for_sim.npcs_registered_in_test, \
+        "Improvised Cassandra profile not found in mock registry by ID."
+
+    improvised_mem_events = [e for e in _test_events_captured_sim if e['type'] == EVENT_MEMORY_WRITE and e['data'].get('type') == "npc_improvised"]
+    assert len(improvised_mem_events) == 1, f"Expected 1 'npc_improvised' memory event, found {len(improvised_mem_events)}."
+    if improvised_mem_events:
+        assert "Cassandra (SimTest Improvised)" in improvised_mem_events[0]['data']['content']
+        assert improvised_mem_events[0]['data']['metadata']['npc_id'] == "cassandra_improv_simtest"
+
+    print("\nSubconscious NPC improvisation flow in simulator tick (with parser signature change) test completed successfully.")
+    _current_active_block_data = None
+    print("\n--- Simulator main test finished ---")

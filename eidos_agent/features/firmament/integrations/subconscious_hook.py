@@ -1,18 +1,15 @@
 # eidos_agent/features/firmament/integrations/subconscious_hook.py
 
-import logging # Added
-import httpx # Added
-# import asyncio # Not strictly needed for this version as the call is simulated
+import logging
+import httpx
+from typing import List, Dict, Any, Optional # Added List, Dict, Any, Optional
 
 from ..core.event_bus import EventBus
 from ..core.event_types import THOUGHT_TRIGGER, IMPULSE
-from datetime import datetime, timezone
-# Removed: import random (was for old placeholder _call_llm_for_thought_elaboration)
+from datetime import datetime, timezone, timedelta # Added timedelta
 
 # Eidos core components
 try:
-    # Assuming this file is eidos_agent/features/firmament/integrations/subconscious_hook.py
-    # Adjust path to go up three levels to eidos_agent, then to core/config.py
     from ....core.config import Config, LLMConfig
     from ....llm_integrations.llm_client import LLMClient
 except ImportError as e: # Fallback for parsing if paths are tricky during dev/test # pragma: no cover
@@ -25,18 +22,87 @@ except ImportError as e: # Fallback for parsing if paths are tricky during dev/t
             if role == "DUMMY_FIRMAMENT_ROLE":
                 return {"url": "dummy_url", "model": "dummy_model", "timeout": 10.0, "temperature": 0.5, "max_tokens": 50}
             return None
-    LLMConfig = dict # type: ignore
+    LLMConfig = Dict[str, Any] # type: ignore
     class LLMClient: # type: ignore
         constructor_takes_httpx_client = True
         def __init__(self, http_client): pass
-        # Add a dummy call_llm_api for type hinting if used, though not called here
         async def call_llm_api(self, messages, llm_config, llm_role): pass # type: ignore
-
 
 logger = logging.getLogger(__name__)
 
-# Removed _call_llm_for_thought_elaboration function as its logic is now integrated below,
-# and the actual LLM call is simulated differently.
+# --- New Function: Simulated SubconsciousNode Data Source ---
+def get_recent_subconscious_thoughts(limit: int = 5) -> List[Dict[str, Any]]:
+    """
+    Simulates fetching recent thoughts from the SubconsciousNode.
+    Each thought dictionary should ideally contain 'content', 'timestamp',
+    'mood_at_thought', 'urgency', and optionally 'impulse_type'.
+
+    TODO: Replace this with actual integration with SubconsciousNode logs/API.
+          This might involve querying a database, an API endpoint, or reading logs.
+    """
+    # logger.info(f"Simulating fetch of {limit} recent subconscious thoughts.")
+    # Static list of sample thoughts for consistent testing and demonstration.
+    # More thoughts are defined than the default limit to allow testing `limit`.
+    sample_thoughts_db = [
+        {
+            "content": "I wonder if Lara Croft still works at the cafe downtown. Haven't seen her in ages.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=5, seconds=10)).isoformat(),
+            "mood_at_thought": {"name": "nostalgic", "intensity": 0.6, "dominant_emotion": "longing"},
+            "urgency": "low",
+            "source": "subconscious_memory_retrieval" # Example source
+        },
+        {
+            "content": "Need to remember to call Bob about the upcoming project deadline. It's critical.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=10, seconds=25)).isoformat(),
+            "mood_at_thought": {"name": "focused", "intensity": 0.8, "dominant_emotion": "anxiety"},
+            "urgency": "high", # Higher urgency
+            "impulse_type": "task_reminder", # Specific type for subconscious_hook to pass to IMPULSE
+            "source": "subconscious_goal_monitoring"
+        },
+        {
+            "content": "That mention of Dr. Evelyn Hayes in the news article about quantum entanglement was interesting. I should look her up.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=15, seconds=50)).isoformat(),
+            "mood_at_thought": {"name": "curious", "intensity": 0.7, "dominant_emotion": "intrigue"},
+            "urgency": "medium", # Medium urgency due to "should look her up"
+            "impulse_type": "curiosity_research",
+            "source": "subconscious_information_processing"
+        },
+        {
+            "content": "Pathos should consider what Alice said about the garden's soil pH. It might explain the wilting roses.", # Known NPC, self-reference for Pathos
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=20, seconds=15)).isoformat(),
+            "mood_at_thought": {"name": "reflective", "intensity": 0.5, "dominant_emotion": "contemplation"},
+            "urgency": "low",
+            "source": "subconscious_problem_solving"
+        },
+        {
+            "content": "A man named Victor was asking for directions earlier near the library. He seemed lost.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=25, seconds=33)).isoformat(),
+            "mood_at_thought": {"name": "neutral", "intensity": 0.4, "dominant_emotion": "observation"},
+            "urgency": "low",
+            "source": "subconscious_sensory_log_echo"
+        },
+        {
+            "content": "The weather is surprisingly pleasant today. Maybe I can go for a walk.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=30, seconds=5)).isoformat(),
+            "mood_at_thought": {"name": "content", "intensity": 0.6, "dominant_emotion": "pleasantness"},
+            "urgency": "low",
+            "impulse_type": "leisure_activity_suggestion",
+            "source": "subconscious_environmental_awareness"
+        },
+        {
+            "content": "I'm feeling quite hungry. That pizza from last night sounds good.",
+            "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=35, seconds=12)).isoformat(),
+            "mood_at_thought": {"name": "anticipatory", "intensity": 0.5, "dominant_emotion": "craving"},
+            "urgency": "medium",
+            "impulse_type": "hunger",
+            "source": "subconscious_physiological_monitoring"
+        }
+    ]
+    # Return a slice of the most recent 'limit' thoughts.
+    # The list is ordered with most recent first if it were a real DB query.
+    # For this static list, it's just the first `limit` items.
+    return sample_thoughts_db[:limit]
+
 
 def handle_thought_trigger(payload: dict):
     """
@@ -46,13 +112,16 @@ def handle_thought_trigger(payload: dict):
     then published for memory writing, and if deemed actionable, an IMPULSE event
     is also published.
     """
-    logger.debug(f"SubconsciousHook: handle_thought_trigger received payload: {payload}")
+    # logger.debug(f"SubconsciousHook: handle_thought_trigger received payload: {payload}")
     if not isinstance(payload, dict):
         logger.error("Payload for thought trigger must be a dictionary.")
         return
 
     raw_content = payload.get("content")
-    mood_context = payload.get("mood", "neutral")
+    mood_context = payload.get("mood", payload.get("mood_at_thought", "neutral")) # Use mood_at_thought as fallback
+    if isinstance(mood_context, dict): # If mood is a dict, extract name
+        mood_context = mood_context.get("name", "neutral")
+
     trigger_source = payload.get("source", "unknown_trigger_source")
     urgency = payload.get("urgency", "low")
 
@@ -60,58 +129,31 @@ def handle_thought_trigger(payload: dict):
         logger.error("'content' (raw thought) is missing from thought trigger payload.")
         return
 
-    logger.info(f"Processing raw thought: \"{raw_content}\" (Mood: {mood_context}, Urgency: {urgency}, Source: {trigger_source})")
+    # logger.info(f"Processing raw thought: \"{raw_content}\" (Mood: {mood_context}, Urgency: {urgency}, Source: {trigger_source})")
 
-    # --- LLM Interaction Setup (Simulated) ---
-    elaborated_thought_content = f"Default elaboration for: '{raw_content}' (Mood: {mood_context})" # Fallback
+    elaborated_thought_content = f"Default elaboration for: '{raw_content}' (Mood: {mood_context})"
 
     llm_prompt = f"Internal monologue: {raw_content}"
-    # messages = [{"role": "user", "content": llm_prompt}] # This would be for the actual LLM call
 
     firmament_module_cfg = Config.get_firmament_module_config()
     if not firmament_module_cfg: # pragma: no cover
         logger.error("Firmament module configuration not found. Cannot determine LLM role for thought elaboration.")
-        # Fallback to default elaboration already set
     else:
         llm_role = firmament_module_cfg.get("firmament_llm_role", "FIRMAMENT_PRIMARY")
         firmament_llm_config: LLMConfig | None = Config.get_llm_config(llm_role)
 
         if firmament_llm_config:
-            # logger.warning("TODO (SubconsciousHook): HTTP client in handle_thought_trigger should be shared/managed, "
-            #                "not created per call. This is a placeholder for structure.")
-
-            # In a real async implementation, an httpx.AsyncClient would be used:
-            # timeout_seconds = firmament_llm_config.get("timeout", 15.0)
-            # http_client = httpx.AsyncClient(timeout=timeout_seconds)
-            # llm_client = LLMClient(http_client=http_client)
-
-            logger.info(f"SIMULATING LLM call for Firmament role '{llm_role}'. Prompt (conceptual): \"{llm_prompt}\"")
-            # Parameters that would be passed to llm_client.call_llm_api:
-            #   messages=messages,
-            #   llm_config=firmament_llm_config,
-            #   llm_role=llm_role
-
-            # New placeholder response, indicating simulation and configured role/model
+            # logger.info(f"SIMULATING LLM call for Firmament role '{llm_role}'. Prompt (conceptual): \"{llm_prompt}\"")
             elaborated_thought_content = (
                 f"Simulated LLM (Role: {llm_role}, Model: {firmament_llm_config.get('model', 'N/A')}) "
                 f"elaboration for internal monologue: '{raw_content}' (Original Mood: {mood_context})"
             )
-            logger.info(f"Using new placeholder LLM response: \"{elaborated_thought_content}\"")
-
-            logger.warning("TODO (SubconsciousHook): Replace placeholder LLM response with an actual async call "
-                           "to llm_client.call_llm_api. This will require making handle_thought_trigger async "
-                           "and ensuring the EventBus and its subscribers can handle async operations "
-                           "(e.g., by using asyncio.create_task for dispatching to async handlers from a sync bus, "
-                           "or by upgrading EventBus to be fully async).")
-            # logger.warning("TODO (SubconsciousHook): If an httpx.AsyncClient is created here per call (which is not ideal), "
-            #                "it must be properly closed using 'async with' or 'await http_client.aclose()'. "
-            #                "This is not done currently as the handler is synchronous and the call is simulated. "
-            #                "The preferred solution is a shared/managed HTTP client instance.")
+            # logger.info(f"Using new placeholder LLM response: \"{elaborated_thought_content}\"")
+            logger.warning("TODO (SubconsciousHook): Replace placeholder LLM response with an actual async call.")
         else: # pragma: no cover
             logger.error(f"LLM configuration for Firmament role '{llm_role}' not found. Using default elaboration.")
 
-    # --- Event Publishing Logic (remains mostly the same, uses new elaborated_thought_content) ---
-    current_time_iso = datetime.now(timezone.utc).isoformat()
+    current_time_iso = payload.get("timestamp", datetime.now(timezone.utc).isoformat()) # Use original thought timestamp if available
     memory_entry = {
         "type": "thought",
         "content": elaborated_thought_content,
@@ -126,7 +168,7 @@ def handle_thought_trigger(payload: dict):
     is_actionable_impulse = False
     actionable_keywords = [
         "i should", "i need to", "maybe i can", "let's try to", "what if i",
-        "i must", "i want to", "i have to", "better check", "time to"
+        "i must", "i want to", "i have to", "better check", "time to", "remember to"
     ]
     if any(keyword in raw_content.lower() for keyword in actionable_keywords) or \
        urgency.lower() in ["medium", "high", "critical"]:
@@ -136,11 +178,11 @@ def handle_thought_trigger(payload: dict):
         impulse_data = {
             "type": payload.get("impulse_type", "generic_actionable_thought"),
             "original_thought_content": raw_content,
-            "elaborated_thought_content": elaborated_thought_content, # Include the (simulated) LLM elaboration
+            "elaborated_thought_content": elaborated_thought_content,
             "mood": mood_context,
             "urgency": urgency,
-            "source": trigger_source,
-            "timestamp": current_time_iso
+            "source": trigger_source, # Source of the THOUGHT_TRIGGER payload
+            "timestamp": current_time_iso # Timestamp of the original thought
         }
         EventBus.instance().publish(IMPULSE, impulse_data)
 
@@ -152,61 +194,50 @@ def register_thought_trigger_handler():
 
 if __name__ == '__main__': # pragma: no cover
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    _test_published_events = []
+    logger_sh = logging.getLogger('eidos_agent.features.firmament.integrations.subconscious_hook')
+    logger_sh.setLevel(logging.DEBUG) # Enable debug for this module to see more logs
 
-    # Using a simplified EventBus mock for this __main__ as the focus is on handle_thought_trigger's internal logic
-    class MockEventBusForSubconsciousHookTest(EventBus):
+    logger.info("--- Testing Subconscious Hook ---")
+
+    # --- Test the new get_recent_subconscious_thoughts function ---
+    print("\n--- Testing get_recent_subconscious_thoughts ---")
+    recent_thoughts_data = get_recent_subconscious_thoughts(limit=3)
+    print(f"Fetched {len(recent_thoughts_data)} recent thoughts:")
+    for i, thought_info in enumerate(recent_thoughts_data):
+        mood_info = thought_info.get('mood_at_thought', {})
+        mood_name = mood_info.get('name', 'N/A') if isinstance(mood_info, dict) else 'N/A'
+        print(f"  Thought {i+1}: '{thought_info['content']}' (Mood: {mood_name}, Urgency: {thought_info.get('urgency')})")
+    assert len(recent_thoughts_data) == 3, f"Expected 3 thoughts, got {len(recent_thoughts_data)}"
+    if recent_thoughts_data: # Check content if list is not empty
+        assert "Lara Croft" in recent_thoughts_data[0]["content"], "First thought content mismatch"
+
+    print("\n--- Testing handle_thought_trigger (using one of the fetched thoughts) ---")
+    _test_published_events_main = []
+    # Using a simplified EventBus mock for this __main__
+    class MockEventBusForMainTest(EventBus):
         def publish(self, event_type: str, data: dict):
-            print(f"    [MockEventBus Capture] Event: {event_type}, Data: {str(data)[:120]}...")
-            _test_published_events.append({"event_type": event_type, "data": data})
+            print(f"    [MockEventBus MainTest Capture] Event: {event_type}, Data: {str(data)[:120]}...")
+            _test_published_events_main.append({"event_type": event_type, "data": data})
 
-    original_event_bus_instance = EventBus.instance
-    EventBus.instance = lambda: MockEventBusForSubconsciousHookTest() # Patch with the simple mock
+    original_event_bus_instance_main = EventBus.instance
+    EventBus.instance = lambda: MockEventBusForMainTest() # Patch with the simple mock
 
-    print("--- Testing Subconscious Hook (with SIMULATED LLMClient structure and new placeholder response) ---")
+    # Use a thought that should trigger an impulse (e.g., the one about Bob or Dr. Hayes)
+    if len(recent_thoughts_data) > 1:
+        actionable_thought_payload = recent_thoughts_data[1] # "Need to remember to call Bob..."
+        print(f"\nProcessing actionable thought for handle_thought_trigger: {actionable_thought_payload}")
+        handle_thought_trigger(actionable_thought_payload)
 
-    test_payloads_for_llm_sim = [
-        {"content": "I should check the door locks again!", "mood": "anxious", "urgency": "high", "impulse_type": "security_check"},
-        {"content": "Maybe I can learn a new skill today, like painting.", "mood": "inspired", "urgency": "low"},
-        {"content": "The sky is very dark; it might rain soon.", "mood": "observant", "urgency": "low"},
-    ]
+        found_memory_write_main = any(e["event_type"] == "memory.write" for e in _test_published_events_main)
+        found_impulse_main = any(e["event_type"] == IMPULSE for e in _test_published_events_main)
+        assert found_memory_write_main, "Memory.write event not found in __main__ test for actionable thought"
+        assert found_impulse_main, "IMPULSE event not found in __main__ test for actionable thought"
+        if found_impulse_main:
+            impulse_event = next(e for e in _test_published_events_main if e["event_type"] == IMPULSE)
+            assert impulse_event["data"]["type"] == "task_reminder", f"Expected impulse_type 'task_reminder', got {impulse_event['data']['type']}"
+        print("handle_thought_trigger test with actionable thought produced expected event types.")
+    else:
+        print("Skipping handle_thought_trigger test as not enough thoughts were fetched.")
 
-    # Simulate a Firmament LLM config being available
-    # This would normally be loaded from Config.LLM by Config.get_llm_config()
-    mock_firmament_llm_config = {
-        "url": "http://mockhost:1234/v1",
-        "model": "firmament-test-model-v1",
-        "api_key": "mock_key",
-        "temperature": 0.55,
-        "timeout": 12.0,
-        "max_tokens": 1000
-    }
-
-    # Patch Config.get_llm_config to return our mock config when FIRMAMENT_PRIMARY is requested
-    # And Config.get_firmament_module_config to specify FIRMAMENT_PRIMARY as the role
-    with patch('eidos_agent.core.config.Config.get_llm_config', side_effect=lambda role: mock_firmament_llm_config if role == "FIRMAMENT_PRIMARY" else None) as mock_get_llm_config, \
-         patch('eidos_agent.core.config.Config.get_firmament_module_config', return_value={"firmament_llm_role": "FIRMAMENT_PRIMARY"}) as mock_get_firmament_cfg:
-
-        for i, payload in enumerate(test_payloads_for_llm_sim):
-            print(f"\n--- Test Case {i+1} ---")
-            print(f"Input Payload: {payload}")
-            _test_published_events.clear() # Clear for each payload
-            handle_thought_trigger(payload)
-
-            print("  Published events for this case:")
-            for evt in _test_published_events:
-                event_content_key = 'content' if evt['event_type'] == "memory.write" else 'original_thought_content'
-                event_content = evt['data'].get(event_content_key, '')
-                print(f"    - Type='{evt['event_type']}', Relevant Content='{str(event_content)[:70]}...'")
-                if evt['event_type'] == "memory.write" and evt['data'].get('type') == 'thought':
-                    assert "Simulated LLM (Role: FIRMAMENT_PRIMARY" in evt['data']['content'], \
-                        f"Elaborated thought content does not indicate simulation with correct role. Got: {evt['data']['content']}"
-                    assert mock_firmament_llm_config['model'] in evt['data']['content'], \
-                        f"Elaborated thought content does not mention the (mocked) model name. Got: {evt['data']['content']}"
-
-            # Verify that get_llm_config was called with the expected role
-            mock_get_llm_config.assert_any_call("FIRMAMENT_PRIMARY")
-
-
-    EventBus.instance = original_event_bus_instance # Restore
-    print("\n--- Subconscious Hook (simulated LLM) testing finished ---")
+    EventBus.instance = original_event_bus_instance_main # Restore
+    logger.info("--- Subconscious Hook __main__ testing finished ---")
