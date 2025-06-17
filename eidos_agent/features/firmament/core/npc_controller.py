@@ -1,114 +1,231 @@
 # eidos_agent/features/firmament/core/npc_controller.py
 
-# This module will manage NPC (Non-Player Character) generation,
-# their behaviors, dialogues, and interactions within the simulation.
+import yaml
+import os
+import logging
+import random
+from datetime import datetime, timezone # Added
 
-# Adjust import paths as necessary for the Eidos project structure
-from ..event_bus import EventBus
-from ..event_types import NPC_DIALOGUE, WORLD_EVENT # Ensure NPC_DIALOGUE is "npc.say" as per event_types.py
+# Attempt to import EventBus and event types.
+try:
+    from ..event_bus import EventBus
+    from ..event_types import NPC_DIALOGUE, WORLD_EVENT
+except ImportError: # pragma: no cover
+    print("CRITICAL: NPC_Controller could not import EventBus or core event types. Event handling will fail.")
+    class EventBus: _instance = None; _subscribers = {}; @classmethod def instance(cls): return cls._instance or cls(); subscribe = lambda s,e,h: None; publish = lambda s,e,d: print(f"DummyEventBus: {e} with {d}") #type:ignore # type: ignore
+    NPC_DIALOGUE, WORLD_EVENT = "dummy.npc_dialogue", "dummy.world_event" #type:ignore
 
-# Placeholder for NPC profiles or more complex NPC management
-NPC_PROFILES = {
-    "Mailman": {
-        "dialogue_generic": ["Looks like a nice day.", "Here's the mail."],
-        "dialogue_package": "Hey there! Got a package for you today.",
-        "dialogue_no_package": "Just the usual letters today."
-    },
-    "Neighbor": {
-        "dialogue_generic": ["Morning!", "How are you doing?", "Nice weather we're having."],
-    }
-}
+logger = logging.getLogger(__name__)
+_npc_profiles_data: dict = {}
+CONFIG_DIR_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "configs"))
+
+EVENT_MEMORY_WRITE = "memory.write" # Added
+
+def load_npc_profiles(config_file_name: str = "npc_profiles.yaml") -> bool:
+    """
+    Loads NPC profiles from the specified YAML file into the module-level
+    _npc_profiles_data dictionary.
+    """
+    global _npc_profiles_data
+    config_file_path = os.path.join(CONFIG_DIR_PATH, config_file_name)
+
+    # logger.info(f"Attempting to load NPC profiles from: {config_file_path}")
+    if not os.path.exists(CONFIG_DIR_PATH): # pragma: no cover
+        logger.error(f"Configuration directory does not exist: {CONFIG_DIR_PATH}")
+        return False
+
+    try:
+        with open(config_file_path, 'r', encoding='utf-8') as f:
+            raw_profiles = yaml.safe_load(f)
+
+        if raw_profiles is None:
+            logger.warning(f"NPC profiles file is empty: {config_file_path}")
+            _npc_profiles_data.clear()
+            return True
+
+        if not isinstance(raw_profiles, dict):
+            logger.error(f"NPC profiles YAML content is not a dictionary. File: {config_file_path}")
+            return False
+
+        temp_profiles_data = {}
+        for npc_id, npc_data in raw_profiles.items():
+            if isinstance(npc_data, dict) and npc_data.get("id") == npc_id:
+                temp_profiles_data[npc_id] = npc_data
+            else:
+                logger.warning(f"Skipping profile entry with key '{npc_id}' due to missing/mismatched 'id' in {config_file_path}.")
+
+        _npc_profiles_data.clear()
+        _npc_profiles_data.update(temp_profiles_data)
+        # logger.info(f"Successfully loaded and validated {len(_npc_profiles_data)} NPC profiles from {config_file_path}.")
+        return True
+
+    except FileNotFoundError: # pragma: no cover
+        logger.error(f"NPC profiles file not found: {config_file_path}")
+    except yaml.YAMLError as e: # pragma: no cover
+        logger.error(f"Error parsing NPC profiles YAML file: {config_file_path}. Error: {e}")
+    except Exception as e: # pragma: no cover
+        logger.error(f"An unexpected error occurred loading NPC profiles from {config_file_path}: {e}", exc_info=True)
+
+    return False
 
 def spawn_npc_interaction(triggering_event_data: dict):
     """
-    Generates NPC interactions based on triggering events (e.g., world events).
-    Publishes NPC dialogue events.
+    Generates NPC interactions based on triggering world events and loaded NPC profiles.
+    If an NPC is triggered by the event, it publishes an NPC_DIALOGUE event with a selected
+    dialogue line and an EVENT_MEMORY_WRITE event to log the NPC's presence.
     """
-    # event_data here is the data from the event that triggered this function,
-    # e.g., a WORLD_EVENT.
-    print(f"NPC Controller: spawn_npc_interaction triggered by event data: {triggering_event_data}")
+    event_name = triggering_event_data.get("event_name")
+    if not event_name:
+        logger.warning(f"NPC Controller: spawn_npc_interaction called with no 'event_name' in data: {triggering_event_data}")
+        return
 
-    # The design doc implies that this function is called with data that has an "event" key,
-    # which describes the type of world event, like "mail_delivery".
-    # Let's assume triggering_event_data might be something like:
-    # {"type": "random_world_event", "event_name": "mail_delivery", ...}
-    # Or directly {"event": "mail_delivery"} if published that way.
+    # logger.debug(f"NPC Controller: Processing event_name '{event_name}' for NPC interaction.")
 
-    event_name_from_trigger = triggering_event_data.get("event_name") # if coming from our random_events.py
-    if not event_name_from_trigger: # Fallback if the key is "event" directly
-        event_name_from_trigger = triggering_event_data.get("event")
+    for npc_id, npc_profile in _npc_profiles_data.items():
+        presence_triggers = npc_profile.get("presence_trigger_events", [])
+        if not isinstance(presence_triggers, list): # Ensure presence_triggers is a list
+            # logger.warning(f"NPC {npc_id} has malformed presence_trigger_events (not a list). Skipping.")
+            continue
 
-    npc_name = None
-    dialogue_line = None
+        if event_name in presence_triggers:
+            npc_name = npc_profile.get("name", npc_id)
+            # logger.info(f"NPC Controller: Event '{event_name}' triggered NPC '{npc_name}' (ID: {npc_id}).")
 
-    if event_name_from_trigger == "mail_delivery":
-        npc_name = "Mailman"
-        # Example: Decide dialogue based on more detailed event data if available
-        if triggering_event_data.get("has_package", True): # Assume package by default for this event
-            dialogue_line = NPC_PROFILES.get(npc_name, {}).get("dialogue_package", "Hello! Mail's here.")
-        else:
-            dialogue_line = NPC_PROFILES.get(npc_name, {}).get("dialogue_no_package", "Hello! Mail's here.")
+            dialogue_lines_map = npc_profile.get("dialogue_lines", {})
+            if not isinstance(dialogue_lines_map, dict): # Ensure dialogue_lines_map is a dict
+                # logger.warning(f"NPC {npc_name} has malformed dialogue_lines (not a dictionary). Using default response.")
+                dialogue_lines_map = {}
 
-        print(f"NPC Controller: Mailman interaction triggered for '{event_name_from_trigger}'.")
+            chosen_dialogue_line = ""
 
-    # Add more NPC interaction triggers and logic here
-    # Example: A neighbor passes by due to a different world event
-    # elif event_name_from_trigger == "neighbor_sighting":
-    #     npc_name = "Neighbor"
-    #     dialogue_line = random.choice(NPC_PROFILES.get(npc_name, {}).get("dialogue_generic", ["Hi."]))
-    #     print(f"NPC Controller: Neighbor interaction triggered for '{event_name_from_trigger}'.")
+            # Try event-specific dialogue first
+            event_dialogue_key = f"event_{event_name}"
+            event_specific_lines = dialogue_lines_map.get(event_dialogue_key, [])
+            if event_specific_lines and isinstance(event_specific_lines, list) and event_specific_lines:
+                chosen_dialogue_line = random.choice(event_specific_lines)
+            # Fallback to general greeting
+            elif dialogue_lines_map.get("greeting_general") and isinstance(dialogue_lines_map["greeting_general"], list) and dialogue_lines_map["greeting_general"]:
+                chosen_dialogue_line = random.choice(dialogue_lines_map["greeting_general"])
+            else:
+                # Default line if no suitable dialogue is found
+                chosen_dialogue_line = f"{npc_name} acknowledges the {event_name} event."
 
-    else:
-        print(f"NPC Controller: No specific NPC interaction defined for event '{event_name_from_trigger}'.")
-        return # No interaction to publish
+            # Publish NPC_DIALOGUE event
+            dialogue_payload = {
+                "npc_id": npc_id, # Crucial for identifying the NPC
+                "npc_name": npc_name,
+                "line": chosen_dialogue_line,
+                "triggering_event_name": event_name, # Context about what brought the NPC
+                "mood": npc_profile.get("default_mood", "neutral") # Optionally include NPC's current mood
+            }
+            EventBus.instance().publish(NPC_DIALOGUE, dialogue_payload)
+            # logger.debug(f"NPC Controller: Published NPC_DIALOGUE: {dialogue_payload}")
 
-    if npc_name and dialogue_line:
-        # Publishing to NPC_DIALOGUE event type (which should be "npc.say")
-        EventBus.instance().publish(NPC_DIALOGUE, {
-            "npc_name": npc_name, # Changed key to be more descriptive
-            "line": dialogue_line,
-            "source_trigger_event": event_name_from_trigger # Optional: trace where this interaction originated
-        })
-        print(f"NPC Controller: Published {NPC_DIALOGUE} - {npc_name} says: '{dialogue_line}'")
+            # Publish memory.write event for NPC presence
+            presence_memory_content = f"{npc_name} (ID: {npc_id}) is present due to the '{event_name}' event."
+            presence_memory_payload = {
+                "type": "npc_presence", # Specific type for this memory
+                "content": presence_memory_content,
+                "metadata": {
+                    "npc_id": npc_id,
+                    "npc_name": npc_name,
+                    "triggering_event_name": event_name,
+                    "dialogue_spoken": chosen_dialogue_line, # Include what was said
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            }
+            EventBus.instance().publish(EVENT_MEMORY_WRITE, presence_memory_payload)
+            # logger.debug(f"NPC Controller: Published npc_presence memory: {presence_memory_payload}")
+
+            # For now, handle only the first matching NPC for a given event to keep it simple.
+            # Future enhancements could allow multiple NPCs to react or have a priority system.
+            break
+    # else:
+        # logger.debug(f"NPC Controller: No NPC profile found a trigger for event_name '{event_name}'.")
 
 
-# Example of how one might subscribe this to an event (for testing or integration)
-# This setup function would typically be called during application initialization.
 def register_npc_event_listeners():
     """
     Subscribes NPC interaction handlers to relevant world events.
     """
-    # This assumes that WORLD_EVENT's data payload will contain an "event_name"
-    # or "event" key that spawn_npc_interaction can use.
-    EventBus.instance().subscribe(WORLD_EVENT, spawn_npc_interaction)
-    print("NPC Controller: Subscribed spawn_npc_interaction to WORLD_EVENT.")
+    if "EventBus" in globals() and callable(EventBus.instance):
+        try:
+            EventBus.instance().subscribe(WORLD_EVENT, spawn_npc_interaction)
+            # logger.info("NPC Controller: Subscribed spawn_npc_interaction to WORLD_EVENT.")
+        except Exception as e: # pragma: no cover
+             logger.error(f"Error subscribing NPC_Controller to EventBus: {e}")
+    # else: # pragma: no cover
+        # logger.error("NPC Controller: EventBus not available for subscribing event listeners.")
 
-if __name__ == '__main__':
-    # Basic test setup for npc_controller.py
-    # This requires EventBus and NPC_DIALOGUE, WORLD_EVENT from event_types to be accessible.
 
-    # Mock handler for NPC_DIALOGUE to see if it's published
-    def mock_npc_dialogue_handler(data):
-        print(f"[Test NPC_DIALOGUE Handler] Event received: {data}")
+if __name__ == '__main__': # pragma: no cover
+    from collections import defaultdict # For mock event bus in test
 
-    bus = EventBus.instance()
-    bus.subscribe(NPC_DIALOGUE, mock_npc_dialogue_handler)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    print("--- Testing NPC Controller with Profile Loading & Spawn Interaction ---")
 
-    # Register the NPC listener (subscribes spawn_npc_interaction to WORLD_EVENT)
-    register_npc_event_listeners()
+    if not load_npc_profiles():
+        print("FATAL: Could not load NPC profiles for test. Aborting __main__ test for spawn_npc_interaction.")
+    else:
+        _test_events_npc_main = []
+        def capture_npc_events(event_type, data):
+            print(f"    [Capture] Event: {event_type}, Relevant Data: {str(data.get('npc_name', data.get('content', data)))[:80]}...")
+            _test_events_npc_main.append({"type": event_type, "data": data})
 
-    print("\nTesting NPC mail delivery interaction (via WORLD_EVENT)...")
-    # Simulate a world event that should trigger the mailman
-    mail_event_data = {"type": "random_world_event", "event_name": "mail_delivery", "has_package": True, "source": "test_harness"}
-    bus.publish(WORLD_EVENT, mail_event_data)
+        # Setup a mock-like EventBus for this specific test run
+        if hasattr(EventBus, '_instance'): EventBus._instance = None
+        bus = EventBus.instance()
+        # Clear any subscribers from other test runs if instance is reused (though it shouldn't be here)
+        if hasattr(bus, '_subscribers'): bus._subscribers = defaultdict(list)
 
-    print("\nTesting NPC mail delivery interaction (no package)...")
-    mail_event_data_no_package = {"type": "random_world_event", "event_name": "mail_delivery", "has_package": False, "source": "test_harness"}
-    bus.publish(WORLD_EVENT, mail_event_data_no_package)
+        bus.subscribe(NPC_DIALOGUE, lambda d: capture_npc_events(NPC_DIALOGUE, d))
+        bus.subscribe(EVENT_MEMORY_WRITE, lambda d: capture_npc_events(EVENT_MEMORY_WRITE, d))
+        register_npc_event_listeners() # Subscribes spawn_npc_interaction to WORLD_EVENT
 
-    print("\nTesting NPC interaction with an unhandled world event type...")
-    # Simulate a world event that currently has no specific NPC interaction defined
-    unhandled_event_data = {"type": "random_world_event", "event_name": "birds_chirping", "source": "test_harness"}
-    bus.publish(WORLD_EVENT, unhandled_event_data)
+        print("\n--- Test 1: Event that should trigger Mailman Bob ('mail_delivery') ---")
+        _test_events_npc_main.clear()
+        mail_event = {"event_name": "mail_delivery", "source": "test_harness_npc", "detail": "Package for Pathos"}
+        bus.publish(WORLD_EVENT, mail_event)
 
-    print("\nNPC controller testing finished.")
+        npc_dialogues = [e for e in _test_events_npc_main if e["type"] == NPC_DIALOGUE]
+        npc_presence_logs = [e for e in _test_events_npc_main if e["type"] == EVENT_MEMORY_WRITE and e["data"].get("type") == "npc_presence"]
+
+        assert len(npc_dialogues) == 1, f"Expected 1 NPC_DIALOGUE for mail_delivery, got {len(npc_dialogues)}"
+        if npc_dialogues:
+            assert npc_dialogues[0]["data"]["npc_id"] == "mailman_bob", "NPC ID should be mailman_bob"
+            assert "Mailman Bob" in npc_dialogues[0]["data"]["npc_name"], "NPC name mismatch"
+            print(f"  Mailman Bob dialogue: '{npc_dialogues[0]['data']['line']}'")
+
+        assert len(npc_presence_logs) == 1, f"Expected 1 npc_presence log for mail_delivery, got {len(npc_presence_logs)}"
+        if npc_presence_logs:
+            assert npc_presence_logs[0]["data"]["metadata"]["npc_id"] == "mailman_bob"
+            assert "Mailman Bob (ID: mailman_bob) is present due to 'mail_delivery' event." in npc_presence_logs[0]["data"]["content"]
+            print(f"  Mailman Bob presence logged: '{npc_presence_logs[0]['data']['content']}'")
+
+
+        print("\n--- Test 2: Event that should trigger Neighbor Alice ('neighbor_starts_lawnmower') ---")
+        _test_events_npc_main.clear()
+        lawnmower_event = {"event_name": "neighbor_starts_lawnmower", "source": "test_harness_npc", "sound_level": "loud"}
+        bus.publish(WORLD_EVENT, lawnmower_event)
+
+        npc_dialogues = [e for e in _test_events_npc_main if e["type"] == NPC_DIALOGUE]
+        npc_presence_logs = [e for e in _test_events_npc_main if e["type"] == EVENT_MEMORY_WRITE and e["data"].get("type") == "npc_presence"]
+        assert len(npc_dialogues) == 1, f"Expected 1 NPC_DIALOGUE for lawnmower, got {len(npc_dialogues)}"
+        if npc_dialogues: assert npc_dialogues[0]["data"]["npc_id"] == "neighbor_alice"
+        assert len(npc_presence_logs) == 1, f"Expected 1 npc_presence log for lawnmower, got {len(npc_presence_logs)}"
+        if npc_presence_logs: assert npc_presence_logs[0]["data"]["metadata"]["npc_id"] == "neighbor_alice"
+        print(f"  Neighbor Alice dialogue: '{npc_dialogues[0]['data']['line'] if npc_dialogues else 'N/A'}'")
+
+
+        print("\n--- Test 3: Event that should NOT trigger any specific NPC dialogue ('birds_chirping') ---")
+        _test_events_npc_main.clear()
+        birds_event = {"event_name": "birds_chirping", "source": "test_harness_npc", "type_of_bird": "robin"}
+        bus.publish(WORLD_EVENT, birds_event)
+
+        npc_dialogues = [e for e in _test_events_npc_main if e["type"] == NPC_DIALOGUE]
+        npc_presence_logs = [e for e in _test_events_npc_main if e["type"] == EVENT_MEMORY_WRITE and e["data"].get("type") == "npc_presence"]
+        assert len(npc_dialogues) == 0, f"Expected 0 NPC_DIALOGUE for birds_chirping, got {len(npc_dialogues)}"
+        assert len(npc_presence_logs) == 0, f"Expected 0 npc_presence logs for birds_chirping, got {len(npc_presence_logs)}"
+        print("  Correctly no NPC dialogue or presence log for 'birds_chirping'.")
+
+        print("\nNPC controller spawn interaction testing finished.")
