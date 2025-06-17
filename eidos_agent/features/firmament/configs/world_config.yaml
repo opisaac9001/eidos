@@ -1,0 +1,58 @@
+# eidos_agent/features/firmament/configs/world_config.yaml
+
+# This file will store general configuration parameters for the Firmament
+# world simulation engine. These settings govern the overall behavior and
+# characteristics of the simulated environment and its dynamics.
+
+# Examples of parameters that might be configured here:
+# - Simulation tick rate or speed.
+# - Probabilities for various types of random events (e.g., weather changes, ambient sounds).
+# - Default environmental parameters if not dynamically generated or overridden.
+# - Feature flags for enabling or disabling certain world simulation aspects or modules.
+# - Limits or thresholds (e.g., max number of concurrent NPCs, max event queue size).
+
+# --- Example Structure (to be refined as features are implemented) ---
+
+simulation_parameters:
+  # Defines how often the main simulation loop (tick) runs.
+  # This could be in real-time seconds, or an abstract simulation step unit.
+  tick_interval_seconds: 10
+
+  # The rate at which simulation time progresses relative to real time.
+  # e.g., 60 means 1 minute of real time = 1 hour of simulation time.
+  # e.g., 1 means simulation time progresses at the same rate as real time.
+  time_progression_rate: 60
+
+  # Maximum number of active Non-Player Characters (NPCs) in the world at any given time.
+  # This helps manage computational resources.
+  max_active_npcs: 5
+
+random_event_probabilities:
+  # Base chance (e.g., 0.0 to 1.0) for any minor random event to occur per simulation tick.
+  # Specific event types might have their own modifiers.
+  minor_ambient_event_chance: 0.05 # e.g., car passing by, dog barking
+
+  # Base chance for a more significant, potentially narrative-impacting random event.
+  significant_world_event_chance: 0.01 # e.g., unexpected visitor, power outage simulation
+
+environment_defaults:
+  # Default starting weather if not set by a more specific system.
+  # Options could be: "clear", "cloudy", "rainy", "stormy", "foggy"
+  default_weather: "clear"
+
+  # Default starting temperature (could be in Celsius or Fahrenheit, unit should be defined).
+  default_temperature_celsius: 22
+
+  # Settings for how the environment (e.g., weather, temperature) can change over time.
+  weather_change_frequency_hours: 6 # How often weather patterns might shift.
+  max_temperature_fluctuation_celsius: 5 # Max change per weather shift.
+
+feature_flags:
+  # Enable or disable specific features within Firmament.
+  enable_npc_interactions: true
+  enable_dynamic_weather: true
+  enable_subconscious_impulses: true
+  enable_oneiros_dream_generation: false # Example: feature not yet fully integrated
+
+# This is a placeholder configuration. Actual parameters and their values
+# will be determined by the specific needs of the Firmament simulation components.
