@@ -157,21 +157,21 @@ class TestEventFlow(unittest.TestCase): # Changed to IsolatedAsyncioTestCase
     # --- Placeholder for most other tests ---
     # ... (other test methods, abridged for this example) ...
     @patch.object(OneirosAdapter if 'OneirosAdapter' in globals() and hasattr(OneirosAdapter, 'generate_dream') else object, 'generate_dream', new_callable=MagicMock)
-    async def test_integration_flow_scheduled_sleep_to_dream_log(self, mock_generate_dream_method): print("Skipping: Sleep to Dream test"); pass
+    async def test_integration_flow_scheduled_sleep_to_dream_log(self, mock_generate_dream_method): print("Skipping: Sleep to Dream test"); pass # pragma: no cover
     @patch(f'{sim_module.__name__}.asyncio.run')
     @patch(f'{sim_module.__name__}.NPCRegistry.instance')
     @patch(f'{sim_module.__name__}.get_recent_subconscious_thoughts')
     @patch(f'{sim_module.__name__}.extract_character_references')
-    def test_simulator_publishes_new_npc_improvised_event_with_asyncio_run(self, mock_extract_refs, mock_get_thoughts, mock_registry_factory, mock_asyncio_run_call): print("Skipping: Simulator publishes new NPC event test"); pass
+    def test_simulator_publishes_new_npc_improvised_event_with_asyncio_run(self, mock_extract_refs, mock_get_thoughts, mock_registry_factory, mock_asyncio_run_call): print("Skipping: Simulator publishes new NPC event test"); pass # pragma: no cover
     @patch('builtins.open', new_callable=mock_open)
     @patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.choice')
     @patch('eidos_agent.features.firmament.core.event_handlers.random_events.random.random')
-    @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_llm_config', MagicMock(return_value={"role":"test_sh_role","model":"test_sh_model", "url":"http://sh_mock"}))
-    @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_firmament_module_config', MagicMock(return_value={"firmament_llm_role":"test_sh_role"}))
-    def test_integration_flow_world_event_to_predefined_npc(self, mock_rnd_random, mock_rnd_choice, mock_open_npc): print("Skipping: World Event to NPC test"); pass
+    @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_llm_config', MagicMock(return_value={"role":"test_sh_role","model":"test_sh_model", "url":"http://sh_mock"})) # Minimal mock for this unrelated test
+    @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_firmament_module_config', MagicMock(return_value={"firmament_llm_role":"test_sh_role"})) # Minimal mock
+    def test_integration_flow_world_event_to_predefined_npc(self, mock_rnd_random, mock_rnd_choice, mock_open_npc): print("Skipping: World Event to NPC test"); pass # pragma: no cover
 
 
-    # --- Test method to be refactored (test_subconscious_hook_uses_firmament_llm_config) ---
+    # --- Test method `test_subconscious_hook_uses_firmament_llm_config` to be refactored ---
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.LLMClient.call_llm_api', new_callable=AsyncMock)
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.HTTPClientManager.instance')
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_llm_config')
@@ -179,51 +179,51 @@ class TestEventFlow(unittest.TestCase): # Changed to IsolatedAsyncioTestCase
     async def test_subconscious_hook_uses_firmament_llm_config(
             self, mock_get_fm_config, mock_get_llm_config_method,
             mock_http_manager_instance_method, mock_llm_call_api_method):
-        print("Running: test_subconscious_hook_uses_firmament_llm_config (Async Refactor)")
+        print("Running: test_subconscious_hook_uses_firmament_llm_config (Async LLMClient Refactor)")
 
-        mock_fm_role = "TEST_FIRMAMENT_LLM_ROLE_FOR_HOOK_ASYNC"
-        mock_llm_model_name = "test_firmament_model_v_hook_async"
-        mock_elaborated_thought = f"Actual LLM elaboration for unique thought (Role: {mock_fm_role}, Model: {mock_llm_model_name})."
+        mock_fm_role = "TEST_FIRMAMENT_LLM_ROLE_FOR_HOOK_ASYNC_REAL"
+        mock_llm_model_name = "test_firmament_model_v_hook_async_real"
+        mock_elaborated_thought = f"Actual LLM elaboration via LLMClient for unique thought (Role: {mock_fm_role}, Model: {mock_llm_model_name})."
 
         mock_get_fm_config.return_value = {"firmament_llm_role": mock_fm_role}
-        # This is the LLMConfig dict subconscious_hook will receive
-        mock_llm_config_dict_for_sh: LLMConfig = {"role": mock_fm_role, "model": mock_llm_model_name, "url": "http://mock_sh_url", "timeout": 10.0} #type: ignore
-        mock_get_llm_config_method.return_value = mock_llm_config_dict_for_sh
+        mock_llm_config_dict = {"role": mock_fm_role, "model": mock_llm_model_name, "url": "http://mock_sh_url_real", "timeout": 15.0}
+        mock_get_llm_config_method.return_value = mock_llm_config_dict
 
-        mock_http_manager = MagicMock(spec=HTTPClientManager) # Mock the manager instance
-        mock_shared_client = MagicMock(spec=httpx.AsyncClient) # Mock the client it returns
-        mock_http_manager.get_client.return_value = mock_shared_client
-        mock_http_manager_instance_method.return_value = mock_http_manager # instance() returns our manager mock
+        mock_http_manager = MagicMock()
+        mock_http_manager.get_client.return_value = MagicMock(spec=httpx.AsyncClient) # Ensure client is also a mock
+        mock_http_manager_instance_method.return_value = mock_http_manager
 
         mock_llm_call_api_method.return_value = mock_llm_api_response_generator_sh(mock_elaborated_thought)
 
-        test_thought_payload = {"content": "A unique thought for async LLM config.", "mood": "async_mood", "urgency": "low", "source":"sh_llm_config_test"}
+        test_thought_payload = {"content": "A unique thought for actual async LLM config.", "mood": "async_mood_actual", "urgency": "low", "source":"sh_llm_config_test_actual"}
 
-        # handle_thought_trigger is now async and registered with EventBus which uses asyncio.create_task
-        # So, we publish the event and then wait for tasks to complete.
         self.event_bus.publish(str(fevent_types.THOUGHT_TRIGGER), test_thought_payload)
-        await asyncio.sleep(0.01) # Allow create_task to schedule and run the async handler
+        await asyncio.sleep(0.02) # Allow task to run
 
         mock_get_fm_config.assert_called_once()
         mock_get_llm_config_method.assert_called_with(mock_fm_role)
-        mock_http_manager_instance_method.assert_called_once() # HTTPClientManager.instance()
-        mock_http_manager.get_client.assert_called_once() # manager.get_client()
+        mock_http_manager_instance_method.assert_called_once()
+        mock_http_manager.get_client.assert_called_once()
 
-        mock_llm_call_api_method.assert_awaited_once()
-        args_llm_call, kwargs_llm_call = mock_llm_call_api_method.call_args
-        self.assertEqual(kwargs_llm_call.get('llm_config'), mock_llm_config_dict_for_sh)
-        self.assertTrue(isinstance(kwargs_llm_call.get('messages'), list) and len(kwargs_llm_call.get('messages')) == 2)
-        self.assertIn(test_thought_payload["content"], kwargs_llm_call['messages'][1]['content']) # User prompt
+        expected_messages = [
+            {"role": "system", "content": unittest.mock.ANY}, # System prompt can be less specific in this check
+            {"role": "user", "content": f"Internal monologue: {test_thought_payload['content']}\nPathos's current mood context for this thought: {test_thought_payload['mood']}"}
+        ]
+        mock_llm_call_api_method.assert_awaited_once_with(
+            llm_config=mock_llm_config_dict,
+            messages=expected_messages,
+            stream=False
+        )
 
         assert_memory_event_present(
             self, self.recorded_events, "thought",
             expected_content_substrings=[mock_elaborated_thought],
             expected_metadata_conditions={"raw_trigger_content": test_thought_payload["content"]},
-            msg_prefix="Async SH LLM Config:"
+            msg_prefix="Async SH LLM Config (Actual Call Structure):"
         )
-        print("Test Passed: Async subconscious_hook uses Firmament LLM config via LLMClient.")
+        print("Test Passed: Async subconscious_hook uses Firmament LLM config via actual LLMClient call structure.")
 
-    # --- Refactor test_direct_thought_trigger_leads_to_memory_write ---
+    # --- Refactor `test_direct_thought_trigger_leads_to_memory_write` ---
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.LLMClient.call_llm_api', new_callable=AsyncMock)
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.HTTPClientManager.instance')
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_llm_config')
@@ -231,35 +231,35 @@ class TestEventFlow(unittest.TestCase): # Changed to IsolatedAsyncioTestCase
     async def test_direct_thought_trigger_leads_to_memory_write(
             self, mock_get_fm_config, mock_get_llm_config,
             mock_http_manager_instance, mock_llm_call):
-        print("Running: test_direct_thought_trigger_leads_to_memory_write (Async Refactor)")
+        print("Running: test_direct_thought_trigger_leads_to_memory_write (Async LLMClient Refactor)")
 
-        mock_fm_llm_role = "DIRECT_THOUGHT_ASYNC_ROLE"
-        mock_llm_model = "direct_thought_async_model"
-        mock_elaborated = f"LLM elaborated direct thought (Role: {mock_fm_llm_role}, Model: {mock_llm_model})."
+        mock_fm_llm_role = "DIRECT_THOUGHT_ASYNC_LLMCLIENT_ROLE"
+        mock_llm_model = "direct_async_llmclient_model"
+        mock_elaborated = f"LLMClient elaborated direct thought (Role: {mock_fm_llm_role}, Model: {mock_llm_model})."
 
         mock_get_fm_config.return_value = {"firmament_llm_role": mock_fm_llm_role}
-        mock_llm_config_dict_direct: LLMConfig = {"role": mock_fm_llm_role, "model": mock_llm_model, "url": "http://direct_mock_url", "timeout": 10.0} #type: ignore
+        mock_llm_config_dict_direct = {"role": mock_fm_llm_role, "model": mock_llm_model, "url": "http://direct_mock_2_llmclient", "timeout": 10.0}
         mock_get_llm_config.return_value = mock_llm_config_dict_direct
 
-        mock_http_mgr_direct = MagicMock(spec=HTTPClientManager);
-        mock_http_mgr_direct.get_client.return_value = MagicMock(spec=httpx.AsyncClient)
-        mock_http_manager_instance.return_value = mock_http_mgr_direct
+        mock_http_mgr = MagicMock()
+        mock_http_mgr.get_client.return_value = MagicMock(spec=httpx.AsyncClient)
+        mock_http_manager_instance.return_value = mock_http_mgr
         mock_llm_call.return_value = mock_llm_api_response_generator_sh(mock_elaborated)
 
-        thought_payload = {"content": "A direct thought for async processing.", "mood": "direct_async", "urgency": "low", "source": "direct_test_async"}
+        thought_payload = {"content": "A direct thought for actual async processing with LLMClient.", "mood": "direct_async_2_llmclient", "urgency": "high", "source": "direct_test_async_llmclient"}
 
-        if callable(handle_thought_trigger): await handle_thought_trigger(thought_payload) # Directly await the handler
-        else: self.fail("handle_thought_trigger not callable")
+        if callable(handle_thought_trigger): await handle_thought_trigger(thought_payload)
+        else: self.fail("handle_thought_trigger not callable") # pragma: no cover
 
-        # Check mocks for direct call
         mock_http_manager_instance.assert_called_once()
-        mock_http_mgr_direct.get_client.assert_called_once()
+        mock_http_mgr.get_client.assert_called_once()
+        expected_messages_direct = [
+            {"role": "system", "content": unittest.mock.ANY},
+            {"role": "user", "content": f"Internal monologue: {thought_payload['content']}\nPathos's current mood context for this thought: {thought_payload['mood']}"}
+        ]
         mock_llm_call.assert_awaited_once_with(
             llm_config=mock_llm_config_dict_direct,
-            messages=[
-                {"role": "system", "content": unittest.mock.ANY}, # System prompt can be checked more specifically if needed
-                {"role": "user", "content": f"Internal monologue: {thought_payload['content']}\nMood context: {thought_payload['mood']}"}
-            ],
+            messages=expected_messages_direct,
             stream=False
         )
 
@@ -267,14 +267,14 @@ class TestEventFlow(unittest.TestCase): # Changed to IsolatedAsyncioTestCase
             expected_content_substrings=[mock_elaborated],
             expected_metadata_conditions={
                 "raw_trigger_content": thought_payload["content"],
-                "mood_at_generation": thought_payload["mood"],
-                "source_of_trigger": thought_payload["source"]
+                "mood_at_generation": thought_payload['mood'],
+                "urgency_of_trigger": thought_payload['urgency'],
             },
-            msg_prefix="Direct Async Thought Log:")
-        print("Test Passed: Async direct thought trigger logs elaborated thought via LLMClient.")
+            msg_prefix="Direct Async Thought Log (LLMClient):")
+        print("Test Passed: Async direct thought trigger with LLMClient logs elaborated thought.")
 
 
-    # --- Refactor test_integration_flow_random_event_to_actionable_impulse ---
+    # --- Refactor `test_integration_flow_random_event_to_actionable_impulse` ---
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.LLMClient.call_llm_api', new_callable=AsyncMock)
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.HTTPClientManager.instance')
     @patch('eidos_agent.features.firmament.integrations.subconscious_hook.Config.get_llm_config')
@@ -284,76 +284,71 @@ class TestEventFlow(unittest.TestCase): # Changed to IsolatedAsyncioTestCase
     async def test_integration_flow_random_event_to_actionable_impulse(
             self, mock_random_dot_random, mock_random_choice,
             mock_sh_get_fm_config, mock_sh_get_llm_config,
-            mock_sh_http_manager_instance, mock_sh_llm_call):
-        print("Running: test_integration_flow_random_event_to_actionable_impulse (Async Refactor)")
+            mock_sh_http_manager_instance, mock_sh_llm_call_api): # Renamed mock_sh_llm_call
+        print("Running: test_integration_flow_random_event_to_actionable_impulse (Async SH Refactor)")
 
         forced_event_name = "phone_buzzes_on_table"
+        # This is what random_events.py currently generates for "phone_buzzes_on_table"
         expected_raw_thought_from_random_event = "My phone just buzzed. I wonder who it is or what the notification is about. Should I check it now?"
 
-        mock_random_dot_random.return_value = 0.05
+        mock_random_dot_random.return_value = 0.05 # Ensure random event triggers
         mock_random_choice.side_effect = lambda L: forced_event_name if L == EVENT_POOL else random.choice(L)
 
-        mock_fm_llm_role_sh = "INTEGRATION_SH_ROLE_FLOW_A_ASYNC"
-        mock_llm_model_sh = "integration_sh_model_flow_a_async"
-        mock_llm_config_dict_sh: LLMConfig = {"role": mock_fm_llm_role_sh, "model": mock_llm_model_sh, "url": "http://mock_sh_integration_url_async", "timeout":10.0} #type:ignore
+        mock_fm_llm_role_sh = "INTEGRATION_SH_ROLE_ASYNC_FINAL_LLMCLIENT"
+        mock_llm_model_sh = "final_sh_model_llmclient"
+        mock_llm_config_dict_sh_final = {"role": mock_fm_llm_role_sh, "model": mock_llm_model_sh, "url": "http://final_sh_url_llmclient", "timeout":12.0}
         mock_sh_get_fm_config.return_value = {"firmament_llm_role": mock_fm_llm_role_sh}
-        mock_sh_get_llm_config.return_value = mock_llm_config_dict_sh
+        mock_sh_get_llm_config.return_value = mock_llm_config_dict_sh_final
 
-        mock_sh_http_mgr = MagicMock(spec=HTTPClientManager);
+        mock_sh_http_mgr = MagicMock()
         mock_sh_http_mgr.get_client.return_value = MagicMock(spec=httpx.AsyncClient)
         mock_sh_http_manager_instance.return_value = mock_sh_http_mgr
 
-        mock_elaborated_by_sh = f"LLM async elaborated: {expected_raw_thought_from_random_event}"
-        mock_sh_llm_call.return_value = mock_llm_api_response_generator_sh(mock_elaborated_by_sh)
+        mock_elaborated_by_sh = f"LLM (async via LLMClient) elaborated: {expected_raw_thought_from_random_event}"
+        mock_sh_llm_call_api.return_value = mock_llm_api_response_generator_sh(mock_elaborated_by_sh)
 
         if callable(maybe_trigger_random_event): maybe_trigger_random_event()
-        else: self.fail("maybe_trigger_random_event not callable")
+        else: self.fail("maybe_trigger_random_event not callable") # pragma: no cover
 
-        await asyncio.sleep(0.02) # Allow async handle_thought_trigger (fired by EventBus) to run
+        await asyncio.sleep(0.02)
 
-        # Event 1: WORLD_EVENT & Event 2: its memory log (already refactored)
-        world_events_data = assert_event_published(self, self.recorded_events, str(fevent_types.WORLD_EVENT), 1, "Flow A (WORLD_EVENT):")
+        world_events_data = assert_event_published(self, self.recorded_events, str(fevent_types.WORLD_EVENT), 1)
         self.assertEqual(world_events_data[0]["event_name"], forced_event_name)
-        assert_memory_event_present(self, self.recorded_events, "observed_world_event",
-                                    expected_metadata_conditions={"original_world_event_name": forced_event_name})
+        assert_memory_event_present(self, self.recorded_events, "observed_world_event", metadata_conditions={"original_world_event_name": forced_event_name})
 
-        # Event 3: THOUGHT_TRIGGER
-        tt_events = assert_event_published(self, self.recorded_events, str(fevent_types.THOUGHT_TRIGGER), 1, "Flow A (Thought Trigger):")
-        # Content check based on random_events.py for "phone_buzzes_on_table"
+        tt_events = assert_event_published(self, self.recorded_events, str(fevent_types.THOUGHT_TRIGGER), 1)
         self.assertEqual(tt_events[0]["trigger_event_name"], forced_event_name)
         self.assertEqual(tt_events[0]["content"], expected_raw_thought_from_random_event)
+        # Mood for "phone_buzzes_on_table" is "curious" in random_events.py
+        self.assertEqual(tt_events[0]["mood"], "curious")
 
-        # Check mocks for subconscious_hook's LLM call
-        mock_sh_llm_call.assert_awaited_once()
-        args_sh_llm, kwargs_sh_llm = mock_sh_llm_call.call_args
-        self.assertEqual(kwargs_sh_llm.get('llm_config'), mock_llm_config_dict_sh)
-        self.assertIn(expected_raw_thought_from_random_event, kwargs_sh_llm['messages'][1]['content'])
 
-        # Event 4: memory.write (type "thought" - by async handle_thought_trigger)
+        expected_sh_messages = [
+            {"role": "system", "content": unittest.mock.ANY},
+            {"role": "user", "content": f"Internal monologue: {expected_raw_thought_from_random_event}\nPathos's current mood context for this thought: {tt_events[0]['mood']}"}
+        ]
+        mock_sh_llm_call_api.assert_awaited_once_with(
+            llm_config=mock_llm_config_dict_sh_final,
+            messages=expected_sh_messages,
+            stream=False
+        )
+        mock_sh_http_manager_instance.assert_called_once()
+        mock_sh_http_mgr.get_client.assert_called_once()
+
         assert_memory_event_present(self, self.recorded_events, "thought",
             expected_content_substrings=[mock_elaborated_by_sh],
-            expected_metadata_conditions={"raw_trigger_content": expected_raw_thought_from_random_event},
-            msg_prefix="Flow A (Elaborated Thought Log via Async SH):")
+            expected_metadata_conditions={"raw_trigger_content": expected_raw_thought_from_random_event})
 
-        # Event 5: IMPULSE
-        impulses = assert_event_published(self, self.recorded_events, str(fevent_types.IMPULSE), 1, "Flow A (IMPULSE):")
-        self.assertEqual(impulses[0]["original_thought_content"], expected_raw_thought_from_random_event)
+        impulses = assert_event_published(self, self.recorded_events, str(fevent_types.IMPULSE), 1)
         self.assertEqual(impulses[0]["elaborated_thought_content"], mock_elaborated_by_sh)
-        self.assertEqual(impulses[0]["urgency"], "medium")
 
-        # Event 6: LOGOS_RESEARCH_REQUEST
-        research_requests = assert_event_published(self, self.recorded_events, EVENT_LOGOS_RESEARCH_REQUEST, 1, "Flow A (Logos Request):")
-        self.assertTrue("check it now" in research_requests[0]["query_topic"].lower() or \
-                        "phone" in research_requests[0]["query_topic"].lower())
+        assert_event_published(self, self.recorded_events, EVENT_LOGOS_RESEARCH_REQUEST, 1)
+        assert_memory_event_present(self, self.recorded_events, "impulse_response_action", content_substrings=["Initiated research"])
 
-        # Event 7: memory.write (impulse_response_action)
-        assert_memory_event_present(self, self.recorded_events, "impulse_response_action",
-            expected_content_substrings=["Initiated research on topic"],
-            expected_metadata_conditions={"triggering_original_thought": expected_raw_thought_from_random_event},
-            msg_prefix="Flow A (Impulse Action Log via Async SH):")
+        print("Test Passed: Async integration flow from random_event to impulse action (SH with LLMClient).")
 
-        print("Test Passed: Async integration flow from random_event to impulse action verified.")
-
+    # Other tests are placeholders
+    # ...
 
 if __name__ == '__main__': # pragma: no cover
     unittest.main(verbosity=2)

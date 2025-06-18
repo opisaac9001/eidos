@@ -9,110 +9,155 @@ from typing import Dict, Any, AsyncGenerator, Optional, List # Added Optional, L
 
 # Adjust import path based on actual file structure
 try:
+    # Try to import the actual classes first
     from eidos_agent.features.firmament.npcs.npc_improviser import NPCImproviser
-    from eidos_agent.core.config import Config, LLMConfig
-    from eidos_agent.llm_integrations.llm_client import LLMClient # For type hinting mock
-except ImportError: # pragma: no cover
-    print("CRITICAL: NPCImproviser test imports failed. Using dummies.")
-    LLMConfig = Dict[str, Any]; #type:ignore
-    class NPCImproviser: #type:ignore
-        def __init__(self,r=None):
-            self.llm_role_name="dummy_role_in_dummy_improviser"
-            self.llm_config: Optional[LLMConfig] = {"model":"dummy_model_in_dummy_improviser", "url":"http://dummyurl", "timeout": 5.0} if r != "A_ROLE_WITH_NO_CONFIG_DEFINED" else None
-        def _build_improvisation_prompt(self, nh, sct, sc): return "dummy_prompt_content"
-        async def improvise_npc(s,nh=None,sct=None,sc=None):
-            if not s.llm_config: return None
-            return {"name":nh or "DummyNPCFromDummyImproviser","id":"d1_dummy_improv"}
-    class Config: #type:ignore
-        @staticmethod
-        def get_firmament_module_config(): return {"firmament_llm_role":"DUMMY_FIRMAMENT_TEST_ROLE"}
-        @staticmethod
-        def get_llm_config(role_name_arg):
-            if role_name_arg=="DUMMY_FIRMAMENT_TEST_ROLE": return {"role":role_name_arg,"model":"dummy_model_from_config","url":"http://dummy_cfg_url"}
-            if role_name_arg=="A_ROLE_WITH_NO_CONFIG_DEFINED": return None
-            return {"role":role_name_arg,"model":"generic_dummy_model","url":"http://generic_dummy_url"}
+    from eidos_agent.core.config import Config, LLMConfig # These are used for patching and type hints
+    from eidos_agent.llm_integrations.llm_client import LLMClient # Used for patching
+    from eidos_agent.core.http_client_manager import HTTPClientManager # Used for patching
+except ImportError:  # pragma: no cover
+    # Fallback to using dummies from npc_improviser itself if top-level import fails
+    # This helps if the test is run in a context where npc_improviser.py is accessible
+    # but its own internal imports of core components might fail.
+    print("WARNING: NPCImproviser test using potentially dummied core components from npc_improviser.py itself.")
+    try:
+        from eidos_agent.features.firmament.npcs.npc_improviser import NPCImproviser, Config, LLMConfig, LLMClient, HTTPClientManager
+    except ImportError:
+        print("CRITICAL: NPCImproviser test imports failed completely. Using placeholder dummies.")
+        LLMConfig = Dict[str, Any]  # type:ignore
+        class Config:  # type:ignore
+            @staticmethod
+            def get_firmament_module_config(): return {"firmament_llm_role": "PH_DUMMY_FIRMAMENT_ROLE"}
+            @staticmethod
+            def get_llm_config(role_name_arg: str) -> Optional[LLMConfig]:
+                if role_name_arg == "PH_DUMMY_FIRMAMENT_ROLE":
+                    return {"role": role_name_arg, "model": "PH_generic_dummy_model", "url": "http://ph_generic_dummy_url"}
+                return None
+        class LLMClient:  # type:ignore
+            def __init__(self, http_client: Any): pass
+            async def call_llm_api(self, llm_config: LLMConfig, messages: List[Dict[str, str]], stream: bool = False, **kwargs: Any):
+                yield json.dumps({"id": "placeholder_id", "name": "Placeholder NPC", "appearance": "PH", "role": "PH", "personality": "PH", "relationship_to_pathos": "PH", "initial_dialogue": "PH"})
+                if False: yield # Make it a generator
+        class HTTPClientManager: #type:ignore
+            _instance = None
+            @classmethod
+            def instance(cls): cls._instance = cls._instance or cls(); return cls._instance
+            def get_client(self): return MagicMock(spec=httpx.AsyncClient) # type: ignore
+            async def startup(self): pass
+            async def shutdown(self): pass
+        class NPCImproviser:  # type:ignore
+            def __init__(self, firmament_llm_role_name: Optional[str] = None):
+                self.llm_role_name = firmament_llm_role_name or "PH_DUMMY_ROLE"
+                self.llm_config: Optional[LLMConfig] = Config.get_llm_config(self.llm_role_name)
+                self.http_client_manager = HTTPClientManager.instance()
+            def _build_improvisation_prompt(self, name_hint: Any, subconscious_thought_context: Any, scene_context: Any) -> str: return "PH_dummy_prompt"
+            async def improvise_npc(self, name_hint: Any = None, subconscious_thought_context: Any = None, scene_context: Any = None) -> Optional[Dict[str, Any]]:
+                if not self.llm_config or not self.llm_config.get("url"): return None
+                return {"id": "ph_dummy_id", "name": name_hint or "PH_DummyNPC", "appearance": "PH", "role": "PH", "personality": "PH", "relationship_to_pathos": "PH", "initial_dialogue": "PH"}
+            def _normalize_id(self, text: str, suffix: str = "") -> str: # Add dummy normalize
+                return text.lower().replace(" ", "_") + suffix if text else f"normalized{suffix}"
 
-    class LLMClient: pass #type:ignore
-
-# This mock async generator will be the return_value for the patched LLMClient.call_llm_api
-async def mock_llm_api_response_generator(
-    response_data: Any,
+# Renamed to make_mock_llm_api_response_generator and changed to a sync function returning an async generator
+def make_mock_llm_api_response_generator(
+    response_data: Any = None,
     is_error_chunk: bool = False,
     is_malformed_json_string: bool = False,
-    is_incomplete_json_string: bool = False,
-    is_empty_string: bool = False
-) -> AsyncGenerator[Any, None]:
-    # logger_mock_gen = logging.getLogger("MockLLMGenerator") # For debugging the generator itself
-    # logger_mock_gen.debug(f"MockLLMGenerator called with: data='{str(response_data)[:50]}...', error_chunk={is_error_chunk}, malformed={is_malformed_json_string}, incomplete={is_incomplete_json_string}, empty={is_empty_string}")
-    if is_error_chunk:
-        # logger_mock_gen.debug("Yielding error chunk.")
-        yield {"type": "error_chunk", "payload": response_data} # response_data is the error message string
-    elif is_malformed_json_string:
-        # logger_mock_gen.debug("Yielding malformed JSON string.")
-        yield "This is { not valid json"
-    elif is_incomplete_json_string:
-        # logger_mock_gen.debug("Yielding incomplete JSON string (missing required fields).")
-        yield json.dumps({"name": "Incomplete NPC", "id": "inc_123"}) # Missing appearance, role etc.
-    elif is_empty_string:
-        # logger_mock_gen.debug("Yielding empty string.")
-        yield ""
-    elif isinstance(response_data, str): # This should be a valid JSON string
-        # logger_mock_gen.debug(f"Yielding JSON string: {response_data}")
-        yield response_data
-    else: # Should not happen if test provides string for success
-        # logger_mock_gen.error(f"MockLLMGenerator: Unexpected response_data type: {type(response_data)}")
-        yield {"type": "error_chunk", "payload": "Mock generator misconfigured"}
+    is_empty_string: bool = False,
+    response_json_dict: Optional[Dict[str, Any]] = None,
+    raw_string_response: Optional[str] = None
+): # This is now a synchronous function
+    async def _inner_async_generator() -> AsyncGenerator[Any, None]: # The actual async generator
+        if is_error_chunk:
+            yield {"type": "error_chunk", "payload": str(response_data) if response_data else "Simulated error"}
+        elif is_malformed_json_string:
+            yield "This is { not valid json because it's broken."
+        elif raw_string_response is not None:
+            yield raw_string_response
+        elif response_json_dict is not None:
+            yield json.dumps(response_json_dict)
+        elif is_empty_string:
+            yield ""
+        elif isinstance(response_data, str): # general valid JSON string
+            yield response_data
+        else: # Fallback if no other condition met
+            # Ensure it still yields something to be an async generator if no specific path taken
+            # This case should ideally be avoided by specific test configurations.
+            # For safety, yield an error or a default valid empty structure if that makes sense for non-error paths.
+            # Here, erroring out if mock is misconfigured seems reasonable.
+            yield {"type": "error_chunk", "payload": f"Mock LLM generator misconfigured. Data: {str(response_data)}"}
+
+        # Ensure it's always treated as an async generator, even if no specific data yielded above (e.g. if all flags false and no dict/str)
+        # This is typically not needed if one of the conditions above always yields.
+        # If all paths yield, this is redundant. If a path might not yield, it ensures generator type.
+        if False: # pragma: no cover
+            yield None
+    return _inner_async_generator() # Return the callable async generator instance
 
 
-# For Python versions < 3.8, IsolatedAsyncioTestCase might not be available.
-# Using unittest.TestCase and asyncio.run() for broader compatibility if needed.
-# However, modern unittest typically handles `async def` test methods correctly.
-class TestNPCImproviser(unittest.TestCase):
+IMPROVISER_LOGGER_NAME = 'eidos_agent.features.firmament.npcs.npc_improviser'
+
+class TestNPCImproviser(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        # Patch Config methods used by NPCImproviser's __init__
-        # The target for patch should be where the Config class is *looked up* by npc_improviser.py
         self.mock_fm_config_patcher = patch('eidos_agent.features.firmament.npcs.npc_improviser.Config.get_firmament_module_config')
         self.mock_llm_config_patcher = patch('eidos_agent.features.firmament.npcs.npc_improviser.Config.get_llm_config')
+        self.mock_http_client_manager_patcher = patch('eidos_agent.features.firmament.npcs.npc_improviser.HTTPClientManager.instance')
 
         self.mock_get_fm_config = self.mock_fm_config_patcher.start()
         self.mock_get_llm_config = self.mock_llm_config_patcher.start()
+        self.mock_http_client_manager_instance = self.mock_http_client_manager_patcher.start()
 
-        self.test_llm_role = "TEST_IMPROVISER_ASYNC_ROLE"
-        self.test_llm_model = "test_improviser_async_model_v2"
-        self.test_llm_url = "http://test_async_url_v2"
+        # Configure the HTTPClientManager mock
+        self.mock_shared_async_client = AsyncMock(spec=LLMClient.__init__.__annotations__.get('http_client', MagicMock())) # httpx.AsyncClient
+        mock_http_manager = MagicMock()
+        mock_http_manager.get_client.return_value = self.mock_shared_async_client
+        self.mock_http_client_manager_instance.return_value = mock_http_manager
+
+        self.test_llm_role = "TEST_IMPROVISER_ROLE_VALID"
+        self.test_llm_model = "test_improviser_model_v3"
+        self.test_llm_url = "http://test_improviser_url_v3"
         self.mock_llm_config_dict: LLMConfig = { # type: ignore
             "role": self.test_llm_role, "model": self.test_llm_model,
-            "url": self.test_llm_url, "timeout": 10.0, "temperature": 0.7, "max_tokens": 500
+            "url": self.test_llm_url, "timeout": 10.0, "temperature": 0.7, "max_tokens": 550
         }
-        # Default mock returns for successful config loading in __init__
         self.mock_get_fm_config.return_value = {"firmament_llm_role": self.test_llm_role}
         self.mock_get_llm_config.return_value = self.mock_llm_config_dict
 
+        # Ensure logger for NPCImproviser is accessible via the class for dummy testing if needed
+        # This is more for the dummy class structure if used, real class uses module logger.
+        NPCImproviser.logger = logging.getLogger(IMPROVISER_LOGGER_NAME)
+
+
         self.improviser = NPCImproviser(firmament_llm_role_name=self.test_llm_role)
+        # Test instance that would try to use default role from Config
+        self.improviser_default_role = NPCImproviser()
+
 
     def tearDown(self):
         self.mock_fm_config_patcher.stop()
         self.mock_llm_config_patcher.stop()
+        self.mock_http_client_manager_patcher.stop()
+        patch.stopall() # Stop any other patches that might have been started in tests, e.g. LLMClient.call_llm_api
 
     def test_npc_improviser_initialization(self):
-        print("Running: test_npc_improviser_initialization (async context)")
-        # This test now verifies the state set by setUp's default mocks
-        self.mock_get_fm_config.assert_not_called() # Because role_name was passed to __init__
-        self.mock_get_llm_config.assert_called_with(self.test_llm_role)
+        # Test with specified role
+        self.mock_get_llm_config.assert_any_call(self.test_llm_role)
         self.assertEqual(self.improviser.llm_role_name, self.test_llm_role)
         self.assertEqual(self.improviser.llm_config, self.mock_llm_config_dict)
-        print("Test Passed: NPCImproviser initialized with specific role.")
+        self.assertIsNotNone(self.improviser.http_client_manager)
 
-    # Patching LLMClient.call_llm_api where it's used by NPCImproviser instance
+        # Test with default role
+        self.mock_get_fm_config.assert_called_once() # Called for improviser_default_role
+        self.assertEqual(self.improviser_default_role.llm_role_name, self.test_llm_role) # As per mock_get_fm_config
+        self.assertEqual(self.improviser_default_role.llm_config, self.mock_llm_config_dict)
+        self.assertIsNotNone(self.improviser_default_role.http_client_manager)
+
     @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
     async def test_improvise_npc_successful_call_and_parsing(self, mock_call_llm_api):
-        print("Running: test_improvise_npc_successful_call_and_parsing")
         name_hint = "Eleanor Vance"
         subconscious_context = "Pathos recalls a kind librarian with a penchant for mysteries."
         scene_context = {"location_description": "a dusty old library section", "pathos_mood_state": "intrigued"}
 
-        expected_profile_dict = { # This is what the LLM is expected to return (as a JSON string)
+        expected_profile_dict = {
             "id": "eleanor_vance_librarian", "name": "Eleanor Vance",
             "appearance": "Mid-50s, sharp eyes behind round spectacles, usually has a book in hand.",
             "role": "Head Archivist & Local Historian",
@@ -120,111 +165,191 @@ class TestNPCImproviser(unittest.TestCase):
             "relationship_to_pathos": "A new acquaintance Pathos might consult for research.",
             "initial_dialogue": "The answers you seek are often hidden in the most unexpected pages, young one."
         }
-        # Configure the mock_call_llm_api to return our mock async generator yielding the JSON string
-        mock_call_llm_api.return_value = mock_llm_api_response_generator(json.dumps(expected_profile_dict))
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=expected_profile_dict)
 
         npc_profile = await self.improviser.improvise_npc(name_hint, subconscious_context, scene_context)
 
-        mock_call_llm_api.assert_awaited_once()
-        args_passed, kwargs_passed = mock_call_llm_api.call_args
+        mock_call_llm_api.assert_called_once() # Changed from assert_awaited_once as return_value is now a direct generator
+        _, kwargs_passed = mock_call_llm_api.call_args
         self.assertEqual(kwargs_passed.get('llm_config'), self.mock_llm_config_dict)
-        self.assertTrue(isinstance(kwargs_passed.get('messages'), list) and len(kwargs_passed.get('messages')) == 2)
-        self.assertIn(name_hint, kwargs_passed['messages'][1]['content'])
-        self.assertIn(subconscious_context, kwargs_passed['messages'][1]['content'])
-        self.assertFalse(kwargs_passed.get('stream'))
 
-        self.assertEqual(npc_profile, expected_profile_dict, "The returned NPC profile does not match the expected dictionary.")
-        print("Test Passed: Successful async NPC improvisation and response parsing.")
+        user_prompt_content = kwargs_passed['messages'][1]['content']
+        self.assertIn(name_hint, user_prompt_content)
+        if subconscious_context: self.assertIn(subconscious_context, user_prompt_content)
+        self.assertIn("Output ONLY a single, valid JSON object", user_prompt_content)
+        self.assertIn("The 'id' MUST be a unique, lowercase, snake_case string", user_prompt_content)
+        self.assertIn("lara_croft_example", user_prompt_content)
+
+        self.assertFalse(kwargs_passed.get('stream'))
+        self.assertEqual(npc_profile, expected_profile_dict)
+
+    @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
+    async def test_improvise_npc_json_extraction_from_llm_text(self, mock_call_llm_api):
+        expected_profile_dict = {"id": "extracted_id", "name": "Extracted NPC", "appearance": "Clear", "role": "Extractor", "personality": "Precise", "relationship_to_pathos": "Found", "initial_dialogue": "Got it!"}
+        llm_response_with_markdown = f"Some introductory text from LLM.\n```json\n{json.dumps(expected_profile_dict)}\n```\nSome concluding text."
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(raw_string_response=llm_response_with_markdown)
+
+        npc_profile = await self.improviser.improvise_npc("Extractor", scene_context={})
+        self.assertEqual(npc_profile, expected_profile_dict)
 
     @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
     async def test_improvise_npc_llm_returns_error_chunk(self, mock_call_llm_api):
-        print("Running: test_improvise_npc_llm_returns_error_chunk")
-        error_message = "Simulated LLM Processing Error"
-        mock_call_llm_api.return_value = mock_llm_api_response_generator(error_message, is_error_chunk=True)
+        error_message = "Simulated LLM Processing Error during generation"
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_data=error_message, is_error_chunk=True)
 
-        with self.assertLogs(logger='eidos_agent.features.firmament.npcs.npc_improviser', level='ERROR') as log_cm:
-            npc_profile = await self.improviser.improvise_npc("ErrorTestNPC", scene_context={})
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
+            npc_profile = await self.improviser.improvise_npc("ErrorNPC", scene_context={})
 
-        self.assertIsNone(npc_profile, "NPC profile should be None when LLMClient yields an error chunk.")
-        self.assertTrue(any(f"LLMClient returned an error_chunk: {error_message}" in msg for msg in log_cm.output),
-                        "Expected error message about LLMClient error_chunk not found in logs.")
-        print("Test Passed: Correctly handled LLM error chunk.")
+        self.assertIsNone(npc_profile)
+        self.assertTrue(any(f"LLM API error: {error_message}" in msg for msg in log_cm.output))
 
     @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
     async def test_improvise_npc_llm_returns_malformed_json_string(self, mock_call_llm_api):
-        print("Running: test_improvise_npc_llm_returns_malformed_json_string")
-        mock_call_llm_api.return_value = mock_llm_api_response_generator(None, is_malformed_json_string=True) # Generator yields "This is { not valid json"
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(is_malformed_json_string=True)
 
-        with self.assertLogs(logger='eidos_agent.features.firmament.npcs.npc_improviser', level='ERROR') as log_cm:
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
             npc_profile = await self.improviser.improvise_npc("MalformedJSON_NPC", scene_context={})
 
-        self.assertIsNone(npc_profile, "NPC profile should be None for malformed JSON response.")
-        # Check for either "No valid JSON object found" (if regex fails) or "Failed to parse JSON" (if json.loads fails)
-        self.assertTrue(any("No valid JSON object found" in msg or "Failed to parse JSON" in msg for msg in log_cm.output),
-                        "Expected error message about malformed/non-existent JSON not found in logs.")
-        print("Test Passed: Correctly handled malformed JSON string from LLM.")
+        self.assertIsNone(npc_profile)
+        self.assertTrue(any("No valid JSON object found" in msg or "JSONDecodeError" in msg for msg in log_cm.output))
 
     @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
-    async def test_improvise_npc_llm_returns_incomplete_json_profile(self, mock_call_llm_api):
-        print("Running: test_improvise_npc_llm_returns_incomplete_json_profile")
-        # The generator will yield a JSON string for an incomplete profile
-        mock_call_llm_api.return_value = mock_llm_api_response_generator(None, is_incomplete_json_string=True)
+    async def test_improvise_npc_missing_id_generates_from_name(self, mock_call_llm_api):
+        profile_missing_id = {
+            "name": "Test NPC Name", "appearance": "Looks testy", "role": "Tester",
+            "personality": "Thorough", "relationship_to_pathos": "Acquaintance",
+            "initial_dialogue": "Testing..."
+        } # id is missing
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=profile_missing_id)
 
-        with self.assertLogs(logger='eidos_agent.features.firmament.npcs.npc_improviser', level='ERROR') as log_cm:
-            npc_profile = await self.improviser.improvise_npc("IncompleteProfileNPC", scene_context={})
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='WARNING') as log_cm:
+            npc_profile = await self.improviser.improvise_npc(name_hint="Test NPC Name", scene_context={})
 
-        self.assertIsNone(npc_profile, "NPC profile should be None if LLM returns JSON missing required fields.")
-        self.assertTrue(any("LLM response missing or invalid essential key" in msg for msg in log_cm.output),
-                        "Expected error about missing essential keys not found in logs.")
-        print("Test Passed: Correctly handled incomplete JSON profile from LLM.")
+        self.assertIsNotNone(npc_profile)
+        self.assertEqual(npc_profile['id'], "test_npc_name_improv_id")
+        self.assertEqual(npc_profile['name'], "Test NPC Name")
+        self.assertTrue(any("Validation failed for field 'id'" in msg and "Generated new ID: 'test_npc_name_improv_id'" in msg for msg in log_cm.output))
+
+    @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
+    async def test_improvise_npc_malformed_id_reformats_from_name(self, mock_call_llm_api):
+        profile_malformed_id = {
+            "id": "My Bad ID With Spaces", "name": "Reformat Me Kindly", "appearance": "Looks reformattable",
+            "role": "Reformatter", "personality": "Flexible", "relationship_to_pathos": "Neutral",
+            "initial_dialogue": "Reformatting now!"
+        }
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=profile_malformed_id)
+
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='INFO') as log_cm: # Reformatted ID is INFO level
+            npc_profile = await self.improviser.improvise_npc(name_hint="Reformat Me Kindly", scene_context={})
+
+        self.assertIsNotNone(npc_profile)
+        self.assertEqual(npc_profile['id'], "reformat_me_kindly_reformatted_id")
+        self.assertTrue(any("ID 'My Bad ID With Spaces' from LLM (or initial generation) is not valid lowercase snake_case." in msg for msg in log_cm.output))
+        self.assertTrue(any("Reformatted ID to: 'reformat_me_kindly_reformatted_id'" in msg for msg in log_cm.output))
+
+
+    @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
+    async def test_improvise_npc_critical_id_and_name_failure(self, mock_call_llm_api):
+        profile_missing_id_and_invalid_name = {
+            "name": 12345, # Invalid name type
+            "appearance": "Vague", "role": "None", "personality": "Unknown",
+            "relationship_to_pathos": "None", "initial_dialogue": "..."
+        } # id is missing, name is not string
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=profile_missing_id_and_invalid_name)
+
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
+            npc_profile = await self.improviser.improvise_npc(scene_context={})
+
+        self.assertIsNone(npc_profile)
+        self.assertTrue(any("Validation failed for field 'id'" in msg and "Cannot generate fallback ID as 'name' field is also invalid or missing" in msg for msg in log_cm.output))
+
+    @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
+    async def test_improvise_npc_missing_other_critical_field(self, mock_call_llm_api):
+        profile_missing_appearance = {
+            "id": "test_id_123", "name": "NoShow NPC", "role": "Actor",
+            "personality": "Shy", "relationship_to_pathos": "Distant", "initial_dialogue": "Boo."
+            # appearance is missing
+        }
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=profile_missing_appearance)
+
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
+            npc_profile = await self.improviser.improvise_npc(name_hint="NoShow NPC", scene_context={})
+
+        self.assertIsNone(npc_profile)
+        self.assertTrue(any("Validation failed for field 'appearance'" in msg and "Field is critical and invalid. Profile discarded." in msg for msg in log_cm.output))
+
+    @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
+    async def test_improvise_npc_llm_returns_empty_string_value_for_field_salvaged_by_name_hint(self, mock_call_llm_api):
+        profile_empty_name_field = {
+            "id": "fixed_id_123", "name": "  ", "appearance": "Okay", "role": "Tester", # name is empty string
+            "personality": "Good", "relationship_to_pathos": "Okay", "initial_dialogue": "Hi"
+        }
+        name_hint_for_salvage = "Salvaged Valid Name"
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(response_json_dict=profile_empty_name_field)
+
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='WARNING') as log_cm:
+            npc_profile = await self.improviser.improvise_npc(name_hint=name_hint_for_salvage, scene_context={})
+
+        self.assertIsNotNone(npc_profile)
+        self.assertEqual(npc_profile['name'], name_hint_for_salvage)
+        self.assertTrue(any(f"Validation failed for field 'name'" in msg and f"Used original name_hint '{name_hint_for_salvage}' for 'name' field" in msg for msg in log_cm.output))
 
     @patch('eidos_agent.features.firmament.npcs.npc_improviser.LLMClient.call_llm_api', new_callable=AsyncMock)
     async def test_improvise_npc_llm_returns_empty_string_content(self, mock_call_llm_api):
-        print("Running: test_improvise_npc_llm_returns_empty_string_content")
-        mock_call_llm_api.return_value = mock_llm_api_response_generator(None, is_empty_string=True) # Generator yields ""
+        mock_call_llm_api.return_value = make_mock_llm_api_response_generator(is_empty_string=True)
 
-        with self.assertLogs(logger='eidos_agent.features.firmament.npcs.npc_improviser', level='WARNING') as log_cm:
+        with self.assertLogs(IMPROVISER_LOGGER_NAME, level='WARNING') as log_cm:
             npc_profile = await self.improviser.improvise_npc("EmptyContentNPC", scene_context={})
 
-        self.assertIsNone(npc_profile, "NPC profile should be None if LLM returns an empty string.")
-        self.assertTrue(any("LLM returned empty content string." in msg for msg in log_cm.output),
-                        "Expected warning about empty content string not found in logs.")
-        print("Test Passed: Correctly handled empty string content from LLM.")
-
-    # Test for missing LLM config during improvise_npc call (not just init)
-    async def test_improvise_npc_no_llm_url_at_call_time(self):
-        print("Running: test_improvise_npc_no_llm_url_at_call_time")
-        # Ensure improviser is created with a seemingly valid config initially
-        improviser_temp = NPCImproviser(firmament_llm_role_name=self.test_llm_role)
-        self.assertIsNotNone(improviser_temp.llm_config)
-
-        # Now, sabotage the config's URL before calling improvise_npc
-        if improviser_temp.llm_config: # Should exist based on setUp
-            improviser_temp.llm_config['url'] = "" # Set URL to empty string
-
-        with self.assertLogs(logger='eidos_agent.features.firmament.npcs.npc_improviser', level='ERROR') as log_cm:
-            npc_profile = await improviser_temp.improvise_npc(scene_context={})
-
         self.assertIsNone(npc_profile)
-        self.assertTrue(any(f"LLM URL for role '{self.test_llm_role}' is missing" in msg for msg in log_cm.output))
-        print("Test Passed: Returns None if LLM URL is missing at call time.")
+        self.assertTrue(any("LLM returned empty content." in msg for msg in log_cm.output))
 
+    async def test_improvise_npc_no_llm_url_at_call_time(self):
+        # Create a temporary improviser instance for this test
+        # Ensure it gets a config, then invalidate the URL part of that config
+        with patch('eidos_agent.features.firmament.npcs.npc_improviser.Config.get_llm_config') as mock_get_specific_llm_config:
+            temp_llm_config_no_url = self.mock_llm_config_dict.copy()
+            temp_llm_config_no_url["url"] = "" # Invalid URL
+            mock_get_specific_llm_config.return_value = temp_llm_config_no_url
 
-# This structure allows running async tests with `python -m unittest ...`
-# or directly `python your_test_file.py` if unittest TestLoader handles async def methods.
-# If using an older unittest version that doesn't auto-wrap, one might need:
-# if __name__ == '__main__':
-#     suite = unittest.TestSuite()
-#     for test_name in unittest.defaultTestLoader.getTestCaseNames(TestNPCImproviser):
-#         if test_name.startswith("test_"): # Assuming async tests are 'async def test_...'
-#             test_method = getattr(TestNPCImproviser(methodName=test_name), test_name)
-#             if asyncio.iscoroutinefunction(test_method):
-#                 # A simple way to wrap, more robust solutions exist
-#                 def sync_wrapper(self_test, method_to_run=test_method):
-#                     return asyncio.run(method_to_run())
-#                 setattr(TestNPCImproviser, test_name, sync_wrapper) # Replace async with sync wrapper
-#     unittest.main(verbosity=2)
+            improviser_no_url = NPCImproviser(firmament_llm_role_name="ROLE_WITH_NO_URL_CONFIG")
+            self.assertEqual(improviser_no_url.llm_config, temp_llm_config_no_url)
+
+            with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
+                npc_profile = await improviser_no_url.improvise_npc(scene_context={})
+
+            self.assertIsNone(npc_profile)
+            self.assertTrue(any(f"LLM URL for role '{improviser_no_url.llm_role_name}' missing or invalid" in msg for msg in log_cm.output))
+
+    async def test_improvise_npc_llm_config_completely_missing_at_call_time(self):
+        with patch('eidos_agent.features.firmament.npcs.npc_improviser.Config.get_llm_config') as mock_get_specific_llm_config:
+            mock_get_specific_llm_config.return_value = None # Simulate config not found
+
+            improviser_no_config = NPCImproviser(firmament_llm_role_name="ROLE_WITH_NO_CONFIG_AT_ALL")
+            self.assertIsNone(improviser_no_config.llm_config) # Verifies init state
+
+            with self.assertLogs(IMPROVISER_LOGGER_NAME, level='ERROR') as log_cm:
+                npc_profile = await improviser_no_config.improvise_npc(scene_context={})
+
+            self.assertIsNone(npc_profile)
+            self.assertTrue(any(f"LLM URL for role '{improviser_no_config.llm_role_name}' missing or invalid" in msg for msg in log_cm.output))
+
+    async def test_normalize_id_functionality(self):
+        # Test cases for _normalize_id (it's a protected method, but crucial for id generation)
+        impr = self.improviser # Use existing instance
+        self.assertEqual(impr._normalize_id("Test Name", suffix="_test_id"), "test_name_test_id")
+        self.assertEqual(impr._normalize_id(" Test   Name  ", suffix="_test_id"), "test_name_test_id")
+        self.assertEqual(impr._normalize_id("Test-Name!@#123", suffix="_id"), "testname123_id")
+        self.assertEqual(impr._normalize_id("  !@#$  ", suffix="_id"), "sanitized_empty_name_id") # All invalid chars
+        self.assertEqual(impr._normalize_id("!@#$", suffix="_id"), "sanitized_empty_name_id")
+        self.assertEqual(impr._normalize_id(None, suffix="_id"), "invalid_name_for_id") # type: ignore
+        self.assertEqual(impr._normalize_id("  leading_trailing_  ", suffix=""), "leading_trailing")
+        self.assertEqual(impr._normalize_id("double__underscore", suffix=""), "double_underscore")
+        self.assertEqual(impr._normalize_id("name", suffix=""), "name") # No suffix
+        self.assertEqual(impr._normalize_id("_start", suffix="_suf"), "start_suf")
+        self.assertEqual(impr._normalize_id("end_", suffix="_suf"), "end_suf")
+
 
 if __name__ == '__main__': # pragma: no cover
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG) # Ensure logs are visible for test runs
     unittest.main(verbosity=2)

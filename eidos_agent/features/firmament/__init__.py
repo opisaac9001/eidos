@@ -202,9 +202,4 @@ else: # pragma: no cover
 
 logger.info("eidos_agent.features.firmament package loaded. Initialization attempt status logged above.")
 
-# For direct use by other parts of the application:
-# from eidos_agent.features.firmament.core.simulator import run_simulation_tick
-# from eidos_agent.features.firmament.core.event_bus import EventBus
-# from eidos_agent.features.firmament.core.event_types import *
-# from eidos_agent.features.firmament import get_plugin_manager, get_http_client_manager
-```
+# End of Firmament __init__.py

@@ -107,13 +107,22 @@ async def handle_thought_trigger(payload: dict): # Changed to async def
         if shared_httpx_client:
             llm_api_client = LLMClient(http_client=shared_httpx_client)
 
-            system_prompt_elaborate = "You are an internal monologue elaborator. Take the user's raw thought and expand on it slightly, maintaining the original mood and intent, as if it's Pathos's own internal continuation of the thought. Keep it concise, 1-3 sentences. Do not be conversational or add preambles like 'Okay, here's an elaboration'. Directly provide the elaborated thought text only."
-            user_prompt_elaborate = f"Internal monologue: {raw_content}\nMood context: {mood_context}"
+            # --- Refined System Prompt ---
+            system_prompt_elaborate = (
+                "You are Pathos's inner voice, responsible for elaborating on brief thoughts or observations. "
+                "Take the provided 'Internal monologue' and expand it slightly into a natural-sounding, reflective thought, "
+                "maintaining the original mood and intent. The elaboration should be concise, typically 1-2 sentences. "
+                "Do not be conversational with an external user; directly provide the elaborated thought as if it's Pathos's own "
+                "internal continuation. Do not add preambles like 'Okay, here's the elaboration:' or any quotation marks "
+                "around the final thought itself unless it's direct speech within the thought."
+            )
+            user_prompt_elaborate = f"Internal monologue: {raw_content}\nPathos's current mood context for this thought: {mood_context}"
             messages = [
                 {"role": "system", "content": system_prompt_elaborate},
                 {"role": "user", "content": user_prompt_elaborate}
             ]
-            logger.info(f"SubconsciousHook: Calling LLM (Role: {llm_role}, Model: {firmament_llm_config.get('model','N/A')}) for thought elaboration.")
+            logger.info(f"SubconsciousHook: Calling LLM (Role: {llm_role}, Model: {firmament_llm_config.get('model', 'N/A')}) for thought elaboration.")
+            # logger.debug(f"SubconsciousHook LLM User Prompt: {user_prompt_elaborate}") # Can be verbose
 
             full_response_str = ""
             llm_error_detail = None
@@ -127,19 +136,26 @@ async def handle_thought_trigger(payload: dict): # Changed to async def
                         llm_error_detail = chunk.get("payload"); break
 
                 if llm_error_detail:
-                    logger.error(f"SubconsciousHook: LLM API error during thought elaboration: {llm_error_detail}")
+                    logger.error(f"LLM API error during thought elaboration for '{raw_content[:50]}...': {llm_error_detail}. Using raw_content.")
                 elif not full_response_str.strip():
-                    logger.warning(f"SubconsciousHook: LLM returned empty elaboration for '{raw_content}'. Using raw_content as fallback.")
+                    logger.warning(f"LLM returned empty elaboration for '{raw_content[:50]}...'. Using raw_content.")
                 else:
-                    elaborated_thought_content = full_response_str.strip() # Use LLM response
-                    logger.info(f"SubconsciousHook: LLM elaborated thought for '{raw_content}' to '{elaborated_thought_content}'")
+                    # Basic cleanup: strip whitespace.
+                    elaborated_thought_content = full_response_str.strip()
+                    # Remove potential surrounding quotes if LLM still adds them
+                    if elaborated_thought_content.startswith('"') and elaborated_thought_content.endswith('"'):
+                        elaborated_thought_content = elaborated_thought_content[1:-1]
+                    if elaborated_thought_content.startswith("'") and elaborated_thought_content.endswith("'"):
+                        elaborated_thought_content = elaborated_thought_content[1:-1]
+                    logger.info(f"SubconsciousHook: LLM elaborated thought for '{raw_content[:50]}...' to '{elaborated_thought_content[:100]}...'")
             except Exception as e: # pragma: no cover
-                logger.error(f"SubconsciousHook: Error calling LLM for thought elaboration: {e}", exc_info=True)
-                # Fallback to raw_content is already set
+                logger.error(f"Error calling LLM for thought elaboration or processing response: {e}", exc_info=True)
+                # Fallback to raw_content is already set, log this explicitly
+                logger.info(f"SubconsciousHook: Using raw_content for '{raw_content[:50]}...' due to exception during LLM call/processing.")
         else: # pragma: no cover
             logger.error("SubconsciousHook: Failed to get shared HTTP client for thought elaboration. Using raw content.")
     else:
-        logger.warning(f"SubconsciousHook: LLM config for role '{llm_role}' not found or URL missing. Using raw content for elaboration.")
+        logger.warning(f"SubconsciousHook: LLM config for role '{llm_role}' not found or URL missing. Using raw content for elaboration for '{raw_content[:50]}...'.")
 
     # --- Event Publishing Logic ---
     current_time_iso = payload.get("timestamp", datetime.now(timezone.utc).isoformat())
@@ -166,63 +182,94 @@ def register_thought_trigger_handler():
 
 
 if __name__ == '__main__': # pragma: no cover
-    logging.basicConfig(level=logging.DEBUG)
-    logger_sh_main = logging.getLogger('eidos_agent.features.firmament.integrations.subconscious_hook')
-    logger_sh_main.setLevel(logging.DEBUG)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Set specific loggers to DEBUG if more detail is needed
+    logging.getLogger('eidos_agent.features.firmament.integrations.subconscious_hook').setLevel(logging.DEBUG)
+    # logging.getLogger('eidos_agent.llm_integrations.llm_client').setLevel(logging.DEBUG)
 
-    async def main_test_subconscious_hook_async():
-        logger_sh_main.info("--- Testing Subconscious Hook (Async Handler & LLM Call Structure) ---")
+    async def main_test_subconscious_hook_llm_guidance():
+        print("\n" + "="*80)
+        print("Subconscious Hook Standalone Test Script (Thought Elaboration)")
+        print("="*80)
+        print("This script will attempt to use the configured Firmament LLM to elaborate thoughts.")
+        print("Please ensure your .env file has the following variables correctly set for the")
+        print("'FIRMAMENT_PRIMARY' LLM role (or the role specified in FIRMAMENT_LLM_ROLE):")
+        print("  - LLM_FIRMAMENT_PRIMARY_URL:     (e.g., http://localhost:11434/v1 for Ollama)")
+        print("  - LLM_FIRMAMENT_PRIMARY_MODEL:   (e.g., llama3:8b-instruct, mistral, phi3)")
+        print("  - LLM_FIRMAMENT_PRIMARY_API_KEY: (e.g., 'ollama', 'lm-studio', or your actual key if required)")
+        print("If these are not set, or if core Eidos components cannot be imported, this script")
+        print("will fall back to using a DUMMY LLMClient or simplified elaboration.")
+        print("Set logging level to DEBUG for this script's logger to see more details.")
+        print("="*80 + "\n")
 
-        _test_events_sh_main_async = []
-        class MockEventBusForSHAsync(EventBus):
+        # Check current LLM config that handle_thought_trigger would use
+        # This requires Config to be the real one, or a dummy that mimics its structure well.
+        current_fm_cfg = Config.get_firmament_module_config()
+        current_llm_role = current_fm_cfg.get("firmament_llm_role", "FIRMAMENT_PRIMARY")
+        current_llm_cfg = Config.get_llm_config(current_llm_role)
+
+        is_dummy_llm_client = "dummy" in LLMClient.__name__.lower() or "dummy" in str(type(LLMClient)).lower()
+
+
+        if not current_llm_cfg or not current_llm_cfg.get("url") or \
+           "dummy" in current_llm_cfg.get("url", "").lower() or \
+           is_dummy_llm_client:
+            logger.warning("Running subconscious_hook test with DUMMY LLM configuration or DUMMY LLMClient. "
+                           "Thought elaboration will be a placeholder or use raw content.\n")
+        else:
+            logger.info(f"Attempting REAL LLM calls for thought elaboration using role: '{current_llm_role}', "
+                        f"model: '{current_llm_cfg.get('model')}', URL: '{current_llm_cfg.get('url')}'.\n")
+
+        # Setup a mock EventBus to capture outputs of handle_thought_trigger
+        _test_events_sh_main_guidance = []
+        class MockEventBusSHGuidance(EventBus):
             def publish(self, event_type: str, data: dict):
-                print(f"    [MockEventBusSHAsync Capture] Event: {event_type}, Data: {str(data)[:120]}...")
-                _test_events_sh_main_async.append({"event_type":event_type, "data":data})
+                print(f"    [SubconsciousHook MainTest Capture] Event: {event_type}, Data: {str(data)[:120]}...")
+                _test_events_sh_main_guidance.append({"event_type": event_type, "data": data})
 
-        original_event_bus_sh_async = EventBus.instance
-        EventBus.instance = lambda: MockEventBusForSHAsync() #type:ignore
+        original_event_bus_sh_guidance = EventBus.instance
+        EventBus.instance = lambda: MockEventBusSHGuidance()
 
-        # This test will use the DUMMY LLMClient if actual imports failed,
-        # or a real one if imports succeeded and .env is configured for FIRMAMENT_PRIMARY.
-        # The dummy LLMClient yields a predefined JSON-like string.
+        # Get some sample thoughts
+        sample_thoughts = get_recent_subconscious_thoughts(limit=3)
+        if not sample_thoughts: # pragma: no cover
+            sample_thoughts = [
+                {"content": "This is a default test thought if get_recent_subconscious_thoughts returns empty.",
+                 "mood": "neutral", "urgency": "low", "source":"main_fallback",
+                 "timestamp": datetime.now(timezone.utc).isoformat()},
+                {"content": "I should really test this thoroughly.", "mood": "determined", "urgency": "medium",
+                 "impulse_type": "testing_focus", "source":"main_fallback",
+                 "timestamp": datetime.now(timezone.utc).isoformat()}
+            ]
 
-        sample_thought_payload = get_recent_subconscious_thoughts(limit=3)[2] # Dr. Evelyn Hayes thought
-        sample_thought_payload['content'] = "I should definitely research Dr. Evelyn Hayes's theory on time more deeply."
-        sample_thought_payload['impulse_type'] = "deep_research_needed"
-        sample_thought_payload['urgency'] = "high"
+        for i, thought_payload in enumerate(sample_thoughts):
+            print(f"--- Processing Test Thought {i+1}/{len(sample_thoughts)} ---")
+            print(f"Raw thought: {thought_payload.get('content')}")
+            await handle_thought_trigger(thought_payload) # Await the async handler
+            print("-" * 20)
+            await asyncio.sleep(0.1) # Allow any create_task in EventBus to potentially run
+
+        print("\n--- Subconscious Hook Test Run Completed ---")
+        print("Review logs above for 'LLM elaborated thought to...' messages or errors.")
+        print(f"Total events captured by mock EventBus: {len(_test_events_sh_main_guidance)}")
+        for evt in _test_events_sh_main_guidance:
+             if evt["event_type"] == "memory.write" and evt["data"].get("type") == "thought":
+                 print(f"  Logged thought content: {evt['data'].get('content')}")
+
+        EventBus.instance = original_event_bus_sh_guidance # Restore
+
+        # Attempt to shutdown HTTPClientManager if it was used
+        if 'HTTPClientManager' in globals() and callable(globals()['HTTPClientManager'].instance):
+            mgr_instance = HTTPClientManager.instance()
+            # Check if it's not the dummy one from ImportError block by checking for a specific attribute
+            # that the real one might have or by checking qualname of a method on the instance type.
+            # This is a bit fragile. A better way would be to have a more robust way to know if it's dummy.
+            is_real_http_manager = not ("dummy" in str(type(mgr_instance)).lower())
+
+            if is_real_http_manager and hasattr(mgr_instance, 'shutdown') and asyncio.iscoroutinefunction(mgr_instance.shutdown):
+                print("Attempting HTTPClientManager shutdown...")
+                await mgr_instance.shutdown()
 
 
-        logger_sh_main.info(f"Processing thought for async handler: {sample_thought_payload['content']}")
-        await handle_thought_trigger(sample_thought_payload) # Await the async handler
-
-        logger_sh_main.info(f"Captured events ({len(_test_events_sh_main_async)} total):")
-        found_memory_write_sh = False
-        found_impulse_sh = False
-        for evt_sh in _test_events_sh_main_async:
-            logger_sh_main.info(f"  - Type: {evt_sh['event_type']}, "
-                                f"Content/Trigger: {str(evt_sh['data'].get('content', evt_sh['data'].get('original_thought_content')))[:70]}")
-            if evt_sh["event_type"] == "memory.write" and evt_sh["data"]["type"] == "thought":
-                found_memory_write_sh = True
-                # Check if elaboration happened (dummy or real)
-                assert evt_sh["data"]["content"] != sample_thought_payload["content"] or "dummy LLM elaboration" in evt_sh["data"]["content"], \
-                    f"Elaborated thought content missing or same as raw. Got: {evt_sh['data']['content']}"
-            if evt_sh["event_type"] == IMPULSE and evt_sh["data"]["type"] == "deep_research_needed":
-                found_impulse_sh = True
-
-        assert found_memory_write_sh, "Memory.write (thought) event not found in __main__ async test"
-        assert found_impulse_sh, "IMPULSE event (type 'deep_research_needed') not found in __main__ async test"
-        logger_sh_main.info("Subconscious hook async handler test completed. Check logs for LLM call details or dummy responses.")
-
-        # Test HTTPClientManager shutdown if it was used by a real LLMClient
-        if 'HTTPClientManager' in globals() and callable(globals()['HTTPClientManager'].instance) and \
-           not ("dummy" in str(type(HTTPClientManager.instance())).lower()): # Check if not dummy
-            logger_sh_main.info("Attempting HTTPClientManager shutdown...")
-            shared_manager_instance_sh = HTTPClientManager.instance()
-            if hasattr(shared_manager_instance_sh, 'shutdown') and asyncio.iscoroutinefunction(shared_manager_instance_sh.shutdown):
-                 await shared_manager_instance_sh.shutdown()
-                 logger_sh_main.info("Shared HTTPClientManager shutdown called successfully.")
-
-        EventBus.instance = original_event_bus_sh_async # Restore
-
-    asyncio.run(main_test_subconscious_hook_async())
-    print("\n--- Subconscious Hook __main__ (async handler) testing finished ---")
+    asyncio.run(main_test_subconscious_hook_llm_guidance())
+    print("\nConsider running `python -m eidos_agent.features.firmament.integrations.subconscious_hook` directly for testing.")
