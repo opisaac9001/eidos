@@ -15,6 +15,9 @@ try:
     from ....core.config import Config, LLMConfig
     from ....llm_integrations.llm_client import LLMClient
     from ....core.http_client_manager import HTTPClientManager # New import
+    from ....persona_logic.ethos_core.core import EthosCore
+    from ....persona_logic.ethos_core.memory_storage import MemoryEntry
+    from .....persona_logic.chronos_engine import PATHOS_USER_ID # For use in get_recent_subconscious_thoughts
 except ImportError as e: # pragma: no cover
     print(f"CRITICAL IMPORT ERROR in subconscious_hook.py: {e}. Using dummies.")
     class Config: #type:ignore
@@ -24,6 +27,7 @@ except ImportError as e: # pragma: no cover
         def get_llm_config(role_name_arg):
             return {"url": "dummy_url", "model": "d_model_sh_dummy", "timeout":10.0, "temperature":0.7, "max_tokens":128} if role_name_arg=="DUMMY_FIRMAMENT_ROLE" else None
     LLMConfig = Dict[str, Any]; #type:ignore
+    MemoryEntry = Dict[str, Any] #type: ignore
 
     class LLMClient: #type:ignore
         """Dummy LLMClient for use when actual import fails."""
@@ -59,18 +63,87 @@ except ImportError as e: # pragma: no cover
             return mock_client
         async def shutdown(self): pass
 
+    class EthosCore: # type: ignore
+        PATHOS_USER_ID = "pathos_dummy_ethos_user" # Dummy for EthosCore
+        def __init__(self, config: Any):
+            print("DummyEthosCore (subconscious_hook) initialized.")
+            self.memory_storage = None # Or a dummy MemoryStorage if methods are called on it
+
+        async def get_entries_by_type_and_user(self, entry_type: str, user_id: str, limit: int) -> List[MemoryEntry]:
+            logger.warning("DummyEthosCore.get_entries_by_type_and_user called. Returning empty list.")
+            return []
+
+    PATHOS_USER_ID = "pathos_dummy_user_id_if_chronos_import_fails" # Dummy for PATHOS_USER_ID from chronos_engine
+
 logger = logging.getLogger(__name__)
+_ethos_core_instance: Optional[EthosCore] = None
+
+def set_ethos_core_for_subconscious_hook(ethos_core: EthosCore):
+    global _ethos_core_instance
+    _ethos_core_instance = ethos_core
+    logger.info(f"SubconsciousHook: EthosCore instance set. {_ethos_core_instance is not None}")
 
 def get_recent_subconscious_thoughts(limit: int = 5) -> List[Dict[str, Any]]:
-    # (Full existing get_recent_subconscious_thoughts function from previous step)
-    sample_thoughts_db = [
-        {"content": "I wonder if Lara Croft still works at the cafe downtown. Haven't seen her in ages.","timestamp": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),"mood_at_thought": {"name": "nostalgic"}, "urgency": "low", "source":"dummy_subconscious_ Lara"},
-        {"content": "I should call Bob about the project.","timestamp": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(),"mood_at_thought": {"name": "focused"}, "urgency": "high", "impulse_type":"task_reminder_Bob", "source":"dummy_subconscious_Bob"},
-        {"content": "Dr. Evelyn Hayes's theory on time is fascinating. I need to read more.","timestamp": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(),"mood_at_thought": {"name": "curious"},"urgency": "medium","impulse_type": "curiosity_research_Hayes","source":"dummy_subconscious_Hayes"},
-        {"content": "The garden looks like it needs watering. Alice would know.","timestamp": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat(),"mood_at_thought": {"name": "observant"},"urgency": "low","source":"dummy_subconscious_Alice"},
-        {"content": "A man named Victor seemed lost at the market earlier.","timestamp": (datetime.now(timezone.utc) - timedelta(minutes=25)).isoformat(),"mood_at_thought": {"name": "neutral"},"urgency": "low","source":"dummy_subconscious_Victor"}
-    ]
-    return sample_thoughts_db[:limit]
+    """
+    Fetches recent thoughts (memories of type 'thought' or 'received_subconscious_intention')
+    from EthosCore for Pathos.
+    """
+    if not _ethos_core_instance:
+        logger.warning("SubconsciousHook: EthosCore not initialized. Returning empty list for recent thoughts.")
+        return []
+
+    try:
+        # These are typically Pathos's own thoughts or system-generated intentions for Pathos
+        # PATHOS_USER_ID is imported from chronos_engine at the top of the file.
+        # If that import fails, a dummy PATHOS_USER_ID is created at the module level.
+        # It's assumed that the _ethos_core_instance, if real, would use the real PATHOS_USER_ID internally
+        # or that its methods called with PATHOS_USER_ID would correctly resolve.
+        # For this function, we use the PATHOS_USER_ID available in its scope (either real or dummy).
+        user_id_for_query = PATHOS_USER_ID
+
+        thought_memories: List[MemoryEntry] = []
+        if hasattr(_ethos_core_instance, 'memory_storage') and _ethos_core_instance.memory_storage:
+            # Fetch 'thought' type memories
+            thoughts1 = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
+                entry_type='thought',
+                user_id=user_id_for_query,
+                limit=limit
+            )
+            thought_memories.extend(thoughts1)
+
+            intentions = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
+                entry_type='received_subconscious_intention',
+                user_id=user_id_for_query,
+                limit=limit
+            )
+            thought_memories.extend(intentions)
+
+            thought_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            thought_memories = thought_memories[:limit]
+
+        if not thought_memories:
+            logger.info("SubconsciousHook: No recent thoughts/intentions found in EthosCore.")
+            return []
+
+        formatted_thoughts = []
+        for mem_entry in thought_memories:
+            metadata = mem_entry.get('metadata', {})
+            formatted_thought = {
+                "content": mem_entry.get('content', ''),
+                "timestamp": mem_entry.get('timestamp', datetime.now(timezone.utc).isoformat()),
+                "source": metadata.get('source_of_trigger', metadata.get('source', 'ethos_core_thought')),
+                "mood_at_thought": metadata.get('mood_at_generation', metadata.get('mood', {"name": "neutral"})),
+                "urgency": metadata.get('urgency_of_trigger', metadata.get('urgency', 'low')),
+                "impulse_type": metadata.get('impulse_type')
+            }
+            formatted_thoughts.append(formatted_thought)
+
+        logger.info(f"SubconsciousHook: Returning {len(formatted_thoughts)} formatted thoughts.")
+        return formatted_thoughts
+
+    except Exception as e:
+        logger.error(f"SubconsciousHook: Error fetching thoughts from EthosCore: {e}", exc_info=True)
+        return []
 
 async def handle_thought_trigger(payload: dict): # Changed to async def
     """
@@ -187,13 +260,22 @@ if __name__ == '__main__': # pragma: no cover
     logging.getLogger('eidos_agent.features.firmament.integrations.subconscious_hook').setLevel(logging.DEBUG)
     # logging.getLogger('eidos_agent.llm_integrations.llm_client').setLevel(logging.DEBUG)
 
+    # For test, import the PATHOS_USER_ID that the real code would try to import
+    # This ensures the mock uses the same ID for assertions if needed.
+    try:
+        from .....persona_logic.chronos_engine import PATHOS_USER_ID as TEST_PATHOS_USER_ID
+    except ImportError:
+        TEST_PATHOS_USER_ID = "pathos_dummy_user_id_for_test" # Fallback for test if main import fails
+        print(f"SubconsciousHook Test: Failed to import real PATHOS_USER_ID, using test fallback: {TEST_PATHOS_USER_ID}")
+
+
     async def main_test_subconscious_hook_llm_guidance():
         print("\n" + "="*80)
-        print("Subconscious Hook Standalone Test Script (Thought Elaboration)")
+        print("Subconscious Hook Standalone Test Script (Thought Elaboration & Memory Fetch)")
         print("="*80)
-        print("This script will attempt to use the configured Firmament LLM to elaborate thoughts.")
-        print("Please ensure your .env file has the following variables correctly set for the")
-        print("'FIRMAMENT_PRIMARY' LLM role (or the role specified in FIRMAMENT_LLM_ROLE):")
+        print("This script will test thought elaboration (potentially using Firmament LLM) and")
+        print("the fetching of recent subconscious thoughts using a mocked EthosCore.")
+        print("Please ensure your .env file has Firmament LLM variables correctly set if you expect real LLM calls:")
         print("  - LLM_FIRMAMENT_PRIMARY_URL:     (e.g., http://localhost:11434/v1 for Ollama)")
         print("  - LLM_FIRMAMENT_PRIMARY_MODEL:   (e.g., llama3:8b-instruct, mistral, phi3)")
         print("  - LLM_FIRMAMENT_PRIMARY_API_KEY: (e.g., 'ollama', 'lm-studio', or your actual key if required)")
@@ -203,13 +285,11 @@ if __name__ == '__main__': # pragma: no cover
         print("="*80 + "\n")
 
         # Check current LLM config that handle_thought_trigger would use
-        # This requires Config to be the real one, or a dummy that mimics its structure well.
-        current_fm_cfg = Config.get_firmament_module_config()
+        current_fm_cfg = Config.get_firmament_module_config() if callable(getattr(Config, 'get_firmament_module_config', None)) else {}
         current_llm_role = current_fm_cfg.get("firmament_llm_role", "FIRMAMENT_PRIMARY")
-        current_llm_cfg = Config.get_llm_config(current_llm_role)
+        current_llm_cfg = Config.get_llm_config(current_llm_role) if callable(getattr(Config, 'get_llm_config', None)) else {}
 
         is_dummy_llm_client = "dummy" in LLMClient.__name__.lower() or "dummy" in str(type(LLMClient)).lower()
-
 
         if not current_llm_cfg or not current_llm_cfg.get("url") or \
            "dummy" in current_llm_cfg.get("url", "").lower() or \
@@ -220,52 +300,73 @@ if __name__ == '__main__': # pragma: no cover
             logger.info(f"Attempting REAL LLM calls for thought elaboration using role: '{current_llm_role}', "
                         f"model: '{current_llm_cfg.get('model')}', URL: '{current_llm_cfg.get('url')}'.\n")
 
+        # Setup Mock EthosCore and MemoryStorage
+        class MockMemoryStorage:
+            def get_entries_by_type_and_user(self, entry_type: str, user_id: str, limit: int) -> List[Dict[str, Any]]:
+                logger.info(f"MockMemoryStorage.get_entries_by_type_and_user called for type '{entry_type}', user '{user_id}' (Expected: {TEST_PATHOS_USER_ID}), limit {limit}")
+                assert user_id == TEST_PATHOS_USER_ID, f"MockMemoryStorage expected user_id {TEST_PATHOS_USER_ID}, got {user_id}"
+                if entry_type == 'thought':
+                    return [{"content": "Mocked thought 1 from Ethos.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), "metadata": {"source": "mock_ethos", "mood_at_generation": {"name": "curious"}, "urgency": "low"}, 'type': 'thought', 'id': 't1'}]
+                if entry_type == 'received_subconscious_intention':
+                    return [{"content": "Mocked intention: Investigate AI ethics.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(), "metadata": {"source": "mock_subconscious_node", "urgency": "medium", "impulse_type": "research_ai_ethics"}, 'type': 'received_subconscious_intention', 'id': 'i1'}]
+                return []
+
+        class MockEthosCoreForSubconscious:
+            PATHOS_USER_ID = TEST_PATHOS_USER_ID
+            def __init__(self):
+                self.memory_storage = MockMemoryStorage()
+                logger.info("MockEthosCoreForSubconscious initialized with MockMemoryStorage.")
+
+        mock_ethos_sub_hook = MockEthosCoreForSubconscious()
+        set_ethos_core_for_subconscious_hook(mock_ethos_sub_hook) # type: ignore
+
+        # Test get_recent_subconscious_thoughts
+        print("\n--- Testing get_recent_subconscious_thoughts (with mock EthosCore) ---")
+        recent_thoughts = get_recent_subconscious_thoughts(limit=3)
+        print(f"Retrieved thoughts: {json.dumps(recent_thoughts, indent=2)}")
+        assert len(recent_thoughts) <= 3
+        assert len(recent_thoughts) > 0, "Expected mock EthosCore to return some thoughts"
+        # Check if combined and sorted correctly (intention should be older than thought in mock)
+        if len(recent_thoughts) == 2: # Assuming limit >= 2
+            assert recent_thoughts[0]['content'] == "Mocked thought 1 from Ethos." # Newer
+            assert recent_thoughts[1]['content'] == "Mocked intention: Investigate AI ethics." # Older
+
         # Setup a mock EventBus to capture outputs of handle_thought_trigger
         _test_events_sh_main_guidance = []
-        class MockEventBusSHGuidance(EventBus):
+        class MockEventBusSHGuidance(EventBus): # type: ignore
             def publish(self, event_type: str, data: dict):
                 print(f"    [SubconsciousHook MainTest Capture] Event: {event_type}, Data: {str(data)[:120]}...")
                 _test_events_sh_main_guidance.append({"event_type": event_type, "data": data})
 
-        original_event_bus_sh_guidance = EventBus.instance
-        EventBus.instance = lambda: MockEventBusSHGuidance()
+        original_event_bus_sh_guidance = EventBus.instance # type: ignore
+        EventBus.instance = lambda: MockEventBusSHGuidance() # type: ignore
 
-        # Get some sample thoughts
-        sample_thoughts = get_recent_subconscious_thoughts(limit=3)
-        if not sample_thoughts: # pragma: no cover
-            sample_thoughts = [
-                {"content": "This is a default test thought if get_recent_subconscious_thoughts returns empty.",
-                 "mood": "neutral", "urgency": "low", "source":"main_fallback",
-                 "timestamp": datetime.now(timezone.utc).isoformat()},
-                {"content": "I should really test this thoroughly.", "mood": "determined", "urgency": "medium",
-                 "impulse_type": "testing_focus", "source":"main_fallback",
-                 "timestamp": datetime.now(timezone.utc).isoformat()}
-            ]
+        # Test handle_thought_trigger (which might use LLM or dummy)
+        print("\n--- Testing handle_thought_trigger ---")
+        # Use one of the thoughts fetched (or a new one) for handle_thought_trigger
+        trigger_payload_for_handler = {
+            "content": "A new thought just occurred: what if the sky is green elsewhere?",
+            "mood": {"name": "pensive"}, "urgency": "low", "source":"test_main_direct_trigger",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
-        for i, thought_payload in enumerate(sample_thoughts):
-            print(f"--- Processing Test Thought {i+1}/{len(sample_thoughts)} ---")
-            print(f"Raw thought: {thought_payload.get('content')}")
-            await handle_thought_trigger(thought_payload) # Await the async handler
-            print("-" * 20)
-            await asyncio.sleep(0.1) # Allow any create_task in EventBus to potentially run
+        print(f"Triggering handle_thought_trigger with: {trigger_payload_for_handler.get('content')}")
+        await handle_thought_trigger(trigger_payload_for_handler)
+        await asyncio.sleep(0.1)
 
         print("\n--- Subconscious Hook Test Run Completed ---")
         print("Review logs above for 'LLM elaborated thought to...' messages or errors.")
-        print(f"Total events captured by mock EventBus: {len(_test_events_sh_main_guidance)}")
+        print(f"Total events captured by mock EventBus for handle_thought_trigger: {len(_test_events_sh_main_guidance)}")
         for evt in _test_events_sh_main_guidance:
-             if evt["event_type"] == "memory.write" and evt["data"].get("type") == "thought":
-                 print(f"  Logged thought content: {evt['data'].get('content')}")
+             if evt["event_type"] == "memory.write" and evt["data"].get("type") == "thought": # type: ignore
+                 print(f"  Logged thought content from handle_thought_trigger: {evt['data'].get('content')}") # type: ignore
 
         EventBus.instance = original_event_bus_sh_guidance # Restore
 
         # Attempt to shutdown HTTPClientManager if it was used
-        if 'HTTPClientManager' in globals() and callable(globals()['HTTPClientManager'].instance):
-            mgr_instance = HTTPClientManager.instance()
-            # Check if it's not the dummy one from ImportError block by checking for a specific attribute
-            # that the real one might have or by checking qualname of a method on the instance type.
-            # This is a bit fragile. A better way would be to have a more robust way to know if it's dummy.
+        if 'HTTPClientManager' in globals() and callable(globals()['HTTPClientManager'].instance): # type: ignore
+            mgr_instance = HTTPClientManager.instance() # type: ignore
             is_real_http_manager = not ("dummy" in str(type(mgr_instance)).lower())
-
             if is_real_http_manager and hasattr(mgr_instance, 'shutdown') and asyncio.iscoroutinefunction(mgr_instance.shutdown):
                 print("Attempting HTTPClientManager shutdown...")
                 await mgr_instance.shutdown()
