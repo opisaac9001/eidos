@@ -2794,3 +2794,52 @@ class EthosCore:
 
         logger.info(f"Retrieved {len(final_selection)} relevant past interactions for user '{user_id}' after filtering. (Initial candidates: {len(similar_results_with_scores)}, Valid after filters: {len(valid_candidates)})")
         return final_selection
+
+    async def get_memories_for_dream_seeding(
+        self,
+        user_id: str,
+        lookback_days: int,
+        limit: int,
+        memory_types: Optional[List[str]] = None
+    ) -> List[MemoryEntry]:
+        """
+        Fetches recent and relevant memories suitable for seeding dream generation.
+        """
+        if not self.memory_storage:
+            logger.error("EthosCore: MemoryStorage not available. Cannot fetch memories for dream seeding.")
+            return []
+
+        if not user_id:
+            logger.warning("EthosCore.get_memories_for_dream_seeding: user_id not provided. Cannot fetch memories.")
+            return []
+
+        now_utc = datetime.now(timezone.utc)
+        start_time_dt = now_utc - timedelta(days=lookback_days)
+
+        default_memory_types = [
+            'interaction', 'firmament_activity_log', 'received_subconscious_intention',
+            'npc_dialogue_event', 'reflection_insight', 'learned_correction',
+            'feedback', 'dream' # Include actual past dreams as well
+        ]
+        types_to_fetch = memory_types if memory_types else default_memory_types
+
+        logger.debug(f"EthosCore: Fetching memories for dream seeding for user '{user_id}'. Lookback: {lookback_days} days, Limit: {limit}, Types: {types_to_fetch}")
+
+        try:
+            # get_memories_for_summary sorts by salience DESC, then timestamp DESC
+            fetched_memories = await asyncio.to_thread(
+                self.memory_storage.get_memories_for_summary, # Assuming get_memories_for_summary is synchronous
+                user_id=user_id,
+                start_time_utc=start_time_dt,
+                end_time_utc=now_utc,
+                types=types_to_fetch,
+                limit=limit # The method itself handles the limit
+            )
+            # Ensure MemoryStorage.get_memories_for_summary is used correctly.
+            # If get_memories_for_summary is already async, remove asyncio.to_thread.
+
+            logger.info(f"EthosCore: Fetched {len(fetched_memories)} memories for dream seeding for user '{user_id}'.")
+            return fetched_memories
+        except Exception as e:
+            logger.error(f"EthosCore: Error fetching memories for dream seeding for user '{user_id}': {e}", exc_info=True)
+            return []

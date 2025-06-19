@@ -16,6 +16,8 @@ try:
     from ....llm_integrations.llm_client import LLMClient
     from ....core.http_client_manager import HTTPClientManager
     from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
+    from ....persona_logic.ethos_core.core import EthosCore
+    from ....persona_logic.ethos_core.memory_storage import MemoryEntry
 except ImportError: # pragma: no cover
     print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
     # Define dummy versions for parsing and basic type hinting
@@ -28,6 +30,7 @@ except ImportError: # pragma: no cover
             return None
 
     LLMConfig = Dict[str, Any] # type: ignore
+    MemoryEntry = Dict[str, Any] # type: ignore
 
     class LLMClient: # type: ignore
         def __init__(self, http_client: Any):
@@ -55,6 +58,14 @@ except ImportError: # pragma: no cover
         async def startup(self): print("DummyHTTPClientManager: startup")
         async def shutdown(self): print("DummyHTTPClientManager: shutdown")
 
+    class EthosCore: # type: ignore
+        def __init__(self, config: Any):
+            print("DummyEthosCore initialized.")
+        async def get_memories_for_dream_seeding(self, user_id: str, lookback_days: int, limit: int, memory_types: Optional[List[str]] = None) -> List[MemoryEntry]:
+            print(f"DummyEthosCore.get_memories_for_dream_seeding called for user {user_id}")
+            return [{"type": "dummy_interaction", "content": "Dummy memory content from EthosCore.", "timestamp": datetime.now(timezone.utc).isoformat()}]
+
+
     # Define a dummy EventBus if import fails, so the file can be parsed
     class EventBus: # type: ignore
         _instance = None; _subscribers = {} # type: ignore
@@ -72,7 +83,11 @@ EVENT_MEMORY_WRITE = "memory.write"                     # Event this adapter pub
 
 
 class OneirosAdapter:
-    def __init__(self, http_client_manager: Optional[HTTPClientManager] = None, llm_role_name: str = "FIRMAMENT_PRIMARY", oneiros_config: Optional[Dict[str, Any]] = None):
+    def __init__(self,
+                 http_client_manager: Optional[HTTPClientManager] = None,
+                 llm_role_name: str = "FIRMAMENT_PRIMARY",
+                 oneiros_config: Optional[Dict[str, Any]] = None,
+                 ethos_core: Optional[EthosCore] = None):
         """
         Initializes the OneirosAdapter.
         This adapter can use an LLM to enhance dream generation if configured.
@@ -81,12 +96,14 @@ class OneirosAdapter:
             http_client_manager (Optional[HTTPClientManager], optional): Manager for HTTP clients. Defaults to None.
             llm_role_name (str, optional): The LLM role name to use for LLM-driven features. Defaults to "FIRMAMENT_PRIMARY".
             oneiros_config (Optional[Dict[str, Any]], optional): Configuration for the Oneiros module. Defaults to None.
+            ethos_core (Optional[EthosCore], optional): Instance of EthosCore for memory access. Defaults to None.
         """
         self.logger = logging.getLogger(__name__)
         self.adapter_config = oneiros_config if oneiros_config else {}
         self.http_client_manager = http_client_manager
         self.llm_role_name = llm_role_name
         self.llm_config: Optional[LLMConfig] = None
+        self.ethos_core = ethos_core
 
         if http_client_manager: # Only try to get LLM config if a client manager is provided
             self.llm_config = Config.get_llm_config(self.llm_role_name)
@@ -97,15 +114,71 @@ class OneirosAdapter:
         else: # No http_client_manager, so no LLM operations possible
             self.logger.info("OneirosAdapter initialized without HTTPClientManager. LLM operations will be disabled.")
 
+        if self.ethos_core:
+            self.logger.info("OneirosAdapter initialized with EthosCore instance.")
+        else:
+            self.logger.warning("OneirosAdapter initialized without EthosCore instance. Dream context from memories will be limited.")
+
         self.model_loaded = False # Existing attribute, relevance might change
         self._initialize_oneiros_engine() # Existing method call
         self.logger.info(f"OneirosAdapter initialized. Model Loaded: {self.model_loaded}. Config: {self.adapter_config}")
 
 
-    def _get_recent_memories_for_dream_context(self) -> List[str]:
-        # Placeholder implementation
-        self.logger.debug("Using placeholder recent memories for dream context.")
-        return ["Memory of a fleeting shadow.", "A distant melody heard earlier.", "An unresolved puzzle from yesterday."]
+    async def _get_recent_memories_for_dream_context(self) -> List[str]:
+        if not self.ethos_core:
+            self.logger.warning("OneirosAdapter: EthosCore not available. Returning default placeholder memories.")
+            return ["Pathos recalls a day of quiet contemplation.", "A fleeting thought about the color blue."]
+
+        try:
+            # Configuration for fetching memories - could be made configurable later
+            lookback_days = self.adapter_config.get("dream_memory_lookback_days", 3)
+            memory_limit = self.adapter_config.get("dream_memory_limit", 5)
+
+            # Assuming PATHOS_USER_ID is accessible or a constant.
+            # For now, let's hardcode it or assume it's available via a config/constant import.
+            # If not, this needs to be passed in or made available.
+            # Let's assume a placeholder for now if direct import isn't clean.
+            pathos_user_id = self.adapter_config.get("pathos_user_id", "pathos_default_user") # Placeholder
+
+            self.logger.debug(f"Fetching memories for dream context. User: {pathos_user_id}, Lookback: {lookback_days} days, Limit: {memory_limit}")
+
+            # Define specific memory types relevant for dreams
+            dream_memory_types = [
+                'interaction', 'firmament_activity_log', 'received_subconscious_intention',
+                'npc_dialogue_event', 'reflection_insight', 'learned_correction', 'feedback', 'dream'
+            ]
+
+            # Call the new EthosCore method
+            recent_memory_entries: List[MemoryEntry] = await self.ethos_core.get_memories_for_dream_seeding(
+                user_id=pathos_user_id,
+                lookback_days=lookback_days,
+                limit=memory_limit,
+                memory_types=dream_memory_types
+            )
+
+            if not recent_memory_entries:
+                self.logger.info("No recent memories returned from EthosCore for dream context.")
+                return ["The day's events are a blur.", "A sense of quiet anticipation."]
+
+            # Format memories into strings for the prompt
+            formatted_memories = []
+            for mem_entry in recent_memory_entries:
+                content = str(mem_entry.get('content', ''))
+                # Simple summarization: take first N chars. More sophisticated summarization could be added.
+                snippet = (content[:75] + '...') if len(content) > 75 else content
+                type_info = mem_entry.get('type', 'memory')
+                # Optional: add timestamp or salience if useful for the dream LLM
+                # ts_info = datetime.fromisoformat(mem_entry.get('timestamp', '')).strftime('%H:%M') if mem_entry.get('timestamp') else ''
+                # formatted_memories.append(f"A {type_info} from {ts_info}: {snippet}")
+                formatted_memories.append(f"A recent {type_info}: {snippet}")
+
+
+            self.logger.info(f"Returning {len(formatted_memories)} formatted memories for dream prompt.")
+            return formatted_memories
+
+        except Exception as e:
+            self.logger.error(f"Error fetching or processing memories for dream context: {e}", exc_info=True)
+            return ["A vague recollection of the day's events.", "An echo of a distant thought."]
 
     def _initialize_oneiros_engine(self):
         """
@@ -138,18 +211,36 @@ class OneirosAdapter:
         block_data = context.get("block_data", {}) if context else {}
         block_name = block_data.get("name", "an unknown activity")
 
-        # Placeholder for current mood
-        current_mood = "neutral"  # Replace with actual mood fetching later
-        self.logger.debug(f"Using placeholder mood for dream context: {current_mood}")
+        # Fetch current mood from EthosCore
+        current_mood_name = "neutral" # Default mood
+        if self.ethos_core:
+            try:
+                mood_data = self.ethos_core.get_current_mood() # This is a synchronous method
+                if mood_data and isinstance(mood_data, dict) and "name" in mood_data:
+                    current_mood_name = mood_data["name"]
+                    # Ensure valence and arousal are numbers before formatting
+                    valence_val = mood_data.get('valence', 'N/A')
+                    arousal_val = mood_data.get('arousal', 'N/A')
+                    valence_str = f"{valence_val:.2f}" if isinstance(valence_val, (int, float)) else str(valence_val)
+                    arousal_str = f"{arousal_val:.2f}" if isinstance(arousal_val, (int, float)) else str(arousal_val)
+                    self.logger.debug(f"Fetched current mood for dream context: {current_mood_name} (Valence: {valence_str}, Arousal: {arousal_str})")
+                else:
+                    self.logger.warning(f"Failed to get valid mood name from EthosCore. Mood data: {mood_data}. Using default '{current_mood_name}'.")
+            except Exception as e_mood:
+                self.logger.error(f"Error fetching mood from EthosCore: {e_mood}", exc_info=True)
+                self.logger.info(f"Using default mood '{current_mood_name}' due to error.")
+        else:
+            self.logger.info(f"EthosCore not available. Using default mood '{current_mood_name}'.")
 
-        # Placeholder for recent memories
-        recent_memories = self._get_recent_memories_for_dream_context()
-        memories_summary = " ".join(recent_memories) if recent_memories else "No specific recent memories noted."
+        # Get recent memories for dream context
+        recent_memories_list = await self._get_recent_memories_for_dream_context()
+        memories_summary = "\n".join(recent_memories_list) if recent_memories_list else "No specific recent memories noted."
+
 
         prompt_parts = [
             "You are a dream weaver, skilled in crafting surreal and symbolic narratives.",
             f"Pathos is currently in a state of '{block_name}'.",
-            f"Pathos's current mood is '{current_mood}'.",
+            f"Pathos's current mood is '{current_mood_name}'.",
             f"Recent experiences or thoughts include: '{memories_summary}'.",
             "Generate a dream narrative, 2-4 sentences long.",
             "Make it surreal, abstract, or symbolic, reflecting these recent experiences or current mood.",
@@ -337,17 +428,40 @@ if __name__ == '__main__':
         # Test with and without HTTPClientManager
         main_logger.info("\n--- Testing OneirosAdapter with HTTPClientManager (dummy) ---")
         dummy_http_client_manager = HTTPClientManager.instance() # Get dummy instance
+
+        class MockEthosCore: # Defined here for the test block
+            async def get_memories_for_dream_seeding(self, user_id, lookback_days, limit, memory_types):
+                main_logger.info(f"MockEthosCore.get_memories_for_dream_seeding called for user {user_id}")
+                return [
+                    {"type": "interaction", "content": "Had a pleasant chat about the weather.", "timestamp": "2023-01-01T10:00:00Z", "salience": 0.7},
+                    {"type": "firmament_activity_log", "content": "Pathos was working on a creative project.", "timestamp": "2023-01-01T14:00:00Z", "salience": 0.5}
+                ]
+
+            def get_current_mood(self) -> Dict[str, Any]: # This is synchronous
+                main_logger.info("MockEthosCore.get_current_mood called.")
+                return {
+                    "valence": 0.5,
+                    "arousal": 0.3,
+                    "name": "content", # Example mood name
+                    "simulation_disabled": False,
+                    "hexus_snapshot": {"joy": 0.6, "stress": 0.1} # Dummy hexus snapshot
+                }
+
+        mock_ethos_core_instance = MockEthosCore()
+
         oneiros_adapter_with_llm = OneirosAdapter(
             http_client_manager=dummy_http_client_manager, # type: ignore
             llm_role_name="FIRMAMENT_PRIMARY",
-            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True}
+            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True, "pathos_user_id": "test_pathos_user"},
+            ethos_core=mock_ethos_core_instance # type: ignore
         )
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
 
 
-        main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager ---")
+        main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore ---")
         oneiros_adapter_no_llm = OneirosAdapter(
             oneiros_config={"model_type": "test_basic", "allow_basic_fallback": True}
+            # ethos_core is None by default
         )
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_no_llm)
 
