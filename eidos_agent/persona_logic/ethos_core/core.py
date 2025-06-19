@@ -14,6 +14,7 @@ from eidos_agent.utils.prompt_loader import load_system_prompt
 
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
 from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
+from .mood_engine import MoodEngine
 from eidos_agent.utils.logger import get_logger
 import pytz # Added import
 
@@ -386,6 +387,10 @@ class EthosCore:
                 self.personality_bias_profile = None
 
         self._apply_initial_personality_bias() # Then apply bias
+
+        self.mood_engine = MoodEngine(ethos_core=self) # Pass self (the EthosCore instance)
+        logger.info("MoodEngine instantiated within EthosCore.")
+
         # The first save of Hexus scores (if file didn't exist or was updated by _load_hexus_scores)
         # will happen within _load_hexus_scores if it calls _save_hexus_scores.
         # If _load_hexus_scores doesn't save when it uses defaults, we might need an explicit save here.
@@ -2624,58 +2629,51 @@ class EthosCore:
             return None
             
     def get_current_mood(self) -> Dict[str, Any]:
-
         """
-        Derives a simplified valence/arousal representation from Hexus scores.
-        Also includes all Hexus scores for more detailed context if needed.
-        Returns a dictionary that includes 'valence', 'arousal', 'name' (derived),
-        and a 'hexus_snapshot' of all current Hexus scores.
+        Derives mood state using MoodEngine, based on current Hexus scores.
+        Returns a dictionary including 'valence', 'arousal', 'name',
+        'simulation_disabled' flag, and a 'hexus_snapshot'.
         """
-        if not self.config.ENABLE_MOOD_SIMULATION: # Keep this check if Hexus is part of mood simulation
-            return {"valence": 0.0, "arousal": 0.0, "name": "neutral", "simulation_disabled": True, "hexus_snapshot": self.hexus_scores.copy()}
+        if not self.config.ENABLE_MOOD_SIMULATION:
+            # Return a neutral mood with simulation_disabled flag
+            # and current hexus scores if available, or defaults if not.
+            current_hexus_snapshot = self.hexus_scores.copy() if hasattr(self, 'hexus_scores') else DEFAULT_HEXUS_SCORES.copy()
+            return {
+                "valence": 0.0,
+                "arousal": 0.0,
+                "name": "neutral",
+                "simulation_disabled": True,
+                "hexus_snapshot": current_hexus_snapshot
+            }
 
-        # Simple derivation:
-        # Valence: influenced by joy, contentment vs. stress, resentment, melancholy
-        # Arousal: influenced by curiosity, focus, ambition, impulsiveness vs. tiredness
+        if not hasattr(self, 'mood_engine') or not self.mood_engine:
+            logger.error("EthosCore: MoodEngine not initialized. Cannot get current mood. Returning neutral.")
+            current_hexus_snapshot = self.hexus_scores.copy() if hasattr(self, 'hexus_scores') else DEFAULT_HEXUS_SCORES.copy()
+            return {
+                "valence": 0.0,
+                "arousal": 0.0,
+                "name": "neutral",
+                "simulation_disabled": False, # Simulation might be enabled, but MoodEngine is missing
+                "hexus_snapshot": current_hexus_snapshot
+            }
 
-        joy_val = self.hexus_scores.get("joy", 0.0)
-        contentment_val = self.hexus_scores.get("contentment", 0.0)
-        stress_val = self.hexus_scores.get("stress", 0.0)
-        resentment_val = self.hexus_scores.get("resentment", 0.0)
-        melancholy_val = self.hexus_scores.get("melancholy", 0.0)
+        current_hexus_scores = self.get_hexus_scores() # This already returns a copy
 
-        curiosity_val = self.hexus_scores.get("curiosity", 0.0)
-        focus_val = self.hexus_scores.get("focus", 0.0)
-        ambition_val = self.hexus_scores.get("ambition", 0.0)
-        impulsiveness_val = self.hexus_scores.get("impulsiveness", 0.0)
-        tiredness_val = self.hexus_scores.get("tiredness", 0.0)
+        # Delegate core calculation to MoodEngine
+        mood_components = self.mood_engine.calculate_current_mood(current_hexus_scores)
 
-        derived_valence = (joy_val + contentment_val) - (stress_val + resentment_val + melancholy_val)
-        derived_arousal = (curiosity_val + focus_val + ambition_val + impulsiveness_val) / 2.0 - tiredness_val
+        # MoodEngine returns a dict like: {"valence": ..., "arousal": ..., "name": ...}
+        # We add the hexus_snapshot and simulation_disabled flag here.
 
-        # Clamp derived valence/arousal to -1.0 to 1.0 for consistency if used by other systems expecting that range.
-        derived_valence = max(-1.0, min(1.0, derived_valence))
-        derived_arousal = max(-1.0, min(1.0, derived_arousal))
-
-        # Determine a qualitative name (simplified)
-        mood_name = "neutral"
-        if derived_valence > 0.3:
-            if derived_arousal > 0.3: mood_name = "excited"
-            else: mood_name = "pleased"
-        elif derived_valence < -0.3:
-            if derived_arousal > 0.3: mood_name = "agitated"
-            else: mood_name = "displeased"
-        elif derived_arousal > 0.5: mood_name = "engaged"
-        elif derived_arousal < -0.5: mood_name = "calm"
-
-
-        return {
-            "valence": derived_valence,
-            "arousal": derived_arousal,
-            "name": mood_name, # Simplified qualitative name
-            "simulation_disabled": False, # Assuming if this runs, simulation is enabled
-            "hexus_snapshot": self.hexus_scores.copy() # Include all current Hexus scores
+        final_mood_data = {
+            "valence": mood_components.get("valence", 0.0),
+            "arousal": mood_components.get("arousal", 0.0),
+            "name": mood_components.get("name", "neutral"),
+            "simulation_disabled": False,
+            "hexus_snapshot": current_hexus_scores # Already a copy from get_hexus_scores()
         }
+        # logger.debug(f"EthosCore.get_current_mood: Mood determined by MoodEngine: Name='{final_mood_data['name']}', V={final_mood_data['valence']:.2f}, A={final_mood_data['arousal']:.2f}")
+        return final_mood_data
 
     async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None, magnitude_multiplier: float = 1.0):
         """
