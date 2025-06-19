@@ -18,6 +18,7 @@ try:
     from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
     from ....persona_logic.ethos_core.core import EthosCore
     from ....persona_logic.ethos_core.memory_storage import MemoryEntry
+    from .....persona_logic.chronos_engine import PATHOS_USER_ID
 except ImportError: # pragma: no cover
     print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
     # Define dummy versions for parsing and basic type hinting
@@ -31,6 +32,7 @@ except ImportError: # pragma: no cover
 
     LLMConfig = Dict[str, Any] # type: ignore
     MemoryEntry = Dict[str, Any] # type: ignore
+    PATHOS_USER_ID = "pathos_dummy_user_id_if_import_fails" # Dummy value
 
     class LLMClient: # type: ignore
         def __init__(self, http_client: Any):
@@ -138,9 +140,11 @@ class OneirosAdapter:
             # For now, let's hardcode it or assume it's available via a config/constant import.
             # If not, this needs to be passed in or made available.
             # Let's assume a placeholder for now if direct import isn't clean.
-            pathos_user_id = self.adapter_config.get("pathos_user_id", "pathos_default_user") # Placeholder
+            # pathos_user_id = self.adapter_config.get("pathos_user_id", "pathos_default_user") # Placeholder REMOVED
+            # Use the imported PATHOS_USER_ID constant directly
+            user_id_for_memories = PATHOS_USER_ID
 
-            self.logger.debug(f"Fetching memories for dream context. User: {pathos_user_id}, Lookback: {lookback_days} days, Limit: {memory_limit}")
+            self.logger.debug(f"Fetching memories for dream context. User: {user_id_for_memories}, Lookback: {lookback_days} days, Limit: {memory_limit}")
 
             # Define specific memory types relevant for dreams
             dream_memory_types = [
@@ -150,7 +154,7 @@ class OneirosAdapter:
 
             # Call the new EthosCore method
             recent_memory_entries: List[MemoryEntry] = await self.ethos_core.get_memories_for_dream_seeding(
-                user_id=pathos_user_id,
+                user_id=user_id_for_memories, # Use the constant
                 lookback_days=lookback_days,
                 limit=memory_limit,
                 memory_types=dream_memory_types
@@ -431,7 +435,8 @@ if __name__ == '__main__':
 
         class MockEthosCore: # Defined here for the test block
             async def get_memories_for_dream_seeding(self, user_id, lookback_days, limit, memory_types):
-                main_logger.info(f"MockEthosCore.get_memories_for_dream_seeding called for user {user_id}")
+                main_logger.info(f"MockEthosCore.get_memories_for_dream_seeding called for user {user_id} (should be PATHOS_USER_ID: {PATHOS_USER_ID})")
+                assert user_id == PATHOS_USER_ID, f"MockEthosCore expected user_id {PATHOS_USER_ID}, got {user_id}"
                 return [
                     {"type": "interaction", "content": "Had a pleasant chat about the weather.", "timestamp": "2023-01-01T10:00:00Z", "salience": 0.7},
                     {"type": "firmament_activity_log", "content": "Pathos was working on a creative project.", "timestamp": "2023-01-01T14:00:00Z", "salience": 0.5}
@@ -449,10 +454,11 @@ if __name__ == '__main__':
 
         mock_ethos_core_instance = MockEthosCore()
 
+        # No longer need to pass "pathos_user_id" in oneiros_config for the test, as it uses the imported constant.
         oneiros_adapter_with_llm = OneirosAdapter(
             http_client_manager=dummy_http_client_manager, # type: ignore
             llm_role_name="FIRMAMENT_PRIMARY",
-            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True, "pathos_user_id": "test_pathos_user"},
+            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True},
             ethos_core=mock_ethos_core_instance # type: ignore
         )
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
