@@ -105,6 +105,7 @@ class EthosConfig(TypedDict, total=False):
     forgetting_core_memory_types_json: str # Existing
     forgetting_extremely_low_salience_for_core: float # Existing
     retrieval_min_salience_for_pathos_context: float
+    persona_traits_file_path: Optional[str] # New key
 
 
 
@@ -384,6 +385,7 @@ class Config:
         "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight", "learned_correction"]'), # Updated default
         "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")), # Existing
         "retrieval_min_salience_for_pathos_context": float(os.getenv("ETHOS_RETRIEVAL_MIN_SALIENCE_PATHOS", "0.1")),
+        "persona_traits_file_path": str(PROJECT_ROOT / "persona" / "pathos_traits.json")
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None

@@ -15,6 +15,8 @@ from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.core.config import Config, EthosConfig, PROJECT_ROOT, LLMConfig
 from .memory_storage import MemoryStorage, MemoryEntry # Updated to relative import
 from .mood_engine import MoodEngine
+from .reflection import ReflectionEngine
+from .traits import TraitsEngine
 from eidos_agent.utils.logger import get_logger
 import pytz # Added import
 
@@ -390,6 +392,13 @@ class EthosCore:
 
         self.mood_engine = MoodEngine(ethos_core=self) # Pass self (the EthosCore instance)
         logger.info("MoodEngine instantiated within EthosCore.")
+
+        self.reflection_engine = ReflectionEngine(self) # Pass self (the EthosCore instance)
+        logger.info("ReflectionEngine instantiated within EthosCore.")
+
+        # Initialize TraitsEngine, passing the main config object
+        self.traits_engine = TraitsEngine(config=self.config)
+        logger.info(f"TraitsEngine instantiated within EthosCore. Loaded {len(self.traits_engine.get_all_traits())} traits.")
 
         # The first save of Hexus scores (if file didn't exist or was updated by _load_hexus_scores)
         # will happen within _load_hexus_scores if it calls _save_hexus_scores.
@@ -1725,8 +1734,16 @@ class EthosCore:
         self._save_task_last_run_time("EthosReflection", now)
         logger.info(f"--- Ethos: Reflection Cycle Finished at {now.isoformat()} ---")
         # Call aspiration generation after successful reflection if insights were generated
-        if insights_generated: # Assuming 'insights_generated' boolean is set if insights were made # TODO: Ensure insights_generated is correctly set
+        if generated_insights:
             await self._generate_new_aspirations()
+        else:
+            logger.info("EthosCore: ReflectionEngine did not generate any insights this cycle.")
+            # No Hexus update for REFLECTION_CYCLE_COMPLETED_INSIGHTS if no insights.
+            # Also, no aspiration generation.
+
+        self.last_reflection_time = now
+        self._save_task_last_run_time("EthosReflection", now)
+        logger.info(f"--- Ethos: Reflection Cycle (via ReflectionEngine) Finished at {now.isoformat()} ---")
 
     async def run_knowledge_upkeep(self):
         """
@@ -2295,6 +2312,8 @@ class EthosCore:
             logger.error(f"EthosCore: Error fetching memories for reflection: {e}", exc_info=True)
             return []
 
+    # _get_memories_for_reflection is now removed as its logic is in ReflectionEngine
+
     async def get_background_tasks(self) -> List[asyncio.Task]:
         """Create and return background tasks for EthosCore operations."""
         tasks = []
@@ -2841,3 +2860,117 @@ class EthosCore:
         except Exception as e:
             logger.error(f"EthosCore: Error fetching memories for dream seeding for user '{user_id}': {e}", exc_info=True)
             return []
+
+    def get_trait(self, trait_name: str) -> Optional[Any]:
+        """
+        Retrieves a specific trait value from the TraitsEngine.
+        """
+        if not hasattr(self, 'traits_engine') or not self.traits_engine:
+            logger.warning("EthosCore: TraitsEngine not initialized. Cannot get trait.")
+            return None
+        return self.traits_engine.get_trait(trait_name)
+
+    def get_all_traits(self) -> Dict[str, Any]:
+        """
+        Retrieves all traits from the TraitsEngine.
+        """
+        if not hasattr(self, 'traits_engine') or not self.traits_engine:
+            logger.warning("EthosCore: TraitsEngine not initialized. Cannot get all traits.")
+            return {}
+        return self.traits_engine.get_all_traits()
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    logger_main = get_logger("ethos_core_main_test")
+    logger_main.info("--- Testing EthosCore ---")
+
+    # Minimal Mock Config for EthosCore testing
+    class MockConfigForEthosCoreTests:
+        PROJECT_ROOT = Path(".") # Assuming __main__ runs from a location where ./persona makes sense
+
+        # Define ETHOS as a class attribute that's a dictionary
+        ETHOS: EthosConfig = { # type: ignore
+            "persona_traits_file_path": str(PROJECT_ROOT / "persona" / "test_ethos_main_traits.json"),
+            "memory_db_path": ":memory:",
+            "embedding_model_name": "dummy_model_for_ethos_test",
+            "reflection_interval_seconds": 86400,
+            "forgetting_interval_seconds": 43200,
+            "hexus_decay_interval_seconds": 3600,
+            "knowledge_upkeep_interval_seconds": 86400,
+            "interaction_log_analysis_interval_seconds": 86400,
+            "long_term_planning_interval_seconds": 86400 * 3,
+            "pathos_home_timezone": "UTC",
+            # Add any other keys EthosConfig expects or EthosCore uses from it during init
+        }
+
+        # Define LLM as a class attribute
+        LLM: Dict[str, LLMConfig] = {
+            "LOGOS_TECHNE": {"url": "dummy_techne_url", "model": "dummy_techne_model"},
+            "PATHOS": {"url": "dummy_pathos_url", "model": "dummy_pathos_model"}, # Example if EthosCore needs it
+            # Add other roles if EthosCore initialization or tested methods require them
+        }
+        ONEIROS: Dict[str, Any] = { # Example OneirosConfig structure if needed
+            "dream_interval_seconds": 21600.0
+        }
+
+        # Mock methods that EthosCore's __init__ might call on the config object itself
+        def get_ethos_config(self) -> EthosConfig:
+            return self.ETHOS
+
+        def get_llm_config(self, role: str) -> Optional[LLMConfig]:
+            return self.LLM.get(role)
+
+        # Add other get_..._config() methods if EthosCore __init__ uses them
+
+    config_for_ethos_test = MockConfigForEthosCoreTests()
+
+    # Create dummy traits file for EthosCore's __main__ test
+    test_traits_path = Path(config_for_ethos_test.ETHOS["persona_traits_file_path"])
+    logger_main.info(f"Creating dummy traits file at: {test_traits_path.resolve()}")
+    test_traits_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(test_traits_path, 'w', encoding='utf-8') as f:
+        json.dump({"personality_openness": 0.7, "processing_speed": "fast"}, f)
+
+    ethos_core_instance = None
+    try:
+        ethos_core_instance = EthosCore(config=config_for_ethos_test) # type: ignore
+
+        logger_main.info("--- Testing EthosCore Trait Integration ---")
+        all_traits = ethos_core_instance.get_all_traits()
+        logger_main.info(f"EthosCore - All traits: {all_traits}")
+        assert "personality_openness" in all_traits, f"Expected 'personality_openness' in {all_traits}"
+        assert ethos_core_instance.get_trait("personality_openness") == 0.7, "Trait 'personality_openness' has incorrect value."
+        assert ethos_core_instance.get_trait("non_existent_trait") is None, "Getting a non-existent trait should return None."
+        logger_main.info("EthosCore Trait Integration tests passed.")
+
+    except Exception as e:
+        logger_main.error(f"Error during EthosCore __main__ test: {e}", exc_info=True)
+    finally:
+        # Clean up dummy traits file
+        if test_traits_path.exists():
+            logger_main.info(f"Cleaning up dummy traits file: {test_traits_path.resolve()}")
+            test_traits_path.unlink()
+            # Try to remove parent directory if it's 'persona' and empty
+            try:
+                if test_traits_path.parent.name == "persona" and not any(test_traits_path.parent.iterdir()):
+                    test_traits_path.parent.rmdir()
+            except OSError as e_rmdir:
+                logger_main.warning(f"Could not remove persona directory {test_traits_path.parent}: {e_rmdir}")
+
+        if ethos_core_instance:
+            # Ensure DB connection is closed if memory.sqlite was created
+            if ethos_core_instance.memory_storage and ethos_core_instance.memory_storage.db_path != ":memory:":
+                 ethos_core_instance.memory_storage.close_connection()
+                 # Potentially delete the dummy db file if created by the test
+                 db_file_to_delete = Path(ethos_core_instance.memory_storage.db_path)
+                 if db_file_to_delete.exists() and "test_ethos_memory.sqlite" in str(db_file_to_delete): # Safety check
+                     logger_main.info(f"Cleaning up dummy database file: {db_file_to_delete}")
+                     db_file_to_delete.unlink()
+                     try:
+                         if db_file_to_delete.parent.name == "eidos_memories" and not any(db_file_to_delete.parent.iterdir()):
+                             db_file_to_delete.parent.rmdir()
+                     except OSError as e_rmdir_db:
+                        logger_main.warning(f"Could not remove eidos_memories directory {db_file_to_delete.parent}: {e_rmdir_db}")
+
+
+    logger_main.info("--- EthosCore testing finished ---")
