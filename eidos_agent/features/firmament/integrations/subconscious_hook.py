@@ -99,50 +99,81 @@ def get_recent_subconscious_thoughts(limit: int = 5) -> List[Dict[str, Any]]:
         # It's assumed that the _ethos_core_instance, if real, would use the real PATHOS_USER_ID internally
         # or that its methods called with PATHOS_USER_ID would correctly resolve.
         # For this function, we use the PATHOS_USER_ID available in its scope (either real or dummy).
-        user_id_for_query = PATHOS_USER_ID
+        pathos_user_id = PATHOS_USER_ID # Renamed for clarity within this function
 
-        thought_memories: List[MemoryEntry] = []
+        combined_memories: List[MemoryEntry] = []
         if hasattr(_ethos_core_instance, 'memory_storage') and _ethos_core_instance.memory_storage:
-            # Fetch 'thought' type memories
-            thoughts1 = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
+            # Fetch 'subconscious_imprint'
+            imprint_memories = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
+                entry_type='subconscious_imprint',
+                user_id=pathos_user_id,
+                limit=limit * 2 # Fetch more to allow for sorting with thoughts
+            )
+            combined_memories.extend(imprint_memories)
+
+            # Fetch 'thought'
+            thought_memories_list = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
                 entry_type='thought',
-                user_id=user_id_for_query,
-                limit=limit
+                user_id=pathos_user_id,
+                limit=limit * 2 # Fetch more
             )
-            thought_memories.extend(thoughts1)
+            combined_memories.extend(thought_memories_list)
 
-            intentions = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
-                entry_type='received_subconscious_intention',
-                user_id=user_id_for_query,
-                limit=limit
-            )
-            thought_memories.extend(intentions)
+            # Sort combined list by timestamp descending
+            combined_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            thought_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-            thought_memories = thought_memories[:limit]
+            # Apply the overall limit
+            final_memories_to_process = combined_memories[:limit]
 
-        if not thought_memories:
-            logger.info("SubconsciousHook: No recent thoughts/intentions found in EthosCore.")
+        else:
+            logger.warning("SubconsciousHook: EthosCore.memory_storage not available.")
+            return []
+
+        if not final_memories_to_process:
+            logger.info("SubconsciousHook: No recent 'subconscious_imprint' or 'thought' memories found.")
             return []
 
         formatted_thoughts = []
-        for mem_entry in thought_memories:
+        for mem_entry in final_memories_to_process:
             metadata = mem_entry.get('metadata', {})
+            entry_type = mem_entry.get('type')
+            content = mem_entry.get('content', '')
+
             formatted_thought = {
-                "content": mem_entry.get('content', ''),
                 "timestamp": mem_entry.get('timestamp', datetime.now(timezone.utc).isoformat()),
-                "source": metadata.get('source_of_trigger', metadata.get('source', 'ethos_core_thought')),
-                "mood_at_thought": metadata.get('mood_at_generation', metadata.get('mood', {"name": "neutral"})),
-                "urgency": metadata.get('urgency_of_trigger', metadata.get('urgency', 'low')),
-                "impulse_type": metadata.get('impulse_type')
+                "content": content, # Default to main content
+                "source": metadata.get('source', 'unknown_source'), # Generic source from metadata
+                "mood_at_thought": {"name": "neutral"}, # Default mood
+                "urgency": "low", # Default urgency
+                "impulse_type": None # Default
             }
+
+            if entry_type == 'subconscious_imprint':
+                formatted_thought["source"] = metadata.get('source', 'subconscious_node_imprint') # More specific
+                formatted_thought["mood_at_thought"] = metadata.get('mood_at_imprint', {"name": "neutral"})
+                formatted_thought["urgency"] = metadata.get('urgency', 'medium_from_imprint') # Or a fixed value
+                # 'impulse_type' might not be directly applicable for imprints, or derive from topics
+                if topics := metadata.get('topics_from_imprint'): # Python 3.8+ assignment expression
+                    formatted_thought["impulse_type"] = f"imprint_topic_{topics[0]}" if topics else "imprint_general"
+                else:
+                    formatted_thought["impulse_type"] = "imprint_general"
+
+            elif entry_type == 'thought':
+                formatted_thought["source"] = metadata.get('source_of_trigger', metadata.get('source', 'ethos_core_thought'))
+                formatted_thought["mood_at_thought"] = metadata.get('mood_at_generation', metadata.get('mood', {"name": "neutral"}))
+                formatted_thought["urgency"] = metadata.get('urgency_of_trigger', metadata.get('urgency', 'low'))
+                formatted_thought["impulse_type"] = metadata.get('impulse_type')
+                if raw_content := metadata.get('raw_trigger_content'): # Python 3.8+ assignment expression
+                    logger.debug(f"Thought {mem_entry.get('id')} has raw_trigger_content: '{raw_content[:50]}...' (elaborated: '{content[:50]}...')")
+                    # Decision: For now, still using elaborated 'content'. If raw is needed, logic would change here.
+
             formatted_thoughts.append(formatted_thought)
 
-        logger.info(f"SubconsciousHook: Returning {len(formatted_thoughts)} formatted thoughts.")
+        logger.info(f"SubconsciousHook: Returning {len(formatted_thoughts)} combined formatted thoughts/imprints.")
         return formatted_thoughts
 
     except Exception as e:
-        logger.error(f"SubconsciousHook: Error fetching thoughts from EthosCore: {e}", exc_info=True)
+        logger.error(f"SubconsciousHook: Error fetching combined thoughts/imprints: {e}", exc_info=True)
         return []
 
 async def handle_thought_trigger(payload: dict): # Changed to async def
@@ -305,10 +336,17 @@ if __name__ == '__main__': # pragma: no cover
             def get_entries_by_type_and_user(self, entry_type: str, user_id: str, limit: int) -> List[Dict[str, Any]]:
                 logger.info(f"MockMemoryStorage.get_entries_by_type_and_user called for type '{entry_type}', user '{user_id}' (Expected: {TEST_PATHOS_USER_ID}), limit {limit}")
                 assert user_id == TEST_PATHOS_USER_ID, f"MockMemoryStorage expected user_id {TEST_PATHOS_USER_ID}, got {user_id}"
+
+                if entry_type == 'subconscious_imprint':
+                    return [
+                        {"id": "imp1", "type": "subconscious_imprint", "content": "An imprint about a mysterious melody.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(), "metadata": {"source": "subconscious_node_imprint", "mood_at_imprint": {"name": "intrigued"}, "topics_from_imprint": ["melody", "mystery"]}},
+                        {"id": "imp2", "type": "subconscious_imprint", "content": "Imprint regarding a looming deadline.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(), "metadata": {"source": "subconscious_node_imprint", "mood_at_imprint": {"name": "anxious"}, "urgency": "high", "topics_from_imprint": ["deadline"]}}
+                    ]
                 if entry_type == 'thought':
-                    return [{"content": "Mocked thought 1 from Ethos.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), "metadata": {"source": "mock_ethos", "mood_at_generation": {"name": "curious"}, "urgency": "low"}, 'type': 'thought', 'id': 't1'}]
-                if entry_type == 'received_subconscious_intention':
-                    return [{"content": "Mocked intention: Investigate AI ethics.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(), "metadata": {"source": "mock_subconscious_node", "urgency": "medium", "impulse_type": "research_ai_ethics"}, 'type': 'received_subconscious_intention', 'id': 'i1'}]
+                    return [
+                        {"id": "t1", "type": "thought", "content": "Elaborated thought about the deadline from imprint.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(), "metadata": {"source_of_trigger": "imprint_deadline", "raw_trigger_content": "Imprint regarding a looming deadline.", "mood_at_generation": {"name": "stressed"}, "urgency": "high", "impulse_type": "task_focus_deadline"}},
+                        {"id": "t2", "type": "thought", "content": "A random musing about the color of the sky.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), "metadata": {"source_of_trigger": "internal_pondering", "mood_at_generation": {"name": "neutral"}, "urgency": "low"}}
+                    ]
                 return []
 
         class MockEthosCoreForSubconscious:
