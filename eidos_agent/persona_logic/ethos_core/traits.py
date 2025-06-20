@@ -144,6 +144,81 @@ class TraitsEngine:
         # Consider saving to file if persistence is desired after programmatic changes.
         # For now, changes are in-memory.
 
+    def get_descriptive_trait_summary(self) -> str:
+        """
+        Generates a human-readable summary of key personality traits for LLM prompts.
+        """
+        if not self._traits:
+            return "Pathos has a generally adaptive personality profile." # Default if no traits loaded
+
+        descriptions = []
+
+        # Define mappings for numeric traits (e.g., Big Five on a 0-1 scale)
+        # These trait names should match keys in the loaded traits data.
+        numeric_trait_definitions = {
+            "openness": {
+                "name": "Openness",
+                "bands": [(0.3, "Low (Practical, prefers routine)"), (0.7, "Moderate"), (1.0, "High (Imaginative, curious, open to new experiences)")],
+                "elaboration": " (Tendency to be creative and open to new ideas vs. conventional and preferring routine)"
+            },
+            "conscientiousness": {
+                "name": "Conscientiousness",
+                "bands": [(0.3, "Low (Spontaneous, can be disorganized)"), (0.7, "Moderate"), (1.0, "High (Organized, dependable, self-disciplined)")],
+                "elaboration": " (Tendency to be organized and dependable vs. easy-going and spontaneous)"
+            },
+            "extraversion": {
+                "name": "Extraversion",
+                "bands": [(0.3, "Low (Introverted, prefers solitude or small groups)"), (0.7, "Moderate"), (1.0, "High (Extraverted, outgoing, enjoys social interaction)")],
+                "elaboration": " (Tendency to be outgoing and sociable vs. reserved and preferring solitude)"
+            },
+            "agreeableness": {
+                "name": "Agreeableness",
+                "bands": [(0.3, "Low (Competitive, can be challenging)"), (0.7, "Moderate"), (1.0, "High (Cooperative, empathetic, kind)")],
+                "elaboration": " (Tendency to be compassionate and cooperative vs. analytical and detached)"
+            },
+            "neuroticism": { # Often framed as Emotional Stability (inverse of Neuroticism)
+                "name": "Emotional Stability (low Neuroticism)",
+                "bands": [(0.3, "Low (Prone to stress, experiences mood swings - High Neuroticism)"), (0.7, "Moderate"), (1.0, "High (Calm, emotionally stable, resilient - Low Neuroticism)")],
+                "elaboration": " (Tendency to be calm and emotionally stable vs. prone to stress and negative emotions)"
+            }
+        }
+
+        # Process numeric traits
+        for trait_key, definition in numeric_trait_definitions.items():
+            if trait_key in self._traits:
+                value = self._traits[trait_key]
+                if isinstance(value, (int, float)):
+                    desc = ""
+                    for threshold, band_desc in definition["bands"]:
+                        if value <= threshold:
+                            desc = f"{definition['name']}: {band_desc}"
+                            break
+                    if desc: # Add elaboration if you want, or keep it concise
+                        # desc += definition.get("elaboration","")
+                        descriptions.append(desc)
+                else:
+                    logger.warning(f"Trait '{trait_key}' expected numeric, got {type(value)}. Skipping for summary.")
+
+        # Process categorical traits (example)
+        categorical_traits = {
+            "verbosity_preference": "Verbosity Preference",
+            "humor_style": "Humor Style",
+            "primary_motivation": "Primary Motivation"
+            # Add other known categorical traits here
+        }
+        for trait_key, display_name in categorical_traits.items():
+            if trait_key in self._traits:
+                value = self._traits[trait_key]
+                if isinstance(value, str):
+                    descriptions.append(f"{display_name}: {value.capitalize()}")
+                # Can add handling for other types if needed
+
+        if not descriptions:
+            return "Pathos has a generally adaptive personality profile." # Fallback if no processable traits found
+
+        summary_prefix = "Pathos's key personality characteristics include: "
+        return summary_prefix + "; ".join(descriptions) + "."
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logger_main = logging.getLogger(__name__ + ".__main__")

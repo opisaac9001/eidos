@@ -16,7 +16,7 @@ try:
     from ....llm_integrations.llm_client import LLMClient
     from ....core.http_client_manager import HTTPClientManager
     from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
-    from ....persona_logic.ethos_core.core import EthosCore
+    from ....persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
     from ....persona_logic.ethos_core.memory_storage import MemoryEntry
     from .....persona_logic.chronos_engine import PATHOS_USER_ID
 except ImportError: # pragma: no cover
@@ -24,13 +24,14 @@ except ImportError: # pragma: no cover
     # Define dummy versions for parsing and basic type hinting
     class Config: # type: ignore
         @staticmethod
-        def get_llm_config(role_name: str) -> Optional[Dict[str, Any]]:
+        def get_llm_config(role_name: str) -> Optional[Dict[str, Any]]: # This dummy returns Dict, not LLMConfig alias directly
             print(f"DummyConfig: get_llm_config called for role {role_name}")
             if role_name == "FIRMAMENT_PRIMARY":
-                return {"role": role_name, "model": "dummy_model", "url": "http://dummy.url"}
+                return {"role": role_name, "model": "dummy_model", "url": "http://dummy.url"} # Example LLMConfig structure
             return None
 
-    LLMConfig = Dict[str, Any] # type: ignore
+    LLMConfig = Dict[str, Any] # type: ignore # Actual LLMConfig is a TypedDict, but Dict is fine for dummy
+
     MemoryEntry = Dict[str, Any] # type: ignore
     PATHOS_USER_ID = "pathos_dummy_user_id_if_import_fails" # Dummy value
 
@@ -60,12 +61,17 @@ except ImportError: # pragma: no cover
         async def startup(self): print("DummyHTTPClientManager: startup")
         async def shutdown(self): print("DummyHTTPClientManager: shutdown")
 
+    # Dummy EthosCore still needed if methods on self.ethos_core are called elsewhere in the class.
+    # For this task, we are only modifying __init__. If self.ethos_core is used, it should be set by a setter.
     class EthosCore: # type: ignore
-        def __init__(self, config: Any):
+        def __init__(self, config: Any = None): # Added default to config
             print("DummyEthosCore initialized.")
         async def get_memories_for_dream_seeding(self, user_id: str, lookback_days: int, limit: int, memory_types: Optional[List[str]] = None) -> List[MemoryEntry]:
             print(f"DummyEthosCore.get_memories_for_dream_seeding called for user {user_id}")
             return [{"type": "dummy_interaction", "content": "Dummy memory content from EthosCore.", "timestamp": datetime.now(timezone.utc).isoformat()}]
+        def get_current_mood(self) -> Dict[str, Any]: # Adding dummy for get_current_mood as it's used
+             print("DummyEthosCore.get_current_mood called.")
+             return {"name": "dummy_mood", "valence": 0, "arousal": 0}
 
 
     # Define a dummy EventBus if import fails, so the file can be parsed
@@ -85,11 +91,12 @@ EVENT_MEMORY_WRITE = "memory.write"                     # Event this adapter pub
 
 
 class OneirosAdapter:
+    # EthosCore is removed from __init__ params. If needed, it should be set via a dedicated setter method
+    # by the Firmament bootstrap process, similar to other adapters.
     def __init__(self,
                  http_client_manager: Optional[HTTPClientManager] = None,
                  llm_role_name: str = "FIRMAMENT_PRIMARY",
-                 oneiros_config: Optional[Dict[str, Any]] = None,
-                 ethos_core: Optional[EthosCore] = None):
+                 oneiros_config: Optional[Dict[str, Any]] = None):
         """
         Initializes the OneirosAdapter.
         This adapter can use an LLM to enhance dream generation if configured.
@@ -98,37 +105,47 @@ class OneirosAdapter:
             http_client_manager (Optional[HTTPClientManager], optional): Manager for HTTP clients. Defaults to None.
             llm_role_name (str, optional): The LLM role name to use for LLM-driven features. Defaults to "FIRMAMENT_PRIMARY".
             oneiros_config (Optional[Dict[str, Any]], optional): Configuration for the Oneiros module. Defaults to None.
-            ethos_core (Optional[EthosCore], optional): Instance of EthosCore for memory access. Defaults to None.
         """
         self.logger = logging.getLogger(__name__)
-        self.adapter_config = oneiros_config if oneiros_config else {}
+        self.adapter_config = oneiros_config if oneiros_config is not None else {} # Ensure {} if None
         self.http_client_manager = http_client_manager
         self.llm_role_name = llm_role_name
-        self.llm_config: Optional[LLMConfig] = None
-        self.ethos_core = ethos_core
+        self.llm_config: Optional[LLMConfig] = None # Correctly typed
+        self.ethos_core: Optional[EthosCore] = None # Initialize as None, to be set by a setter if used
 
         if http_client_manager: # Only try to get LLM config if a client manager is provided
-            self.llm_config = Config.get_llm_config(self.llm_role_name)
-            if not self.llm_config:
+            # Config.get_llm_config should ideally return Optional[LLMConfig]
+            # If it returns Optional[Dict], the type hint for self.llm_config handles it.
+            llm_config_data = Config.get_llm_config(self.llm_role_name)
+            if not llm_config_data:
                 self.logger.error(f"OneirosAdapter: LLM config for role '{self.llm_role_name}' not found.")
+                self.llm_config = None # Explicitly set to None
             else:
+                # Assuming llm_config_data is compatible with LLMConfig structure
+                self.llm_config = llm_config_data # type: ignore # If get_llm_config returns Dict instead of LLMConfig
                 self.logger.info(f"OneirosAdapter initialized for LLM role '{self.llm_role_name}'. Model: {self.llm_config.get('model')}")
         else: # No http_client_manager, so no LLM operations possible
+            self.llm_config = None # Explicitly set to None
             self.logger.info("OneirosAdapter initialized without HTTPClientManager. LLM operations will be disabled.")
 
-        if self.ethos_core:
-            self.logger.info("OneirosAdapter initialized with EthosCore instance.")
-        else:
-            self.logger.warning("OneirosAdapter initialized without EthosCore instance. Dream context from memories will be limited.")
+        # EthosCore is no longer passed in __init__, so related logging is removed.
+        # It will be set by a setter method by the Firmament system if needed.
+        # self.logger.info/warning for ethos_core removed here.
 
-        self.model_loaded = False # Existing attribute, relevance might change
+        self.model_loaded = False # Existing attribute
         self._initialize_oneiros_engine() # Existing method call
         self.logger.info(f"OneirosAdapter initialized. Model Loaded: {self.model_loaded}. Config: {self.adapter_config}")
 
 
+    # It's anticipated that EthosCore will be set using a setter method by Firmament core.
+    # Example:
+    # def set_ethos_core(self, ethos_core_instance: EthosCore):
+    #     self.ethos_core = ethos_core_instance
+    #     self.logger.info("EthosCore instance set on OneirosAdapter.")
+
     async def _get_recent_memories_for_dream_context(self) -> List[str]:
         if not self.ethos_core:
-            self.logger.warning("OneirosAdapter: EthosCore not available. Returning default placeholder memories.")
+            self.logger.warning("OneirosAdapter: EthosCore not available (has it been set via setter?). Returning default placeholder memories.")
             return ["Pathos recalls a day of quiet contemplation.", "A fleeting thought about the color blue."]
 
         try:
@@ -219,7 +236,7 @@ class OneirosAdapter:
         current_mood_name = "neutral" # Default mood
         if self.ethos_core:
             try:
-                mood_data = self.ethos_core.get_current_mood() # This is a synchronous method
+                mood_data = self.ethos_core.get_current_mood() # This is a synchronous method in EthosCore
                 if mood_data and isinstance(mood_data, dict) and "name" in mood_data:
                     current_mood_name = mood_data["name"]
                     # Ensure valence and arousal are numbers before formatting
@@ -234,7 +251,7 @@ class OneirosAdapter:
                 self.logger.error(f"Error fetching mood from EthosCore: {e_mood}", exc_info=True)
                 self.logger.info(f"Using default mood '{current_mood_name}' due to error.")
         else:
-            self.logger.info(f"EthosCore not available. Using default mood '{current_mood_name}'.")
+            self.logger.warning(f"EthosCore not available (has it been set via setter?). Using default mood '{current_mood_name}'.")
 
         # Get recent memories for dream context
         recent_memories_list = await self._get_recent_memories_for_dream_context()
@@ -433,9 +450,15 @@ if __name__ == '__main__':
         main_logger.info("\n--- Testing OneirosAdapter with HTTPClientManager (dummy) ---")
         dummy_http_client_manager = HTTPClientManager.instance() # Get dummy instance
 
-        class MockEthosCore: # Defined here for the test block
+
+        # MockEthosCore for testing purposes. In a real scenario, Firmament would inject this.
+        class MockEthosCoreForOneirosTest(EthosCore): # Inherits from dummy or real EthosCore
+            def __init__(self):
+                super().__init__(config=None) # Call parent __init__ if necessary
+                main_logger.info("MockEthosCoreForOneirosTest initialized for testing.")
+
             async def get_memories_for_dream_seeding(self, user_id, lookback_days, limit, memory_types):
-                main_logger.info(f"MockEthosCore.get_memories_for_dream_seeding called for user {user_id} (should be PATHOS_USER_ID: {PATHOS_USER_ID})")
+                main_logger.info(f"MockEthosCoreForOneirosTest.get_memories_for_dream_seeding called for user {user_id} (should be PATHOS_USER_ID: {PATHOS_USER_ID})")
                 assert user_id == PATHOS_USER_ID, f"MockEthosCore expected user_id {PATHOS_USER_ID}, got {user_id}"
                 return [
                     {"type": "interaction", "content": "Had a pleasant chat about the weather.", "timestamp": "2023-01-01T10:00:00Z", "salience": 0.7},
@@ -443,7 +466,7 @@ if __name__ == '__main__':
                 ]
 
             def get_current_mood(self) -> Dict[str, Any]: # This is synchronous
-                main_logger.info("MockEthosCore.get_current_mood called.")
+                main_logger.info("MockEthosCoreForOneirosTest.get_current_mood called.")
                 return {
                     "valence": 0.5,
                     "arousal": 0.3,
@@ -452,23 +475,29 @@ if __name__ == '__main__':
                     "hexus_snapshot": {"joy": 0.6, "stress": 0.1} # Dummy hexus snapshot
                 }
 
-        mock_ethos_core_instance = MockEthosCore()
+        mock_ethos_core_instance = MockEthosCoreForOneirosTest()
 
-        # No longer need to pass "pathos_user_id" in oneiros_config for the test, as it uses the imported constant.
         oneiros_adapter_with_llm = OneirosAdapter(
             http_client_manager=dummy_http_client_manager, # type: ignore
             llm_role_name="FIRMAMENT_PRIMARY",
-            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True},
-            ethos_core=mock_ethos_core_instance # type: ignore
+            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True}
+            # ethos_core is NOT passed in __init__ anymore
         )
+        # Simulate setting ethos_core via a setter (method would need to be added to OneirosAdapter)
+        oneiros_adapter_with_llm.ethos_core = mock_ethos_core_instance # type: ignore # Direct set for test
+        if hasattr(oneiros_adapter_with_llm, 'set_ethos_core'): # If a setter exists
+             # oneiros_adapter_with_llm.set_ethos_core(mock_ethos_core_instance) # type: ignore
+             pass # Call actual setter if it was added
+
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
 
 
         main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore ---")
         oneiros_adapter_no_llm = OneirosAdapter(
             oneiros_config={"model_type": "test_basic", "allow_basic_fallback": True}
-            # ethos_core is None by default
+            # ethos_core is None by default and not set for this test instance
         )
+        # ethos_core will be None for this instance, testing graceful handling
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_no_llm)
 
 
