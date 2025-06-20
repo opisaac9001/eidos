@@ -15,6 +15,7 @@ try:
     from ....persona_logic.ethos_core.core import EthosCore
     from ....persona_logic.chronos_engine.models import ActivitySlot
     from .....persona_logic.chronos_engine import PATHOS_USER_ID # Added module level
+    from datetime import time # Ensure time is imported for MockActivitySlot
     # Attempt to import ZoneInfo, fall back if not available (Python < 3.9)
     from zoneinfo import ZoneInfo
 except ImportError: # pragma: no cover
@@ -23,6 +24,8 @@ except ImportError: # pragma: no cover
     ZoneInfo = None # type: ignore
     PATHOS_USER_ID = "pathos_dummy_user_id_chronos_adapter" # Dummy for module level
     print("ChronosAdapter: Warning - Core Eidos components or ZoneInfo could not be imported. Using placeholders/dummies if defined or will raise errors.")
+    # time would be missing here if datetime isn't fully imported, but test mocks need it.
+    # However, datetime is already imported, so time should be accessible via datetime.time
 
 
 _ethos_core_instance: Optional[EthosCore] = None
@@ -159,10 +162,36 @@ def get_upcoming_blocks(count: int = 3) -> List[Dict[str, Any]]:
                     upcoming_blocks_dicts.append(block_dict)
 
             if len(upcoming_blocks_dicts) < count:
-                # tomorrow_date = today_date + timedelta(days=1) # Not used due to limitation
-                logger.info("ChronosAdapter: Fetching tomorrow's schedule for upcoming blocks is currently limited by ChronosEngine interface. Returning only today's remaining.")
-                # If ChronosEngine had get_schedule_for_date(target_date):
-                # tomorrows_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_schedule_for_date(tomorrow_date) etc.
+                tomorrow_date = today_date + timedelta(days=1)
+                logger.info(f"ChronosAdapter: Not enough blocks from today. Fetching schedule for tomorrow: {tomorrow_date.isoformat()}")
+
+                # Ensure CHRONOS_PATHOS_USER_ID is defined in this scope; using pathos_id_to_use which is PATHOS_USER_ID
+                tomorrows_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_schedule_for_date(
+                    target_date=tomorrow_date,
+                    user_id=pathos_id_to_use
+                )
+
+                for slot in tomorrows_schedule:
+                    if len(upcoming_blocks_dicts) >= count:
+                        break
+                    # Convert slot to dict and append (use the same conversion logic as for today's slots)
+                    pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
+                    pathos_tz = timezone.utc
+                    if ZoneInfo and pathos_tz_str.lower() != "utc":
+                        try: pathos_tz = ZoneInfo(pathos_tz_str)
+                        except Exception: pass
+
+                    start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
+                    end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                    block_dict = {
+                        "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
+                        "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
+                        "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
+                        "description": slot.activity_details.description if slot.activity_details else "",
+                        "location_hint": slot.activity_details.location_context if slot.activity_details else None,
+                        "slot_name": slot.slot_name, "status": slot.status
+                    }
+                    upcoming_blocks_dicts.append(block_dict)
 
         asyncio.run(_async_get_upcoming())
         return upcoming_blocks_dicts[:count]
@@ -216,8 +245,11 @@ if __name__ == '__main__':
             self.status = status
 
     class MockChronosEngine:
+        def __init__(self, parent_ethos_core: 'MockEthosCore'): # Store parent to access its methods if needed
+            self.parent_ethos_core = parent_ethos_core
+
         async def get_current_activity(self, current_datetime: datetime) -> Optional[MockActivitySlot]:
-            print(f"MockChronosEngine.get_current_activity called with time: {current_datetime}")
+            logger.info(f"MockChronosEngine.get_current_activity called with time: {current_datetime}")
             return MockActivitySlot(
                 id="mock_slot_123", activity_type="testing", activity_title="Mocked Activity from Chronos",
                 date=current_datetime.date(), start_time=current_datetime.time(),
@@ -225,24 +257,42 @@ if __name__ == '__main__':
                 description="This is a mocked activity for testing ChronosAdapter."
             )
 
+        async def get_todays_schedule_for_user(self) -> List[MockActivitySlot]:
+            logger.info(f"MockChronosEngine.get_todays_schedule_for_user called.")
+            now = await self.parent_ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
+            return [
+                MockActivitySlot("slot_future_today", "learning", "Future Learning Today", now.date(), (now + timedelta(hours=1)).time(), (now + timedelta(hours=2)).time())
+            ]
+
+        async def get_schedule_for_date(self, target_date: date, user_id: str) -> List[MockActivitySlot]:
+            logger.info(f"MockChronosEngine.get_schedule_for_date called for date {target_date}, user {user_id}")
+            now = await self.parent_ethos_core.get_local_datetime_for_user(user_id)
+            if target_date == (now.date() + timedelta(days=1)): # Tomorrow
+                return [
+                    MockActivitySlot("slot_tomorrow1", "work", "Work Tomorrow", target_date, time(9,0), time(10,0)),
+                    MockActivitySlot("slot_tomorrow2", "leisure", "Leisure Tomorrow", target_date, time(10,0), time(11,0))
+                ]
+            return []
+
+
     class MockEthosCore:
         PATHOS_USER_ID = "pathos_test_user_chronos_adapter" # Define for the mock
 
         def __init__(self):
-            self.chronos_engine = MockChronosEngine()
+            self.chronos_engine = MockChronosEngine(self) # Pass self to MockChronosEngine
             # Mock ethos_config as a simple dictionary for testing
             self.ethos_config = {"pathos_home_timezone": "America/New_York"}
 
         async def get_local_datetime_for_user(self, user_id: str) -> datetime:
-            print(f"MockEthosCore.get_local_datetime_for_user called for {user_id}")
-            assert user_id == self.PATHOS_USER_ID
+            logger.info(f"MockEthosCore.get_local_datetime_for_user called for {user_id}")
+            assert user_id == self.PATHOS_USER_ID # Use the class attribute for assertion
             tz_str = self.ethos_config.get('pathos_home_timezone', "UTC")
             tz = timezone.utc # Default
             if ZoneInfo and tz_str.lower() != "utc":
                 try:
                     tz = ZoneInfo(tz_str)
                 except Exception as e_tz:
-                    print(f"MockEthosCore Warning: Could not use timezone '{tz_str}': {e_tz}")
+                    logger.warning(f"MockEthosCore Warning: Could not use timezone '{tz_str}': {e_tz}")
             return datetime.now(tz)
 
     # Setup for the test
@@ -252,14 +302,14 @@ if __name__ == '__main__':
     logger.info("\n1. Testing get_current_block() with mocked EthosCore and ChronosEngine:")
     current_block_via_ethos = get_current_block()
     if current_block_via_ethos:
-        print("   Current Schedule Block (via mocked EthosCore):")
+        logger.info("   Current Schedule Block (via mocked EthosCore):")
         for key, value in current_block_via_ethos.items():
-            print(f"     {key}: {value}")
+            logger.info(f"     {key}: {value}")
         assert current_block_via_ethos["id"] == "mock_slot_123"
         assert current_block_via_ethos["name"] == "Mocked Activity from Chronos"
         assert "start_time_utc" in current_block_via_ethos # Check for UTC conversion
     else:
-        print("   get_current_block() returned None or an error block.")
+        logger.error("   get_current_block() returned None or an error block.")
 
 
     logger.info("\n2. Overriding current block for testing (still works):")
