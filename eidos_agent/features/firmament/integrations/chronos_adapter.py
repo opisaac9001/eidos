@@ -42,10 +42,11 @@ def set_ethos_core_for_chronos_adapter(ethos_core: EthosCore):
         logger.info(f"ChronosAdapter: EthosCore.chronos_engine is present: {_ethos_core_instance.chronos_engine is not None}")
 
 
-def get_current_block() -> Optional[Dict[str, Any]]:
+async def get_current_block() -> Optional[Dict[str, Any]]:
     """
     Fetches the current schedule block for Pathos from ChronosEngine via EthosCore.
     Returns the block data as a dictionary, or None if not found or error.
+    Now an async method.
     """
     global _current_block_override
     if _current_block_override:
@@ -57,20 +58,16 @@ def get_current_block() -> Optional[Dict[str, Any]]:
         return {"id": "error_no_ethos_chronos", "name": "Error: System Uninitialized", "type": "error", "description": "EthosCore/ChronosEngine missing."}
 
     try:
-        async def _async_get_block() -> Optional[ActivitySlot]:
-            pathos_id_to_use = PATHOS_USER_ID # Use module-level imported PATHOS_USER_ID
-            if hasattr(_ethos_core_instance, 'PATHOS_USER_ID') and _ethos_core_instance.PATHOS_USER_ID != PATHOS_USER_ID:
-                logger.warning(f"ChronosAdapter: EthosCore's PATHOS_USER_ID ({_ethos_core_instance.PATHOS_USER_ID}) differs from imported ({PATHOS_USER_ID}). Using imported.")
+        pathos_id_to_use = PATHOS_USER_ID
+        if hasattr(_ethos_core_instance, 'PATHOS_USER_ID') and _ethos_core_instance.PATHOS_USER_ID != PATHOS_USER_ID:
+            logger.warning(f"ChronosAdapter: EthosCore's PATHOS_USER_ID ({_ethos_core_instance.PATHOS_USER_ID}) differs from imported ({PATHOS_USER_ID}). Using imported.")
 
-            pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(
-                pathos_id_to_use
-            )
-            current_activity_slot: Optional[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_current_activity(
-                current_datetime=pathos_local_now
-            )
-            return current_activity_slot
-
-        current_slot: Optional[ActivitySlot] = asyncio.run(_async_get_block())
+        pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(
+            pathos_id_to_use
+        )
+        current_slot: Optional[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_current_activity(
+            current_datetime=pathos_local_now
+        )
 
         if current_slot:
             pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
@@ -114,10 +111,11 @@ def get_current_block() -> Optional[Dict[str, Any]]:
 
 # --- Other potential Chronos interactions (placeholders) ---
 
-def get_upcoming_blocks(count: int = 3) -> List[Dict[str, Any]]:
+async def get_upcoming_blocks(count: int = 3) -> List[Dict[str, Any]]:
     """
     Fetches a list of upcoming schedule blocks for Pathos.
     Combines today's remaining schedule with tomorrow's schedule if needed.
+    Now an async method.
     """
     if not _ethos_core_instance or not _ethos_core_instance.chronos_engine:
         logger.warning("ChronosAdapter Error: EthosCore or ChronosEngine not initialized. Cannot get upcoming blocks.")
@@ -126,74 +124,66 @@ def get_upcoming_blocks(count: int = 3) -> List[Dict[str, Any]]:
     upcoming_blocks_dicts: List[Dict[str, Any]] = []
 
     try:
-        # This function is synchronous, but EthosCore/ChronosEngine methods are async.
-        # Use asyncio.run() as a temporary bridge, similar to get_current_block.
-        async def _async_get_upcoming():
-            nonlocal upcoming_blocks_dicts # Allow modification of outer scope variable
+        pathos_id_to_use = PATHOS_USER_ID
 
-            pathos_id_to_use = PATHOS_USER_ID # Use module-level imported PATHOS_USER_ID
+        pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(pathos_id_to_use)
+        today_date = pathos_local_now.date()
+        current_time = pathos_local_now.time()
 
-            pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(pathos_id_to_use)
-            today_date = pathos_local_now.date()
-            current_time = pathos_local_now.time()
+        todays_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_todays_schedule_for_user()
 
-            todays_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_todays_schedule_for_user()
+        # Filter today's schedule for remaining blocks
+        for slot in todays_schedule:
+            if len(upcoming_blocks_dicts) >= count: break
+            if slot.end_time > current_time:
+                pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
+                pathos_tz = timezone.utc
+                if ZoneInfo and pathos_tz_str.lower() != "utc":
+                    try: pathos_tz = ZoneInfo(pathos_tz_str)
+                    except Exception: pass
 
-            # Filter today's schedule for remaining blocks
-            for slot in todays_schedule:
-                if len(upcoming_blocks_dicts) >= count: break
-                if slot.end_time > current_time: # Block ends after current time
-                    pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
-                    pathos_tz = timezone.utc
-                    if ZoneInfo and pathos_tz_str.lower() != "utc":
-                        try: pathos_tz = ZoneInfo(pathos_tz_str)
-                        except Exception: pass
+                start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
+                end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                block_dict = {
+                    "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
+                    "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
+                    "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
+                    "description": slot.activity_details.description if slot.activity_details else "",
+                    "location_hint": slot.activity_details.location_context if slot.activity_details else None,
+                    "slot_name": slot.slot_name, "status": slot.status
+                }
+                upcoming_blocks_dicts.append(block_dict)
 
-                    start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
-                    end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
-                    block_dict = {
-                        "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
-                        "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
-                        "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
-                        "description": slot.activity_details.description if slot.activity_details else "",
-                        "location_hint": slot.activity_details.location_context if slot.activity_details else None,
-                        "slot_name": slot.slot_name, "status": slot.status
-                    }
-                    upcoming_blocks_dicts.append(block_dict)
+        if len(upcoming_blocks_dicts) < count:
+            tomorrow_date = today_date + timedelta(days=1)
+            logger.info(f"ChronosAdapter: Not enough blocks from today. Fetching schedule for tomorrow: {tomorrow_date.isoformat()}")
 
-            if len(upcoming_blocks_dicts) < count:
-                tomorrow_date = today_date + timedelta(days=1)
-                logger.info(f"ChronosAdapter: Not enough blocks from today. Fetching schedule for tomorrow: {tomorrow_date.isoformat()}")
+            tomorrows_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_schedule_for_date(
+                target_date=tomorrow_date,
+                user_id=pathos_id_to_use
+            )
 
-                # Ensure CHRONOS_PATHOS_USER_ID is defined in this scope; using pathos_id_to_use which is PATHOS_USER_ID
-                tomorrows_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_schedule_for_date(
-                    target_date=tomorrow_date,
-                    user_id=pathos_id_to_use
-                )
+            for slot in tomorrows_schedule:
+                if len(upcoming_blocks_dicts) >= count:
+                    break
+                pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
+                pathos_tz = timezone.utc
+                if ZoneInfo and pathos_tz_str.lower() != "utc":
+                    try: pathos_tz = ZoneInfo(pathos_tz_str)
+                    except Exception: pass
 
-                for slot in tomorrows_schedule:
-                    if len(upcoming_blocks_dicts) >= count:
-                        break
-                    # Convert slot to dict and append (use the same conversion logic as for today's slots)
-                    pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
-                    pathos_tz = timezone.utc
-                    if ZoneInfo and pathos_tz_str.lower() != "utc":
-                        try: pathos_tz = ZoneInfo(pathos_tz_str)
-                        except Exception: pass
+                start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
+                end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                block_dict = {
+                    "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
+                    "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
+                    "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
+                    "description": slot.activity_details.description if slot.activity_details else "",
+                    "location_hint": slot.activity_details.location_context if slot.activity_details else None,
+                    "slot_name": slot.slot_name, "status": slot.status
+                }
+                upcoming_blocks_dicts.append(block_dict)
 
-                    start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
-                    end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
-                    block_dict = {
-                        "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
-                        "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
-                        "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
-                        "description": slot.activity_details.description if slot.activity_details else "",
-                        "location_hint": slot.activity_details.location_context if slot.activity_details else None,
-                        "slot_name": slot.slot_name, "status": slot.status
-                    }
-                    upcoming_blocks_dicts.append(block_dict)
-
-        asyncio.run(_async_get_upcoming())
         return upcoming_blocks_dicts[:count]
 
     except Exception as e:
@@ -226,7 +216,9 @@ def _set_current_block_for_testing(block_data: dict = None):
 
 
 if __name__ == '__main__':
-    print("--- Testing Chronos Adapter ---")
+    # Ensure logging is configured for the test run
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger.info("--- Testing Chronos Adapter (Async) ---")
 
     # Mock ActivitySlot and EthosCore for testing
     class MockActivitySlot:
