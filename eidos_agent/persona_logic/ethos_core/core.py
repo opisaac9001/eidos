@@ -3496,6 +3496,49 @@ if __name__ == '__main__':
 
         logger_main.info("--- Proactive Behavior tests finished ---")
 
+        # Now call the subconscious imprint creation test
+        await run_subconscious_imprint_creation_test(ethos_core_instance_arg)
+
+
+    async def run_subconscious_imprint_creation_test(ethos_core_instance_arg: EthosCore):
+        logger_main.info("\n\n--- Testing Subconscious Imprint Creation ---")
+        test_imprint_id = f"sim_imprint_{uuid.uuid4().hex}"
+        # PATHOS_USER_ID is available at the module level where EthosCore is defined
+        pathos_user_id_for_test = PATHOS_USER_ID
+
+        imprint_data = {
+            "id": test_imprint_id,
+            "type": "subconscious_imprint",
+            "content": "Test imprint: a fleeting thought about rain.",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "salience": 0.65,
+            "metadata": {
+                "source": "test_simulation_imprint_creation",
+                "user_id": pathos_user_id_for_test,
+                "mood_at_imprint": {"name": "introspective", "valence": 0.1, "arousal": 0.2},
+                "topics_from_imprint": ["weather", "patterns", "reflection"],
+                "urgency": "low"
+            }
+        }
+        logger_main.info(f"Attempting to add imprint with ID: {test_imprint_id}")
+        created_entry = await ethos_core_instance_arg.add_memory_entry(imprint_data, user_id_context=pathos_user_id_for_test)
+
+        assert created_entry is not None, "add_memory_entry returned None for subconscious_imprint"
+        assert created_entry.get('id') == test_imprint_id, f"Created entry ID mismatch. Expected {test_imprint_id}, got {created_entry.get('id')}"
+        logger_main.info(f"Subconscious imprint added successfully with ID: {created_entry.get('id')}")
+
+        logger_main.info(f"Attempting to retrieve imprint with ID: {test_imprint_id}")
+        retrieved_entry = await asyncio.to_thread(ethos_core_instance_arg.memory_storage.get_entry_by_id, test_imprint_id)
+
+        assert retrieved_entry is not None, f"Could not retrieve imprint with ID: {test_imprint_id}"
+        logger_main.info(f"Retrieved entry: {retrieved_entry.get('content')}")
+        assert retrieved_entry.get('type') == "subconscious_imprint", f"Type mismatch. Expected 'subconscious_imprint', got {retrieved_entry.get('type')}"
+        assert retrieved_entry.get('content') == imprint_data['content'], "Content mismatch."
+        assert retrieved_entry.get('metadata', {}).get('source') == "test_simulation_imprint_creation", "Metadata source mismatch."
+        assert retrieved_entry.get('metadata', {}).get('user_id') == pathos_user_id_for_test, "Metadata user_id mismatch."
+
+        logger_main.info("Subconscious imprint retrieved and verified successfully.")
+        logger_main.info("--- Subconscious Imprint Creation test finished ---")
 
     try:
         # Create dummy traits file for EthosCore's __main__ test if it doesn't exist
