@@ -31,6 +31,9 @@ try:
 
     # Import for Plugin System
     from .plugins.manager import PluginManager
+    # Import for the new memory event listener
+    from ...services.memory_event_listener import handle_memory_write_event, set_ethos_core_for_memory_event_listener
+
     if TYPE_CHECKING: # pragma: no cover
         from unittest.mock import MagicMock # For dummy type hints below if needed
 
@@ -177,6 +180,16 @@ def initialize_firmament_systems(): # Renamed for broader scope
             logger.info(f"Plugin loading phase complete. Active plugins: {active_plugin_names}")
         else: # pragma: no cover
             logger.error("Firmament: PluginManager or its core dependencies (NPCRegistry, Config) not available. Plugins not loaded.")
+
+        # Subscribe the generic memory write handler
+        if is_real_component('handle_memory_write_event'):
+            event_bus.subscribe("memory.write", handle_memory_write_event) # Assuming "memory.write" is the correct event name
+            logger.info("Firmament: Subscribed 'memory.write' event to MemoryEventListener.handle_memory_write_event.")
+            logger.warning("Firmament IMPORTANT: The MemoryEventListener's EthosCore instance MUST be set "
+                           "by the main application after EthosCore is initialized, using "
+                           "set_ethos_core_for_memory_event_listener(ethos_core_instance).")
+        else: # pragma: no cover
+            logger.error("Firmament: MemoryEventListener.handle_memory_write_event not available. Cannot subscribe.")
 
         logger.info("Firmament systems initialization process completed.")
     except Exception as e: # pragma: no cover

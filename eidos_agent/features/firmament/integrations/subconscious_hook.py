@@ -85,95 +85,92 @@ def set_ethos_core_for_subconscious_hook(ethos_core: EthosCore):
 
 def get_recent_subconscious_thoughts(limit: int = 5) -> List[Dict[str, Any]]:
     """
-    Fetches recent thoughts (memories of type 'thought' or 'received_subconscious_intention')
-    from EthosCore for Pathos.
+    Fetches recent thoughts and imprints from EthosCore for Pathos.
+    Returns a list of dictionaries, each representing a memory entry,
+    with an added 'primary_display_content' field.
     """
     if not _ethos_core_instance:
-        logger.warning("SubconsciousHook: EthosCore not initialized. Returning empty list for recent thoughts.")
+        logger.warning("SubconsciousHook: EthosCore not initialized. Returning empty list for recent thoughts/imprints.")
         return []
 
     try:
-        # These are typically Pathos's own thoughts or system-generated intentions for Pathos
-        # PATHOS_USER_ID is imported from chronos_engine at the top of the file.
-        # If that import fails, a dummy PATHOS_USER_ID is created at the module level.
-        # It's assumed that the _ethos_core_instance, if real, would use the real PATHOS_USER_ID internally
-        # or that its methods called with PATHOS_USER_ID would correctly resolve.
-        # For this function, we use the PATHOS_USER_ID available in its scope (either real or dummy).
-        pathos_user_id = PATHOS_USER_ID # Renamed for clarity within this function
+        pathos_user_id = PATHOS_USER_ID # Available from module-level import or dummy
 
-        combined_memories: List[MemoryEntry] = []
+        imprint_memories: List[MemoryEntry] = []
+        thought_memories: List[MemoryEntry] = []
+
         if hasattr(_ethos_core_instance, 'memory_storage') and _ethos_core_instance.memory_storage:
-            # Fetch 'subconscious_imprint'
+            # These are synchronous calls as per MemoryStorage's current design
             imprint_memories = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
-                entry_type='subconscious_imprint',
-                user_id=pathos_user_id,
-                limit=limit * 2 # Fetch more to allow for sorting with thoughts
+                entry_type='subconscious_imprint', user_id=pathos_user_id, limit=limit * 2
             )
-            combined_memories.extend(imprint_memories)
-
-            # Fetch 'thought'
-            thought_memories_list = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
-                entry_type='thought',
-                user_id=pathos_user_id,
-                limit=limit * 2 # Fetch more
+            thought_memories = _ethos_core_instance.memory_storage.get_entries_by_type_and_user(
+                entry_type='thought', user_id=pathos_user_id, limit=limit * 2
             )
-            combined_memories.extend(thought_memories_list)
-
-            # Sort combined list by timestamp descending
-            combined_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-
-            # Apply the overall limit
-            final_memories_to_process = combined_memories[:limit]
-
         else:
-            logger.warning("SubconsciousHook: EthosCore.memory_storage not available.")
+            logger.warning("SubconsciousHook: EthosCore.memory_storage not available. Cannot fetch thoughts/imprints.")
             return []
+
+        combined_memories = imprint_memories + thought_memories
+        # Sort by timestamp in descending order (most recent first)
+        combined_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        # Limit to the requested number of entries
+        final_memories_to_process = combined_memories[:limit]
 
         if not final_memories_to_process:
-            logger.info("SubconsciousHook: No recent 'subconscious_imprint' or 'thought' memories found.")
+            logger.info("SubconsciousHook: No recent 'subconscious_imprint' or 'thought' memories found to process.")
             return []
 
-        formatted_thoughts = []
+        processed_entries: List[Dict[str, Any]] = []
         for mem_entry in final_memories_to_process:
-            metadata = mem_entry.get('metadata', {})
             entry_type = mem_entry.get('type')
-            content = mem_entry.get('content', '')
+            entry_id = mem_entry.get('id', 'unknown_id')
 
-            formatted_thought = {
-                "timestamp": mem_entry.get('timestamp', datetime.now(timezone.utc).isoformat()),
-                "content": content, # Default to main content
-                "source": metadata.get('source', 'unknown_source'), # Generic source from metadata
-                "mood_at_thought": {"name": "neutral"}, # Default mood
-                "urgency": "low", # Default urgency
-                "impulse_type": None # Default
+            processed_entry_dict: Dict[str, Any] = {
+                "id": entry_id,
+                "timestamp": mem_entry.get('timestamp'),
+                "type": entry_type,
+                "content": mem_entry.get('content'), # Original content (elaborated for thoughts)
+                "metadata": mem_entry.get('metadata', {}).copy(), # Ensure a copy
+                "salience": mem_entry.get('salience'),
+                "primary_display_content": "" # Initialize
             }
 
-            if entry_type == 'subconscious_imprint':
-                formatted_thought["source"] = metadata.get('source', 'subconscious_node_imprint') # More specific
-                formatted_thought["mood_at_thought"] = metadata.get('mood_at_imprint', {"name": "neutral"})
-                formatted_thought["urgency"] = metadata.get('urgency', 'medium_from_imprint') # Or a fixed value
-                # 'impulse_type' might not be directly applicable for imprints, or derive from topics
-                if topics := metadata.get('topics_from_imprint'): # Python 3.8+ assignment expression
-                    formatted_thought["impulse_type"] = f"imprint_topic_{topics[0]}" if topics else "imprint_general"
+            if entry_type == 'thought':
+                elaborated_content = mem_entry.get('content')
+                if elaborated_content and str(elaborated_content).strip():
+                    processed_entry_dict["primary_display_content"] = str(elaborated_content).strip()
+                    logger.debug(f"Using elaborated content for thought ID {entry_id} as primary_display_content.")
                 else:
-                    formatted_thought["impulse_type"] = "imprint_general"
+                    raw_content = mem_entry.get('metadata', {}).get('raw_trigger_content')
+                    if raw_content and str(raw_content).strip():
+                        processed_entry_dict["primary_display_content"] = str(raw_content).strip()
+                        logger.debug(f"Using raw_trigger_content for thought ID {entry_id} as primary_display_content.")
+                    else:
+                        processed_entry_dict["primary_display_content"] = "[empty thought content]"
+                        logger.warning(f"Thought ID {entry_id} has no usable content for primary_display_content.")
 
-            elif entry_type == 'thought':
-                formatted_thought["source"] = metadata.get('source_of_trigger', metadata.get('source', 'ethos_core_thought'))
-                formatted_thought["mood_at_thought"] = metadata.get('mood_at_generation', metadata.get('mood', {"name": "neutral"}))
-                formatted_thought["urgency"] = metadata.get('urgency_of_trigger', metadata.get('urgency', 'low'))
-                formatted_thought["impulse_type"] = metadata.get('impulse_type')
-                if raw_content := metadata.get('raw_trigger_content'): # Python 3.8+ assignment expression
-                    logger.debug(f"Thought {mem_entry.get('id')} has raw_trigger_content: '{raw_content[:50]}...' (elaborated: '{content[:50]}...')")
-                    # Decision: For now, still using elaborated 'content'. If raw is needed, logic would change here.
+            elif entry_type == 'subconscious_imprint':
+                imprint_content = mem_entry.get('content')
+                if imprint_content and str(imprint_content).strip():
+                    processed_entry_dict["primary_display_content"] = str(imprint_content).strip()
+                    logger.debug(f"Using content for subconscious_imprint ID {entry_id} as primary_display_content.")
+                else:
+                    processed_entry_dict["primary_display_content"] = "[empty imprint content]"
+                    logger.warning(f"Subconscious_imprint ID {entry_id} has no usable content for primary_display_content.")
 
-            formatted_thoughts.append(formatted_thought)
+            else: # Should not happen
+                logger.warning(f"Unexpected memory type '{entry_type}' ID {entry_id}. Setting placeholder display content.")
+                processed_entry_dict["primary_display_content"] = "[unknown memory type content]"
 
-        logger.info(f"SubconsciousHook: Returning {len(formatted_thoughts)} combined formatted thoughts/imprints.")
-        return formatted_thoughts
+            processed_entries.append(processed_entry_dict)
+
+        logger.info(f"SubconsciousHook: Returning {len(processed_entries)} processed thoughts/imprints (dictionaries) (limit: {limit}).")
+        return processed_entries
 
     except Exception as e:
-        logger.error(f"SubconsciousHook: Error fetching combined thoughts/imprints: {e}", exc_info=True)
+        logger.error(f"SubconsciousHook: Error fetching or processing recent thoughts/imprints: {e}", exc_info=True)
         return []
 
 async def handle_thought_trigger(payload: dict): # Changed to async def
@@ -286,6 +283,9 @@ def register_thought_trigger_handler():
 
 
 if __name__ == '__main__': # pragma: no cover
+    import unittest.mock # Added for mocking
+    from ....services.memory_event_listener import handle_memory_write_event as memory_listener_handler, set_ethos_core_for_memory_event_listener
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # Set specific loggers to DEBUG if more detail is needed
     logging.getLogger('eidos_agent.features.firmament.integrations.subconscious_hook').setLevel(logging.DEBUG)
@@ -353,7 +353,13 @@ if __name__ == '__main__': # pragma: no cover
             PATHOS_USER_ID = TEST_PATHOS_USER_ID
             def __init__(self):
                 self.memory_storage = MockMemoryStorage()
-                logger.info("MockEthosCoreForSubconscious initialized with MockMemoryStorage.")
+                self.async_add_memory_entry_mock = unittest.mock.AsyncMock(return_value={"id": "mock_added_entry_id"}) # Simulate a return value
+                logger.info("MockEthosCoreForSubconscious initialized with MockMemoryStorage and async_add_memory_entry_mock.")
+
+            async def add_memory_entry(self, entry_data, user_id_context=None):
+                # This method will now call the mock
+                logger.info(f"MockEthosCoreForSubconscious.add_memory_entry called with type: {entry_data.get('type')}, user_context: {user_id_context}")
+                return await self.async_add_memory_entry_mock(entry_data, user_id_context)
 
         mock_ethos_sub_hook = MockEthosCoreForSubconscious()
         set_ethos_core_for_subconscious_hook(mock_ethos_sub_hook) # type: ignore
@@ -379,29 +385,64 @@ if __name__ == '__main__': # pragma: no cover
         original_event_bus_sh_guidance = EventBus.instance # type: ignore
         EventBus.instance = lambda: MockEventBusSHGuidance() # type: ignore
 
+        # Set the mocked EthosCore instance for the memory event listener
+        set_ethos_core_for_memory_event_listener(mock_ethos_sub_hook)
+
+        # Get the test event bus instance
+        mock_bus_instance_sh_guidance = EventBus.instance()
+        if hasattr(mock_bus_instance_sh_guidance, 'subscribe'):
+            mock_bus_instance_sh_guidance.subscribe("memory.write", memory_listener_handler) # type: ignore
+            logger.info("SubconsciousHook MainTest: Subscribed real memory_listener_handler to mock event bus for 'memory.write'.")
+        else:
+            logger.error("SubconsciousHook MainTest: Could not find mock_bus_instance_sh_guidance to subscribe memory_listener_handler.")
+
+
         # Test handle_thought_trigger (which might use LLM or dummy)
         print("\n--- Testing handle_thought_trigger ---")
-        # Use one of the thoughts fetched (or a new one) for handle_thought_trigger
         trigger_payload_for_handler = {
             "content": "A new thought just occurred: what if the sky is green elsewhere?",
             "mood": {"name": "pensive"}, "urgency": "low", "source":"test_main_direct_trigger",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-        print(f"Triggering handle_thought_trigger with: {trigger_payload_for_handler.get('content')}")
-        await handle_thought_trigger(trigger_payload_for_handler)
-        await asyncio.sleep(0.1)
+        logger.info(f"Publishing THOUGHT_TRIGGER event with: {trigger_payload_for_handler.get('content')}")
+        # from ..core.event_types import THOUGHT_TRIGGER # Already imported in main file
+        if hasattr(mock_bus_instance_sh_guidance, 'publish'):
+            mock_bus_instance_sh_guidance.publish(THOUGHT_TRIGGER, trigger_payload_for_handler) # type: ignore
+            await asyncio.sleep(0.2) # Allow time for async handlers to process
+        else:
+            logger.error("SubconsciousHook MainTest: mock_bus_instance_sh_guidance not found to publish THOUGHT_TRIGGER.")
+
 
         print("\n--- Subconscious Hook Test Run Completed ---")
         print("Review logs above for 'LLM elaborated thought to...' messages or errors.")
         print(f"Total events captured by mock EventBus for handle_thought_trigger: {len(_test_events_sh_main_guidance)}")
-        for evt in _test_events_sh_main_guidance:
-             if evt["event_type"] == "memory.write" and evt["data"].get("type") == "thought": # type: ignore
-                 print(f"  Logged thought content from handle_thought_trigger: {evt['data'].get('content')}") # type: ignore
+
+        # Verify EthosCore.add_memory_entry mock calls from memory_listener_handler
+        logger.info("Verifying EthosCore.add_memory_entry mock calls...")
+        # handle_thought_trigger publishes to "memory.write", which memory_listener_handler listens to,
+        # then memory_listener_handler calls ethos_core.add_memory_entry.
+        mock_ethos_sub_hook.async_add_memory_entry_mock.assert_called_once()
+
+        # Check the arguments of the call to the mock
+        # The mock was called with (entry_data, user_id_context)
+        # We want the first argument (entry_data), which is at index 0 of args list (call_args[0])
+        # and it's the first element of that inner list/tuple (call_args[0][0])
+        if mock_ethos_sub_hook.async_add_memory_entry_mock.call_args:
+            call_args = mock_ethos_sub_hook.async_add_memory_entry_mock.call_args[0][0]
+            assert call_args.get('type') == "thought", f"Expected memory type 'thought', got {call_args.get('type')}"
+            assert call_args.get('raw_trigger_content') == trigger_payload_for_handler['content'], "Raw content mismatch"
+            assert "dummy LLM elaboration of the thought: '" + trigger_payload_for_handler['content'] + "'" in call_args.get('content'), "Elaborated content mismatch"
+            assert call_args.get('mood_at_generation') == trigger_payload_for_handler['mood']['name'], "Mood mismatch"
+            assert call_args.get('source_of_trigger') == trigger_payload_for_handler['source'], "Source mismatch"
+            logger.info("Assertions for EthosCore.add_memory_entry (mocked) passed successfully for 'thought' creation.")
+        else:
+            assert False, "async_add_memory_entry_mock was called but call_args is None (should not happen if assert_called_once passed)"
 
         EventBus.instance = original_event_bus_sh_guidance # Restore
 
         # Attempt to shutdown HTTPClientManager if it was used
+        set_ethos_core_for_memory_event_listener(None) # Cleanup listener's EthosCore
         if 'HTTPClientManager' in globals() and callable(globals()['HTTPClientManager'].instance): # type: ignore
             mgr_instance = HTTPClientManager.instance() # type: ignore
             is_real_http_manager = not ("dummy" in str(type(mgr_instance)).lower())
