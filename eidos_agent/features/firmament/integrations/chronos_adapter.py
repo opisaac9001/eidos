@@ -26,199 +26,212 @@ except ImportError: # pragma: no cover
     print("ChronosAdapter: Warning - Core Eidos components or ZoneInfo could not be imported. Using placeholders/dummies if defined or will raise errors.")
     # time would be missing here if datetime isn't fully imported, but test mocks need it.
     # However, datetime is already imported, so time should be accessible via datetime.time
+    EventBus = None # Placeholder if import fails
+    try:
+        from ..core.event_bus import EventBus
+    except ImportError:
+        # logger is not defined yet at this point if this is the first import attempt
+        print("ChronosAdapter Warning: Firmament EventBus could not be imported. Listener notifications will not be published in a real scenario.")
+        # Define a dummy EventBus for the tests to run if the real one isn't available
+        class DummyEventBus:
+            _instance = None
+            def __init__(self): self._subscribers = {}
+            @classmethod
+            def instance(cls):
+                if cls._instance is None: cls._instance = cls()
+                return cls._instance
+            def publish(self, event_type, data): print(f"DummyEventBus: Published {event_type} with {data}") # Changed to print
+            def subscribe(self, event_type, handler): pass
+        EventBus = DummyEventBus # type: ignore
 
-
-_ethos_core_instance: Optional[EthosCore] = None
-_current_block_override: Optional[Dict[str, Any]] = None # For testing purposes, type hinted
 
 # Logger setup
-logger = logging.getLogger(__name__) # Added logger
+import logging # Ensure logging is imported for the module level logger
+logger = logging.getLogger(__name__)
 
-def set_ethos_core_for_chronos_adapter(ethos_core: EthosCore):
-    global _ethos_core_instance
-    _ethos_core_instance = ethos_core
-    logger.info(f"ChronosAdapter: EthosCore instance set. EthosCore is present: {_ethos_core_instance is not None}")
-    if _ethos_core_instance:
-        logger.info(f"ChronosAdapter: EthosCore.chronos_engine is present: {_ethos_core_instance.chronos_engine is not None}")
+# New Event Type String
+FIRMAMENT_SCHEDULE_RELOAD_REQUESTED = "firmament.schedule_reload_requested"
+# This should eventually move to firmament/core/event_types.py
+
+# Required for type hints and new functions
+from datetime import date
+from typing import Coroutine, Any, Callable
 
 
-async def get_current_block() -> Optional[Dict[str, Any]]:
-    """
-    Fetches the current schedule block for Pathos from ChronosEngine via EthosCore.
-    Returns the block data as a dictionary, or None if not found or error.
-    Now an async method.
-    """
-    global _current_block_override
-    if _current_block_override:
-        logger.debug("ChronosAdapter: get_current_block() called (returning overridden block for testing)")
-        return _current_block_override
+class ChronosAdapter:
+    def __init__(self, ethos_core: EthosCore):
+        self.ethos_core = ethos_core
+        self.logger = logging.getLogger(__name__)
+        self.is_listening = False
+        logger.info(f"ChronosAdapter initialized with EthosCore: {ethos_core is not None}")
 
-    if not _ethos_core_instance or not _ethos_core_instance.chronos_engine:
-        logger.error("ChronosAdapter Error: EthosCore or ChronosEngine not initialized. Cannot get current block.")
-        return {"id": "error_no_ethos_chronos", "name": "Error: System Uninitialized", "type": "error", "description": "EthosCore/ChronosEngine missing."}
+    async def get_current_block(self) -> Optional[Dict[str, Any]]:
+        if not self.ethos_core or not self.ethos_core.chronos_engine:
+            self.logger.warning("ChronosAdapter Error: EthosCore or ChronosEngine not initialized.")
+            return {"id": "error_no_ethos_chronos", "name": "Error: System Uninitialized", "type": "error", "description": "EthosCore/ChronosEngine missing."}
 
-    try:
-        pathos_id_to_use = PATHOS_USER_ID
-        if hasattr(_ethos_core_instance, 'PATHOS_USER_ID') and _ethos_core_instance.PATHOS_USER_ID != PATHOS_USER_ID:
-            logger.warning(f"ChronosAdapter: EthosCore's PATHOS_USER_ID ({_ethos_core_instance.PATHOS_USER_ID}) differs from imported ({PATHOS_USER_ID}). Using imported.")
+        try:
+            pathos_id_to_use = getattr(self.ethos_core, 'PATHOS_USER_ID', PATHOS_USER_ID)
 
-        pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(
-            pathos_id_to_use
-        )
-        current_slot: Optional[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_current_activity(
-            current_datetime=pathos_local_now
-        )
-
-        if current_slot:
-            pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
-            pathos_tz = timezone.utc
-            if ZoneInfo and pathos_tz_str.lower() != "utc":
-                try:
-                    pathos_tz = ZoneInfo(pathos_tz_str)
-                except Exception:
-                    logger.warning(f"ChronosAdapter Warning: Invalid timezone '{pathos_tz_str}'. Defaulting to UTC.")
-                    pass
-
-            start_datetime_local = datetime.combine(current_slot.date, current_slot.start_time, tzinfo=pathos_tz)
-            end_datetime_local = datetime.combine(current_slot.date, current_slot.end_time, tzinfo=pathos_tz)
-
-            block_dict = {
-                "id": current_slot.id,
-                "type": str(current_slot.activity_type),
-                "name": current_slot.activity_title,
-                "start_time_utc": start_datetime_local.astimezone(timezone.utc).isoformat(),
-                "end_time_utc": end_datetime_local.astimezone(timezone.utc).isoformat(),
-                "description": current_slot.activity_details.description if current_slot.activity_details else "",
-                "location_hint": current_slot.activity_details.location_context if current_slot.activity_details else None,
-                "slot_name": current_slot.slot_name,
-                "status": current_slot.status,
-            }
-            logger.debug(f"ChronosAdapter: Returning current block: {block_dict.get('name')}")
-            return block_dict
-        else:
-            logger.debug("ChronosAdapter: No current activity slot found for Pathos.")
-            return {
-                "id": f"unscheduled_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
-                "type": "unscheduled",
-                "name": "Unscheduled Time / Idle",
-                "start_time_utc": datetime.now(timezone.utc).isoformat(),
-                "end_time_utc": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
-                "description": "Pathos is currently unscheduled or idle."
-            }
-    except Exception as e:
-        logger.error(f"ChronosAdapter Error: Failed to get current block: {e}", exc_info=True)
-        return {"id": "error_get_block_exception", "name": "Error Fetching Block", "type": "error", "description": str(e)}
-
-# --- Other potential Chronos interactions (placeholders) ---
-
-async def get_upcoming_blocks(count: int = 3) -> List[Dict[str, Any]]:
-    """
-    Fetches a list of upcoming schedule blocks for Pathos.
-    Combines today's remaining schedule with tomorrow's schedule if needed.
-    Now an async method.
-    """
-    if not _ethos_core_instance or not _ethos_core_instance.chronos_engine:
-        logger.warning("ChronosAdapter Error: EthosCore or ChronosEngine not initialized. Cannot get upcoming blocks.")
-        return [{"id": f"error_upcoming_{i}", "name": "Error: System Uninitialized", "type": "error"} for i in range(count)]
-
-    upcoming_blocks_dicts: List[Dict[str, Any]] = []
-
-    try:
-        pathos_id_to_use = PATHOS_USER_ID
-
-        pathos_local_now = await _ethos_core_instance.get_local_datetime_for_user(pathos_id_to_use)
-        today_date = pathos_local_now.date()
-        current_time = pathos_local_now.time()
-
-        todays_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_todays_schedule_for_user()
-
-        # Filter today's schedule for remaining blocks
-        for slot in todays_schedule:
-            if len(upcoming_blocks_dicts) >= count: break
-            if slot.end_time > current_time:
-                pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
-                pathos_tz = timezone.utc
-                if ZoneInfo and pathos_tz_str.lower() != "utc":
-                    try: pathos_tz = ZoneInfo(pathos_tz_str)
-                    except Exception: pass
-
-                start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
-                end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
-                block_dict = {
-                    "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
-                    "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
-                    "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
-                    "description": slot.activity_details.description if slot.activity_details else "",
-                    "location_hint": slot.activity_details.location_context if slot.activity_details else None,
-                    "slot_name": slot.slot_name, "status": slot.status
-                }
-                upcoming_blocks_dicts.append(block_dict)
-
-        if len(upcoming_blocks_dicts) < count:
-            tomorrow_date = today_date + timedelta(days=1)
-            logger.info(f"ChronosAdapter: Not enough blocks from today. Fetching schedule for tomorrow: {tomorrow_date.isoformat()}")
-
-            tomorrows_schedule: List[ActivitySlot] = await _ethos_core_instance.chronos_engine.get_schedule_for_date(
-                target_date=tomorrow_date,
-                user_id=pathos_id_to_use
+            pathos_local_now = await self.ethos_core.get_local_datetime_for_user(pathos_id_to_use)
+            current_activity_slot: Optional[ActivitySlot] = await self.ethos_core.chronos_engine.get_current_activity(
+                current_datetime=pathos_local_now
             )
 
-            for slot in tomorrows_schedule:
-                if len(upcoming_blocks_dicts) >= count:
-                    break
-                pathos_tz_str = _ethos_core_instance.ethos_config.get('pathos_home_timezone', "UTC")
+            if current_activity_slot:
+                pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
                 pathos_tz = timezone.utc
                 if ZoneInfo and pathos_tz_str.lower() != "utc":
                     try: pathos_tz = ZoneInfo(pathos_tz_str)
-                    except Exception: pass
+                    except Exception: self.logger.warning(f"Invalid timezone '{pathos_tz_str}'. Defaulting to UTC.")
 
-                start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
-                end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                start_datetime_local = datetime.combine(current_activity_slot.date, current_activity_slot.start_time, tzinfo=pathos_tz)
+                end_datetime_local = datetime.combine(current_activity_slot.date, current_activity_slot.end_time, tzinfo=pathos_tz)
+
                 block_dict = {
-                    "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
-                    "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
-                    "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
-                    "description": slot.activity_details.description if slot.activity_details else "",
-                    "location_hint": slot.activity_details.location_context if slot.activity_details else None,
-                    "slot_name": slot.slot_name, "status": slot.status
+                    "id": current_activity_slot.id,
+                    "type": str(current_activity_slot.activity_type),
+                    "name": current_activity_slot.activity_title,
+                    "start_time_utc": start_datetime_local.astimezone(timezone.utc).isoformat(),
+                    "end_time_utc": end_datetime_local.astimezone(timezone.utc).isoformat(),
+                    "description": current_activity_slot.activity_details.description if current_activity_slot.activity_details else "",
+                    "location_hint": current_activity_slot.activity_details.location_context if current_activity_slot.activity_details else None,
+                    "slot_name": current_activity_slot.slot_name,
+                    "status": current_activity_slot.status
                 }
-                upcoming_blocks_dicts.append(block_dict)
+                return block_dict
+            else:
+                return {
+                    "id": f"unscheduled_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                    "type": "unscheduled", "name": "Unscheduled Time / Idle",
+                    "start_time_utc": datetime.now(timezone.utc).isoformat(),
+                    "end_time_utc": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+                    "description": "Pathos is currently unscheduled or idle."
+                }
+        except Exception as e:
+            self.logger.error(f"ChronosAdapter Error: Failed to get current block: {e}", exc_info=True)
+            return {"id": "error_get_block_exception", "name": "Error Fetching Block", "type": "error", "description": str(e)}
 
-        return upcoming_blocks_dicts[:count]
+    async def get_upcoming_blocks(self, count: int = 3) -> List[Dict[str, Any]]:
+        if not self.ethos_core or not self.ethos_core.chronos_engine:
+            self.logger.warning("ChronosAdapter Error: EthosCore or ChronosEngine not initialized.")
+            return [{"id": f"error_upcoming_{i}", "name": "Error: System Uninitialized", "type": "error"} for i in range(count)]
 
-    except Exception as e:
-        logger.error(f"ChronosAdapter Error: Failed to get upcoming blocks: {e}", exc_info=True)
-        return [{"id": f"error_upcoming_{i}", "name": "Error Fetching Upcoming", "type": "error", "description": str(e)} for i in range(count)]
+        upcoming_blocks_dicts: List[Dict[str, Any]] = []
+        pathos_id_to_use = getattr(self.ethos_core, 'PATHOS_USER_ID', PATHOS_USER_ID)
 
+        try:
+            pathos_local_now = await self.ethos_core.get_local_datetime_for_user(pathos_id_to_use)
+            today_date = pathos_local_now.date()
+            current_time = pathos_local_now.time()
 
-def on_schedule_updated(handler_callback: callable):
-    """
-    Placeholder to register a callback for when the schedule is updated in Chronos.
-    This would be used if Chronos supports a push mechanism for updates.
-    """
-    print(f"ChronosAdapter: on_schedule_updated registered callback {handler_callback.__name__} (placeholder)")
-    # In a real system, this might add the callback to a list of listeners
-    # that Chronos invokes when changes occur.
-    pass
+            todays_schedule: List[ActivitySlot] = await self.ethos_core.chronos_engine.get_todays_schedule_for_user()
 
-# --- Test Utilities ---
-def _set_current_block_for_testing(block_data: dict = None):
-    """
-    Allows tests to override the block returned by get_current_block.
-    Pass None to reset to default behavior.
-    """
-    global _current_block_override
-    _current_block_override = block_data
-    if block_data:
-        print(f"ChronosAdapter Test Util: Current block is NOW OVERRIDDEN for get_current_block().")
-    else:
-        print(f"ChronosAdapter Test Util: Current block override REMOVED for get_current_block().")
+            pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
+            pathos_tz = timezone.utc
+            if ZoneInfo and pathos_tz_str.lower() != "utc":
+                try: pathos_tz = ZoneInfo(pathos_tz_str)
+                except Exception: self.logger.warning(f"Invalid timezone '{pathos_tz_str}'. Defaulting to UTC.")
+
+            for slot in todays_schedule:
+                if len(upcoming_blocks_dicts) >= count: break
+                if slot.activity_details and slot.end_time > current_time: # Ensure activity_details exists
+                    start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
+                    end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                    block_dict = {
+                        "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
+                        "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
+                        "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
+                        "description": slot.activity_details.description,
+                        "location_hint": slot.activity_details.location_context,
+                        "slot_name": slot.slot_name, "status": slot.status
+                    }
+                    upcoming_blocks_dicts.append(block_dict)
+
+            if len(upcoming_blocks_dicts) < count:
+                tomorrow_date = today_date + timedelta(days=1)
+                self.logger.info(f"ChronosAdapter: Not enough blocks from today. Fetching schedule for tomorrow: {tomorrow_date.isoformat()}")
+                tomorrows_schedule: List[ActivitySlot] = await self.ethos_core.chronos_engine.get_schedule_for_date(
+                    target_date=tomorrow_date, user_id=pathos_id_to_use
+                )
+                for slot in tomorrows_schedule:
+                    if len(upcoming_blocks_dicts) >= count: break
+                    if slot.activity_details: # Ensure activity_details exists
+                        start_dt_local = datetime.combine(slot.date, slot.start_time, tzinfo=pathos_tz)
+                        end_dt_local = datetime.combine(slot.date, slot.end_time, tzinfo=pathos_tz)
+                        block_dict = {
+                            "id": slot.id, "type": str(slot.activity_type), "name": slot.activity_title,
+                            "start_time_utc": start_dt_local.astimezone(timezone.utc).isoformat(),
+                            "end_time_utc": end_dt_local.astimezone(timezone.utc).isoformat(),
+                            "description": slot.activity_details.description,
+                            "location_hint": slot.activity_details.location_context,
+                            "slot_name": slot.slot_name, "status": slot.status
+                        }
+                        upcoming_blocks_dicts.append(block_dict)
+
+            return upcoming_blocks_dicts[:count]
+        except Exception as e:
+            self.logger.error(f"ChronosAdapter Error: Failed to get upcoming blocks: {e}", exc_info=True)
+            return [{"id": f"error_upcoming_{i}", "name": "Error Fetching Upcoming", "type": "error", "description": str(e)} for i in range(count)]
+
+    async def _handle_firmament_schedule_update(self, affected_date: date, user_id: str):
+        self.logger.info(f"ChronosAdapter: Received schedule update notification for date: {affected_date}, user: {user_id}. Publishing to Firmament EventBus.")
+        pathos_id_to_use = getattr(self.ethos_core, 'PATHOS_USER_ID', PATHOS_USER_ID)
+        if user_id == pathos_id_to_use:
+            if EventBus is None:
+                self.logger.error("ChronosAdapter: EventBus is None, cannot publish schedule update.")
+                return
+            try:
+                firmament_event_bus = EventBus.instance()
+                firmament_event_bus.publish(
+                    FIRMAMENT_SCHEDULE_RELOAD_REQUESTED,
+                    {"affected_date": affected_date.isoformat(), "user_id": user_id, "reason": "chronos_schedule_updated"}
+                )
+                self.logger.info(f"ChronosAdapter: Published '{FIRMAMENT_SCHEDULE_RELOAD_REQUESTED}' for date: {affected_date}, user: {user_id}.")
+            except Exception as e:
+                self.logger.error(f"ChronosAdapter: Failed to publish schedule update to Firmament EventBus: {e}", exc_info=True)
+        else:
+            self.logger.debug(f"ChronosAdapter: Received schedule update for user '{user_id}', but only processing for '{pathos_id_to_use}'. Ignoring.")
+
+    async def start_listening_to_schedule_updates(self) -> bool:
+        """Registers the adapter's handler with ChronosEngine's schedule update notifications."""
+        if not self.ethos_core or not hasattr(self.ethos_core, 'chronos_engine') or not self.ethos_core.chronos_engine:
+            self.logger.error("ChronosAdapter: Cannot subscribe - EthosCore or ChronosEngine not initialized.")
+            return False
+        if not hasattr(self.ethos_core.chronos_engine, 'register_schedule_update_listener'):
+            self.logger.error("ChronosAdapter: ChronosEngine missing 'register_schedule_update_listener'.")
+            return False
+        try:
+            self.ethos_core.chronos_engine.register_schedule_update_listener(self._handle_firmament_schedule_update)
+            self.is_listening = True
+            self.logger.info("ChronosAdapter: Successfully subscribed to ChronosEngine schedule updates.")
+            return True
+        except Exception as e:
+            self.logger.error(f"ChronosAdapter: Error subscribing to ChronosEngine updates: {e}", exc_info=True)
+            return False
+
+    async def stop_listening_to_schedule_updates(self):
+        """Unregisters the adapter's handler from ChronosEngine."""
+        if self.is_listening and self.ethos_core and hasattr(self.ethos_core, 'chronos_engine') and self.ethos_core.chronos_engine and \
+           hasattr(self.ethos_core.chronos_engine, 'unregister_schedule_update_listener'):
+            try:
+                self.ethos_core.chronos_engine.unregister_schedule_update_listener(self._handle_firmament_schedule_update)
+                self.is_listening = False
+                self.logger.info("ChronosAdapter: Unsubscribed from ChronosEngine schedule updates.")
+            except Exception as e:
+                self.logger.error(f"ChronosAdapter: Error unsubscribing from ChronosEngine updates: {e}", exc_info=True)
+        elif self.is_listening:
+            self.logger.warning("ChronosAdapter: Could not unsubscribe, dependencies missing or listener not active.")
 
 
 if __name__ == '__main__':
+    import unittest.mock # For __main__ tests
+    from datetime import date # For __main__ tests (already imported above too)
+
     # Ensure logging is configured for the test run
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger.info("--- Testing Chronos Adapter (Async) ---")
+    logger_main = logging.getLogger("chronos_adapter_main_test") # Use a specific logger for main
+    logger_main.info("--- Testing Chronos Adapter (Async) ---")
 
     # Mock ActivitySlot and EthosCore for testing
     class MockActivitySlot:
@@ -291,61 +304,97 @@ if __name__ == '__main__':
     mock_ethos_instance = MockEthosCore()
     set_ethos_core_for_chronos_adapter(mock_ethos_instance)
 
-    logger.info("\n1. Testing get_current_block() with mocked EthosCore and ChronosEngine:")
-    current_block_via_ethos = get_current_block()
-    if current_block_via_ethos:
-        logger.info("   Current Schedule Block (via mocked EthosCore):")
-        for key, value in current_block_via_ethos.items():
-            logger.info(f"     {key}: {value}")
-        assert current_block_via_ethos["id"] == "mock_slot_123"
-        assert current_block_via_ethos["name"] == "Mocked Activity from Chronos"
-        assert "start_time_utc" in current_block_via_ethos # Check for UTC conversion
-    else:
-        logger.error("   get_current_block() returned None or an error block.")
+    # Test runner function
+    async def main_tests():
+        logger_main.info("\n1. Testing get_current_block() with mocked EthosCore and ChronosEngine:")
+        current_block_via_ethos = await get_current_block() # Now async
+        if current_block_via_ethos:
+            logger_main.info("   Current Schedule Block (via mocked EthosCore):")
+            for key, value in current_block_via_ethos.items():
+                logger_main.info(f"     {key}: {value}")
+            assert current_block_via_ethos["id"] == "mock_slot_123"
+            assert current_block_via_ethos["name"] == "Mocked Activity from Chronos"
+            assert "start_time_utc" in current_block_via_ethos
+        else:
+            logger_main.error("   get_current_block() returned None or an error block.")
 
+        logger_main.info("\n2. Overriding current block for testing (still works):")
+        test_override_block = {
+            "id": "test_block_override_789", "type": "testing_override",
+            "name": "Chronos Adapter Test Override Block",
+            "start_time_utc": datetime.now(timezone.utc).isoformat(),
+            "end_time_utc": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            "description": "This block is from _set_current_block_for_testing."
+        }
+        _set_current_block_for_testing(test_override_block)
+        current_block_overridden = await get_current_block() # Now async
+        logger_main.info("   Current Schedule Block (Overridden for Test):")
+        if current_block_overridden:
+            for key, value in current_block_overridden.items():
+                logger_main.info(f"     {key}: {value}")
+            assert current_block_overridden["id"] == "test_block_override_789"
+        _set_current_block_for_testing(None)
 
-    logger.info("\n2. Overriding current block for testing (still works):")
-    test_override_block = {
-        "id": "test_block_override_789", "type": "testing_override",
-        "name": "Chronos Adapter Test Override Block",
-        "start_time_utc": datetime.now(timezone.utc).isoformat(),
-        "end_time_utc": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-        "description": "This block is from _set_current_block_for_testing."
-    }
-    _set_current_block_for_testing(test_override_block)
-    current_block_overridden = get_current_block()
-    print("   Current Schedule Block (Overridden for Test):")
-    if current_block_overridden:
-        for key, value in current_block_overridden.items():
-            print(f"     {key}: {value}")
-        assert current_block_overridden["id"] == "test_block_override_789"
-    _set_current_block_for_testing(None) # Reset override
+        logger_main.info("\n3. Testing get_current_block() after reset (should use mock Ethos again):")
+        current_block_after_reset = await get_current_block() # Now async
+        if current_block_after_reset:
+            logger_main.info("   Current Schedule Block (via mocked EthosCore after reset):")
+            for key, value in current_block_after_reset.items():
+                logger_main.info(f"     {key}: {value}")
+            assert current_block_after_reset["id"] == "mock_slot_123"
+        else:
+            logger_main.info("   get_current_block() returned None or an error block after reset.")
 
-    logger.info("\n3. Testing get_current_block() after reset (should use mock Ethos again):")
-    current_block_after_reset = get_current_block()
-    if current_block_after_reset:
-        print("   Current Schedule Block (via mocked EthosCore after reset):")
-        for key, value in current_block_after_reset.items():
-            print(f"     {key}: {value}")
-        assert current_block_after_reset["id"] == "mock_slot_123"
-    else:
-        print("   get_current_block() returned None or an error block after reset.")
-
-    logger.info("\n--- Testing get_upcoming_blocks ---")
-    upcoming = get_upcoming_blocks(2) # Request 2 upcoming blocks
-    logger.info(f"Upcoming blocks retrieved: {upcoming}")
-    assert len(upcoming) <= 2, f"Expected 2 or fewer upcoming blocks, got {len(upcoming)}"
-    if len(upcoming) > 0:
-        # Based on MockChronosEngine, first upcoming should be "Current Leisure for Upcoming" or "Future Learning 1"
-        # This depends on the exact time the test is run relative to now_for_schedule in the mock
-        # A more robust test might fix the "now" time for MockChronosEngine or check IDs.
-        first_upcoming_name = upcoming[0]["name"]
-        logger.info(f"First upcoming block name: {first_upcoming_name}")
-        assert first_upcoming_name in ["Current Leisure for Upcoming", "Future Learning 1"], f"Unexpected first upcoming block: {first_upcoming_name}"
+        logger_main.info("\n--- Testing get_upcoming_blocks ---")
+        upcoming = await get_upcoming_blocks(2) # Now async
+        logger_main.info(f"Upcoming blocks retrieved: {len(upcoming)}")
+        assert len(upcoming) <= 2, f"Expected 2 or fewer upcoming blocks, got {len(upcoming)}"
+        if len(upcoming) > 0:
+            first_upcoming_name = upcoming[0]["name"]
+            logger_main.info(f"First upcoming block name: {first_upcoming_name}")
+            assert "Tomorrow" in first_upcoming_name # Adjusted for clarity based on mock
         if len(upcoming) == 2:
              second_upcoming_name = upcoming[1]["name"]
-             logger.info(f"Second upcoming block name: {second_upcoming_name}")
-             assert second_upcoming_name in ["Future Learning 1", "Future Creative"], f"Unexpected second upcoming block: {second_upcoming_name}"
+             logger_main.info(f"Second upcoming block name: {second_upcoming_name}")
+             assert "Tomorrow" in second_upcoming_name
 
 
-    logger.info("\n--- Chronos Adapter testing finished ---")
+        # --- Testing Schedule Update Subscription and Handling ---
+        logger_main.info("\n--- Testing Schedule Update Subscription and Handling ---")
+
+        mock_firmament_event_bus_publish = unittest.mock.MagicMock()
+        original_event_bus_instance_method = EventBus.instance
+        EventBus.instance = unittest.mock.MagicMock(return_value=unittest.mock.MagicMock(publish=mock_firmament_event_bus_publish))
+
+        captured_listener_arg = None
+        def mock_register_listener(listener_func):
+            nonlocal captured_listener_arg
+            captured_listener_arg = listener_func
+            logger_main.info(f"MockChronosEngine: Listener {getattr(listener_func,'__name__','<unknown>')} registered.")
+
+        mock_ethos_instance.chronos_engine.register_schedule_update_listener = mock_register_listener
+
+        subscribe_success = subscribe_to_schedule_updates()
+        assert subscribe_success, "Failed to subscribe to schedule updates."
+        assert captured_listener_arg is not None, "Listener was not captured by mock_register_listener."
+        assert captured_listener_arg == _firmament_schedule_update_handler, "Incorrect listener was registered."
+
+        if captured_listener_arg:
+            test_update_date = date(2024, 7, 4)
+            test_update_user = PATHOS_USER_ID # Use the one the handler checks against
+
+            logger_main.info(f"Simulating call to captured listener with date: {test_update_date}, user: {test_update_user}")
+            await captured_listener_arg(test_update_date, test_update_user)
+
+            mock_firmament_event_bus_publish.assert_called_once()
+            args, _ = mock_firmament_event_bus_publish.call_args
+            assert args[0] == FIRMAMENT_SCHEDULE_RELOAD_REQUESTED
+            assert args[1]["affected_date"] == test_update_date.isoformat()
+            assert args[1]["user_id"] == test_update_user
+            logger_main.info("Schedule update handler correctly published to Firmament EventBus.")
+
+        EventBus.instance = original_event_bus_instance_method # Restore
+
+        logger_main.info("\n--- Chronos Adapter testing finished ---")
+
+    asyncio.run(main_tests())

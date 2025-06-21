@@ -9,21 +9,26 @@ from .event_types import SCHEDULE_BLOCK_STARTED, SCHEDULE_BLOCK_ENDED, WORLD_EVE
 # --- Integration Imports ---
 from typing import Optional, Dict, Any, List # Ensure List is imported for type hints
 
+# Import ChronosAdapter class instead of global functions
 try:
-    from ..integrations.chronos_adapter import get_current_block # Now async
-    from ..integrations.chronos_adapter import _set_current_block_for_testing # For __main__
+    from ..integrations.chronos_adapter import ChronosAdapter
     from ....persona_logic.ethos_core.core import EthosCore
 except ImportError: # pragma: no cover
-    print("CRITICAL: Could not import from chronos_adapter or EthosCore. Simulator will use dummies.")
-    async def get_current_block(): return {"id": "dummy_error_block", "name": "Error Block", "type": "error"} #type:ignore
-    _set_current_block_for_testing = lambda d=None: None #type:ignore
+    print("CRITICAL: Could not import ChronosAdapter or EthosCore. Simulator will use dummies.")
+    class ChronosAdapter: # type: ignore
+        def __init__(self, ethos_core_mock): pass # Add dummy __init__
+        async def get_current_block(self):
+            # logger is not defined at module level yet if this dummy is hit during initial imports
+            print("Warning: Using DUMMY ChronosAdapter.get_current_block in simulator.")
+            return {"id": "dummy_error_block_sim_ca", "name": "Dummy Error Block (CA missing)", "type": "error"}
     class EthosCore: # type: ignore
         PATHOS_USER_ID = "dummy_pathos_user_sim_import_error"
-        def get_current_mood(self) -> Dict[str, Any]:
+        ethos_config = {"pathos_home_timezone": "UTC"} # Dummy config
+        async def get_local_datetime_for_user(self, user_id: str) -> datetime:
+            return datetime.now(timezone.utc)
+        def get_current_mood(self) -> Dict[str, Any]: # Added for NPC improvisation context
             print("Dummy EthosCore (simulator import error): get_current_mood called")
             return {"name": "dummy_neutral", "valence": 0.0, "arousal": 0.0}
-        async def get_local_datetime_for_user(self, user_id: str) -> datetime: # Add dummy async method
-            return datetime.now(timezone.utc)
 
 try:
     from ..core.event_handlers.random_events import maybe_trigger_random_event
@@ -80,6 +85,7 @@ EVENT_MEMORY_WRITE = "memory.write"
 
 _ethos_core_instance_for_sim: Optional[EthosCore] = None
 _npc_improviser_instance: Optional[NPCImproviser] = None
+_chronos_adapter_instance: Optional[ChronosAdapter] = None # Module-level instance for ChronosAdapter
 
 def set_ethos_core_for_simulator(ethos_core: EthosCore):
     global _ethos_core_instance_for_sim
@@ -91,13 +97,24 @@ def set_npc_improviser_for_simulator(improviser: NPCImproviser):
     _npc_improviser_instance = improviser
     logger.info(f"Simulator: NPCImproviser instance set. {_npc_improviser_instance is not None}")
 
-async def run_simulation_tick(): # Changed to async def
+def set_chronos_adapter_for_simulator(adapter: ChronosAdapter): # New setter for ChronosAdapter
+    global _chronos_adapter_instance
+    _chronos_adapter_instance = adapter
+    logger.info(f"Simulator: ChronosAdapter instance set. {_chronos_adapter_instance is not None}")
+
+async def run_simulation_tick():
     global _current_active_block_data
     current_time_iso_for_tick = datetime.now(timezone.utc).isoformat()
 
     # --- Schedule Block Transition Logic ---
-    new_block_data = await get_current_block() # Now awaited
+    if not _chronos_adapter_instance:
+        logger.error("Simulator: ChronosAdapter instance not set. Cannot get current block.")
+        new_block_data = {"id": "error_no_chronos_adapter", "name": "Error: ChronosAdapter Missing", "type": "error", "description": "ChronosAdapter not set in simulator."}
+    else:
+        new_block_data = await _chronos_adapter_instance.get_current_block()
+
     if not isinstance(new_block_data, dict) or not new_block_data.get("id"):
+        logger.warning(f"Simulator: Invalid or None block data received: {new_block_data}")
         if _current_active_block_data:
             EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "new_block_data_invalid_or_none"})
             _current_active_block_data = None
@@ -183,9 +200,17 @@ async def run_simulation_tick(): # Changed to async def
 
 
 if __name__ == '__main__': # pragma: no cover
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import patch, AsyncMock, MagicMock
     from collections import defaultdict
-    # from ....core.http_client_manager import HTTPClientManager # Not strictly needed for this test with MockNPCImproviser
+    from datetime import timedelta # Added for MockActivitySlotForSimTest
+    # Import the real ChronosAdapter for instantiation in test
+    from ..integrations.chronos_adapter import ChronosAdapter as RealChronosAdapter
+    # Import ActivitySlot for type hinting the mock, if available, otherwise use Any
+    try:
+        from ....persona_logic.chronos_engine.models import ActivitySlot as RealActivitySlotType
+    except ImportError:
+        RealActivitySlotType = Any # Fallback type
+
 
     logging.basicConfig(level=logging.INFO)
     sim_logger_main = logging.getLogger('eidos_agent.features.firmament.core.simulator')
@@ -235,17 +260,22 @@ if __name__ == '__main__': # pragma: no cover
 
     class MockEthosCoreForSimulator:
         PATHOS_USER_ID = "pathos_test_user_sim_main_async"
+        # This mock EthosCore will now need a mock chronos_engine for the ChronosAdapter
+        chronos_engine: Any = None # Will be set to MockSimChronosEngineForTest instance
+
         def __init__(self):
             self.ethos_config = {"pathos_home_timezone": "UTC"}
             sim_logger_main.info("MockEthosCoreForSimulator (async test) initialized.")
+
         def get_current_mood(self) -> Dict[str, Any]:
             sim_logger_main.info("MockEthosCoreForSimulator.get_current_mood called.")
             return {"name": "mocked_async_mood", "valence": 0.1, "arousal": 0.2}
+
         async def get_local_datetime_for_user(self, user_id: str) -> datetime:
             sim_logger_main.info(f"MockEthosCoreForSimulator.get_local_datetime_for_user for {user_id}")
             return datetime.now(timezone.utc)
 
-    class MockNPCImproviser:
+    class MockNPCImproviser: # This mock can remain largely the same
         def __init__(self, firmament_llm_role_name=None):
             sim_logger_main.info(f"MockNPCImproviser (async test) initialized with role: {firmament_llm_role_name}")
         async def improvise_npc(self, name_hint, subconscious_thought_context, scene_context):
@@ -259,22 +289,55 @@ if __name__ == '__main__': # pragma: no cover
         mock_ethos_sim_main = MockEthosCoreForSimulator()
         set_ethos_core_for_simulator(mock_ethos_sim_main)
 
-        test_improviser = MockNPCImproviser()
+        test_improviser = MockNPCImproviser() # This mock is fine
         set_npc_improviser_for_simulator(test_improviser)
 
-        sim_logger_main.info("\n--- Testing Simulator Tick (Now Async) ---")
+        # NEW: Setup ChronosAdapter and its dependencies for the simulator test
+        class MockActivitySlotForSimTest:
+            def __init__(self, id, activity_type, activity_title, date, start_time, end_time, description="Desc", location="Loc", slot_name="Slot", status="pending"):
+                self.id, self.activity_type, self.activity_title, self.date, self.start_time, self.end_time = id, activity_type, activity_title, date, start_time, end_time
+                self.activity_details = type('details', (), {'description': description, 'location_context': location})()
+                self.slot_name, self.status = slot_name, status
 
+        class MockSimChronosEngineForTest:
+            async def get_current_activity(self, current_datetime: datetime) -> Optional[MockActivitySlotForSimTest]:
+                sim_logger_main.debug(f"MockSimChronosEngineForTest.get_current_activity called at {current_datetime}")
+                # This is what ChronosAdapter's get_current_block will use
+                return MockActivitySlotForSimTest(
+                    id="test_sim_block_from_adapter", # New ID to confirm it's from this path
+                    activity_type="testing_adapter",
+                    activity_title="Activity Via Class Adapter", # New title
+                    date=current_datetime.date(),
+                    start_time=current_datetime.time(),
+                    end_time=(current_datetime + timedelta(hours=1)).time()
+                )
+
+        mock_ethos_sim_main.chronos_engine = MockSimChronosEngineForTest()
+
+        # Instantiate the real ChronosAdapter with the fully mocked EthosCore (which now has a mock chronos_engine)
+        chronos_adapter_instance_for_test = RealChronosAdapter(ethos_core=mock_ethos_sim_main) # type: ignore
+        set_chronos_adapter_for_simulator(chronos_adapter_instance_for_test)
+
+        sim_logger_main.info("\n--- Testing Simulator Tick (Now Async, with Class-based ChronosAdapter) ---")
+
+        # Remove the patch for the global get_current_block.
+        # The test will now go through _chronos_adapter_instance.get_current_block()
         with patch('eidos_agent.features.firmament.core.simulator.NPC_SYSTEM_AVAILABLE', True), \
              patch('eidos_agent.features.firmament.core.simulator.get_recent_subconscious_thoughts', return_value=mock_thoughts_main_async), \
              patch('eidos_agent.features.firmament.core.simulator.extract_character_references', return_value=[("Cassandra", mock_thoughts_main_async[0]['content'])]), \
              patch('eidos_agent.features.firmament.core.simulator.NPCRegistry.instance', return_value=mock_registry_main_inst_sim_async), \
              patch('eidos_agent.features.firmament.core.simulator.maybe_trigger_random_event'), \
-             patch('eidos_agent.features.firmament.core.simulator.get_plugin_manager', return_value=None), \
-             patch('eidos_agent.features.firmament.integrations.chronos_adapter.get_current_block', new_callable=AsyncMock) as mock_async_get_current_block: # Mock get_current_block as async
+             patch('eidos_agent.features.firmament.core.simulator.get_plugin_manager', return_value=None):
+            # NO MORE: patch('eidos_agent.features.firmament.integrations.chronos_adapter.get_current_block', ... )
 
-            mock_async_get_current_block.return_value = {"id": "test_sim_block_async_call", "name": "Activity Async Call", "type": "testing"}
+            await run_simulation_tick()
 
-            await run_simulation_tick() # Now awaited
+        # Assertion for block data should reflect what MockSimChronosEngineForTest provides via ChronosAdapter
+        block_started_events = [e for e in _test_events_captured_sim_main if e['type'] == str(SCHEDULE_BLOCK_STARTED)]
+        assert len(block_started_events) > 0, "Expected SCHEDULE_BLOCK_STARTED event"
+        if block_started_events:
+            assert block_started_events[0]['data']['block']['id'] == "test_sim_block_from_adapter"
+            assert block_started_events[0]['data']['block']['name'] == "Activity Via Class Adapter"
 
         assert len(mock_registry_main_inst_sim_async.npcs_registered_in_test) == 1, \
             f"Expected 1 NPC registered, got {len(mock_registry_main_inst_sim_async.npcs_registered_in_test)}"
