@@ -543,3 +543,208 @@ class PathosInterface:
 
         except Exception as e:
             logger.error(f"Error storing final interaction in Ethos: {e}", exc_info=True)
+
+    async def send_proactive_message(
+        self,
+        user_id: str,
+        message_type: str, # e.g., "proactive_greeting", "proactive_queued_topic"
+        message_content: str,
+        context_data: Optional[Dict[str, Any]] = None # e.g., the queued point memory for context
+    ):
+        """
+        Sends a fully formulated proactive message to a user and handles TTS.
+        This method does NOT call an LLM to generate the message_content.
+        """
+        if not user_id or not message_content:
+            logger.warning(f"PathosInterface: Attempted to send proactive message with missing user_id or content. User: {user_id}, Type: {message_type}")
+            return
+
+        logger.info(f"PathosInterface: Sending proactive message. User: '{user_id}', Type: '{message_type}', Content: '{message_content[:70]}...'")
+
+        # 1. Send the text message via WebSocket
+        if self.connection_manager:
+            ws_payload = {
+                "type": "proactive_message", # A distinct WebSocket message type
+                "payload": {
+                    "message_type": message_type,
+                    "text": message_content,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "context": context_data if context_data else {} # Include any relevant context
+                }
+            }
+            try:
+                await self.connection_manager.send_personal_message(ws_payload, user_id)
+                logger.debug(f"PathosInterface: Proactive text message sent to user '{user_id}'.")
+            except Exception as e:
+                logger.error(f"PathosInterface: Error sending proactive text message to user '{user_id}': {e}", exc_info=True)
+        else:
+            logger.error("PathosInterface: ConnectionManager not available. Cannot send proactive text message.")
+
+        # 2. Handle TTS for the proactive message
+        should_stream_tts = (
+            self.eidos_tts_service_instance and
+            self.eidos_tts_service_instance.is_available() and
+            self.audio_cache is not None
+        )
+
+        if should_stream_tts:
+            logger.debug(f"PathosInterface: Attempting TTS for proactive message to user '{user_id}'.")
+            proactive_tts_chunk_id_prefix = f"proactive_tts_{message_type}_{user_id}_"
+            tts_sequence_num = 0
+            try:
+                sentences = re.split(r'(?<=[.!?])\s+', message_content.strip())
+                for sentence_text in sentences:
+                    sentence = sentence_text.strip()
+                    if not sentence:
+                        continue
+
+                    forced_chunk_id = f"{proactive_tts_chunk_id_prefix}{uuid.uuid4().hex[:8]}_{tts_sequence_num}"
+
+                    asyncio.create_task(self.send_sentence_to_tts_and_notify_client(
+                        sentence=sentence,
+                        user_id=user_id,
+                        sequence_num=tts_sequence_num,
+                        forced_chunk_id=forced_chunk_id,
+                        chunk_id_prefix="proactive_tts_"
+                    ))
+                    tts_sequence_num += 1
+                logger.info(f"PathosInterface: Queued {tts_sequence_num} sentence(s) for proactive TTS for user '{user_id}'.")
+            except Exception as e_tts:
+                logger.error(f"PathosInterface: Error during proactive message TTS processing for user '{user_id}': {e_tts}", exc_info=True)
+        else:
+            logger.debug(f"PathosInterface: Proactive TTS not attempted for user '{user_id}' (service unavailable or cache missing).")
+
+if __name__ == '__main__':
+    import unittest.mock
+
+    # Basic Config for PathosInterface testing
+    class MockConfigForPathosInterface:
+        def __init__(self):
+            self.LLM: Dict[str, LLMConfig] = { # type: ignore
+                "PATHOS": {"url": "dummy_pathos_url", "model": "dummy_pathos_model", "timeout": 30.0},
+                "LOGOS_VISION": {"url": "dummy_vision_url", "model": "dummy_vision_model"}, # For vision description
+            }
+            self.ENABLE_PROACTIVE_BEHAVIOR = True # Assuming needed for EthosCore mock
+            self.ENABLE_LEARNING_FROM_FEEDBACK = True # Assuming needed for EthosCore mock
+            self.ENABLE_MOOD_SIMULATION = True
+            self.DYNAMIC_CONTEXT_ENABLED = True
+            self.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS = 1
+            self.DYNAMIC_CONTEXT_SIMILARITY_THRESHOLD = 0.75
+            self.ETHOS = { # Mock EthosConfig part
+                "persona_traits_file_path": "dummy_traits.json", # EthosCore might try to load this
+                 "retrieval_min_salience_for_pathos_context": 0.1,
+                 "retrieval_limit_for_pathos_context": 3,
+            }
+
+
+        def get_llm_config(self, role: str) -> Optional[LLMConfig]: # type: ignore
+            return self.LLM.get(role)
+
+        def get_ethos_config(self): # Mimic real Config
+            return self.ETHOS
+
+        @staticmethod
+        async def get_llm_config_with_auto_detection(role: str) -> Optional[LLMConfig]:
+            # Simplified for mock: return the base config directly
+            return MockConfigForPathosInterface().LLM.get(role)
+
+
+    # Mock External Services
+    MockEthosCore = unittest.mock.AsyncMock(spec=EthosCore)
+    MockLogosCore = unittest.mock.AsyncMock(spec=LogosCore)
+    MockConnectionManager = unittest.mock.AsyncMock(spec='eidos_agent.core.connection_manager.ConnectionManager') # Use string path if class not directly available
+    MockExternalTTSService = unittest.mock.AsyncMock(spec='eidos_agent.services.external_tts_service.ExternalTTSService') # Use string path
+
+    async def main_test_runner():
+        # Setup basic logging for the test
+        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logger_main_test = logging.getLogger("pathos_interface_main_test")
+
+        mock_config = MockConfigForPathosInterface()
+
+        # Instantiate mocks for EthosCore and LogosCore
+        mock_ethos = MockEthosCore()
+        mock_ethos.get_persona_directives.return_value = ["Be a test AI."]
+        mock_ethos.get_current_mood.return_value = {"name": "neutral", "valence": 0.0, "arousal": 0.0}
+        mock_ethos.get_current_activity_description.return_value = "testing"
+        mock_ethos.get_hexus_scores.return_value = {}
+        mock_ethos.get_user_profile_summary.return_value = "Test user profile."
+        mock_ethos.get_pathos_schedule_context_for_prompt.return_value = "Test schedule."
+        mock_ethos.get_pathos_aspirations_context_for_prompt.return_value = "Test aspirations."
+        mock_ethos.retrieve_relevant_memories.return_value = []
+        mock_ethos.get_todays_briefing_context_for_prompt.return_value = "Test briefing."
+        # Mock for traits integration in PromptBuilder
+        mock_ethos.traits_engine = unittest.mock.Mock()
+        mock_ethos.traits_engine.get_descriptive_trait_summary.return_value = "Test personality traits."
+
+
+        mock_logos = MockLogosCore()
+        mock_logos.execute_get_time.return_value = datetime.now(timezone.utc).isoformat()
+
+
+        mock_conn_mgr_instance = MockConnectionManager()
+
+        pathos_iface = PathosInterface(mock_config, mock_ethos, mock_logos, mock_conn_mgr_instance) # type: ignore
+
+        # Setup TTS Service and Cache for proactive message test
+        mock_tts_service_instance = MockExternalTTSService()
+        mock_tts_service_instance.is_available.return_value = True
+        pathos_iface.set_tts_service(mock_tts_service_instance) # Use the setter
+
+        pathos_iface.audio_cache = {}
+        pathos_iface.audio_cache_lock = asyncio.Lock()
+
+        # Patch the method that actually does the TTS sending for this unit test
+        with unittest.mock.patch.object(pathos_iface, 'send_sentence_to_tts_and_notify_client', new_callable=unittest.mock.AsyncMock) as mock_send_tts_chunk:
+            logger_main_test.info("\n--- Testing send_proactive_message ---")
+            test_user_id = "user_proactive_test_01"
+            test_message_type = "test_proactive_greeting"
+            test_message_content = "Hello there, friend! How are you doing today?" # Two sentences
+            test_context_data = {"source": "test_trigger"}
+
+            await pathos_iface.send_proactive_message(test_user_id, test_message_type, test_message_content, test_context_data)
+
+            # Check ConnectionManager call
+            mock_conn_mgr_instance.send_personal_message.assert_called_once()
+            args_cm, _ = mock_conn_mgr_instance.send_personal_message.call_args
+            sent_payload_cm = args_cm[0]
+            sent_to_user_cm = args_cm[1]
+
+            assert sent_to_user_cm == test_user_id
+            assert sent_payload_cm["type"] == "proactive_message"
+            assert sent_payload_cm["payload"]["message_type"] == test_message_type
+            assert sent_payload_cm["payload"]["text"] == test_message_content
+            assert sent_payload_cm["payload"]["context"] == test_context_data
+            logger_main_test.info("send_personal_message call verified for proactive message.")
+
+            # Check if TTS was attempted (split into 2 sentences)
+            assert mock_send_tts_chunk.call_count == 2, f"Expected 2 TTS calls, got {mock_send_tts_chunk.call_count}"
+
+            first_tts_call_args = mock_send_tts_chunk.call_args_list[0].kwargs
+            assert first_tts_call_args.get("sentence") == "Hello there, friend!"
+            assert first_tts_call_args.get("user_id") == test_user_id
+            assert first_tts_call_args.get("chunk_id_prefix") == "proactive_tts_"
+
+            second_tts_call_args = mock_send_tts_chunk.call_args_list[1].kwargs
+            assert second_tts_call_args.get("sentence") == "How are you doing today?"
+            assert second_tts_call_args.get("user_id") == test_user_id
+            logger_main_test.info("send_sentence_to_tts_and_notify_client calls verified for proactive message.")
+
+            logger_main_test.info("--- send_proactive_message test passed basic checks. ---")
+
+        # Test with TTS disabled
+        mock_tts_service_instance.is_available.return_value = False # Disable TTS
+        mock_send_tts_chunk.reset_mock()
+        mock_conn_mgr_instance.send_personal_message.reset_mock()
+
+        with unittest.mock.patch.object(pathos_iface, 'send_sentence_to_tts_and_notify_client', new_callable=unittest.mock.AsyncMock) as mock_send_tts_chunk_disabled:
+            logger_main_test.info("\n--- Testing send_proactive_message (TTS Disabled) ---")
+            await pathos_iface.send_proactive_message(test_user_id, "tts_disabled_test", "Single sentence.")
+            mock_conn_mgr_instance.send_personal_message.assert_called_once() # Still sends text
+            mock_send_tts_chunk_disabled.assert_not_called() # TTS method should not be called
+            logger_main_test.info("send_proactive_message with TTS disabled verified.")
+
+
+        logger_main_test.info("\n--- PathosInterface __main__ tests finished ---")
+
+    asyncio.run(main_test_runner())

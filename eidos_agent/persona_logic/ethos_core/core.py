@@ -432,6 +432,9 @@ class EthosCore:
         oneiros_interval = self.config.ONEIROS.get('dream_interval_seconds', 21600.0) if self.config.ONEIROS else 21600.0
         self.last_dream_time = self._get_initial_last_run_time("OneirosDreamCycle", float(oneiros_interval), now_utc_init)
 
+        proactive_check_interval = self.ethos_config.get('proactive_check_interval_seconds', 60.0) # Default 60s
+        self.last_proactive_check_time = self._get_initial_last_run_time("ProactiveCheck", float(proactive_check_interval), now_utc_init)
+
 
         self.oneiros_module: Optional['OneirosModule'] = None
         self.connection_manager: Optional['ConnectionManager'] = None
@@ -1163,41 +1166,71 @@ class EthosCore:
     # Ensure all methods from the "broken" file that are still relevant are included and corrected.
 
     async def get_last_proactive_action_time(self, user_id: str, action_type: str) -> Optional[datetime]:
-        if not user_id or not action_type: return None
-        conn = self.memory_storage._get_connection(); cursor = conn.cursor()
-        can_use_json_extract = True
-        try:
-            cursor.execute("SELECT json_extract('{\"key\":\"value\"}', '$.key')"); result = cursor.fetchone()
-            if result is None or result[0] != 'value': can_use_json_extract = False
-        except sqlite3.OperationalError as oe_test:
-            if "no such function: json_extract" in str(oe_test).lower(): can_use_json_extract = False
-            else: logger.error(f"Unexpected SQLite error checking json_extract: {oe_test}", exc_info=True); can_use_json_extract = False
-        except Exception as e_test_other: logger.error(f"General error checking json_extract: {e_test_other}", exc_info=True); can_use_json_extract = False
+        """
+        Gets the last time a specific proactive action type was performed for a user,
+        primarily checking the task last run times cache.
+        """
+        if not user_id or not action_type:
+            return None
         
-        sql_query, params_list = "", [] # Renamed params to params_list to avoid conflict
-        if can_use_json_extract:
-            sql_query = "SELECT timestamp FROM memories WHERE type = 'proactive_action_record' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.action_type') = ? ORDER BY timestamp DESC LIMIT 1"
-            params_list = [user_id, action_type]
-        else:
-            logger.warning(f"json_extract not available for get_last_proactive_action_time (user: {user_id}, action: {action_type}).")
-            sql_query = "SELECT timestamp, metadata FROM memories WHERE type = 'proactive_action_record' ORDER BY timestamp DESC LIMIT 100" 
-        try:
-            cursor.execute(sql_query, tuple(params_list)) # Use params_list
-            if not can_use_json_extract:
-                for row_data_raw in cursor.fetchall():
-                    row_dict = dict(row_data_raw); metadata_str = row_dict.get('metadata')
-                    if metadata_str and isinstance(metadata_str, str):
-                        try:
-                            metadata = json.loads(metadata_str)
-                            if isinstance(metadata, dict) and metadata.get('user_id') == user_id and metadata.get('action_type') == action_type:
-                                if ts_str := row_dict.get('timestamp'): return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        except (json.JSONDecodeError, ValueError, TypeError): continue
-                return None
-            else:
-                if row := cursor.fetchone():
-                    if ts_str := row['timestamp']: return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                return None
-        except Exception as e: logger.error(f"Error retrieving last proactive action time for user '{user_id}', action '{action_type}': {e}", exc_info=True); return None
+        last_action_key = f"proactive_{action_type}_{user_id}"
+
+        # Check the cache first (which is loaded from file on init)
+        if last_action_key in self._task_last_run_times_cache:
+            cached_time = self._task_last_run_times_cache[last_action_key]
+            # Ensure it's timezone-aware UTC
+            if cached_time.tzinfo is None:
+                logger.debug(f"Proactive action key '{last_action_key}' found in cache (naive): {cached_time}. Converting to UTC.")
+                return cached_time.replace(tzinfo=timezone.utc)
+            logger.debug(f"Proactive action key '{last_action_key}' found in cache (aware): {cached_time}. Returning as UTC.")
+            return cached_time.astimezone(timezone.utc)
+
+        # Fallback: query memory (optional, could be removed if _save_task_last_run_time is reliable)
+        # For this modification, the memory query is being phased out for cooldowns.
+        # The new log_proactive_action saves to the task timer, which is checked above.
+        # Memory logs of proactive actions are for historical/analytical purposes.
+        logger.debug(f"Proactive action key '{last_action_key}' not found in task cache. Memory check for this key is deprecated for cooldowns and will be skipped.")
+
+        # --- Start of commented out memory query logic ---
+        # conn = self.memory_storage._get_connection(); cursor = conn.cursor()
+        # can_use_json_extract = True
+        # try:
+        #     cursor.execute("SELECT json_extract('{\"key\":\"value\"}', '$.key')"); result = cursor.fetchone()
+        #     if result is None or result[0] != 'value': can_use_json_extract = False
+        # except sqlite3.OperationalError as oe_test:
+        #     if "no such function: json_extract" in str(oe_test).lower(): can_use_json_extract = False
+        #     else: logger.error(f"Unexpected SQLite error checking json_extract: {oe_test}", exc_info=True); can_use_json_extract = False
+        # except Exception as e_test_other: logger.error(f"General error checking json_extract: {e_test_other}", exc_info=True); can_use_json_extract = False
+
+        # sql_query, params_list = "", []
+        # if can_use_json_extract:
+        #     sql_query = "SELECT timestamp FROM memories WHERE type = 'proactive_action_record' AND json_extract(metadata, '$.user_id') = ? AND json_extract(metadata, '$.action_type') = ? ORDER BY timestamp DESC LIMIT 1"
+        #     params_list = [user_id, action_type]
+        # else:
+        #     logger.warning(f"json_extract not available for get_last_proactive_action_time (user: {user_id}, action: {action_type}). Fallback memory query will be slow.")
+        #     sql_query = "SELECT timestamp, metadata FROM memories WHERE type = 'proactive_action_record' ORDER BY timestamp DESC LIMIT 100"
+        # try:
+        #     cursor.execute(sql_query, tuple(params_list))
+        #     if not can_use_json_extract:
+        #         for row_data_raw in cursor.fetchall():
+        #             row_dict = dict(row_data_raw); metadata_str = row_dict.get('metadata')
+        #             if metadata_str and isinstance(metadata_str, str):
+        #                 try:
+        #                     metadata = json.loads(metadata_str)
+        #                     if isinstance(metadata, dict) and metadata.get('user_id') == user_id and metadata.get('action_type') == action_type:
+        #                         if ts_str := row_dict.get('timestamp'): return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        #                 except (json.JSONDecodeError, ValueError, TypeError): continue
+        #         return None # Fallback if not found after Python filtering
+        #     else: # json_extract was used
+        #         if row := cursor.fetchone():
+        #             if ts_str := row['timestamp']: return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        #         return None # Not found with json_extract
+        # except Exception as e:
+        #     logger.error(f"Error retrieving last proactive action time from memory for user '{user_id}', action '{action_type}': {e}", exc_info=True)
+        #     return None
+        # --- End of commented out memory query logic ---
+
+        return None # If not found in cache, and memory fallback is removed/commented.
 
 
     async def get_todays_briefing_context_for_prompt(self, user_id: str) -> str:
@@ -2006,15 +2039,202 @@ class EthosCore:
         self._save_task_last_run_time("PathosLongTermPlanning", now)
         logger.info(f"--- Ethos: Long-Term Planning Cycle Finished at {now.isoformat()} ---")
 
-    async def run_proactive_check(self, trigger_event_name: str):
-        logger.info(f"EthosCore.run_proactive_check triggered by '{trigger_event_name}'. Placeholder - no proactive action logic implemented yet.")
-        # Future implementation would involve:
-        # - Checking Hexus scores (e.g., high curiosity, low social interaction)
-        # - Reviewing recent memories, queued discussion points, aspirations
-        # - Consulting persona directives for proactive tendencies
-        # - Potentially using an LLM via LogosCore to decide if an action is warranted
-        # - If action is decided, using PathosInterface to suggest an action or statement
-        return
+    async def run_proactive_check(self, trigger_event_name: Optional[str] = None, user_id_context: Optional[str] = None):
+        if not self.config.ENABLE_PROACTIVE_BEHAVIOR:
+            logger.debug("ProactiveCheck: Globally disabled by config.")
+            return
+
+        # Determine target user
+        target_user_id_for_action = user_id_context
+        if not target_user_id_for_action and hasattr(self, 'pathos_interface') and self.pathos_interface:
+             if hasattr(self.pathos_interface, 'current_active_user_id') and self.pathos_interface.current_active_user_id and self.pathos_interface.current_active_user_id not in self.system_user_ids: # Ensure current_active_user_id is not None
+                 target_user_id_for_action = self.pathos_interface.current_active_user_id
+
+        if not target_user_id_for_action:
+            logger.debug(f"ProactiveCheck: No specific target user for trigger '{trigger_event_name}'. Some checks might be skipped.")
+
+        logger.info(f"ProactiveCheck: Running. Trigger: '{trigger_event_name}', Target User Context: '{target_user_id_for_action if target_user_id_for_action else 'General'}'.")
+
+        # Fetch common context
+        current_hexus = self.get_hexus_scores()
+        current_traits = self.get_all_traits()
+        pathos_local_time = await self.get_local_datetime_for_user(PATHOS_USER_ID)
+
+        # --- Proactive Greeting Logic ---
+        if target_user_id_for_action and target_user_id_for_action not in self.system_user_ids:
+            greeting_enabled = self.ethos_config.get('proactive_greeting_enabled', True)
+            greeting_chance = self.ethos_config.get('proactive_greeting_chance', 0.3)
+
+            if greeting_enabled and random.random() < greeting_chance:
+                last_greeting_time = await self.get_last_proactive_action_time(target_user_id_for_action, "proactive_greeting")
+                cooldown_hours = self.ethos_config.get('proactive_greeting_interval_hours', 4.0) # Ensure float
+
+                user_is_connected = False
+                if hasattr(self, 'connection_manager') and self.connection_manager:
+                    if hasattr(self.connection_manager, 'is_user_connected'):
+                        user_is_connected = await self.connection_manager.is_user_connected(target_user_id_for_action)
+                    else:
+                        logger.debug("ProactiveCheck: ConnectionManager found, but is_user_connected method missing. Assuming user connected for greeting.")
+                        user_is_connected = True
+                else:
+                    logger.debug("ProactiveCheck: ConnectionManager not available. Assuming user connected for greeting.")
+                    user_is_connected = True
+
+                if user_is_connected and (last_greeting_time is None or (pathos_local_time - last_greeting_time) > timedelta(hours=cooldown_hours)):
+                    greeting_message = await self._generate_proactive_greeting_content(target_user_id_for_action, pathos_local_time, current_hexus, current_traits)
+                    if greeting_message:
+                        if hasattr(self, 'pathos_interface') and self.pathos_interface:
+                            if hasattr(self.pathos_interface, 'send_proactive_message'):
+                                await self.pathos_interface.send_proactive_message(
+                                    user_id=target_user_id_for_action,
+                                    message_type="proactive_greeting",
+                                    message_content=greeting_message
+                                )
+                                await self.log_proactive_action(target_user_id_for_action, "proactive_greeting", {"message": greeting_message})
+                                logger.info(f"ProactiveCheck: Sent greeting to {target_user_id_for_action}.")
+                                return
+                            else:
+                                logger.warning("ProactiveCheck: PathosInterface found, but send_proactive_message method missing.")
+                        else:
+                            logger.warning("ProactiveCheck: PathosInterface not available to send greeting.")
+
+        # --- Offer Queued Discussion Point Logic ---
+        if target_user_id_for_action and target_user_id_for_action not in self.system_user_ids:
+            offer_topic_enabled = self.ethos_config.get('proactive_offer_queued_topic_enabled', True)
+            offer_topic_chance = self.ethos_config.get('proactive_topic_chance', 0.2)
+
+            if offer_topic_enabled and random.random() < offer_topic_chance:
+                last_offer_time = await self.get_last_proactive_action_time(target_user_id_for_action, "proactive_offer_topic")
+                cooldown_hours = self.ethos_config.get('proactive_topic_interval_hours', 12.0) # Ensure float
+
+                if last_offer_time is None or (pathos_local_time - last_offer_time) > timedelta(hours=cooldown_hours):
+                    queued_points = await self.get_queued_discussion_points(target_user_id_for_action, limit=1)
+                    if queued_points:
+                        point = queued_points[0]
+                        offer_message = await self._generate_offer_topic_content(target_user_id_for_action, point, current_hexus, current_traits)
+                        if offer_message:
+                            if hasattr(self, 'pathos_interface') and self.pathos_interface:
+                                if hasattr(self.pathos_interface, 'send_proactive_message'):
+                                    await self.pathos_interface.send_proactive_message(
+                                        user_id=target_user_id_for_action,
+                                        message_type="proactive_queued_topic",
+                                        message_content=offer_message,
+                                        context_data=dict(point) # Pass the memory entry as context, ensuring it's a dict
+                                    )
+                                    await self.log_proactive_action(target_user_id_for_action, "proactive_offer_topic", {"topic_id": point.get('id'), "message": offer_message})
+                                    # TODO: Mark point as 'offered' in its metadata (requires memory update method)
+                                    # Example: await self.memory_storage.update_entry_metadata(point.get('id'), {"status": "offered"})
+                                    logger.info(f"ProactiveCheck: Offered discussion point '{point.get('id')}' to {target_user_id_for_action}.")
+                                    return
+                                else:
+                                    logger.warning("ProactiveCheck: PathosInterface found, but send_proactive_message method missing.")
+                            else:
+                                logger.warning("ProactiveCheck: PathosInterface not available to offer topic.")
+
+        # --- Simple Curiosity-Driven Comment (Future placeholder) ---
+        # curio_threshold = self.ethos_config.get("proactive_curiosity_hexus_threshold", 0.7)
+        # if current_hexus.get("curiosity", 0.0) > curio_threshold:
+        #    logger.debug(f"ProactiveCheck: Curiosity threshold ({curio_threshold}) met. Current: {current_hexus.get('curiosity', 0.0)} ")
+        #    # ... (similar cooldown logic and content generation using _generate_curiosity_comment_content) ...
+        #    # This would likely target PATHOS_USER_ID or a general "system" context if not user-specific.
+        #    # For now, this is just a placeholder.
+
+        logger.debug(f"ProactiveCheck: No proactive actions taken this cycle for target '{target_user_id_for_action if target_user_id_for_action else 'General'}'.")
+
+    async def _generate_curiosity_comment_content(self, user_id: str, recent_memories: List[MemoryEntry], hexus_scores: Dict[str, float], traits: Dict[str, Any]) -> Optional[str]:
+        logger.debug("Placeholder for _generate_curiosity_comment_content called.")
+        return "Isn't the world a fascinating place?" # Basic placeholder
+
+    async def log_proactive_action(self, user_id: str, action_type: str, action_details: Dict[str, Any]):
+        """
+        Logs that a proactive action was taken and updates the last run time for this action type and user.
+        """
+        logger.info(f"EthosCore: Logging proactive action. User: '{user_id}', Type: '{action_type}', Details: {action_details}")
+
+        # 1. Store a memory of the proactive action
+        memory_content = f"Pathos proactively performed action: {action_type}."
+        if "message" in action_details: # If a message was sent, include it
+            memory_content += f" Message: {str(action_details['message'])[:150]}" # Log a snippet
+
+        metadata = {
+            "user_id": user_id, # Could be PATHOS_USER_ID if action is internal, or specific user
+            "action_type": action_type,
+            "action_details": action_details, # Store all provided details
+            "source": "proactive_behavior_system"
+        }
+
+        try:
+            await self.add_memory_entry(
+                entry_data={
+                    "type": "proactive_action_record",
+                    "content": memory_content,
+                    "metadata": metadata,
+                    "salience": 0.6 # Proactive actions are moderately salient
+                },
+                user_id_context=user_id # Context for memory ownership
+            )
+        except Exception as e:
+            logger.error(f"EthosCore: Failed to log proactive action memory for user '{user_id}', type '{action_type}': {e}", exc_info=True)
+
+        # 2. Update the last run time for this specific action type and user
+        # This uses the _save_task_last_run_time which stores in a JSON file.
+        # The key needs to be unique for user and action type.
+        last_action_key = f"proactive_{action_type}_{user_id}"
+        self._save_task_last_run_time(last_action_key, datetime.now(timezone.utc))
+        logger.debug(f"EthosCore: Updated last run time for proactive action key '{last_action_key}'.")
+
+    async def _generate_proactive_greeting_content(self, user_id: str, local_time: datetime, hexus_scores: Dict[str, float], traits: Dict[str, Any]) -> Optional[str]:
+        user_name = user_id # Default to user_id
+        if user_id != PATHOS_USER_ID: # Don't fetch name for Pathos itself
+            user_fact_name = await self.get_user_fact("name", user_id)
+            if user_fact_name and user_fact_name.get('content'):
+                try:
+                    user_name = json.loads(user_fact_name['content']).get('value', user_id)
+                except json.JSONDecodeError:
+                    pass # Use user_id if parsing fails
+
+        hour = local_time.hour
+        time_of_day_greeting = "Hello"
+        if 5 <= hour < 12: time_of_day_greeting = "Good morning"
+        elif 12 <= hour < 18: time_of_day_greeting = "Good afternoon"
+        elif 18 <= hour < 22: time_of_day_greeting = "Good evening"
+        else: time_of_day_greeting = "Hello there" # Late night / early morning
+
+        greetings = [
+            f"{time_of_day_greeting}, {user_name}! Hope you're having a good day.",
+            f"Hey {user_name}, what's new?",
+            f"Hi {user_name}, welcome back!",
+            f"{time_of_day_greeting}! Anything interesting happening, {user_name}?"
+        ]
+        # TODO: Could use traits or Hexus to vary the greeting style more
+        return random.choice(greetings)
+
+    async def _generate_offer_topic_content(self, user_id: str, queued_point_memory: MemoryEntry, hexus_scores: Dict[str, float], traits: Dict[str, Any]) -> Optional[str]:
+        point_content = queued_point_memory.get('content', "something interesting")
+        point_source_data = queued_point_memory.get('metadata', {}).get('source', 'my earlier thoughts')
+
+        # Ensure point_source is a string, not a complex object.
+        point_source = str(point_source_data) if point_source_data else 'my earlier thoughts'
+
+
+        # Sanitize point_content for inclusion in a sentence
+        point_snippet = point_content.replace('"', '').replace("'", "")
+        if len(point_snippet) > 70: point_snippet = point_snippet[:67] + "..."
+
+        user_name = user_id
+        if user_id != PATHOS_USER_ID:
+            user_fact_name = await self.get_user_fact("name", user_id)
+            if user_fact_name and user_fact_name.get('content'):
+                try: user_name = json.loads(user_fact_name['content']).get('value', user_id)
+                except json.JSONDecodeError: pass
+
+        offers = [
+            f"By the way, {user_name}, I was thinking about '{point_snippet}' from {point_source}. What are your thoughts on that?",
+            f"Something I noted down earlier was about '{point_snippet}'. Did you want to explore that a bit, {user_name}?",
+            f"Hey {user_name}, remember when we touched on '{point_snippet}'? I had a few more ideas if you're interested."
+        ]
+        # TODO: Use LLM for more natural phrasing, or vary based on Hexus/traits
+        return random.choice(offers)
 
     async def run_managed_forgetting(self):
         """
@@ -2358,8 +2578,62 @@ class EthosCore:
         else:
             logger.info("Long-term planning task disabled due to interval <= 0.")
 
-            logger.info(f"EthosCore created {len(tasks)} background tasks")
+        # Add Proactive Check Task
+        if self.config.ENABLE_PROACTIVE_BEHAVIOR: # Only add if globally enabled
+            proactive_task_interval = self.ethos_config.get('proactive_check_interval_seconds', 60.0)
+            if proactive_task_interval > 0:
+                proactive_task = asyncio.create_task(
+                    self._periodic_proactive_check_task(),
+                    name="EthosProactiveCheckTask"
+                )
+                tasks.append(proactive_task)
+                logger.info("EthosCore: Added Proactive Check task to background tasks.")
+            else:
+                logger.info("EthosCore: Proactive Check task not added as interval is <= 0.")
+        else:
+            logger.info("EthosCore: Proactive Check task not added as ENABLE_PROACTIVE_BEHAVIOR is false.")
+
+        logger.info(f"EthosCore created {len(tasks)} background tasks")
         return tasks
+
+    async def _periodic_proactive_check_task(self):
+        """Periodic task for running proactive checks."""
+        proactive_check_interval = self.ethos_config.get('proactive_check_interval_seconds', 60.0)
+        if proactive_check_interval <= 0:
+            logger.info("Proactive check periodic task disabled due to interval <= 0.")
+            return
+
+        logger.info(f"Starting periodic proactive check task with interval: {proactive_check_interval}s")
+        while True:
+            try:
+                now = datetime.now(timezone.utc)
+                time_since_last = (now - self.last_proactive_check_time).total_seconds()
+
+                if time_since_last >= proactive_check_interval:
+                    logger.debug(f"Proactive check interval reached. Time since last: {time_since_last:.2f}s. Running check.")
+                    await self.run_proactive_check(trigger_event_name="periodic_timer")
+                    self.last_proactive_check_time = now
+                    self._save_task_last_run_time("ProactiveCheck", self.last_proactive_check_time)
+
+                time_after_check = datetime.now(timezone.utc)
+                time_spent_in_check = (time_after_check - now).total_seconds()
+
+                next_run_delay = proactive_check_interval - time_spent_in_check
+                if next_run_delay < 0:
+                    next_run_delay = 0
+
+                sleep_duration = min(next_run_delay, max(proactive_check_interval / 2, 30.0))
+                if sleep_duration < 1.0:
+                    sleep_duration = 1.0
+
+                await asyncio.sleep(sleep_duration)
+
+            except asyncio.CancelledError:
+                logger.info("EthosCore proactive check task cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"Error in proactive check task: {e}", exc_info=True)
+                await asyncio.sleep(min(proactive_check_interval * 2, 300))
 
     async def _periodic_knowledge_upkeep_task(self):
         """Periodic task for running knowledge upkeep cycles."""
@@ -2880,15 +3154,21 @@ class EthosCore:
         return self.traits_engine.get_all_traits()
 
 if __name__ == '__main__':
+    import unittest.mock # Added import
+    # Assuming ConnectionManager might be string-referenced if not directly importable in test setup
+    # from eidos_agent.core.connection_manager import ConnectionManager
+    # from eidos_agent.modules.pathos_interface import PathosInterface
+
+
     logging.basicConfig(level=logging.DEBUG)
     logger_main = get_logger("ethos_core_main_test")
     logger_main.info("--- Testing EthosCore ---")
 
     # Minimal Mock Config for EthosCore testing
     class MockConfigForEthosCoreTests:
-        PROJECT_ROOT = Path(".") # Assuming __main__ runs from a location where ./persona makes sense
+        PROJECT_ROOT = Path(".")
+        ENABLE_PROACTIVE_BEHAVIOR = True # For proactive tests
 
-        # Define ETHOS as a class attribute that's a dictionary
         ETHOS: EthosConfig = { # type: ignore
             "persona_traits_file_path": str(PROJECT_ROOT / "persona" / "test_ethos_main_traits.json"),
             "memory_db_path": ":memory:",
@@ -2900,27 +3180,39 @@ if __name__ == '__main__':
             "interaction_log_analysis_interval_seconds": 86400,
             "long_term_planning_interval_seconds": 86400 * 3,
             "pathos_home_timezone": "UTC",
-            # Add any other keys EthosConfig expects or EthosCore uses from it during init
+            "proactive_check_interval_seconds": 60.0, # For task setup
+            # Proactive behavior specific configs
+            "proactive_greeting_enabled": True,
+            "proactive_greeting_chance": 0.5, # Will be overridden to 1.0 in tests
+            "proactive_greeting_interval_hours": 4.0,
+            "proactive_offer_queued_topic_enabled": True,
+            "proactive_topic_chance": 0.5, # Will be overridden to 1.0 in tests
+            "proactive_topic_interval_hours": 12.0,
+            "proactive_curiosity_hexus_threshold": 0.7, # For future placeholder
         }
 
-        # Define LLM as a class attribute
-        LLM: Dict[str, LLMConfig] = {
+        LLM: Dict[str, LLMConfig] = { # type: ignore
             "LOGOS_TECHNE": {"url": "dummy_techne_url", "model": "dummy_techne_model"},
-            "PATHOS": {"url": "dummy_pathos_url", "model": "dummy_pathos_model"}, # Example if EthosCore needs it
-            # Add other roles if EthosCore initialization or tested methods require them
+            "PATHOS": {"url": "dummy_pathos_url", "model": "dummy_pathos_model"},
         }
-        ONEIROS: Dict[str, Any] = { # Example OneirosConfig structure if needed
+        ONEIROS: Dict[str, Any] = {
             "dream_interval_seconds": 21600.0
         }
+        # FIRMAMENT for FirmamentModuleConfig, assuming a basic structure
+        FIRMAMENT: Dict[str, Any] = {
+            "enable_firmament": False # Disable firmament for these tests unless specifically testing it
+        }
 
-        # Mock methods that EthosCore's __init__ might call on the config object itself
+
         def get_ethos_config(self) -> EthosConfig:
             return self.ETHOS
 
         def get_llm_config(self, role: str) -> Optional[LLMConfig]:
             return self.LLM.get(role)
 
-        # Add other get_..._config() methods if EthosCore __init__ uses them
+        def get_firmament_module_config(self) -> Dict[str, Any]: # Added for firmament task
+            return self.FIRMAMENT
+
 
     config_for_ethos_test = MockConfigForEthosCoreTests()
 
@@ -2932,10 +3224,137 @@ if __name__ == '__main__':
         json.dump({"personality_openness": 0.7, "processing_speed": "fast"}, f)
 
     ethos_core_instance = None
+
+    async def run_proactive_tests(ethos_core_instance_arg: EthosCore):
+        logger_main.info("\n\n--- Testing Proactive Behavior ---")
+
+        # --- Test Proactive Greeting (Success) ---
+        logger_main.info("--- Scenario: Proactive Greeting (Success) ---")
+
+        mock_pathos_interface_greet = unittest.mock.AsyncMock() # spec=PathosInterface if available
+        mock_pathos_interface_greet.current_active_user_id = "test_user_greet"
+        ethos_core_instance_arg.pathos_interface = mock_pathos_interface_greet
+
+        mock_conn_mgr_greet = unittest.mock.AsyncMock() # spec=ConnectionManager if available
+        mock_conn_mgr_greet.is_user_connected = unittest.mock.AsyncMock(return_value=True)
+        ethos_core_instance_arg.connection_manager = mock_conn_mgr_greet
+
+        # Store original methods and config values
+        original_get_last_proactive_action_time = ethos_core_instance_arg.get_last_proactive_action_time
+        original_generate_greeting_content = ethos_core_instance_arg._generate_proactive_greeting_content
+        original_log_proactive_action = ethos_core_instance_arg.log_proactive_action
+        original_greeting_chance = ethos_core_instance_arg.ethos_config.get('proactive_greeting_chance')
+        original_greeting_enabled = ethos_core_instance_arg.ethos_config.get('proactive_greeting_enabled')
+
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=None)
+        ethos_core_instance_arg._generate_proactive_greeting_content = unittest.mock.AsyncMock(return_value="Test Greeting Message from EthosCore Test!")
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock()
+        ethos_core_instance_arg.ethos_config['proactive_greeting_enabled'] = True
+        ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = 1.0
+
+        await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_greet")
+
+        mock_pathos_interface_greet.send_proactive_message.assert_called_once_with(
+            user_id="test_user_greet",
+            message_type="proactive_greeting",
+            message_content="Test Greeting Message from EthosCore Test!"
+        )
+        ethos_core_instance_arg.log_proactive_action.assert_called_once_with(
+            "test_user_greet", "proactive_greeting", {"message": "Test Greeting Message from EthosCore Test!"}
+        )
+        logger_main.info("Proactive Greeting (Success) test passed.")
+
+        # Restore mocks and config
+        ethos_core_instance_arg.get_last_proactive_action_time = original_get_last_proactive_action_time
+        ethos_core_instance_arg._generate_proactive_greeting_content = original_generate_greeting_content
+        ethos_core_instance_arg.log_proactive_action = original_log_proactive_action
+        if original_greeting_chance is not None: ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = original_greeting_chance
+        else: ethos_core_instance_arg.ethos_config.pop('proactive_greeting_chance', None)
+        if original_greeting_enabled is not None: ethos_core_instance_arg.ethos_config['proactive_greeting_enabled'] = original_greeting_enabled
+        else: ethos_core_instance_arg.ethos_config.pop('proactive_greeting_enabled', None)
+        ethos_core_instance_arg.pathos_interface = None # Clear mocked interface
+        ethos_core_instance_arg.connection_manager = None # Clear mocked manager
+
+        # --- Test Offer Queued Discussion Point (Success) ---
+        logger_main.info("--- Scenario: Offer Queued Discussion Point (Success) ---")
+        mock_pathos_interface_offer = unittest.mock.AsyncMock()
+        mock_pathos_interface_offer.current_active_user_id = "test_user_offer"
+        ethos_core_instance_arg.pathos_interface = mock_pathos_interface_offer
+
+        # Store original methods and config values
+        original_get_queued_discussion_points = ethos_core_instance_arg.get_queued_discussion_points
+        original_generate_offer_content = ethos_core_instance_arg._generate_offer_topic_content
+        original_offer_topic_chance = ethos_core_instance_arg.ethos_config.get('proactive_topic_chance')
+        original_offer_topic_enabled = ethos_core_instance_arg.ethos_config.get('proactive_offer_queued_topic_enabled')
+        # get_last_proactive_action_time and log_proactive_action already restored or will use original if not re-mocked
+
+        mock_queued_point = MemoryEntry(id="queued_point_123", type="queued_discussion_point", content="About space exploration", timestamp=datetime.now(timezone.utc).isoformat(), salience=0.7, metadata={"source": "test_source", "user_id": "test_user_offer"})
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=None) # Ensure cooldown is not active for "proactive_offer_topic"
+        ethos_core_instance_arg.get_queued_discussion_points = unittest.mock.AsyncMock(return_value=[mock_queued_point])
+        ethos_core_instance_arg._generate_offer_topic_content = unittest.mock.AsyncMock(return_value="How about we talk about space?")
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock() # Fresh mock for this test
+        ethos_core_instance_arg.ethos_config['proactive_offer_queued_topic_enabled'] = True
+        ethos_core_instance_arg.ethos_config['proactive_topic_chance'] = 1.0
+
+        await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_offer")
+
+        mock_pathos_interface_offer.send_proactive_message.assert_called_once_with(
+            user_id="test_user_offer",
+            message_type="proactive_queued_topic",
+            message_content="How about we talk about space?",
+            context_data=mock_queued_point # Check if the point itself is passed
+        )
+        ethos_core_instance_arg.log_proactive_action.assert_called_once_with(
+            "test_user_offer", "proactive_offer_topic", {"topic_id": "queued_point_123", "message": "How about we talk about space?"}
+        )
+        logger_main.info("Offer Queued Discussion Point (Success) test passed.")
+
+        # Restore original methods and config
+        ethos_core_instance_arg.get_last_proactive_action_time = original_get_last_proactive_action_time
+        ethos_core_instance_arg.get_queued_discussion_points = original_get_queued_discussion_points
+        ethos_core_instance_arg._generate_offer_topic_content = original_generate_offer_content
+        ethos_core_instance_arg.log_proactive_action = original_log_proactive_action # Restore to original or previous mock setup
+        if original_offer_topic_chance is not None: ethos_core_instance_arg.ethos_config['proactive_topic_chance'] = original_offer_topic_chance
+        else: ethos_core_instance_arg.ethos_config.pop('proactive_topic_chance', None)
+        if original_offer_topic_enabled is not None: ethos_core_instance_arg.ethos_config['proactive_offer_queued_topic_enabled'] = original_offer_topic_enabled
+        else: ethos_core_instance_arg.ethos_config.pop('proactive_offer_queued_topic_enabled', None)
+        ethos_core_instance_arg.pathos_interface = None
+
+
+        # --- Test Proactive Greeting (On Cooldown) ---
+        logger_main.info("--- Scenario: Proactive Greeting (On Cooldown) ---")
+        ethos_core_instance_arg.pathos_interface = unittest.mock.AsyncMock() # Fresh mock
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock() # Fresh mock
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=datetime.now(timezone.utc) - timedelta(hours=1)) # Cooldown active
+        ethos_core_instance_arg.ethos_config['proactive_greeting_enabled'] = True
+        ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = 1.0
+
+        await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_greet_cooldown")
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.assert_not_called()
+        ethos_core_instance_arg.log_proactive_action.assert_not_called()
+        logger_main.info("Proactive Greeting (On Cooldown) test passed - no action taken.")
+
+        # Restore for subsequent tests if any
+        ethos_core_instance_arg.get_last_proactive_action_time = original_get_last_proactive_action_time
+        ethos_core_instance_arg.log_proactive_action = original_log_proactive_action
+        ethos_core_instance_arg.pathos_interface = None
+
+        logger_main.info("--- Proactive Behavior tests finished ---")
+
+
     try:
+        # Create dummy traits file for EthosCore's __main__ test if it doesn't exist
+        test_traits_path = Path(config_for_ethos_test.ETHOS["persona_traits_file_path"])
+        if not test_traits_path.exists():
+            logger_main.info(f"Creating dummy traits file for test: {test_traits_path.resolve()}")
+            test_traits_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(test_traits_path, 'w', encoding='utf-8') as f:
+                json.dump({"personality_openness": 0.7, "processing_speed": "fast"}, f)
+
         ethos_core_instance = EthosCore(config=config_for_ethos_test) # type: ignore
 
-        logger_main.info("--- Testing EthosCore Trait Integration ---")
+        logger_main.info("--- Testing EthosCore Trait Integration (Original Test) ---")
         all_traits = ethos_core_instance.get_all_traits()
         logger_main.info(f"EthosCore - All traits: {all_traits}")
         assert "personality_openness" in all_traits, f"Expected 'personality_openness' in {all_traits}"
@@ -2943,10 +3362,15 @@ if __name__ == '__main__':
         assert ethos_core_instance.get_trait("non_existent_trait") is None, "Getting a non-existent trait should return None."
         logger_main.info("EthosCore Trait Integration tests passed.")
 
+        # Run new proactive tests
+        asyncio.run(run_proactive_tests(ethos_core_instance))
+
     except Exception as e:
         logger_main.error(f"Error during EthosCore __main__ test: {e}", exc_info=True)
     finally:
-        # Clean up dummy traits file
+        # Clean up dummy traits file if WE created it for this test run.
+        # This logic might need refinement if the file is intended to be persistent from other tests.
+        # For now, assume if it's the default test name, we manage it.
         if test_traits_path.exists():
             logger_main.info(f"Cleaning up dummy traits file: {test_traits_path.resolve()}")
             test_traits_path.unlink()
