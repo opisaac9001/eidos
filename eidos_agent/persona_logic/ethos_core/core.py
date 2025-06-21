@@ -2063,9 +2063,17 @@ class EthosCore:
         # --- Proactive Greeting Logic ---
         if target_user_id_for_action and target_user_id_for_action not in self.system_user_ids:
             greeting_enabled = self.ethos_config.get('proactive_greeting_enabled', True)
-            greeting_chance = self.ethos_config.get('proactive_greeting_chance', 0.3)
+            # greeting_chance = self.ethos_config.get('proactive_greeting_chance', 0.3) # Replaced by adjusted
 
-            if greeting_enabled and random.random() < greeting_chance:
+            base_greeting_chance = self.ethos_config.get('proactive_greeting_chance', 0.3)
+            extraversion_score = float(current_traits.get("extraversion", 0.5)) # Default to neutral 0.5
+            extraversion_sensitivity = 0.2
+            adjusted_greeting_chance = base_greeting_chance + (extraversion_score - 0.5) * extraversion_sensitivity
+            adjusted_greeting_chance = max(0.05, min(0.95, adjusted_greeting_chance)) # Clamp probability
+
+            logger.debug(f"ProactiveGreeting: Base chance: {base_greeting_chance:.2f}, Extraversion: {extraversion_score:.2f}, Adjusted chance: {adjusted_greeting_chance:.2f}")
+
+            if greeting_enabled and random.random() < adjusted_greeting_chance:
                 last_greeting_time = await self.get_last_proactive_action_time(target_user_id_for_action, "proactive_greeting")
                 cooldown_hours = self.ethos_config.get('proactive_greeting_interval_hours', 4.0) # Ensure float
 
@@ -2101,9 +2109,23 @@ class EthosCore:
         # --- Offer Queued Discussion Point Logic ---
         if target_user_id_for_action and target_user_id_for_action not in self.system_user_ids:
             offer_topic_enabled = self.ethos_config.get('proactive_offer_queued_topic_enabled', True)
-            offer_topic_chance = self.ethos_config.get('proactive_topic_chance', 0.2)
+            # offer_topic_chance = self.ethos_config.get('proactive_topic_chance', 0.2) # Replaced by adjusted
 
-            if offer_topic_enabled and random.random() < offer_topic_chance:
+            base_offer_topic_chance = self.ethos_config.get('proactive_topic_chance', 0.2)
+            extraversion_score_topic = float(current_traits.get("extraversion", 0.5))
+            curiosity_score_topic = float(current_traits.get("curiosity", 0.5)) # Assuming 'curiosity' trait
+
+            trait_sensitivity_topic = 0.15 # Sensitivity for each trait's influence
+
+            trait_modifier = ((extraversion_score_topic - 0.5) * trait_sensitivity_topic) + \
+                             ((curiosity_score_topic - 0.5) * trait_sensitivity_topic)
+
+            adjusted_offer_topic_chance = base_offer_topic_chance + trait_modifier
+            adjusted_offer_topic_chance = max(0.05, min(0.90, adjusted_offer_topic_chance)) # Clamp
+
+            logger.debug(f"OfferQueuedTopic: Base chance: {base_offer_topic_chance:.2f}, Extraversion: {extraversion_score_topic:.2f}, Curiosity: {curiosity_score_topic:.2f}, Adjusted chance: {adjusted_offer_topic_chance:.2f}")
+
+            if offer_topic_enabled and random.random() < adjusted_offer_topic_chance:
                 last_offer_time = await self.get_last_proactive_action_time(target_user_id_for_action, "proactive_offer_topic")
                 cooldown_hours = self.ethos_config.get('proactive_topic_interval_hours', 12.0) # Ensure float
 
@@ -2131,13 +2153,40 @@ class EthosCore:
                             else:
                                 logger.warning("ProactiveCheck: PathosInterface not available to offer topic.")
 
-        # --- Simple Curiosity-Driven Comment (Future placeholder) ---
-        # curio_threshold = self.ethos_config.get("proactive_curiosity_hexus_threshold", 0.7)
-        # if current_hexus.get("curiosity", 0.0) > curio_threshold:
-        #    logger.debug(f"ProactiveCheck: Curiosity threshold ({curio_threshold}) met. Current: {current_hexus.get('curiosity', 0.0)} ")
-        #    # ... (similar cooldown logic and content generation using _generate_curiosity_comment_content) ...
-        #    # This would likely target PATHOS_USER_ID or a general "system" context if not user-specific.
-        #    # For now, this is just a placeholder.
+        # --- Simple Curiosity-Driven Comment Logic ---
+        if target_user_id_for_action and target_user_id_for_action not in self.system_user_ids: # Requires a target user
+            curiosity_comment_enabled = self.ethos_config.get('proactive_curiosity_comment_enabled', True)
+            base_curiosity_chance = self.ethos_config.get('proactive_curiosity_chance', 0.1)
+            curiosity_trait_score = float(current_traits.get("curiosity", 0.5))
+
+            curiosity_sensitivity_factor = 0.2
+            adjusted_curiosity_chance = base_curiosity_chance + (curiosity_trait_score - 0.5) * curiosity_sensitivity_factor
+            adjusted_curiosity_chance = max(0.01, min(0.50, adjusted_curiosity_chance)) # Clamp
+
+            hexus_curiosity_threshold = self.ethos_config.get("proactive_curiosity_hexus_threshold", 0.6)
+
+            logger.debug(f"CuriosityComment: Base chance: {base_curiosity_chance:.2f}, Trait Curiosity: {curiosity_trait_score:.2f}, Adjusted chance: {adjusted_curiosity_chance:.2f}, Hexus Curiosity: {current_hexus.get('curiosity', 0.0):.2f}")
+
+            if curiosity_comment_enabled and random.random() < adjusted_curiosity_chance and \
+               current_hexus.get("curiosity", 0.0) > hexus_curiosity_threshold:
+
+                last_curiosity_time = await self.get_last_proactive_action_time(target_user_id_for_action, "proactive_curiosity_comment")
+                cooldown_hours = self.ethos_config.get('proactive_curiosity_interval_hours', 6.0)
+
+                if last_curiosity_time is None or (pathos_local_time - last_curiosity_time) > timedelta(hours=cooldown_hours):
+                    curiosity_message = await self._generate_curiosity_comment_content(target_user_id_for_action, [], current_hexus, current_traits)
+                    if curiosity_message:
+                        if hasattr(self, 'pathos_interface') and self.pathos_interface and hasattr(self.pathos_interface, 'send_proactive_message'):
+                            await self.pathos_interface.send_proactive_message(
+                                user_id=target_user_id_for_action,
+                                message_type="proactive_curiosity_comment",
+                                message_content=curiosity_message
+                            )
+                            await self.log_proactive_action(target_user_id_for_action, "proactive_curiosity_comment", {"message": curiosity_message, "triggering_hexus_curiosity": current_hexus.get("curiosity")})
+                            logger.info(f"ProactiveCheck: Sent curiosity comment to {target_user_id_for_action}.")
+                            return
+                        else:
+                            logger.warning("ProactiveCheck: PathosInterface not available to send curiosity comment.")
 
         logger.debug(f"ProactiveCheck: No proactive actions taken this cycle for target '{target_user_id_for_action if target_user_id_for_action else 'General'}'.")
 
@@ -3183,12 +3232,15 @@ if __name__ == '__main__':
             "proactive_check_interval_seconds": 60.0, # For task setup
             # Proactive behavior specific configs
             "proactive_greeting_enabled": True,
-            "proactive_greeting_chance": 0.5, # Will be overridden to 1.0 in tests
+            "proactive_greeting_chance": 0.5,
             "proactive_greeting_interval_hours": 4.0,
             "proactive_offer_queued_topic_enabled": True,
-            "proactive_topic_chance": 0.5, # Will be overridden to 1.0 in tests
+            "proactive_topic_chance": 0.5,
             "proactive_topic_interval_hours": 12.0,
-            "proactive_curiosity_hexus_threshold": 0.7, # For future placeholder
+            "proactive_curiosity_comment_enabled": True, # New
+            "proactive_curiosity_chance": 0.1, # New
+            "proactive_curiosity_hexus_threshold": 0.65, # New (adjusted from 0.7)
+            "proactive_curiosity_interval_hours": 6.0, # New
         }
 
         LLM: Dict[str, LLMConfig] = { # type: ignore
@@ -3340,6 +3392,108 @@ if __name__ == '__main__':
         ethos_core_instance_arg.log_proactive_action = original_log_proactive_action
         ethos_core_instance_arg.pathos_interface = None
 
+
+        # --- Test Trait Influence: High Extraversion Greeting ---
+        logger_main.info("--- Testing Trait Influence: High Extraversion Greeting ---")
+        ethos_core_instance_arg.ethos_config['proactive_greeting_enabled'] = True
+        ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = 0.1 # Low base chance
+
+        # Ensure PathosInterface and ConnectionManager are set for this test part
+        mock_pi_high_ext = unittest.mock.AsyncMock()
+        mock_pi_high_ext.current_active_user_id = "test_user_extraverted"
+        ethos_core_instance_arg.pathos_interface = mock_pi_high_ext
+        mock_cm_high_ext = unittest.mock.AsyncMock()
+        mock_cm_high_ext.is_user_connected = unittest.mock.AsyncMock(return_value=True)
+        ethos_core_instance_arg.connection_manager = mock_cm_high_ext
+
+        original_get_all_traits_high_ext = ethos_core_instance_arg.get_all_traits
+        ethos_core_instance_arg.get_all_traits = unittest.mock.MagicMock(return_value={"extraversion": 0.9, "curiosity": 0.5})
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.reset_mock()
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock() # Re-mock log_proactive_action
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=None)
+        ethos_core_instance_arg._generate_proactive_greeting_content = unittest.mock.AsyncMock(return_value="A very outgoing greeting!")
+
+        with unittest.mock.patch('random.random', return_value=0.1): # Adjusted chance: 0.1 + (0.9-0.5)*0.2 = 0.18. 0.1 < 0.18
+            await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_extraverted")
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.assert_called_once()
+        ethos_core_instance_arg.log_proactive_action.assert_called_once()
+        logger_main.info("High Extraversion Greeting test passed.")
+        ethos_core_instance_arg.get_all_traits = original_get_all_traits_high_ext
+
+
+        # --- Test Trait Influence: Low Extraversion Greeting ---
+        logger_main.info("--- Testing Trait Influence: Low Extraversion Greeting ---")
+        ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = 0.1 # Reset base chance
+
+        # Ensure PathosInterface and ConnectionManager are set
+        mock_pi_low_ext = unittest.mock.AsyncMock()
+        mock_pi_low_ext.current_active_user_id = "test_user_introverted"
+        ethos_core_instance_arg.pathos_interface = mock_pi_low_ext
+        mock_cm_low_ext = unittest.mock.AsyncMock()
+        mock_cm_low_ext.is_user_connected = unittest.mock.AsyncMock(return_value=True)
+        ethos_core_instance_arg.connection_manager = mock_cm_low_ext
+
+        original_get_all_traits_low_ext = ethos_core_instance_arg.get_all_traits
+        ethos_core_instance_arg.get_all_traits = unittest.mock.MagicMock(return_value={"extraversion": 0.1, "curiosity": 0.5})
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.reset_mock()
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock() # Re-mock
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=None)
+        ethos_core_instance_arg._generate_proactive_greeting_content = unittest.mock.AsyncMock(return_value="A reserved greeting.")
+
+        # Adjusted chance: 0.1 + (0.1-0.5)*0.2 = 0.1 - 0.08 = 0.02. Clamped to 0.05.
+        with unittest.mock.patch('random.random', return_value=0.06): # 0.06 > 0.05, should not send
+            await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_introverted")
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.assert_not_called()
+        ethos_core_instance_arg.log_proactive_action.assert_not_called()
+        logger_main.info("Low Extraversion Greeting (no send) test passed.")
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.reset_mock() # Reset for next call
+        ethos_core_instance_arg.log_proactive_action.reset_mock()
+
+        with unittest.mock.patch('random.random', return_value=0.04): # 0.04 < 0.05, should send
+            await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_introverted")
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.assert_called_once()
+        ethos_core_instance_arg.log_proactive_action.assert_called_once()
+        logger_main.info("Low Extraversion Greeting (send) test passed.")
+        ethos_core_instance_arg.get_all_traits = original_get_all_traits_low_ext
+
+
+        # --- Test Trait Influence: Missing Extraversion Trait for Greeting ---
+        logger_main.info("--- Testing Trait Influence: Missing Extraversion Trait for Greeting ---")
+        ethos_core_instance_arg.ethos_config['proactive_greeting_chance'] = 0.1 # Reset base chance
+
+        mock_pi_missing_trait = unittest.mock.AsyncMock()
+        mock_pi_missing_trait.current_active_user_id = "test_user_no_extraversion_trait"
+        ethos_core_instance_arg.pathos_interface = mock_pi_missing_trait
+        mock_cm_missing_trait = unittest.mock.AsyncMock()
+        mock_cm_missing_trait.is_user_connected = unittest.mock.AsyncMock(return_value=True)
+        ethos_core_instance_arg.connection_manager = mock_cm_missing_trait
+
+        original_get_all_traits_missing = ethos_core_instance_arg.get_all_traits
+        ethos_core_instance_arg.get_all_traits = unittest.mock.MagicMock(return_value={"curiosity": 0.5}) # 'extraversion' is missing
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.reset_mock()
+        ethos_core_instance_arg.log_proactive_action = unittest.mock.AsyncMock() # Re-mock
+        ethos_core_instance_arg.get_last_proactive_action_time = unittest.mock.AsyncMock(return_value=None)
+        ethos_core_instance_arg._generate_proactive_greeting_content = unittest.mock.AsyncMock(return_value="Default trait greeting.")
+
+        # Adjusted chance (extraversion defaults to 0.5): 0.1 + (0.5-0.5)*0.2 = 0.1.
+        with unittest.mock.patch('random.random', return_value=0.05): # 0.05 < 0.1
+            await ethos_core_instance_arg.run_proactive_check(user_id_context="test_user_no_extraversion_trait")
+
+        ethos_core_instance_arg.pathos_interface.send_proactive_message.assert_called_once()
+        ethos_core_instance_arg.log_proactive_action.assert_called_once()
+        logger_main.info("Missing Extraversion Trait for Greeting test passed.")
+        ethos_core_instance_arg.get_all_traits = original_get_all_traits_missing
+
+        # Restore original log_proactive_action if it was an instance method we want to keep for other tests
+        ethos_core_instance_arg.log_proactive_action = original_log_proactive_action
+        ethos_core_instance_arg.pathos_interface = None # Clear mocked interface
+        ethos_core_instance_arg.connection_manager = None # Clear mocked manager
+
         logger_main.info("--- Proactive Behavior tests finished ---")
 
 
@@ -3350,7 +3504,7 @@ if __name__ == '__main__':
             logger_main.info(f"Creating dummy traits file for test: {test_traits_path.resolve()}")
             test_traits_path.parent.mkdir(parents=True, exist_ok=True)
             with open(test_traits_path, 'w', encoding='utf-8') as f:
-                json.dump({"personality_openness": 0.7, "processing_speed": "fast"}, f)
+                json.dump({"personality_openness": 0.7, "processing_speed": "fast", "extraversion": 0.5, "curiosity": 0.5}, f) # Added default traits
 
         ethos_core_instance = EthosCore(config=config_for_ethos_test) # type: ignore
 

@@ -58,6 +58,12 @@ class EthosConfig(TypedDict, total=False):
     proactive_topic_chance: float
     proactive_briefing_chance: float
     proactive_queued_point_chance: float
+    proactive_greeting_enabled: Optional[bool]
+    proactive_offer_queued_topic_enabled: Optional[bool]
+    proactive_curiosity_comment_enabled: Optional[bool]
+    proactive_curiosity_chance: Optional[float]
+    proactive_curiosity_hexus_threshold: Optional[float]
+    proactive_curiosity_interval_hours: Optional[float]
     enable_memory_summarization: bool
     summarization_llm_role: str
     interaction_log_analysis_llm_role: str
@@ -338,6 +344,12 @@ class Config:
         "proactive_topic_chance": float(os.getenv("ETHOS_PROACTIVE_TOPIC_CHANCE", 0.2)),
         "proactive_briefing_chance": float(os.getenv("ETHOS_PROACTIVE_BRIEFING_CHANCE", 0.4)),
         "proactive_queued_point_chance": float(os.getenv("ETHOS_PROACTIVE_QUEUED_POINT_CHANCE", 0.5)),
+        "proactive_greeting_enabled": os.getenv("ETHOS_PROACTIVE_GREETING_ENABLED", "True").lower() == "true",
+        "proactive_offer_queued_topic_enabled": os.getenv("ETHOS_PROACTIVE_OFFER_TOPIC_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_comment_enabled": os.getenv("ETHOS_PROACTIVE_CURIOSITY_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_chance": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_CHANCE", 0.1)),
+        "proactive_curiosity_hexus_threshold": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_HEXUS_THRESHOLD", 0.65)),
+        "proactive_curiosity_interval_hours": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_INTERVAL_HOURS", 6.0)),
         "enable_memory_summarization": os.getenv("ETHOS_ENABLE_MEMORY_SUMMARIZATION", "True").lower() == "true",
         "summarization_llm_role": os.getenv("ETHOS_SUMMARIZATION_LLM_ROLE", "LOGOS_TECHNE"),
         "summarization_cluster_min_memories": int(os.getenv("ETHOS_SUMMARIZATION_CLUSTER_MIN_MEMORIES", 5)),
