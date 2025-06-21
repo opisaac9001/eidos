@@ -11,3 +11,6 @@ NPC_DIALOGUE = "npc.say"
 
 # Event published when a new NPC has been improvised and registered
 NEW_NPC_IMPROVISED = "firmament.npc.improvised.new"
+
+# Event published by ChronosAdapter when ChronosEngine updates its schedule
+FIRMAMENT_SCHEDULE_RELOAD_REQUESTED = "firmament.schedule_reload_requested"
