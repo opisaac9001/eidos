@@ -300,6 +300,69 @@ if __name__ == '__main__': # pragma: no cover
         print(f"SubconsciousHook Test: Failed to import real PATHOS_USER_ID, using test fallback: {TEST_PATHOS_USER_ID}")
 
 
+    async def test_get_recent_thoughts_logic(mock_ethos_core_for_test: MockEthosCoreForSubconscious):
+        logger.info("\n\n--- Starting: test_get_recent_thoughts_logic ---")
+
+        # Test Case 1: Empty Result
+        logger.info("Test Case 1: Empty Result")
+        mock_ethos_core_for_test.memory_storage.set_mock_data({})
+        result_dicts = get_recent_subconscious_thoughts(limit=5)
+        assert len(result_dicts) == 0, f"Expected 0 results, got {len(result_dicts)}"
+        logger.info("Test Case 1 Passed.")
+
+        # Test Case 2: Thoughts Only (Elaborated vs. Raw)
+        logger.info("\nTest Case 2: Thoughts Only (Elaborated vs. Raw)")
+        thought1_elaborated = {"id": "t1", "type": "thought", "content": "Elaborated T1", "metadata": {"raw_trigger_content": "Raw T1"}, "timestamp": "2023-01-01T10:00:00Z"}
+        thought2_raw_only = {"id": "t2", "type": "thought", "content": "", "metadata": {"raw_trigger_content": "Raw T2 only"}, "timestamp": "2023-01-01T09:00:00Z"}
+        mock_ethos_core_for_test.memory_storage.set_mock_data({"thought": [thought1_elaborated, thought2_raw_only]})
+        result_dicts = get_recent_subconscious_thoughts(limit=2)
+        assert len(result_dicts) == 2, f"Expected 2 results, got {len(result_dicts)}"
+        assert result_dicts[0]['primary_display_content'] == "Elaborated T1", f"Got: {result_dicts[0]['primary_display_content']}"
+        assert result_dicts[1]['primary_display_content'] == "Raw T2 only", f"Got: {result_dicts[1]['primary_display_content']}"
+        logger.info("Test Case 2 Passed.")
+
+        # Test Case 3: Imprints Only
+        logger.info("\nTest Case 3: Imprints Only")
+        imprint1 = {"id": "i1", "type": "subconscious_imprint", "content": "Imprint Content 1", "timestamp": "2023-01-01T12:00:00Z", "metadata": {}}
+        imprint2 = {"id": "i2", "type": "subconscious_imprint", "content": "Imprint Content 2", "timestamp": "2023-01-01T11:00:00Z", "metadata": {}}
+        mock_ethos_core_for_test.memory_storage.set_mock_data({"subconscious_imprint": [imprint1, imprint2]})
+        result_dicts = get_recent_subconscious_thoughts(limit=2)
+        assert len(result_dicts) == 2, f"Expected 2 results, got {len(result_dicts)}"
+        assert result_dicts[0]['primary_display_content'] == "Imprint Content 1", f"Got: {result_dicts[0]['primary_display_content']}"
+        logger.info("Test Case 3 Passed.")
+
+        # Test Case 4: Mixed, Order, Limit
+        logger.info("\nTest Case 4: Mixed, Order, Limit")
+        thought_new = {"id": "t_new", "type": "thought", "content": "Newest thought", "metadata": {}, "timestamp": "2023-01-01T14:00:00Z"}
+        imprint_mid = {"id": "i_mid", "type": "subconscious_imprint", "content": "Middle imprint", "timestamp": "2023-01-01T13:00:00Z", "metadata": {}}
+        thought_old = {"id": "t_old", "type": "thought", "content": "Older thought", "metadata": {}, "timestamp": "2023-01-01T12:30:00Z"}
+        mock_ethos_core_for_test.memory_storage.set_mock_data({"thought": [thought_new, thought_old], "subconscious_imprint": [imprint_mid]})
+        result_dicts = get_recent_subconscious_thoughts(limit=2)
+        assert len(result_dicts) == 2, f"Expected 2 results, got {len(result_dicts)}"
+        assert result_dicts[0]['primary_display_content'] == "Newest thought", f"Got: {result_dicts[0]['primary_display_content']}"
+        assert result_dicts[1]['primary_display_content'] == "Middle imprint", f"Got: {result_dicts[1]['primary_display_content']}"
+        logger.info("Test Case 4 Passed.")
+
+        # Test Case 5: Content Missing (Thoughts)
+        logger.info("\nTest Case 5: Content Missing (Thoughts)")
+        thought_both_empty = {"id": "t_empty", "type": "thought", "content": None, "metadata": {"raw_trigger_content": ""}, "timestamp": "2023-01-01T15:00:00Z"}
+        mock_ethos_core_for_test.memory_storage.set_mock_data({"thought": [thought_both_empty]})
+        result_dicts = get_recent_subconscious_thoughts(limit=1)
+        assert len(result_dicts) == 1, f"Expected 1 result, got {len(result_dicts)}"
+        assert result_dicts[0]['primary_display_content'] == "[empty thought content]", f"Got: {result_dicts[0]['primary_display_content']}"
+        logger.info("Test Case 5 Passed.")
+
+        # Test Case 6: Content Missing (Imprints)
+        logger.info("\nTest Case 6: Content Missing (Imprints)")
+        imprint_empty = {"id": "i_empty", "type": "subconscious_imprint", "content": " ", "timestamp": "2023-01-01T16:00:00Z", "metadata": {}}
+        mock_ethos_core_for_test.memory_storage.set_mock_data({"subconscious_imprint": [imprint_empty]})
+        result_dicts = get_recent_subconscious_thoughts(limit=1)
+        assert len(result_dicts) == 1, f"Expected 1 result, got {len(result_dicts)}"
+        assert result_dicts[0]['primary_display_content'] == "[empty imprint content]", f"Got: {result_dicts[0]['primary_display_content']}"
+        logger.info("Test Case 6 Passed.")
+
+        logger.info("--- Finished: test_get_recent_thoughts_logic ---")
+
     async def main_test_subconscious_hook_llm_guidance():
         print("\n" + "="*80)
         print("Subconscious Hook Standalone Test Script (Thought Elaboration & Memory Fetch)")
@@ -331,51 +394,45 @@ if __name__ == '__main__': # pragma: no cover
             logger.info(f"Attempting REAL LLM calls for thought elaboration using role: '{current_llm_role}', "
                         f"model: '{current_llm_cfg.get('model')}', URL: '{current_llm_cfg.get('url')}'.\n")
 
-        # Setup Mock EthosCore and MemoryStorage
+        # Setup Mock EthosCore and MemoryStorage (Step 1: Refactor Mocks)
         class MockMemoryStorage:
+            def __init__(self):
+                self.mock_data: Dict[str, List[Dict[str, Any]]] = {}
+                logger.info("MockMemoryStorage initialized.")
+
+            def set_mock_data(self, data_map: Dict[str, List[Dict[str, Any]]]):
+                self.mock_data = data_map
+                logger.info(f"MockMemoryStorage mock_data set: {list(self.mock_data.keys())}")
+
             def get_entries_by_type_and_user(self, entry_type: str, user_id: str, limit: int) -> List[Dict[str, Any]]:
                 logger.info(f"MockMemoryStorage.get_entries_by_type_and_user called for type '{entry_type}', user '{user_id}' (Expected: {TEST_PATHOS_USER_ID}), limit {limit}")
-                assert user_id == TEST_PATHOS_USER_ID, f"MockMemoryStorage expected user_id {TEST_PATHOS_USER_ID}, got {user_id}"
-
-                if entry_type == 'subconscious_imprint':
-                    return [
-                        {"id": "imp1", "type": "subconscious_imprint", "content": "An imprint about a mysterious melody.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(), "metadata": {"source": "subconscious_node_imprint", "mood_at_imprint": {"name": "intrigued"}, "topics_from_imprint": ["melody", "mystery"]}},
-                        {"id": "imp2", "type": "subconscious_imprint", "content": "Imprint regarding a looming deadline.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(), "metadata": {"source": "subconscious_node_imprint", "mood_at_imprint": {"name": "anxious"}, "urgency": "high", "topics_from_imprint": ["deadline"]}}
-                    ]
-                if entry_type == 'thought':
-                    return [
-                        {"id": "t1", "type": "thought", "content": "Elaborated thought about the deadline from imprint.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(), "metadata": {"source_of_trigger": "imprint_deadline", "raw_trigger_content": "Imprint regarding a looming deadline.", "mood_at_generation": {"name": "stressed"}, "urgency": "high", "impulse_type": "task_focus_deadline"}},
-                        {"id": "t2", "type": "thought", "content": "A random musing about the color of the sky.", "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), "metadata": {"source_of_trigger": "internal_pondering", "mood_at_generation": {"name": "neutral"}, "urgency": "low"}}
-                    ]
-                return []
+                if user_id != TEST_PATHOS_USER_ID:
+                    logger.error(f"MockMemoryStorage expected user_id {TEST_PATHOS_USER_ID}, got {user_id}")
+                    return []
+                # Return a copy to allow for modification by the caller if needed, without affecting the mock's source data.
+                # The limit application here is simplified; the function under test (get_recent_subconscious_thoughts)
+                # fetches more initially (limit * 2 for each type) then combines, sorts, and limits.
+                # This mock just needs to provide enough data for those operations to be tested.
+                return self.mock_data.get(entry_type, [])[:]
 
         class MockEthosCoreForSubconscious:
             PATHOS_USER_ID = TEST_PATHOS_USER_ID
             def __init__(self):
                 self.memory_storage = MockMemoryStorage()
-                self.async_add_memory_entry_mock = unittest.mock.AsyncMock(return_value={"id": "mock_added_entry_id"}) # Simulate a return value
-                logger.info("MockEthosCoreForSubconscious initialized with MockMemoryStorage and async_add_memory_entry_mock.")
+                self.async_add_memory_entry_mock = unittest.mock.AsyncMock(return_value={"id": "mock_added_entry_id"})
+                logger.info("MockEthosCoreForSubconscious initialized with new MockMemoryStorage and async_add_memory_entry_mock.")
 
             async def add_memory_entry(self, entry_data, user_id_context=None):
-                # This method will now call the mock
                 logger.info(f"MockEthosCoreForSubconscious.add_memory_entry called with type: {entry_data.get('type')}, user_context: {user_id_context}")
                 return await self.async_add_memory_entry_mock(entry_data, user_id_context)
 
-        mock_ethos_sub_hook = MockEthosCoreForSubconscious()
+        mock_ethos_sub_hook = MockEthosCoreForSubconscious() # Instantiated with new MockMemoryStorage
         set_ethos_core_for_subconscious_hook(mock_ethos_sub_hook) # type: ignore
 
-        # Test get_recent_subconscious_thoughts
-        print("\n--- Testing get_recent_subconscious_thoughts (with mock EthosCore) ---")
-        recent_thoughts = get_recent_subconscious_thoughts(limit=3)
-        print(f"Retrieved thoughts: {json.dumps(recent_thoughts, indent=2)}")
-        assert len(recent_thoughts) <= 3
-        assert len(recent_thoughts) > 0, "Expected mock EthosCore to return some thoughts"
-        # Check if combined and sorted correctly (intention should be older than thought in mock)
-        if len(recent_thoughts) == 2: # Assuming limit >= 2
-            assert recent_thoughts[0]['content'] == "Mocked thought 1 from Ethos." # Newer
-            assert recent_thoughts[1]['content'] == "Mocked intention: Investigate AI ethics." # Older
+        # Call the new detailed tests for get_recent_subconscious_thoughts
+        await test_get_recent_thoughts_logic(mock_ethos_sub_hook)
 
-        # Setup a mock EventBus to capture outputs of handle_thought_trigger
+        # Setup for handle_thought_trigger test
         _test_events_sh_main_guidance = []
         class MockEventBusSHGuidance(EventBus): # type: ignore
             def publish(self, event_type: str, data: dict):

@@ -139,10 +139,15 @@ async def run_simulation_tick():
             else:
                 npc_improviser = _npc_improviser_instance
                 registry = NPCRegistry.instance()
-                recent_thoughts_data = get_recent_subconscious_thoughts(limit=5) # This is synchronous
+                recent_thoughts_data = get_recent_subconscious_thoughts(limit=5) # This is synchronous, returns List[Dict[str, Any]]
                 if recent_thoughts_data:
-                    thought_contents = [t['content'] for t in recent_thoughts_data if isinstance(t, dict) and 'content' in t]
-                    original_thought_payloads = {t['content']: t for t in recent_thoughts_data if isinstance(t, dict) and 'content' in t}
+                    # Use 'primary_display_content' and filter out None/empty strings
+                    thought_contents = [t.get('primary_display_content') for t in recent_thoughts_data if isinstance(t, dict) and t.get('primary_display_content')]
+                    thought_contents = [content for content in thought_contents if content and content.strip()]
+
+                    # Use 'primary_display_content' as key for original_thought_payloads
+                    original_thought_payloads = {t.get('primary_display_content'): t for t in recent_thoughts_data if isinstance(t, dict) and t.get('primary_display_content')}
+
                     known_npc_profiles = registry.get_all_npcs() # This is synchronous
                     new_references = extract_character_references(thought_contents, known_npc_profiles) # This is synchronous
 
@@ -246,7 +251,21 @@ if __name__ == '__main__': # pragma: no cover
             return lambda data_arg: main_test_event_handler_for_sim_async(et_cap_name_str_arg, data_arg)
         test_bus_sim_main_async.subscribe(actual_et_name_str_main_async, create_main_test_handler_async(actual_et_name_str_main_async))
 
-    mock_thoughts_main_async = [{'content': "Think of Cassandra for test.", 'timestamp': 'ts_main_test_async', 'source': 'main_test_subconscious_async'}]
+    mock_thoughts_main_async = [
+        {
+            'id': 'sim_thought_for_npc_test_1',
+            'type': 'thought',
+            'timestamp': 'ts_main_test_async_sim',
+            'primary_display_content': "Think of Cassandra for test.",
+            'content': "Elaborated version: Think of Cassandra for test, perhaps she knows about the old library.",
+            'metadata': {
+                'raw_trigger_content': "Think of Cassandra for test.",
+                'source': 'main_test_subconscious_simulator',
+                'user_id': 'pathos_test_user_sim_main_async'
+            },
+            'salience': 0.85
+        }
+    ]
     mock_profile_main_async = {"id": "cass_async_direct_await", "name": "Cassandra DirectAwait Improv", "role": "DirectAwait Test Role"}
 
     class MockNPCRegistryMainSimAsync:
