@@ -80,7 +80,57 @@ class LogosCore:
         logger.info("LogosCore resources closed.")
 
     async def initialize_services(self):
-        logger.info("LogosCore initialize_services called.")
+        logger.info("LogosCore: Service initialization started.")
+
+        # Web Search
+        web_search_enabled = self.config.ENABLE_WEB_SEARCH
+        web_search_service_init = self.web_search_service is not None
+        logger.info(f"LogosCore: Web Search: {'ENABLED' if web_search_enabled else 'DISABLED'}, Service Initialized: {web_search_service_init}")
+
+        # Wolfram Alpha
+        wolfram_enabled = self.config.ENABLE_WOLFRAM_ALPHA
+        wolfram_configured = bool(self.wolfram_alpha_config and self.wolfram_alpha_config.get('app_id'))
+        logger.info(f"LogosCore: Wolfram Alpha: {'ENABLED' if wolfram_enabled else 'DISABLED'}, App ID Configured: {wolfram_configured}")
+
+        # News API
+        news_api_enabled = bool(self.news_config and self.news_config.get('enabled'))
+        news_api_key_present = bool(self.news_config and self.news_config.get('api_key'))
+        if news_api_enabled:
+            logger.info(f"LogosCore: News API: ENABLED, API Key Present: {news_api_key_present}")
+        else:
+            logger.info("LogosCore: News API: DISABLED")
+
+        # OpenWeatherMap Service
+        owm_available = self.owm_service is not None and self.owm_service.is_available()
+        # Log warning if OWM service is not available, info otherwise
+        if owm_available:
+            logger.info("LogosCore: OpenWeatherMap Service: AVAILABLE")
+        else:
+            logger.warning("LogosCore: OpenWeatherMap Service: UNAVAILABLE")
+
+
+        # LLM Configurations
+        llm_roles_to_check = {
+            "LOGOS_TECHNE": self.logos_techne_config,
+            "LOGOS_VISION_CONTEXT": self.logos_vision_config,
+            "LOGOS_DEEP_RESEARCH": self.logos_research_config,
+            "KNOWLEDGE_UPKEEP_LLM": self.knowledge_upkeep_llm_config # Using the attribute name
+        }
+
+        for role, config_obj in llm_roles_to_check.items():
+            role_name_for_log = role
+            # For KNOWLEDGE_UPKEEP_LLM, self.config.ETHOS might not be available if config is a mock not providing ETHOS.
+            # Safe access pattern:
+            ethos_config_from_main_config = getattr(self.config, 'ETHOS', {})
+            if role == "KNOWLEDGE_UPKEEP_LLM":
+                role_name_for_log = ethos_config_from_main_config.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE')
+
+            if config_obj and config_obj.get('url'):
+                logger.info(f"LogosCore: LLM Role '{role_name_for_log}': CONFIGURED (URL: {config_obj.get('url')}, Model: {config_obj.get('model', 'N/A')})")
+            else:
+                logger.warning(f"LogosCore: LLM Role '{role_name_for_log}': NOT CONFIGURED or URL missing.")
+
+        logger.info("LogosCore: Service initialization checks completed.") # Changed from "complete" to "checks completed"
 
     async def process_uploaded_document(self, file_content: bytes, filename: str, user_id: Optional[str] = None) -> Dict[str, Any]:
          logger.info(f"LogosCore processing doc: '{filename}' ({len(file_content)} bytes) for user '{user_id or 'unknown'}'.")
@@ -557,7 +607,7 @@ class LogosCore:
         except json.JSONDecodeError as e: response_text = resp.text[:500] if 'resp' in locals() and hasattr(resp, 'text') else 'N/A'; return {"success": False, "message": f"Invalid JSON from Wolfram Alpha: {e}. Response: {response_text}", "raw_response": None}
         except Exception as e: logger.error(f"Error processing Wolfram Alpha response: {e}", exc_info=True); return {"success": False, "message": f"Error processing Wolfram Alpha data: {e}", "raw_response": None}
 
-    async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]:
+    async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]: # type: ignore
         fact_id, original_statement = fact_entry.get('id', 'unknown'), fact_entry.get('content')
         if not original_statement: return {"status": "unverifiable", "reason": "Original fact content empty."}
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return {"status": "unverifiable", "reason": "Web search unavailable."}
@@ -626,6 +676,7 @@ class LogosCore:
         if not persona_directives_str_parts:
             persona_directives_str_parts.append("- N/A (No specific persona directives provided for this decision)")
         persona_directives_for_prompt = "\n".join(persona_directives_str_parts)
+        persona_directives_subset_for_log = persona_directives_for_prompt # For logging
 
         system_prompt = "You are an AI assistant helping to determine Pathos's personal, subjective reaction to an event. Pathos has a defined persona and current internal Hexus state."
 
@@ -653,18 +704,11 @@ class LogosCore:
         try:
             raw_llm_response = await self._call_logos_llm(
                 llm_config=self.logos_techne_config,
-                llm_messages_for_synthesis=messages, # Using the correct parameter name
-                # Not passing prompt_text as llm_messages_for_synthesis is used
-            ) # Temperature defaults to 0.1, max_tokens to 1024 in _call_logos_llm
-              # Override for this specific call if needed, e.g. by enhancing _call_logos_llm or passing more params.
-              # For now, we'll rely on _call_logos_llm's defaults or its own config-driven values.
-              # A specific temperature and max_tokens for this task would be:
-              # temperature_override=0.4, max_tokens_override=50 (approx)
+                llm_messages_for_synthesis=messages,
+            )
 
             if raw_llm_response:
                 logger.debug(f"LogosCore: Raw LLM response for subjective reaction: '{raw_llm_response}'")
-                # Basic parsing: strip whitespace, remove potential quotes, take first line
-                # More robust parsing might be needed if LLM is inconsistent
                 parsed_reaction = raw_llm_response.strip().replace('"', '').replace("'", "").splitlines()[0].strip()
 
                 if parsed_reaction in available_reactions:
@@ -680,3 +724,142 @@ class LogosCore:
         except Exception as e:
             logger.error(f"LogosCore: Error during LLM call for subjective reaction: {e}", exc_info=True)
             return default_reaction
+
+if __name__ == '__main__':
+    import asyncio
+    import unittest.mock
+    from pathlib import Path
+    # logging is already imported at module level
+
+    # Attempt to import real Config, EthosCore for type hinting if possible,
+    # but define mocks for actual use in testing.
+    try:
+        from eidos_agent.core.config import Config as RealConfig, LLMConfig as RealLLMConfig, WolframAlphaConfig as RealWolframAlphaConfig, NewsApiConfig as RealNewsApiConfig, BraveSearchConfig as RealBraveConfig, EthosConfig as RealEthosConfig
+        from eidos_agent.persona_logic.ethos_core.core import EthosCore as RealEthosCore
+        ConfigType = RealConfig
+        EthosCoreType = RealEthosCore
+    except ImportError:
+        # Define basic stand-ins if real ones can't be imported (e.g., during isolated testing)
+        ConfigType = unittest.mock.MagicMock
+        EthosCoreType = unittest.mock.MagicMock
+        RealLLMConfig = dict # type: ignore
+        RealWolframAlphaConfig = dict # type: ignore
+        RealNewsApiConfig = dict # type: ignore
+        RealBraveConfig = dict # type: ignore
+        RealEthosConfig = dict # type: ignore
+
+
+    # Configure basic logging for the test output
+    # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Get the specific logger used in logos_core.handler to patch it
+    logos_core_handler_logger = logging.getLogger('eidos_agent.persona_logic.logos_core.handler')
+    # Ensure handlers are set for the test output if running standalone
+    if not logos_core_handler_logger.handlers:
+        logging.basicConfig(level=logging.INFO) # Basic config if no handlers yet
+        logos_core_handler_logger.setLevel(logging.INFO) # Ensure it's at least INFO for test
+
+
+    class MockEthosCore:
+        def __init__(self):
+            pass # Add attributes if needed by LogosCore __init__
+
+    class MockConfig(ConfigType): # Inherit from RealConfig if available, else MagicMock
+        def __init__(self):
+            super().__init__() # Call parent __init__ if RealConfig is used
+            self.ENABLE_WEB_SEARCH = True
+            self.ENABLE_WOLFRAM_ALPHA = True
+            # Ensure ETHOS is a dictionary, even if ConfigType is MagicMock
+            self.ETHOS: RealEthosConfig = {'knowledge_upkeep_llm_role': 'LOGOS_TECHNE'} # type: ignore
+            self.LLM: Dict[str, RealLLMConfig] = { # type: ignore
+                'LOGOS_TECHNE': {'url': 'http://localhost:11434/v1', 'model': 'techne_model'},
+                'LOGOS_VISION_CONTEXT': {'url': 'http://localhost:11434/v1', 'model': 'vision_model'},
+                'LOGOS_DEEP_RESEARCH': {'url': 'http://localhost:11434/v1', 'model': 'research_model'}
+            }
+            self.BRAVE_SEARCH: RealBraveConfig = {'api_key': 'dummy_brave_key'} # type: ignore
+            self.WOLFRAM_ALPHA: RealWolframAlphaConfig = {'app_id': 'dummy_wolfram_id', 'api_url': 'http://api.wolframalpha.com/v2/query'} # type: ignore
+            self.NEWS_API: RealNewsApiConfig = {'enabled': True, 'api_key': 'dummy_news_key', 'base_url': 'https://api.thenewsapi.com'} # type: ignore
+
+        def get_llm_config(self, role: str) -> Optional[RealLLMConfig]: # type: ignore
+            return self.LLM.get(role)
+
+        def get_brave_search_config(self) -> Optional[RealBraveConfig]: # type: ignore
+            return self.BRAVE_SEARCH if self.ENABLE_WEB_SEARCH else None
+
+        def get_wolfram_alpha_config(self) -> Optional[RealWolframAlphaConfig]: # type: ignore
+            return self.WOLFRAM_ALPHA if self.ENABLE_WOLFRAM_ALPHA else None
+
+        def get_news_api_config(self) -> Optional[RealNewsApiConfig]: # type: ignore
+            return self.NEWS_API
+
+        # Add get_ethos_config if LogosCore constructor or initialize_services needs it directly from config object
+        def get_ethos_config(self) -> RealEthosConfig: # type: ignore
+            return self.ETHOS
+
+
+    class MockOWMService:
+        def __init__(self, api_key, http_client_session):
+            self._is_available = bool(api_key)
+        def is_available(self): # Make it a method
+            return self._is_available
+        async def get_current_weather(self, location_query: str): return {}
+
+
+    async def run_tests():
+        logger.info("--- Testing LogosCore.initialize_services ---")
+
+        # Scenario 1: All services configured
+        logger.info("\n--- Scenario 1: All services configured ---")
+        mock_config_all_enabled = MockConfig()
+        mock_ethos_core = MockEthosCore()
+        mock_owm_all_enabled = MockOWMService("dummy_key", None)
+
+        logos_core_instance_s1 = LogosCore(config=mock_config_all_enabled, ethos_core=mock_ethos_core, owm_service=mock_owm_all_enabled) # type: ignore
+
+        with unittest.mock.patch.object(logos_core_handler_logger, 'info') as mock_log_info_s1, \
+             unittest.mock.patch.object(logos_core_handler_logger, 'warning') as mock_log_warning_s1:
+            await logos_core_instance_s1.initialize_services()
+
+            # Basic check: ensure it logs start and end
+            assert any("LogosCore: Service initialization started." in call.args[0] for call in mock_log_info_s1.call_args_list)
+            assert any("LogosCore: Service initialization checks completed." in call.args[0] for call in mock_log_info_s1.call_args_list)
+
+            # Check for specific service enabled messages
+            assert any("Web Search: ENABLED" in call.args[0] and "Service Initialized: True" in call.args[0] for call in mock_log_info_s1.call_args_list)
+            assert any("Wolfram Alpha: ENABLED" in call.args[0] and "App ID Configured: True" in call.args[0] for call in mock_log_info_s1.call_args_list)
+            assert any("News API: ENABLED" in call.args[0] and "API Key Present: True" in call.args[0] for call in mock_log_info_s1.call_args_list)
+            assert any("OpenWeatherMap Service: AVAILABLE" in call.args[0] for call in mock_log_info_s1.call_args_list)
+            assert any("LLM Role 'LOGOS_TECHNE': CONFIGURED" in call.args[0] for call in mock_log_info_s1.call_args_list)
+            mock_log_warning_s1.assert_not_called() # No warnings expected in this scenario
+
+        await logos_core_instance_s1.close()
+        logger.info("Scenario 1 tests passed.")
+
+        # Scenario 2: Some services disabled/misconfigured
+        logger.info("\n--- Scenario 2: Some services disabled/misconfigured ---")
+        mock_config_some_disabled = MockConfig()
+        mock_config_some_disabled.ENABLE_WEB_SEARCH = False
+        mock_config_some_disabled.WOLFRAM_ALPHA = {'app_id': None, 'api_url': 'http://api.wolframalpha.com/v2/query'} # No app_id
+        mock_config_some_disabled.NEWS_API = {'enabled': True, 'api_key': None, 'base_url': 'https://api.thenewsapi.com'} # Key missing
+        mock_config_some_disabled.LLM['LOGOS_VISION_CONTEXT'] = None # type: ignore # LLM role not configured
+
+        mock_owm_disabled = MockOWMService(None, None) # OWM key missing
+
+        logos_core_instance_s2 = LogosCore(config=mock_config_some_disabled, ethos_core=mock_ethos_core, owm_service=mock_owm_disabled) # type: ignore
+
+        with unittest.mock.patch.object(logos_core_handler_logger, 'info') as mock_log_info_s2, \
+             unittest.mock.patch.object(logos_core_handler_logger, 'warning') as mock_log_warning_s2:
+            await logos_core_instance_s2.initialize_services()
+
+            assert any("Web Search: DISABLED" in call.args[0] for call in mock_log_info_s2.call_args_list)
+            assert any("Wolfram Alpha: ENABLED" in call.args[0] and "App ID Configured: False" in call.args[0] for call in mock_log_info_s2.call_args_list)
+            assert any("News API: ENABLED" in call.args[0] and "API Key Present: False" in call.args[0] for call in mock_log_info_s2.call_args_list)
+
+            # Check for warnings
+            assert any("OpenWeatherMap Service: UNAVAILABLE" in call.args[0] for call in mock_log_warning_s2.call_args_list)
+            assert any("LLM Role 'LOGOS_VISION_CONTEXT': NOT CONFIGURED or URL missing." in call.args[0] for call in mock_log_warning_s2.call_args_list)
+
+        await logos_core_instance_s2.close()
+        logger.info("Scenario 2 tests passed.")
+        logger.info("--- LogosCore.initialize_services tests completed ---")
+
+    asyncio.run(run_tests())
