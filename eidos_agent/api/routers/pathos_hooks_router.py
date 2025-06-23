@@ -12,24 +12,32 @@ from fastapi import APIRouter, HTTPException # Changed FastAPI to APIRouter
 # Attempt to import models from the subconscious module.
 # This structure assumes that 'eidos_agent' is in the Python path.
 try:
-    from eidos_agent.features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData # Updated import
-    from eidos_agent.features.firmament import handle_external_impulse # Updated import
-    from eidos_agent.features.memories_feature import store_imprint # Updated import
+    from eidos_agent.features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData
+    from eidos_agent.features.memories_feature import store_imprint
+    # New imports for EventBus and IMPULSE event type
+    from eidos_agent.features.firmament.core.event_bus import EventBus
+    from eidos_agent.features.firmament.core.event_types import IMPULSE
 except ImportError as e:
     # This fallback is mostly for isolated testing of this file if the full structure isn't in PYTHONPATH.
     # In a proper package installation, this shouldn't be necessary.
     logging.warning(f"Could not import Eidos modules directly, attempting relative for dev: {e}")
     try:
-        from ...features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData # Updated relative import
-        from ...features.firmament import handle_external_impulse # Updated relative import
-        from ...features.memories_feature import store_imprint # Updated relative import
+        from ...features.subconscious_interface_to_node.subconscious.models import ImpulseData, ImprintData
+        from ...features.memories_feature import store_imprint
+        from ...features.firmament.core.event_bus import EventBus # Relative path for dev
+        from ...features.firmament.core.event_types import IMPULSE # Relative path for dev
     except ImportError:
         logging.exception("Failed to import Eidos modules. Ensure eidos_agent is in PYTHONPATH or structure is correct.")
         # Define dummy models if import fails, to allow FastAPI to start but endpoints will fail
         class ImpulseData(logging.getLoggerClass()): pass # Dummy class
         class ImprintData(logging.getLoggerClass()): pass # Dummy class
-        def handle_external_impulse(*args, **kwargs): raise RuntimeError("Module not loaded")
+        # def handle_external_impulse(*args, **kwargs): raise RuntimeError("Module not loaded") # Removed
         def store_imprint(*args, **kwargs): raise RuntimeError("Module not loaded")
+        class EventBus: # Dummy EventBus
+            @staticmethod
+            def instance(): return EventBus()
+            def publish(self, event, payload): print(f"DummyEventBus: Published {event} with {payload}")
+        IMPULSE = "dummy.impulse"
 
 
 # --- APIRouter Instance ---
@@ -55,15 +63,30 @@ async def handle_subconscious_impulse(data: ImpulseData):
     """
     logger.info(f"Eidos API (Router): Received impulse from Pathos: {data.dict()}")
     try:
-        # Pass data to the appropriate Eidos module (e.g., firmament)
-        # handle_external_impulse is now an async function
-        result = await handle_external_impulse(
-            thought=data.thought,
-            timestamp=data.timestamp,
-            mood=data.mood_snapshot
-        )
-        logger.info(f"Eidos API (Router): Impulse processed by firmament module. Result: {result}")
-        return result
+        event_bus = EventBus.instance()
+
+        impulse_type_from_thought = "generic_thought_impulse" # Default
+        if data.thought and isinstance(data.thought, str):
+            lower_thought = data.thought.lower()
+            if "tired" in lower_thought or "sleepy" in lower_thought:
+                impulse_type_from_thought = "tired"
+            elif "hungry" in lower_thought or "eat" in lower_thought:
+                impulse_type_from_thought = "hungry"
+            # Add other keyword-based mappings here if needed
+
+        impulse_event_payload = {
+            "type": impulse_type_from_thought, # This is the specific type of impulse, not the event type itself
+            "content": data.thought, # Using .thought as per ImpulseData model
+            "timestamp": data.timestamp,
+            "mood_snapshot": data.mood_snapshot, # Assuming mood_snapshot is a dict
+            "source": "external_api_subconscious_node"
+        }
+
+        # IMPULSE is the event type string imported from firmament.core.event_types
+        event_bus.publish(IMPULSE, impulse_event_payload)
+
+        logger.info(f"Eidos API (Router): Impulse event '{impulse_type_from_thought}' published to Firmament EventBus.")
+        return {"status": "impulse_event_published", "published_type": impulse_type_from_thought, "content_preview": data.thought[:70] + "..." if data.thought else ""}
     except Exception as e:
         logger.exception(f"Eidos API (Router): Error processing impulse: {data.dict()}")
         raise HTTPException(status_code=500, detail=f"Error processing impulse in Eidos: {str(e)}")

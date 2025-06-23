@@ -250,18 +250,7 @@ class Config:
             "frequency_penalty": float(os.getenv("LLM_LOGOS_TECHNE_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_TECHNE_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_TECHNE_TIKTOKEN_NAME", "cl100k_base") # Added
         },
-        "LOGOS_VISION_CONTEXT": { # Kept for potential dedicated image description tool
-            "url": os.getenv("LLM_LOGOS_VISION_URL"),
-            "model": os.getenv("LLM_LOGOS_VISION_MODEL"),
-            "api_key": os.getenv("LLM_LOGOS_VISION_API_KEY", "lm-studio"),
-            "temperature": float(os.getenv("LLM_LOGOS_VISION_TEMP", 0.2)),
-            "timeout": float(os.getenv("LLM_LOGOS_VISION_TIMEOUT", 10.0)),  # Reduced from 60.0 to 10.0 for faster startup
-            "max_tokens": int(os.getenv("LLM_LOGOS_VISION_MAX_TOKENS", 1024)),
-            "top_p": float(os.getenv("LLM_LOGOS_VISION_TOP_P", 0.95)) if os.getenv("LLM_LOGOS_VISION_TOP_P") else None,
-            "presence_penalty": float(os.getenv("LLM_LOGOS_VISION_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_VISION_PRESENCE_PENALTY") else None,
-            "frequency_penalty": float(os.getenv("LLM_LOGOS_VISION_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_VISION_FREQUENCY_PENALTY") else None,
-            "model_name_for_tiktoken": os.getenv("LLM_LOGOS_VISION_TIKTOKEN_NAME", "cl100k_base") # Added
-        },
+        # "LOGOS_VISION_CONTEXT" entry removed
         "LOGOS_DEEP_RESEARCH": {
             "url": os.getenv("LLM_LOGOS_RESEARCH_URL"),
             "model": os.getenv("LLM_LOGOS_RESEARCH_MODEL"),
@@ -302,7 +291,7 @@ class Config:
 
     ENABLE_AISTHESIS = os.getenv("ENABLE_AISTHESIS", "False").lower() == "true"
     ENABLE_AMBIENT_AUDIO = os.getenv("ENABLE_AMBIENT_AUDIO", "False").lower() == "true"
-    ENABLE_VISION_PROCESSING = os.getenv("ENABLE_VISION_PROCESSING", "False").lower() == "true"
+    # ENABLE_VISION_PROCESSING line removed
     ENABLE_DAILY_CONTEXT = os.getenv("ENABLE_DAILY_CONTEXT", "True").lower() == "true"
     ENABLE_ONEIROS = os.getenv("ENABLE_ONEIROS", "True").lower() == "true"
     ENABLE_PROACTIVE_BEHAVIOR = os.getenv("ENABLE_PROACTIVE_BEHAVIOR", "True").lower() == "true"
@@ -647,7 +636,7 @@ class Config:
         if Config.ONEIROS.get("enable_image_dreams"): Path(Config.ONEIROS["image_output_dir"]).mkdir(parents=True, exist_ok=True)
         
         required_llm_roles = ["PATHOS", "LOGOS_TECHNE"]
-        if Config.ENABLE_VISION_PROCESSING: required_llm_roles.append("LOGOS_VISION_CONTEXT")
+        # Line for LOGOS_VISION_CONTEXT based on ENABLE_VISION_PROCESSING removed
         if Config.LLM.get("LOGOS_DEEP_RESEARCH") and Config.LLM["LOGOS_DEEP_RESEARCH"].get("url"): required_llm_roles.append("LOGOS_DEEP_RESEARCH")
         
         utility_roles_in_ethos = [

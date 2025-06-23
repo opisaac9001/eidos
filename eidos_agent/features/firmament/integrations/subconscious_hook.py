@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 try:
     from ....core.config import Config, LLMConfig
     from ....llm_integrations.llm_client import LLMClient
-    from ....core.http_client_manager import HTTPClientManager # New import
+    from ...core.http_client_manager import HTTPClientManager # Changed from .... to ...
     from ....persona_logic.ethos_core.core import EthosCore
     from ....persona_logic.ethos_core.memory_storage import MemoryEntry
     from .....persona_logic.chronos_engine import PATHOS_USER_ID # For use in get_recent_subconscious_thoughts
