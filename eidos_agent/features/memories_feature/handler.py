@@ -87,14 +87,20 @@ async def store_imprint(content: str, timestamp: str, mood: Dict[str, Any], topi
 
 
 if __name__ == '__main__':
+    import json # Added import for json.dumps in mock
     print("--- Testing memories_feature.handler.store_imprint (mocked EthosCore) ---")
 
     # Mock EthosCore and its method for testing
     class MockEthosCore:
+        def __init__(self):
+            self.last_added_entry_data = None # Attribute to store the data
+
         async def add_memory_entry(self, entry_data: Dict[str, Any], user_id_context: str) -> Any:
             print(f"MockEthosCore.add_memory_entry called:")
             print(f"  User ID Context: {user_id_context}")
             print(f"  Entry Data: {json.dumps(entry_data, indent=2)}")
+            self.last_added_entry_data = entry_data # Capture the data
+
             if "error" in entry_data["content"].lower():
                 raise ValueError("Simulated error in EthosCore")
 
@@ -143,6 +149,18 @@ if __name__ == '__main__':
             else:
                 assert result["status"] == "imprint_stored_in_ethos"
                 assert "memory_id" in result
+                # New assertions:
+                if mock_ethos_instance.last_added_entry_data:
+                    captured_data = mock_ethos_instance.last_added_entry_data
+                    assert captured_data["type"] == "subconscious_imprint"
+                    assert captured_data["content"] == imprint_args["content"]
+                    assert "metadata" in captured_data
+                    assert captured_data["metadata"]["source"] == "subconscious_node_hook"
+                    assert captured_data["metadata"]["original_timestamp"] == imprint_args["timestamp"]
+                    assert captured_data["metadata"]["mood_at_imprint"] == imprint_args["mood"]
+                    assert captured_data["metadata"]["topics_from_imprint"] == imprint_args["topics"]
+                    assert "salience" in captured_data # Check salience is present
+                    print(f"  Verified type and metadata for imprint: {captured_data['type']}")
 
         # Test case where EthosCore is not set
         set_ethos_core_instance(None)

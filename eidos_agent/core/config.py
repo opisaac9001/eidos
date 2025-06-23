@@ -58,6 +58,12 @@ class EthosConfig(TypedDict, total=False):
     proactive_topic_chance: float
     proactive_briefing_chance: float
     proactive_queued_point_chance: float
+    proactive_greeting_enabled: Optional[bool]
+    proactive_offer_queued_topic_enabled: Optional[bool]
+    proactive_curiosity_comment_enabled: Optional[bool]
+    proactive_curiosity_chance: Optional[float]
+    proactive_curiosity_hexus_threshold: Optional[float]
+    proactive_curiosity_interval_hours: Optional[float]
     enable_memory_summarization: bool
     summarization_llm_role: str
     interaction_log_analysis_llm_role: str
@@ -105,6 +111,7 @@ class EthosConfig(TypedDict, total=False):
     forgetting_core_memory_types_json: str # Existing
     forgetting_extremely_low_salience_for_core: float # Existing
     retrieval_min_salience_for_pathos_context: float
+    persona_traits_file_path: Optional[str] # New key
 
 
 
@@ -337,6 +344,12 @@ class Config:
         "proactive_topic_chance": float(os.getenv("ETHOS_PROACTIVE_TOPIC_CHANCE", 0.2)),
         "proactive_briefing_chance": float(os.getenv("ETHOS_PROACTIVE_BRIEFING_CHANCE", 0.4)),
         "proactive_queued_point_chance": float(os.getenv("ETHOS_PROACTIVE_QUEUED_POINT_CHANCE", 0.5)),
+        "proactive_greeting_enabled": os.getenv("ETHOS_PROACTIVE_GREETING_ENABLED", "True").lower() == "true",
+        "proactive_offer_queued_topic_enabled": os.getenv("ETHOS_PROACTIVE_OFFER_TOPIC_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_comment_enabled": os.getenv("ETHOS_PROACTIVE_CURIOSITY_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_chance": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_CHANCE", 0.1)),
+        "proactive_curiosity_hexus_threshold": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_HEXUS_THRESHOLD", 0.65)),
+        "proactive_curiosity_interval_hours": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_INTERVAL_HOURS", 6.0)),
         "enable_memory_summarization": os.getenv("ETHOS_ENABLE_MEMORY_SUMMARIZATION", "True").lower() == "true",
         "summarization_llm_role": os.getenv("ETHOS_SUMMARIZATION_LLM_ROLE", "LOGOS_TECHNE"),
         "summarization_cluster_min_memories": int(os.getenv("ETHOS_SUMMARIZATION_CLUSTER_MIN_MEMORIES", 5)),
@@ -384,6 +397,7 @@ class Config:
         "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight", "learned_correction"]'), # Updated default
         "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")), # Existing
         "retrieval_min_salience_for_pathos_context": float(os.getenv("ETHOS_RETRIEVAL_MIN_SALIENCE_PATHOS", "0.1")),
+        "persona_traits_file_path": str(PROJECT_ROOT / "persona" / "pathos_traits.json")
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None

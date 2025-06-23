@@ -145,7 +145,7 @@ class PromptBuilder:
         cache warming or initial system checks.
         """
         try:
-            main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "Error: Main Pathos system prompt template could not be loaded.")
+            main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "You are Pathos, a helpful AI assistant. Please ensure your persona directives and context are fully loaded.")
 
             if self.ethos_core:
                 persona_directives_content = "\n".join(self.ethos_core.get_persona_directives())
@@ -198,7 +198,7 @@ class PromptBuilder:
         # LLM token limits will be used further down.
 
         # --- Standard System Prompt Construction (as before) ---
-        main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "ERROR: Main Pathos system prompt template not found.")
+        main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "You are Pathos, a helpful AI assistant. Please ensure your persona directives and context are fully loaded.")
         persona_directives_content = "\n".join(self.ethos_core.get_persona_directives()) if self.ethos_core else load_system_prompt("pathos_directives", "Default persona: You are Pathos.")
         current_mood_dict = self.ethos_core.get_current_mood() if self.ethos_core else {'valence': 0.0, 'arousal': 0.0}
         current_mood_str = f"Valence: {current_mood_dict['valence']:.2f}, Arousal: {current_mood_dict['arousal']:.2f}"
@@ -287,6 +287,20 @@ class PromptBuilder:
         pathos_aspirations_context = (await self.ethos_core.get_pathos_aspirations_context_for_prompt()) if self.ethos_core else "No aspirations info."
         todays_briefing_context = (await self.ethos_core.get_todays_briefing_context_for_prompt(user_id)) if self.ethos_core else "No briefing info."
 
+        pathos_traits_description = "Pathos has a generally adaptive personality profile." # Default
+        if self.ethos_core and hasattr(self.ethos_core, 'traits_engine') and self.ethos_core.traits_engine:
+            try:
+                # The get_descriptive_trait_summary is synchronous
+                desc = self.ethos_core.traits_engine.get_descriptive_trait_summary()
+                if desc: # Use it only if it's not empty
+                    pathos_traits_description = desc
+                logger.debug(f"PromptBuilder: Fetched trait description: {pathos_traits_description}")
+            except Exception as e_trait_desc:
+                logger.error(f"PromptBuilder: Error fetching trait description from TraitsEngine: {e_trait_desc}", exc_info=True)
+                # Fallback to default is already set
+        else:
+            logger.warning("PromptBuilder: EthosCore or TraitsEngine not available for fetching trait description. Using default.")
+
         # Use AVAILABLE_TOOLS_FOR_PATHOS_LLM by default for Pathos's own reasoning.
         # PathosInterface._call_llm_with_tools can decide to pass ALL_AVAILABLE_SYSTEM_TOOLS if it's a system call.
         available_tools_json_for_prompt = json.dumps(AVAILABLE_TOOLS_FOR_PATHOS_LLM, indent=2)
@@ -300,6 +314,7 @@ class PromptBuilder:
             "{{CURRENT_HEXUS_SCORES_FOR_PROMPT}}": hexus_scores_str,
             "{{PATHOS_SCHEDULE_CONTEXT}}": pathos_schedule_context,
             "{{PATHOS_ASPIRATIONS_CONTEXT}}": pathos_aspirations_context,
+            "{{PATHOS_TRAITS_DESCRIPTION}}": pathos_traits_description, # New entry
             "{{RELEVANT_MEMORIES_CONTEXT_FOR_PROMPT}}": memories_formatted_for_prompt, # Standard short-term memory retrieval
             "{{TODAYS_BRIEFING_CONTEXT_FOR_PROMPT}}": todays_briefing_context,
             "{{VISION_ANALYSIS_CONTEXT_FOR_PROMPT}}": vision_analysis_context_for_prompt,
@@ -501,3 +516,252 @@ class PromptBuilder:
 # Note: PATHOS_USER_ID is used by _execute_tools in PathosInterface for add_pathos_event.
 # If _execute_tools were moved here, PATHOS_USER_ID would need to be imported here too.
 # For now, it's fine as _execute_tools remains in PathosInterface.
+
+if __name__ == '__main__':
+    import asyncio
+    import logging # Already imported at top level, but good for clarity in __main__
+    from pathlib import Path
+    import unittest.mock # For mocking LogosCore
+
+    # Ensure types for mocks are available. Adjust import paths if necessary based on file structure.
+    # These are typically for type hinting the mock classes to resemble the real ones.
+    try:
+        from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
+    except ImportError:
+        # Define a dummy MemoryEntry if the real one cannot be imported (e.g. running file standalone)
+        MemoryEntry = Dict[str, Any] # type: ignore
+        print("Warning: Could not import MemoryEntry for prompt_builder test, using dummy Dict.")
+
+    try:
+        # Attempt to import real config types for more accurate mock definitions
+        from eidos_agent.core.config import Config as RealConfig
+        from eidos_agent.core.config import EthosConfig as RealEthosConfigType
+        from eidos_agent.core.config import LLMConfig as RealLLMConfigType
+    except ImportError:
+        # Define dummy types if real ones are not available
+        RealConfig = Dict[str, Any] # type: ignore
+        RealEthosConfigType = Dict[str, Any] # type: ignore
+        RealLLMConfigType = Dict[str, Any] # type: ignore
+        print("Warning: Could not import real Config types for prompt_builder test, using dummy Dicts.")
+
+
+    # Setup basic logging for the __main__ block if not already configured
+    # This logger is specific to the test execution in __main__
+    logger_main = logging.getLogger("prompt_builder_test")
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+
+    class MockTraitsEngine:
+        def get_descriptive_trait_summary(self) -> str:
+            logger_main.info("MockTraitsEngine.get_descriptive_trait_summary called")
+            return "Pathos's key personality characteristics include: Test Trait: Value; Test Verbosity: High."
+
+        def get_all_traits(self) -> Dict[str, Any]:
+            logger_main.info("MockTraitsEngine.get_all_traits called")
+            return {"test_trait": "value", "verbosity": "high", "openness": 0.7, "conscientiousness": 0.6, "extraversion": 0.5, "agreeableness": 0.8, "neuroticism": 0.3}
+
+
+    class MockEthosCore:
+        PATHOS_USER_ID = "test_pathos_id_pb" # Static class attribute for user ID
+
+        def __init__(self, config_obj: Any): # config_obj will be an instance of MockConfigForPromptBuilder
+            self.config = config_obj # Store the mock config
+            # EthosConfig is expected to be a dict-like attribute on the main config.
+            # PromptBuilder accesses it via self.config.ETHOS.
+            # So, MockConfigForPromptBuilder needs an ETHOS attribute.
+            self.ethos_config: RealEthosConfigType = getattr(config_obj, 'ETHOS', {})
+            self.traits_engine = MockTraitsEngine()
+            logger_main.info(f"MockEthosCore for PromptBuilder initialized with config: {self.ethos_config}")
+
+        def get_persona_directives(self) -> List[str]:
+            logger_main.debug("MockEthosCore.get_persona_directives called")
+            return ["PB Test Directive 1: Be helpful.", "PB Test Directive 2: Be insightful."]
+
+        def get_current_mood(self) -> Dict[str, Any]:
+            logger_main.debug("MockEthosCore.get_current_mood called")
+            return {"name": "pb_test_mood_calm", "valence": 0.2, "arousal": -0.1}
+
+        async def get_current_activity_description(self) -> str:
+            logger_main.debug("MockEthosCore.get_current_activity_description called")
+            return "PB testing activity: Contemplating test assertions."
+
+        def get_hexus_scores(self) -> Dict[str, float]:
+            logger_main.debug("MockEthosCore.get_hexus_scores called")
+            return {"joy": 0.65, "anticipation": 0.4, "sadness": 0.1} # Example scores
+
+        async def get_user_profile_summary(self, user_id: str) -> str:
+            logger_main.debug(f"MockEthosCore.get_user_profile_summary called for user {user_id}")
+            return f"PB User Profile for {user_id}: Enjoys thorough testing."
+
+        async def get_pathos_schedule_context_for_prompt(self) -> str:
+            logger_main.debug("MockEthosCore.get_pathos_schedule_context_for_prompt called")
+            return "PB Schedule Context: Next up - verify prompt contents. Then, celebrate."
+
+        async def get_pathos_aspirations_context_for_prompt(self) -> str:
+            logger_main.debug("MockEthosCore.get_pathos_aspirations_context_for_prompt called")
+            return "PB Aspirations Context: To build the most illustrative and correct prompts."
+
+        async def retrieve_relevant_memories(
+            self, query: str, top_k: int, min_salience: float,
+            user_id_context: Optional[str] = None,
+            allowed_types: Optional[List[str]] = None
+        ) -> List[MemoryEntry]:
+            logger_main.debug(f"MockEthosCore.retrieve_relevant_memories called with query='{query}', top_k={top_k}, min_salience={min_salience}")
+            # Return a list of MemoryEntry compatible dicts
+            return [
+                {
+                    "id": "mem_pb_test_1", "type": "interaction",
+                    "content": "User previously asked about mock data quality.",
+                    "timestamp": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+                    "salience": 0.85, "summary_llm": "User inquired about mock data."
+                } # type: ignore
+            ]
+
+        async def get_todays_briefing_context_for_prompt(self, user_id: str) -> str:
+            logger_main.debug(f"MockEthosCore.get_todays_briefing_context_for_prompt called for user {user_id}")
+            return "PB Daily Briefing: Focus on trait integration. Ensure tests cover new prompt elements."
+
+        def get_all_traits(self) -> Dict[str, Any]: # Delegates to its traits_engine
+            logger_main.debug("MockEthosCore.get_all_traits called, delegating to traits_engine.")
+            return self.traits_engine.get_all_traits()
+
+        # Mock for retrieve_relevant_past_interactions
+        async def retrieve_relevant_past_interactions(
+            self, query_text: str, user_id: str, current_history_entry_ids: List[str],
+            top_k: int, similarity_threshold: float
+        ) -> List[MemoryEntry]:
+            logger_main.debug(f"MockEthosCore.retrieve_relevant_past_interactions called for user {user_id}, query: '{query_text}'")
+            return [
+                 {
+                    "id": "past_inter_pb_1", "type": "interaction",
+                    "content": "User: What was the weather like yesterday? Pathos: It was sunny.",
+                    "timestamp": (datetime.now(timezone.utc) - timedelta(days=1, hours=2)).isoformat(),
+                    "salience": 0.7, "summary_llm": "Discussed yesterday's weather (sunny)."
+                } # type: ignore
+            ]
+
+
+    class MockConfigForPromptBuilder(RealConfig): # type: ignore
+        PROJECT_ROOT: Path = Path(".") # Mocked project root
+
+        # Mocked ETHOS configuration dictionary
+        ETHOS: RealEthosConfigType = { # type: ignore
+            "retrieval_min_salience_for_pathos_context": 0.05,
+            "retrieval_limit_for_pathos_context": 3, # Added based on PromptBuilder usage
+            "schedule_context_max_items_for_prompt": 2,
+            "schedule_context_desc_snippet_len": 25,
+            "briefing_context_max_length_for_prompt": 200,
+            "aspiration_context_max_items_for_prompt": 2,
+            # Add any other keys PromptBuilder.build_main_llm_messages might access from self.config.ETHOS
+        }
+
+        LLM_MAX_PROMPT_TOKENS_MAIN: int = 7000
+        LLM_RESPONSE_BUFFER_TOKENS: int = 1500
+        DYNAMIC_CONTEXT_ENABLED: bool = True
+        DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS: int = 1
+        DYNAMIC_CONTEXT_SIMILARITY_THRESHOLD: float = 0.65
+
+        # Mocked LLM configurations dictionary
+        LLM: Dict[str, RealLLMConfigType] = { # type: ignore
+            "PATHOS": {
+                "model_name_for_tiktoken": "cl100k_base", # For token estimation
+                "supports_vision": False, # For testing non-multimodal path
+                "model": "gpt-test-model-for-pathos", # Example model name
+                "api_type": "openai", # Example API type
+                "api_key_env_var": "DUMMY_API_KEY", # Example env var for API key
+                "base_url": "http://localhost:1234/v1", # Example base URL
+                # Add other fields as per the actual LLMConfig TypedDict if PromptBuilder uses them
+            }
+        }
+
+        def get_llm_config(self, role: str) -> Optional[RealLLMConfigType]: # type: ignore
+            logger_main.debug(f"MockConfigForPromptBuilder.get_llm_config called for role '{role}'")
+            return self.LLM.get(role) # type: ignore
+
+        def get_ethos_config(self) -> RealEthosConfigType: # type: ignore
+            logger_main.debug("MockConfigForPromptBuilder.get_ethos_config called")
+            return self.ETHOS # type: ignore
+
+        @staticmethod
+        def get_nested_value(config_dict: Dict, path: List[str], default: Any = None) -> Any:
+            """Helper to get nested values from a dictionary, as used in PromptBuilder."""
+            current = config_dict
+            for key in path:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    return default
+            return current
+
+
+    async def main_test_runner():
+        logger_main.info("Starting PromptBuilder test runner...")
+
+        mock_config_pb = MockConfigForPromptBuilder()
+        mock_ethos_pb = MockEthosCore(config_obj=mock_config_pb) # Pass mock config to mock ethos
+
+        # Mock LogosCore
+        mock_logos_pb = unittest.mock.AsyncMock(spec=LogosCore) # type: ignore
+        async def mock_logos_get_time(location=None):
+            logger_main.debug(f"MockLogosCore.execute_get_time called with location: {location}")
+            return f"Mock Time from PB Test: {datetime.now(timezone.utc).strftime('%A, %B %d, %Y, %I:%M %p %Z')}"
+        mock_logos_pb.execute_get_time = mock_logos_get_time # type: ignore
+
+        # Instantiate PromptBuilder with mocks
+        builder = PromptBuilder(config=mock_config_pb, ethos_core=mock_ethos_pb, logos_core=mock_logos_pb) # type: ignore
+
+        logger_main.info("PromptBuilder instantiated with mocks. Building main LLM messages...")
+
+        # Example call to build_main_llm_messages
+        # Ensure all required arguments are provided as per the method's signature.
+        messages, retrieved_memories, mood, hexus, estimated_tokens = await builder.build_main_llm_messages(
+            user_id="test_user_pb_001",
+            user_input_text="Hello Pathos, tell me about your personality.",
+            history_context=[ # Example history
+                {"role": "user", "content": "What was the topic yesterday?"},
+                {"role": "assistant", "content": "We were discussing mock objects."}
+            ],
+            image_data_b64=None, # No image for this test
+            vision_description_if_non_multimodal=None,
+            document_text=None, # No document for this test
+            force_web_search=False,
+            engaged_proactive_id=None,
+            system_provided_info=None,
+            enhanced_pathos_llm_config=mock_config_pb.get_llm_config("PATHOS") # Pass LLM config
+        )
+
+        logger_main.info(f"build_main_llm_messages returned. Estimated tokens: {estimated_tokens}. Number of messages: {len(messages)}")
+
+        assert messages, "No messages returned from build_main_llm_messages"
+        system_prompt_message = messages[0]
+        assert system_prompt_message["role"] == "system", "First message should be a system prompt."
+
+        system_prompt_content = system_prompt_message['content']
+        logger_main.debug(f"Generated system prompt content for test:\n{'-'*20}\n{system_prompt_content}\n{'-'*20}")
+
+        # The core assertion: Check for the trait description
+        expected_trait_description = "Pathos's key personality characteristics include: Test Trait: Value; Test Verbosity: High."
+        assert expected_trait_description in system_prompt_content, \
+            f"Trait description '{expected_trait_description}' missing from system prompt."
+        logger_main.info(f"Assertion successful: Trait description found in system prompt!")
+
+        # Additional check for other dynamic content (optional, but good for sanity)
+        assert "PB Test Directive 1: Be helpful." in system_prompt_content, "Persona directive missing."
+        assert "Mock Time from PB Test:" in system_prompt_content, "Mock time missing."
+        assert "PB User Profile for test_user_pb_001" in system_prompt_content, "User profile summary missing."
+        assert "PB testing activity: Contemplating test assertions." in system_prompt_content, "Activity description missing."
+        assert "Valence: 0.20, Arousal: -0.10" in system_prompt_content, "Mood string missing or incorrect." # Note formatting
+        assert "joy=0.65" in system_prompt_content, "Hexus scores missing." # Example part of hexus
+        assert "PB Schedule Context:" in system_prompt_content, "Schedule context missing."
+        assert "PB Aspirations Context:" in system_prompt_content, "Aspirations context missing."
+        assert "User previously asked about mock data quality." in system_prompt_content, "Retrieved memory missing."
+        assert "PB Daily Briefing:" in system_prompt_content, "Briefing context missing."
+
+        logger_main.info("All basic assertions passed for PromptBuilder test.")
+
+    # Run the async test runner
+    try:
+        asyncio.run(main_test_runner())
+        logger_main.info("PromptBuilder __main__ test run completed successfully.")
+    except Exception as e:
+        logger_main.error(f"Error during PromptBuilder __main__ test run: {e}", exc_info=True)

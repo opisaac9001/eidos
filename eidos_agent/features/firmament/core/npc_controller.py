@@ -12,7 +12,39 @@ try:
     from ..event_types import NPC_DIALOGUE, WORLD_EVENT
 except ImportError: # pragma: no cover
     print("CRITICAL: NPC_Controller could not import EventBus or core event types. Event handling will fail.")
-    class EventBus: _instance = None; _subscribers = {}; @classmethod def instance(cls): return cls._instance or cls(); subscribe = lambda s,e,h: None; publish = lambda s,e,d: print(f"DummyEventBus: {e} with {d}") #type:ignore # type: ignore
+    class EventBus:  # type: ignore
+        _instance = None
+        _subscribers: dict = {} # Class attribute for subscribers
+
+        @classmethod
+        def instance(cls):
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+        def __init__(self):
+            # Ensure instance's subscribers are distinct if class attribute was shared by mistake before
+            self._subscribers = {}
+
+        def subscribe(self, event_type, handler):
+            if event_type not in self._subscribers:
+                self._subscribers[event_type] = []
+            if handler not in self._subscribers[event_type]:
+                 self._subscribers[event_type].append(handler)
+            # print(f"DummyEventBus: Handler {handler.__name__} subscribed to {event_type}")
+
+
+        def publish(self, event_type, data):
+            # print(f"DummyEventBus: Publishing {event_type} with {data}")
+            if event_type in self._subscribers:
+                for handler in self._subscribers[event_type]:
+                    try:
+                        handler(data)
+                    except Exception as e:
+                        print(f"DummyEventBus: Error in handler {handler.__name__} for event {event_type}: {e}")
+            # else:
+                # print(f"DummyEventBus: No subscribers for event {event_type}")
+
     NPC_DIALOGUE, WORLD_EVENT = "dummy.npc_dialogue", "dummy.world_event" #type:ignore
 
 logger = logging.getLogger(__name__)
@@ -159,10 +191,16 @@ def register_npc_event_listeners():
 
 
 if __name__ == '__main__': # pragma: no cover
-    from collections import defaultdict # For mock event bus in test
+    # from collections import defaultdict # No longer needed if dummy EventBus is more robust
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     print("--- Testing NPC Controller with Profile Loading & Spawn Interaction ---")
+
+    # Ensure dummy EventBus is used for __main__ if imports failed
+    # This is tricky because the class definition is global.
+    # If the real EventBus was imported, this __main__ might use it.
+    # For robust __main__ testing when imports fail, the dummy needs to be effective.
+    # The current dummy structure should work if the ImportError was hit.
 
     if not load_npc_profiles():
         print("FATAL: Could not load NPC profiles for test. Aborting __main__ test for spawn_npc_interaction.")
@@ -172,15 +210,20 @@ if __name__ == '__main__': # pragma: no cover
             print(f"    [Capture] Event: {event_type}, Relevant Data: {str(data.get('npc_name', data.get('content', data)))[:80]}...")
             _test_events_npc_main.append({"type": event_type, "data": data})
 
-        # Setup a mock-like EventBus for this specific test run
-        if hasattr(EventBus, '_instance'): EventBus._instance = None
+        # Get an instance of EventBus (could be real or dummy)
         bus = EventBus.instance()
-        # Clear any subscribers from other test runs if instance is reused (though it shouldn't be here)
-        if hasattr(bus, '_subscribers'): bus._subscribers = defaultdict(list)
 
-        bus.subscribe(NPC_DIALOGUE, lambda d: capture_npc_events(NPC_DIALOGUE, d))
-        bus.subscribe(EVENT_MEMORY_WRITE, lambda d: capture_npc_events(EVENT_MEMORY_WRITE, d))
-        register_npc_event_listeners() # Subscribes spawn_npc_interaction to WORLD_EVENT
+        # For __main__ testing, explicitly clear subscribers on the dummy if it's the dummy,
+        # to ensure a clean state for this test run.
+        if hasattr(bus, '_subscribers') and isinstance(bus._subscribers, dict): # Check if it's our dummy
+            print("    Note: Clearing subscribers on the dummy EventBus for __main__ test.")
+            bus._subscribers.clear()
+
+        bus.subscribe(NPC_DIALOGUE, lambda data: capture_npc_events(NPC_DIALOGUE, data))
+        bus.subscribe(EVENT_MEMORY_WRITE, lambda data: capture_npc_events(EVENT_MEMORY_WRITE, data))
+
+        # This will subscribe spawn_npc_interaction to WORLD_EVENT on the bus instance
+        register_npc_event_listeners()
 
         print("\n--- Test 1: Event that should trigger Mailman Bob ('mail_delivery') ---")
         _test_events_npc_main.clear()

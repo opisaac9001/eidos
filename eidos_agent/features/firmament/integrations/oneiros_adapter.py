@@ -6,15 +6,75 @@
 # then logging this dream to memory.
 
 import random
+import logging
 from datetime import datetime, timezone # For timestamp in memory log
+from typing import Optional, Dict, Any, List, AsyncGenerator, Union
 
-# Attempt to import EventBus. If this adapter is part of a larger system,
-# EventBus should be accessible via the Python path.
+# Attempt to import core Eidos components.
 try:
-    from ..core.event_bus import EventBus
+    from ....core.config import Config, LLMConfig
+    from ....llm_integrations.llm_client import LLMClient
+    from ....core.http_client_manager import HTTPClientManager
+    from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
+    from ....persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
+    from ....persona_logic.ethos_core.memory_storage import MemoryEntry
+    from .....persona_logic.chronos_engine import PATHOS_USER_ID
 except ImportError: # pragma: no cover
-    print("Warning: OneirosAdapter could not import EventBus. Event handling will not work unless EventBus is provided.")
-    # Define a dummy EventBus if import fails, so the file can be parsed for basic testing of generate_dream
+    print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
+    # Define dummy versions for parsing and basic type hinting
+    class Config: # type: ignore
+        @staticmethod
+        def get_llm_config(role_name: str) -> Optional[Dict[str, Any]]: # This dummy returns Dict, not LLMConfig alias directly
+            print(f"DummyConfig: get_llm_config called for role {role_name}")
+            if role_name == "FIRMAMENT_PRIMARY":
+                return {"role": role_name, "model": "dummy_model", "url": "http://dummy.url"} # Example LLMConfig structure
+            return None
+
+    LLMConfig = Dict[str, Any] # type: ignore # Actual LLMConfig is a TypedDict, but Dict is fine for dummy
+
+    MemoryEntry = Dict[str, Any] # type: ignore
+    PATHOS_USER_ID = "pathos_dummy_user_id_if_import_fails" # Dummy value
+
+    class LLMClient: # type: ignore
+        def __init__(self, http_client: Any):
+            self.http_client = http_client
+            print("DummyLLMClient initialized.")
+        async def call_llm_api(self, llm_config: LLMConfig, messages: List[Dict[str, str]], stream: bool = False, **kwargs: Any) -> Union[AsyncGenerator[str, None], str]:
+            print(f"DummyLLMClient: call_llm_api called with config {llm_config}")
+            if stream:
+                async def dummy_stream():
+                    yield "Dummy streamed response."
+                return dummy_stream()
+            return "Dummy response."
+
+    class HTTPClientManager: # type: ignore
+        _instance = None
+        @classmethod
+        def instance(cls):
+            if cls._instance is None:
+                cls._instance = cls()
+                print("DummyHTTPClientManager instance created.")
+            return cls._instance
+        def get_client(self) -> Optional[Any]: # Should ideally be Optional[httpx.AsyncClient]
+            print("DummyHTTPClientManager: get_client called.")
+            return None # Or a mock client
+        async def startup(self): print("DummyHTTPClientManager: startup")
+        async def shutdown(self): print("DummyHTTPClientManager: shutdown")
+
+    # Dummy EthosCore still needed if methods on self.ethos_core are called elsewhere in the class.
+    # For this task, we are only modifying __init__. If self.ethos_core is used, it should be set by a setter.
+    class EthosCore: # type: ignore
+        def __init__(self, config: Any = None): # Added default to config
+            print("DummyEthosCore initialized.")
+        async def get_memories_for_dream_seeding(self, user_id: str, lookback_days: int, limit: int, memory_types: Optional[List[str]] = None) -> List[MemoryEntry]:
+            print(f"DummyEthosCore.get_memories_for_dream_seeding called for user {user_id}")
+            return [{"type": "dummy_interaction", "content": "Dummy memory content from EthosCore.", "timestamp": datetime.now(timezone.utc).isoformat()}]
+        def get_current_mood(self) -> Dict[str, Any]: # Adding dummy for get_current_mood as it's used
+             print("DummyEthosCore.get_current_mood called.")
+             return {"name": "dummy_mood", "valence": 0, "arousal": 0}
+
+
+    # Define a dummy EventBus if import fails, so the file can be parsed
     class EventBus: # type: ignore
         _instance = None; _subscribers = {} # type: ignore
         @classmethod
@@ -31,95 +91,264 @@ EVENT_MEMORY_WRITE = "memory.write"                     # Event this adapter pub
 
 
 class OneirosAdapter:
-    def __init__(self, oneiros_config: dict = None):
+    # EthosCore is removed from __init__ params. If needed, it should be set via a dedicated setter method
+    # by the Firmament bootstrap process, similar to other adapters.
+    def __init__(self,
+                 http_client_manager: Optional[HTTPClientManager] = None,
+                 llm_role_name: str = "FIRMAMENT_PRIMARY",
+                 oneiros_config: Optional[Dict[str, Any]] = None):
         """
         Initializes the OneirosAdapter.
-        In a real implementation, this might load dream generation models or
-        connect to an Oneiros service.
+        This adapter can use an LLM to enhance dream generation if configured.
 
         Args:
-            oneiros_config (dict, optional): Configuration for the Oneiros module.
-                                             Defaults to None.
+            http_client_manager (Optional[HTTPClientManager], optional): Manager for HTTP clients. Defaults to None.
+            llm_role_name (str, optional): The LLM role name to use for LLM-driven features. Defaults to "FIRMAMENT_PRIMARY".
+            oneiros_config (Optional[Dict[str, Any]], optional): Configuration for the Oneiros module. Defaults to None.
         """
-        self.config = oneiros_config if oneiros_config else {}
-        self.model_loaded = False
-        self._initialize_oneiros_engine()
-        # print(f"OneirosAdapter initialized. Model Loaded: {self.model_loaded}. Config: {self.config}")
+        self.logger = logging.getLogger(__name__)
+        self.adapter_config = oneiros_config if oneiros_config is not None else {} # Ensure {} if None
+        self.http_client_manager = http_client_manager
+        self.llm_role_name = llm_role_name
+        self.llm_config: Optional[LLMConfig] = None # Correctly typed
+        self.ethos_core: Optional[EthosCore] = None # Initialize as None, to be set by a setter if used
+
+        if http_client_manager: # Only try to get LLM config if a client manager is provided
+            # Config.get_llm_config should ideally return Optional[LLMConfig]
+            # If it returns Optional[Dict], the type hint for self.llm_config handles it.
+            llm_config_data = Config.get_llm_config(self.llm_role_name)
+            if not llm_config_data:
+                self.logger.error(f"OneirosAdapter: LLM config for role '{self.llm_role_name}' not found.")
+                self.llm_config = None # Explicitly set to None
+            else:
+                # Assuming llm_config_data is compatible with LLMConfig structure
+                self.llm_config = llm_config_data # type: ignore # If get_llm_config returns Dict instead of LLMConfig
+                self.logger.info(f"OneirosAdapter initialized for LLM role '{self.llm_role_name}'. Model: {self.llm_config.get('model')}")
+        else: # No http_client_manager, so no LLM operations possible
+            self.llm_config = None # Explicitly set to None
+            self.logger.info("OneirosAdapter initialized without HTTPClientManager. LLM operations will be disabled.")
+
+        # EthosCore is no longer passed in __init__, so related logging is removed.
+        # It will be set by a setter method by the Firmament system if needed.
+        # self.logger.info/warning for ethos_core removed here.
+
+        self.model_loaded = False # Existing attribute
+        self._initialize_oneiros_engine() # Existing method call
+        self.logger.info(f"OneirosAdapter initialized. Model Loaded: {self.model_loaded}. Config: {self.adapter_config}")
+
+
+    # It's anticipated that EthosCore will be set using a setter method by Firmament core.
+    # Example:
+    # def set_ethos_core(self, ethos_core_instance: EthosCore):
+    #     self.ethos_core = ethos_core_instance
+    #     self.logger.info("EthosCore instance set on OneirosAdapter.")
+
+    async def _get_recent_memories_for_dream_context(self) -> List[str]:
+        if not self.ethos_core:
+            self.logger.warning("OneirosAdapter: EthosCore not available (has it been set via setter?). Returning default placeholder memories.")
+            return ["Pathos recalls a day of quiet contemplation.", "A fleeting thought about the color blue."]
+
+        try:
+            # Configuration for fetching memories - could be made configurable later
+            lookback_days = self.adapter_config.get("dream_memory_lookback_days", 3)
+            memory_limit = self.adapter_config.get("dream_memory_limit", 5)
+
+            # Assuming PATHOS_USER_ID is accessible or a constant.
+            # For now, let's hardcode it or assume it's available via a config/constant import.
+            # If not, this needs to be passed in or made available.
+            # Let's assume a placeholder for now if direct import isn't clean.
+            # pathos_user_id = self.adapter_config.get("pathos_user_id", "pathos_default_user") # Placeholder REMOVED
+            # Use the imported PATHOS_USER_ID constant directly
+            user_id_for_memories = PATHOS_USER_ID
+
+            self.logger.debug(f"Fetching memories for dream context. User: {user_id_for_memories}, Lookback: {lookback_days} days, Limit: {memory_limit}")
+
+            # Define specific memory types relevant for dreams
+            dream_memory_types = [
+                'interaction', 'firmament_activity_log', 'received_subconscious_intention',
+                'npc_dialogue_event', 'reflection_insight', 'learned_correction', 'feedback', 'dream'
+            ]
+
+            # Call the new EthosCore method
+            recent_memory_entries: List[MemoryEntry] = await self.ethos_core.get_memories_for_dream_seeding(
+                user_id=user_id_for_memories, # Use the constant
+                lookback_days=lookback_days,
+                limit=memory_limit,
+                memory_types=dream_memory_types
+            )
+
+            if not recent_memory_entries:
+                self.logger.info("No recent memories returned from EthosCore for dream context.")
+                return ["The day's events are a blur.", "A sense of quiet anticipation."]
+
+            # Format memories into strings for the prompt
+            formatted_memories = []
+            for mem_entry in recent_memory_entries:
+                content = str(mem_entry.get('content', ''))
+                # Simple summarization: take first N chars. More sophisticated summarization could be added.
+                snippet = (content[:75] + '...') if len(content) > 75 else content
+                type_info = mem_entry.get('type', 'memory')
+                # Optional: add timestamp or salience if useful for the dream LLM
+                # ts_info = datetime.fromisoformat(mem_entry.get('timestamp', '')).strftime('%H:%M') if mem_entry.get('timestamp') else ''
+                # formatted_memories.append(f"A {type_info} from {ts_info}: {snippet}")
+                formatted_memories.append(f"A recent {type_info}: {snippet}")
+
+
+            self.logger.info(f"Returning {len(formatted_memories)} formatted memories for dream prompt.")
+            return formatted_memories
+
+        except Exception as e:
+            self.logger.error(f"Error fetching or processing memories for dream context: {e}", exc_info=True)
+            return ["A vague recollection of the day's events.", "An echo of a distant thought."]
 
     def _initialize_oneiros_engine(self):
         """
         Placeholder for loading dream generation models or setting up the engine.
         """
-        if self.config.get("model_path") or self.config.get("use_default_model", True):
-            # print(f"OneirosAdapter: Initializing Oneiros engine with config: {self.config} (simulated)")
+        if self.adapter_config.get("model_path") or self.adapter_config.get("use_default_model", True):
+            self.logger.debug(f"OneirosAdapter: Initializing Oneiros engine with config: {self.adapter_config} (simulated)")
             self.model_loaded = True
-        # else:
-            # print("OneirosAdapter: No model configuration. Dream generation will be very basic.")
+        else:
+            self.logger.info("OneirosAdapter: No model configuration. Dream generation will be very basic.")
         return self.model_loaded
 
-    def generate_dream(self, context: dict = None) -> str:
+    async def generate_dream(self, context: Optional[Dict[str, Any]] = None) -> str:
         """
         Simulates generating a dream narrative via the Oneiros module.
 
         Args:
-            context (dict, optional): Contextual information that might influence
+            context (Optional[Dict[str, Any]], optional): Contextual information that might influence
                                       dream generation. This could include keys like
                                       'name' (of sleep block), 'type', etc. Defaults to None.
 
         Returns:
             str: The generated dream content as a string narrative.
         """
-        # print(f"OneirosAdapter: generate_dream() called. Context provided: {bool(context)}")
-        # if context:
-            # print(f"  Context details for dream gen: {str(context)[:200]}{'...' if len(str(context)) > 200 else ''}")
-
-        if not self.model_loaded and not self.config.get("allow_basic_fallback", True):
-            return "Dream generation engine not available or not loaded."
-
-        dream_themes = ["flying over abstract landscapes", "being chased by geometric shapes",
-                        "falling through colorful voids", "discovering hidden rooms in a familiar place",
-                        "solving ethereal puzzles with no clear rules", "meeting mysterious figures who speak in riddles"]
-        dream_settings = ["a surreal, shifting cityscape", "a strangely distorted version of home",
-                          "a library containing books with blank pages", "a dark, endless forest",
-                          "an underwater realm of glowing flora"]
-
-        chosen_theme = random.choice(dream_themes)
-        chosen_setting = random.choice(dream_settings)
-        dream_content = f"Pathos dreamt of {chosen_theme} in {chosen_setting}."
-
+        self.logger.debug(f"OneirosAdapter: generate_dream() called. Context provided: {bool(context)}")
         if context:
-            block_name = context.get("name", "an unknown activity")
-            block_type = context.get("type", "unknown_type")
-            dream_content += f" The dream seemed subtly influenced by the preceding '{block_name}' ({block_type}) block."
-            if "Deep Slumber" in block_name: # Example of specific context influence
-                 dream_content += " Whispers of forgotten code echoed in the depths of the dream."
+            self.logger.debug(f"  Context details for dream gen: {str(context)[:200]}{'...' if len(str(context)) > 200 else ''}")
 
-        # print(f"OneirosAdapter: Dream generated (simulated): \"{dream_content[:100]}{'...' if len(dream_content) > 100 else ''}\"")
+        # Extract context for prompt
+        block_data = context.get("block_data", {}) if context else {}
+        block_name = block_data.get("name", "an unknown activity")
+
+        # Fetch current mood from EthosCore
+        current_mood_name = "neutral" # Default mood
+        if self.ethos_core:
+            try:
+                mood_data = self.ethos_core.get_current_mood() # This is a synchronous method in EthosCore
+                if mood_data and isinstance(mood_data, dict) and "name" in mood_data:
+                    current_mood_name = mood_data["name"]
+                    # Ensure valence and arousal are numbers before formatting
+                    valence_val = mood_data.get('valence', 'N/A')
+                    arousal_val = mood_data.get('arousal', 'N/A')
+                    valence_str = f"{valence_val:.2f}" if isinstance(valence_val, (int, float)) else str(valence_val)
+                    arousal_str = f"{arousal_val:.2f}" if isinstance(arousal_val, (int, float)) else str(arousal_val)
+                    self.logger.debug(f"Fetched current mood for dream context: {current_mood_name} (Valence: {valence_str}, Arousal: {arousal_str})")
+                else:
+                    self.logger.warning(f"Failed to get valid mood name from EthosCore. Mood data: {mood_data}. Using default '{current_mood_name}'.")
+            except Exception as e_mood:
+                self.logger.error(f"Error fetching mood from EthosCore: {e_mood}", exc_info=True)
+                self.logger.info(f"Using default mood '{current_mood_name}' due to error.")
+        else:
+            self.logger.warning(f"EthosCore not available (has it been set via setter?). Using default mood '{current_mood_name}'.")
+
+        # Get recent memories for dream context
+        recent_memories_list = await self._get_recent_memories_for_dream_context()
+        memories_summary = "\n".join(recent_memories_list) if recent_memories_list else "No specific recent memories noted."
+
+
+        prompt_parts = [
+            "You are a dream weaver, skilled in crafting surreal and symbolic narratives.",
+            f"Pathos is currently in a state of '{block_name}'.",
+            f"Pathos's current mood is '{current_mood_name}'.",
+            f"Recent experiences or thoughts include: '{memories_summary}'.",
+            "Generate a dream narrative, 2-4 sentences long.",
+            "Make it surreal, abstract, or symbolic, reflecting these recent experiences or current mood.",
+            "Output only the dream text, with no additional commentary or conversational elements."
+        ]
+        prompt_text = "\n".join(prompt_parts)
+        self.logger.debug(f"Constructed dream prompt:\n{prompt_text}")
+
+        # Attempt to use LLM for dream generation if configured
+        use_llm = self.adapter_config.get("use_llm_if_available", False) and self.llm_config and self.http_client_manager
+        if use_llm:
+            try:
+                shared_httpx_client = self.http_client_manager.get_client() # type: ignore
+                if not shared_httpx_client:
+                    self.logger.warning("OneirosAdapter: LLM use enabled, but HTTP client not available. Falling back to basic dream generation.")
+                else:
+                    llm_api_client = LLMClient(http_client=shared_httpx_client)
+                    messages = [{"role": "user", "content": prompt_text}]
+
+                    self.logger.info(f"OneirosAdapter: Calling LLM for dream generation (Role: {self.llm_role_name}).")
+                    response_data = await llm_api_client.call_llm_api(
+                        llm_config=self.llm_config, # type: ignore
+                        messages=messages,
+                        stream=False # Assuming non-streaming for dream content for now
+                    )
+
+                    if isinstance(response_data, str) and response_data.strip():
+                        dream_content = response_data.strip()
+                        self.logger.info(f"OneirosAdapter: Dream generated by LLM: \"{dream_content[:100]}{'...' if len(dream_content) > 100 else ''}\"")
+                        return dream_content
+                    elif isinstance(response_data, dict) and response_data.get("type") == "error_chunk": # Check for error structure from LLMClient dummy
+                        self.logger.error(f"OneirosAdapter: LLM API error: {response_data.get('payload')}. Falling back.")
+                    else:
+                        self.logger.warning(f"OneirosAdapter: LLM returned empty or unexpected response: {response_data}. Falling back.")
+
+            except Exception as e:
+                self.logger.error(f"OneirosAdapter: Error during LLM call for dream generation: {e}", exc_info=True)
+                self.logger.info("Falling back to basic dream generation due to LLM error.")
+
+        # Fallback logic:
+        # This section is reached if LLM was not used (use_llm is false)
+        # OR if the LLM call was attempted but failed (and did not return a dream_content).
+
+        # This check can be relevant if, for instance, http_client_manager was not provided at all,
+        # making LLM use impossible from the start.
+        if not use_llm and not self.http_client_manager:
+             self.logger.warning("OneirosAdapter: LLM operations disabled (no HTTPClientManager). Cannot generate LLM dream.")
+        # The self.model_loaded check might be less relevant now if LLM is primary,
+        # but can be kept if there's a non-LLM "engine" concept that could be "not loaded".
+        # For now, we simplify: if LLM failed or wasn't used, provide a static placeholder.
+
+        # If LLM was attempted (meaning use_llm was true) but failed, it would have logged the specific error.
+        # Now, we log that we're using a placeholder.
+        if use_llm: # Implies an LLM attempt was made but failed to return content
+            self.logger.info("OneirosAdapter: LLM dream generation failed or returned no content. Using static placeholder dream.")
+        else: # LLM was not attempted (e.g. use_llm_if_available was false, or no llm_config)
+            self.logger.info("OneirosAdapter: LLM not configured or not enabled. Using static placeholder dream.")
+
+        # Static placeholder dream
+        dream_content = "Pathos had a fleeting, indistinct dream."
+        self.logger.info(f"OneirosAdapter: Using static placeholder: \"{dream_content}\"")
         return dream_content
 
-    def handle_start_dream_request(self, data: dict):
+    async def handle_start_dream_request(self, data: Dict[str, Any]):
         """
         Handles the request to start a dream sequence (typically from EVENT_ONEIROS_START_DREAM),
-        generates a dream, and logs it to memory.
+        generates a dream, and logs it to memory. This is now an async method.
 
         Args:
-            data (dict): The event data, expected to contain 'block_data' with details
-                         of the sleep schedule block that triggered the dream.
+            data (Dict[str, Any]): The event data, expected to contain 'block_data' with details
+                                   of the sleep schedule block that triggered the dream.
         """
-        # print(f"OneirosAdapter: Received {EVENT_ONEIROS_START_DREAM} event.")
-        # if data:
-            # print(f"  Event Data: {str(data)[:200]}{'...' if len(str(data)) > 200 else ''}")
+        self.logger.info(f"OneirosAdapter: Received {EVENT_ONEIROS_START_DREAM} event.")
+        if data:
+            self.logger.debug(f"  Event Data: {str(data)[:200]}{'...' if len(str(data)) > 200 else ''}")
 
         # block_data provides context for dream generation (e.g., from the sleep schedule block)
-        block_data = data.get("block_data", {})
+        block_data: Dict[str, Any] = data.get("block_data", {}) # type: ignore
         if not isinstance(block_data, dict): # Ensure block_data is a dict if it exists
+            self.logger.warning(f"Received block_data is not a dict: {type(block_data)}. Using empty context.")
             block_data = {}
 
         # Generate the dream content using the provided context
-        dream_content = self.generate_dream(context=block_data)
+        dream_content = await self.generate_dream(context=block_data) # Ensure context is Dict[str, Any] or None
 
         # Prepare the payload for writing the dream to memory
-        memory_payload = {
+        memory_payload: Dict[str, Any] = {
             "type": "dream", # Categorizes this memory entry as a dream
             "content": dream_content,
             "metadata": {
@@ -127,7 +356,7 @@ class OneirosAdapter:
                 "sleep_block_id": block_data.get("id"),
                 "sleep_block_name": block_data.get("name"),
                 "sleep_block_type": block_data.get("type"),
-                "dream_generation_config": self.config, # Store config used, if any
+                "dream_generation_config": self.adapter_config, # Store config used, if any
                 "dream_timestamp_utc": datetime.now(timezone.utc).isoformat() # Timestamp of dream generation
             }
         }
@@ -135,9 +364,9 @@ class OneirosAdapter:
         # Publish the dream to memory
         try:
             EventBus.instance().publish(EVENT_MEMORY_WRITE, memory_payload)
-            # print(f"OneirosAdapter: Published dream content to memory via '{EVENT_MEMORY_WRITE}'. Dream: '{dream_content[:60]}...'")
+            self.logger.info(f"OneirosAdapter: Published dream content to memory via '{EVENT_MEMORY_WRITE}'. Dream: '{dream_content[:60]}...'")
         except Exception as e: # pragma: no cover
-            print(f"OneirosAdapter Error: Failed to publish dream to EventBus. Exception: {e}")
+            self.logger.error(f"OneirosAdapter Error: Failed to publish dream to EventBus. Exception: {e}", exc_info=True)
 
 
 def register_oneiros_event_handlers(adapter_instance: OneirosAdapter):
@@ -148,84 +377,198 @@ def register_oneiros_event_handlers(adapter_instance: OneirosAdapter):
         adapter_instance (OneirosAdapter): The instance of the OneirosAdapter whose
                                            handlers need to be registered.
     """
+    # Assuming logger is available or passed if this function is outside a class with self.logger
+    # For simplicity, using print here if global logger not easily accessible.
+    # If this function were part of a class, self.logger would be used.
+    global_logger = logging.getLogger(__name__) # Or pass logger as an argument
     try:
         event_bus = EventBus.instance()
         event_bus.subscribe(EVENT_ONEIROS_START_DREAM, adapter_instance.handle_start_dream_request)
-        # print(f"OneirosAdapter: Successfully registered 'handle_start_dream_request' for {EVENT_ONEIROS_START_DREAM} events.")
+        global_logger.info(f"OneirosAdapter: Successfully registered 'handle_start_dream_request' for {EVENT_ONEIROS_START_DREAM} events.")
     except Exception as e: # pragma: no cover
-        print(f"OneirosAdapter Error: Failed to register event handlers with EventBus. Exception: {e}")
+        global_logger.error(f"OneirosAdapter Error: Failed to register event handlers with EventBus. Exception: {e}", exc_info=True)
 
 
 if __name__ == '__main__':
+    import asyncio # Required for running async functions in __main__
     from collections import defaultdict # For MockEventBus
 
+    # Setup basic logging for the __main__ block if not already configured
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    main_logger = logging.getLogger(__name__ + ".__main__") # Specific logger for main test
+
     # Basic test setup for OneirosAdapter event handling
-    _test_events_captured_oneiros = [] # Stores {"type": event_type, "data": data_arg}
-    def capture_event_for_oneiros_test(event_type_captured, data_captured): # Unique name
-        print(f"    [CaptureOneirosTest] Event: {event_type_captured}, Relevant Data: {str(data_captured.get('content', data_captured.get('reason', data_captured)))[:80]}")
+    _test_events_captured_oneiros: List[Dict[str, Any]] = [] # Stores {"type": event_type, "data": data_arg}
+    def capture_event_for_oneiros_test(event_type_captured: str, data_captured: Dict[str, Any]): # Unique name
+        main_logger.info(f"    [CaptureOneirosTest] Event: {event_type_captured}, Relevant Data: {str(data_captured.get('content', data_captured.get('reason', data_captured)))[:80]}")
         _test_events_captured_oneiros.append({"type": event_type_captured, "data": data_captured})
 
     # Mock EventBus for isolated testing of this adapter's event interactions
-    class MockEventBusForOneiros(EventBus):
+    class MockEventBusForOneiros(EventBus): # type: ignore
         def __init__(self):
-            self._subscribers = defaultdict(list) # Initialize subscribers
-            print("MockEventBusForOneiros initialized.")
+            self._subscribers: Dict[str, List[Any]] = defaultdict(list) # Initialize subscribers
+            main_logger.info("MockEventBusForOneiros initialized.")
 
-        def publish(self, event_type: str, data: dict):
-            # print(f"MockEventBusForOneiros: Publishing {event_type}...")
+        async def publish_async(self, event_type: str, data: Dict[str, Any]): # Renamed to avoid conflict if sync publish is also used
+            main_logger.debug(f"MockEventBusForOneiros: Async Publishing {event_type}...")
             # Crucially, call the capture function to log what this adapter would publish
-            capture_event_for_oneiros_test(event_type, data)
+            capture_event_for_oneiros_test(event_type, data) # Assuming capture_event is sync
 
             # Then, simulate dispatch to actual subscribers that were registered on this mock instance
             # This is important for testing if the handler *itself* works when an event comes in.
             for handler in self._subscribers.get(event_type, []):
-                handler(data)
+                if asyncio.iscoroutinefunction(handler):
+                    await handler(data) # Await async handlers
+                else:
+                    handler(data) # Call sync handlers directly
             for handler in self._subscribers.get("*", []): # Wildcard listeners
-                handler(event_type, data)
+                if asyncio.iscoroutinefunction(handler): # Assuming wildcard handlers could also be async
+                    await handler(event_type, data)
+                else:
+                    handler(event_type, data)
 
-    # Monkey patch EventBus.instance() for this test run
-    original_event_bus_instance_method = EventBus.instance
-    mock_bus_instance_oneiros = MockEventBusForOneiros()
-    EventBus.instance = lambda: mock_bus_instance_oneiros
+        # Keep a sync publish if other parts of the system use it, or if EventBus supports both
+        def publish(self, event_type: str, data: Dict[str, Any]):
+            main_logger.debug(f"MockEventBusForOneiros: Sync Publishing {event_type}...")
+            capture_event_for_oneiros_test(event_type, data)
+            for handler in self._subscribers.get(event_type, []):
+                if not asyncio.iscoroutinefunction(handler): # Only call sync handlers
+                    handler(data)
+            for handler in self._subscribers.get("*", []):
+                 if not asyncio.iscoroutinefunction(handler):
+                    handler(event_type, data)
 
-    # Create an instance of the adapter and register its handlers on the mock bus
-    oneiros_adapter_test_instance = OneirosAdapter(oneiros_config={"model_type": "test_model_v1", "allow_basic_fallback": True})
-    register_oneiros_event_handlers(adapter_instance=oneiros_adapter_test_instance)
 
-    print("\n--- Testing OneirosAdapter's handle_start_dream_request via Event ---")
+    async def main_async_test_runner():
+        # Monkey patch EventBus.instance() for this test run
+        original_event_bus_instance_method = EventBus.instance # type: ignore
+        mock_bus_instance_oneiros = MockEventBusForOneiros() # type: ignore
+        EventBus.instance = lambda: mock_bus_instance_oneiros # type: ignore
 
-    # This is the data that the `schedule` handler would publish for a sleep block
-    sleep_block_trigger_data = {
-        "reason": "schedule_block_sleep_started", # From schedule.py
-        "block_data": { # This is the 'block_data' passed to generate_dream context
-            "id": "sleep_block_test_001",
-            "name": "Deep Slumber Cycle 1",
-            "type": "sleep",
-            "start_time_utc": "2023-01-01T22:00:00Z",
-            "end_time_utc": "2023-01-02T01:00:00Z" # Example duration
-        },
-        "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat() # From schedule.py
-    }
+        # Create an instance of the adapter and register its handlers on the mock bus
+        # Test with and without HTTPClientManager
+        main_logger.info("\n--- Testing OneirosAdapter with HTTPClientManager (dummy) ---")
+        dummy_http_client_manager = HTTPClientManager.instance() # Get dummy instance
 
-    # Simulate the EVENT_ONEIROS_START_DREAM event being published on the bus.
-    # The mock bus's publish will call our capture_event_for_oneiros_test AND
-    # dispatch to oneiros_adapter_test_instance.handle_start_dream_request.
-    mock_bus_instance_oneiros.publish(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data)
 
-    # Verify that handle_start_dream_request (when triggered) published a "dream" memory event
-    found_dream_memory_event = False
+        # MockEthosCore for testing purposes. In a real scenario, Firmament would inject this.
+        class MockEthosCoreForOneirosTest(EthosCore): # Inherits from dummy or real EthosCore
+            def __init__(self):
+                super().__init__(config=None) # Call parent __init__ if necessary
+                main_logger.info("MockEthosCoreForOneirosTest initialized for testing.")
+
+            async def get_memories_for_dream_seeding(self, user_id, lookback_days, limit, memory_types):
+                main_logger.info(f"MockEthosCoreForOneirosTest.get_memories_for_dream_seeding called for user {user_id} (should be PATHOS_USER_ID: {PATHOS_USER_ID})")
+                assert user_id == PATHOS_USER_ID, f"MockEthosCore expected user_id {PATHOS_USER_ID}, got {user_id}"
+                return [
+                    {"type": "interaction", "content": "Had a pleasant chat about the weather.", "timestamp": "2023-01-01T10:00:00Z", "salience": 0.7},
+                    {"type": "firmament_activity_log", "content": "Pathos was working on a creative project.", "timestamp": "2023-01-01T14:00:00Z", "salience": 0.5}
+                ]
+
+            def get_current_mood(self) -> Dict[str, Any]: # This is synchronous
+                main_logger.info("MockEthosCoreForOneirosTest.get_current_mood called.")
+                return {
+                    "valence": 0.5,
+                    "arousal": 0.3,
+                    "name": "content", # Example mood name
+                    "simulation_disabled": False,
+                    "hexus_snapshot": {"joy": 0.6, "stress": 0.1} # Dummy hexus snapshot
+                }
+
+        mock_ethos_core_instance = MockEthosCoreForOneirosTest()
+
+        oneiros_adapter_with_llm = OneirosAdapter(
+            http_client_manager=dummy_http_client_manager, # type: ignore
+            llm_role_name="FIRMAMENT_PRIMARY",
+            oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True}
+            # ethos_core is NOT passed in __init__ anymore
+        )
+        # Simulate setting ethos_core via a setter (method would need to be added to OneirosAdapter)
+        oneiros_adapter_with_llm.ethos_core = mock_ethos_core_instance # type: ignore # Direct set for test
+        if hasattr(oneiros_adapter_with_llm, 'set_ethos_core'): # If a setter exists
+             # oneiros_adapter_with_llm.set_ethos_core(mock_ethos_core_instance) # type: ignore
+             pass # Call actual setter if it was added
+
+        register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
+
+
+        main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore ---")
+        oneiros_adapter_no_llm = OneirosAdapter(
+            oneiros_config={"model_type": "test_basic", "allow_basic_fallback": True}
+            # ethos_core is None by default and not set for this test instance
+        )
+        # ethos_core will be None for this instance, testing graceful handling
+        register_oneiros_event_handlers(adapter_instance=oneiros_adapter_no_llm)
+
+
+        main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for LLM-enabled instance) ---")
+
+        # This is the data that the `schedule` handler would publish for a sleep block
+        sleep_block_trigger_data: Dict[str, Any] = {
+            "reason": "schedule_block_sleep_started", # From schedule.py
+            "block_data": { # This is the 'block_data' passed to generate_dream context
+                "id": "sleep_block_test_001_llm",
+                "name": "REM Sleep Cycle (LLM)",
+                "type": "sleep_rem",
+                "start_time_utc": "2023-01-01T23:00:00Z",
+                "end_time_utc": "2023-01-02T00:00:00Z" # Example duration
+            },
+            "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat() # From schedule.py
+        }
+
+        # Simulate the EVENT_ONEIROS_START_DREAM event being published on the bus.
+        # This should trigger oneiros_adapter_with_llm.handle_start_dream_request
+        _test_events_captured_oneiros.clear() # Clear events before this test
+        # Use the new async publish method
+        await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data)
+
+        # Verify that handle_start_dream_request (when triggered) published a "dream" memory event
+        found_dream_memory_event_llm = False
     for evt in _test_events_captured_oneiros:
         if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
-            found_dream_memory_event = True
-            dream_metadata = evt["data"].get("metadata", {})
-            print(f"  Verified dream memory event was published by OneirosAdapter:")
-            print(f"    Dream Content: '{evt['data']['content'][:70]}...'")
-            print(f"    Sleep Block ID in metadata: {dream_metadata.get('sleep_block_id')}")
-            assert dream_metadata.get('sleep_block_id') == "sleep_block_test_001", "Sleep block ID mismatch in dream metadata."
-            assert dream_metadata.get('source_event_type') == EVENT_ONEIROS_START_DREAM, "Source event type mismatch."
+            found_dream_memory_event_llm = True
+            dream_metadata = evt["data"].get("metadata", {}) # type: ignore
+            main_logger.info(f"  Verified dream memory event (LLM instance):")
+            main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
+            main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
+            main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
+            assert dream_metadata.get('sleep_block_id') == "sleep_block_test_001_llm", "Sleep block ID mismatch (LLM)." # type: ignore
+            assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_llm_enhanced" # type: ignore
             break
-    assert found_dream_memory_event, f"Expected OneirosAdapter to publish an '{EVENT_MEMORY_WRITE}' event with type 'dream', but it was not found in captured events."
+    assert found_dream_memory_event_llm, f"Expected LLM-enabled OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
+
+
+    main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for basic instance) ---")
+    sleep_block_trigger_data_basic: Dict[str, Any] = {
+        "reason": "schedule_block_sleep_started",
+        "block_data": {
+            "id": "sleep_block_test_002_basic",
+            "name": "Deep Slumber Cycle (Basic)",
+            "type": "sleep_deep",
+        },
+        "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat()
+    }
+    _test_events_captured_oneiros.clear() # Clear events before this test
+    await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data_basic)
+
+    found_dream_memory_event_basic = False
+    for evt in _test_events_captured_oneiros:
+        if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
+            found_dream_memory_event_basic = True
+            dream_metadata = evt["data"].get("metadata", {}) # type: ignore
+            main_logger.info(f"  Verified dream memory event (Basic instance):")
+            main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
+            main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
+            main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
+            assert dream_metadata.get('sleep_block_id') == "sleep_block_test_002_basic", "Sleep block ID mismatch (Basic)." # type: ignore
+            assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_basic" # type: ignore
+            break
+    assert found_dream_memory_event_basic, f"Expected basic OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
+
 
     # Restore original EventBus class method
-    EventBus.instance = original_event_bus_instance_method
-    print("\n--- OneirosAdapter event handling testing finished ---")
+    EventBus.instance = original_event_bus_instance_method # type: ignore
+    main_logger.info("\n--- OneirosAdapter event handling testing finished ---")
+
+if __name__ == '__main__':
+    asyncio.run(main_async_test_runner())

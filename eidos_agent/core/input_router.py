@@ -71,9 +71,61 @@ class InputRouter:
                     content=response_from_pathos.get('content', '[No response content from Pathos]'),
                     metadata=response_from_pathos.get('metadata', {})
                 )
-            elif input_type in ['voice', 'sensor']:
-                 logger.warning(f"Routing for input type '{input_type}' not fully implemented yet.")
-                 return RoutingResult(success=False, content=f"Handling for input type '{input_type}' is not implemented.")
+            elif input_type == 'voice':
+                    # CONCEPTUAL DESIGN FOR VOICE INPUT:
+                    # 1. Expected input_data fields:
+                    #    - type: "voice"
+                    #    - audio_content_b64: str (Base64 encoded audio)
+                    #    - audio_format: str (e.g., "wav", "mp3")
+                    #    - user_id: str (from metadata)
+                    #    - timestamp: str (ISO 8601)
+                    #    - Optional: language_hint: str
+                    #
+                    # 2. Processing Flow:
+                    #    - InputRouter receives 'voice' type.
+                    #    - Delegate to a new 'VoiceProcessingService' (or LogosCore if STT is a tool).
+                    #    - VoiceProcessingService.transcribe(audio_data, format, hint) calls STT engine.
+                    #    - STT returns transcribed_text.
+                    #    - InputRouter then re-routes this transcribed_text as a 'text' input:
+                    #      await self.pathos_interface.generate_response(
+                    #          user_id=input_data.metadata.user_id,
+                    #          user_input=transcribed_text,
+                    #          request_metadata=input_data.metadata
+                    #      )
+                    #
+                    # 3. Output: The RoutingResult from pathos_interface.
+                    # 4. Error Handling: STT failures logged; specific error message returned.
+                    logger.warning(f"Routing for input type 'voice' not functionally implemented yet. See conceptual design in comments.")
+                    return RoutingResult(success=False, content="Voice input handling is not yet implemented.")
+
+            elif input_type == 'sensor':
+                    # CONCEPTUAL DESIGN FOR SENSOR INPUT:
+                    # 1. Expected input_data fields:
+                    #    - type: "sensor"
+                    #    - sensor_id: str
+                    #    - sensor_type: str (e.g., "temperature", "motion", "gps_location")
+                    #    - value: Any (sensor reading)
+                    #    - unit: Optional[str]
+                    #    - user_id: Optional[str] (or system ID)
+                    #    - timestamp: str (ISO 8601)
+                    #    - location_hint: Optional[str]
+                    #
+                    # 2. Processing Flow:
+                    #    - InputRouter receives 'sensor' type.
+                    #    - Option A: Publish to a system-wide event bus (if exists).
+                    #    - Option B: Direct delegation:
+                    #        - To Firmament (e.g., an EnvironmentState manager or event handler):
+                    #            - firmament.process_sensor_data(input_data)
+                    #            - Firmament updates its internal state, may trigger other events (e.g., WORLD_EVENT).
+                    #        - To EthosCore:
+                    #            - ethos_core.add_memory_entry(type="sensor_reading", content=json.dumps(input_data), metadata=...)
+                    #    - (Aisthesis module might be involved in receiving sensor data from external sources before it hits InputRouter).
+                    #
+                    # 3. Output: Likely an acknowledgment (e.g., {"status": "sensor_data_processed"}) or None,
+                    #    as direct user response is not typical for sensor readings. Internal effects are key.
+                    # 4. Error Handling: Log malformed data or processing failures.
+                    logger.warning(f"Routing for input type 'sensor' not functionally implemented yet. See conceptual design in comments.")
+                    return RoutingResult(success=False, content="Sensor input handling is not yet implemented.")
             else:
                 logger.warning(f"Unsupported input type received: {input_type}")
                 return RoutingResult(success=False, content=f"Unsupported input type: {input_type}")
