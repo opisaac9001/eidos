@@ -24,7 +24,7 @@ try:
     from .integrations.oneiros_adapter import OneirosAdapter, register_oneiros_event_handlers
     from .integrations.subconscious_hook import register_thought_trigger_handler
 
-    from .core.npc_controller import load_npc_profiles, register_npc_event_handlers
+    from .core.npc_controller import load_npc_profiles, register_npc_event_listeners # Renamed here
     from .npcs.npc_registry import NPCRegistry
 
     from .core.scene_narrator import register_scene_narrator_handlers
@@ -67,7 +67,7 @@ except ImportError as e: # pragma: no cover
     register_schedule_event_handlers=lambda:None; handle_impulse=lambda d:None; register_world_event_logging_handler=lambda:None #type:ignore
     class OneirosAdapter:pass #type:ignore
     register_oneiros_event_handlers=lambda i:None; register_thought_trigger_handler=lambda:None #type:ignore
-    load_npc_profiles=lambda:False; register_npc_event_handlers=lambda:None; #type:ignore
+    load_npc_profiles=lambda:False; register_npc_event_listeners=lambda:None; # Renamed dummy assignment #type:ignore
 
     # Dummy NPCRegistry needs to be a class that can be instantiated for PluginManager dummy
     class NPCRegistry_Dummy: #type:ignore
@@ -156,11 +156,11 @@ def initialize_firmament_systems(): # Renamed for broader scope
         else: logger.error("Firmament: Scene narrator registration missing!") # pragma: no cover
 
         # --- Load NPC System ---
-        # logger.info("Attempting to load NPC profiles & register NPC event handlers...") # Less verbose
-        if is_real_component('load_npc_profiles') and is_real_component('register_npc_event_handlers'):
+        # logger.info("Attempting to load NPC profiles & register NPC event listeners...") # Less verbose
+        if is_real_component('load_npc_profiles') and is_real_component('register_npc_event_listeners'): # Renamed check
             if load_npc_profiles():
                 logger.info("NPC profiles loaded successfully.")
-                register_npc_event_handlers(); logger.info("Registered NPC event handlers (npc_controller listeners).")
+                register_npc_event_listeners(); logger.info("Registered NPC event listeners (npc_controller listeners).") # Renamed call
             else: logger.error("NPC profiles failed to load. Some NPC interactions may not work.")
         else: logger.error("Firmament: NPC profile loading/registration functions missing!") # pragma: no cover
 

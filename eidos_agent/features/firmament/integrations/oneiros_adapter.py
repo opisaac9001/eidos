@@ -12,13 +12,13 @@ from typing import Optional, Dict, Any, List, AsyncGenerator, Union
 
 # Attempt to import core Eidos components.
 try:
-    from ....core.config import Config, LLMConfig
-    from ....llm_integrations.llm_client import LLMClient
-    from ....core.http_client_manager import HTTPClientManager
+    from ...core.config import Config, LLMConfig
+    from ...llm_integrations.llm_client import LLMClient
+    from ...core.http_client_manager import HTTPClientManager
     from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
-    from ....persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
-    from ....persona_logic.ethos_core.memory_storage import MemoryEntry
-    from .....persona_logic.chronos_engine import PATHOS_USER_ID
+    from ...persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
+    from ...persona_logic.ethos_core.memory_storage import MemoryEntry
+    from ...persona_logic.chronos_engine import PATHOS_USER_ID
 except ImportError: # pragma: no cover
     print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
     # Define dummy versions for parsing and basic type hinting

@@ -8,8 +8,8 @@ from datetime import datetime, timezone # Added
 
 # Attempt to import EventBus and event types.
 try:
-    from ..event_bus import EventBus
-    from ..event_types import NPC_DIALOGUE, WORLD_EVENT
+    from .event_bus import EventBus
+    from .event_types import NPC_DIALOGUE, WORLD_EVENT
 except ImportError: # pragma: no cover
     print("CRITICAL: NPC_Controller could not import EventBus or core event types. Event handling will fail.")
     class EventBus:  # type: ignore
