@@ -27,6 +27,7 @@ from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.prompt_loader import load_system_prompt
 
 from eidos_agent.features.simulation.module import initiate_simulated_interaction, send_message_to_simulated_npc, end_simulated_interaction
+from .task_model import Task # Added import
 
 logger = get_logger(__name__)
 
@@ -157,50 +158,140 @@ class LogosCore:
              return {"success": True, "message": f"Stored '{filename}' ({len(chunks)} chunks) for RAG.", "doc_id": final_doc_id, "num_chunks": len(chunks)}
          except Exception as e: logger.error(f"Error adding doc '{filename}' to RAG: {e}", exc_info=True); return {"success": False, "message": "System error adding document to RAG."}
 
-    async def execute_get_time(self, location: Optional[str] = None) -> str:
+    async def execute_get_time(self, location: Optional[str] = None) -> Dict[str, Any]:
         try:
-            final_time_str = ""; utc_now = datetime.now(timezone.utc); utc_fallback = utc_now.strftime('%A, %B %d, %Y at %I:%M:%S %p %Z (%z)')
+            final_time_str = ""
+            location_used = location if location else "UTC (default)"
+            utc_now = datetime.now(timezone.utc)
+            utc_fallback = utc_now.strftime('%A, %B %d, %Y at %I:%M:%S %p %Z (%z)')
+
             if location:
                 target_tz_obj = None
                 if ZoneInfo:
-                    try: target_tz_obj = ZoneInfo(location); final_time_str = f"The current time in {location} is {datetime.now(target_tz_obj).strftime('%A, %B %d, %Y at %I:%M:%S %p %Z (%z)')}."
-                    except Exception: logger.debug(f"Could not interpret '{location}' as IANA timezone.")
+                    try:
+                        target_tz_obj = ZoneInfo(location)
+                        final_time_str = f"The current time in {location} is {datetime.now(target_tz_obj).strftime('%A, %B %d, %Y at %I:%M:%S %p %Z (%z)')}."
+                        location_used = location
+                    except Exception:
+                        logger.debug(f"Could not interpret '{location}' as IANA timezone for execute_get_time.")
+
                 if not final_time_str and self.config.ENABLE_WOLFRAM_ALPHA and self.wolfram_alpha_config:
                     wa_res = await self.query_wolfram_alpha(f"current time in {location}")
-                    if wa_res.get('success') and wa_res.get('result'): final_time_str = f"For {location}, Wolfram Alpha reports: {wa_res['result']}."
-                if not final_time_str: final_time_str = f"I couldn't determine local time for '{location}'. UTC is {utc_fallback}."
-            else: final_time_str = f"Current UTC is {utc_fallback}. Specify a location for local time."
-            return final_time_str
-        except Exception as e: logger.error(f"Error in execute_get_time: {e}", exc_info=True); return json.dumps({"error": f"Error determining time: {e}"})
+                    if wa_res.get('success') and wa_res.get('result'):
+                        final_time_str = f"For {location}, Wolfram Alpha reports: {wa_res['result']}."
+                        location_used = location + " (via Wolfram Alpha)"
 
-    async def execute_describe_image(self, image_data_b64: str, prompt_from_llm: str) -> str:
+                if not final_time_str:
+                    final_time_str = f"I couldn't determine local time for '{location}'. UTC is {utc_fallback}."
+                    location_used = "UTC (fallback)"
+            else:
+                final_time_str = f"Current UTC is {utc_fallback}. Specify a location for local time."
+
+            return {"success": True, "data": {"time_string": final_time_str, "location_used": location_used}}
+        except Exception as e:
+            logger.error(f"Error in execute_get_time: {e}", exc_info=True)
+            return {"success": False, "error": f"Error determining time: {str(e)}"}
+
+    async def execute_store_user_fact(self, attribute_name: str, attribute_value: str, user_statement_context: str, user_id: str) -> Dict[str, Any]:
+        norm_attr_name = attribute_name.lower().replace(" ", "_").strip()
+        if not norm_attr_name:
+            return {"success": False, "error": "Attribute name cannot be empty."}
+
+        content = {
+            "attribute": norm_attr_name,
+            "value": attribute_value,
+            "original_user_statement": user_statement_context,
+            "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        entry_data = {
+            "type": "user_fact",
+            "content": json.dumps(content),
+            "salience": 1.5,
+            "metadata": {
+                "user_id": user_id,
+                "fact_attribute_key": norm_attr_name,
+                "source": "pathos_tool_store_user_fact"
+            }
+        }
+        try:
+            await self.ethos_core.add_memory_entry(entry_data, user_id_context=user_id)
+            return {"success": True, "message": f"Noted: your {attribute_name} is {attribute_value}."}
+        except Exception as e:
+            logger.error(f"Error storing user fact for '{user_id}': {e}", exc_info=True)
+            return {"success": False, "error": f"Failed to store user fact: {str(e)}"}
+
+    async def execute_store_world_fact(self, fact_statement: str, source_description: str, topic_tags: Optional[List[str]] = None, confidence_level: float = 0.8) -> Dict[str, Any]:
+        if topic_tags is None: topic_tags = []
+        try:
+            confidence = max(0.0, min(1.0, float(confidence_level)))
+        except (ValueError, TypeError):
+            confidence = 0.8
+
+        tags = sorted(list(set(tag.lower().strip() for tag in topic_tags if isinstance(tag, str) and tag.strip())))
+        entry_data = {
+            "type": "world_knowledge",
+            "content": fact_statement,
+            "salience": 0.7 + (confidence * 0.3),
+            "metadata": {
+                "stored_by_user_id": "system_or_current_user", # This might need context if a specific user is storing it via Pathos
+                "source_description": source_description,
+                "topic_tags": tags,
+                "confidence_level": confidence,
+                "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+        try:
+            await self.ethos_core.add_memory_entry(entry_data, user_id_context="world_knowledge_store")
+            return {"success": True, "message": f"Noted fact: '{fact_statement[:70]}...'."}
+        except Exception as e:
+            logger.error(f"Error storing world fact: {e}", exc_info=True)
+            return {"success": False, "error": f"Failed to store world fact: {str(e)}"}
+
+    async def execute_describe_image(self, image_data_b64: str, prompt_from_llm: str) -> Dict[str, Any]:
         logger.info(f"LogosCore: Describing image. User prompt: '{prompt_from_llm[:50]}...'")
-        if not self.config.ENABLE_VISION_PROCESSING: return json.dumps({"error": "Vision processing disabled."})
+        if not self.config.ENABLE_VISION_PROCESSING:
+            return {"success": False, "error": "Vision processing disabled."}
+
         vision_llm_config = self.logos_vision_config
         if not vision_llm_config or not vision_llm_config.get('url'):
-            return json.dumps({"error": "LOGOS_VISION_CONTEXT LLM not configured."})
-        messages_payload = [{"role": "user", "content": [{"type": "text", "text": prompt_from_llm},{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data_b64}"}}]}]
-        description = await self._call_logos_llm(vision_llm_config, llm_messages_for_synthesis=messages_payload)
-        if description and not description.startswith("["):
-            logger.info(f"Vision LLM provided description: {description[:100]}...")
-            return description
-        else:
-            logger.warning(f"Vision LLM description failed or returned error: {description}")
-            return json.dumps({"error": description or "Failed to get description from vision model."})
+            return {"success": False, "error": "LOGOS_VISION_CONTEXT LLM not configured."}
 
-    async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]:
+        messages_payload = [{"role": "user", "content": [{"type": "text", "text": prompt_from_llm},{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data_b64}"}}]}]
+
+        try:
+            description = await self._call_logos_llm(vision_llm_config, llm_messages_for_synthesis=messages_payload)
+            if description and not description.startswith("["): # Assuming error messages from _call_logos_llm start with "["
+                logger.info(f"Vision LLM provided description: {description[:100]}...")
+                return {"success": True, "data": {"description": description}}
+            else:
+                logger.warning(f"Vision LLM description failed or returned error: {description}")
+                return {"success": False, "error": description or "Failed to get description from vision model."}
+        except Exception as e:
+            logger.error(f"Error during image description LLM call: {e}", exc_info=True)
+            return {"success": False, "error": f"Error during image description: {str(e)}"}
+
+    async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]: # This one is used by execute_task, so its direct return might be fine, or wrap in task exec.
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return None
         if not query or not isinstance(query, str) or not query.strip(): return []
         return await self.web_search_service.perform_search(query)
 
-    async def execute_math_calculation(self, expression: str) -> str:
-        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config: return json.dumps({"error": "Calculation service (Wolfram Alpha) unavailable."})
-        if not expression or not isinstance(expression, str) or not expression.strip(): return json.dumps({"error": "No valid expression provided."})
-        wa_res = await self.query_wolfram_alpha(expression)
-        if wa_res.get('success') and wa_res.get('result'):
-            cleaned = " | ".join(line.strip() for line in wa_res['result'].splitlines() if line.strip())
-            return cleaned if cleaned else "[Calculation resulted in empty response]"
-        return json.dumps({"error": wa_res.get('message', 'Calculation failed.')})
+    async def execute_math_calculation(self, expression: str) -> Dict[str, Any]:
+        if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config:
+            return {"success": False, "error": "Calculation service (Wolfram Alpha) unavailable."}
+        if not expression or not isinstance(expression, str) or not expression.strip():
+            return {"success": False, "error": "No valid expression provided."}
+
+        try:
+            wa_res = await self.query_wolfram_alpha(expression)
+            if wa_res.get('success') and wa_res.get('result'):
+                cleaned_result = " | ".join(line.strip() for line in wa_res['result'].splitlines() if line.strip())
+                final_result = cleaned_result if cleaned_result else "[Calculation resulted in empty response]"
+                return {"success": True, "data": {"result": final_result}}
+            else:
+                return {"success": False, "error": wa_res.get('message', 'Calculation failed.')}
+        except Exception as e:
+            logger.error(f"Error during math calculation via Wolfram Alpha: {e}", exc_info=True)
+            return {"success": False, "error": f"Error in math calculation: {str(e)}"}
 
     async def execute_get_weather(self, location: str, user_id_context: Optional[str] = None) -> Dict[str, Any]:
         if not location or not location.strip(): return {"success": False, "error": "No valid location provided.", "location": location}
@@ -254,53 +345,111 @@ class LogosCore:
         if success: data.setdefault('source', "Wolfram Alpha"); return {"success": True, "weather_data": data}
         else: return {"success": False, "error": err_msg or "Unknown error processing Wolfram Alpha weather.", "location": location, "message": wa_res.get('message')}
 
-    async def execute_store_user_fact(self, attribute_name: str, attribute_value: str, user_statement_context: str, user_id: str) -> str:
+    async def execute_store_user_fact(self, attribute_name: str, attribute_value: str, user_statement_context: str, user_id: str) -> Dict[str, Any]:
         norm_attr_name = attribute_name.lower().replace(" ", "_").strip()
-        if not norm_attr_name: return json.dumps({"error": "Attribute name cannot be empty."})
-        content = {"attribute": norm_attr_name, "value": attribute_value, "original_user_statement": user_statement_context, "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()}
-        entry_data = {"type": "user_fact", "content": json.dumps(content), "salience": 1.5, "metadata": {"user_id": user_id, "fact_attribute_key": norm_attr_name, "source": "pathos_tool_store_user_fact"}}
-        try: await self.ethos_core.add_memory_entry(entry_data, user_id_context=user_id); return json.dumps({"status": "success", "message": f"Noted: your {attribute_name} is {attribute_value}."})
-        except Exception as e: logger.error(f"Error storing user fact for '{user_id}': {e}", exc_info=True); return json.dumps({"error": f"Failed to store user fact: {e}"})
+        if not norm_attr_name:
+            return {"success": False, "error": "Attribute name cannot be empty."}
 
-    async def execute_store_world_fact(self, fact_statement: str, source_description: str, topic_tags: Optional[List[str]] = None, confidence_level: float = 0.8) -> str:
-        if topic_tags is None: topic_tags = []
-        try: confidence = max(0.0, min(1.0, float(confidence_level)))
-        except (ValueError, TypeError): confidence = 0.8
-        tags = sorted(list(set(tag.lower().strip() for tag in topic_tags if isinstance(tag, str) and tag.strip())))
-        entry_data = {"type": "world_knowledge", "content": fact_statement, "salience": 0.7 + (confidence * 0.3), "metadata": {"stored_by_user_id": "system_or_current_user", "source_description": source_description, "topic_tags": tags, "confidence_level": confidence, "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()}}
-        try: await self.ethos_core.add_memory_entry(entry_data, user_id_context="world_knowledge_store"); return json.dumps({"status": "success", "message": f"Noted fact: '{fact_statement[:70]}...'."})
-        except Exception as e: logger.error(f"Error storing world fact: {e}", exc_info=True); return json.dumps({"error": f"Failed to store world fact: {e}"})
-
-    async def execute_deep_research(self, research_query: str, num_searches_to_perform: int = 3) -> str:
-        if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return json.dumps({"error": "Web search unavailable for deep research."})
-        llm_config = self.logos_research_config
-        if not llm_config or not llm_config.get('url'): return json.dumps({"error": "Deep research LLM (LOGOS_DEEP_RESEARCH) not configured."})
-        queries = [research_query]
-        if num_searches_to_perform > 1: queries.append(f"benefits and drawbacks of {research_query}")
-        if num_searches_to_perform > 2: queries.append(f"key aspects of {research_query}")
-        if num_searches_to_perform > 3: queries.append(f"future trends for {research_query}")
-        queries = queries[:num_searches_to_perform]; aggregated_text = ""; count = 0
-        for i, sq in enumerate(queries):
-            if results := await self.web_search_service.perform_search(sq):
-                for res in results: aggregated_text += f"--- Result {count+1} (Query: '{sq}') ---\nTitle: {res.get('title', 'N/A')}\nLink: {res.get('link', '#')}\nSnippet: {res.get('snippet', '')[:700]}\n\n"; count +=1
-            await asyncio.sleep(0.3)
-        if not aggregated_text: return json.dumps({"error": "No web search results for deep research query."})
-        max_input_chars = ((llm_config.get('max_tokens', 4096) - 1024) * 3)
-        if len(aggregated_text) > max_input_chars: aggregated_text = aggregated_text[:max_input_chars]
-        sys_prompt = load_system_prompt("deep_research_llm_system_prompt", "Synthesize provided info into a report.")
-        user_prompt = f"Query: '{research_query}'\nCollected Info:\n{aggregated_text}\n\nSynthesized report:"
+        content = {
+            "attribute": norm_attr_name,
+            "value": attribute_value,
+            "original_user_statement": user_statement_context,
+            "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        entry_data = {
+            "type": "user_fact",
+            "content": json.dumps(content),
+            "salience": 1.5,
+            "metadata": {
+                "user_id": user_id,
+                "fact_attribute_key": norm_attr_name,
+                "source": "pathos_tool_store_user_fact"
+            }
+        }
         try:
-            report = await self._call_logos_llm(llm_config, llm_messages_for_synthesis=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}])
-            if not report or report.startswith("["): return json.dumps({"error": f"LLM synthesis error: {report}"})
-            return report
-        except Exception as e: logger.error(f"Error in deep research synthesis: {e}", exc_info=True); return json.dumps({"error": f"Synthesis error: {e}"})
+            await self.ethos_core.add_memory_entry(entry_data, user_id_context=user_id)
+            return {"success": True, "message": f"Noted: your {attribute_name} is {attribute_value}."}
+        except Exception as e:
+            logger.error(f"Error storing user fact for '{user_id}': {e}", exc_info=True)
+            return {"success": False, "error": f"Failed to store user fact: {str(e)}"}
 
-    async def execute_get_news(self, query: Optional[str] = None, category: Optional[str] = None, max_articles_to_process: int = 3) -> List[Dict[str, Any]]:
+    async def execute_store_world_fact(self, fact_statement: str, source_description: str, topic_tags: Optional[List[str]] = None, confidence_level: float = 0.8) -> Dict[str, Any]:
+        if topic_tags is None: topic_tags = []
+        try:
+            confidence = max(0.0, min(1.0, float(confidence_level)))
+        except (ValueError, TypeError):
+            confidence = 0.8
+
+        tags = sorted(list(set(tag.lower().strip() for tag in topic_tags if isinstance(tag, str) and tag.strip())))
+        entry_data = {
+            "type": "world_knowledge",
+            "content": fact_statement,
+            "salience": 0.7 + (confidence * 0.3),
+            "metadata": {
+                "stored_by_user_id": "system_or_current_user", # This might need context if a specific user is storing it via Pathos
+                "source_description": source_description,
+                "topic_tags": tags,
+                "confidence_level": confidence,
+                "stored_by_tool_timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+        try:
+            await self.ethos_core.add_memory_entry(entry_data, user_id_context="world_knowledge_store")
+            return {"success": True, "message": f"Noted fact: '{fact_statement[:70]}...'."}
+        except Exception as e:
+            logger.error(f"Error storing world fact: {e}", exc_info=True)
+            return {"success": False, "error": f"Failed to store world fact: {str(e)}"}
+
+    async def execute_deep_research(self, research_query: str, num_searches_to_perform: int = 3) -> Dict[str, Any]:
+        if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service:
+            return {"success": False, "error": "Web search unavailable for deep research."}
+
+        llm_config = self.logos_research_config
+        if not llm_config or not llm_config.get('url'):
+            return {"success": False, "error": "Deep research LLM (LOGOS_DEEP_RESEARCH) not configured."}
+
+        try:
+            queries = [research_query]
+            if num_searches_to_perform > 1: queries.append(f"benefits and drawbacks of {research_query}")
+            if num_searches_to_perform > 2: queries.append(f"key aspects of {research_query}")
+            if num_searches_to_perform > 3: queries.append(f"future trends for {research_query}")
+            queries = queries[:num_searches_to_perform]
+
+            aggregated_text = ""
+            search_result_count = 0
+            for i, sq in enumerate(queries):
+                if results := await self.web_search_service.perform_search(sq):
+                    for res in results:
+                        aggregated_text += f"--- Result {search_result_count+1} (Query: '{sq}') ---\nTitle: {res.get('title', 'N/A')}\nLink: {res.get('link', '#')}\nSnippet: {res.get('snippet', '')[:700]}\n\n"
+                        search_result_count +=1
+                await asyncio.sleep(0.3) # Be nice to the search API
+
+            if not aggregated_text:
+                return {"success": False, "error": "No web search results for deep research query."}
+
+            max_input_chars = ((llm_config.get('max_tokens', 4096) - 1024) * 3) # Rough estimate for context window
+            if len(aggregated_text) > max_input_chars:
+                aggregated_text = aggregated_text[:max_input_chars]
+
+            sys_prompt = load_system_prompt("deep_research_llm_system_prompt", "Synthesize provided info into a report.")
+            user_prompt = f"Query: '{research_query}'\nCollected Info:\n{aggregated_text}\n\nSynthesized report:"
+
+            report = await self._call_logos_llm(llm_config, llm_messages_for_synthesis=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}])
+
+            if not report or report.startswith("["): # Assuming _call_logos_llm returns error messages in brackets
+                return {"success": False, "error": f"LLM synthesis error: {report}"}
+
+            return {"success": True, "data": {"report": report, "source_snippets_count": search_result_count}}
+        except Exception as e:
+            logger.error(f"Error in deep research execution: {e}", exc_info=True)
+            return {"success": False, "error": f"Deep research failed: {str(e)}"}
+
+    async def execute_get_news(self, query: Optional[str] = None, category: Optional[str] = None, max_articles_to_process: int = 3) -> Dict[str, Any]:
         if not self.news_config or not self.news_config.get('enabled') or not self.news_config.get('api_key'):
             logger.warning("News API not configured or enabled for execute_get_news.")
-            return []
+            return {"success": False, "error": "News API not configured or enabled."}
 
-        temp_news_config_dict = self.news_config.copy()
+        temp_news_config_dict = self.news_config.copy() # type: ignore
         if query:
             temp_news_config_dict['search_keywords'] = query
             temp_news_config_dict.pop('categories', None)
@@ -388,6 +537,95 @@ class LogosCore:
 
         logger.info(f"LogosCore execute_get_news: Fully processed {len(articles_to_process_fully)} articles, added {len(processed_articles) - len(articles_to_process_fully)} more with basic info.")
         return processed_articles
+
+    async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]: # type: ignore
+        fact_id, original_statement = fact_entry.get('id', 'unknown'), fact_entry.get('content')
+        if not original_statement:
+            return {"success": False, "error": "Original fact content empty.", "data": {"verification_status": "unverifiable"}}
+
+        if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service:
+            return {"success": False, "error": "Web search unavailable for verification.", "data": {"verification_status": "unverifiable"}}
+
+        llm_config = self.knowledge_upkeep_llm_config
+        if not llm_config or not llm_config.get('url'):
+            upkeep_role = self.config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE')
+            return {"success": False, "error": f"LLM for role {upkeep_role} not configured.", "data": {"verification_status": "unverifiable"}}
+
+        query = f"Verify fact: {original_statement}"[:250]
+        try:
+            results = await self.web_search_service.perform_search(query)
+            if not results:
+                return {"success": False, "error": "No web search results for verification.", "data": {"verification_status": "unverifiable"}}
+
+            context_parts = [f"Source {i+1} (Title: {r.get('title', 'N/A')}, URL: {r.get('link', '#')}):\n{r.get('snippet', 'N/A')}" for i, r in enumerate(results[:3])]
+            context = "\n\n---\n\n".join(context_parts)
+            sys_prompt = "You are a fact verification AI. Analyze 'Original Fact' against 'Web Snippets'. Determine accuracy, provide corrected statement if UPDATED, or explain if UNCERTAIN."
+            user_prompt = f"Original Fact:\n\"{original_statement}\"\n\nWeb Snippets:\n---\n{context}\n---\n\nJSON Response (assessment: ACCURATE|UPDATED|UNCERTAIN, corrected_statement: if UPDATED else null, reasoning: brief explanation):"
+
+            llm_resp_str = await self._call_logos_llm(llm_config, llm_messages_for_synthesis=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}])
+
+            if not llm_resp_str or llm_resp_str.startswith("["): # _call_logos_llm returns error in brackets
+                 return {"success": False, "error": f"LLM response invalid or empty: {llm_resp_str}", "data": {"verification_status": "unverifiable"}}
+
+            cleaned = re.sub(r"```json\s*|\s*```", "", llm_resp_str).strip()
+            analysis = json.loads(cleaned)
+            assessment = analysis.get("assessment", "").upper()
+            corrected = analysis.get("corrected_statement")
+            reasoning = analysis.get("reasoning", "")
+
+            if assessment == "ACCURATE":
+                return {"success": True, "data": {"verification_status": "accurate", "original_statement": original_statement, "reason": reasoning}}
+            elif assessment == "UPDATED" and corrected:
+                return {"success": True, "data": {"verification_status": "updated", "original_statement": original_statement, "new_statement": corrected, "reason": reasoning}}
+            elif assessment == "UNCERTAIN":
+                return {"success": False, "error": f"LLM uncertain: {reasoning}", "data": {"verification_status": "unverifiable"}}
+            else:
+                return {"success": False, "error": f"LLM unexpected assessment: {assessment}. Raw: {llm_resp_str[:100]}", "data": {"verification_status": "unverifiable"}}
+
+        except json.JSONDecodeError:
+            # Fallback for non-JSON LLM responses that might still indicate accuracy
+            if llm_resp_str and "ACCURATE" in llm_resp_str.upper(): # type: ignore
+                return {"success": True, "data": {"verification_status": "accurate", "original_statement": original_statement, "reason": "LLM indicated accuracy, JSON parse failed."}}
+            return {"success": False, "error": f"LLM response not valid JSON: {llm_resp_str[:100] if llm_resp_str else 'N/A'}", "data": {"verification_status": "unverifiable"}}
+        except Exception as e:
+            logger.error(f"Error in LLM fact verification for ID {fact_id}: {e}", exc_info=True)
+            return {"success": False, "error": f"Verification error: {str(e)}", "data": {"verification_status": "unverifiable"}}
+
+
+    # --- NPC Simulation Tool Execution Stubs ---
+    async def execute_initiate_simulated_interaction(self, npc_name: Optional[str], npc_role: str, npc_description: str, initial_context: str, pathos_opening_statement: str) -> Dict[str, Any]:
+        logger.info(f"LogosCore: Initiating simulated interaction. Role: {npc_role}, Context: {initial_context}")
+        try:
+            result = await initiate_simulated_interaction(npc_name, npc_role, npc_description, initial_context, pathos_opening_statement)
+            # Assuming result is already a dict like {"success": True/False, ...} or needs to be wrapped
+            if isinstance(result, dict):
+                return result
+            return {"success": True, "data": result} # Basic wrapping if not already dict
+        except Exception as e:
+            logger.error(f"Error in execute_initiate_simulated_interaction: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    async def execute_send_message_to_simulated_npc(self, message_to_npc: str) -> Dict[str, Any]:
+        logger.info(f"LogosCore: Sending message to simulated NPC: '{message_to_npc[:50]}...'")
+        try:
+            result = await send_message_to_simulated_npc(message_to_npc)
+            if isinstance(result, dict):
+                return result
+            return {"success": True, "data": result}
+        except Exception as e:
+            logger.error(f"Error in execute_send_message_to_simulated_npc: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    async def execute_end_simulated_interaction(self) -> Dict[str, Any]:
+        logger.info("LogosCore: Ending simulated interaction.")
+        try:
+            result = await end_simulated_interaction()
+            if isinstance(result, dict):
+                return result
+            return {"success": True, "data": result}
+        except Exception as e:
+            logger.error(f"Error in execute_end_simulated_interaction: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
 
     async def _fetch_news_headlines_with_details(self, news_api_config: NewsApiConfig) -> List[Dict[str, str]]:
         if not news_api_config or not news_api_config.get('enabled') or not news_api_config.get('api_key'): return []
@@ -606,6 +844,84 @@ class LogosCore:
         except httpx.RequestError as e: return {"success": False, "message": f"Connection error querying Wolfram Alpha: {e}", "raw_response": None}
         except json.JSONDecodeError as e: response_text = resp.text[:500] if 'resp' in locals() and hasattr(resp, 'text') else 'N/A'; return {"success": False, "message": f"Invalid JSON from Wolfram Alpha: {e}. Response: {response_text}", "raw_response": None}
         except Exception as e: logger.error(f"Error processing Wolfram Alpha response: {e}", exc_info=True); return {"success": False, "message": f"Error processing Wolfram Alpha data: {e}", "raw_response": None}
+
+    async def execute_task(self, task: Task) -> Task:
+        logger.info(f"LogosCore: Received task ID {task.task_id} of type '{task.type}'. Name: '{task.name}'")
+
+        # Do not re-run tasks that are already completed or failed, unless explicitly designed for retry
+        if task.status not in ["pending", "retry"]: # Assuming 'retry' could be a valid status to re-initiate
+            logger.warning(f"LogosCore: Task {task.task_id} (type: {task.type}) has status '{task.status}' and will not be executed.")
+            return task
+
+        task.update_status("in_progress")
+
+        try:
+            if task.type == "web_search":
+                query = task.input_params.get("query")
+                if not query or not isinstance(query, str) or not query.strip():
+                    task.error_message = "Missing or invalid 'query' in input_params for web_search task."
+                    task.update_status("failure")
+                elif not self.config.ENABLE_WEB_SEARCH or not self.web_search_service:
+                    task.error_message = "Web search service is disabled or not available."
+                    task.update_status("failure")
+                else:
+                    search_results = await self.execute_web_search(query)
+                    if search_results is not None:
+                        task.result = {"results": search_results}
+                        task.result_summary = f"Web search for '{query}' found {len(search_results)} results."
+                        task.update_status("success")
+                    else:
+                        task.error_message = f"Web search for '{query}' failed or returned no results. Check logs for details."
+                        task.update_status("failure")
+
+            elif task.type == "get_weather":
+                location = task.input_params.get("location")
+                user_id = task.user_id
+
+                if not location or not isinstance(location, str) or not location.strip():
+                    task.error_message = "Missing or invalid 'location' in input_params for get_weather task."
+                    task.update_status("failure")
+                else:
+                    weather_result_dict = await self.execute_get_weather(location, user_id_context=user_id)
+                    task.result = weather_result_dict
+
+                    if weather_result_dict.get("success"):
+                        wd = weather_result_dict.get("weather_data", {})
+                        task.result_summary = f"Weather for {wd.get('location', location)}: {wd.get('temperature', '--')}{wd.get('unit', '')}, {wd.get('description', 'N/A')}."
+                        task.update_status("success")
+                    else:
+                        task.error_message = weather_result_dict.get("error", "Failed to get weather data.")
+                        task.update_status("failure")
+
+            # TODO: Implement handlers for other task types based on existing execute_... methods:
+            # - describe_image (needs image_data_b64, prompt_from_llm)
+            # - math_calculation (needs expression)
+            # - get_time (needs optional location)
+            # - store_user_fact (needs attribute_name, attribute_value, user_statement_context, user_id)
+            # - store_world_fact (needs fact_statement, source_description, optional topic_tags, confidence_level)
+            # - deep_research (needs research_query, optional num_searches_to_perform)
+            # - get_news (needs optional query, category, max_articles_to_process)
+            # - process_document_for_rag (new task type, would combine process_uploaded_document and add_document_to_rag)
+            #   Input params: file_content_b64, filename, user_id, optional doc_id
+            # - initiate_simulated_interaction
+            # - send_message_to_simulated_npc
+            # - end_simulated_interaction
+            # - verify_world_fact (needs fact_entry_id or full fact_entry content)
+
+            else:
+                logger.warning(f"LogosCore: Unsupported task type '{task.type}' for task ID {task.task_id}.")
+                task.error_message = f"Unsupported task type: {task.type}"
+                task.update_status("failure")
+
+        except Exception as e:
+            logger.error(f"LogosCore: Unhandled error executing task {task.task_id} (type: {task.type}): {e}", exc_info=True)
+            task.error_message = f"Unhandled execution error: {str(e)}"
+            task.update_status("failure")
+
+        if task.status in ["success", "failure", "cancelled"] and not task.completed_at:
+            task.completed_at = task.updated_at if task.updated_at else datetime.now(timezone.utc)
+
+        return task
 
     async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]: # type: ignore
         fact_id, original_statement = fact_entry.get('id', 'unknown'), fact_entry.get('content')
@@ -861,5 +1177,103 @@ if __name__ == '__main__':
         await logos_core_instance_s2.close()
         logger.info("Scenario 2 tests passed.")
         logger.info("--- LogosCore.initialize_services tests completed ---")
+
+        # New tests for execute_task
+        logger.info("\n\n--- Testing LogosCore.execute_task ---")
+        # Use a general instance for these tests, can reconfigure its parts if needed per test case
+        # Re-using mock_config_all_enabled and mock_ethos_core from Scenario 1 for simplicity
+        # Ensure OWM service is also available for the get_weather task test
+        general_mock_config = MockConfig()
+        general_mock_ethos = MockEthosCore()
+        general_mock_owm = MockOWMService("dummy_owm_key_for_task_test", None)
+        logos_core_instance = LogosCore(config=general_mock_config, ethos_core=general_mock_ethos, owm_service=general_mock_owm) # type: ignore
+
+        # Test Case 1: "web_search" task - Success
+        logger.info("\n--- Test Case: 'web_search' task - Success ---")
+        task_ws_success = Task(name="Test Web Search Success", type="web_search", input_params={"query": "AI ethics"})
+        original_execute_web_search = logos_core_instance.execute_web_search
+        logos_core_instance.execute_web_search = unittest.mock.AsyncMock(return_value=[{"title": "AI Ethics Guide", "snippet": "A guide..."}])
+
+        returned_task_ws_success = await logos_core_instance.execute_task(task_ws_success)
+
+        assert returned_task_ws_success.status == "success"
+        assert returned_task_ws_success.result == {"results": [{"title": "AI Ethics Guide", "snippet": "A guide..."}]}
+        assert "Web search for 'AI ethics' found 1 results." in returned_task_ws_success.result_summary # type: ignore
+        logos_core_instance.execute_web_search.assert_called_once_with("AI ethics")
+        logger.info("Test Case 'web_search' task - Success: PASSED")
+        logos_core_instance.execute_web_search = original_execute_web_search
+
+        # Test Case 2: "web_search" task - Failure (service disabled)
+        logger.info("\n--- Test Case: 'web_search' task - Service Disabled ---")
+        mock_config_ws_disabled = MockConfig()
+        mock_config_ws_disabled.ENABLE_WEB_SEARCH = False
+        logos_core_ws_disabled = LogosCore(config=mock_config_ws_disabled, ethos_core=general_mock_ethos, owm_service=general_mock_owm) # type: ignore
+
+        task_ws_disabled_req = Task(name="Test Web Search Disabled", type="web_search", input_params={"query": "AI ethics"})
+        returned_task_ws_disabled = await logos_core_ws_disabled.execute_task(task_ws_disabled_req)
+
+        assert returned_task_ws_disabled.status == "failure"
+        assert "Web search service is disabled" in returned_task_ws_disabled.error_message # type: ignore
+        logger.info("Test Case 'web_search' task - Service Disabled: PASSED")
+        await logos_core_ws_disabled.close()
+
+        # Test Case 3: "get_weather" task - Success
+        logger.info("\n--- Test Case: 'get_weather' task - Success ---")
+        task_gw_success = Task(name="Test Get Weather Success", type="get_weather", input_params={"location": "London"}, user_id="test_user_weather")
+
+        mock_weather_data_success = {"success": True, "weather_data": {"location": "London", "description": "Cloudy", "temperature": "15", "unit": "°C"}}
+        original_execute_get_weather = logos_core_instance.execute_get_weather
+        logos_core_instance.execute_get_weather = unittest.mock.AsyncMock(return_value=mock_weather_data_success)
+
+        returned_task_gw_success = await logos_core_instance.execute_task(task_gw_success)
+
+        assert returned_task_gw_success.status == "success"
+        assert returned_task_gw_success.result == mock_weather_data_success
+        assert "Weather for London: 15°C, Cloudy." in returned_task_gw_success.result_summary # type: ignore
+        logos_core_instance.execute_get_weather.assert_called_once_with("London", user_id_context="test_user_weather")
+        logger.info("Test Case 'get_weather' task - Success: PASSED")
+        logos_core_instance.execute_get_weather = original_execute_get_weather
+
+        # Test Case 4: "get_weather" task - Failure (API error)
+        logger.info("\n--- Test Case: 'get_weather' task - API Error ---")
+        task_gw_failure = Task(name="Test Get Weather API Fail", type="get_weather", input_params={"location": "Oz"})
+
+        mock_weather_data_failure = {"success": False, "error": "API error for Oz"}
+        original_execute_get_weather_fail = logos_core_instance.execute_get_weather
+        logos_core_instance.execute_get_weather = unittest.mock.AsyncMock(return_value=mock_weather_data_failure)
+
+        returned_task_gw_failure = await logos_core_instance.execute_task(task_gw_failure)
+
+        assert returned_task_gw_failure.status == "failure"
+        assert returned_task_gw_failure.error_message == "API error for Oz"
+        assert returned_task_gw_failure.result == mock_weather_data_failure
+        logger.info("Test Case 'get_weather' task - API Error: PASSED")
+        logos_core_instance.execute_get_weather = original_execute_get_weather_fail
+
+        # Test Case 5: Unsupported task type
+        logger.info("\n--- Test Case: Unsupported task type ---")
+        task_unsupported = Task(name="Test Unsupported", type="fly_to_mars", input_params={})
+        returned_task_unsupported = await logos_core_instance.execute_task(task_unsupported)
+
+        assert returned_task_unsupported.status == "failure"
+        assert "Unsupported task type: fly_to_mars" in returned_task_unsupported.error_message # type: ignore
+        logger.info("Test Case Unsupported task type: PASSED")
+
+        # Test Case 6: Task already completed (not runnable)
+        logger.info("\n--- Test Case: Task already completed ---")
+        task_already_done = Task(name="Test Already Done", type="web_search", input_params={"query":"test"}, status="success")
+
+        original_execute_web_search_completed = logos_core_instance.execute_web_search
+        logos_core_instance.execute_web_search = unittest.mock.AsyncMock() # Fresh mock to check for calls
+
+        returned_task_already_done = await logos_core_instance.execute_task(task_already_done)
+
+        assert returned_task_already_done.status == "success"
+        logos_core_instance.execute_web_search.assert_not_called()
+        logger.info("Test Case Task already completed: PASSED")
+        logos_core_instance.execute_web_search = original_execute_web_search_completed
+
+        await logos_core_instance.close() # Close the main instance used for these tests
+        logger.info("--- LogosCore.execute_task tests completed ---")
 
     asyncio.run(run_tests())
