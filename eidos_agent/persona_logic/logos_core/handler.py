@@ -38,7 +38,7 @@ class LogosCore:
         self.owm_service = owm_service
 
         self.logos_techne_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_TECHNE')
-        self.logos_vision_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_VISION_CONTEXT')
+        # self.logos_vision_config line removed
         self.logos_research_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_DEEP_RESEARCH')
         
         knowledge_upkeep_llm_role = config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE')
@@ -113,7 +113,7 @@ class LogosCore:
         # LLM Configurations
         llm_roles_to_check = {
             "LOGOS_TECHNE": self.logos_techne_config,
-            "LOGOS_VISION_CONTEXT": self.logos_vision_config,
+            # "LOGOS_VISION_CONTEXT" line removed
             "LOGOS_DEEP_RESEARCH": self.logos_research_config,
             "KNOWLEDGE_UPKEEP_LLM": self.knowledge_upkeep_llm_config # Using the attribute name
         }
@@ -247,28 +247,7 @@ class LogosCore:
             logger.error(f"Error storing world fact: {e}", exc_info=True)
             return {"success": False, "error": f"Failed to store world fact: {str(e)}"}
 
-    async def execute_describe_image(self, image_data_b64: str, prompt_from_llm: str) -> Dict[str, Any]:
-        logger.info(f"LogosCore: Describing image. User prompt: '{prompt_from_llm[:50]}...'")
-        if not self.config.ENABLE_VISION_PROCESSING:
-            return {"success": False, "error": "Vision processing disabled."}
-
-        vision_llm_config = self.logos_vision_config
-        if not vision_llm_config or not vision_llm_config.get('url'):
-            return {"success": False, "error": "LOGOS_VISION_CONTEXT LLM not configured."}
-
-        messages_payload = [{"role": "user", "content": [{"type": "text", "text": prompt_from_llm},{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data_b64}"}}]}]
-
-        try:
-            description = await self._call_logos_llm(vision_llm_config, llm_messages_for_synthesis=messages_payload)
-            if description and not description.startswith("["): # Assuming error messages from _call_logos_llm start with "["
-                logger.info(f"Vision LLM provided description: {description[:100]}...")
-                return {"success": True, "data": {"description": description}}
-            else:
-                logger.warning(f"Vision LLM description failed or returned error: {description}")
-                return {"success": False, "error": description or "Failed to get description from vision model."}
-        except Exception as e:
-            logger.error(f"Error during image description LLM call: {e}", exc_info=True)
-            return {"success": False, "error": f"Error during image description: {str(e)}"}
+    # execute_describe_image method removed
 
     async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]: # This one is used by execute_task, so its direct return might be fine, or wrap in task exec.
         if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return None

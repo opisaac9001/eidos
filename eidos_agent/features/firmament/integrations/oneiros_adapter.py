@@ -5,16 +5,19 @@
 # memories, current mood, current sleep block) and retrieving the generated dream content,
 # then logging this dream to memory.
 
+import logging # Added: logging import
 import random
-import logging
 from datetime import datetime, timezone # For timestamp in memory log
+# Updated: typing imports to ensure all required types are present
 from typing import Optional, Dict, Any, List, AsyncGenerator, Union
 
 # Attempt to import core Eidos components.
 try:
+    # Ensure these specific imports are present
     from ...core.config import Config, LLMConfig
     from ...llm_integrations.llm_client import LLMClient
     from ...core.http_client_manager import HTTPClientManager
+    # Other existing imports from the try block
     from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
     from ...persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
     from ...persona_logic.ethos_core.memory_storage import MemoryEntry
@@ -22,67 +25,90 @@ try:
 except ImportError: # pragma: no cover
     print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
     # Define dummy versions for parsing and basic type hinting
-    class Config: # type: ignore
+    # Modeled after npc_improviser.py and existing dummies
+
+    LLMConfig = Dict[str, Any]  # type:ignore # Alias for LLM configuration, typically a TypedDict
+
+    class Config:  # type:ignore
         @staticmethod
-        def get_llm_config(role_name: str) -> Optional[Dict[str, Any]]: # This dummy returns Dict, not LLMConfig alias directly
+        def get_llm_config(role_name: str) -> Optional[LLMConfig]:
             print(f"DummyConfig: get_llm_config called for role {role_name}")
-            if role_name == "FIRMAMENT_PRIMARY":
-                return {"role": role_name, "model": "dummy_model", "url": "http://dummy.url"} # Example LLMConfig structure
+            if role_name == "FIRMAMENT_PRIMARY": # Example role
+                return {"role": role_name, "model": "dummy_model", "url": "http://dummy.url", "timeout": 10.0}
             return None
+        # Add other static methods if Config is used for more by this adapter
 
-    LLMConfig = Dict[str, Any] # type: ignore # Actual LLMConfig is a TypedDict, but Dict is fine for dummy
-
-    MemoryEntry = Dict[str, Any] # type: ignore
-    PATHOS_USER_ID = "pathos_dummy_user_id_if_import_fails" # Dummy value
-
-    class LLMClient: # type: ignore
-        def __init__(self, http_client: Any):
+    class LLMClient:  # type:ignore
+        def __init__(self, http_client: Any): # http_client can be a dummy/mock
             self.http_client = http_client
-            print("DummyLLMClient initialized.")
-        async def call_llm_api(self, llm_config: LLMConfig, messages: List[Dict[str, str]], stream: bool = False, **kwargs: Any) -> Union[AsyncGenerator[str, None], str]:
-            print(f"DummyLLMClient: call_llm_api called with config {llm_config}")
+            self._logger = logging.getLogger(__name__) # Use standard logger
+            self._logger.info("DummyLLMClient initialized.")
+
+        async def call_llm_api(
+            self, llm_config: LLMConfig, messages: List[Dict[str, str]],
+            stream: bool = False, **kwargs: Any
+        ) -> Union[AsyncGenerator[str, None], str]:
+            self._logger.info(f"DummyLLMClient: call_llm_api called with config {llm_config}, stream={stream}")
             if stream:
                 async def dummy_stream():
-                    yield "Dummy streamed response."
+                    yield "Dummy streamed response chunk 1."
+                    yield "Dummy streamed response chunk 2."
                 return dummy_stream()
-            return "Dummy response."
+            return "Dummy non-streamed LLM response."
+        # Add other methods if LLMClient is used for more by this adapter
 
-    class HTTPClientManager: # type: ignore
+    class HTTPClientManager:  # type:ignore
         _instance = None
+        def __init__(self):
+            self._logger = logging.getLogger(__name__)
+            self._logger.info("DummyHTTPClientManager __init__ called (should be singleton).")
+
         @classmethod
         def instance(cls):
             if cls._instance is None:
                 cls._instance = cls()
-                print("DummyHTTPClientManager instance created.")
+                # Logger in __init__ will confirm creation
             return cls._instance
-        def get_client(self) -> Optional[Any]: # Should ideally be Optional[httpx.AsyncClient]
-            print("DummyHTTPClientManager: get_client called.")
-            return None # Or a mock client
-        async def startup(self): print("DummyHTTPClientManager: startup")
-        async def shutdown(self): print("DummyHTTPClientManager: shutdown")
 
-    # Dummy EthosCore still needed if methods on self.ethos_core are called elsewhere in the class.
-    # For this task, we are only modifying __init__. If self.ethos_core is used, it should be set by a setter.
+        def get_client(self) -> Optional[Any]: # Ideally Optional[httpx.AsyncClient]
+            # In a dummy, can return None or a mock httpx.AsyncClient
+            # For simplicity, returning None as OneirosAdapter should handle it
+            self._logger.info("DummyHTTPClientManager: get_client called, returning None.")
+            return None
+
+        async def startup(self):
+            self._logger.info("DummyHTTPClientManager: startup called.")
+
+        async def shutdown(self):
+            self._logger.info("DummyHTTPClientManager: shutdown called.")
+
+    # Existing dummy types that might still be needed if other parts of the file use them
+    MemoryEntry = Dict[str, Any] # type: ignore
+    PATHOS_USER_ID = "pathos_dummy_user_id_if_import_fails" # Dummy value
+
     class EthosCore: # type: ignore
         def __init__(self, config: Any = None): # Added default to config
-            print("DummyEthosCore initialized.")
+            self._logger = logging.getLogger(__name__)
+            self._logger.info("DummyEthosCore initialized.")
         async def get_memories_for_dream_seeding(self, user_id: str, lookback_days: int, limit: int, memory_types: Optional[List[str]] = None) -> List[MemoryEntry]:
-            print(f"DummyEthosCore.get_memories_for_dream_seeding called for user {user_id}")
+            self._logger.info(f"DummyEthosCore.get_memories_for_dream_seeding called for user {user_id}")
             return [{"type": "dummy_interaction", "content": "Dummy memory content from EthosCore.", "timestamp": datetime.now(timezone.utc).isoformat()}]
-        def get_current_mood(self) -> Dict[str, Any]: # Adding dummy for get_current_mood as it's used
-             print("DummyEthosCore.get_current_mood called.")
+        def get_current_mood(self) -> Dict[str, Any]:
+             self._logger.info("DummyEthosCore.get_current_mood called.")
              return {"name": "dummy_mood", "valence": 0, "arousal": 0}
 
-
-    # Define a dummy EventBus if import fails, so the file can be parsed
     class EventBus: # type: ignore
         _instance = None; _subscribers = {} # type: ignore
+        def __init__(self):
+            self._logger = logging.getLogger(__name__)
+            self._logger.info("DummyEventBus __init__ called (should be singleton).")
+
         @classmethod
         def instance(cls): # type: ignore
             if not cls._instance: cls._instance = cls() # type: ignore
             return cls._instance # type: ignore
-        def subscribe(self, et, h): pass # type: ignore
-        def publish(self, et, d): print(f"DummyEventBus (Oneiros): Published {et} with {d}") # type: ignore
+        def subscribe(self, et, h): self._logger.info(f"DummyEventBus: Subscribed handler to {et}") # type: ignore
+        def publish(self, et, d): self._logger.info(f"DummyEventBus (Oneiros): Published {et} with {d}") # type: ignore
 
 
 # Define event type strings used by this adapter
@@ -110,31 +136,29 @@ class OneirosAdapter:
         self.adapter_config = oneiros_config if oneiros_config is not None else {} # Ensure {} if None
         self.http_client_manager = http_client_manager
         self.llm_role_name = llm_role_name
-        self.llm_config: Optional[LLMConfig] = None # Correctly typed
+        # self.llm_config: Optional[LLMConfig] = None # Declaration moved slightly for clarity
         self.ethos_core: Optional[EthosCore] = None # Initialize as None, to be set by a setter if used
 
         if http_client_manager: # Only try to get LLM config if a client manager is provided
-            # Config.get_llm_config should ideally return Optional[LLMConfig]
-            # If it returns Optional[Dict], the type hint for self.llm_config handles it.
-            llm_config_data = Config.get_llm_config(self.llm_role_name)
-            if not llm_config_data:
+            self.llm_config: Optional[LLMConfig] = Config.get_llm_config(self.llm_role_name) # type: ignore
+            if not self.llm_config:
                 self.logger.error(f"OneirosAdapter: LLM config for role '{self.llm_role_name}' not found.")
-                self.llm_config = None # Explicitly set to None
+                # self.llm_config remains None if not found, which is desired.
             else:
-                # Assuming llm_config_data is compatible with LLMConfig structure
-                self.llm_config = llm_config_data # type: ignore # If get_llm_config returns Dict instead of LLMConfig
                 self.logger.info(f"OneirosAdapter initialized for LLM role '{self.llm_role_name}'. Model: {self.llm_config.get('model')}")
         else: # No http_client_manager, so no LLM operations possible
-            self.llm_config = None # Explicitly set to None
+            self.llm_config = None
             self.logger.info("OneirosAdapter initialized without HTTPClientManager. LLM operations will be disabled.")
 
-        # EthosCore is no longer passed in __init__, so related logging is removed.
-        # It will be set by a setter method by the Firmament system if needed.
-        # self.logger.info/warning for ethos_core removed here.
+        # EthosCore is no longer passed in __init__.
+        # If an EthosCore instance is needed, it should be provided via a setter method
+        # by the Firmament system after OneirosAdapter initialization.
+        # Example: oneiros_adapter.set_ethos_core(ethos_core_instance)
 
-        self.model_loaded = False # Existing attribute
-        self._initialize_oneiros_engine() # Existing method call
-        self.logger.info(f"OneirosAdapter initialized. Model Loaded: {self.model_loaded}. Config: {self.adapter_config}")
+        self.model_loaded = False # Existing attribute, relevance might change with more LLM focus
+        self._initialize_oneiros_engine() # Existing method call, might also adapt over time
+        # Updated log message to be slightly more concise if EthosCore is not part of init status
+        self.logger.info(f"OneirosAdapter initialized. LLM Role: '{self.llm_role_name}'. Model Loaded: {self.model_loaded}. Config: {self.adapter_config}")
 
 
     # It's anticipated that EthosCore will be set using a setter method by Firmament core.

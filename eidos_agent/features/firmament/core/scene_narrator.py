@@ -8,22 +8,23 @@ from typing import Dict, Any, Optional # Added Optional
 try:
     from .event_bus import EventBus
     from .event_types import NEW_NPC_IMPROVISED
+    from .event_types import MEMORY_WRITE # Directly import MEMORY_WRITE
 
-    # Attempt to import a centrally defined EVENT_MEMORY_WRITE
-    try:
-        from .event_types import MEMORY_WRITE as MEMORY_WRITE_EVENT_NAME
+    # Attempt to import a centrally defined EVENT_MEMORY_WRITE - This block is now simplified
+    # try:
+        # from .event_types import MEMORY_WRITE as MEMORY_WRITE_EVENT_NAME # Old import
         # Assuming it might be named MEMORY_WRITE in event_types.py
         # If it's literally EVENT_MEMORY_WRITE, then:
         # from .event_types import EVENT_MEMORY_WRITE as MEMORY_WRITE_EVENT_NAME
-    except ImportError:
+    # except ImportError: # This specific except block for MEMORY_WRITE is no longer needed
         # Fallback to local definition if not found in event_types.py
-        MEMORY_WRITE_EVENT_NAME = "memory.write"
-        logger = logging.getLogger(__name__) # Initialize logger here if not top-level due to try/except
-        logger.info("SceneNarrator: MEMORY_WRITE_EVENT_NAME not found in event_types, using local definition 'memory.write'.")
+        # MEMORY_WRITE_EVENT_NAME = "memory.write" # Removed
+        # logger = logging.getLogger(__name__) # Initialize logger here if not top-level due to try/except # Logger init moved to top or main except
+        # logger.info("SceneNarrator: MEMORY_WRITE_EVENT_NAME not found in event_types, using local definition 'memory.write'.") # Removed
 
 
 except ImportError: # pragma: no cover
-    # This block executes if core EventBus or NEW_NPC_IMPROVISED cannot be imported.
+    # This block executes if core EventBus, NEW_NPC_IMPROVISED, or MEMORY_WRITE cannot be imported.
     # This indicates a severe setup issue or that the file is being parsed in isolation without correct paths.
     print("CRITICAL IMPORT ERROR in scene_narrator.py. Scene narration will not function. Using dummy versions.")
     class EventBus: #type:ignore
@@ -34,9 +35,9 @@ except ImportError: # pragma: no cover
         def subscribe(self, event_type: str, handler: Any): pass
 
     NEW_NPC_IMPROVISED = "dummy.firmament.npc.improvised.new" #type:ignore
-    MEMORY_WRITE_EVENT_NAME = "dummy.memory.write" #type:ignore
+    MEMORY_WRITE = "dummy.memory.write" #type:ignore # Fallback for MEMORY_WRITE if its import fails
     # Initialize logger here as well if it wasn't initialized due to other import error paths
-    if 'logger' not in globals():
+    if 'logger' not in globals(): # Ensure logger is initialized if other imports failed
         logger = logging.getLogger(__name__) # type: ignore
 
 
@@ -108,7 +109,7 @@ def handle_new_npc_improvised_event(data: Dict[str, Any]):
             "timestamp_event_logged_utc": datetime.now(timezone.utc).isoformat() # Timestamp of this log
         }
     }
-    EventBus.instance().publish(MEMORY_WRITE_EVENT_NAME, memory_payload)
+    EventBus.instance().publish(MEMORY_WRITE, memory_payload) # Use imported MEMORY_WRITE
     # logger.debug(f"SceneNarrator: Published memory entry for new NPC scene description (Type: {memory_payload.get('type')})")
 
 
@@ -196,15 +197,15 @@ if __name__ == '__main__': # pragma: no cover
     # Directly publish the NEW_NPC_IMPROVISED event to trigger the handler registered on the mock bus.
     # The mock bus's publish will first call `capture_narrator_events_for_test` for NEW_NPC_IMPROVISED itself,
     # then dispatch to `handle_new_npc_improvised_event`.
-    # `handle_new_npc_improvised_event` will then call publish for MEMORY_WRITE_EVENT_NAME,
+    # `handle_new_npc_improvised_event` will then call publish for MEMORY_WRITE,
     # which will again be captured by `capture_narrator_events_for_test`.
     mock_bus_instance_narrator_test.publish(NEW_NPC_IMPROVISED, new_npc_event_payload_for_test)
 
     # Assertions
-    # We expect two events captured: NEW_NPC_IMPROVISED (input) and MEMORY_WRITE_EVENT_NAME (output)
+    # We expect two events captured: NEW_NPC_IMPROVISED (input) and MEMORY_WRITE (output)
     assert len(_test_events_captured_narrator) == 2, f"Expected 2 captured events (input NEW_NPC & output MEMORY_WRITE), got {len(_test_events_captured_narrator)}"
 
-    published_memory_events = [e for e in _test_events_captured_narrator if e["type"] == MEMORY_WRITE_EVENT_NAME]
+    published_memory_events = [e for e in _test_events_captured_narrator if e["type"] == MEMORY_WRITE] # Use imported MEMORY_WRITE
     assert len(published_memory_events) == 1, "Expected exactly one memory.write event from scene_narrator."
 
     if published_memory_events:
