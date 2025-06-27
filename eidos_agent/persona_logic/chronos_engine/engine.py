@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, date, time, timedelta, timezone
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any, Literal, Callable, Coroutine
 import uuid
 import json
 try:
@@ -29,6 +29,9 @@ logger = get_logger(__name__)
 
 PATHOS_USER_ID = "pathos_agent_internal"
 
+# Type alias for schedule update listeners
+ScheduleUpdateListener = Callable[[date, str], Coroutine[Any, Any, None]]
+
 class ChronosEngine:
     def __init__(self, config: Config, memory_storage: MemoryStorage, ethos_core: 'EthosCore', logos_core: 'LogosCore'):
         self.config = config
@@ -39,6 +42,7 @@ class ChronosEngine:
         self._todays_schedule_cache: Dict[str, List[ActivitySlot]] = {}
         self._cache_date: Optional[date] = None
         self._schedule_generation_lock = asyncio.Lock()
+        self._schedule_update_listeners: List[ScheduleUpdateListener] = []
 
         self.default_daily_slots_config = [
             ("Early Morning Routine & Light Reading", (7,30), (8,30), "reflective"),
@@ -343,9 +347,15 @@ class ChronosEngine:
 
         if new_schedule:
             new_schedule.sort(key=lambda x: x.start_time)
-            try: await asyncio.to_thread(self.memory_storage.save_schedule_to_db, new_schedule, PATHOS_USER_ID)
-            except Exception as e: logger.error(f"Error saving schedule to DB for {target_date}: {e}", exc_info=True); new_schedule = []
-        else: logger.warning(f"No activities generated for schedule on {target_date}.")
+            try:
+                await asyncio.to_thread(self.memory_storage.save_schedule_to_db, new_schedule, PATHOS_USER_ID)
+                logger.info(f"ChronosEngine: Successfully generated and saved schedule for {target_date}, user {PATHOS_USER_ID}.")
+                await self._notify_schedule_update_listeners(target_date, PATHOS_USER_ID) # Notify
+            except Exception as e:
+                logger.error(f"Error saving schedule to DB for {target_date}: {e}", exc_info=True)
+                new_schedule = [] # Ensure empty list if save fails
+        else:
+            logger.warning(f"No activities generated for schedule on {target_date}.")
         return new_schedule
 
     async def get_current_activity(self, current_datetime: datetime) -> Optional[ActivitySlot]:
@@ -391,13 +401,25 @@ class ChronosEngine:
                 async with self._schedule_generation_lock:
                     current_affected_date = event.start_date
                     while current_affected_date <= event.end_date:
-                        if self._cache_date == current_affected_date and PATHOS_USER_ID in self._todays_schedule_cache:
-                            self._todays_schedule_cache[PATHOS_USER_ID] = [] # Invalidate by emptying
-                            if self._cache_date == current_affected_date: self._cache_date = None
+                        if self._cache_date == current_affected_date and event.user_id in self._todays_schedule_cache: # Use event.user_id
+                            self._todays_schedule_cache[event.user_id] = []
+                            # Only clear _cache_date if it matches the date being invalidated for general Pathos cache
+                            if self._cache_date == current_affected_date and event.user_id == PATHOS_USER_ID:
+                                self._cache_date = None
                         current_affected_date += timedelta(days=1)
+
+                # Notify for all affected dates of the event
+                current_notify_date = event.start_date
+                while current_notify_date <= event.end_date:
+                    await self._notify_schedule_update_listeners(current_notify_date, event.user_id)
+                    current_notify_date += timedelta(days=1)
                 return event
-            else: logger.error(f"Failed to add planned event '{event.title}' to DB."); return None
-        except Exception as e: logger.error(f"Error adding planned event: {e}", exc_info=True); return None
+            else:
+                logger.error(f"Failed to add planned event '{event.title}' to DB.")
+                return None
+        except Exception as e:
+            logger.error(f"Error adding planned event: {e}", exc_info=True)
+            return None
 
     async def daily_schedule_maintenance_task(self):
         logger.debug("Chronos: Daily schedule maintenance task running.")
@@ -670,6 +692,7 @@ class ChronosEngine:
                 if self._cache_date == target_date and user_id in self._todays_schedule_cache:
                     self._todays_schedule_cache[user_id] = todays_schedule
                     logger.debug(f"Cache updated for {target_date} after reporting outcome for slot {slot_id}.")
+                await self._notify_schedule_update_listeners(target_date, user_id) # Notify for the affected date
             else:
                 logger.warning(f"report_activity_outcome: No changes made to schedule for slot {slot_id} on {target_date}.")
 
@@ -758,5 +781,147 @@ class ChronosEngine:
             self._todays_schedule_cache[user_id] = final_schedule_for_day
             self._cache_date = current_date_val
             logger.info(f"Integrated spontaneous slot {new_spontaneous_slot.id} into schedule for {current_date_val} and saved.")
+            await self._notify_schedule_update_listeners(current_date_val, user_id) # Notify
 
         return new_spontaneous_slot
+
+    # Listener Management Methods
+    def register_schedule_update_listener(self, listener: ScheduleUpdateListener):
+        """Registers a listener for schedule updates."""
+        if listener not in self._schedule_update_listeners:
+            self._schedule_update_listeners.append(listener)
+            logger.info(f"Registered schedule update listener: {getattr(listener, '__name__', str(listener))}")
+        else:
+            logger.debug(f"Listener already registered: {getattr(listener, '__name__', str(listener))}")
+
+    def unregister_schedule_update_listener(self, listener: ScheduleUpdateListener):
+        """Unregisters a listener for schedule updates."""
+        try:
+            self._schedule_update_listeners.remove(listener)
+            logger.info(f"Unregistered schedule update listener: {getattr(listener, '__name__', str(listener))}")
+        except ValueError:
+            logger.debug(f"Attempted to unregister listener not found: {getattr(listener, '__name__', str(listener))}")
+
+    async def _notify_schedule_update_listeners(self, affected_date: date, user_id: str):
+        """Notifies all registered listeners about a schedule update for a given date and user."""
+        if not self._schedule_update_listeners:
+            return
+
+        logger.info(f"Notifying {len(self._schedule_update_listeners)} listeners of schedule update for date: {affected_date}, user: {user_id}")
+        # Iterate over a copy in case a listener tries to unregister itself during notification
+        for listener in list(self._schedule_update_listeners):
+            try:
+                await listener(affected_date, user_id)
+            except Exception as e:
+                logger.error(f"Error in schedule update listener {getattr(listener, '__name__', str(listener))}: {e}", exc_info=True)
+
+if __name__ == '__main__':
+    import unittest.mock
+
+    # Setup basic logging for the test
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger_main = logging.getLogger("chronos_engine_main_test")
+
+    # Mock dependencies
+    class MockEthosConfig(TypedDict, total=False): # For EthosConfig type hint
+        pathos_home_timezone: str
+        scheduler_llm_role: str
+
+    class MockConfig:
+        ETHOS: MockEthosConfig = {"pathos_home_timezone": "UTC", "scheduler_llm_role": "LOGOS_TECHNE"} # type: ignore
+        def get_ethos_config(self) -> MockEthosConfig: return self.ETHOS
+        def get_llm_config(self, role: str) -> Optional[Dict[str, Any]]:
+            if role == "LOGOS_TECHNE": return {"url": "mock_url", "model": "mock_model"}
+            return None
+
+    MockMemoryStorage = unittest.mock.AsyncMock(spec=MemoryStorage)
+    MockEthosCore = unittest.mock.AsyncMock(spec='eidos_agent.persona_logic.ethos_core.core.EthosCore')
+    MockLogosCore = unittest.mock.AsyncMock(spec='eidos_agent.persona_logic.logos_core.handler.LogosCore')
+
+    mock_config_instance = MockConfig()
+    mock_memory_storage_instance = MockMemoryStorage()
+    mock_ethos_core_instance = MockEthosCore()
+    mock_ethos_core_instance.ethos_config = mock_config_instance.ETHOS # Ensure ethos_config is set on mock_ethos
+    mock_logos_core_instance = MockLogosCore()
+
+
+    async def main_test_runner():
+        logger_main.info("--- Testing ChronosEngine ---")
+
+        chronos_engine_test = ChronosEngine(
+            config=mock_config_instance, # type: ignore
+            memory_storage=mock_memory_storage_instance,
+            ethos_core=mock_ethos_core_instance,
+            logos_core=mock_logos_core_instance
+        )
+
+        # Test listener registration and notification
+        logger_main.info("\n--- Testing Listener Registration and Notification ---")
+        test_listener_called_event = asyncio.Event()
+        test_listener_call_args = None
+
+        async def mock_listener(affected_date_arg: date, user_id_arg: str):
+            nonlocal test_listener_call_args # Allow modification of outer scope variable
+            logger_main.info(f"Mock listener CALLED for date: {affected_date_arg}, user: {user_id_arg}")
+            test_listener_call_args = (affected_date_arg, user_id_arg)
+            test_listener_called_event.set()
+
+        chronos_engine_test.register_schedule_update_listener(mock_listener)
+        assert mock_listener in chronos_engine_test._schedule_update_listeners
+        logger_main.info("Mock listener registered.")
+
+        test_notification_date = date(2024, 5, 5)
+        test_notification_user = "test_user_for_notify"
+
+        logger_main.info(f"Calling _notify_schedule_update_listeners for {test_notification_date}, user {test_notification_user}...")
+        await chronos_engine_test._notify_schedule_update_listeners(test_notification_date, test_notification_user)
+
+        try:
+            await asyncio.wait_for(test_listener_called_event.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            assert False, "Mock listener was not called after notification within timeout."
+
+        assert test_listener_call_args is not None, "test_listener_call_args was not set."
+        assert test_listener_call_args[0] == test_notification_date, f"Listener called with wrong date: {test_listener_call_args[0]}"
+        assert test_listener_call_args[1] == test_notification_user, f"Listener called with wrong user_id: {test_listener_call_args[1]}"
+        logger_main.info("Listener registration and direct notification test passed.")
+
+        chronos_engine_test.unregister_schedule_update_listener(mock_listener)
+        assert mock_listener not in chronos_engine_test._schedule_update_listeners
+        logger_main.info("Mock listener unregistered.")
+
+        # Example of testing a method that triggers notification (simplified)
+        # This requires more setup of the mock_memory_storage_instance for save_schedule_to_db
+        logger_main.info("\n--- Testing Notification via generate_schedule_for_date (Simplified) ---")
+        test_listener_called_event.clear() # Reset event
+        test_listener_call_args = None
+        chronos_engine_test.register_schedule_update_listener(mock_listener)
+
+        test_gen_date = date(2024, 1, 15)
+        # Mock the save_schedule_to_db to simulate success
+        mock_memory_storage_instance.save_schedule_to_db = unittest.mock.MagicMock() # Synchronous mock for to_thread
+
+        # Mock generate_activity_for_slot to return a basic slot to make new_schedule non-empty
+        async def mock_gen_activity(*args, **kwargs):
+            return ActivitySlot(user_id=PATHOS_USER_ID, date=test_gen_date, start_time=time(9,0), end_time=time(10,0), slot_name="Test Slot", activity_title="Mocked Activity", activity_type="work", activity_details=ActivitySlotDetails(description="Mocked details"))
+
+        original_gen_activity = chronos_engine_test.generate_activity_for_slot
+        chronos_engine_test.generate_activity_for_slot = mock_gen_activity
+
+        await chronos_engine_test.generate_schedule_for_date(test_gen_date)
+
+        # Restore original method
+        chronos_engine_test.generate_activity_for_slot = original_gen_activity
+
+        try:
+            await asyncio.wait_for(test_listener_called_event.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            assert False, "Mock listener was not called after generate_schedule_for_date within timeout."
+        assert test_listener_call_args == (test_gen_date, PATHOS_USER_ID)
+        logger_main.info("Notification via generate_schedule_for_date test passed.")
+        chronos_engine_test.unregister_schedule_update_listener(mock_listener)
+
+
+        logger_main.info("\n--- ChronosEngine tests finished ---")
+
+    asyncio.run(main_test_runner())

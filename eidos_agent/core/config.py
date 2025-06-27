@@ -58,6 +58,12 @@ class EthosConfig(TypedDict, total=False):
     proactive_topic_chance: float
     proactive_briefing_chance: float
     proactive_queued_point_chance: float
+    proactive_greeting_enabled: Optional[bool]
+    proactive_offer_queued_topic_enabled: Optional[bool]
+    proactive_curiosity_comment_enabled: Optional[bool]
+    proactive_curiosity_chance: Optional[float]
+    proactive_curiosity_hexus_threshold: Optional[float]
+    proactive_curiosity_interval_hours: Optional[float]
     enable_memory_summarization: bool
     summarization_llm_role: str
     interaction_log_analysis_llm_role: str
@@ -105,6 +111,7 @@ class EthosConfig(TypedDict, total=False):
     forgetting_core_memory_types_json: str # Existing
     forgetting_extremely_low_salience_for_core: float # Existing
     retrieval_min_salience_for_pathos_context: float
+    persona_traits_file_path: Optional[str] # New key
 
 
 
@@ -243,18 +250,7 @@ class Config:
             "frequency_penalty": float(os.getenv("LLM_LOGOS_TECHNE_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_TECHNE_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_TECHNE_TIKTOKEN_NAME", "cl100k_base") # Added
         },
-        "LOGOS_VISION_CONTEXT": { # Kept for potential dedicated image description tool
-            "url": os.getenv("LLM_LOGOS_VISION_URL"),
-            "model": os.getenv("LLM_LOGOS_VISION_MODEL"),
-            "api_key": os.getenv("LLM_LOGOS_VISION_API_KEY", "lm-studio"),
-            "temperature": float(os.getenv("LLM_LOGOS_VISION_TEMP", 0.2)),
-            "timeout": float(os.getenv("LLM_LOGOS_VISION_TIMEOUT", 10.0)),  # Reduced from 60.0 to 10.0 for faster startup
-            "max_tokens": int(os.getenv("LLM_LOGOS_VISION_MAX_TOKENS", 1024)),
-            "top_p": float(os.getenv("LLM_LOGOS_VISION_TOP_P", 0.95)) if os.getenv("LLM_LOGOS_VISION_TOP_P") else None,
-            "presence_penalty": float(os.getenv("LLM_LOGOS_VISION_PRESENCE_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_VISION_PRESENCE_PENALTY") else None,
-            "frequency_penalty": float(os.getenv("LLM_LOGOS_VISION_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_VISION_FREQUENCY_PENALTY") else None,
-            "model_name_for_tiktoken": os.getenv("LLM_LOGOS_VISION_TIKTOKEN_NAME", "cl100k_base") # Added
-        },
+        # "LOGOS_VISION_CONTEXT" entry removed
         "LOGOS_DEEP_RESEARCH": {
             "url": os.getenv("LLM_LOGOS_RESEARCH_URL"),
             "model": os.getenv("LLM_LOGOS_RESEARCH_MODEL"),
@@ -267,11 +263,26 @@ class Config:
             "frequency_penalty": float(os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY", 0.0)) if os.getenv("LLM_LOGOS_RESEARCH_FREQUENCY_PENALTY") else None,
             "model_name_for_tiktoken": os.getenv("LLM_LOGOS_RESEARCH_TIKTOKEN_NAME", "cl100k_base") # Added
         },
-        "FIRMAMENT_STATUS_CLASSIFIER": { # Added for Firmament
-            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_LOGOS_TECHNE_URL", "http://localhost:1234/v1")), # Default to LOGOS_TECHNE URL
-            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_LOGOS_TECHNE_MODEL")), # Default to LOGOS_TECHNE MODEL
-            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_LOGOS_TECHNE_API_KEY", "lm-studio")), # Default to LOGOS_TECHNE API Key
-            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.3)),
+
+        # New dedicated LLM role for Firmament's general use
+        "FIRMAMENT_PRIMARY": {
+            "url": os.getenv("LLM_FIRMAMENT_PRIMARY_URL", "http://localhost:1234/v1"), # Sensible default if often local
+            "model": os.getenv("LLM_FIRMAMENT_PRIMARY_MODEL"), # Allow specific model for Firmament
+            "api_key": os.getenv("LLM_FIRMAMENT_PRIMARY_API_KEY", "ollama"), # Default to common local key if any
+            "temperature": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TEMP", 0.6)), # Slightly different temp
+            "timeout": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TIMEOUT", 15.0)), # Potentially longer timeout
+            "max_tokens": int(os.getenv("LLM_FIRMAMENT_PRIMARY_MAX_TOKENS", 1536)), # Different token limit
+            "top_p": float(os.getenv("LLM_FIRMAMENT_PRIMARY_TOP_P", 0.9)) if os.getenv("LLM_FIRMAMENT_PRIMARY_TOP_P") else None,
+            "presence_penalty": float(os.getenv("LLM_FIRMAMENT_PRIMARY_PRESENCE_PENALTY", 0.1)) if os.getenv("LLM_FIRMAMENT_PRIMARY_PRESENCE_PENALTY") else None,
+            "frequency_penalty": float(os.getenv("LLM_FIRMAMENT_PRIMARY_FREQUENCY_PENALTY", 0.1)) if os.getenv("LLM_FIRMAMENT_PRIMARY_FREQUENCY_PENALTY") else None,
+            "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_PRIMARY_TIKTOKEN_NAME", "cl100k_base")
+        },
+
+        "FIRMAMENT_STATUS_CLASSIFIER": { # This existing Firmament-related role can remain, or also use dedicated vars
+            "url": os.getenv("LLM_FIRMAMENT_CLASSIFIER_URL", os.getenv("LLM_FIRMAMENT_PRIMARY_URL", "http://localhost:1234/v1")),
+            "model": os.getenv("LLM_FIRMAMENT_CLASSIFIER_MODEL", os.getenv("LLM_FIRMAMENT_PRIMARY_MODEL")),
+            "api_key": os.getenv("LLM_FIRMAMENT_CLASSIFIER_API_KEY", os.getenv("LLM_FIRMAMENT_PRIMARY_API_KEY", "ollama")),
+            "temperature": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TEMP", 0.2)), # Lower temp for classification
             "timeout": float(os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIMEOUT", 10.0)),
             "max_tokens": int(os.getenv("LLM_FIRMAMENT_CLASSIFIER_MAX_TOKENS", 256)),
             "model_name_for_tiktoken": os.getenv("LLM_FIRMAMENT_CLASSIFIER_TIKTOKEN_NAME", "cl100k_base")
@@ -280,7 +291,7 @@ class Config:
 
     ENABLE_AISTHESIS = os.getenv("ENABLE_AISTHESIS", "False").lower() == "true"
     ENABLE_AMBIENT_AUDIO = os.getenv("ENABLE_AMBIENT_AUDIO", "False").lower() == "true"
-    ENABLE_VISION_PROCESSING = os.getenv("ENABLE_VISION_PROCESSING", "False").lower() == "true"
+    # ENABLE_VISION_PROCESSING line removed
     ENABLE_DAILY_CONTEXT = os.getenv("ENABLE_DAILY_CONTEXT", "True").lower() == "true"
     ENABLE_ONEIROS = os.getenv("ENABLE_ONEIROS", "True").lower() == "true"
     ENABLE_PROACTIVE_BEHAVIOR = os.getenv("ENABLE_PROACTIVE_BEHAVIOR", "True").lower() == "true"
@@ -322,6 +333,12 @@ class Config:
         "proactive_topic_chance": float(os.getenv("ETHOS_PROACTIVE_TOPIC_CHANCE", 0.2)),
         "proactive_briefing_chance": float(os.getenv("ETHOS_PROACTIVE_BRIEFING_CHANCE", 0.4)),
         "proactive_queued_point_chance": float(os.getenv("ETHOS_PROACTIVE_QUEUED_POINT_CHANCE", 0.5)),
+        "proactive_greeting_enabled": os.getenv("ETHOS_PROACTIVE_GREETING_ENABLED", "True").lower() == "true",
+        "proactive_offer_queued_topic_enabled": os.getenv("ETHOS_PROACTIVE_OFFER_TOPIC_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_comment_enabled": os.getenv("ETHOS_PROACTIVE_CURIOSITY_ENABLED", "True").lower() == "true",
+        "proactive_curiosity_chance": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_CHANCE", 0.1)),
+        "proactive_curiosity_hexus_threshold": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_HEXUS_THRESHOLD", 0.65)),
+        "proactive_curiosity_interval_hours": float(os.getenv("ETHOS_PROACTIVE_CURIOSITY_INTERVAL_HOURS", 6.0)),
         "enable_memory_summarization": os.getenv("ETHOS_ENABLE_MEMORY_SUMMARIZATION", "True").lower() == "true",
         "summarization_llm_role": os.getenv("ETHOS_SUMMARIZATION_LLM_ROLE", "LOGOS_TECHNE"),
         "summarization_cluster_min_memories": int(os.getenv("ETHOS_SUMMARIZATION_CLUSTER_MIN_MEMORIES", 5)),
@@ -369,6 +386,7 @@ class Config:
         "forgetting_core_memory_types_json": os.getenv("ETHOS_FORGETTING_CORE_MEMORY_TYPES_JSON", '["persona_directive", "user_fact", "aspiration", "reflection_insight", "learned_correction"]'), # Updated default
         "forgetting_extremely_low_salience_for_core": float(os.getenv("ETHOS_FORGETTING_EXTREMELY_LOW_SALIENCE_CORE", "0.01")), # Existing
         "retrieval_min_salience_for_pathos_context": float(os.getenv("ETHOS_RETRIEVAL_MIN_SALIENCE_PATHOS", "0.1")),
+        "persona_traits_file_path": str(PROJECT_ROOT / "persona" / "pathos_traits.json")
     }
 
     HOME_ASSISTANT: Optional[HomeAssistantConfig] = None
@@ -569,7 +587,8 @@ class Config:
 
     FIRMAMENT: FirmamentModuleConfig = { # Default Firmament config
         "enable_firmament": os.getenv("FIRMAMENT_ENABLE", "True").lower() == "true", # Changed default to "True"
-        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "LOGOS_TECHNE"),
+        # IMPORTANT CHANGE HERE: Default firmament_llm_role to the new dedicated role
+        "firmament_llm_role": os.getenv("FIRMAMENT_LLM_ROLE", "FIRMAMENT_PRIMARY"),
         "intention_based_activity_duration_minutes": int(os.getenv("FIRMAMENT_INTENTION_ACTIVITY_DURATION_MINUTES", "15")),
         "intention_based_activity_type": os.getenv("FIRMAMENT_INTENTION_ACTIVITY_TYPE", "reflective"),
         "enable_llm_status_classification": os.getenv("FIRMAMENT_ENABLE_LLM_STATUS_CLASSIFICATION", "True").lower() == "true",
@@ -617,7 +636,7 @@ class Config:
         if Config.ONEIROS.get("enable_image_dreams"): Path(Config.ONEIROS["image_output_dir"]).mkdir(parents=True, exist_ok=True)
         
         required_llm_roles = ["PATHOS", "LOGOS_TECHNE"]
-        if Config.ENABLE_VISION_PROCESSING: required_llm_roles.append("LOGOS_VISION_CONTEXT")
+        # Line for LOGOS_VISION_CONTEXT based on ENABLE_VISION_PROCESSING removed
         if Config.LLM.get("LOGOS_DEEP_RESEARCH") and Config.LLM["LOGOS_DEEP_RESEARCH"].get("url"): required_llm_roles.append("LOGOS_DEEP_RESEARCH")
         
         utility_roles_in_ethos = [
