@@ -9,12 +9,12 @@ from collections import defaultdict # For __main__ mock event bus
 try:
     from ..plugin_base import FirmamentPluginBase
     # Assuming EventBus and NPCRegistry types might be needed for hinting in setup
-    # Path from enabled -> plugins -> firmament -> core
-    # Path from enabled -> plugins -> firmament -> npcs
+    # Path from enabled -> plugins -> firmament -> core : ../../core
+    # Path from enabled -> plugins -> firmament -> npcs : ../../npcs
     if TYPE_CHECKING: # pragma: no cover
-        from ....core.event_bus import EventBus
-        from ....npcs.npc_registry import NPCRegistry
-    from ....core.event_types import WORLD_EVENT, THOUGHT_TRIGGER, MOOD_UPDATED
+        from ../../core.event_bus import EventBus
+        from ../../npcs.npc_registry import NPCRegistry
+    from ../../core.event_types import WORLD_EVENT, THOUGHT_TRIGGER, MOOD_UPDATED
 except ImportError: # pragma: no cover
     # This block is primarily for allowing the file to be parsed if imports fail,
     # e.g., when running this file directly without the full package structure in PYTHONPATH.
