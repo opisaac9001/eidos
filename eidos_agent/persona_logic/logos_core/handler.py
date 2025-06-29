@@ -102,7 +102,7 @@ class LogosCore:
             logger.info("LogosCore: News API: DISABLED")
 
         # OpenWeatherMap Service
-        owm_available = self.owm_service is not None and self.owm_service.is_available()
+        owm_available = self.owm_service is not None and self.owm_service.is_available
         # Log warning if OWM service is not available, info otherwise
         if owm_available:
             logger.info("LogosCore: OpenWeatherMap Service: AVAILABLE")
