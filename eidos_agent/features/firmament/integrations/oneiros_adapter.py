@@ -421,64 +421,51 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main_logger = logging.getLogger(__name__ + ".__main__") # Specific logger for main test
 
-    # Basic test setup for OneirosAdapter event handling
-    _test_events_captured_oneiros: List[Dict[str, Any]] = [] # Stores {"type": event_type, "data": data_arg}
-    def capture_event_for_oneiros_test(event_type_captured: str, data_captured: Dict[str, Any]): # Unique name
+    _test_events_captured_oneiros: List[Dict[str, Any]] = []
+    def capture_event_for_oneiros_test(event_type_captured: str, data_captured: Dict[str, Any]):
         main_logger.info(f"    [CaptureOneirosTest] Event: {event_type_captured}, Relevant Data: {str(data_captured.get('content', data_captured.get('reason', data_captured)))[:80]}")
         _test_events_captured_oneiros.append({"type": event_type_captured, "data": data_captured})
 
-    # Mock EventBus for isolated testing of this adapter's event interactions
     class MockEventBusForOneiros(EventBus): # type: ignore
         def __init__(self):
-            self._subscribers: Dict[str, List[Any]] = defaultdict(list) # Initialize subscribers
+            self._subscribers: Dict[str, List[Any]] = defaultdict(list)
             main_logger.info("MockEventBusForOneiros initialized.")
 
-        async def publish_async(self, event_type: str, data: Dict[str, Any]): # Renamed to avoid conflict if sync publish is also used
+        async def publish_async(self, event_type: str, data: Dict[str, Any]):
             main_logger.debug(f"MockEventBusForOneiros: Async Publishing {event_type}...")
-            # Crucially, call the capture function to log what this adapter would publish
-            capture_event_for_oneiros_test(event_type, data) # Assuming capture_event is sync
-
-            # Then, simulate dispatch to actual subscribers that were registered on this mock instance
-            # This is important for testing if the handler *itself* works when an event comes in.
+            capture_event_for_oneiros_test(event_type, data)
             for handler in self._subscribers.get(event_type, []):
                 if asyncio.iscoroutinefunction(handler):
-                    await handler(data) # Await async handlers
+                    await handler(data)
                 else:
-                    handler(data) # Call sync handlers directly
-            for handler in self._subscribers.get("*", []): # Wildcard listeners
-                if asyncio.iscoroutinefunction(handler): # Assuming wildcard handlers could also be async
+                    handler(data)
+            for handler in self._subscribers.get("*", []):
+                if asyncio.iscoroutinefunction(handler):
                     await handler(event_type, data)
                 else:
                     handler(event_type, data)
 
-        # Keep a sync publish if other parts of the system use it, or if EventBus supports both
         def publish(self, event_type: str, data: Dict[str, Any]):
             main_logger.debug(f"MockEventBusForOneiros: Sync Publishing {event_type}...")
             capture_event_for_oneiros_test(event_type, data)
             for handler in self._subscribers.get(event_type, []):
-                if not asyncio.iscoroutinefunction(handler): # Only call sync handlers
+                if not asyncio.iscoroutinefunction(handler):
                     handler(data)
             for handler in self._subscribers.get("*", []):
                  if not asyncio.iscoroutinefunction(handler):
                     handler(event_type, data)
 
-
     async def main_async_test_runner():
-        # Monkey patch EventBus.instance() for this test run
         original_event_bus_instance_method = EventBus.instance # type: ignore
         mock_bus_instance_oneiros = MockEventBusForOneiros() # type: ignore
         EventBus.instance = lambda: mock_bus_instance_oneiros # type: ignore
 
-        # Create an instance of the adapter and register its handlers on the mock bus
-        # Test with and without HTTPClientManager
         main_logger.info("\n--- Testing OneirosAdapter with HTTPClientManager (dummy) ---")
-        dummy_http_client_manager = HTTPClientManager.instance() # Get dummy instance
+        dummy_http_client_manager = HTTPClientManager.instance()
 
-
-        # MockEthosCore for testing purposes. In a real scenario, Firmament would inject this.
-        class MockEthosCoreForOneirosTest(EthosCore): # Inherits from dummy or real EthosCore
+        class MockEthosCoreForOneirosTest(EthosCore):
             def __init__(self):
-                super().__init__(config=None) # Call parent __init__ if necessary
+                super().__init__(config=None)
                 main_logger.info("MockEthosCoreForOneirosTest initialized for testing.")
 
             async def get_memories_for_dream_seeding(self, user_id, lookback_days, limit, memory_types):
@@ -489,14 +476,11 @@ if __name__ == '__main__':
                     {"type": "firmament_activity_log", "content": "Pathos was working on a creative project.", "timestamp": "2023-01-01T14:00:00Z", "salience": 0.5}
                 ]
 
-            def get_current_mood(self) -> Dict[str, Any]: # This is synchronous
+            def get_current_mood(self) -> Dict[str, Any]:
                 main_logger.info("MockEthosCoreForOneirosTest.get_current_mood called.")
                 return {
-                    "valence": 0.5,
-                    "arousal": 0.3,
-                    "name": "content", # Example mood name
-                    "simulation_disabled": False,
-                    "hexus_snapshot": {"joy": 0.6, "stress": 0.1} # Dummy hexus snapshot
+                    "valence": 0.5, "arousal": 0.3, "name": "content",
+                    "simulation_disabled": False, "hexus_snapshot": {"joy": 0.6, "stress": 0.1}
                 }
 
         mock_ethos_core_instance = MockEthosCoreForOneirosTest()
@@ -505,94 +489,72 @@ if __name__ == '__main__':
             http_client_manager=dummy_http_client_manager, # type: ignore
             llm_role_name="FIRMAMENT_PRIMARY",
             oneiros_config={"model_type": "test_llm_enhanced", "allow_basic_fallback": True, "use_llm_if_available": True}
-            # ethos_core is NOT passed in __init__ anymore
         )
-        # Simulate setting ethos_core via a setter (method would need to be added to OneirosAdapter)
-        oneiros_adapter_with_llm.ethos_core = mock_ethos_core_instance # type: ignore # Direct set for test
-        if hasattr(oneiros_adapter_with_llm, 'set_ethos_core'): # If a setter exists
-             # oneiros_adapter_with_llm.set_ethos_core(mock_ethos_core_instance) # type: ignore
-             pass # Call actual setter if it was added
+        oneiros_adapter_with_llm.ethos_core = mock_ethos_core_instance # type: ignore
+        if hasattr(oneiros_adapter_with_llm, 'set_ethos_core'):
+             pass
 
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
-
 
         main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore ---")
         oneiros_adapter_no_llm = OneirosAdapter(
             oneiros_config={"model_type": "test_basic", "allow_basic_fallback": True}
-            # ethos_core is None by default and not set for this test instance
         )
-        # ethos_core will be None for this instance, testing graceful handling
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_no_llm)
 
-
         main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for LLM-enabled instance) ---")
-
-        # This is the data that the `schedule` handler would publish for a sleep block
         sleep_block_trigger_data: Dict[str, Any] = {
-            "reason": "schedule_block_sleep_started", # From schedule.py
-            "block_data": { # This is the 'block_data' passed to generate_dream context
-                "id": "sleep_block_test_001_llm",
-                "name": "REM Sleep Cycle (LLM)",
-                "type": "sleep_rem",
-                "start_time_utc": "2023-01-01T23:00:00Z",
-                "end_time_utc": "2023-01-02T00:00:00Z" # Example duration
+            "reason": "schedule_block_sleep_started",
+            "block_data": {
+                "id": "sleep_block_test_001_llm", "name": "REM Sleep Cycle (LLM)", "type": "sleep_rem",
+                "start_time_utc": "2023-01-01T23:00:00Z", "end_time_utc": "2023-01-02T00:00:00Z"
             },
-            "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat() # From schedule.py
+            "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat()
         }
-
-        # Simulate the EVENT_ONEIROS_START_DREAM event being published on the bus.
-        # This should trigger oneiros_adapter_with_llm.handle_start_dream_request
-        _test_events_captured_oneiros.clear() # Clear events before this test
-        # Use the new async publish method
+        _test_events_captured_oneiros.clear()
         await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data)
 
-        # Verify that handle_start_dream_request (when triggered) published a "dream" memory event
         found_dream_memory_event_llm = False
-    for evt in _test_events_captured_oneiros:
-        if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
-            found_dream_memory_event_llm = True
-            dream_metadata = evt["data"].get("metadata", {}) # type: ignore
-            main_logger.info(f"  Verified dream memory event (LLM instance):")
-            main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
-            main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
-            main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
-            assert dream_metadata.get('sleep_block_id') == "sleep_block_test_001_llm", "Sleep block ID mismatch (LLM)." # type: ignore
-            assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_llm_enhanced" # type: ignore
-            break
-    assert found_dream_memory_event_llm, f"Expected LLM-enabled OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
+        for evt in _test_events_captured_oneiros: # THIS LOOP AND ASSERT WAS DE-DENTED
+            if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
+                found_dream_memory_event_llm = True
+                dream_metadata = evt["data"].get("metadata", {}) # type: ignore
+                main_logger.info(f"  Verified dream memory event (LLM instance):")
+                main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
+                main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
+                main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
+                assert dream_metadata.get('sleep_block_id') == "sleep_block_test_001_llm", "Sleep block ID mismatch (LLM)." # type: ignore
+                assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_llm_enhanced" # type: ignore
+                break
+        assert found_dream_memory_event_llm, f"Expected LLM-enabled OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
 
 
-    main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for basic instance) ---")
-    sleep_block_trigger_data_basic: Dict[str, Any] = {
-        "reason": "schedule_block_sleep_started",
-        "block_data": {
-            "id": "sleep_block_test_002_basic",
-            "name": "Deep Slumber Cycle (Basic)",
-            "type": "sleep_deep",
-        },
-        "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat()
-    }
-    _test_events_captured_oneiros.clear() # Clear events before this test
-    await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data_basic)
+        main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for basic instance) ---")
+        sleep_block_trigger_data_basic: Dict[str, Any] = {
+            "reason": "schedule_block_sleep_started",
+            "block_data": {
+                "id": "sleep_block_test_002_basic", "name": "Deep Slumber Cycle (Basic)", "type": "sleep_deep",
+            },
+            "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat()
+        }
+        _test_events_captured_oneiros.clear()
+        await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data_basic) # THIS IS THE LINE (576 in previous read)
 
-    found_dream_memory_event_basic = False
-    for evt in _test_events_captured_oneiros:
-        if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
-            found_dream_memory_event_basic = True
-            dream_metadata = evt["data"].get("metadata", {}) # type: ignore
-            main_logger.info(f"  Verified dream memory event (Basic instance):")
-            main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
-            main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
-            main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
-            assert dream_metadata.get('sleep_block_id') == "sleep_block_test_002_basic", "Sleep block ID mismatch (Basic)." # type: ignore
-            assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_basic" # type: ignore
-            break
-    assert found_dream_memory_event_basic, f"Expected basic OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
+        found_dream_memory_event_basic = False
+        for evt in _test_events_captured_oneiros: # THIS LOOP AND ASSERT WAS DE-DENTED
+            if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
+                found_dream_memory_event_basic = True
+                dream_metadata = evt["data"].get("metadata", {}) # type: ignore
+                main_logger.info(f"  Verified dream memory event (Basic instance):")
+                main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'") # type: ignore
+                main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}") # type: ignore
+                main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}") # type: ignore
+                assert dream_metadata.get('sleep_block_id') == "sleep_block_test_002_basic", "Sleep block ID mismatch (Basic)." # type: ignore
+                assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_basic" # type: ignore
+                break
+        assert found_dream_memory_event_basic, f"Expected basic OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream)."
 
+        EventBus.instance = original_event_bus_instance_method # type: ignore
+        main_logger.info("\n--- OneirosAdapter event handling testing finished ---")
 
-    # Restore original EventBus class method
-    EventBus.instance = original_event_bus_instance_method # type: ignore
-    main_logger.info("\n--- OneirosAdapter event handling testing finished ---")
-
-if __name__ == '__main__':
     asyncio.run(main_async_test_runner())

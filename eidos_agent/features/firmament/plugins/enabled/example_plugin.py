@@ -12,9 +12,9 @@ try:
     # Path from enabled -> plugins -> firmament -> core : ../../core
     # Path from enabled -> plugins -> firmament -> npcs : ../../npcs
     if TYPE_CHECKING: # pragma: no cover
-        from ../../core.event_bus import EventBus
-        from ../../npcs.npc_registry import NPCRegistry
-    from ../../core.event_types import WORLD_EVENT, THOUGHT_TRIGGER, MOOD_UPDATED
+        from eidos_agent.features.firmament.core.event_bus import EventBus
+        from eidos_agent.features.firmament.npcs.npc_registry import NPCRegistry
+    from eidos_agent.features.firmament.core.event_types import WORLD_EVENT, THOUGHT_TRIGGER, MOOD_UPDATED
 except ImportError: # pragma: no cover
     # This block is primarily for allowing the file to be parsed if imports fail,
     # e.g., when running this file directly without the full package structure in PYTHONPATH.
