@@ -136,7 +136,7 @@ async def lifespan(app_instance: FastAPI):
     global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance, SUBCONSCIOUS_NODE_STATE # Added firmament_module
     # ha_service: Optional[HomeAssistantService] = None # Removed
     owm_service: Optional[OpenWeatherMapService] = None
-    firmament_module: Optional[FirmamentModule] = None # Initialize firmament_module variable
+    # firmament_module: Optional[FirmamentModule] = None # Initialize firmament_module variable # Deprecated
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
         logger.info("Lifespan: Starting core component initialization...")

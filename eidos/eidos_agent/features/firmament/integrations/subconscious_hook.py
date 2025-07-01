@@ -7,8 +7,9 @@ import asyncio # For async def
 
 from typing import List, Dict, Any, Optional
 
-from ..core.event_bus import EventBus
-from ..core.event_types import THOUGHT_TRIGGER, IMPULSE
+# Absolute imports for core components (fixed from relative to resolve "split-brain" issue)
+from eidos_agent.core.event_bus import EventBus
+from eidos_agent.core.event_types import THOUGHT_TRIGGER, IMPULSE
 from datetime import datetime, timezone, timedelta
 
 try:

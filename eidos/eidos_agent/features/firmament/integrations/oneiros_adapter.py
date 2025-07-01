@@ -13,15 +13,14 @@ from typing import Optional, Dict, Any, List, AsyncGenerator, Union
 
 # Attempt to import core Eidos components.
 try:
-    # Ensure these specific imports are present
-    from ...core.config import Config, LLMConfig
-    from ...llm_integrations.llm_client import LLMClient
-    from ...core.http_client_manager import HTTPClientManager
-    # Other existing imports from the try block
-    from ..core.event_bus import EventBus # Assuming EventBus is a firmament core component
-    from ...persona_logic.ethos_core.core import EthosCore # Will be needed for type hints if EthosCore methods are called
-    from ...persona_logic.ethos_core.memory_storage import MemoryEntry
-    from ...persona_logic.chronos_engine import PATHOS_USER_ID
+    # Absolute imports for core components (fixed from relative to resolve "split-brain" issue)
+    from eidos_agent.core.config import Config, LLMConfig
+    from eidos_agent.llm_integrations.llm_client import LLMClient
+    from eidos_agent.core.http_client_manager import HTTPClientManager
+    from eidos_agent.core.event_bus import EventBus # Corrected path for EventBus
+    from eidos_agent.persona_logic.ethos_core.core import EthosCore
+    from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
+    from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
 except ImportError: # pragma: no cover
     print("Warning: OneirosAdapter could not import core Eidos components. Using dummy versions.")
     # Define dummy versions for parsing and basic type hinting
@@ -358,9 +357,9 @@ class OneirosAdapter:
             data (Dict[str, Any]): The event data, expected to contain 'block_data' with details
                                    of the sleep schedule block that triggered the dream.
         """
-        self.logger.info(f"OneirosAdapter: Received {EVENT_ONEIROS_START_DREAM} event.")
+        self.logger.info(f"OneirosAdapter: Entered handle_start_dream_request for {EVENT_ONEIROS_START_DREAM} event.") # MODIFIED
         if data:
-            self.logger.debug(f"  Event Data: {str(data)[:200]}{'...' if len(str(data)) > 200 else ''}")
+            self.logger.debug(f"  Event Data for handle_start_dream_request: {str(data)[:200]}{'...' if len(str(data)) > 200 else ''}") # MODIFIED
 
         # block_data provides context for dream generation (e.g., from the sleep schedule block)
         block_data: Dict[str, Any] = data.get("block_data", {}) # type: ignore
@@ -387,8 +386,9 @@ class OneirosAdapter:
 
         # Publish the dream to memory
         try:
+            self.logger.info(f"OneirosAdapter: About to publish dream to EventBus. Type: {EVENT_MEMORY_WRITE}, Content: {dream_content[:60]}...") # MODIFIED
             EventBus.instance().publish(EVENT_MEMORY_WRITE, memory_payload)
-            self.logger.info(f"OneirosAdapter: Published dream content to memory via '{EVENT_MEMORY_WRITE}'. Dream: '{dream_content[:60]}...'")
+            self.logger.info(f"OneirosAdapter: Successfully published dream content to memory via '{EVENT_MEMORY_WRITE}'. Dream: '{dream_content[:60]}...'") # MODIFIED
         except Exception as e: # pragma: no cover
             self.logger.error(f"OneirosAdapter Error: Failed to publish dream to EventBus. Exception: {e}", exc_info=True)
 
@@ -431,7 +431,16 @@ if __name__ == '__main__':
     class MockEventBusForOneiros(EventBus): # type: ignore
         def __init__(self):
             self._subscribers: Dict[str, List[Any]] = defaultdict(list) # Initialize subscribers
+            self._logger = logging.getLogger(__name__) # Added logger initialization
             main_logger.info("MockEventBusForOneiros initialized.")
+
+        def subscribe(self, event_type: str, handler: Any): # Added subscribe override
+            self._subscribers[event_type].append(handler)
+            self._logger.info(f"MockEventBusForOneiros: Subscribed handler {handler.__name__} to {event_type}")
+
+        def clear_subscribers(self): # Added method to clear subscribers
+            self._subscribers.clear()
+            self._logger.info("MockEventBusForOneiros: All subscribers cleared.")
 
         async def publish_async(self, event_type: str, data: Dict[str, Any]): # Renamed to avoid conflict if sync publish is also used
             main_logger.debug(f"MockEventBusForOneiros: Async Publishing {event_type}...")
@@ -515,17 +524,60 @@ if __name__ == '__main__':
 
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_with_llm)
 
+        # --- Test for LLM-enabled instance ---
+        main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for LLM-enabled instance) ---")
+        # This part of the test uses the handlers registered above (for oneiros_adapter_with_llm)
+        # It's assumed that at this point, only oneiros_adapter_with_llm's handlers are (or should be) active for this test sequence.
+        # However, due to how MockEventBus was structured, both might have been registered if not careful.
+        # The fix to MockEventBus.subscribe and the later clear_subscribers call address this.
 
-        main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore ---")
+        # To be absolutely sure for the LLM test, we could clear and re-register ONLY the LLM adapter's handlers
+        # For now, the issue was that the *basic* test was polluted by the LLM adapter's events.
+
+        sleep_block_trigger_data_llm: Dict[str, Any] = { # Renamed for clarity
+            "reason": "schedule_block_sleep_started",
+            "block_data": {
+                "id": "sleep_block_test_001_llm",
+                "name": "REM Sleep Cycle (LLM)",
+                "type": "sleep_rem",
+                "start_time_utc": "2023-01-01T23:00:00Z",
+                "end_time_utc": "2023-01-02T00:00:00Z"
+            },
+            "trigger_timestamp_utc": datetime.now(timezone.utc).isoformat()
+        }
+        _test_events_captured_oneiros.clear()
+        await mock_bus_instance_oneiros.publish_async(EVENT_ONEIROS_START_DREAM, sleep_block_trigger_data_llm)
+
+        found_dream_memory_event_llm = False
+        # Iterate through captured events to find the one from the LLM adapter.
+        # This might require more specific checks if both adapters' events are still captured.
+        for evt in _test_events_captured_oneiros:
+            if evt["type"] == EVENT_MEMORY_WRITE and evt["data"].get("type") == "dream":
+                dream_metadata = evt["data"].get("metadata", {})
+                # Check if this event is from the LLM adapter based on sleep_block_id
+                if dream_metadata.get('sleep_block_id') == "sleep_block_test_001_llm":
+                    found_dream_memory_event_llm = True
+                    main_logger.info(f"  Verified dream memory event (LLM instance):")
+                    main_logger.info(f"    Dream Content: '{evt['data']['content'][:70]}...'")
+                    main_logger.info(f"    Sleep Block ID: {dream_metadata.get('sleep_block_id')}")
+                    main_logger.info(f"    Config used: {dream_metadata.get('dream_generation_config')}")
+                    assert dream_metadata.get('dream_generation_config', {}).get("model_type") == "test_llm_enhanced"
+                    break # Found the specific event for the LLM test
+        assert found_dream_memory_event_llm, f"Expected LLM-enabled OneirosAdapter to publish '{EVENT_MEMORY_WRITE}' (dream) for its specific trigger."
+
+
+        # --- Test for basic instance (no LLM) ---
+        main_logger.info("\n--- Testing OneirosAdapter without HTTPClientManager or EthosCore (Basic Instance Test) ---")
+        mock_bus_instance_oneiros.clear_subscribers() # Clear handlers from the LLM adapter test
+        _test_events_captured_oneiros.clear() # Clear captured events from previous test run
+
         oneiros_adapter_no_llm = OneirosAdapter(
             oneiros_config={"model_type": "test_basic", "allow_basic_fallback": True}
-            # ethos_core is None by default and not set for this test instance
         )
-        # ethos_core will be None for this instance, testing graceful handling
         register_oneiros_event_handlers(adapter_instance=oneiros_adapter_no_llm)
 
 
-        main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for LLM-enabled instance) ---")
+        main_logger.info("\n--- Testing OneirosAdapter's handle_start_dream_request via Event (for basic instance) ---")
 
         # This is the data that the `schedule` handler would publish for a sleep block
         sleep_block_trigger_data: Dict[str, Any] = {

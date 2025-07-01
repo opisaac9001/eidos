@@ -15,9 +15,11 @@ import os # Ensure os is imported if not already
 from typing import Optional # Added import
 
 if __package__ is None or __package__ == '':
-    # This ensures that when the script is run directly (e.g., python api.py),
-    # the parent directory (which contains the 'subconscious_node' package)
-    # is added to the Python path, allowing absolute imports from subconscious_node.
+    # This block allows the script to be run directly (e.g., `python subconscious_node/api.py`).
+    # It adds the parent directory of `subconscious_node` (i.e., `eidos/`) to `sys.path`.
+    # This enables imports like `from subconscious_node import ...` to work correctly,
+    # assuming `subconscious_node` is a package within that parent directory.
+    # This is primarily for local development or direct execution scenarios.
     parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
