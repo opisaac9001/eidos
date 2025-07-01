@@ -56,8 +56,6 @@ from eidos_agent.persona_logic.chronos_engine import (
 )
 # Updated import for chat_storage_router
 from eidos_agent.api.routers.chat_storage_router import router as chat_storage_router
-from eidos_agent.features.firmament.module import FirmamentModule # Firmament import
-from eidos_agent.features.firmament.handler import set_firmament_module_instance # Firmament handler import
 # Removed chat_storage init import, it's done in lifespan
 from eidos_agent.api.routers.pathos_hooks_router import router as pathos_hooks_router # Renamed to avoid conflict
 from eidos_agent.api.routers.tts_router import router as tts_api_router
@@ -241,18 +239,19 @@ async def lifespan(app_instance: FastAPI):
 
         if ethos_core:
             # Initialize Firmament Module (after EthosCore, ChronosEngine, OneirosModule)
-            if Config.FIRMAMENT.get("enable_firmament") and chronos_engine_instance and oneiros_module:
-                try:
-                    firmament_module = FirmamentModule(Config, ethos_core, chronos_engine_instance, oneiros_module)
-                    await firmament_module.start() # Call start method
-                    set_firmament_module_instance(firmament_module) # Link to handler
-                    ethos_core.set_firmament_module(firmament_module) # Link to EthosCore for background task
-                    logger.info("Lifespan: FirmamentModule initialized, started, and linked.")
-                except Exception as e_firmament:
-                    logger.error(f"Lifespan: Failed to initialize or start FirmamentModule: {e_firmament}", exc_info=True)
-                    firmament_module = None # Ensure it's None if init fails
-            elif Config.FIRMAMENT.get("enable_firmament"):
-                logger.warning("Lifespan: FirmamentModule enabled in config, but dependencies (ChronosEngine or OneirosModule) are missing. Firmament will not be initialized.")
+            # FirmamentModule is deprecated and removed.
+            # if Config.FIRMAMENT.get("enable_firmament") and chronos_engine_instance and oneiros_module:
+            #     try:
+            #         firmament_module = FirmamentModule(Config, ethos_core, chronos_engine_instance, oneiros_module)
+            #         await firmament_module.start() # Call start method
+            #         set_firmament_module_instance(firmament_module) # Link to handler
+            #         ethos_core.set_firmament_module(firmament_module) # Link to EthosCore for background task
+            #         logger.info("Lifespan: FirmamentModule initialized, started, and linked.")
+            #     except Exception as e_firmament:
+            #         logger.error(f"Lifespan: Failed to initialize or start FirmamentModule: {e_firmament}", exc_info=True)
+            #         firmament_module = None # Ensure it's None if init fails
+            # elif Config.FIRMAMENT.get("enable_firmament"):
+            #     logger.warning("Lifespan: FirmamentModule enabled in config, but dependencies (ChronosEngine or OneirosModule) are missing. Firmament will not be initialized.")
 
 
             background_tasks = await ethos_core.get_background_tasks() # EthosCore now potentially adds Firmament task

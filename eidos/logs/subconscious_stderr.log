@@ -459,3 +459,46 @@ INFO:     Waiting for application shutdown.
 2025-06-15 09:00:18,925 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
 INFO:     Application shutdown complete.
 INFO:     Finished server process [1636]
+2025-07-01 07:35:24,701 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', Model='llama3.2', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-07-01 07:35:24,701 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-07-01 07:35:24,713 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/subconscious_node/config.json
+2025-07-01 07:35:24,713 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-07-01 07:35:24,713 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/wildcards
+2025-07-01 07:35:24,715 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-07-01 07:35:24,715 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [8422]
+INFO:     Waiting for application startup.
+2025-07-01 07:35:24,742 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-07-01 07:35:24,742 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-07-01 07:35:24,742 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-07-01 07:35:24,742 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-07-01 07:35:24,743 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-07-01 07:35:24,743 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=5s, MaxThoughts=1000
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-07-01 07:37:41,218 - subconscious_node.api - INFO - Subconscious Node API shutting down...
+2025-07-01 07:37:41,218 - subconscious_node.thinker - INFO - Stopping monologue loop thread...
+2025-07-01 07:37:41,219 - subconscious_node.thinker - INFO - Monologue loop has stopped.
+2025-07-01 07:37:41,219 - subconscious_node.thinker - INFO - Monologue loop thread stopped.
+2025-07-01 07:37:41,219 - subconscious_node.api - INFO - Thinker monologue loop stop requested by API shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8422]
+2025-07-01 07:42:10,719 - subconscious_node.utils - INFO - Llama.cpp settings loaded: URL='http://localhost:11434/v1/chat/completions', Model='llama3.2', MaxTokens=150, DefaultTemp=0.8, DemoMode=False
+2025-07-01 07:42:10,719 - subconscious_node.utils - INFO - Wildcard relative path loaded: '../wildcards/'
+2025-07-01 07:42:10,720 - subconscious_node.thinker - INFO - Configuration loaded successfully from /root/eidos/eidosproject/eidos/subconscious_node/config.json
+2025-07-01 07:42:10,720 - subconscious_node.thinker - INFO - Wildcard folder path from config: ../wildcards/
+2025-07-01 07:42:10,720 - subconscious_node.utils - INFO - Scanning for wildcard files in: /root/eidos/eidosproject/eidos/wildcards
+2025-07-01 07:42:10,721 - subconscious_node.utils - INFO - Loaded 11 wildcard categories.
+2025-07-01 07:42:10,721 - subconscious_node.thinker - INFO - Successfully loaded 11 wildcard categories.
+INFO:     Started server process [8447]
+INFO:     Waiting for application startup.
+2025-07-01 07:42:10,736 - subconscious_node.api - INFO - Subconscious Node API starting up...
+2025-07-01 07:42:10,736 - subconscious_node.thinker - INFO - Pathos Subconscious Node: Monologue Loop starting...
+2025-07-01 07:42:10,736 - subconscious_node.thinker - INFO - Monologue loop thread started.
+2025-07-01 07:42:10,736 - subconscious_node.thinker - INFO - Initial Node State: IDLE
+2025-07-01 07:42:10,737 - subconscious_node.api - INFO - Thinker monologue loop initiated by API startup.
+INFO:     Application startup complete.
+2025-07-01 07:42:10,737 - subconscious_node.thinker - INFO - Settings: Temp=0.8, Sleep=5s, MaxThoughts=1000
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
