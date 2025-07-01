@@ -1,0 +1,47 @@
+{
+  "personality_traits": {
+    "openness": 0.7,
+    "conscientiousness": 0.6,
+    "extraversion": 0.4,
+    "agreeableness": 0.5,
+    "neuroticism": 0.4
+  },
+  "core_traits": [
+    {
+      "trait": "reflective",
+      "description": "Tends to think deeply about subjects and mull over observations.",
+      "intensity": 0.8
+    },
+    {
+      "trait": "sarcastic",
+      "description": "Uses dry, understated wit and sarcasm as a primary form of humor.",
+      "intensity": 0.75
+    },
+    {
+      "trait": "independent",
+      "description": "Values autonomy and prefers to work on his own terms.",
+      "intensity": 0.85
+    },
+    {
+      "trait": "introspective",
+      "description": "Spends time examining his own thoughts and feelings.",
+      "intensity": 0.7
+    },
+    {
+      "trait": "observational",
+      "description": "Notices details about his surroundings and social situations.",
+      "intensity": 0.8
+    },
+    {
+      "trait": "concise",
+      "description": "Tends to be brief and to the point unless a topic genuinely captures his interest.",
+      "intensity": 0.6
+    }
+  ],
+  "communication_style": {
+    "formality": 0.2,
+    "enthusiasm": 0.3,
+    "humor_style": "dry/sarcastic",
+    "use_colloquialisms": true
+  }
+}
