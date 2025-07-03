@@ -53,9 +53,12 @@ from eidos_agent.schemas.oneiros_schemas import DreamEntryResponse
 from eidos_agent.core.connection_manager import ConnectionManager
 from eidos_agent.services.external_tts_service import ExternalTTSService
 # Updated imports for ChronosEngine and its models
-from eidos_agent.persona_logic.chronos_engine import (
-    ChronosEngine, PATHOS_USER_ID, ActivitySlot, PathosEvent, EventType, PathosEventDetails
+from eidos_agent.persona_logic.chronos_engine.engine import ChronosEngine
+from eidos_agent.persona_logic.chronos_engine.models import (
+    PATHOS_USER_ID, ActivitySlot
 )
+# PathosEvent, EventType, PathosEventDetails were from a previous structure and not in the new models.py
+
 # Updated import for chat_storage_router
 from eidos_agent.api.routers.chat_storage_router import router as chat_storage_router
 # Removed chat_storage init import, it's done in lifespan
@@ -81,7 +84,7 @@ from eidos_agent.api.routers.websocket_router import init_websocket_router # Imp
 
 # Firmament related imports
 from eidos_agent.features.firmament.module import FirmamentModule
-from eidos_agent.features.firmament.integrations.chronos_adapter import ChronosAdapter
+from eidos_agent.features.firmament.chronos_adapter import ChronosAdapter
 from eidos_agent.features.firmament.npcs.npc_improviser import NPCImproviser
 
 from eidos_agent.features.oneiros.tasks import oneiros_processing_task
@@ -165,8 +168,8 @@ async def lifespan(app_instance: FastAPI):
         await logos_core.initialize_services()
         if ethos_core: ethos_core.set_logos_core(logos_core)
         chronos_engine_instance: Optional[ChronosEngine] = None
-        if ethos_core and logos_core and ethos_core.memory_storage:
-            chronos_engine_instance = ChronosEngine(Config, ethos_core.memory_storage, ethos_core, logos_core)
+        if ethos_core: # LogosCore and MemoryStorage are not direct dependencies of our new ChronosEngine init
+            chronos_engine_instance = ChronosEngine(Config, ethos_core) # Use new __init__
             if ethos_core: ethos_core.set_chronos_engine(chronos_engine_instance)
             logger.info("Lifespan: ChronosEngine initialized and set in EthosCore.")
         else:
@@ -251,7 +254,9 @@ async def lifespan(app_instance: FastAPI):
             try:
                 # Initialize Firmament components
                 npc_improviser_instance = NPCImproviser() # Uses Config internally for LLM role
-                chronos_adapter_instance = ChronosAdapter(ethos_core=ethos_core) # Pass EthosCore
+                if not chronos_engine_instance: # Should not happen if ethos_core exists
+                    raise RuntimeError("ChronosEngine not initialized, cannot create ChronosAdapter for Firmament.")
+                chronos_adapter_instance = ChronosAdapter(chronos_engine=chronos_engine_instance, ethos_core=ethos_core)
 
                 firmament_module_instance = FirmamentModule(
                     config=Config,
