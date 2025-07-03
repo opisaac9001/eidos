@@ -102,10 +102,51 @@ class PathosInterface:
         self.processed_npc_initiation_ids_this_turn.clear()
         logger.debug("Cleared processed NPC initiation IDs for the current turn.")
 
+    async def _identify_target_npc(self,
+                                 original_user_input: str,
+                                 npc_initiated_info: Optional[Dict[str, str]],
+                                 present_npcs_in_simulation: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Identifies a target NPC based on direct initiation, user input, or presence.
+        Returns the NPC ID if a target is identified, otherwise None.
+        """
+        # 1. Direct NPC Initiation takes highest priority
+        if npc_initiated_info and npc_initiated_info.get('npc_id'):
+            logger.debug(f"_identify_target_npc: Prioritizing directly initiated NPC: {npc_initiated_info.get('npc_name')}")
+            return npc_initiated_info['npc_id']
+
+        # 2. Explicit User Mention
+        if self.firmament_module:
+            known_npcs = self.firmament_module.get_npc_profiles_for_context() # List of {'id': ..., 'name': ...}
+            if known_npcs:
+                for npc_profile in known_npcs:
+                    npc_id = npc_profile.get('id')
+                    npc_name = npc_profile.get('name')
+                    if not npc_id or not npc_name:
+                        continue
+                    # Case-insensitive search for name or ID in user input
+                    if (re.search(r'\b' + re.escape(npc_name) + r'\b', original_user_input, re.IGNORECASE) or
+                        re.search(r'\b' + re.escape(npc_id) + r'\b', original_user_input, re.IGNORECASE)):
+                        logger.debug(f"_identify_target_npc: Found explicit mention of NPC '{npc_name}' (ID: {npc_id}) in user input.")
+                        return npc_id # Return first match for MVP
+
+        # 3. Single NPC Present (and maybe a generic social cue in user input)
+        # This is a weaker heuristic and can be added later if needed.
+        # For now, focusing on direct initiation or explicit mention.
+        # Example: if len(present_npcs_in_simulation) == 1 and any(cue in original_user_input.lower() for cue in ["them", "her", "him"]):
+        #     target_npc_id = present_npcs_in_simulation[0].get('id')
+        #     logger.debug(f"_identify_target_npc: Single NPC '{present_npcs_in_simulation[0].get('name')}' present, and user used pronoun.")
+        #     return target_npc_id
+
+        logger.debug("_identify_target_npc: No specific target NPC identified.")
+        return None
+
     # --- Start of New Orchestration Methods (Stubbed) ---
 
     async def gather_context_for_main_llm(self, user_input: str, conversation_history: List[Dict[str, str]]) -> MainLLMPromptContext:
         """Gathers all necessary context from various modules for the Main Pathos LLM."""
+        # original_user_input is preserved before prepending NPC initiation string
+        original_user_input_for_npc_identification = user_input
         logger.debug(f"Gathering context for user_input: '{user_input[:50]}...'")
 
         current_mood = await self.ethos_core.get_current_mood_state()
@@ -133,43 +174,43 @@ class PathosInterface:
         # Using a placeholder from config for now.
         pathos_user_id = self.config.ETHOS.get("pathos_user_id", "pathos_agent_id") # Fallback needed if not in EthosConfig type
 
-        # Fetch NPC Initiated Dialogue first
-        npc_initiated_dialogue_str = ""
+        npc_initiated_info_for_identification: Optional[Dict[str,str]] = None
+        npc_initiated_dialogue_str_for_prompt = ""
+
         if self.ethos_core:
             try:
-                # Fetch most recent, unaddressed NPC initiation for Pathos
-                # Using get_relevant_memories with specific type and small limit.
-                # This relies on salience/recency; a more robust "unaddressed" flag might be needed later.
                 npc_initiation_mems = await self.ethos_core.get_relevant_memories(
-                    query="", # General query, rely on type and recency
-                    user_id_context=pathos_user_id,
-                    allowed_types=["npc_initiated_dialogue"],
-                    limit=1 # Get the single most recent one
+                    query="", user_id_context=pathos_user_id,
+                    allowed_types=["npc_initiated_dialogue"], limit=1
                 )
                 if npc_initiation_mems:
-                    latest_initiation = npc_initiation_mems[0] # EthosMemory object
+                    latest_initiation = npc_initiation_mems[0]
                     if latest_initiation.memory_id not in self.processed_npc_initiation_ids_this_turn:
                         npc_name = latest_initiation.metadata.get("npc_name", "An NPC")
-                        utterance = latest_initiation.metadata.get("utterance", latest_initiation.content) # Fallback to content
-                        # Reconstruct from content if metadata utterance is not primary
-                        if "said to you:" in latest_initiation.content: # Check if content has the full phrase
-                            utterance = latest_initiation.content.split("said to you: \"", 1)[-1].rstrip("\"")
+                        npc_id = latest_initiation.metadata.get("npc_id", "unknown_npc")
+                        utterance = latest_initiation.metadata.get("utterance", latest_initiation.content)
+                        if "said to you:" in latest_initiation.content:
+                             utterance = latest_initiation.content.split("said to you: \"", 1)[-1].rstrip("\"")
 
                         location = latest_initiation.metadata.get("location", "somewhere")
                         pathos_activity = latest_initiation.metadata.get("pathos_activity_at_time", "doing something")
 
-                        npc_initiated_dialogue_str = f"[At {location}, while you were {pathos_activity}, {npc_name} said to you: \"{utterance}\"]\n"
+                        # Format for prompt, including NPC ID for the main LLM
+                        npc_initiated_dialogue_str_for_prompt = f"[NPC Event: {npc_name} (ID: {npc_id}) at {location} said to you while you were {pathos_activity}: \"{utterance}\"]\n"
                         self.processed_npc_initiation_ids_this_turn.add(latest_initiation.memory_id)
-                        logger.info(f"Presenting NPC initiation (ID: {latest_initiation.memory_id}) to Pathos: {npc_initiated_dialogue_str[:100]}...")
+                        npc_initiated_info_for_identification = {"npc_id": npc_id, "npc_name": npc_name} # For _identify_target_npc
+                        logger.info(f"Presenting NPC initiation (ID: {latest_initiation.memory_id}) to Pathos: {npc_initiated_dialogue_str_for_prompt[:100]}...")
             except Exception as e_npc_init:
-                logger.error(f"Error fetching or formatting NPC initiated dialogue: {e_npc_init}", exc_info=True)
+                logger.error(f"Error fetching/formatting NPC initiated dialogue: {e_npc_init}", exc_info=True)
 
-        # Prepend NPC initiation to user_input if present
-        effective_user_input = npc_initiated_dialogue_str + user_input
+        effective_user_input_for_general_memories = npc_initiated_dialogue_str_for_prompt + original_user_input_for_npc_identification
 
         current_mood_data = await self.ethos_core.get_current_mood_state()
-        # Fetch other relevant memories based on the combined input
-        recent_memories_data = await self.ethos_core.get_relevant_memories(query=effective_user_input, user_id_context=self.current_active_user_id, limit=self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS or 5)
+        general_recent_memories_data = await self.ethos_core.get_relevant_memories(
+            query=effective_user_input_for_general_memories,
+            user_id_context=self.current_active_user_id,
+            limit=self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS or 5
+        )
         persona_profile_data = await self.ethos_core.get_persona_profile()
         current_activity_data = await self.chronos_engine.get_current_activity_for_user(user_id=pathos_user_id)
 
@@ -185,11 +226,51 @@ class PathosInterface:
             except Exception as e_sub:
                 logger.warning(f"Failed to get thoughts from subconscious_node_client: {e_sub}")
 
+        # Now, identify target NPC and fetch specific memories for them
+        all_recent_memories = general_recent_memories_data if general_recent_memories_data else []
+
+        present_npcs_for_identification = simulation_context_data.present_npcs if simulation_context_data else []
+        # Convert Pydantic NPCProfile models to simple dicts for _identify_target_npc if it expects that
+        present_npcs_dicts = [npc.model_dump(include={'id', 'name'}) for npc in present_npcs_for_identification]
+
+
+        target_npc_id = await self._identify_target_npc(
+            original_user_input=original_user_input_for_npc_identification, # Use original input for name matching
+            npc_initiated_info=npc_initiated_info_for_identification, # Info from any NPC who just spoke
+            present_npcs_in_simulation=present_npcs_dicts
+        )
+
+        if target_npc_id and self.ethos_core:
+            try:
+                npc_profile_for_query = self.firmament_module.npc_registry.get_npc_by_id(target_npc_id) if self.firmament_module else None
+                npc_name_for_query = npc_profile_for_query.get("name") if npc_profile_for_query else target_npc_id
+
+                logger.debug(f"Target NPC identified: {npc_name_for_query} (ID: {target_npc_id}). Fetching specific memories.")
+                npc_specific_memories = await self.ethos_core.get_relevant_memories(
+                    query=f"interactions with {npc_name_for_query} or facts about {npc_name_for_query}",
+                    user_id_context=pathos_user_id,
+                    allowed_types=["npc_dialogue_event", "user_fact_about_npc"], # Define 'user_fact_about_npc' if used
+                    limit=2 # Fetch 2 most relevant specific memories for this NPC
+                )
+                if npc_specific_memories:
+                    logger.info(f"Fetched {len(npc_specific_memories)} specific memories for NPC {npc_name_for_query}.")
+                    # Add to all_recent_memories, ensuring no duplicates if get_relevant_memories might overlap
+                    existing_mem_ids = {mem.memory_id for mem in all_recent_memories}
+                    for npc_mem in npc_specific_memories:
+                        if npc_mem.memory_id not in existing_mem_ids:
+                            all_recent_memories.append(npc_mem)
+                            existing_mem_ids.add(npc_mem.memory_id)
+                    # Re-sort or prioritize if needed, for now just appending.
+                    # PromptBuilder will handle snippetizing.
+            except Exception as e_npc_mem:
+                logger.error(f"Error fetching specific memories for NPC {target_npc_id}: {e_npc_mem}", exc_info=True)
+
+
         return MainLLMPromptContext(
-            user_input=user_input,
+            user_input=effective_user_input_for_general_memories, # This now includes NPC initiation string
             conversation_history=conversation_history,
             current_mood=current_mood_data.model_dump() if current_mood_data else None,
-            recent_memories=[mem.model_dump() for mem in recent_memories_data] if recent_memories_data else [],
+            recent_memories=[mem.model_dump() for mem in all_recent_memories] if all_recent_memories else [],
             persona_profile=persona_profile_data.model_dump() if persona_profile_data else None,
             current_activity=current_activity_data.model_dump() if current_activity_data else None,
             simulation_context=simulation_context_data.model_dump() if simulation_context_data else None,
