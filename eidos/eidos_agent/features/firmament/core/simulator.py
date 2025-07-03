@@ -127,6 +127,13 @@ def set_chronos_adapter_for_simulator(adapter: ChronosAdapter): # New setter for
     _chronos_adapter_instance = adapter
     logger.info(f"Simulator: ChronosAdapter instance set. {_chronos_adapter_instance is not None}")
 
+_npc_controller_instance: Optional[Any] = None # Forward declare for NPCController, type hint later if possible
+
+def set_npc_controller_for_simulator(controller): # Controller type hint can be 'NPCController'
+    global _npc_controller_instance
+    _npc_controller_instance = controller
+    logger.info(f"Simulator: NPCController instance set. {_npc_controller_instance is not None}")
+
 # Helper function to map activity type to Hexus event string
 def _get_hexus_event_from_activity(activity_block: Dict[str, Any]) -> Optional[str]:
     activity_type_str = activity_block.get('activity_type')
@@ -291,18 +298,54 @@ async def run_simulation_tick():
     else: # pragma: no cover
         logger.warning("Simulator: maybe_trigger_random_event is not callable.")
 
-    # --- Placeholder for NPC Interaction Trigger ---
-    if _current_active_block_data:
+    # --- NPC Interaction Opportunity Assessment ---
+    if _current_active_block_data and _npc_controller_instance:
         activity_type_for_npc_check = _current_active_block_data.get('activity_type')
         npc_hints = _current_active_block_data.get('specific_npc_hints')
-        # Compare with enum value
-        if activity_type_for_npc_check == ChronosActivityTypeEnum.SOCIAL.value or \
-           (isinstance(npc_hints, list) and npc_hints):
-            active_block_title_for_npc_log = _current_active_block_data.get('activity_title', 'Unknown Activity')
-            logger.info(f"Activity '{active_block_title_for_npc_log}' suggests potential NPC interaction. Placeholder for detailed NPC handling.")
-            # Future: Call a method in FirmamentModule or an NPCController here
+        location_hint = _current_active_block_data.get('location_hint')
+        should_assess_npc_interaction = False
+
+        if activity_type_for_npc_check == ChronosActivityTypeEnum.SOCIAL.value:
+            should_assess_npc_interaction = True
+        elif isinstance(npc_hints, list) and npc_hints:
+            should_assess_npc_interaction = True
+        # Could add other conditions, e.g., random chance during LEISURE_ACTIVE in populated areas
+
+        if should_assess_npc_interaction and location_hint:
+            active_npcs_in_location = []
+            try:
+                # NPCRegistry is a singleton, can be accessed if NPC_SYSTEM_AVAILABLE
+                if NPC_SYSTEM_AVAILABLE:
+                    registry = NPCRegistry.instance()
+                    # Assuming get_npcs_in_location is a method in NPCRegistry
+                    # This method might not exist yet or have a different signature.
+                    # For now, let's assume it's a simple list of NPC profile dicts.
+                    if hasattr(registry, 'get_npcs_in_location'):
+                        active_npcs_in_location = registry.get_npcs_in_location(location_hint)
+                    else: # Fallback: get all NPCs and filter by a potential 'current_location' field
+                        all_npcs = registry.get_all_npcs() # List[Dict[str, Any]]
+                        active_npcs_in_location = [
+                            npc for npc in all_npcs
+                            if npc.get('current_location') == location_hint or npc.get('home_location') == location_hint
+                        ]
+                    logger.debug(f"Simulator: Found {len(active_npcs_in_location)} NPCs at '{location_hint}' for interaction assessment.")
+                else:
+                    logger.warning("Simulator: NPC_SYSTEM_AVAILABLE is False, cannot fetch NPCs for interaction assessment.")
+
+                # Call NPCController to assess the opportunity
+                await _npc_controller_instance.assess_interaction_opportunity(
+                    current_block_data=_current_active_block_data,
+                    active_npcs_in_location=active_npcs_in_location
+                )
+            except Exception as e_npc_assess:
+                logger.error(f"Error during NPC interaction assessment: {e_npc_assess}", exc_info=True)
+    elif _current_active_block_data and not _npc_controller_instance:
+        logger.warning("Simulator: NPCController instance not set. Skipping NPC interaction opportunity assessment.")
+
 
     # --- NPC Improvisation from Subconscious (EXISTING) ---
+    # This existing logic might also benefit from NPCController in the future,
+    # but for now, we keep it as is, as it handles NPC *creation* primarily.
     if NPC_SYSTEM_AVAILABLE:
         try:
             if not _npc_improviser_instance:

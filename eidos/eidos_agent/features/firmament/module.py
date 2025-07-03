@@ -10,17 +10,21 @@ from ...core.config import Config
 from .core import simulator
 # Assuming ChronosAdapter, NPCImproviser might be directly under integrations and npcs respectively
 # These paths might need adjustment based on actual file locations if they are deeper.
-from .integrations.chronos_adapter import ChronosAdapter
+from ..chronos_adapter import ChronosAdapter # Corrected path
 from .npcs.npc_improviser import NPCImproviser
+from .npcs.npc_controller import NPCController # Import NPCController
+from .npcs.npc_registry import NPCRegistry # Import NPCRegistry to get instance
 
 # Import the global accessor for the plugin manager if needed for start/close
 from . import get_plugin_manager, get_http_client_manager
 
 if TYPE_CHECKING:
     from ...persona_logic.ethos_core.core import EthosCore
-    # from .core.event_bus import EventBus # EventBus is likely a singleton via EventBus.instance()
-    # from .npcs.npc_registry import NPCRegistry # NPCRegistry is likely a singleton via NPCRegistry.instance()
-    # from .plugins.manager import PluginManager # Accessed via get_plugin_manager()
+    from ...llm_integrations.llm_client import LLMClient # For type hinting
+    from ....schemas.firmament_schemas import SimulationContext, NPCInteractionInput, NPCInteractionOutput, NPCProfile # Schemas
+    from ....schemas.llm_schemas import LLMResponsePayload # For process_pathos_utterance_to_npc
+    import uuid # For process_pathos_utterance_to_npc if creating default NPCProfile
+    from typing import List # For List[NPCProfile] type hint in get_current_simulation_context
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +36,8 @@ class FirmamentModule:
                  config: Config,
                  ethos_core: 'EthosCore',
                  chronos_adapter: ChronosAdapter,
-                 npc_improviser: NPCImproviser):
+                 npc_improviser: NPCImproviser,
+                 llm_client: 'LLMClient'): # Added llm_client
         """
         Initializes the FirmamentModule.
 
@@ -41,24 +46,49 @@ class FirmamentModule:
             ethos_core: Instance of EthosCore for persona and memory access.
             chronos_adapter: Instance of ChronosAdapter for schedule information.
             npc_improviser: Instance of NPCImproviser for generating NPCs.
+            llm_client: Instance of LLMClient for making LLM calls.
         """
         self.config = config
-        self.firmament_config = config.get_firmament_module_config() # Assuming this method exists in Config
+        self.firmament_config = config.get_firmament_module_config()
         self.ethos_core = ethos_core
         self.chronos_adapter = chronos_adapter
         self.npc_improviser = npc_improviser
+        self.llm_client = llm_client # Store llm_client
+        self.npc_registry = NPCRegistry.instance() # Get NPCRegistry instance
 
         logger.info("FirmamentModule initializing...")
 
+        # Instantiate NPCController
+        self.npc_controller = NPCController(
+            firmament_module=self,
+            npc_registry=self.npc_registry,
+            npc_improviser=self.npc_improviser,
+            ethos_core=self.ethos_core,
+            llm_client=self.llm_client
+        )
+        logger.info("NPCController instantiated in FirmamentModule.")
+
         # Wire up dependencies for the simulator functions
-        # These functions in simulator.py expect the instances to be set globally within their module.
         simulator.set_ethos_core_for_simulator(self.ethos_core)
         simulator.set_chronos_adapter_for_simulator(self.chronos_adapter)
-        simulator.set_npc_improviser_for_simulator(self.npc_improviser) # Used by simulator's NPC improvisation from thought
+        simulator.set_npc_improviser_for_simulator(self.npc_improviser)
+        # No direct setter for NPCController in simulator.py in current plan;
+        # simulator calls FirmamentModule if it needs controller actions, or FM calls controller.
+        # Let's assume simulator's interaction opportunity assessment will now be handled by FirmamentModule itself
+        # after simulator.run_simulation_tick, or simulator directly calls NPCController if set.
+        # Plan step 3 for simulator.py mentioned simulator calling NPCController.
+        # So, we need a setter for NPCController in simulator.py.
+        # For now, assuming simulator.py will be updated to have set_npc_controller.
+        if hasattr(simulator, 'set_npc_controller_for_simulator'): # Check if setter exists
+            simulator.set_npc_controller_for_simulator(self.npc_controller)
+            logger.info("NPCController injected into simulator.")
+        else:
+            logger.warning("NPCController setter not found in simulator.py. Interaction opportunities might not be processed by NPCController via simulator.")
+
 
         logger.info("FirmamentModule initialized and dependencies injected into simulator.")
 
-    async def get_current_simulation_context(self, pathos_user_id: str) -> SimulationContext:
+    async def get_current_simulation_context(self, pathos_user_id: str) -> 'SimulationContext': # Added return type hint
         """
         Provides the current situational context for Pathos from the simulation.
         pathos_user_id is provided to ensure context is Pathos-centric (though Firmament primarily knows about Pathos via Chronos).
