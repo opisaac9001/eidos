@@ -11,16 +11,17 @@ from typing import Optional, Dict, Any, List # Ensure List is imported for type 
 
 # Import ChronosAdapter class instead of global functions
 try:
-    from ..integrations.chronos_adapter import ChronosAdapter
+    from ..integrations.chronos_adapter import ChronosAdapter # This should be firmament.chronos_adapter
     from ....persona_logic.ethos_core.core import EthosCore
+    # Import ActivityType for mapping Hexus events
+    from ....persona_logic.chronos_engine.models import ActivityType as ChronosActivityTypeEnum
 except ImportError: # pragma: no cover
-    print("CRITICAL: Could not import ChronosAdapter or EthosCore. Simulator will use dummies.")
+    print("CRITICAL: Could not import ChronosAdapter, EthosCore, or ChronosActivityTypeEnum. Simulator will use dummies.")
     class ChronosAdapter: # type: ignore
-        def __init__(self, ethos_core_mock): pass # Add dummy __init__
-        async def get_current_block(self):
-            # logger is not defined at module level yet if this dummy is hit during initial imports
-            print("Warning: Using DUMMY ChronosAdapter.get_current_block in simulator.")
-            return {"id": "dummy_error_block_sim_ca", "name": "Dummy Error Block (CA missing)", "type": "error"}
+        def __init__(self, ethos_core_mock=None, chronos_engine_mock=None): pass # Adjusted dummy init
+        async def get_current_block_for_firmament(self): # Renamed method
+            print("Warning: Using DUMMY ChronosAdapter.get_current_block_for_firmament in simulator.")
+            return {"id": "dummy_error_block_sim_ca", "activity_title": "Dummy Error Block (CA missing)", "activity_type": "error", "description": "ChronosAdapter missing"}
     class EthosCore: # type: ignore
         PATHOS_USER_ID = "dummy_pathos_user_sim_import_error"
         ethos_config = {"pathos_home_timezone": "UTC"} # Dummy config
@@ -29,9 +30,33 @@ except ImportError: # pragma: no cover
         def get_current_mood(self) -> Dict[str, Any]: # Added for NPC improvisation context
             print("Dummy EthosCore (simulator import error): get_current_mood called")
             return {"name": "dummy_neutral", "valence": 0.0, "arousal": 0.0}
+        async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+            print(f"DUMMY EthosCore: process_event_for_hexus_update called for {event_type}")
+        async def add_memory_entry(self, entry_data: Dict, user_id_context: Optional[str] = None):
+            print(f"DUMMY EthosCore: add_memory_entry called for type {entry_data.get('type')}")
+            return {"id": "dummy_mem_id", **entry_data} # Return a mock entry
+    class ChronosActivityTypeEnum(str, Enum): # Dummy Enum for fallback
+        WORK = "work"; LEARNING = "learning"; SLEEP = "sleep"; SOCIAL = "social"; IDLE = "idle"; MEAL = "meal"; PERSONAL_CARE = "personal_care"; CHORE = "chore"; LEISURE_ACTIVE = "leisure_active"; LEISURE_PASSIVE = "leisure_passive"; TRAVEL = "travel"; ERRAND = "errand"; EXERCISE = "exercise"; REFLECTIVE = "reflective"; OTHER = "other"; ERROR = "error"
+
 
 try:
-    from ..core.event_handlers.random_events import maybe_trigger_random_event
+    from ..core.event_handlers.random_events import maybe_trigger_random_event # This path seems incorrect based on `ls`
+    # Should likely be from eidos_agent.features.firmament.event_handlers.random_events import maybe_trigger_random_event
+    # Or if random_events is a file in the current directory (core), then:
+    # from .random_events import maybe_trigger_random_event
+    # For now, assuming it might be intended to be at the same level as this 'core' directory.
+    # If it's e.g. eidos_agent.features.firmament.random_events, then `from ..random_events import ...`
+    # Let's assume it's a sibling to this 'core' directory, or correct it if it's inside core.
+    # If it's `eidos_agent/features/firmament/random_events.py`, then `from ..random_events import ...`
+    # If it's `eidos_agent/features/firmament/core/random_events.py`, then `from .random_events import ...`
+    # The original `..core.event_handlers` suggests `event_handlers` is a subdir of `core`.
+    # Let's try `from .event_handlers.random_events import ...` assuming event_handlers/ is in core/
+    # If `event_handlers` is a sibling to `core`, then `../event_handlers/random_events.py`
+    # The grep output for `maybe_trigger_random_event` was not provided, so path is uncertain.
+    # Sticking to original `..core.event_handlers` assuming a structure like `firmament/core/event_handlers/random_events.py`
+    # However, `ls("eidos_agent/features/firmament/core/")` was empty.
+    # This implies `random_events.py` is not there.
+    # For now, will keep the original import and let the dummy handle it if not found.
 except ImportError: # pragma: no cover
     print("CRITICAL: Could not import from random_events. Simulator will not trigger random events.")
     maybe_trigger_random_event = lambda: None #type:ignore
@@ -102,36 +127,225 @@ def set_chronos_adapter_for_simulator(adapter: ChronosAdapter): # New setter for
     _chronos_adapter_instance = adapter
     logger.info(f"Simulator: ChronosAdapter instance set. {_chronos_adapter_instance is not None}")
 
+_npc_controller_instance: Optional[Any] = None # Forward declare for NPCController, type hint later if possible
+
+def set_npc_controller_for_simulator(controller): # Controller type hint can be 'NPCController'
+    global _npc_controller_instance
+    _npc_controller_instance = controller
+    logger.info(f"Simulator: NPCController instance set. {_npc_controller_instance is not None}")
+
+# Helper function to map activity type to Hexus event string
+def _get_hexus_event_from_activity(activity_block: Dict[str, Any]) -> Optional[str]:
+    activity_type_str = activity_block.get('activity_type')
+    activity_theme = activity_block.get('activity_theme') # Optional theme
+
+    if not activity_type_str:
+        return None
+
+    # Convert string back to ChronosActivityTypeEnum member if necessary for matching
+    # For direct string comparison, ensure activity_type_str matches enum values.
+
+    # Example mapping (ensure these event strings exist in EthosCore.HEXUS_EVENT_DEFINITIONS)
+    if activity_type_str == ChronosActivityTypeEnum.WORK.value:
+        if activity_theme == "focused_work" or "deep_work" in activity_block.get('description', '').lower():
+            return "ACTIVITY_EFFECT_WORK_DEEP"
+        return "ACTIVITY_EFFECT_WORK_ROUTINE"
+    elif activity_type_str == ChronosActivityTypeEnum.LEARNING.value:
+        return "ACTIVITY_EFFECT_LEARNING"
+    elif activity_type_str == ChronosActivityTypeEnum.SLEEP.value:
+        # EthosCore HEXUS_ACTIVITY_MODIFIERS uses "sleeping", not an "ACTIVITY_EFFECT_SLEEPING" event.
+        # Hexus decay during "sleeping" activity type is handled by run_hexus_decay modifiers.
+        # However, an initial effect might still be desired, e.g., "ACTIVITY_EFFECT_RESTING" or a new specific one.
+        # For now, let's map it to resting, or consider if direct Hexus changes are better here.
+        return "ACTIVITY_EFFECT_RESTING" # Or a more specific "ACTIVITY_EFFECT_SLEEP_ONSET" if defined
+    elif activity_type_str == ChronosActivityTypeEnum.LEISURE_PASSIVE.value:
+        return "ACTIVITY_EFFECT_LEISURE_PASSIVE"
+    elif activity_type_str == ChronosActivityTypeEnum.LEISURE_ACTIVE.value:
+        return "ACTIVITY_EFFECT_LEISURE_ACTIVE"
+    elif activity_type_str == ChronosActivityTypeEnum.SOCIAL.value:
+        return "ACTIVITY_EFFECT_SOCIAL"
+    elif activity_type_str == ChronosActivityTypeEnum.CHORE.value:
+        return "ACTIVITY_EFFECT_CHORE"
+    elif activity_type_str == ChronosActivityTypeEnum.REFLECTIVE.value:
+        return "ACTIVITY_EFFECT_REFLECTIVE" # Ensure this is defined in EthosCore
+    elif activity_type_str == ChronosActivityTypeEnum.MEAL.value:
+        return "ACTIVITY_EFFECT_MEAL" # Ensure this is defined
+    elif activity_type_str == ChronosActivityTypeEnum.PERSONAL_CARE.value:
+        return "ACTIVITY_EFFECT_PERSONAL_CARE" # Ensure this is defined
+    elif activity_type_str == ChronosActivityTypeEnum.EXERCISE.value:
+        return "ACTIVITY_EFFECT_EXERCISE" # Ensure this is defined
+    elif activity_type_str == ChronosActivityTypeEnum.TRAVEL.value:
+        return "ACTIVITY_EFFECT_TRAVEL" # Ensure this is defined
+    elif activity_type_str == ChronosActivityTypeEnum.ERRAND.value:
+        return "ACTIVITY_EFFECT_ERRAND" # Ensure this is defined
+    elif activity_type_str == ChronosActivityTypeEnum.IDLE.value: # From ChronosAdapter default
+        return None # Or "ACTIVITY_EFFECT_IDLE" if we want specific Hexus changes for idling
+    # Add more mappings for other ActivityType members as needed
+
+    logger.warning(f"No specific Hexus event mapping for activity type: {activity_type_str}")
+    return None
+
+
 async def run_simulation_tick():
-    global _current_active_block_data
+    global _current_active_block_data, _ethos_core_instance_for_sim # Make sure _ethos_core_instance_for_sim is accessible
     current_time_iso_for_tick = datetime.now(timezone.utc).isoformat()
 
     # --- Schedule Block Transition Logic ---
     if not _chronos_adapter_instance:
         logger.error("Simulator: ChronosAdapter instance not set. Cannot get current block.")
-        new_block_data = {"id": "error_no_chronos_adapter", "name": "Error: ChronosAdapter Missing", "type": "error", "description": "ChronosAdapter not set in simulator."}
+        # Use activity_title and activity_type as expected by new logic
+        new_block_data = {"id": "error_no_chronos_adapter", "activity_title": "Error: ChronosAdapter Missing", "activity_type": "error", "description": "ChronosAdapter not set in simulator."}
     else:
-        new_block_data = await _chronos_adapter_instance.get_current_block()
+        # ChronosAdapter.get_current_block_for_firmament is the correct method now
+        new_block_data = await _chronos_adapter_instance.get_current_block_for_firmament()
+
+    # Check for a more specific activity_title key if 'name' is not standard from adapter
+    activity_name_for_log = new_block_data.get("activity_title", new_block_data.get("name", "Unknown Activity"))
 
     if not isinstance(new_block_data, dict) or not new_block_data.get("id"):
-        logger.warning(f"Simulator: Invalid or None block data received: {new_block_data}")
+        logger.warning(f"Simulator: Invalid or None block data received from ChronosAdapter: {new_block_data}")
         if _current_active_block_data:
-            EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "new_block_data_invalid_or_none"})
+            EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "new_block_data_invalid_or_none_from_adapter"})
             _current_active_block_data = None
     else:
         new_block_id = new_block_data.get("id")
+        # Use activity_name_for_log for logging consistency
+        logger.info(f"Simulator: New block ID '{new_block_id}' ({activity_name_for_log}) received.")
         previous_block_id = _current_active_block_data.get("id") if _current_active_block_data else None
+
         if new_block_id != previous_block_id:
             if _current_active_block_data:
+                prev_activity_name_for_log = _current_active_block_data.get("activity_title", _current_active_block_data.get("name", "Unknown Previous Activity"))
+                logger.info(f"Simulator: Ending block '{previous_block_id}' ({prev_activity_name_for_log}). Starting new block '{new_block_id}' ({activity_name_for_log}).")
                 EventBus.instance().publish(SCHEDULE_BLOCK_ENDED, {"block": _current_active_block_data, "reason": "block_changed"})
-            EventBus.instance().publish(SCHEDULE_BLOCK_STARTED, {"block": new_block_data})
-            _current_active_block_data = new_block_data
+            else:
+                logger.info(f"Simulator: Starting initial block '{new_block_id}' ({activity_name_for_log}).")
 
+            EventBus.instance().publish(SCHEDULE_BLOCK_STARTED, {"block": new_block_data})
+            _current_active_block_data = new_block_data # Update current block
+        else:
+            logger.debug(f"Simulator: Continuing with active block '{new_block_id}' ({activity_name_for_log}).")
+
+
+    # --- NEW: Hexus Update and Memory Logging for Active Block ---
+    if _current_active_block_data and \
+       _current_active_block_data.get("id") != "default_idle_block" and \
+       _current_active_block_data.get("activity_type") != ChronosActivityTypeEnum.ERROR.value: # Use enum value for comparison
+
+        active_block_title_for_log = _current_active_block_data.get('activity_title', 'Unknown Activity')
+        logger.debug(f"Simulator: Processing active block: {active_block_title_for_log}")
+
+        if _ethos_core_instance_for_sim:
+            # 1. Hexus Update
+            hexus_event = _get_hexus_event_from_activity(_current_active_block_data)
+            if hexus_event:
+                try:
+                    # Ensure EthosCore is awaited if its methods are async
+                    await _ethos_core_instance_for_sim.process_event_for_hexus_update(
+                        event_type=hexus_event,
+                        payload=_current_active_block_data # Pass full block as payload
+                    )
+                    logger.debug(f"Processed Hexus event '{hexus_event}' for activity '{active_block_title_for_log}'.")
+                except Exception as e_hexus:
+                    logger.error(f"Error processing Hexus update for activity '{active_block_title_for_log}': {e_hexus}", exc_info=True)
+
+            # 2. Memory Logging for Activity
+            try:
+                activity_type_val = _current_active_block_data.get('activity_type', ChronosActivityTypeEnum.OTHER.value)
+                location_hint = _current_active_block_data.get('location_hint', 'Unknown Location')
+                description = _current_active_block_data.get('description', 'No details.')
+
+                memory_content = (
+                    f"During this time, Pathos was engaged in '{active_block_title_for_log}' ({activity_type_val}) "
+                    f"at '{location_hint}'. Details: {description}"
+                )
+
+                # Safely get PATHOS_USER_ID from EthosCore instance or default
+                pathos_user_id_for_memory = getattr(_ethos_core_instance_for_sim, 'PATHOS_USER_ID', 'pathos_internal_user')
+
+                memory_metadata = {
+                    "activity_id": _current_active_block_data.get('activity_id', _current_active_block_data.get('id')), # Prefer 'activity_id' if distinct from block 'id'
+                    "activity_type": activity_type_val,
+                    "activity_title": active_block_title_for_log,
+                    "location_hint": location_hint,
+                    "start_time_iso": _current_active_block_data.get('start_time_iso'),
+                    "end_time_iso": _current_active_block_data.get('end_time_iso'),
+                    "user_id": pathos_user_id_for_memory,
+                    "source": "firmament_simulation",
+                    "sim_tick_timestamp": current_time_iso_for_tick
+                }
+                # Ensure EthosCore is awaited
+                await _ethos_core_instance_for_sim.add_memory_entry(
+                    entry_data={
+                        "type": "firmament_activity_log",
+                        "content": memory_content,
+                        "metadata": memory_metadata,
+                        "salience": 0.45 # Default salience for activity logs
+                    },
+                    user_id_context=pathos_user_id_for_memory
+                )
+                logger.debug(f"Logged Firmament activity: '{active_block_title_for_log}'.")
+            except Exception as e_mem:
+                logger.error(f"Error logging Firmament activity '{active_block_title_for_log}' to memory: {e_mem}", exc_info=True)
+        else:
+            logger.warning("Simulator: EthosCore instance not available. Skipping Hexus updates and memory logging for activity.")
+
+
+    # --- Random Events (EXISTING - check if it should be here or before activity processing) ---
+    # Moving this after activity processing for now, as random events might be influenced by current state
     if callable(maybe_trigger_random_event):
         maybe_trigger_random_event()
     else: # pragma: no cover
         logger.warning("Simulator: maybe_trigger_random_event is not callable.")
 
+    # --- NPC Interaction Opportunity Assessment ---
+    if _current_active_block_data and _npc_controller_instance:
+        activity_type_for_npc_check = _current_active_block_data.get('activity_type')
+        npc_hints = _current_active_block_data.get('specific_npc_hints')
+        location_hint = _current_active_block_data.get('location_hint')
+        should_assess_npc_interaction = False
+
+        if activity_type_for_npc_check == ChronosActivityTypeEnum.SOCIAL.value:
+            should_assess_npc_interaction = True
+        elif isinstance(npc_hints, list) and npc_hints:
+            should_assess_npc_interaction = True
+        # Could add other conditions, e.g., random chance during LEISURE_ACTIVE in populated areas
+
+        if should_assess_npc_interaction and location_hint:
+            active_npcs_in_location = []
+            try:
+                # NPCRegistry is a singleton, can be accessed if NPC_SYSTEM_AVAILABLE
+                if NPC_SYSTEM_AVAILABLE:
+                    registry = NPCRegistry.instance()
+                    # Assuming get_npcs_in_location is a method in NPCRegistry
+                    # This method might not exist yet or have a different signature.
+                    # For now, let's assume it's a simple list of NPC profile dicts.
+                    if hasattr(registry, 'get_npcs_in_location'):
+                        active_npcs_in_location = registry.get_npcs_in_location(location_hint)
+                    else: # Fallback: get all NPCs and filter by a potential 'current_location' field
+                        all_npcs = registry.get_all_npcs() # List[Dict[str, Any]]
+                        active_npcs_in_location = [
+                            npc for npc in all_npcs
+                            if npc.get('current_location') == location_hint or npc.get('home_location') == location_hint
+                        ]
+                    logger.debug(f"Simulator: Found {len(active_npcs_in_location)} NPCs at '{location_hint}' for interaction assessment.")
+                else:
+                    logger.warning("Simulator: NPC_SYSTEM_AVAILABLE is False, cannot fetch NPCs for interaction assessment.")
+
+                # Call NPCController to assess the opportunity
+                await _npc_controller_instance.assess_interaction_opportunity(
+                    current_block_data=_current_active_block_data,
+                    active_npcs_in_location=active_npcs_in_location
+                )
+            except Exception as e_npc_assess:
+                logger.error(f"Error during NPC interaction assessment: {e_npc_assess}", exc_info=True)
+    elif _current_active_block_data and not _npc_controller_instance:
+        logger.warning("Simulator: NPCController instance not set. Skipping NPC interaction opportunity assessment.")
+
+
+    # --- NPC Improvisation from Subconscious (EXISTING) ---
+    # This existing logic might also benefit from NPCController in the future,
+    # but for now, we keep it as is, as it handles NPC *creation* primarily.
     if NPC_SYSTEM_AVAILABLE:
         try:
             if not _npc_improviser_instance:

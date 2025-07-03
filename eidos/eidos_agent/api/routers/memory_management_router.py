@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, Path as FastApiPath
 from fastapi.responses import JSONResponse
 
-from eidos_agent.schemas import ClearUserMemoryRequest, ApiMemoryEntry
+from eidos_agent.schemas.ethos_schemas import ClearUserMemoryRequest, ApiMemoryEntry
 from eidos_agent.persona_logic.ethos_core.core import EthosCore # Path is already correct from previous step, ensuring it stays
 from eidos_agent.core.config import Config
 

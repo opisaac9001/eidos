@@ -8,11 +8,8 @@ from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from eidos_agent.schemas import (
-    DreamEntryResponse,
-    ApiMemoryEntry,
-    MemoryEntry as GenericMemoryEntry
-)
+from eidos_agent.schemas.oneiros_schemas import DreamEntryResponse
+from eidos_agent.schemas.ethos_schemas import Memory as GenericMemoryEntry, ApiMemoryEntry
 
 from pydantic import ValidationError
 # This specific import from memory_storage might not be needed if GenericMemoryEntry from schemas is sufficient
