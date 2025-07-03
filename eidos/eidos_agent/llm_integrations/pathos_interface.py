@@ -92,7 +92,15 @@ class PathosInterface:
         self.eidos_tts_service_instance: Optional['ExternalTTSService'] = None
         self.audio_cache: Optional[Dict[str, bytes]] = None
         self.audio_cache_lock: Optional[asyncio.Lock] = None
+
+        # Cache for NPC initiation memory IDs processed in the current user interaction cycle
+        self.processed_npc_initiation_ids_this_turn: set[str] = set()
         logger.info("PathosInterface initialized with new dependencies.")
+
+    def _clear_processed_npc_initiations_for_turn(self):
+        """Clears the set of processed NPC initiation IDs for the new turn."""
+        self.processed_npc_initiation_ids_this_turn.clear()
+        logger.debug("Cleared processed NPC initiation IDs for the current turn.")
 
     # --- Start of New Orchestration Methods (Stubbed) ---
 
@@ -125,9 +133,43 @@ class PathosInterface:
         # Using a placeholder from config for now.
         pathos_user_id = self.config.ETHOS.get("pathos_user_id", "pathos_agent_id") # Fallback needed if not in EthosConfig type
 
+        # Fetch NPC Initiated Dialogue first
+        npc_initiated_dialogue_str = ""
+        if self.ethos_core:
+            try:
+                # Fetch most recent, unaddressed NPC initiation for Pathos
+                # Using get_relevant_memories with specific type and small limit.
+                # This relies on salience/recency; a more robust "unaddressed" flag might be needed later.
+                npc_initiation_mems = await self.ethos_core.get_relevant_memories(
+                    query="", # General query, rely on type and recency
+                    user_id_context=pathos_user_id,
+                    allowed_types=["npc_initiated_dialogue"],
+                    limit=1 # Get the single most recent one
+                )
+                if npc_initiation_mems:
+                    latest_initiation = npc_initiation_mems[0] # EthosMemory object
+                    if latest_initiation.memory_id not in self.processed_npc_initiation_ids_this_turn:
+                        npc_name = latest_initiation.metadata.get("npc_name", "An NPC")
+                        utterance = latest_initiation.metadata.get("utterance", latest_initiation.content) # Fallback to content
+                        # Reconstruct from content if metadata utterance is not primary
+                        if "said to you:" in latest_initiation.content: # Check if content has the full phrase
+                            utterance = latest_initiation.content.split("said to you: \"", 1)[-1].rstrip("\"")
+
+                        location = latest_initiation.metadata.get("location", "somewhere")
+                        pathos_activity = latest_initiation.metadata.get("pathos_activity_at_time", "doing something")
+
+                        npc_initiated_dialogue_str = f"[At {location}, while you were {pathos_activity}, {npc_name} said to you: \"{utterance}\"]\n"
+                        self.processed_npc_initiation_ids_this_turn.add(latest_initiation.memory_id)
+                        logger.info(f"Presenting NPC initiation (ID: {latest_initiation.memory_id}) to Pathos: {npc_initiated_dialogue_str[:100]}...")
+            except Exception as e_npc_init:
+                logger.error(f"Error fetching or formatting NPC initiated dialogue: {e_npc_init}", exc_info=True)
+
+        # Prepend NPC initiation to user_input if present
+        effective_user_input = npc_initiated_dialogue_str + user_input
+
         current_mood_data = await self.ethos_core.get_current_mood_state()
-        # Ensure recent_memories is a list of dicts if models are not directly used in MainLLMPromptContext
-        recent_memories_data = await self.ethos_core.get_relevant_memories(query=user_input, user_id_context=self.current_active_user_id, limit=self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS or 5)
+        # Fetch other relevant memories based on the combined input
+        recent_memories_data = await self.ethos_core.get_relevant_memories(query=effective_user_input, user_id_context=self.current_active_user_id, limit=self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS or 5)
         persona_profile_data = await self.ethos_core.get_persona_profile()
         current_activity_data = await self.chronos_engine.get_current_activity_for_user(user_id=pathos_user_id)
 
@@ -301,6 +343,8 @@ class PathosInterface:
         Orchestrates context gathering, LLM invocation, tool use, NPC interaction, and state updates.
         Returns the final textual response to be delivered to the user.
         """
+        self._clear_processed_npc_initiations_for_turn() # Clear cache for the new turn
+
         # Determine user_id for this interaction turn.
         # Priority: request_metadata.user_id > conversation_history user_id > default_user
         req_meta_user_id = request_metadata.get("user_id") if request_metadata else None
