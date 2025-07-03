@@ -321,10 +321,16 @@ class ChronosEngine:
                 pathos_home_tz_str = self._get_pathos_home_timezone_str()
                 pathos_tz = timezone.utc # Default
                 if pathos_home_tz_str.lower() != 'utc':
-                    if ZoneInfo: try: pathos_tz = ZoneInfo(pathos_home_tz_str)
-                    except: pass
-                    elif pytz: try: pathos_tz = pytz.timezone(pathos_home_tz_str)
-                    except: pass
+                    if ZoneInfo:
+                        try:
+                            pathos_tz = ZoneInfo(pathos_home_tz_str)
+                        except:
+                            pass
+                    elif pytz:
+                        try:
+                            pathos_tz = pytz.timezone(pathos_home_tz_str)
+                        except:
+                            pass
 
                 # Convert target_date_utc (which is a specific point in time) to Pathos's local time
                 user_local_target_date = target_date_utc.astimezone(pathos_tz)

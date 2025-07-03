@@ -30,12 +30,12 @@ from eidos_agent.features.simulation.module import initiate_simulated_interactio
 from .task_model import Task # Added import
 
 # Import LLMClient and LLMResponsePayload
-from ....llm_integrations.llm_client import LLMClient
-from ....schemas.llm_schemas import LLMResponsePayload, LLMToolCall, FunctionCall # Added LLMToolCall, FunctionCall
-from ....schemas.tool_schemas import ToolResult # Added ToolResult
+from eidos_agent.llm_integrations.llm_client import LLMClient # Adjusted relative import to absolute
+from eidos_agent.schemas.llm_schemas import LLMResponsePayload, LLMToolCall, FunctionCall # Adjusted relative import
+from eidos_agent.schemas.tool_schemas import ToolResult # Adjusted relative import
 # Import HTTPClientManager if LogosCore is to initialize services that need it
-from ....features.firmament.core.http_client_manager import HTTPClientManager
-from ....features.bookshelf_feature.handler import BookshelfHandler # For Bookshelf tools
+from eidos_agent.features.firmament.core.http_client_manager import HTTPClientManager # Adjusted relative import
+from eidos_agent.features.bookshelf_feature.handler import BookshelfHandler # Corrected absolute import
 
 
 logger = get_logger(__name__)

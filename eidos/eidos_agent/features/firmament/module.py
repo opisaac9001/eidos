@@ -258,6 +258,26 @@ class FirmamentModule:
         #     await plugin_manager.initialize_active_plugins_async()
         logger.info("FirmamentModule started.")
 
+    def get_npc_profiles_for_context(self) -> List[Dict[str, Any]]:
+        """
+        Returns a list of basic profiles (id, name) for all known NPCs.
+        Used by PathosInterface to identify NPCs mentioned in user input.
+        """
+        if not self.npc_registry:
+            logger.warning("FirmamentModule: NPCRegistry not available, cannot get NPC profiles for context.")
+            return []
+
+        all_npc_data = self.npc_registry.get_all_npcs() # This returns List[Dict[str, Any]] from the singleton
+
+        # We only need id and name for matching in PathosInterface for now
+        profiles_for_context = [
+            {"id": npc.get("id"), "name": npc.get("name")}
+            for npc in all_npc_data
+            if npc.get("id") and npc.get("name")
+        ]
+        logger.debug(f"FirmamentModule: Providing {len(profiles_for_context)} NPC profiles for context identification.")
+        return profiles_for_context
+
     async def handle_pathos_dialogue_with_npc(self,
                                             npc_id: str,
                                             pathos_utterance: str,
