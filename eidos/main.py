@@ -42,12 +42,14 @@ from eidos_agent.llm_integrations.pathos_interface import PathosInterface # Upda
 from eidos_agent.features.oneiros import OneirosModule # Updated import
 from eidos_agent.core.input_router import InputRouter, RoutingResult
 # Updated import to use eidos_agent.schemas
-from eidos_agent.schemas import (
+from eidos_agent.schemas.oai_schemas import (
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage,
-    ChatCompletionChoice, ChatCompletionUsage, ModelList, ModelCard,
-    UserSettingItem, UserSettingsRequest, ClearUserMemoryRequest,
-    FeedbackRequest, DreamEntryResponse, MemoryEntry as ApiMemoryEntry # Use ApiMemoryEntry for response_model
+    ChatCompletionChoice, ChatCompletionUsage, ModelList, ModelCard
 )
+from eidos_agent.schemas.user_profile_schemas import UserSettingItem, UserSettingsRequest
+from eidos_agent.schemas.ethos_schemas import ClearUserMemoryRequest, ApiMemoryEntry
+from eidos_agent.schemas.feedback_schemas import FeedbackRequest
+from eidos_agent.schemas.oneiros_schemas import DreamEntryResponse
 from eidos_agent.core.connection_manager import ConnectionManager
 from eidos_agent.services.external_tts_service import ExternalTTSService
 # Updated imports for ChronosEngine and its models
@@ -76,6 +78,11 @@ from eidos_agent.api.routers.pathos_chronos_router import router as pathos_chron
 from eidos_agent.api.routers.pathos_chronos_router import init_pathos_chronos_router
 from eidos_agent.api.routers.websocket_router import router as websocket_api_router # Import WebSocket router
 from eidos_agent.api.routers.websocket_router import init_websocket_router # Import WebSocket router init function
+
+# Firmament related imports
+from eidos_agent.features.firmament.module import FirmamentModule
+from eidos_agent.features.firmament.integrations.chronos_adapter import ChronosAdapter
+from eidos_agent.features.firmament.npcs.npc_improviser import NPCImproviser
 
 from eidos_agent.features.oneiros.tasks import oneiros_processing_task
 from eidos_agent.system_tasks.subconscious_context_scheduler import SCHEDULER_STATE, init_scheduler as init_subconscious_scheduler
@@ -136,7 +143,8 @@ async def lifespan(app_instance: FastAPI):
     global ethos_core, logos_core, pathos_interface, oneiros_module, router, background_tasks, manager, eidos_tts_service_instance, SUBCONSCIOUS_NODE_STATE # Added firmament_module
     # ha_service: Optional[HomeAssistantService] = None # Removed
     owm_service: Optional[OpenWeatherMapService] = None
-    firmament_module: Optional[FirmamentModule] = None # Initialize firmament_module variable
+    # firmament_module global variable is removed as it's instantiated and used within lifespan
+    # firmament_module: Optional[FirmamentModule] = None
     logger.info("--- Initializing Eidos System for API (Lifespan Startup) ---")
     try:
         logger.info("Lifespan: Starting core component initialization...")
@@ -237,24 +245,31 @@ async def lifespan(app_instance: FastAPI):
         else: # pragma: no cover
             logger.error("ConnectionManager (manager) is None, WebSocket router not initialized.")
 
-        if ethos_core:
-            # Initialize Firmament Module (after EthosCore, ChronosEngine, OneirosModule)
-            # FirmamentModule is deprecated and removed.
-            # if Config.FIRMAMENT.get("enable_firmament") and chronos_engine_instance and oneiros_module:
-            #     try:
-            #         firmament_module = FirmamentModule(Config, ethos_core, chronos_engine_instance, oneiros_module)
-            #         await firmament_module.start() # Call start method
-            #         set_firmament_module_instance(firmament_module) # Link to handler
-            #         ethos_core.set_firmament_module(firmament_module) # Link to EthosCore for background task
-            #         logger.info("Lifespan: FirmamentModule initialized, started, and linked.")
-            #     except Exception as e_firmament:
-            #         logger.error(f"Lifespan: Failed to initialize or start FirmamentModule: {e_firmament}", exc_info=True)
-            #         firmament_module = None # Ensure it's None if init fails
-            # elif Config.FIRMAMENT.get("enable_firmament"):
-            #     logger.warning("Lifespan: FirmamentModule enabled in config, but dependencies (ChronosEngine or OneirosModule) are missing. Firmament will not be initialized.")
+        firmament_module_instance: Optional[FirmamentModule] = None # Define for use in shutdown
+        if ethos_core and chronos_engine_instance and Config.get_firmament_module_config().get("enable_firmament"):
+            logger.info("Lifespan: Firmament is enabled. Initializing FirmamentModule...")
+            try:
+                # Initialize Firmament components
+                npc_improviser_instance = NPCImproviser() # Uses Config internally for LLM role
+                chronos_adapter_instance = ChronosAdapter(ethos_core=ethos_core) # Pass EthosCore
 
+                firmament_module_instance = FirmamentModule(
+                    config=Config,
+                    ethos_core=ethos_core,
+                    chronos_adapter=chronos_adapter_instance,
+                    npc_improviser=npc_improviser_instance
+                )
+                await firmament_module_instance.start()
+                ethos_core.set_firmament_module(firmament_module_instance)
+                logger.info("Lifespan: FirmamentModule initialized, started, and set in EthosCore.")
+            except Exception as e_firmament:
+                logger.error(f"Lifespan: Failed to initialize or start FirmamentModule: {e_firmament}", exc_info=True)
+                firmament_module_instance = None # Ensure it's None if init fails
+        elif Config.get_firmament_module_config().get("enable_firmament"):
+            logger.warning("Lifespan: FirmamentModule enabled in config, but core dependencies (EthosCore, ChronosEngine) are missing. Firmament will not be initialized.")
 
-            background_tasks = await ethos_core.get_background_tasks() # EthosCore now potentially adds Firmament task
+        if ethos_core: # ethos_core check is still relevant for other tasks
+            background_tasks = await ethos_core.get_background_tasks() # EthosCore now potentially adds Firmament task via set_firmament_module
             # Initialize subconscious_context_scheduler after ethos_core is ready
             try:
                 current_loop = asyncio.get_running_loop()
@@ -323,7 +338,7 @@ async def lifespan(app_instance: FastAPI):
         if logos_core: await logos_core.close()
         # if ha_service: await ha_service.disconnect() # Removed
         if owm_service and hasattr(owm_service, 'close'): await owm_service.close() # type: ignore
-        if firmament_module: await firmament_module.close() # Close FirmamentModule
+        if firmament_module_instance: await firmament_module_instance.close() # Close FirmamentModule
         if oneiros_module: await oneiros_module.close()
         if ethos_core: await ethos_core.close()
         if eidos_tts_service_instance: await eidos_tts_service_instance.close()

@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 # Pydantic models from eidos_agent.schemas
-from eidos_agent.schemas import UserSettingsRequest, ApiMemoryEntry, MemoryEntry
+from eidos_agent.schemas.user_profile_schemas import UserSettingsRequest
+from eidos_agent.schemas.ethos_schemas import ApiMemoryEntry, Memory as MemoryEntry
 from pydantic import ValidationError
 
 # Core Eidos components (to be injected)

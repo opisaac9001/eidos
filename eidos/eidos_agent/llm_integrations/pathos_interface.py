@@ -14,7 +14,7 @@ from eidos_agent.persona_logic.ethos_core.core import EthosCore
 from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryEntry
 from eidos_agent.utils.logger import get_logger
-from eidos_agent.schemas import ChatMessage
+from eidos_agent.schemas.oai_schemas import ChatMessage
 # PATHOS_USER_ID is used by ToolOrchestrator._execute_tools, but ToolOrchestrator imports it directly.
 # from eidos_agent.modules.chronos_engine import PATHOS_USER_ID
 # simulation_module is used by ToolOrchestrator._execute_tools, ToolOrchestrator imports it directly.
@@ -24,49 +24,447 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from eidos_agent.core.connection_manager import ConnectionManager
     from eidos_agent.services.external_tts_service import ExternalTTSService
+    from eidos_agent.features.firmament.module import FirmamentModule
+    # Assuming SubconsciousNodeClient will be created in integrations
+    from eidos_agent.integrations.subconscious_node_client import SubconsciousNodeClient
+    from eidos_agent.persona_logic.chronos_engine.engine import ChronosEngine
+    from eidos_agent.features.firmament.core.http_client_manager import HTTPClientManager
+
+# New Schema Imports
+from eidos_agent.schemas.llm_schemas import LLMOutput, LLMToolCall, LLMResponsePayload
+from eidos_agent.schemas.orchestration_schemas import MainLLMPromptContext
+from eidos_agent.schemas.firmament_schemas import NPCInteractionOutput # Renamed from FirmamentNPCResponse
+from eidos_agent.schemas.tool_schemas import ToolResult
+
 
 logger = get_logger(__name__)
 
 # Updated internal imports to be relative
 from .pathos_tools_definitions import (
-    AVAILABLE_TOOLS_FOR_PATHOS_LLM,
+    AVAILABLE_TOOLS_FOR_PATHOS_LLM, # This might be used by PromptBuilder or LogosCore directly
     ALL_AVAILABLE_SYSTEM_TOOLS
 )
 from .prompt_builder import PromptBuilder
 from .llm_client import LLMClient
-from .tool_orchestrator import ToolOrchestrator
+# ToolOrchestrator might be deprecated or its logic moved into PathosInterface's process_user_interaction loop
+# from .tool_orchestrator import ToolOrchestrator
 
 
 class PathosInterface:
-    INTENT_TO_SEARCH_PHRASES = [
+    INTENT_TO_SEARCH_PHRASES = [ # This seems like a specific feature, can be refactored into a tool or different logic
         "look that up", "check online", "find out about that",
         "search for that", "see what i can find", "let me check",
         "i'll try to find that", "i should look into that", "wonder what the web says",
         "let me search that", "i'll google that"
     ]
 
-    def __init__(self, config: Config, ethos_core: EthosCore, logos_core: LogosCore, connection_manager: 'ConnectionManager'):
+    def __init__(self,
+                 config: Config,
+                 ethos_core: EthosCore,
+                 logos_core: LogosCore,
+                 connection_manager: 'ConnectionManager',
+                 firmament_module: 'FirmamentModule',
+                 chronos_engine: 'ChronosEngine',
+                 # subconscious_node_client: 'SubconsciousNodeClient', # To be added when client is implemented
+                 http_client_manager: 'HTTPClientManager' # For LLMClient
+                ):
         self.config = config
         self.ethos_core = ethos_core
         self.logos_core = logos_core
         self.connection_manager = connection_manager
+        self.firmament_module = firmament_module
+        self.chronos_engine = chronos_engine
+        # self.subconscious_node_client = subconscious_node_client # Will be uncommented when SubconsciousNodeClient is implemented
+        self.subconscious_node_client: Optional['SubconsciousNodeClient'] = None # Placeholder for now
+
         self.pathos_llm_config: Optional[LLMConfig] = config.get_llm_config('PATHOS')
-        self._enhanced_pathos_llm_config: Optional[LLMConfig] = None
+        self._enhanced_pathos_llm_config: Optional[LLMConfig] = None # For auto-detection
         self.current_active_user_id: str = "default_user"
 
-        self.prompt_builder = PromptBuilder(self.config, self.ethos_core, self.logos_core)
+        self.prompt_builder = PromptBuilder(self.config, self.ethos_core, self.logos_core) # LogosCore might provide tool defs to PromptBuilder
 
-        timeout_seconds_cfg = self.pathos_llm_config.get('timeout', 300.0) if self.pathos_llm_config else 300.0
-        try: timeout_value = float(timeout_seconds_cfg)
-        except (ValueError, TypeError): timeout_value = 300.0
-        self.http_client = httpx.AsyncClient(timeout=timeout_value)
-        self.llm_client = LLMClient(self.http_client)
-        self.tool_orchestrator = ToolOrchestrator(self.llm_client, self.logos_core, self.ethos_core) # Instantiate ToolOrchestrator
+        # LLMClient now takes HTTPClientManager
+        self.llm_client = LLMClient(http_client_manager)
+
+        # ToolOrchestrator is being replaced by logic within process_user_interaction
+        # self.tool_orchestrator = ToolOrchestrator(self.llm_client, self.logos_core, self.ethos_core) # REMOVED
 
         self.eidos_tts_service_instance: Optional['ExternalTTSService'] = None
         self.audio_cache: Optional[Dict[str, bytes]] = None
         self.audio_cache_lock: Optional[asyncio.Lock] = None
-        logger.info("PathosInterface initialized with PromptBuilder, LLMClient, and ToolOrchestrator.")
+        logger.info("PathosInterface initialized with new dependencies.")
+
+    # --- Start of New Orchestration Methods (Stubbed) ---
+
+    async def gather_context_for_main_llm(self, user_input: str, conversation_history: List[Dict[str, str]]) -> MainLLMPromptContext:
+        """Gathers all necessary context from various modules for the Main Pathos LLM."""
+        logger.debug(f"Gathering context for user_input: '{user_input[:50]}...'")
+
+        current_mood = await self.ethos_core.get_current_mood_state()
+        # Using user_input as query for memories, might need refinement
+        # Also, self.current_active_user_id should be set before this is called by process_user_interaction
+        recent_memories = await self.ethos_core.get_relevant_memories(query=user_input, user_id_context=self.current_active_user_id, limit=5)
+        persona_profile = await self.ethos_core.get_persona_profile()
+        current_activity = await self.chronos_engine.get_current_activity_for_user(user_id=self.config.ETHOS.get("pathos_user_id", "pathos")) # Assuming Pathos's schedule
+
+        simulation_context = None
+        if self.firmament_module:
+            simulation_context = await self.firmament_module.get_current_simulation_context(pathos_user_id=self.config.ETHOS.get("pathos_user_id", "pathos"))
+
+        significant_subconscious_thoughts = []
+        if self.subconscious_node_client: # Check if client is available
+            # significant_subconscious_thoughts = await self.subconscious_node_client.get_significant_thoughts(limit=3)
+            pass # Implement when SubconsciousNodeClient is fully available
+
+        # Convert Pydantic models to dicts for MainLLMPromptContext if necessary, or update MainLLMPromptContext to use the models directly
+        # For now, assuming MainLLMPromptContext placeholders are Dict[str, Any]
+        # This will require careful mapping or direct use of Pydantic models in MainLLMPromptContext schema.
+        # Let's assume for now the schemas are designed to be compatible or direct model usage.
+
+        # Ensure we get the correct user_id for Pathos. This should ideally be a constant.
+        # Using a placeholder from config for now.
+        pathos_user_id = self.config.ETHOS.get("pathos_user_id", "pathos_agent_id") # Fallback needed if not in EthosConfig type
+
+        current_mood_data = await self.ethos_core.get_current_mood_state()
+        # Ensure recent_memories is a list of dicts if models are not directly used in MainLLMPromptContext
+        recent_memories_data = await self.ethos_core.get_relevant_memories(query=user_input, user_id_context=self.current_active_user_id, limit=self.config.DYNAMIC_CONTEXT_MAX_RETRIEVED_CHUNKS or 5)
+        persona_profile_data = await self.ethos_core.get_persona_profile()
+        current_activity_data = await self.chronos_engine.get_current_activity_for_user(user_id=pathos_user_id)
+
+        simulation_context_data = None
+        if self.firmament_module:
+            simulation_context_data = await self.firmament_module.get_current_simulation_context(pathos_user_id=pathos_user_id)
+
+        significant_subconscious_thoughts_data = []
+        if self.subconscious_node_client:
+            try:
+                # significant_subconscious_thoughts_data = await self.subconscious_node_client.get_significant_thoughts(limit=3)
+                logger.debug("SubconsciousNodeClient.get_significant_thoughts call placeholder.") # Placeholder
+            except Exception as e_sub:
+                logger.warning(f"Failed to get thoughts from subconscious_node_client: {e_sub}")
+
+        return MainLLMPromptContext(
+            user_input=user_input,
+            conversation_history=conversation_history,
+            current_mood=current_mood_data.model_dump() if current_mood_data else None,
+            recent_memories=[mem.model_dump() for mem in recent_memories_data] if recent_memories_data else [],
+            persona_profile=persona_profile_data.model_dump() if persona_profile_data else None,
+            current_activity=current_activity_data.model_dump() if current_activity_data else None,
+            simulation_context=simulation_context_data.model_dump() if simulation_context_data else None,
+            significant_subconscious_thoughts=[thought.model_dump() for thought in significant_subconscious_thoughts_data] if significant_subconscious_thoughts_data else []
+        )
+
+    async def invoke_main_llm(self, prompt_context: MainLLMPromptContext) -> LLMOutput:
+        """Constructs prompt, calls main LLM, and parses its output into a structured LLMOutput."""
+        logger.debug("Invoking Main Pathos LLM.")
+
+        enhanced_pathos_config = await self._get_enhanced_pathos_llm_config()
+        if not enhanced_pathos_config:
+            logger.error("Pathos LLM configuration not available for invoke_main_llm.")
+            return LLMOutput(raw_text="Error: LLM configuration missing.", dialogue_to_user="I'm having trouble thinking right now due to a configuration issue.")
+
+        # PromptBuilder constructs the messages list for the LLM
+        # This will likely involve calling a method on self.prompt_builder
+        # For now, creating a placeholder messages list.
+        # Actual implementation will require PromptBuilder.build_messages_from_prompt_context to be defined.
+        try:
+            # Assuming PromptBuilder might raise an error if context is problematic
+            llm_messages = await self.prompt_builder.build_messages_from_main_llm_prompt_context(prompt_context, enhanced_pathos_config)
+        except Exception as e_prompt:
+            logger.error(f"Error building LLM messages from prompt context: {e_prompt}", exc_info=True)
+            return LLMOutput(raw_text=f"Error building prompt: {e_prompt}", dialogue_to_user="I had trouble understanding the context for our conversation.")
+
+        if not llm_messages:
+            logger.error("PromptBuilder returned empty messages for the LLM.")
+            return LLMOutput(raw_text="Error: Empty prompt for LLM.", dialogue_to_user="I'm not sure what to say next, the prompt was empty.")
+
+        # Using the standardized LLMClient
+        # For structured parsing, non-streaming (stream=False) is generally easier to start with.
+        # Tool definitions would be passed to the LLM if applicable for function calling.
+        # The current self.logos_core.get_tools_for_llm() seems to be the source for this.
+        tools_for_llm = self.logos_core.get_tools_for_llm(user_id_context=self.current_active_user_id)
+
+        llm_response_payload: LLMResponsePayload = await self.llm_client.call_llm_api(
+            llm_config=enhanced_pathos_config,
+            messages=llm_messages,
+            tools_definition=tools_for_llm if tools_for_llm else None, # Pass tool definitions
+            stream=False
+        )
+
+        if not llm_response_payload.success() or (llm_response_payload.content is None and not self._check_for_tool_calls_in_raw_response(llm_response_payload)): # check if content is None AND no tool calls in raw
+            error_msg = llm_response_payload.error_message or "LLM call failed with no content or tool calls."
+            logger.error(f"invoke_main_llm: LLM call failed. Error: {error_msg}")
+            return LLMOutput(raw_text=llm_response_payload.content or error_msg, dialogue_to_user=f"I encountered an issue: {error_msg}")
+
+        return await self._parse_raw_llm_response(llm_response_payload) # Pass the full payload
+
+    def _check_for_tool_calls_in_raw_response(self, llm_response_payload: LLMResponsePayload) -> bool:
+        """
+        Helper to check if the raw LLM response (before full parsing) might contain tool calls.
+        This is a placeholder. Actual checking depends on how LLMClient structures raw_response_data.
+        """
+        # This is a placeholder. The actual logic would inspect llm_response_payload.raw_response_data
+        # if we decide to include the full JSON object there.
+        # For now, if content is None, we rely on _parse_raw_llm_response to find tool calls in the text.
+        # A more robust way: if the LLM returns a structured JSON (not just text) for non-streaming,
+        # LLMClient.call_llm_api (non-streaming part) should parse that and LLMResponsePayload would carry it.
+        # Let's assume _parse_raw_llm_response will handle extracting tool_calls from content for now.
+        return False # Placeholder
+
+    async def _parse_raw_llm_response(self, llm_response_payload: LLMResponsePayload) -> LLMOutput:
+        """
+        Parses the LLM's raw text from LLMResponsePayload.content to identify dialogue, tool calls, etc.
+        This version assumes the LLM might output OpenAI-style tool calls if tools were provided in the prompt,
+        or specific XML-like tags for NPC dialogue.
+        """
+        raw_text = llm_response_payload.content if llm_response_payload.content else ""
+        logger.debug(f"Parsing LLM raw response: '{raw_text[:250]}...'")
+
+        dialogue_to_user: Optional[str] = None
+        dialogue_to_npc: Optional[str] = None
+        target_npc_id: Optional[str] = None
+        parsed_tool_calls: List[LLMToolCall] = []
+
+        # Attempt to parse for OpenAI-style tool calls if raw_text might be a JSON string
+        # representing the assistant's message with tool_calls.
+        # This depends on how `LLMClient.call_llm_api` (non-streaming) structures its `content`
+        # when the LLM itself returns a structured message (e.g. from OpenAI API).
+        # If `llm_response_payload.content` IS the structured assistant message:
+        try:
+            # A more robust check: does the raw_text look like it's an assistant message object?
+            # For example, if the LLM (like OpenAI) returns a JSON object for the message containing tool_calls.
+            # This part is tricky if `llm_response_payload.content` is *always* just the text part.
+            # If `LLMClient` puts the full assistant message (potentially a dict with 'content' and 'tool_calls')
+            # into `raw_response_data` field of `LLMResponsePayload`, we'd use that.
+            # For now, let's assume `raw_text` might contain special structures or needs to be the primary source.
+
+            # Placeholder: If the LLM is prompted to output JSON for actions, try to parse it.
+            # Example: LLM outputs: {"action": "tool_call", "tool_name": "X", "tool_arguments": {...}}
+            # Or: {"action": "dialogue_npc", "target_npc_id": "Y", "text": "Hello NPC"}
+            # Or: {"action": "dialogue_user", "text": "Hello User"}
+
+            # This simplified parser will look for XML-like tags first.
+            # If not found, it assumes the text is for the user.
+
+            # 1. Check for NPC Dialogue: <npc_dialogue target_npc_id="NPC_ID_HERE">Message to NPC</npc_dialogue>
+            npc_match = re.search(r"<npc_dialogue target_npc_id=['\"](.*?)['\"]>(.*?)</npc_dialogue>", raw_text, re.DOTALL)
+            if npc_match:
+                target_npc_id = npc_match.group(1).strip()
+                dialogue_to_npc = npc_match.group(2).strip()
+                # Remove this tag from raw_text if we want to process other parts, or assume it's exclusive.
+                # For now, assume it's exclusive or the main content.
+                logger.info(f"Parsed NPC dialogue for '{target_npc_id}': '{dialogue_to_npc[:50]}...'")
+
+            # 2. Check for Tool Calls (OpenAI Format - assuming LLMClient might pass this structure if applicable)
+            # This part is more complex if we only have raw_text.
+            # If the LLM is prompted to produce, e.g., <tool_call id="call_abc" name="tool_name">{"arg": "value"}</tool_call>
+            tool_call_pattern = r"<tool_call\s+id=['\"]([^'\"]+)['\"]\s+name=['\"]([^'\"]+)['\"]>(.*?)</tool_call>"
+            remaining_text = raw_text
+            for match in re.finditer(tool_call_pattern, raw_text, re.DOTALL):
+                call_id = match.group(1)
+                tool_name = match.group(2)
+                args_str = match.group(3).strip()
+                try:
+                    tool_arguments = json.loads(args_str)
+                    if not isinstance(tool_arguments, dict):
+                        raise json.JSONDecodeError("Arguments not a dict", args_str, 0)
+                    parsed_tool_calls.append(LLMToolCall(id=call_id, type="function", function=FunctionCall(name=tool_name, arguments=json.dumps(tool_arguments)))) # Store args as JSON string
+                    logger.info(f"Parsed tool call: ID='{call_id}', Name='{tool_name}', Args='{tool_arguments}'")
+                except json.JSONDecodeError as e_json:
+                    logger.warning(f"Failed to parse JSON arguments for tool '{tool_name}': {args_str}. Error: {e_json}")
+                # Remove the matched tool call from remaining_text to isolate user dialogue
+                remaining_text = remaining_text.replace(match.group(0), "", 1).strip()
+
+            if parsed_tool_calls:
+                # If there were tool calls, any remaining text might be a concluding remark for the user, or empty.
+                if remaining_text:
+                    dialogue_to_user = remaining_text
+            elif not dialogue_to_npc: # No tool calls and no NPC dialogue found
+                dialogue_to_user = raw_text # Assume the entire text is for the user
+
+        except Exception as e:
+            logger.error(f"Error during _parse_raw_llm_response: {e}", exc_info=True)
+            # Fallback: treat the entire raw_text as dialogue to user in case of parsing error
+            dialogue_to_user = raw_text
+
+        return LLMOutput(
+            raw_text=raw_text,
+            dialogue_to_user=dialogue_to_user.strip() if dialogue_to_user else None,
+            dialogue_to_npc=dialogue_to_npc.strip() if dialogue_to_npc else None,
+            target_npc_id=target_npc_id,
+            tool_calls=parsed_tool_calls if parsed_tool_calls else None
+        )
+
+    async def process_user_interaction(self, user_input: str, conversation_history: List[Dict[str, str]], request_metadata: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Main entry point for a user interaction turn.
+        Orchestrates context gathering, LLM invocation, tool use, NPC interaction, and state updates.
+        Returns the final textual response to be delivered to the user.
+        """
+        # Determine user_id for this interaction turn.
+        # Priority: request_metadata.user_id > conversation_history user_id > default_user
+        req_meta_user_id = request_metadata.get("user_id") if request_metadata else None
+        history_user_id = conversation_history[-1].get("user_id_for_turn") if conversation_history and conversation_history[-1].get("user_id_for_turn") else None # Assuming user_id_for_turn is added to history entries
+
+        effective_user_id = req_meta_user_id or history_user_id or self.current_active_user_id # Fallback to existing active user
+        if not effective_user_id or effective_user_id == "unknown_user": # Ensure a more specific ID if possible
+            effective_user_id = "default_user"
+
+        self._update_active_user(user_id_from_request=effective_user_id)
+
+        logger.info(f"Processing user interaction for user '{self.current_active_user_id}': '{user_input[:70]}...'")
+
+        # Initialize conversation history for this turn with the current user input
+        # The full conversation_history passed in is for context gathering,
+        # while turn_specific_history tracks this specific multi-step interaction.
+        turn_specific_history: List[Dict[str, Any]] = conversation_history + [{"role": "user", "content": user_input}]
+
+        context = await self.gather_context_for_main_llm(user_input, turn_specific_history)
+
+        MAX_ITERATIONS = self.config.LLM.get("PATHOS", {}).get("max_tool_iterations", 5)
+        final_response_to_user = "I'm not sure how to respond to that." # Default error/fallback
+        llm_output: Optional[LLMOutput] = None # To store the last llm_output outside loop if needed
+
+        for i in range(MAX_ITERATIONS):
+            logger.debug(f"Interaction loop iteration {i+1}/{MAX_ITERATIONS} for user '{self.current_active_user_id}'")
+            llm_output = await self.invoke_main_llm(context)
+
+            # Construct assistant message for history based on LLMOutput
+            assistant_message_for_history: Dict[str, Any] = {"role": "assistant"}
+            if llm_output.tool_calls: # LLM wants to use tools
+                # Ensure tool_calls are in the format expected by OpenAI schemas if needed
+                # My LLMToolCall -> oai_schemas.ToolCall
+                oai_tool_calls = []
+                for tc in llm_output.tool_calls:
+                    # Assuming LLMOutput.tool_calls directly matches oai_schemas.ToolCall after parsing
+                    oai_tool_calls.append(tc.model_dump(exclude_none=True))
+                assistant_message_for_history["tool_calls"] = oai_tool_calls
+                if llm_output.raw_text and not llm_output.dialogue_to_user and not llm_output.dialogue_to_npc:
+                     # Sometimes LLM includes text content alongside tool_calls, which should be part of the assistant message
+                     assistant_message_for_history["content"] = llm_output.raw_text
+
+            elif llm_output.dialogue_to_npc: # LLM wants to talk to an NPC
+                assistant_message_for_history["content"] = f"<thinking_process>Pathos decides to speak to NPC {llm_output.target_npc_id}.</thinking_process>\n<dialogue_to_npc target_id=\"{llm_output.target_npc_id}\">{llm_output.dialogue_to_npc}</dialogue_to_npc>"
+
+            elif llm_output.dialogue_to_user: # LLM has direct dialogue for the user
+                assistant_message_for_history["content"] = llm_output.dialogue_to_user
+
+            else: # Fallback if LLM output is unclear but not an error
+                assistant_message_for_history["content"] = llm_output.raw_text # Use raw_text as a last resort
+
+            # Add assistant's action/response to the turn-specific history and context for next iteration
+            context.conversation_history.append(assistant_message_for_history)
+            turn_specific_history.append(assistant_message_for_history)
+
+
+            if llm_output.tool_calls:
+                logger.info(f"LLM requested tool calls: {[tc.function.name for tc in llm_output.tool_calls]}")
+                tool_results: List[ToolResult] = await self.logos_core.execute_tools(llm_output.tool_calls, user_id_context=self.current_active_user_id)
+
+                for tr in tool_results:
+                    tool_response_message = {
+                        "role": "tool",
+                        "tool_call_id": tr.call_id,
+                        "name": tr.tool_name,
+                        "content": tr.result_summary_for_llm or json.dumps(tr.result_payload)
+                    }
+                    context.conversation_history.append(tool_response_message)
+                    turn_specific_history.append(tool_response_message)
+                continue # Loop back to invoke_main_llm with updated context
+
+            elif llm_output.dialogue_to_npc and llm_output.target_npc_id and self.firmament_module:
+                logger.info(f"Pathos to NPC '{llm_output.target_npc_id}': '{llm_output.dialogue_to_npc[:50]}...'")
+
+                npc_interaction_input = NPCInteractionInput(
+                    pathos_utterance=llm_output.dialogue_to_npc,
+                    npc_id=llm_output.target_npc_id
+                )
+                # The current_context for Firmament should be context.simulation_context
+                npc_response: NPCInteractionOutput = await self.firmament_module.process_pathos_utterance_to_npc(npc_interaction_input)
+
+                npc_response_message = {
+                    "role": "assistant", # From Pathos's perspective, NPC is providing content for him to process
+                    "name": npc_response.npc_id,
+                    "content": npc_response.npc_response_utterance
+                }
+                context.conversation_history.append(npc_response_message)
+                turn_specific_history.append(npc_response_message)
+
+                if npc_response.updated_simulation_context_summary and context.simulation_context and isinstance(context.simulation_context.get('ambient_details'), list):
+                    context.simulation_context["ambient_details"].append(f"Following interaction with {npc_response.npc_id}: {npc_response.updated_simulation_context_summary}")
+                continue # Loop back to invoke_main_llm
+
+            elif llm_output.dialogue_to_user:
+                logger.info(f"LLM generated dialogue for user: '{llm_output.dialogue_to_user[:70]}...'")
+                final_response_to_user = llm_output.dialogue_to_user
+                break
+
+            else:
+                logger.warning("LLMOutput had no actionable content. Using raw_text.")
+                final_response_to_user = llm_output.raw_text or "I'm a bit unsure how to proceed."
+                break
+
+        if i == MAX_ITERATIONS - 1 and llm_output and (llm_output.tool_calls or llm_output.dialogue_to_npc) :
+             logger.warning(f"Max interaction iterations ({MAX_ITERATIONS}) reached. Ending turn with last status.")
+             final_response_to_user = "I was in the middle of processing that. Could you give me a moment or rephrase?"
+
+        # After loop completion or break (meaning final response for user is determined)
+        # Record the interaction and perform other post-interaction tasks
+        mood_at_start_of_turn = context.current_mood # This was fetched at the beginning of process_user_interaction
+
+        interaction_log_data = InteractionLog(
+            interaction_id=str(uuid.uuid4()),
+            timestamp=datetime.now(timezone.utc), # Consider timestamp at start of user_input
+            user_id=self.current_active_user_id,
+            pathos_mood_at_start=mood_at_start_of_turn, # type: ignore # Assuming mood_at_start_of_turn is MoodState compatible
+            conversation_turns=turn_specific_history # This contains the full exchange for this turn
+        )
+        await self.ethos_core.record_interaction_event(interaction_log_data)
+
+        # Update Hexus based on the overall interaction (this might be simplified here)
+        # A more nuanced Hexus update could happen inside record_interaction_event or based on final_response_to_user
+        await self.ethos_core.process_event_for_hexus_update(
+            event_type="GENERAL_INTERACTION", # Or a more specific event based on content/outcome
+            payload={"user_input_snippet": user_input[:50], "pathos_response_snippet": final_response_to_user[:50]}
+        )
+
+        if self.subconscious_node_client:
+            try:
+                # Send a summary or key parts to subconscious
+                # subconscious_context = f"User: {user_input}\nPathos: {final_response_to_user}"
+                # await self.subconscious_node_client.inject_context_to_node("conversation", subconscious_context)
+                logger.debug("SubconsciousNodeClient.inject_context_to_node call placeholder.")
+            except Exception as e_sub_inject:
+                logger.warning(f"Failed to inject context to subconscious_node_client: {e_sub_inject}")
+
+        # TTS Streaming for final_response_to_user (if applicable)
+        # This logic can be adapted from the old generate_response method's TTS handling.
+        if final_response_to_user and request_metadata and request_metadata.get('auto_tts_enabled_for_response', False):
+            if self.eidos_tts_service_instance and self.eidos_tts_service_instance.is_available() and self.audio_cache is not None:
+                sentences = re.split(r'(?<=[.!?])\s+', final_response_to_user.strip())
+                tts_sequence_num = 0
+                for sentence_text in sentences:
+                    sentence = sentence_text.strip()
+                    if not sentence: continue
+                    # Use current_active_user_id for TTS task naming
+                    forced_chunk_id = f"chat_tts_main_{self.current_active_user_id}_{uuid.uuid4().hex[:8]}_{tts_sequence_num}"
+                    asyncio.create_task(self.send_sentence_to_tts_and_notify_client(
+                        sentence=sentence,
+                        user_id=self.current_active_user_id, # Use the active user ID
+                        sequence_num=tts_sequence_num,
+                        forced_chunk_id=forced_chunk_id
+                    ))
+                    tts_sequence_num += 1
+
+        return final_response_to_user
+
+    # --- End of New Orchestration Methods ---
+
+    # The _get_enhanced_pathos_llm_config, set_tts_service, set_audio_cache,
+    # get_static_prompt_for_cache_warming, _update_active_user methods remain as they are useful utilities.
+    # The old generate_response method and its helper _store_final_interaction will be removed or commented out.
+    # Proactive message generation methods (_generate_proactive_message, send_proactive_message)
+    # also need review to see if they fit the new orchestration or need adjustment.
 
     async def _get_enhanced_pathos_llm_config(self) -> Optional[LLMConfig]:
         if self._enhanced_pathos_llm_config is not None:
@@ -96,218 +494,78 @@ class PathosInterface:
     def get_static_prompt_for_cache_warming(self) -> Optional[str]:
         return self.prompt_builder.get_static_system_prompt_content()
 
-    def _update_active_user(self, new_user_id: str, set_by_statement: bool = False):
-        normalized_id = (new_user_id.lower().strip().replace(" ", "_") if new_user_id else "unknown_user") or "unknown_user"
-        if not normalized_id: normalized_id = "unknown_user"
+    def _update_active_user(self, new_user_id: Optional[str] = None, user_id_from_request: Optional[str] = None, set_by_statement: bool = False):
+        # Priority: new_user_id > user_id_from_request > fallback
+        effective_new_user_id = new_user_id or user_id_from_request or "unknown_user"
+
+        normalized_id = (effective_new_user_id.lower().strip().replace(" ", "_") if effective_new_user_id else "unknown_user")
+        if not normalized_id: normalized_id = "unknown_user" # Ensure it's never empty
+
         if self.current_active_user_id != normalized_id:
             logger.info(f"PathosInterface: Active user changed from '{self.current_active_user_id}' to '{normalized_id}'.")
             self.current_active_user_id = normalized_id
 
-    # _call_llm_with_tools and _execute_tools are now moved to ToolOrchestrator
 
-    async def generate_response(
-        self,
-        user_id: str,
-        user_input: str,
-        image_data_b64: Optional[str] = None,
-        document_text: Optional[str] = None,
-        request_metadata: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
-    ) -> Dict[str, Any]:
-        response_metadata: Dict[str, Any] = {}
-        req_meta = request_metadata if request_metadata is not None else {}
-        user_id_for_response = user_id
-        self._update_active_user(user_id_for_response)
-        should_stream_tts_for_this_response = req_meta.get('auto_tts_enabled_for_response', False)
-        response_metadata["tts_stream_attempted"] = should_stream_tts_for_this_response
-        if engaged_proactive_id := req_meta.get('engaged_proactive_id'): response_metadata["engaged_proactive_id"] = engaged_proactive_id
+    # Old generate_response method - COMMENTED OUT as its logic will be replaced by process_user_interaction
+    # async def generate_response(
+    #     self,
+    #     user_id: str,
+    #     user_input: str,
+    #     image_data_b64: Optional[str] = None,
+    #     document_text: Optional[str] = None,
+    #     request_metadata: Optional[Dict[str, Any]] = None,
+    #     **kwargs: Any
+    # ) -> Dict[str, Any]:
+    #     response_metadata: Dict[str, Any] = {}
+    #     req_meta = request_metadata if request_metadata is not None else {}
+    #     user_id_for_response = user_id
+    #     self._update_active_user(user_id_for_response)
+    #     should_stream_tts_for_this_response = req_meta.get('auto_tts_enabled_for_response', False)
+    #     response_metadata["tts_stream_attempted"] = should_stream_tts_for_this_response
+    #     if engaged_proactive_id := req_meta.get('engaged_proactive_id'): response_metadata["engaged_proactive_id"] = engaged_proactive_id
+    #     logger.info(f"PathosInterface: Processing request for user '{user_id_for_response}' with Main PATHOS LLM.")
+    #     vision_description_for_non_multimodal_pathos: Optional[str] = None
+    #     enhanced_pathos_config = await self._get_enhanced_pathos_llm_config()
+    #     if image_data_b64 and enhanced_pathos_config and not enhanced_pathos_config.get('supports_vision', False) and self.logos_core:
+    #         logger.info(f"Pathos LLM for '{user_id_for_response}' not multimodal. Requesting image description.")
+    #         vision_prompt = user_input if user_input.strip() else "Describe this image in detail."
+    #         try:
+    #             vision_description_for_non_multimodal_pathos = await self.logos_core.execute_describe_image(image_data_b64, vision_prompt)
+    #             if vision_description_for_non_multimodal_pathos and vision_description_for_non_multimodal_pathos.startswith('{\"error\":'):
+    #                 logger.warning(f"LogosCore image description failed: {vision_description_for_non_multimodal_pathos}")
+    #                 vision_description_for_non_multimodal_pathos = "[System note: Error processing image description.]"
+    #         except Exception as e_vision: logger.error(f"Error getting image description: {e_vision}", exc_info=True); vision_description_for_non_multimodal_pathos = "[System note: Error obtaining image description.]"
+    #     system_provided_info_for_prompt: Dict[str, Any] = {}
+    #     initial_llm_messages, retrieved_memories, current_mood, hexus_scores, estimated_prompt_tokens = await self.prompt_builder.build_main_llm_messages(
+    #         user_id=user_id_for_response,
+    #         user_input_text=user_input,
+    #         history_context=req_meta.get('conversation_history', []),
+    #         image_data_b64=image_data_b64,
+    #         vision_description_if_non_multimodal=vision_description_for_non_multimodal_pathos,
+    #         document_text=document_text,
+    #         force_web_search=req_meta.get('force_web_search_requested', False),
+    #         engaged_proactive_id=req_meta.get('engaged_proactive_id'),
+    #         system_provided_info=system_provided_info_for_prompt,
+    #         enhanced_pathos_llm_config=enhanced_pathos_config
+    #     )
+    #     full_history_for_interaction_log: List[Dict[str, Any]] = list(initial_llm_messages)
+    #     llm_usage_data: Optional[Dict[str, Any]] = None; llm_error_occurred = False
+    #     final_pathos_response_text_parts: List[str] = []; tts_sequence_num = 0
+    #     final_assistant_message_payload_for_response: Optional[Dict[str, Any]] = None
+    #     if not enhanced_pathos_config:
+    #         final_pathos_response_text_parts.append("I'm sorry, my internal configuration is incomplete."); llm_error_occurred = True
+    #     else:
+    #         current_conversation_messages = list(initial_llm_messages)
+    #         # This part used self.tool_orchestrator - will be replaced by new loop in process_user_interaction
+    #         # async for item in self.tool_orchestrator.call_llm_with_tools(...):
+    #         #    ...
+    #         logger.warning("generate_response: ToolOrchestrator logic needs to be moved/refactored into process_user_interaction.")
+    #         final_pathos_response_text_parts.append("[Old generate_response logic - needs refactor]") # Placeholder
+    #
+    #     final_pathos_response_text = "".join(final_pathos_response_text_parts).strip()
+    #     # ... rest of the old generate_response logic ...
+    #     return {"success": not llm_error_occurred, "content": final_pathos_response_text, "metadata": response_metadata}
 
-        logger.info(f"PathosInterface: Processing request for user '{user_id_for_response}' with Main PATHOS LLM.")
-
-        vision_description_for_non_multimodal_pathos: Optional[str] = None
-        enhanced_pathos_config = await self._get_enhanced_pathos_llm_config()
-        if image_data_b64 and enhanced_pathos_config and not enhanced_pathos_config.get('supports_vision', False) and self.logos_core:
-            logger.info(f"Pathos LLM for '{user_id_for_response}' not multimodal. Requesting image description.")
-            vision_prompt = user_input if user_input.strip() else "Describe this image in detail."
-            try:
-                vision_description_for_non_multimodal_pathos = await self.logos_core.execute_describe_image(image_data_b64, vision_prompt)
-                if vision_description_for_non_multimodal_pathos and vision_description_for_non_multimodal_pathos.startswith('{"error":'):
-                    logger.warning(f"LogosCore image description failed: {vision_description_for_non_multimodal_pathos}")
-                    vision_description_for_non_multimodal_pathos = "[System note: Error processing image description.]"
-            except Exception as e_vision: logger.error(f"Error getting image description: {e_vision}", exc_info=True); vision_description_for_non_multimodal_pathos = "[System note: Error obtaining image description.]"
-
-        system_provided_info_for_prompt: Dict[str, Any] = {}
-
-        initial_llm_messages, retrieved_memories, current_mood, hexus_scores, estimated_prompt_tokens = await self.prompt_builder.build_main_llm_messages(
-            user_id=user_id_for_response,
-            user_input_text=user_input,
-            history_context=req_meta.get('conversation_history', []),
-            image_data_b64=image_data_b64,
-            vision_description_if_non_multimodal=vision_description_for_non_multimodal_pathos,
-            document_text=document_text,
-            force_web_search=req_meta.get('force_web_search_requested', False),
-            engaged_proactive_id=req_meta.get('engaged_proactive_id'),
-            system_provided_info=system_provided_info_for_prompt,
-            enhanced_pathos_llm_config=enhanced_pathos_config
-        )
-        full_history_for_interaction_log: List[Dict[str, Any]] = list(initial_llm_messages)
-        llm_usage_data: Optional[Dict[str, Any]] = None; llm_error_occurred = False
-        final_pathos_response_text_parts: List[str] = []; tts_sequence_num = 0
-        final_assistant_message_payload_for_response: Optional[Dict[str, Any]] = None
-
-        if not enhanced_pathos_config:
-            final_pathos_response_text_parts.append("I'm sorry, my internal configuration is incomplete."); llm_error_occurred = True
-        else:
-            current_conversation_messages = list(initial_llm_messages)
-            # Use self.tool_orchestrator.call_llm_with_tools
-            async for item in self.tool_orchestrator.call_llm_with_tools(
-                llm_config_to_use=enhanced_pathos_config,
-                messages=current_conversation_messages,
-                tools_definition=getattr(self, 'AVAILABLE_TOOLS_FOR_PATHOS_LLM', ALL_AVAILABLE_SYSTEM_TOOLS),
-                user_id=user_id_for_response,
-                stream_tool_calls=True,
-                temperature_override=req_meta.get('temperature'),
-                max_tokens_override=req_meta.get('max_tokens_override'),
-                llm_provider_url_override=req_meta.get('llm_provider_url_override'),
-                model_override=req_meta.get('pathos_model_override')
-            ):
-                item_type = item.get("type"); payload = item.get("payload")
-                if item_type == "text_chunk" and isinstance(payload, str):
-                    final_pathos_response_text_parts.append(payload)
-                    await self.connection_manager.send_personal_message({"type": "text_chunk", "payload": {"text": payload, "sequence": tts_sequence_num}}, user_id_for_response)
-                elif item_type == "assistant_message_chunk" and isinstance(payload, dict): full_history_for_interaction_log.append(payload)
-                elif item_type == "tool_result_chunk" and isinstance(payload, dict): full_history_for_interaction_log.append(payload)
-                elif item_type == "final_assistant_message" and isinstance(payload, dict):
-                    full_history_for_interaction_log.append(payload); final_assistant_message_payload_for_response = payload
-                    if final_content := payload.get("content"):
-                        if not "".join(final_pathos_response_text_parts).strip() and isinstance(final_content, str):
-                             final_pathos_response_text_parts = [final_content]
-                elif item_type == "error_chunk":
-                    error_content = payload if isinstance(payload, str) else "Unknown LLM error from stream"
-                    final_pathos_response_text_parts.append(f"[{error_content}]")
-                    llm_error_occurred = True; full_history_for_interaction_log.append({"role": "system", "content": f"LLM Error: {error_content}"})
-                    logger.error(f"LLM error_chunk received: {error_content}"); break
-                elif item_type == "usage_chunk": llm_usage_data = payload
-
-        final_pathos_response_text = "".join(final_pathos_response_text_parts).strip()
-        if final_assistant_message_payload_for_response and isinstance(final_assistant_message_payload_for_response.get("content"), str) and not final_pathos_response_text:
-            final_pathos_response_text = final_assistant_message_payload_for_response["content"]
-
-        final_pathos_response_text = re.sub(r"<think>.*?</think>\s*", "", final_pathos_response_text, flags=re.DOTALL).strip()
-
-        # Process Hexus updates based on successful tool calls
-        if self.ethos_core and final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls"):
-            tool_calls_data = final_assistant_message_payload_for_response.get("tool_calls")
-            # Need to find corresponding tool results in full_history_for_interaction_log
-            # This part is a bit complex as results are separate messages.
-            # For simplicity, we'll iterate through tool_calls and assume success if a result for that call_id exists later.
-            # A more robust way would be to have tool_orchestrator return explicit success/failure per tool.
-
-            # Create a map of tool_call_id to tool_name
-            tool_call_name_map = {}
-            if isinstance(tool_calls_data, list):
-                for tc in tool_calls_data:
-                    if isinstance(tc, dict) and tc.get("id") and tc.get("function"):
-                        tool_call_name_map[tc["id"]] = tc["function"].get("name")
-
-            for message in full_history_for_interaction_log:
-                if message.get("role") == "tool" and (tool_call_id := message.get("tool_call_id")):
-                    tool_name = tool_call_name_map.get(tool_call_id)
-                    if not tool_name: continue # Should not happen if history is consistent
-
-                    # Assuming tool execution was successful if we have a "tool" role message with its ID.
-                    # More precise success checking would require changes in ToolOrchestrator's output.
-                    event_name: Optional[str] = None
-                    event_payload: Dict[str, Any] = {"tool_name": tool_name} # Basic payload
-
-                    if tool_name == "web_search":
-                        event_name = "TOOL_SUCCESS_WEB_SEARCH"
-                    elif tool_name == "add_pathos_event_to_calendar":
-                        # Ideally, parse arguments to determine if it's work or leisure
-                        # For now, default to a generic or work-related event
-                        event_name = "TOOL_SUCCESS_ADD_EVENT_WORK"
-                        # Example for future:
-                        # try:
-                        #     args = json.loads(tc.get("function", {}).get("arguments", "{}"))
-                        #     if "leisure" in args.get("event_type", "").lower() or "social" in args.get("event_type", "").lower():
-                        #         event_name = "TOOL_SUCCESS_ADD_EVENT_LEISURE"
-                        # except json.JSONDecodeError:
-                        #     pass
-                    elif tool_name == "fetch_weather":
-                        event_name = "TOOL_SUCCESS_FETCH_WEATHER"
-                    # Add other tool mappings here
-                    else:
-                        event_name = "TOOL_SUCCESS_GENERIC" # Fallback for unmapped successful tools
-
-                    if event_name:
-                        asyncio.create_task(self.ethos_core.process_event_for_hexus_update(event_name, payload=event_payload))
-
-                    # TODO: Add handling for TOOL_FAILURE_GENERIC if ToolOrchestrator provides failure info
-
-
-        if not final_pathos_response_text and not llm_error_occurred and not (final_assistant_message_payload_for_response and final_assistant_message_payload_for_response.get("tool_calls")):
-             final_pathos_response_text = "Understood."
-
-        if final_pathos_response_text and should_stream_tts_for_this_response and self.eidos_tts_service_instance and self.eidos_tts_service_instance.is_available() and self.audio_cache is not None:
-            sentences = re.split(r'(?<=[.!?])\s+', final_pathos_response_text.strip())
-            for sentence_text in sentences:
-                sentence = sentence_text.strip();
-                if not sentence: continue
-                forced_chunk_id = f"chat_tts_main_{user_id_for_response}_{uuid.uuid4().hex[:8]}_{tts_sequence_num}"
-                asyncio.create_task(self.send_sentence_to_tts_and_notify_client(sentence=sentence, user_id=user_id_for_response, sequence_num=tts_sequence_num, forced_chunk_id=forced_chunk_id))
-                tts_sequence_num += 1
-
-        if self.ethos_core:
-            # Changed from update_mood_on_interaction to process_interaction_for_hexus_update
-            self.ethos_core.process_interaction_for_hexus_update(user_input, final_pathos_response_text, bool(image_data_b64), bool(document_text))
-
-        tool_calls_for_metadata = final_assistant_message_payload_for_response.get("tool_calls") if final_assistant_message_payload_for_response else None
-        conversation_id = kwargs.get("conversation_id", "unknown_conv_id")
-
-        detected_intent_to_search = False
-        original_user_query_for_search = user_input
-        pathos_formulated_search_query = None
-
-        if final_pathos_response_text and not tool_calls_for_metadata:
-            response_lower = final_pathos_response_text.lower()
-            for phrase in self.INTENT_TO_SEARCH_PHRASES:
-                if phrase.lower() in response_lower:
-                    detected_intent_to_search = True
-                    logger.info(f"PathosInterface: Detected intent to search in response: '{final_pathos_response_text}' (Trigger: '{phrase}') for user_id: {user_id_for_response}, conversation_id: {conversation_id}")
-                    pathos_formulated_search_query = f"Information related to Pathos's statement: '{final_pathos_response_text}' (Original user query: '{user_input}')"
-                    response_metadata["detected_intent_to_search"] = True
-                    response_metadata["pathos_stated_intent_text"] = final_pathos_response_text
-                    response_metadata["original_user_query_for_search"] = user_input
-                    response_metadata["pathos_formulated_search_query_mvp"] = pathos_formulated_search_query
-                    break
-
-        if detected_intent_to_search:
-            logger.info(f"PathosInterface: TODO - Call Computer Interaction Module with query. User='{original_user_query_for_search}', Pathos Response='{final_pathos_response_text}' for user_id: {user_id_for_response}, conversation_id: {conversation_id}")
-            pass
-
-        response_metadata["tool_calls_from_pathos"] = tool_calls_for_metadata
-        response_metadata["error_flag"] = llm_error_occurred
-        response_metadata["mood_at_response"] = self.ethos_core.get_current_mood() if self.ethos_core else {} # Updated to use new get_current_mood()
-        response_metadata["hexus_scores"] = self.ethos_core.get_hexus_scores() if self.ethos_core else {} # Ensure this is up-to-date
-        response_metadata["retrieved_memory_ids"] = [m['id'] for m in retrieved_memories if isinstance(m, dict) and 'id' in m]
-        if llm_usage_data:
-            response_metadata["prompt_tokens_from_llm"] = llm_usage_data.get("prompt_tokens")
-            response_metadata["completion_tokens_from_llm"] = llm_usage_data.get("completion_tokens")
-        if estimated_prompt_tokens > 0: response_metadata["estimated_prompt_tokens"] = estimated_prompt_tokens
-
-        if self.ethos_core:
-            await self._store_final_interaction(
-                original_user_input=user_input, pathos_response=final_pathos_response_text, mood_at_response=current_mood,
-                retrieved_memories=retrieved_memories, full_history_for_pathos=full_history_for_interaction_log, error=llm_error_occurred,
-                image_provided_this_turn=bool(image_data_b64), vision_llm_output=vision_description_for_non_multimodal_pathos,
-                is_proactive_turn=bool(engaged_proactive_id), forced_action=req_meta.get('force_web_search_requested')
-            )
-        if document_text and self.logos_core:
-             asyncio.create_task(self.logos_core.add_document_to_rag(extracted_text=document_text, filename="uploaded_via_chat", user_id=user_id_for_response), name=f"AddDocToRAG_{user_id_for_response}_{uuid.uuid4().hex[:4]}")
-
-        is_error_response = llm_error_occurred or (not final_pathos_response_text and not tool_calls_for_metadata)
-
-        return {"success": not is_error_response, "content": final_pathos_response_text, "metadata": response_metadata}
 
     async def _generate_proactive_message(self, user_id: str, proactive_type: str, context: Optional[Any] = None) -> Tuple[Optional[str], List[Dict[str, Any]]]:
         enhanced_config = await self._get_enhanced_pathos_llm_config()
@@ -348,30 +606,48 @@ class PathosInterface:
         system_prompt_content_pm = "\n".join(system_prompt_content_parts_pm)
         proactive_messages_for_llm = [{"role": "system", "content": system_prompt_content_pm}, {"role": "user", "content": prompt_for_llm}]
 
-        proactive_text_content_accumulator = []; llm_usage_data: Optional[Dict[str, Any]] = None; llm_error_occurred = False
+        proactive_text_content: Optional[str] = None
+        llm_error_occurred = False
 
-        async for item in self.llm_client.call_llm_api(
+        # Call LLM (non-streaming for a single proactive message)
+        llm_response: LLMResponsePayload = await self.llm_client.call_llm_api(
             llm_config=enhanced_config,
             messages=proactive_messages_for_llm,
-            tools_definition=None,
-            temperature_override=float(enhanced_config.get('temperature', 0.4)),
-            max_tokens_override=150,
-            stream=True
-        ):
-            if isinstance(item, str): proactive_text_content_accumulator.append(item)
-            elif isinstance(item, dict):
-                item_type = item.get("type"); payload = item.get("payload")
-                if item_type == "error_chunk":
-                    logger.warning(f"Proactive message generation LLM error: {payload}")
-                    proactive_text_content_accumulator.append(f"[{payload}]"); llm_error_occurred = True; break
-                elif item_type == "usage_chunk": llm_usage_data = payload
+            # tools_definition=None, # No tools for proactive messages typically
+            temperature_override=float(enhanced_config.get('temperature', 0.7)), # Temp might be different for proactive
+            max_tokens_override=150, # Proactive messages should be concise
+            stream=False
+        )
 
-        proactive_text_content = "".join(proactive_text_content_accumulator).strip()
-        if llm_usage_data: logger.info(f"LLM usage for proactive message generation: {llm_usage_data}")
-
-        if proactive_text_content and not llm_error_occurred:
+        if llm_response.success() and llm_response.content:
+            proactive_text_content = llm_response.content.strip()
+            # Further processing like stripping <think> tags
             proactive_text_content = re.sub(r"<think>.*?</think>\s*", "", proactive_text_content, flags=re.DOTALL).strip()
-            if not proactive_text_content: logger.warning(f"Proactive message for '{proactive_type}' empty after stripping think tags."); return None, []
+            if not proactive_text_content:
+                logger.warning(f"Proactive message for '{proactive_type}' empty after stripping think tags or initial processing.")
+                proactive_text_content = None # Ensure it's None if truly empty
+        else:
+            logger.warning(f"Proactive message generation LLM call failed or returned no content. Error: {llm_response.error_message}")
+            llm_error_occurred = True
+            proactive_text_content = None
+
+        if proactive_text_content: # Check if content is not None and not empty
+            logger.info(f"Generated proactive message text for '{proactive_type}': {proactive_text_content[:100]}...")
+            audio_chunk_info_list: List[Dict[str, Any]] = []; tts_sequence_num_proactive = 0
+            if self.eidos_tts_service_instance and self.eidos_tts_service_instance.is_available() and self.audio_cache is not None:
+                sentences = re.split(r'(?<=[.!?])\s+', proactive_text_content.strip())
+                for sentence_text in sentences:
+                    sentence = sentence_text.strip();
+                    if not sentence: continue
+                    forced_chunk_id = f"proactive_tts_{user_id}_{uuid.uuid4().hex[:10]}_{tts_sequence_num_proactive}"
+                    asyncio.create_task(self.send_sentence_to_tts_and_notify_client(sentence=sentence, user_id=user_id, sequence_num=tts_sequence_num_proactive, forced_chunk_id=forced_chunk_id, chunk_id_prefix="proactive_tts_"))
+                    tts_sequence_num_proactive += 1
+            return proactive_text_content, audio_chunk_info_list
+        else:
+            logger.warning(f"Proactive message generation for '{proactive_type}' failed or resulted in empty content.")
+            return None, []
+
+    async def send_sentence_to_tts_and_notify_client(self, sentence: str, user_id: str, sequence_num: int, forced_chunk_id: Optional[str] = None, chunk_id_prefix: str = "chat_tts_main_"):
 
             logger.info(f"Generated proactive message text for '{proactive_type}': {proactive_text_content[:100]}...")
             audio_chunk_info_list: List[Dict[str, Any]] = []; tts_sequence_num_proactive = 0
@@ -468,81 +744,8 @@ class PathosInterface:
         except Exception as e: logger.error(f"Error closing PathosInterface resources: {e}", exc_info=True)
         logger.info("PathosInterface closed.")
 
-    async def _store_final_interaction(
-        self,
-        original_user_input: str,
-        pathos_response: str,
-        mood_at_response: Dict[str, Any], # Changed from Dict[str, float] to Dict[str, Any] to accommodate new mood structure
-        retrieved_memories: List[Dict[str, Any]],
-        full_history_for_pathos: List[Dict[str, Any]],
-        error: bool = False,
-        image_provided_this_turn: bool = False,
-        vision_llm_output: Optional[str] = None,
-        is_proactive_turn: bool = False,
-        forced_action: bool = False
-    ):
-        """Store the final interaction details in Ethos memory system."""
-        if not self.ethos_core:
-            logger.error("Cannot store final interaction: EthosCore not available.")
-            return
-
-        try:
-            # Construct interaction content string
-            interaction_content_parts = []
-            interaction_content_parts.append(f"User: {original_user_input}")
-            
-            # Add any vision context if provided
-            if image_provided_this_turn and vision_llm_output:
-                interaction_content_parts.append(f"\nImage Analysis: {vision_llm_output}")
-            
-            # Add Pathos's response
-            interaction_content_parts.append(f"\nPathos: {pathos_response}")
-
-            # Add any tool usage from the conversation history
-            tool_calls = []
-            for msg in full_history_for_pathos:
-                if msg.get("tool_calls"):
-                    tool_calls.extend(msg["tool_calls"])
-            if tool_calls:
-                interaction_content_parts.append("\nTools Used by Pathos:")
-                for tool in tool_calls:
-                    interaction_content_parts.append(f"- {tool.get('function', {}).get('name', 'unknown_tool')}")
-
-            # Build metadata
-            metadata = {
-                "user_id": self.current_active_user_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "mood_at_response": mood_at_response,
-                "is_error": error,
-                "is_proactive": is_proactive_turn,
-                "had_image": image_provided_this_turn,
-                "forced_action": forced_action,
-                "retrieved_memory_count": len(retrieved_memories),
-                "retrieved_memory_ids": [m.get("id") for m in retrieved_memories if isinstance(m, dict) and "id" in m],
-            }
-
-            # Calculate salience based on various factors
-            base_salience = 1.0
-            if error:
-                base_salience *= 1.2  # Errors are more notable
-            if is_proactive_turn:
-                base_salience *= 1.1  # Proactive interactions are slightly more notable
-            if len(retrieved_memories) > 0:
-                base_salience *= (1.0 + min(len(retrieved_memories) * 0.05, 0.2))  # More memories = more significant
-            
-            # Store the interaction in Ethos memory
-            await self.ethos_core.add_memory_entry(
-                entry_data={
-                    "type": "chat_interaction",
-                    "content": "\n".join(interaction_content_parts),
-                    "metadata": metadata,
-                    "salience": base_salience
-                },
-                user_id_context=self.current_active_user_id
-            )
-
-        except Exception as e:
-            logger.error(f"Error storing final interaction in Ethos: {e}", exc_info=True)
+    # Removed _store_final_interaction method. Its logic is now integrated into
+    # process_user_interaction through ethos_core.record_interaction_event.
 
     async def send_proactive_message(
         self,

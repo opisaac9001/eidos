@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, File, UploadFile, Header 
 from fastapi.responses import JSONResponse
 
 # Pydantic models from eidos_agent.schemas
-from eidos_agent.schemas import FeedbackRequest
+from eidos_agent.schemas.feedback_schemas import FeedbackRequest
 
 # Core Eidos components (to be injected)
 

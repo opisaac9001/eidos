@@ -139,6 +139,172 @@ class PromptBuilder:
 
         logger.info("PromptBuilder initialized.")
 
+    async def build_messages_from_main_llm_prompt_context(
+        self,
+        context: 'MainLLMPromptContext', # Forward reference with quotes
+        llm_config: Optional[LLMConfig] = None
+    ) -> List[Dict[str, Any]]: # Returns only the messages
+        """
+        Builds the list of messages for the Main Pathos LLM using a MainLLMPromptContext object.
+        """
+        # Unpack data from the context object
+        user_id = self.ethos_core.current_active_user_id if self.ethos_core else "unknown_user" # Assuming PathosInterface sets this
+        # Or, if MainLLMPromptContext should carry user_id:
+        # user_id = context.user_id_for_context if hasattr(context, 'user_id_for_context') else "unknown_user"
+
+        user_input_text = context.user_input
+        history_context = context.conversation_history
+
+        # Assuming context fields for mood, memories etc. are already Pydantic models or dicts
+        # that can be used directly or easily formatted.
+        # The original build_main_llm_messages fetched these; now they are provided.
+
+        main_system_prompt_template = load_system_prompt("main_pathos_llm_system_prompt", "You are Pathos...")
+
+        persona_directives_content = "\n".join(context.persona_profile.get("core_directives", [])) if context.persona_profile else "Default persona." # Simplified
+        current_mood_str = f"Valence: {context.current_mood.get('valence', 0):.2f}, Arousal: {context.current_mood.get('arousal', 0):.2f}" if context.current_mood else "Mood: Neutral"
+        current_activity_description = context.current_activity.get("title", "Currently idle.") if context.current_activity else "Currently idle."
+        hexus_scores_str = ", ".join([f"{s.get('name')}={s.get('value'):.2f}" for s in context.current_mood.get("detailed_hexus_scores", [])]) if context.current_mood else "N/A"
+
+        user_profile_summary = "User profile not detailed in context." # Placeholder
+        if context.persona_profile and context.persona_profile.get("self_description_summary"): # Assuming profile might contain this
+            user_profile_summary = context.persona_profile.get("self_description_summary")
+        elif self.ethos_core: # Fallback to fetching if not directly in context.persona_profile
+             user_profile_summary = await self.ethos_core.get_user_profile_summary(user_id)
+
+
+        try:
+            current_time_str = await self.logos_core.execute_get_time(location=None) if self.logos_core else datetime.now(timezone.utc).strftime("%A, %B %d, %Y, %I:%M %p %Z")
+            if not isinstance(current_time_str, str) or "Error" in current_time_str or "error" in current_time_str.lower():
+                 current_time_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z (UTC fallback)")
+        except Exception: current_time_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z (UTC fallback)")
+
+        formatted_memory_strings = []
+        if context.recent_memories:
+            for mem_dict in context.recent_memories: # mem_dict is already a dict from model_dump()
+                content_snippet = mem_dict.get('content', '')[:150] + "..." if len(mem_dict.get('content', '')) > 150 else mem_dict.get('content', '')
+                formatted_memory_strings.append(f"- {content_snippet}")
+        memories_formatted_for_prompt = "\n".join(formatted_memory_strings) or "No specific recent memories noted."
+
+        pathos_schedule_context = context.current_activity.get("title", "No specific schedule context.") if context.current_activity else "No schedule info."
+        pathos_aspirations_context = "Aspirations context not detailed." # Placeholder, needs specific field in MainLLMPromptContext or persona_profile
+        todays_briefing_context = "Briefing context not detailed." # Placeholder
+
+        pathos_traits_description = "Pathos has an adaptive personality." # Placeholder
+        if context.persona_profile and context.persona_profile.get("traits"):
+            traits_list = [f"{t.get('name')}: {t.get('value')}" for t in context.persona_profile.get("traits", [])]
+            if traits_list: pathos_traits_description = "Key traits: " + "; ".join(traits_list)
+
+        available_tools_json_for_prompt = json.dumps(self.logos_core.get_tools_for_llm(user_id_context=user_id), indent=2) if self.logos_core else "[]"
+
+        vision_analysis_context_for_prompt = "No image analysis this turn."
+        if context.simulation_context and context.simulation_context.get("image_analysis_result"): # Example if sim_context carried this
+            vision_analysis_context_for_prompt = context.simulation_context.get("image_analysis_result")
+
+
+        system_prompt_replacements = {
+            "{{PATHOS_PERSONA_DIRECTIVES_FROM_FILE}}": persona_directives_content,
+            "{{CURRENT_DATETIME_FOR_PROMPT}}": current_time_str,
+            "{{USER_PROFILE_SUMMARY_FOR_PROMPT}}": user_profile_summary,
+            "{{CURRENT_ACTIVITY_DESCRIPTION}}": current_activity_description,
+            "{{CURRENT_MOOD_FOR_PROMPT}}": current_mood_str,
+            "{{CURRENT_HEXUS_SCORES_FOR_PROMPT}}": hexus_scores_str,
+            "{{PATHOS_SCHEDULE_CONTEXT}}": pathos_schedule_context,
+            "{{PATHOS_ASPIRATIONS_CONTEXT}}": pathos_aspirations_context,
+            "{{PATHOS_TRAITS_DESCRIPTION}}": pathos_traits_description,
+            "{{RELEVANT_MEMORIES_CONTEXT_FOR_PROMPT}}": memories_formatted_for_prompt,
+            "{{TODAYS_BRIEFING_CONTEXT_FOR_PROMPT}}": todays_briefing_context,
+            "{{VISION_ANALYSIS_CONTEXT_FOR_PROMPT}}": vision_analysis_context_for_prompt,
+            "{{AVAILABLE_TOOLS_JSON_FOR_PROMPT}}": available_tools_json_for_prompt
+        }
+        base_system_prompt_content = main_system_prompt_template
+        for placeholder, value in system_prompt_replacements.items():
+            base_system_prompt_content = base_system_prompt_content.replace(placeholder, str(value) if value is not None else "")
+
+        if self.feed_integrator and context.significant_subconscious_thoughts:
+            # This needs SubconsciousFeedIntegrator to be adapted or a new method to format thoughts from context
+            # For now, simple join:
+            thoughts_str = "\n".join([f"- {th.get('content')}" for th in context.significant_subconscious_thoughts])
+            subconscious_enrichment = f"\n\n--- Recent Subconscious Musings ---\n{thoughts_str}\n--- End Subconscious Musings ---"
+            if subconscious_enrichment:
+                base_system_prompt_content += subconscious_enrichment
+
+        system_prompt_message = {"role": "system", "content": base_system_prompt_content}
+
+        # Token management: Use cleaned history from context.conversation_history
+        # The context.conversation_history should already be prepared by PathosInterface
+        # (e.g., user input added, but not yet Pathos's current response attempt).
+
+        # For now, assume history_context in MainLLMPromptContext is ready to use
+        final_messages: List[Dict[str, Any]] = [system_prompt_message] + history_context
+
+        # Simplified token estimation and truncation for this refactor step.
+        # Actual token counting and truncation logic from original build_main_llm_messages should be adapted here.
+        model_name_for_tiktoken = "cl100k_base"
+        if llm_config:
+             model_name_for_tiktoken = llm_config.get('model_name_for_tiktoken', llm_config.get('model', 'cl100k_base'))
+
+        estimated_tokens = estimate_tokens_for_messages(final_messages, model_name_for_tiktoken)
+        logger.info(f"PromptBuilder (new method): Initial message assembly. Estimated tokens: {estimated_tokens}. System prompt length: {len(system_prompt_message['content'])}. Total messages: {len(final_messages)}")
+
+        # Token Truncation Logic (adapted from original build_main_llm_messages)
+        # Max prompt tokens calculation (should come from config, passed via llm_config or self.config)
+        # Assuming llm_config is the enhanced_pathos_llm_config which might have overrides.
+        # Fallback to main config if specific limits aren't in llm_config.
+
+        # PathosInterface._get_enhanced_pathos_llm_config() will provide this.
+        # For PromptBuilder, it should ideally get these limits via config objects.
+        # Let's assume self.config has these directly for simplicity here.
+        llm_max_prompt_tokens_main = self.config.LLM_MAX_PROMPT_TOKENS_MAIN
+        llm_response_buffer_tokens = self.config.LLM_RESPONSE_BUFFER_TOKENS
+        max_prompt_tokens = llm_max_prompt_tokens_main - llm_response_buffer_tokens
+
+        # Add _estimated_tokens to each message for truncation logic
+        messages_for_truncation: List[Dict[str, Any]] = []
+        for msg in final_messages:
+            msg_copy = msg.copy()
+            msg_copy["_estimated_tokens"] = estimate_tokens_for_messages([msg_copy], model_name_for_tiktoken)
+            messages_for_truncation.append(msg_copy)
+
+        current_total_tokens = sum(m.get("_estimated_tokens", 0) for m in messages_for_truncation)
+        logger.debug(f"Token count before truncation: {current_total_tokens}. Max allowed for prompt: {max_prompt_tokens}")
+
+        # Truncation loop
+        # Priority: Remove oldest from history_context first.
+        # System prompt (index 0) and current user input (last message) should be preserved if possible.
+        # The 'history_context' part is now context.conversation_history.
+        # 'injected_past_messages' equivalent would be context.recent_memories or context.significant_subconscious_thoughts if formatted as messages.
+        # For this refactor, let's assume context.conversation_history is the primary part to truncate.
+
+        # The structure of messages_for_truncation is [system_prompt, ...history_messages..., user_input_message]
+        # We want to remove from the `...history_messages...` part.
+
+        while current_total_tokens > max_prompt_tokens and len(messages_for_truncation) > 2: # Keep at least system and user message
+            # Remove from the oldest part of the history, which is after the system prompt (index 0)
+            idx_to_remove = 1
+            if idx_to_remove < len(messages_for_truncation) - 1: # Ensure we don't remove the last (user) message
+                removed_msg = messages_for_truncation.pop(idx_to_remove)
+                removed_tokens = removed_msg.get("_estimated_tokens", 0)
+                current_total_tokens -= removed_tokens
+                logger.debug(f"Truncation: Removed message (tokens: {removed_tokens}, content: '{str(removed_msg.get('content'))[:30]}...'). New total: {current_total_tokens}")
+            else:
+                # Only system prompt and user message left, or only one history message that can't be removed without leaving only one.
+                logger.warning(f"Cannot truncate further history. Current token count {current_total_tokens} still exceeds max {max_prompt_tokens}.")
+                break
+
+        # Clean up internal token count keys before returning
+        final_truncated_messages = []
+        for msg in messages_for_truncation:
+            msg_copy = msg.copy()
+            msg_copy.pop("_estimated_tokens", None)
+            final_truncated_messages.append(msg_copy)
+
+        final_estimated_tokens_after_trunc = estimate_tokens_for_messages(final_truncated_messages, model_name_for_tiktoken)
+        logger.info(f"PromptBuilder (new method): Built messages. Final token count after truncation: {final_estimated_tokens_after_trunc}. Total messages: {len(final_truncated_messages)}")
+
+        return final_truncated_messages
+
+
     def get_static_system_prompt_content(self) -> Optional[str]:
         """
         Generates a static version of the Pathos system prompt, primarily for
@@ -187,6 +353,7 @@ class PromptBuilder:
         enhanced_pathos_llm_config: Optional[LLMConfig] = None # Passed from PathosInterface
     ) -> Tuple[List[Dict[str, Any]], List[MemoryEntry], Dict[str, float], Dict[str, float], int]:
         """
+        DEPRECATED: This method is being replaced by build_messages_from_main_llm_prompt_context.
         Builds the list of messages to be sent to the main Pathos LLM.
         This involves constructing the system prompt with dynamic context (mood, memories, etc.),
         potentially injecting relevant past interactions, and managing token limits.

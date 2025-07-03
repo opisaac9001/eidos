@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel, Field, ValidationError # Added ValidationError
 
 # Imports from eidos_agent.schemas
-from eidos_agent.schemas import (
+from eidos_agent.schemas.oai_schemas import (
     ModelList, ModelCard,
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage,
     ChatCompletionChoice, ChatCompletionUsage

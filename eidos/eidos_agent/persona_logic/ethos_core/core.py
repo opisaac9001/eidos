@@ -20,18 +20,29 @@ from .traits import TraitsEngine
 from eidos_agent.utils.logger import get_logger
 import pytz # Added import
 
+# New Schema Imports
+from eidos_agent.schemas.ethos_schemas import (
+    MoodState, Memory as EthosMemory, PersonaProfile, InteractionLog,
+    HexusScore, PersonaDirective, Trait
+)
+from eidos_agent.schemas.llm_schemas import LLMResponsePayload # For _call_llm_for_internal_task
+
+# LLMClient for internal LLM calls
+from eidos_agent.llm_integrations.llm_client import LLMClient
+
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from eidos_agent.features.oneiros import OneirosModule # Updated import
-    from eidos_agent.features.firmament.module import FirmamentModule # Added FirmamentModule
+    from eidos_agent.features.oneiros import OneirosModule
+    from eidos_agent.features.firmament.module import FirmamentModule as ActualFirmamentModuleType
     from eidos_agent.core.connection_manager import ConnectionManager
-    from eidos_agent.modules.pathos_interface import PathosInterface # This will be updated in a later task
-    from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
-    # Updated import for ChronosEngine and related types
-    from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot
+    # PathosInterface might not be directly needed by EthosCore after refactor, review dependencies.
+    from eidos_agent.llm_integrations.pathos_interface import PathosInterface
+    from eidos_agent.persona_logic.logos_core.handler import LogosCore
+    from eidos_agent.persona_logic.chronos_engine.engine import ChronosEngine # Assuming engine.py
+    from eidos_agent.persona_logic.chronos_engine.models import ActivitySlot # Assuming models.py
 
-from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID # Moved here
+from eidos_agent.persona_logic.chronos_engine.models import PATHOS_USER_ID # Adjusted import
 
 # PATHOS_USER_ID is now imported via TYPE_CHECKING block or directly if not under TYPE_CHECKING
 # from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # This line is removed
@@ -361,8 +372,9 @@ HEXUS_ACTIVITY_MODIFIERS: Dict[str, Dict[str, Dict[str, float]]] = {
 
 
 class EthosCore:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, llm_client: LLMClient): # Added llm_client
         self.config = config
+        self.llm_client = llm_client # Store the LLMClient instance
         self.ethos_config: EthosConfig = config.get_ethos_config()
         self.memory_storage = MemoryStorage(config)
         self.hexus_state_file_path = self.memory_storage.memory_db_path.parent / HEXUS_STATE_FILENAME
@@ -441,7 +453,7 @@ class EthosCore:
         self.pathos_interface: Optional['PathosInterface'] = None
         self.logos_core: Optional['LogosCore'] = None
         self.chronos_engine: Optional['ChronosEngine'] = None
-        self.firmament_module: Optional[FirmamentModule] = None # Added FirmamentModule attribute
+        self.firmament_module: Optional['ActualFirmamentModuleType'] = None # Updated type hint
 
         self.system_user_ids: List[Optional[str]] = [
             "unknown_user", "api_guest_user", "system_oneiros", "system_document", "system_briefing",
@@ -529,7 +541,7 @@ class EthosCore:
     def set_chronos_engine(self, chronos_engine_instance: 'ChronosEngine'):
         self.chronos_engine = chronos_engine_instance
 
-    def set_firmament_module(self, firmament_module: 'FirmamentModule'): # Added setter
+    def set_firmament_module(self, firmament_module: 'ActualFirmamentModuleType'): # Updated type hint
         self.firmament_module = firmament_module
         logger.info("EthosCore: FirmamentModule instance set.")
 
@@ -606,7 +618,7 @@ class EthosCore:
         except (IOError, TypeError) as e:
             logger.error(f"Failed to save Hexus scores: {e}", exc_info=True)
 
-    async def add_memory_entry(self, entry_data: Dict, user_id_context: Optional[str] = None) -> MemoryEntry:
+    async def add_memory_entry(self, entry_data: Dict, user_id_context: Optional[str] = None) -> EthosMemory: # Changed return type
         if 'content' not in entry_data or 'type' not in entry_data:
             raise ValueError("Memory entry must contain 'content' and 'type'")
 
@@ -690,7 +702,28 @@ class EthosCore:
         
         # If not a user_fact that was updated, or if it's a new user_fact, proceed to normal add
         # MemoryStorage.add_entry itself handles INSERT OR REPLACE based on primary key (id)
-        return self.memory_storage.add_entry(entry_data)
+        stored_entry_dict = self.memory_storage.add_entry(entry_data) # This returns a dict (MemoryEntry TypedDict)
+        try:
+            # Convert to EthosMemory Pydantic model
+            # Ensure timestamp is in the correct string format if EthosMemory expects datetime string
+            if isinstance(stored_entry_dict.get("timestamp"), datetime):
+                stored_entry_dict["timestamp"] = stored_entry_dict["timestamp"].isoformat()
+
+            # Ensure embedding is List[float] if present, or None
+            if "embedding" in stored_entry_dict and not isinstance(stored_entry_dict["embedding"], (list, type(None))):
+                 logger.warning(f"Memory entry ID {stored_entry_dict.get('id')} has embedding of type {type(stored_entry_dict['embedding'])}, expected list or None. Setting to None for Pydantic model.")
+                 stored_entry_dict["embedding"] = None
+            elif isinstance(stored_entry_dict.get("embedding"), list):
+                if not all(isinstance(x, float) for x in stored_entry_dict["embedding"]):
+                    logger.warning(f"Memory entry ID {stored_entry_dict.get('id')} has non-float elements in embedding list. Setting to None for Pydantic model.")
+                    stored_entry_dict["embedding"] = None
+
+            return EthosMemory(**stored_entry_dict)
+        except Exception as e_model:
+            logger.error(f"Failed to convert stored memory entry (ID: {stored_entry_dict.get('id')}) to EthosMemory Pydantic model: {e_model}", exc_info=True)
+            # Depending on desired strictness, could raise error or return a default/dummy EthosMemory
+            raise ValueError(f"Failed to convert memory entry to EthosMemory model: {e_model}") from e_model
+
 
     async def get_todays_briefing(self) -> Optional[str]:
         """
@@ -889,8 +922,11 @@ class EthosCore:
         # or will be called by subsequent updates. This ensures bias is applied before first use.
 
 
-    async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
+    async def get_recent_dreams(self, user_id_context: Optional[str], limit: int) -> List[EthosMemory]: # Changed return type
         dream_type = "queued_discussion_point" # Dreams are stored as queued points
+        # Note: The 'dream' type in EthosMemory.type Literal might be more appropriate if these are actual dream narratives.
+        # If "queued_discussion_point" is correct because dreams are first queued as such, then the type is fine.
+        # For now, assuming "queued_discussion_point" with specific metadata is how dreams are identified.
         dream_source_filter = "oneiros_dream_cycle" # Filter by source metadata
         
         logger.debug(f"EthosCore: Fetching recent dreams. User context: {user_id_context}, Limit: {limit}")
@@ -962,9 +998,16 @@ class EthosCore:
             if not can_use_json_extract:
                 dreams.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             
-            final_dreams = dreams[:limit]
-            logger.info(f"Retrieved {len(final_dreams)} recent dreams (user_context: {user_id_context}, limit: {limit}).")
-            return final_dreams
+            # Convert to EthosMemory Pydantic models
+            final_dreams_pydantic: List[EthosMemory] = []
+            for entry_dict in dreams[:limit]: # Apply limit before conversion
+                try:
+                    final_dreams_pydantic.append(EthosMemory(**entry_dict))
+                except Exception as e_val:
+                    logger.warning(f"Could not convert raw dream entry (ID: {entry_dict.get('id')}) to EthosMemory model: {e_val}")
+
+            logger.info(f"Retrieved {len(final_dreams_pydantic)} recent EthosMemory dream objects (user_context: {user_id_context}, limit: {limit}).")
+            return final_dreams_pydantic
         except Exception as e:
             logger.error(f"Error retrieving recent dreams: {e}", exc_info=True)
             return []
@@ -973,7 +1016,7 @@ class EthosCore:
         """Returns a copy of the current Hexus scores."""
         return self.hexus_scores.copy()
     
-    async def retrieve_relevant_memories(self, query: str, top_k: int = 5, min_salience: float = 0.1, allowed_types: Optional[List[str]] = None, user_id_context: Optional[str] = None) -> List[MemoryEntry]:
+    async def retrieve_relevant_memories(self, query: str, top_k: int = 5, min_salience: float = 0.1, allowed_types: Optional[List[str]] = None, user_id_context: Optional[str] = None) -> List[EthosMemory]: # Changed return type
         if not query.strip() and not allowed_types:
             return []
         try:
@@ -1030,9 +1073,21 @@ class EthosCore:
                 return (priority_score, salience_val, entry.get('timestamp', ''))
 
             # Sort and take top_k
-            final_results = sorted(filtered_by_salience, key=sort_key_func, reverse=True)[:top_k]
-            logger.debug(f"Retrieved {len(final_results)} relevant memories for query '{query[:50]}...' (user: {user_id_context})")
-            return final_results
+            final_results_raw = sorted(filtered_by_salience, key=sort_key_func, reverse=True)[:top_k]
+
+            # Convert to EthosMemory Pydantic models
+            final_results_pydantic: List[EthosMemory] = []
+            for entry_dict in final_results_raw:
+                try:
+                    # The MemoryEntry from storage is a dict. EthosMemory is a Pydantic model.
+                    # Ensure all required fields for EthosMemory are present in entry_dict or have defaults.
+                    # The current EthosMemory schema is designed to be compatible.
+                    final_results_pydantic.append(EthosMemory(**entry_dict))
+                except Exception as e_val: # Catch Pydantic validation error or other issues
+                    logger.warning(f"Could not convert raw memory entry (ID: {entry_dict.get('id')}) to EthosMemory model: {e_val}")
+
+            logger.debug(f"Retrieved {len(final_results_pydantic)} relevant EthosMemory objects for query '{query[:50]}...' (user: {user_id_context})")
+            return final_results_pydantic
             
         except Exception as e:
             logger.error(f"Error retrieving relevant memories: {e}", exc_info=True)
@@ -1056,16 +1111,25 @@ class EthosCore:
                 cursor.execute(sql, (user_id, normalized_key))
                 row = cursor.fetchone()
                 if row:
-                    return self.memory_storage._row_to_entry(row)
+                    entry_dict = self.memory_storage._row_to_entry(row)
+                    try:
+                        return EthosMemory(**entry_dict)
+                    except Exception as e_val:
+                        logger.warning(f"Could not convert raw user_fact entry (ID: {entry_dict.get('id')}) to EthosMemory model for user '{user_id}', key '{attribute_key}': {e_val}")
+                        return None # Or handle error differently
             else:
                 logger.warning("json_extract not available. Falling back for get_user_fact. This may be slow.")
                 cursor.execute("SELECT * FROM memories WHERE type = 'user_fact' AND (is_archived = 0 OR is_archived IS NULL) ORDER BY timestamp DESC")
                 for r_row_data in cursor.fetchall():
                     r_row = dict(r_row_data) # Convert sqlite3.Row to dict
-                    entry = self.memory_storage._row_to_entry(r_row)
-                    meta = entry.get('metadata', {})
+                    entry_dict = self.memory_storage._row_to_entry(r_row)
+                    meta = entry_dict.get('metadata', {})
                     if meta.get('user_id') == user_id and meta.get('fact_attribute_key') == normalized_key:
-                        return entry
+                        try:
+                            return EthosMemory(**entry_dict)
+                        except Exception as e_val:
+                            logger.warning(f"Could not convert raw user_fact entry (ID: {entry_dict.get('id')}) during fallback to EthosMemory model for user '{user_id}', key '{attribute_key}': {e_val}")
+                            return None # Or handle error differently
             return None
         except Exception as e:
             logger.error(f"Error in get_user_fact (key: {attribute_key}, user: {user_id}): {e}", exc_info=True)
@@ -1096,71 +1160,58 @@ class EthosCore:
             )
 
     async def _call_llm_for_internal_task(self, messages: List[Dict[str, Any]], llm_role_to_use: str) -> Optional[str]:
-        llm_config = self.config.get_llm_config(llm_role_to_use)
-        if not llm_config or not llm_config.get('url'):
-            logger.error(f"LLM URL for role '{llm_role_to_use}' not configured.")
-            return f"[LLM URL for role '{llm_role_to_use}' not configured]"
+        """
+        Internal helper to call an LLM for tasks like reflection, summarization, etc.
+        Uses the standardized self.llm_client.
+        Returns the text content of the LLM's response or an error message string.
+        """
+        if not self.llm_client:
+            logger.error(f"LLMClient not available in EthosCore for internal task (role: {llm_role_to_use}).")
+            return f"[LLMClient not available in EthosCore for role '{llm_role_to_use}']"
 
-        api_url = f"{llm_config['url'].rstrip('/')}/chat/completions"
-        response_obj = None # To store response for logging in case of JSONDecodeError
+        llm_config = self.config.get_llm_config(llm_role_to_use)
+        if not llm_config: # No need to check url here, LLMClient will handle it.
+            logger.error(f"LLM configuration for role '{llm_role_to_use}' not found.")
+            return f"[LLM configuration for role '{llm_role_to_use}' not found]"
+
+        # Determine max_tokens based on task type if not specified in llm_config
+        # This logic can be enhanced or made part of the llm_config itself.
+        max_tokens_override = llm_config.get('max_tokens')
+        if max_tokens_override is None: # Only if not explicitly set in the role's config
+            if messages and isinstance(messages[0].get("content"), str):
+                if "summarize" in messages[0].get("content","").lower() or \
+                   "reflection" in messages[0].get("content","").lower() or \
+                   "aspirations" in messages[0].get("content","").lower():
+                    max_tokens_override = 1024 # Allow more for summarization/reflection
+                elif "plan_steps" in messages[0].get("content","").lower():
+                    max_tokens_override = 512
+                else:
+                    max_tokens_override = 256 # Default for other internal tasks
 
         try:
-            timeout_seconds = float(llm_config.get('timeout', 120.0))
-            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-                headers = {"Content-Type": "application/json"}
-                if api_key := llm_config.get('api_key'):
-                    if api_key.lower() not in ['lm-studio', 'ollama', 'vllm', 'none', '']:
-                        headers["Authorization"] = f"Bearer {api_key}"
-                
-                # Determine max_tokens: if "summarize" is in the first message content, use a larger default.
-                default_max_tokens = 512
-                if messages and isinstance(messages[0].get("content"), str) and "summarize" in messages[0].get("content","").lower():
-                    default_max_tokens = 1024 
-                
-                max_tokens_val = int(llm_config.get('max_tokens', default_max_tokens))
-                
-                payload: Dict[str, Any] = {
-                    "model": llm_config.get('model'),
-                    "messages": messages,
-                    "temperature": float(llm_config.get('temperature', 0.3)), # Ensure float
-                    "max_tokens": max_tokens_val
-                }
-                for param in ['top_p', 'presence_penalty', 'frequency_penalty']:
-                    if param_val := llm_config.get(param):
-                        payload[param] = float(param_val) # Ensure float
-                
-                if not payload.get('model'): # If model is None or empty string
-                    logger.warning(f"LLM call for role '{llm_role_to_use}' has no model specified. Provider might use default or fail.")
-                    if 'model' in payload: del payload['model'] # Remove if empty, some servers might infer
+            # Call the standardized LLMClient - assuming non-streaming for internal tasks
+            # that expect a single text response.
+            response_payload: LLMResponsePayload = await self.llm_client.call_llm_api(
+                llm_config=llm_config,
+                messages=messages,
+                stream=False, # Internal tasks usually don't need streaming text back to EthosCore
+                max_tokens_override=max_tokens_override # Pass the determined max_tokens
+            )
 
-                response_obj = await client.post(api_url, headers=headers, json=payload)
-                response_obj.raise_for_status()
-                result_json = response_obj.json()
-                
-                if choices := result_json.get("choices"):
-                    if choices and isinstance(choices, list) and len(choices) > 0:
-                        if message := choices[0].get("message"):
-                            if content := message.get("content"):
-                                if isinstance(content, str):
-                                    return content.strip()
-                logger.warning(f"Unexpected LLM response format from {llm_config.get('model', llm_role_to_use)}: {result_json}")
-                return f"[Unexpected LLM response format from {llm_config.get('model', llm_role_to_use)}]"
-        except httpx.TimeoutException as e:
-            logger.error(f"Timeout connecting to LLM '{llm_config.get('model', llm_role_to_use)}': {e}")
-            return f"[Timeout connecting to LLM '{llm_config.get('model', llm_role_to_use)}': {e}]"
-        except httpx.RequestError as e:
-            logger.error(f"Failed to connect to LLM '{llm_config.get('model', llm_role_to_use)}': {e}")
-            return f"[Failed to connect to LLM '{llm_config.get('model', llm_role_to_use)}': {e}]"
-        except httpx.HTTPStatusError as e:
-            logger.error(f"LLM '{llm_config.get('model', llm_role_to_use)}' API error ({e.response.status_code}): {e.response.text[:200]}")
-            return f"[LLM '{llm_config.get('model', llm_role_to_use)}' API error ({e.response.status_code})]"
-        except json.JSONDecodeError as e_json:
-            response_text_for_log = response_obj.text[:500] if response_obj and hasattr(response_obj, 'text') else 'N/A'
-            logger.error(f"Invalid JSON from LLM '{llm_config.get('model', llm_role_to_use)}': {e_json}. Response: {response_text_for_log}")
-            return f"[Invalid JSON from LLM '{llm_config.get('model', llm_role_to_use)}']"
-        except Exception as e_gen:
-            logger.error(f"Failed to process response from LLM '{llm_config.get('model', llm_role_to_use)}': {e_gen}", exc_info=True)
-            return f"[Failed to process response from LLM '{llm_config.get('model', llm_role_to_use)}': {e_gen}]"
+            if response_payload.success() and response_payload.content is not None:
+                # Ensure content is a string, strip it.
+                # If LLMClient returns JSON string in content for structured non-text data,
+                # this will just return that JSON string. Callers of _call_llm_for_internal_task
+                # that expect JSON must parse it.
+                return str(response_payload.content).strip()
+            else:
+                error_message = response_payload.error_message or f"LLM call for role '{llm_role_to_use}' failed with no content."
+                logger.warning(f"LLM call for internal task (role: {llm_role_to_use}) failed or returned no content. Error: {error_message}. Status Code: {response_payload.status_code}")
+                return f"[{error_message}]" # Return error message wrapped in brackets
+
+        except Exception as e_call:
+            logger.error(f"Unexpected error in _call_llm_for_internal_task (role: {llm_role_to_use}): {e_call}", exc_info=True)
+            return f"[Unexpected error during LLM call for role '{llm_role_to_use}': {str(e_call)}]"
 
     # ... (rest of the EthosCore methods: _run_memory_summarization, get_recent_dreams, etc.)
     # Ensure all methods from the "broken" file that are still relevant are included and corrected.
@@ -1390,6 +1441,15 @@ class EthosCore:
             logger.info(f"Retrieved {len(facts_entries)} unique user facts for user '{user_id}'.")
             return facts_entries
         except Exception as e: logger.error(f"Error retrieving all user facts for user '{user_id}': {e}", exc_info=True); return []
+
+        # Convert to EthosMemory Pydantic models
+        final_facts_pydantic: List[EthosMemory] = []
+        for entry_dict in facts_entries:
+            try:
+                final_facts_pydantic.append(EthosMemory(**entry_dict))
+            except Exception as e_val:
+                logger.warning(f"Could not convert raw user_fact entry (ID: {entry_dict.get('id')}) to EthosMemory model for user '{user_id}': {e_val}")
+        return final_facts_pydantic
     
     async def get_current_activity_description(self) -> str:
         try:
@@ -1410,7 +1470,7 @@ class EthosCore:
             logger.error(f"Error getting current activity description: {e}", exc_info=True)
             return "Activity information temporarily unavailable (error)"
     
-    async def get_queued_discussion_points(self, user_id: str, limit: int = 1) -> List[MemoryEntry]:
+    async def get_queued_discussion_points(self, user_id: str, limit: int = 1) -> List[EthosMemory]: # Changed return type
         if not user_id: return []
         conn = self.memory_storage._get_connection(); cursor = conn.cursor()
         can_use_json_extract = True
@@ -1441,16 +1501,24 @@ class EthosCore:
             except Exception as e_entry: logger.error(f"Error processing queued point entry: {e_entry}", exc_info=True)
         
         queued_points.sort(key=lambda x: (-(float(x.get('salience', 0.0)) if x.get('salience') is not None else 0.0), x.get('timestamp', '') or ''), reverse=False)
-        final_limit = queued_points[:limit]
-        logger.info(f"Retrieved {len(final_limit)} queued discussion points for user_id: {user_id} (Limit: {limit}, Fetched before sort/filter: {len(rows_raw)}, After initial filter: {len(queued_points)})")
-        return final_limit
+
+        # Convert to EthosMemory Pydantic models
+        final_points_pydantic: List[EthosMemory] = []
+        for entry_dict in queued_points[:limit]: # Apply limit before conversion
+            try:
+                final_points_pydantic.append(EthosMemory(**entry_dict))
+            except Exception as e_val:
+                logger.warning(f"Could not convert raw queued_discussion_point entry (ID: {entry_dict.get('id')}) to EthosMemory model for user '{user_id}': {e_val}")
+
+        logger.info(f"Retrieved {len(final_points_pydantic)} EthosMemory queued discussion points for user_id: {user_id} (Limit: {limit}, Fetched before sort/filter: {len(rows_raw)}, After initial filter: {len(queued_points)})")
+        return final_points_pydantic
     
     async def clear_memory_for_user(self, user_id: str) -> bool:
         if not user_id or not user_id.strip(): return False
         try: return self.memory_storage.delete_entries_by_user_id(user_id)
         except Exception as e: logger.error(f"Error clearing memory for user '{user_id}': {e}", exc_info=True); return False
 
-    async def get_recent_learnings(self, learning_types: List[str], user_id_context: Optional[str], limit: int) -> List[MemoryEntry]:
+    async def get_recent_learnings(self, learning_types: List[str], user_id_context: Optional[str], limit: int) -> List[EthosMemory]: # Changed return type
         if not learning_types or limit <= 0: return []
         conn = self.memory_storage._get_connection(); cursor = conn.cursor()
 
@@ -1509,12 +1577,21 @@ class EthosCore:
 
             # If Python user filtering happened, the list might be longer than the original limit before this step.
             # The SQL already sorted by timestamp, so direct slicing is fine.
-            return learnings[:limit]
+
+            # Convert to EthosMemory Pydantic models
+            final_learnings_pydantic: List[EthosMemory] = []
+            for entry_dict in learnings[:limit]: # Apply limit before conversion
+                try:
+                    final_learnings_pydantic.append(EthosMemory(**entry_dict))
+                except Exception as e_val:
+                    logger.warning(f"Could not convert raw learning entry (ID: {entry_dict.get('id')}) to EthosMemory model: {e_val}")
+
+            return final_learnings_pydantic
         except Exception as e:
             logger.error(f"Error retrieving learnings (types: {learning_types}, user: {user_id_context}): {e}", exc_info=True)
             return []
 
-    async def get_recent_knowledge_verifications(self, limit: int = 20) -> List[MemoryEntry]:
+    async def get_recent_knowledge_verifications(self, limit: int = 20) -> List[EthosMemory]: # Changed return type
         conn = self.memory_storage._get_connection(); cursor = conn.cursor()
         # Added (is_archived = 0 OR is_archived IS NULL)
         sql = "SELECT * FROM memories WHERE type = 'world_knowledge' AND json_extract(metadata, '$.last_verified_timestamp') IS NOT NULL AND (is_archived = 0 OR is_archived IS NULL) ORDER BY json_extract(metadata, '$.last_verified_timestamp') DESC LIMIT ?"
@@ -1538,7 +1615,15 @@ class EthosCore:
         if "no such function: json_extract" in oe_msg: # Re-sort if we had to Python filter
             verifications.sort(key=lambda x: x.get('metadata', {}).get('last_verified_timestamp', '0000-00-00T00:00:00Z'), reverse=True)
         
-        return verifications[:limit]
+        # Convert to EthosMemory Pydantic models
+        final_verifications_pydantic: List[EthosMemory] = []
+        for entry_dict in verifications[:limit]: # Apply limit before conversion
+            try:
+                final_verifications_pydantic.append(EthosMemory(**entry_dict))
+            except Exception as e_val:
+                logger.warning(f"Could not convert raw knowledge_verification entry (ID: {entry_dict.get('id')}) to EthosMemory model: {e_val}")
+
+        return final_verifications_pydantic
 
     async def get_user_profile_summary(self, user_id: str) -> str:
         if not user_id or user_id in self.system_user_ids:
@@ -1706,26 +1791,22 @@ class EthosCore:
         # 6. Call LLM for Reflection
         llm_response_str = await self._call_llm_for_internal_task(messages, reflection_llm_role)
 
-        if not llm_response_str or not llm_response_str.strip():
-            logger.warning("Reflection Cycle: LLM call returned no content. Cycle ending.")
+        generated_insights = False # Flag to track if insights were successfully generated
+        if not llm_response_str or not llm_response_str.strip() or llm_response_str.startswith("["):
+            logger.warning(f"Reflection Cycle: LLM call failed or returned error/no content: {llm_response_str}. Cycle ending.")
             self.last_reflection_time = now
             self._save_task_last_run_time("EthosReflection", now)
             return
 
         # 7. Process LLM Response and Store Insights
         try:
-            # Attempt to find JSON block within potentially messy LLM output
-            json_match = re.search(r'\{[\s\S]*\}', llm_response_str)
-            if not json_match:
-                logger.error(f"Reflection Cycle: No JSON object found in LLM response. Raw response: {llm_response_str}")
-                self.last_reflection_time = now
-                self._save_task_last_run_time("EthosReflection", now)
-                return
-
-            parsed_response = json.loads(json_match.group(0))
+            # _call_llm_for_internal_task now returns the string content directly or an error string.
+            # We expect a JSON string for reflection insights.
+            parsed_response = json.loads(llm_response_str) # Try to parse the whole string as JSON
 
             if isinstance(parsed_response, dict) and "insights" in parsed_response and isinstance(parsed_response["insights"], list):
                 insights = parsed_response["insights"]
+                generated_insights = True # Set flag if insights are parsed
                 if not insights:
                     logger.info("Reflection Cycle: LLM generated an empty list of insights.")
                 else:
@@ -1902,13 +1983,14 @@ class EthosCore:
         user_prompt = f"Pathos's recent salient experiences and insights:\n{seeds_block}\n\nNew aspirations (JSON format, 1-2 items):"
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
-        llm_response = await self._call_llm_for_internal_task(messages, llm_role)
-        if not llm_response: logger.warning("Aspiration generation LLM call returned no content."); return
+        llm_response_str = await self._call_llm_for_internal_task(messages, llm_role)
+        if not llm_response_str or llm_response_str.startswith("["): # Check for error string
+            logger.warning(f"Aspiration generation LLM call failed or returned error/no content: {llm_response_str}")
+            return
 
         try:
-            json_match = re.search(r'\{[\s\S]*\}', llm_response)
-            if not json_match: logger.error(f"No JSON in aspiration LLM response: {llm_response}"); return
-            parsed_response = json.loads(json_match.group(0))
+            # Attempt to parse the entire string as JSON, as _call_llm_for_internal_task should return clean JSON string or error string
+            parsed_response = json.loads(llm_response_str)
 
             if isinstance(parsed_response, dict) and "aspirations" in parsed_response and isinstance(parsed_response["aspirations"], list):
                 new_aspirations_text = parsed_response["aspirations"]
@@ -2933,20 +3015,17 @@ class EthosCore:
             )
             messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
 
-            # 6. LLM Call via LogosCore (assuming _call_llm_client_directly exists and is suitable)
-            # The _call_llm_client_directly method in LogosCore returns a Dict, we need the text content.
-            llm_response_dict = await self.logos_core._call_llm_client_directly(
-                llm_config=llm_config,
+            # 6. LLM Call via self._call_llm_for_internal_task
+            summary_text_str = await self._call_llm_for_internal_task(
                 messages=messages,
-                max_tokens_override=300 # Allow enough tokens for a couple of paragraphs
+                llm_role_to_use=summarization_llm_role # This role should be configured with appropriate model & params
             )
 
-            if llm_response_dict and llm_response_dict.get("content"):
-                summary_text = str(llm_response_dict["content"]).strip()
-                logger.info(f"EthosCore: Successfully generated daily summary: '{summary_text[:100]}...'")
-                return summary_text
+            if summary_text_str and not summary_text_str.startswith("["): # Check for error string
+                logger.info(f"EthosCore: Successfully generated daily summary: '{summary_text_str[:100]}...'")
+                return summary_text_str.strip()
             else:
-                logger.error(f"EthosCore: Daily summary generation LLM call did not return valid content. Response: {llm_response_dict}")
+                logger.error(f"EthosCore: Daily summary generation LLM call failed or returned error/no content: {summary_text_str}")
                 return default_summary
 
         except Exception as e:
@@ -2970,52 +3049,49 @@ class EthosCore:
             logger.error(f"Error in chronos_bridge_add_event: {e}", exc_info=True)
             return None
             
-    def get_current_mood(self) -> Dict[str, Any]:
+    async def get_current_mood_state(self, user_id_context: Optional[str] = None) -> MoodState: # Changed signature
         """
         Derives mood state using MoodEngine, based on current Hexus scores.
-        Returns a dictionary including 'valence', 'arousal', 'name',
-        'simulation_disabled' flag, and a 'hexus_snapshot'.
+        Returns a MoodState Pydantic model.
+        user_id_context is not used yet but kept for future API consistency.
         """
+        current_hexus_scores_dict = self.get_hexus_scores() # This returns a Dict[str, float]
+
+        detailed_hexus_scores_models = [
+            HexusScore(name=name, value=val) for name, val in current_hexus_scores_dict.items()
+        ]
+
         if not self.config.ENABLE_MOOD_SIMULATION:
-            # Return a neutral mood with simulation_disabled flag
-            # and current hexus scores if available, or defaults if not.
-            current_hexus_snapshot = self.hexus_scores.copy() if hasattr(self, 'hexus_scores') else DEFAULT_HEXUS_SCORES.copy()
-            return {
-                "valence": 0.0,
-                "arousal": 0.0,
-                "name": "neutral",
-                "simulation_disabled": True,
-                "hexus_snapshot": current_hexus_snapshot
-            }
+            return MoodState(
+                valence=0.0,
+                arousal=0.0,
+                name="neutral (simulation_disabled)",
+                detailed_hexus_scores=detailed_hexus_scores_models, # Still provide current hexus scores
+                timestamp=datetime.now(timezone.utc)
+                # simulation_disabled is implicitly handled by name or could be an explicit field in MoodState
+            )
 
         if not hasattr(self, 'mood_engine') or not self.mood_engine:
             logger.error("EthosCore: MoodEngine not initialized. Cannot get current mood. Returning neutral.")
-            current_hexus_snapshot = self.hexus_scores.copy() if hasattr(self, 'hexus_scores') else DEFAULT_HEXUS_SCORES.copy()
-            return {
-                "valence": 0.0,
-                "arousal": 0.0,
-                "name": "neutral",
-                "simulation_disabled": False, # Simulation might be enabled, but MoodEngine is missing
-                "hexus_snapshot": current_hexus_snapshot
-            }
-
-        current_hexus_scores = self.get_hexus_scores() # This already returns a copy
+            return MoodState(
+                valence=0.0,
+                arousal=0.0,
+                name="neutral (mood_engine_missing)",
+                detailed_hexus_scores=detailed_hexus_scores_models,
+                timestamp=datetime.now(timezone.utc)
+            )
 
         # Delegate core calculation to MoodEngine
-        mood_components = self.mood_engine.calculate_current_mood(current_hexus_scores)
+        # MoodEngine.calculate_current_mood now needs to return a dict compatible with MoodState's main fields
+        mood_engine_output = self.mood_engine.calculate_current_mood(current_hexus_scores_dict)
 
-        # MoodEngine returns a dict like: {"valence": ..., "arousal": ..., "name": ...}
-        # We add the hexus_snapshot and simulation_disabled flag here.
-
-        final_mood_data = {
-            "valence": mood_components.get("valence", 0.0),
-            "arousal": mood_components.get("arousal", 0.0),
-            "name": mood_components.get("name", "neutral"),
-            "simulation_disabled": False,
-            "hexus_snapshot": current_hexus_scores # Already a copy from get_hexus_scores()
-        }
-        # logger.debug(f"EthosCore.get_current_mood: Mood determined by MoodEngine: Name='{final_mood_data['name']}', V={final_mood_data['valence']:.2f}, A={final_mood_data['arousal']:.2f}")
-        return final_mood_data
+        return MoodState(
+            valence=mood_engine_output.get("valence", 0.0),
+            arousal=mood_engine_output.get("arousal", 0.0),
+            name=mood_engine_output.get("name", "neutral"),
+            detailed_hexus_scores=detailed_hexus_scores_models,
+            timestamp=datetime.now(timezone.utc)
+        )
 
     async def process_event_for_hexus_update(self, event_type: str, payload: Optional[Dict[str, Any]] = None, magnitude_multiplier: float = 1.0):
         """
@@ -3201,6 +3277,148 @@ class EthosCore:
             logger.warning("EthosCore: TraitsEngine not initialized. Cannot get all traits.")
             return {}
         return self.traits_engine.get_all_traits()
+
+    async def get_persona_profile(self) -> PersonaProfile:
+        """
+        Constructs and returns Pathos's persona profile including directives and traits.
+        """
+        core_directives_models: List[PersonaDirective] = []
+        # self.persona_directives is List[str]
+        for i, directive_text in enumerate(self.persona_directives):
+            core_directives_models.append(
+                PersonaDirective(
+                    directive_id=f"core_directive_{i+1}",
+                    text=directive_text,
+                    source="core_static_file", # From pathos_directives.txt
+                    is_active=True # Assuming all loaded directives are active
+                )
+            )
+
+        # Placeholder for learned directives - this would involve querying memory for specific types
+        learned_directives_models: List[PersonaDirective] = []
+        # Example:
+        # learned_directive_memories = await self.memory_storage.get_entries_by_type("learned_directive", user_id=PATHOS_USER_ID)
+        # for mem in learned_directive_memories:
+        #     learned_directives_models.append(PersonaDirective(directive_id=mem.get('id','unknown'), text=mem.get('content',''), source="learned", is_active=not mem.get('is_archived', False)))
+
+
+        traits_dict = self.get_all_traits() # This is synchronous from TraitsEngine
+        traits_models: List[Trait] = []
+        for name, value in traits_dict.items():
+            description = f"Personality trait: {name}"
+            # If TraitsEngine had descriptions per trait, they would be fetched here.
+            # For now, using a generic description.
+            traits_models.append(Trait(name=name, value=value, description=description))
+
+        # Placeholder for self-description summary.
+        # This could be dynamically generated by an LLM call using the directives and traits as context.
+        # For now, keeping it simple or None.
+        # Example: self_summary = await self._generate_persona_summary_llm(core_directives_models, traits_models)
+        self_summary_text = None
+
+        return PersonaProfile(
+            core_directives=core_directives_models,
+            learned_directives=learned_directives_models,
+            traits=traits_models,
+            self_description_summary=self_summary_text
+        )
+
+    async def record_interaction_event(self, interaction_data: InteractionLog) -> EthosMemory:
+        """
+        Records a full interaction (e.g., user-Pathos conversation turn, NPC interaction)
+        as a memory, updates Hexus, and informs Subconscious Node.
+        """
+        logger.debug(f"Recording interaction event ID: {interaction_data.interaction_id} for user: {interaction_data.user_id}")
+
+        # 1. Construct content for the memory entry
+        content_parts = []
+        for turn in interaction_data.conversation_turns:
+            role = turn.get("role", "unknown")
+            name = turn.get("name") # For NPC or tool name
+            text = turn.get("content", "")
+            tool_calls_data = turn.get("tool_calls")
+
+            if name and role == "assistant": # Likely an NPC response
+                content_parts.append(f"NPC ({name}): {text}")
+            elif role == "tool":
+                content_parts.append(f"Tool ({name}) Result: {text}")
+            else: # User or Pathos (assistant without name)
+                content_parts.append(f"{role.capitalize()}: {text}")
+
+            if tool_calls_data and isinstance(tool_calls_data, list):
+                for tc in tool_calls_data:
+                    func_info = tc.get('function', {})
+                    func_name = func_info.get('name', 'unknown_tool')
+                    func_args = func_info.get('arguments', '{}')
+                    content_parts.append(f"  -> Pathos considers tool: {func_name}(args: {func_args})")
+
+        memory_content = "\n".join(content_parts)
+
+        # 2. Create metadata
+        metadata = {
+            "interaction_id": interaction_data.interaction_id,
+            "user_id": interaction_data.user_id or PATHOS_USER_ID, # Default to Pathos if user_id is None
+            "pathos_mood_at_start": interaction_data.pathos_mood_at_start.model_dump(exclude_none=True) if interaction_data.pathos_mood_at_start else None,
+            "turn_count": len(interaction_data.conversation_turns),
+            # Add other relevant metadata from InteractionLog if needed
+            # "involved_npc_ids": interaction_data.involved_npc_ids,
+            # "summary_of_outcome": interaction_data.summary_of_outcome,
+        }
+
+        # Assign salience - can be more dynamic later
+        salience = 0.75 # Default salience for interactions
+
+        # 3. Call self.add_memory_entry()
+        # Note: add_memory_entry will be updated to return EthosMemory Pydantic model
+        created_memory_entry_dict = await self.add_memory_entry(
+            entry_data={
+                "type": "chat_interaction", # Or a more specific type if available
+                "content": memory_content,
+                "metadata": metadata,
+                "salience": salience,
+                "timestamp": interaction_data.timestamp.isoformat() # Ensure timestamp is ISO string
+            },
+            user_id_context=interaction_data.user_id
+        )
+
+        # Convert the dict from add_memory_entry (which itself gets it from memory_storage)
+        # to the EthosMemory Pydantic model.
+        # This assumes add_memory_entry returns a dict compatible with EthosMemory.
+        # If add_memory_entry is updated to return EthosMemory directly, this conversion won't be needed.
+        created_ethos_memory: EthosMemory
+        if isinstance(created_memory_entry_dict, dict):
+             created_ethos_memory = EthosMemory(**created_memory_entry_dict)
+        elif isinstance(created_memory_entry_dict, EthosMemory): # If add_memory_entry already returns EthosMemory
+            created_ethos_memory = created_memory_entry_dict
+        else:
+            logger.error(f"record_interaction_event: add_memory_entry returned unexpected type {type(created_memory_entry_dict)}. Cannot create EthosMemory.")
+            # Fallback or raise error
+            raise ValueError("Failed to properly record interaction memory due to internal type mismatch.")
+
+
+        # 4. Trigger Hexus updates
+        # This logic might need to be more sophisticated, e.g., analyzing content of interaction
+        # For now, a generic event. PathosInterface might also call this with more specific events.
+        await self.process_event_for_hexus_update(
+            event_type="GENERAL_INTERACTION",
+            payload={
+                "interaction_id": interaction_data.interaction_id,
+                "user_id": interaction_data.user_id,
+                "first_user_turn_snippet": interaction_data.conversation_turns[0].get("content", "")[:50] if interaction_data.conversation_turns else ""
+            }
+        )
+
+        # 5. Inform Subconscious Node (Placeholder)
+        if hasattr(self, 'subconscious_node_client') and self.subconscious_node_client:
+            try:
+                # subconscious_context_summary = f"Recent interaction ({interaction_data.interaction_id}): {memory_content[:200]}..."
+                # await self.subconscious_node_client.inject_context_to_node("conversation", subconscious_context_summary)
+                logger.debug(f"EthosCore.record_interaction_event: Placeholder for SubconsciousNodeClient.inject_context_to_node for interaction {interaction_data.interaction_id}")
+            except Exception as e_sub_inject:
+                logger.warning(f"EthosCore.record_interaction_event: Failed to inject context to subconscious_node_client: {e_sub_inject}")
+
+        logger.info(f"Recorded interaction event ID: {interaction_data.interaction_id}. Memory ID: {created_ethos_memory.memory_id}")
+        return created_ethos_memory
 
 if __name__ == '__main__':
     import unittest.mock # Added import

@@ -70,25 +70,27 @@ except ImportError:  # pragma: no cover
         async def shutdown(self): pass # Dummy shutdown
 
 
+# Import LLMResponsePayload for type hinting
+from ....schemas.llm_schemas import LLMResponsePayload
+
 logger = logging.getLogger(__name__)
 
 class NPCImproviser:
-    def __init__(self, firmament_llm_role_name: Optional[str] = None):
+    def __init__(self, llm_client: LLMClient, config: Config, firmament_llm_role_name: Optional[str] = None):
+        self.llm_client = llm_client
+        self.config = config # Store config to get LLM settings
+
         if firmament_llm_role_name:
             self.llm_role_name = firmament_llm_role_name
         else:
-            fm_module_cfg = Config.get_firmament_module_config() if callable(getattr(Config, 'get_firmament_module_config', None)) else {}
+            fm_module_cfg = self.config.get_firmament_module_config()
             self.llm_role_name = fm_module_cfg.get("firmament_llm_role", "FIRMAMENT_PRIMARY")
 
-        self.llm_config: Optional[LLMConfig] = Config.get_llm_config(self.llm_role_name) if callable(getattr(Config, 'get_llm_config', None)) else None
+        self.llm_config: Optional[LLMConfig] = self.config.get_llm_config(self.llm_role_name)
         if not self.llm_config:
             logger.error(f"NPCImproviser: LLM config for role '{self.llm_role_name}' not found.")
         else:
             logger.info(f"NPCImproviser initialized for LLM role '{self.llm_role_name}'. Model: {self.llm_config.get('model')}")
-
-        self.http_client_manager = HTTPClientManager.instance()
-        if not (hasattr(self.http_client_manager, 'get_client') and callable(self.http_client_manager.get_client)):
-            logger.error("NPCImproviser: Failed to get valid HTTPClientManager instance.") # Should not occur with dummy
 
     # Note: _normalize_id might still be useful if an ID is provided but needs cleaning,
     # but it should not be used to generate an ID if the LLM fails to provide one,
@@ -153,48 +155,38 @@ class NPCImproviser:
         scene_context: Optional[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
         if scene_context is None: scene_context = {}
-        if not self.llm_config or not self.llm_config.get("url"):
-            logger.error(f"NPCImproviser: LLM URL for role '{self.llm_role_name}' missing."); return None
-
-        shared_httpx_client = self.http_client_manager.get_client()
-        if not shared_httpx_client:
-            logger.error(f"NPCImproviser: Could not obtain shared HTTP client."); return None
+        if not self.llm_config: # Check if llm_config itself is None
+            logger.error(f"NPCImproviser: LLM configuration for role '{self.llm_role_name}' is missing or incomplete.")
+            return None
+        if not self.llm_client: # Check if llm_client was initialized
+            logger.error(f"NPCImproviser: LLMClient not initialized.")
+            return None
 
         user_prompt_str = self._build_improvisation_prompt(name_hint, subconscious_thought_context, scene_context)
         system_message = "You are an expert character creator. Your sole output MUST be a single, valid JSON object. Do not include any explanatory text, markdown formatting, or anything outside of the JSON structure."
         messages = [{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt_str}]
 
         logger.info(f"NPCImproviser: Initiating LLM call (Role: '{self.llm_role_name}') for NPC improvisation.")
-        # logger.debug(f"NPCImproviser Full Prompt (User part):\n{user_prompt_str}") # Can be very verbose
 
-        full_response_content = ""
-        llm_error = None
         try:
-            llm_api_client = LLMClient(http_client=shared_httpx_client)
-            response_generator = llm_api_client.call_llm_api(
-                llm_config=self.llm_config, messages=messages, stream=False
+            response_payload: LLMResponsePayload = await self.llm_client.call_llm_api(
+                llm_config=self.llm_config,
+                messages=messages,
+                stream=False
             )
-            # Handle response (assuming non-streaming, or aggregating stream if necessary)
-            if hasattr(response_generator, '__aiter__'): # Async generator
-                async for chunk in response_generator:
-                    if isinstance(chunk, str): full_response_content += chunk
-                    elif isinstance(chunk, dict) and chunk.get("type") == "error_chunk": llm_error = chunk.get("payload"); break
-            elif isinstance(response_generator, str): # Direct string response
-                 full_response_content = response_generator
-            elif isinstance(response_generator, dict) and response_generator.get("type") == "error_chunk": # Direct error dict
-                 llm_error = response_generator.get("payload")
-            else: # Unexpected response type
-                logger.error(f"NPCImproviser: Unexpected response type from LLM client: {type(response_generator)}")
+
+            if not response_payload.success() or not response_payload.content:
+                error_msg = response_payload.error_message or "LLM call for NPC improvisation failed with no content."
+                logger.error(f"NPCImproviser: {error_msg} (Status: {response_payload.status_code})")
                 return None
 
-            if llm_error: logger.error(f"NPCImproviser LLM Error: {llm_error}"); return None
-            if not full_response_content.strip(): logger.warning("NPCImproviser: LLM returned empty content."); return None
+            raw_response_content = response_payload.content
+            logger.debug(f"NPCImproviser Raw LLM response content: {raw_response_content[:500]}")
 
-            logger.debug(f"NPCImproviser Raw LLM response: {full_response_content[:500]}")
             # Use regex for balanced braces to find JSON object
-            json_match = re.search(r'\{(?:[^{}]|(?R))*\}', full_response_content, re.DOTALL)
+            json_match = re.search(r'\{(?:[^{}]|(?R))*\}', raw_response_content, re.DOTALL)
             if not json_match:
-                logger.error(f"NPCImproviser: No JSON object found in LLM response: {full_response_content[:300]}"); return None
+                logger.error(f"NPCImproviser: No JSON object found in LLM response: {raw_response_content[:300]}"); return None
 
             json_str = json_match.group(0)
             parsed_npc_profile = json.loads(json_str)

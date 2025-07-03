@@ -29,36 +29,51 @@ from eidos_agent.utils.prompt_loader import load_system_prompt
 from eidos_agent.features.simulation.module import initiate_simulated_interaction, send_message_to_simulated_npc, end_simulated_interaction
 from .task_model import Task # Added import
 
+# Import LLMClient and LLMResponsePayload
+from ....llm_integrations.llm_client import LLMClient
+from ....schemas.llm_schemas import LLMResponsePayload, LLMToolCall, FunctionCall # Added LLMToolCall, FunctionCall
+from ....schemas.tool_schemas import ToolResult # Added ToolResult
+# Import HTTPClientManager if LogosCore is to initialize services that need it
+from ....features.firmament.core.http_client_manager import HTTPClientManager
+from ....features.bookshelf_feature.handler import BookshelfHandler # For Bookshelf tools
+
+
 logger = get_logger(__name__)
 
 class LogosCore:
-    def __init__(self, config: Config, ethos_core: EthosCore, owm_service: Optional[OpenWeatherMapService] = None):
+    def __init__(self,
+                 config: Config,
+                 ethos_core: EthosCore,
+                 llm_client: LLMClient,
+                 http_client_manager: HTTPClientManager,
+                 bookshelf_handler: Optional[BookshelfHandler] = None, # Added BookshelfHandler
+                 owm_service: Optional[OpenWeatherMapService] = None
+                 ):
         self.config = config
         self.ethos_core = ethos_core
+        self.llm_client = llm_client
+        self.http_client_manager = http_client_manager
+        self.bookshelf_handler = bookshelf_handler # Store BookshelfHandler
         self.owm_service = owm_service
 
+        # Config for internal LLM tasks within LogosCore still fetched via Config
         self.logos_techne_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_TECHNE')
-        # self.logos_vision_config line removed
         self.logos_research_config: Optional[LLMConfig] = config.get_llm_config('LOGOS_DEEP_RESEARCH')
         
         knowledge_upkeep_llm_role = config.ETHOS.get('knowledge_upkeep_llm_role', 'LOGOS_TECHNE')
         self.knowledge_upkeep_llm_config: Optional[LLMConfig] = config.get_llm_config(knowledge_upkeep_llm_role)
 
-        timeout = 60.0; all_llm_timeouts = []
-        for role_key in Config.LLM.keys():
-            if role_config := config.get_llm_config(role_key): # type: ignore
-                if timeout_str := role_config.get('timeout'):
-                    try: all_llm_timeouts.append(float(timeout_str))
-                    except ValueError: logger.warning(f"Invalid timeout for LLM role '{role_key}': {timeout_str}")
-        if all_llm_timeouts: timeout = max(all_llm_timeouts)
-        self.http_client = httpx.AsyncClient(timeout=timeout + 10.0)
+        # self.http_client is removed; services will use http_client_manager.get_client()
+        # or LLMClient will use it.
 
         self.web_search_service: Optional[WebSearchService] = None
         if config.ENABLE_WEB_SEARCH:
-             if brave_config := config.get_brave_search_config():
-                 if brave_config.get('api_key'): self.web_search_service = WebSearchService(config)
-                 else: logger.error("Brave Search API key missing. Web search disabled.")
-             else: logger.error("Brave Search config missing. Web search disabled.")
+            if brave_config := config.get_brave_search_config():
+                if brave_config.get('api_key'):
+                    # WebSearchService might need to be updated to take HTTPClientManager or an httpx.AsyncClient from it
+                    self.web_search_service = WebSearchService(config, self.http_client_manager.get_client())
+                else: logger.error("Brave Search API key missing. Web search disabled.")
+            else: logger.error("Brave Search config missing. Web search disabled.")
         else: logger.info("Web Search disabled in LogosCore.")
 
         self.wolfram_alpha_config: Optional[WolframAlphaConfig] = config.get_wolfram_alpha_config()
@@ -131,7 +146,158 @@ class LogosCore:
             else:
                 logger.warning(f"LogosCore: LLM Role '{role_name_for_log}': NOT CONFIGURED or URL missing.")
 
-        logger.info("LogosCore: Service initialization checks completed.") # Changed from "complete" to "checks completed"
+        logger.info("LogosCore: Service initialization checks completed.")
+
+    # Note: _call_logos_llm is refactored to use self.llm_client
+    async def _call_logos_llm(self, llm_config: LLMConfig, prompt_text: Optional[str] = None, llm_messages_for_synthesis: Optional[List[Dict[str,Any]]] = None) -> Optional[str]:
+        """
+        Internal helper to call an LLM for LogosCore's own tasks (summarization, classification).
+        Uses the standardized self.llm_client.
+        Returns the text content of the LLM's response or an error message string.
+        """
+        if not self.llm_client:
+            logger.error(f"LLMClient not available in LogosCore for LLM call with role specified in llm_config.")
+            return "[LLMClient not available in LogosCore]"
+
+        if not llm_config: # Should be passed by caller
+            logger.error(f"LLM configuration missing for _call_logos_llm.")
+            return "[LLM configuration missing for _call_logos_llm]"
+
+        messages_to_send = llm_messages_for_synthesis
+        if not messages_to_send and prompt_text:
+            messages_to_send = [{"role": "user", "content": prompt_text}]
+
+        if not messages_to_send:
+            logger.error("_call_logos_llm: No messages or prompt_text provided.")
+            return "[No messages or prompt_text provided for _call_logos_llm]"
+
+        try:
+            response_payload: LLMResponsePayload = await self.llm_client.call_llm_api(
+                llm_config=llm_config,
+                messages=messages_to_send, # type: ignore # Pydantic should handle List[Dict[str,Any]]
+                stream=False
+            )
+            if response_payload.success() and response_payload.content is not None:
+                return str(response_payload.content).strip()
+            else:
+                error_message = response_payload.error_message or f"LogosCore LLM call (model: {llm_config.get('model')}) failed with no content."
+                logger.warning(f"{error_message} (Status: {response_payload.status_code})")
+                return f"[{error_message}]"
+        except Exception as e_call:
+            logger.error(f"Unexpected error in _call_logos_llm (model: {llm_config.get('model')}): {e_call}", exc_info=True)
+            return f"[Unexpected error during LogosCore LLM call: {str(e_call)}]"
+
+    async def execute_tools(self, tool_calls: List[LLMToolCall], user_id_context: Optional[str]) -> List[ToolResult]:
+        """
+        Executes a list of tool calls requested by the LLM.
+        """
+        results: List[ToolResult] = []
+        if not tool_calls:
+            return results
+
+        for tool_call in tool_calls:
+            tool_name = tool_call.function.name
+            call_id = tool_call.id # OpenAI tool call ID
+
+            try:
+                arguments_json = tool_call.function.arguments
+                try:
+                    args_dict = json.loads(arguments_json) if isinstance(arguments_json, str) else {}
+                    if not isinstance(args_dict, dict): # Ensure it's a dict after loading
+                        args_dict = {}
+                        logger.warning(f"Tool '{tool_name}' arguments were not a dict after JSON parsing: {arguments_json}")
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse arguments for tool '{tool_name}': {arguments_json}", exc_info=True)
+                    results.append(ToolResult(tool_name=tool_name, call_id=call_id, status="error", result_payload={}, error_details="Invalid JSON arguments"))
+                    continue
+
+                logger.info(f"Executing tool: {tool_name} with args: {args_dict} for user: {user_id_context}")
+
+                # Dispatch to the appropriate execute_X method
+                # This mapping needs to be robust.
+                tool_method_name = f"execute_{tool_name}"
+                if hasattr(self, tool_method_name) and callable(getattr(self, tool_method_name)):
+                    method_to_call = getattr(self, tool_method_name)
+
+                # Dispatch to the appropriate execute_X method
+                tool_method_map = {
+                    "get_current_time": self.execute_get_time,
+                    "web_search": self.execute_web_search,
+                    "math_calculator": self.execute_math_calculation,
+                    "get_weather": self.execute_get_weather,
+                    "store_user_fact": self.execute_store_user_fact,
+                    "store_world_fact": self.execute_store_world_fact,
+                    "perform_deep_research": self.execute_deep_research,
+                    "get_news_headlines": self.execute_get_news, # Assuming this is the name from tool definition
+                    "add_pathos_event": self.execute_add_pathos_event_to_calendar, # Match definition name
+                    "initiate_simulated_interaction": self.execute_initiate_simulated_interaction,
+                    "send_message_to_simulated_npc": self.execute_send_message_to_simulated_npc,
+                    "end_simulated_interaction": self.execute_end_simulated_interaction,
+                    # Bookshelf tools - ensure execute method names match tool names
+                    "bookshelf_add_document": self.execute_bookshelf_add_document,
+                    "bookshelf_query": self.execute_bookshelf_query,
+                    "bookshelf_list_documents": self.execute_bookshelf_list_documents,
+                    "bookshelf_get_document_raw_text": self.execute_bookshelf_get_document_raw_text,
+                    "bookshelf_remove_document": self.execute_bookshelf_remove_document,
+                }
+
+                method_to_call = tool_method_map.get(tool_name)
+
+                if method_to_call and callable(method_to_call):
+                    # Smartly add user_id_context if the method expects it
+                    # This is still a bit crude; inspect.signature would be more robust.
+                    method_params = method_to_call.__code__.co_varnames
+                    if "user_id_context" in method_params and "user_id_context" not in args_dict and user_id_context:
+                        args_dict["user_id_context"] = user_id_context
+                    elif "user_id" in method_params and "user_id" not in args_dict and user_id_context: # some tools might use 'user_id'
+                        args_dict["user_id"] = user_id_context
+
+                    raw_tool_result: Dict[str, Any] = await method_to_call(**args_dict)
+
+                    result_summary = raw_tool_result.get("message")
+                    if not result_summary: # Fallback for summary
+                        if raw_tool_result.get("success"):
+                            result_summary = json.dumps(raw_tool_result.get("data", raw_tool_result.get("result", "Success")))
+                        else:
+                            result_summary = raw_tool_result.get("error", "Error")
+
+
+                    if isinstance(raw_tool_result, dict) and raw_tool_result.get("success"):
+                        results.append(ToolResult(
+                            tool_name=tool_name,
+                            call_id=call_id,
+                            status="success",
+                            result_payload=raw_tool_result.get("data", raw_tool_result.get("result", raw_tool_result)),
+                            result_summary_for_llm=result_summary
+                        ))
+                    elif isinstance(raw_tool_result, dict):
+                        error_detail = raw_tool_result.get("error", raw_tool_result.get("message", "Tool execution failed without specific error."))
+                        results.append(ToolResult(
+                            tool_name=tool_name,
+                            call_id=call_id,
+                            status="error",
+                            result_payload={}, # No payload on error usually
+                            error_details=error_detail,
+                            result_summary_for_llm=error_detail # Summary can be the error message
+                        ))
+                    else:
+                        logger.warning(f"Tool '{tool_name}' returned unexpected result type: {type(raw_tool_result)}. Content: {str(raw_tool_result)[:100]}")
+                        results.append(ToolResult(
+                            tool_name=tool_name,
+                            call_id=call_id,
+                            status="error",
+                            result_payload={},
+                            error_details=f"Tool returned unexpected data type: {type(raw_tool_result)}"
+                        ))
+                else:
+                    logger.warning(f"Tool '{tool_name}' not found or not callable in LogosCore.")
+                    results.append(ToolResult(tool_name=tool_name, call_id=call_id, status="error", result_payload={}, error_details=f"Tool '{tool_name}' not implemented."))
+
+            except Exception as e:
+                logger.error(f"Error executing tool '{tool_name}': {e}", exc_info=True)
+                results.append(ToolResult(tool_name=tool_name, call_id=call_id, status="error", result_payload={}, error_details=str(e)))
+
+        return results
 
     async def process_uploaded_document(self, file_content: bytes, filename: str, user_id: Optional[str] = None) -> Dict[str, Any]:
          logger.info(f"LogosCore processing doc: '{filename}' ({len(file_content)} bytes) for user '{user_id or 'unknown'}'.")
@@ -249,10 +415,22 @@ class LogosCore:
 
     # execute_describe_image method removed
 
-    async def execute_web_search(self, query: str) -> Optional[List[Dict[str, str]]]: # This one is used by execute_task, so its direct return might be fine, or wrap in task exec.
-        if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service: return None
-        if not query or not isinstance(query, str) or not query.strip(): return []
-        return await self.web_search_service.perform_search(query)
+    async def execute_web_search(self, query: str) -> Dict[str, Any]: # Changed return type
+        if not self.config.ENABLE_WEB_SEARCH or not self.web_search_service:
+            return {"success": False, "error": "Web search service is not enabled or available."}
+        if not query or not isinstance(query, str) or not query.strip():
+            return {"success": False, "error": "Missing or invalid query for web search."}
+        try:
+            results = await self.web_search_service.perform_search(query)
+            if results is not None: # perform_search can return None on error
+                return {"success": True, "data": {"search_results": results}, "message": f"Found {len(results)} results for '{query}'."}
+            else:
+                # This case implies an error within perform_search that didn't raise an exception but returned None
+                return {"success": False, "error": f"Web search for '{query}' failed to return results (internal service error)."}
+        except Exception as e:
+            logger.error(f"Error during web search execution for query '{query}': {e}", exc_info=True)
+            return {"success": False, "error": f"An unexpected error occurred during web search: {str(e)}"}
+
 
     async def execute_math_calculation(self, expression: str) -> Dict[str, Any]:
         if not self.config.ENABLE_WOLFRAM_ALPHA or not self.wolfram_alpha_config:
@@ -440,7 +618,7 @@ class LogosCore:
 
         if not fetched_articles:
             logger.info("No news articles found by _fetch_news_headlines_with_details.")
-            return []
+            return {"success": True, "data": {"articles": []}, "message": "No news articles found."} # Return success with empty list
 
         processed_articles: List[Dict[str, Any]] = []
 
@@ -513,9 +691,9 @@ class LogosCore:
                     "classified_sentiment": "neutral_interesting",
                     "original_description": article_data.get("original_description", "")
                 })
-
-        logger.info(f"LogosCore execute_get_news: Fully processed {len(articles_to_process_fully)} articles, added {len(processed_articles) - len(articles_to_process_fully)} more with basic info.")
-        return processed_articles
+        message = f"Processed {len(articles_to_process_fully)} articles fully, added {len(processed_articles) - len(articles_to_process_fully)} with basic info."
+        logger.info(f"LogosCore execute_get_news: {message}")
+        return {"success": True, "data": {"articles": processed_articles}, "message": message}
 
     async def verify_world_fact(self, fact_entry: MemoryEntry) -> Dict[str, Any]: # type: ignore
         fact_id, original_statement = fact_entry.get('id', 'unknown'), fact_entry.get('content')
@@ -844,48 +1022,222 @@ class LogosCore:
                     task.error_message = "Web search service is disabled or not available."
                     task.update_status("failure")
                 else:
-                    search_results = await self.execute_web_search(query)
-                    if search_results is not None:
-                        task.result = {"results": search_results}
-                        task.result_summary = f"Web search for '{query}' found {len(search_results)} results."
+                    # self.execute_web_search now returns Dict[str, Any]
+                    web_search_dict_result = await self.execute_web_search(query)
+                    if web_search_dict_result.get("success"):
+                        # The actual search results are in web_search_dict_result.get("data", {}).get("search_results")
+                        search_data = web_search_dict_result.get("data", {})
+                        actual_results = search_data.get("search_results", [])
+                        task.result = {"results": actual_results} # Keep task.result structure if other code expects it
+                        task.result_summary = web_search_dict_result.get("message", f"Web search for '{query}' found {len(actual_results)} results.")
                         task.update_status("success")
                     else:
-                        task.error_message = f"Web search for '{query}' failed or returned no results. Check logs for details."
+                        task.error_message = web_search_dict_result.get("error", f"Web search for '{query}' failed.")
                         task.update_status("failure")
 
             elif task.type == "get_weather":
                 location = task.input_params.get("location")
-                user_id = task.user_id
+                user_id = task.user_id # This is from the Task model, not necessarily the current active user
 
                 if not location or not isinstance(location, str) or not location.strip():
                     task.error_message = "Missing or invalid 'location' in input_params for get_weather task."
                     task.update_status("failure")
                 else:
+                    # self.execute_get_weather returns Dict[str, Any]
                     weather_result_dict = await self.execute_get_weather(location, user_id_context=user_id)
-                    task.result = weather_result_dict
 
                     if weather_result_dict.get("success"):
+                        task.result = weather_result_dict # Store the whole success dict
                         wd = weather_result_dict.get("weather_data", {})
                         task.result_summary = f"Weather for {wd.get('location', location)}: {wd.get('temperature', '--')}{wd.get('unit', '')}, {wd.get('description', 'N/A')}."
                         task.update_status("success")
                     else:
+                        task.result = weather_result_dict # Store the error dict
                         task.error_message = weather_result_dict.get("error", "Failed to get weather data.")
                         task.update_status("failure")
 
             # TODO: Implement handlers for other task types based on existing execute_... methods:
-            # - describe_image (needs image_data_b64, prompt_from_llm)
-            # - math_calculation (needs expression)
-            # - get_time (needs optional location)
-            # - store_user_fact (needs attribute_name, attribute_value, user_statement_context, user_id)
-            # - store_world_fact (needs fact_statement, source_description, optional topic_tags, confidence_level)
-            # - deep_research (needs research_query, optional num_searches_to_perform)
-            # - get_news (needs optional query, category, max_articles_to_process)
-            # - process_document_for_rag (new task type, would combine process_uploaded_document and add_document_to_rag)
-            #   Input params: file_content_b64, filename, user_id, optional doc_id
-            # - initiate_simulated_interaction
-            # - send_message_to_simulated_npc
-            # - end_simulated_interaction
-            # - verify_world_fact (needs fact_entry_id or full fact_entry content)
+            # Each case will need to handle the new Dict[str, Any] return type from execute_X methods.
+
+            elif task.type == "math_calculation":
+                expression = task.input_params.get("expression")
+                if not expression or not isinstance(expression, str) or not expression.strip():
+                    task.error_message = "Missing or invalid 'expression' for math_calculation task."
+                    task.update_status("failure")
+                else:
+                    calc_result_dict = await self.execute_math_calculation(expression)
+                    task.result = calc_result_dict # Store full dict
+                    if calc_result_dict.get("success"):
+                        task.result_summary = calc_result_dict.get("data", {}).get("result", "Calculation successful.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = calc_result_dict.get("error", "Math calculation failed.")
+                        task.update_status("failure")
+
+            elif task.type == "get_time": # Added case for get_time
+                location = task.input_params.get("location") # Optional
+                time_result_dict = await self.execute_get_time(location)
+                task.result = time_result_dict
+                if time_result_dict.get("success"):
+                    task.result_summary = time_result_dict.get("data", {}).get("time_string", "Time retrieved.")
+                    task.update_status("success")
+                else:
+                    task.error_message = time_result_dict.get("error", "Failed to get time.")
+                    task.update_status("failure")
+
+            elif task.type == "store_user_fact":
+                args = task.input_params
+                if not all(k in args for k in ["attribute_name", "attribute_value", "user_statement_context", "user_id"]):
+                    task.error_message = "Missing required params for store_user_fact task."
+                    task.update_status("failure")
+                else:
+                    fact_result_dict = await self.execute_store_user_fact(**args)
+                    task.result = fact_result_dict
+                    if fact_result_dict.get("success"):
+                        task.result_summary = fact_result_dict.get("message", "User fact stored.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = fact_result_dict.get("error", "Failed to store user fact.")
+                        task.update_status("failure")
+
+            elif task.type == "store_world_fact":
+                args = task.input_params
+                if not all(k in args for k in ["fact_statement", "source_description"]):
+                    task.error_message = "Missing required params for store_world_fact task."
+                    task.update_status("failure")
+                else:
+                    fact_result_dict = await self.execute_store_world_fact(**args)
+                    task.result = fact_result_dict
+                    if fact_result_dict.get("success"):
+                        task.result_summary = fact_result_dict.get("message", "World fact stored.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = fact_result_dict.get("error", "Failed to store world fact.")
+                        task.update_status("failure")
+
+            elif task.type == "deep_research":
+                args = task.input_params
+                if not args.get("research_query"):
+                    task.error_message = "Missing 'research_query' for deep_research task."
+                    task.update_status("failure")
+                else:
+                    research_result_dict = await self.execute_deep_research(**args)
+                    task.result = research_result_dict
+                    if research_result_dict.get("success"):
+                        task.result_summary = f"Deep research on '{args.get('research_query')}' completed. Report generated."
+                        task.update_status("success")
+                    else:
+                        task.error_message = research_result_dict.get("error", "Deep research failed.")
+                        task.update_status("failure")
+
+            elif task.type == "get_news":
+                args = task.input_params # query, category, max_articles_to_process are optional
+                news_result_dict = await self.execute_get_news(**args)
+                task.result = news_result_dict
+                if news_result_dict.get("success"):
+                    articles = news_result_dict.get("data", {}).get("articles", [])
+                    task.result_summary = news_result_dict.get("message", f"Retrieved {len(articles)} news articles.")
+                    task.update_status("success")
+                else:
+                    task.error_message = news_result_dict.get("error", "Failed to get news.")
+                    task.update_status("failure")
+
+            # Simulation tools
+            elif task.type == "initiate_simulated_interaction":
+                args = task.input_params
+                if not all(k in args for k in ["npc_role", "npc_description", "initial_context", "pathos_opening_statement"]):
+                    task.error_message = "Missing required params for initiate_simulated_interaction."
+                    task.update_status("failure")
+                else:
+                    sim_result_dict = await self.execute_initiate_simulated_interaction(**args)
+                    task.result = sim_result_dict
+                    if sim_result_dict.get("success"):
+                        task.result_summary = sim_result_dict.get("data", {}).get("message", "Simulated interaction initiated.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = sim_result_dict.get("error", "Failed to initiate simulation.")
+                        task.update_status("failure")
+
+            elif task.type == "send_message_to_simulated_npc":
+                args = task.input_params
+                if not args.get("message_to_npc"):
+                    task.error_message = "Missing 'message_to_npc' for send_message_to_simulated_npc."
+                    task.update_status("failure")
+                else:
+                    sim_result_dict = await self.execute_send_message_to_simulated_npc(**args)
+                    task.result = sim_result_dict
+                    if sim_result_dict.get("success"):
+                        task.result_summary = sim_result_dict.get("data", {}).get("npc_response", "Message sent to NPC, response received.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = sim_result_dict.get("error", "Failed to send message/get response from simulated NPC.")
+                        task.update_status("failure")
+
+            elif task.type == "end_simulated_interaction":
+                sim_result_dict = await self.execute_end_simulated_interaction()
+                task.result = sim_result_dict
+                if sim_result_dict.get("success"):
+                    task.result_summary = sim_result_dict.get("data", {}).get("summary", "Simulated interaction ended.")
+                    task.update_status("success")
+                else:
+                    task.error_message = sim_result_dict.get("error", "Failed to end simulation.")
+                    task.update_status("failure")
+
+            elif task.type == "verify_world_fact":
+                # This task might need the fact_entry object or its ID.
+                # Assuming input_params contains "fact_id" or "fact_content".
+                fact_id = task.input_params.get("fact_id")
+                fact_content = task.input_params.get("fact_content")
+                if not fact_id and not fact_content:
+                    task.error_message = "Missing 'fact_id' or 'fact_content' for verify_world_fact task."
+                    task.update_status("failure")
+                else:
+                    fact_entry_to_verify = None
+                    if fact_id and self.ethos_core:
+                        # This assumes get_entry_by_id returns a MemoryEntry dict or compatible
+                        fact_entry_to_verify = await asyncio.to_thread(self.ethos_core.memory_storage.get_entry_by_id, fact_id)
+                    elif fact_content:
+                        fact_entry_to_verify = {"id": "adhoc_" + str(uuid.uuid4())[:8], "content": fact_content, "type": "world_knowledge"} # Synthetic entry
+
+                    if not fact_entry_to_verify:
+                        task.error_message = f"Could not find or construct fact entry for verification (ID: {fact_id})."
+                        task.update_status("failure")
+                    else:
+                        verification_result_dict = await self.verify_world_fact(fact_entry_to_verify) # type: ignore
+                        task.result = verification_result_dict # Store full dict
+                        status_from_verify = verification_result_dict.get("data", {}).get("verification_status", "unverifiable")
+                        task.result_summary = verification_result_dict.get("reason", verification_result_dict.get("error", f"Fact verification status: {status_from_verify}"))
+                        if verification_result_dict.get("success"): # verify_world_fact returns success if LLM could make an assessment
+                            task.update_status("success") # Task success means verification ran
+                        else: # LLM call failed or other system error during verification
+                            task.error_message = verification_result_dict.get("error", "Fact verification process failed.")
+                            task.update_status("failure")
+
+            elif task.type == "process_document_for_rag":
+                args = task.input_params
+                if not all(k in args for k in ["filename", "file_content_b64"]):
+                    task.error_message = "Missing 'filename' or 'file_content_b64' for process_document_for_rag task."
+                    task.update_status("failure")
+                else:
+                    doc_result_dict = await self.execute_process_document_for_rag(
+                        file_content_b64=args["file_content_b64"],
+                        filename=args["filename"],
+                        user_id=args.get("user_id"), # Optional
+                        doc_id=args.get("doc_id")    # Optional
+                    )
+                    task.result = doc_result_dict
+                    if doc_result_dict.get("success"):
+                        task.result_summary = doc_result_dict.get("message", "Document processed and added to RAG.")
+                        task.update_status("success")
+                    else:
+                        task.error_message = doc_result_dict.get("error", "Failed to process document for RAG.")
+                        task.update_status("failure")
+
+            # describe_image case removed as it's handled by PathosInterface or specific vision services.
+            # elif task.type == "describe_image":
+            #     task.error_message = "The 'describe_image' task via LogosCore.execute_task is obsolete."
+            #     task.update_status("failure")
+
 
             else:
                 logger.warning(f"LogosCore: Unsupported task type '{task.type}' for task ID {task.task_id}.")
@@ -932,20 +1284,176 @@ class LogosCore:
         except Exception as e: logger.error(f"Error in LLM fact verification for ID {fact_id}: {e}", exc_info=True); return {"status": "unverifiable", "reason": f"Verification error: {e}"}
 
     # --- NPC Simulation Tool Execution Stubs ---
-    async def execute_initiate_simulated_interaction(self, npc_name: Optional[str], npc_role: str, npc_description: str, initial_context: str, pathos_opening_statement: str) -> str:
+    async def execute_initiate_simulated_interaction(self, npc_name: Optional[str], npc_role: str, npc_description: str, initial_context: str, pathos_opening_statement: str) -> Dict[str, Any]:
         logger.info(f"LogosCore: Initiating simulated interaction. Role: {npc_role}, Context: {initial_context}")
-        result = await simulation_module.initiate_simulated_interaction(npc_name, npc_role, npc_description, initial_context, pathos_opening_statement)
-        return json.dumps(result)
+        try:
+            # simulation_module.initiate_simulated_interaction is expected to return a dict
+            # with 'success' and 'data' or 'error'
+            result_dict = await initiate_simulated_interaction(npc_name, npc_role, npc_description, initial_context, pathos_opening_statement)
+            if not isinstance(result_dict, dict): # Basic validation of return type
+                logger.error(f"Simulated interaction init returned non-dict: {result_dict}")
+                return {"success": False, "error": "Simulation interaction init returned unexpected data type."}
+            return result_dict # Forward the dict from simulation_module
+        except Exception as e:
+            logger.error(f"Error in execute_initiate_simulated_interaction: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
 
-    async def execute_send_message_to_simulated_npc(self, message_to_npc: str) -> str:
+    async def execute_send_message_to_simulated_npc(self, message_to_npc: str) -> Dict[str, Any]:
         logger.info(f"LogosCore: Sending message to simulated NPC: '{message_to_npc[:50]}...'")
-        result = await simulation_module.send_message_to_simulated_npc(message_to_npc)
-        return json.dumps(result)
+        try:
+            result_dict = await send_message_to_simulated_npc(message_to_npc)
+            if not isinstance(result_dict, dict):
+                logger.error(f"Simulated NPC message send returned non-dict: {result_dict}")
+                return {"success": False, "error": "Simulation NPC message send returned unexpected data type."}
+            return result_dict
+        except Exception as e:
+            logger.error(f"Error in execute_send_message_to_simulated_npc: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
 
-    async def execute_end_simulated_interaction(self) -> str:
+    async def execute_end_simulated_interaction(self) -> Dict[str, Any]:
         logger.info("LogosCore: Ending simulated interaction.")
-        result = await simulation_module.end_simulated_interaction()
-        return json.dumps(result)
+        try:
+            result_dict = await end_simulated_interaction()
+            if not isinstance(result_dict, dict):
+                logger.error(f"Simulated interaction end returned non-dict: {result_dict}")
+                return {"success": False, "error": "Simulation interaction end returned unexpected data type."}
+            return result_dict
+        except Exception as e:
+            logger.error(f"Error in execute_end_simulated_interaction: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    async def execute_process_document_for_rag(self, file_content_b64: str, filename: str, user_id: Optional[str] = None, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Processes a base64 encoded file, extracts text, and adds it to the RAG system (bookshelf).
+        """
+        logger.info(f"LogosCore: execute_process_document_for_rag for filename '{filename}' by user '{user_id}'.")
+        try:
+            file_content_bytes = base64.b64decode(file_content_b64)
+        except Exception as e_decode:
+            logger.error(f"Base64 decoding failed for {filename}: {e_decode}", exc_info=True)
+            return {"success": False, "error": f"Invalid base64 content for file {filename}."}
+
+        # Step 1: Process (parse) the document to extract text
+        process_result = await self.process_uploaded_document(file_content_bytes, filename, user_id)
+        if not process_result.get("success"):
+            return {"success": False, "error": process_result.get("message", "Failed to process/parse document.")}
+
+        extracted_text = process_result.get("extracted_text")
+        if not extracted_text:
+            return {"success": False, "error": f"No text could be extracted from document '{filename}'."}
+
+        # Step 2: Add the extracted text to RAG (bookshelf)
+        # The add_document_to_rag method in LogosCore already calls ethos_core.add_document_chunks
+        # and returns a success/error dict.
+        # We need to ensure the parameters match. add_document_to_rag expects extracted_text, filename, user_id, doc_id.
+        # The execute_bookshelf_add_document tool takes document_name, document_content, document_source, topics.
+        # For this internal task, we'll call the more direct add_document_to_rag.
+
+        # If a specific doc_id is provided for this task, use it. Otherwise, add_document_to_rag will generate one.
+        rag_add_result = await self.add_document_to_rag(
+            extracted_text=extracted_text,
+            filename=filename, # Or use a more descriptive name if needed
+            user_id=user_id,
+            doc_id=doc_id
+        )
+
+        if rag_add_result.get("success"):
+            return {
+                "success": True,
+                "message": f"Document '{filename}' processed and added to RAG. {rag_add_result.get('message', '')}",
+                "data": {
+                    "doc_id": rag_add_result.get("doc_id"),
+                    "num_chunks": rag_add_result.get("num_chunks")
+                }
+            }
+        else:
+            return {"success": False, "error": rag_add_result.get("message", "Failed to add document content to RAG.")}
+
+
+    # --- Bookshelf Tool Execution Methods ---
+    async def execute_bookshelf_add_document(self, document_name: str, document_content: str, document_source: Optional[str] = "unknown", topics: Optional[List[str]] = None) -> Dict[str, Any]:
+        if not self.bookshelf_handler:
+            return {"success": False, "error": "Bookshelf service not available."}
+        try:
+            # Assuming BookshelfHandler.add_document_to_ragbits returns a dict like {'success': bool, 'message': str, 'doc_id': str, 'num_chunks': int}
+            # or raises an exception on failure.
+            # The actual method name in BookshelfHandler might be different, e.g. add_document
+            topics_list = topics if topics else []
+            result = await self.bookshelf_handler.add_document_to_ragbits(
+                document_name=document_name,
+                document_content=document_content,
+                document_source=document_source,
+                topics=topics_list
+            )
+            if isinstance(result, dict) and result.get("success"):
+                return {"success": True, "data": result, "message": result.get("message", "Document added successfully.")}
+            elif isinstance(result, dict): # Failure case from handler
+                return {"success": False, "error": result.get("message", "Failed to add document to bookshelf."), "data": result}
+            else: # Unexpected return
+                return {"success": False, "error": "Bookshelf handler returned an unexpected response for add_document."}
+        except Exception as e:
+            logger.error(f"Error executing bookshelf_add_document: {e}", exc_info=True)
+            return {"success": False, "error": f"System error adding document to bookshelf: {str(e)}"}
+
+    async def execute_bookshelf_query(self, query_text: str, document_name: Optional[str] = None, topics_filter: Optional[List[str]] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
+        if not self.bookshelf_handler:
+            return {"success": False, "error": "Bookshelf service not available."}
+        try:
+            # Assuming BookshelfHandler.query_ragbits returns a list of search results (e.g. List[Dict[str,Any]])
+            # or raises an exception.
+            # Actual method name in BookshelfHandler might be different, e.g. query_documents
+            results = await self.bookshelf_handler.query_ragbits(
+                query_text=query_text,
+                document_name=document_name,
+                topics_filter=topics_filter,
+                top_k=top_k or 3 # Default top_k if not provided
+            )
+            return {"success": True, "data": {"query_results": results}, "message": f"Bookshelf query returned {len(results)} results."}
+        except Exception as e:
+            logger.error(f"Error executing bookshelf_query: {e}", exc_info=True)
+            return {"success": False, "error": f"System error querying bookshelf: {str(e)}"}
+
+    async def execute_bookshelf_list_documents(self) -> Dict[str, Any]:
+        if not self.bookshelf_handler:
+            return {"success": False, "error": "Bookshelf service not available."}
+        try:
+            # Assuming BookshelfHandler.list_all_documents returns List[Dict[str,Any]] or similar
+            documents = await self.bookshelf_handler.list_all_documents() # This method needs to exist on handler
+            return {"success": True, "data": {"documents": documents}, "message": f"Found {len(documents)} documents in bookshelf."}
+        except Exception as e:
+            logger.error(f"Error executing bookshelf_list_documents: {e}", exc_info=True)
+            return {"success": False, "error": f"System error listing bookshelf documents: {str(e)}"}
+
+    async def execute_bookshelf_get_document_raw_text(self, document_name: str) -> Dict[str, Any]:
+        if not self.bookshelf_handler:
+            return {"success": False, "error": "Bookshelf service not available."}
+        try:
+            # Assuming BookshelfHandler.get_document_by_name returns a dict with 'content' or similar
+            doc_data = await self.bookshelf_handler.get_document_by_name(document_name) # This method needs to exist
+            if doc_data and doc_data.get("content_full"): # Assuming 'content_full' for raw text
+                return {"success": True, "data": {"document_name": document_name, "raw_text": doc_data["content_full"]}, "message": f"Retrieved raw text for document '{document_name}'."}
+            else:
+                return {"success": False, "error": f"Document '{document_name}' not found or has no content.", "data": None}
+        except Exception as e:
+            logger.error(f"Error executing bookshelf_get_document_raw_text for '{document_name}': {e}", exc_info=True)
+            return {"success": False, "error": f"System error retrieving document raw text: {str(e)}"}
+
+    async def execute_bookshelf_remove_document(self, document_name: str) -> Dict[str, Any]:
+        if not self.bookshelf_handler:
+            return {"success": False, "error": "Bookshelf service not available."}
+        try:
+            # Assuming BookshelfHandler.delete_document_from_ragbits returns a dict {'success': bool, 'message': str}
+            result = await self.bookshelf_handler.delete_document_from_ragbits(document_name) # This method needs to exist
+            if isinstance(result, dict) and result.get("success"):
+                return {"success": True, "message": result.get("message", f"Document '{document_name}' removed successfully.")}
+            elif isinstance(result, dict):
+                return {"success": False, "error": result.get("message", f"Failed to remove document '{document_name}'.")}
+            else:
+                 return {"success": False, "error": f"Bookshelf handler returned an unexpected response for remove_document."}
+        except Exception as e:
+            logger.error(f"Error executing bookshelf_remove_document for '{document_name}': {e}", exc_info=True)
+            return {"success": False, "error": f"System error removing document: {str(e)}"}
+
 
     async def determine_subjective_reaction(
         self,

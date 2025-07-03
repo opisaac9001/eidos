@@ -6,7 +6,8 @@ import json # For loading/dumping content if stored as JSON string in memory
 from pydantic import ValidationError
 
 from eidos_agent.utils.logger import get_logger
-from eidos_agent.schemas import ChatState, ChatMessage # Updated import from schemas
+from eidos_agent.schemas.chat_schemas import ChatState
+from eidos_agent.schemas.oai_schemas import ChatMessage
 from eidos_agent.core.config import Config # Updated to use absolute import
 from eidos_agent.persona_logic.ethos_core.core import EthosCore # Updated import to persona_logic
 
