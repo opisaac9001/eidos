@@ -5,10 +5,15 @@ from typing import TYPE_CHECKING, Optional, Dict, Any, List
 if TYPE_CHECKING:
     from ..module import FirmamentModule # Parent module
     from ....persona_logic.ethos_core.core import EthosCore
+    from ....persona_logic.ethos_core.core import EthosCore
     from ....llm_integrations.llm_client import LLMClient
     from .npc_registry import NPCRegistry
     from .npc_improviser import NPCImproviser
-    from ....schemas.interaction_log_schemas import InteractionLog # Assuming a schema for this
+    # from ....schemas.interaction_log_schemas import InteractionLog # Not used directly here yet
+    from ....persona_logic.chronos_engine.models import ActivityType as ChronosActivityTypeEnum # For activity type checking
+    from datetime import datetime, timezone, timedelta # For cooldown
+    import random # For random chance
+    import uuid # For memory ID
 
 from eidos_agent.utils.logger import get_logger
 
@@ -264,11 +269,48 @@ class NPCController:
     # For example, an NPC might say something to Pathos, or perform an action Pathos observes.
     # This requires a way to inject this "event" into PathosInterface's context gathering.
 
-    # Example:
-    # async def trigger_ambient_npc_speech(self, npc_profile: Dict[str, Any], scene_context: Dict[str, Any]) -> Optional[str]:
-    #     """Generates a line of dialogue an NPC might say proactively."""
-    #     # Use self.npc_improviser.generate_ambient_dialogue(npc_profile, scene_context)
-    #     # This generated speech would then need to be logged and presented to Pathos.
-    #     pass
+    async def generate_npc_initiated_utterance(self,
+                                             npc_profile: Dict[str, Any],
+                                             scene_context: Dict[str, Any]) -> Optional[str]:
+        """
+        Generates an opening line an NPC might say to Pathos to initiate a conversation.
+        Uses NPCImproviser.
+        """
+        npc_name = npc_profile.get("name", "An NPC")
+        logger.info(f"NPCController: Generating initiated utterance for NPC '{npc_name}'. Scene: {scene_context.get('location_description')}, Pathos activity: {scene_context.get('current_activity_name')}")
+
+        if not self.npc_improviser:
+            logger.error(f"NPCController: NPCImproviser not available. Cannot generate initiated utterance for {npc_name}.")
+            return None
+
+        # Craft a conceptual "Pathos utterance" that signals the NPC should initiate.
+        # The NPCImproviser's prompt needs to be flexible enough to handle this.
+        # Option 1: Specific prompt guidance within scene_context for NPCImproviser to generate an opener.
+        # Option 2: A specific method in NPCImproviser for initiations.
+        # For now, let's adapt the existing generate_npc_dialogue_response by modifying its inputs.
+
+        # We're telling the NPCImproviser that Pathos hasn't said anything yet, but the NPC should speak.
+        # The prompt used by NPCImproviser will be key.
+        # The `pathos_utterance` here is more of a directive to the NPC's "mind" (the LLM).
+        directive_for_npc_llm = f"[You, {npc_name}, decide to initiate a conversation with Pathos. Pathos is currently {scene_context.get('current_activity_name', 'nearby')} at {scene_context.get('location_description', 'this location')}. Pathos's mood seems to be {scene_context.get('pathos_mood_state', 'neutral')}. What do you say to start the conversation? Keep it natural and brief.]"
+
+        try:
+            # generate_npc_dialogue_response expects npc_profile, pathos_utterance, scene_context
+            # We pass our directive as the "pathos_utterance" to guide the LLM for the NPC.
+            initiated_utterance = await self.npc_improviser.generate_npc_dialogue_response(
+                npc_profile=npc_profile,
+                pathos_utterance=directive_for_npc_llm, # This guides the NPC's LLM
+                scene_context=scene_context
+            )
+
+            if initiated_utterance and initiated_utterance.strip():
+                logger.info(f"NPCController: Generated initiated utterance for '{npc_name}': '{initiated_utterance[:75]}...'")
+                return initiated_utterance.strip()
+            else:
+                logger.warning(f"NPCController: NPCImproviser returned empty or None for initiated utterance for '{npc_name}'.")
+                return None
+        except Exception as e:
+            logger.error(f"NPCController: Error generating initiated utterance for '{npc_name}': {e}", exc_info=True)
+            return None
 
 ```
