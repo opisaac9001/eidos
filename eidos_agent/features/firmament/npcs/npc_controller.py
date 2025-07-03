@@ -207,8 +207,25 @@ class NPCController:
         try:
             await self.ethos_core.add_memory_entry(memory_data_for_ethos, user_id_context=pathos_user_id)
             logger.info(f"Logged NPC dialogue with {npc_name} to EthosCore.")
+
+            # 3. Trigger Hexus update for the social interaction
+            hexus_payload = {
+                "interaction_type": "npc_dialogue_turn",
+                "npc_id": npc_id,
+                "npc_name": npc_name,
+                "pathos_utterance_snippet": pathos_utterance[:75],
+                "npc_response_snippet": npc_response_text[:75],
+                "activity_title": current_block_data.get('activity_title', 'Unknown Activity') if current_block_data else 'Unknown Activity',
+                "location": current_block_data.get('location_hint', 'Unknown Location') if current_block_data else 'Unknown Location'
+            }
+            await self.ethos_core.process_event_for_hexus_update(
+                event_type="ACTIVITY_EFFECT_SOCIAL", # Generic social event for now
+                payload=hexus_payload
+            )
+            logger.info(f"Processed Hexus update for NPC dialogue with {npc_name}.")
+
         except Exception as e:
-            logger.error(f"NPCController: Failed to log NPC dialogue to EthosCore: {e}", exc_info=True)
+            logger.error(f"NPCController: Failed to log NPC dialogue or process Hexus update: {e}", exc_info=True)
 
         # Update active conversation history
         if conversation_id:
