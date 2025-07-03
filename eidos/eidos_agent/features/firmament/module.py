@@ -21,10 +21,11 @@ from . import get_plugin_manager, get_http_client_manager
 if TYPE_CHECKING:
     from ...persona_logic.ethos_core.core import EthosCore
     from ...llm_integrations.llm_client import LLMClient # For type hinting
+    from ...persona_logic.logos_core.handler import LogosCore # For determine_subjective_reaction
     from ....schemas.firmament_schemas import SimulationContext, NPCInteractionInput, NPCInteractionOutput, NPCProfile # Schemas
     from ....schemas.llm_schemas import LLMResponsePayload # For process_pathos_utterance_to_npc
     import uuid # For process_pathos_utterance_to_npc if creating default NPCProfile
-    from typing import List # For List[NPCProfile] type hint in get_current_simulation_context
+    from typing import List, Dict, Any # Ensure Dict and Any are imported for type hints
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,8 @@ class FirmamentModule:
                  ethos_core: 'EthosCore',
                  chronos_adapter: ChronosAdapter,
                  npc_improviser: NPCImproviser,
-                 llm_client: 'LLMClient'): # Added llm_client
+                 llm_client: 'LLMClient',
+                 logos_core: 'LogosCore'): # Added logos_core
         """
         Initializes the FirmamentModule.
 
@@ -53,8 +55,9 @@ class FirmamentModule:
         self.ethos_core = ethos_core
         self.chronos_adapter = chronos_adapter
         self.npc_improviser = npc_improviser
-        self.llm_client = llm_client # Store llm_client
-        self.npc_registry = NPCRegistry.instance() # Get NPCRegistry instance
+        self.llm_client = llm_client
+        self.logos_core = logos_core # Store LogosCore
+        self.npc_registry = NPCRegistry.instance()
 
         logger.info("FirmamentModule initializing...")
 
@@ -307,7 +310,60 @@ class FirmamentModule:
             # If NPCController updates/generates a conv_id, it should return it.
             # Let's assume npc_interaction_result includes 'conversation_id' if it was managed.
 
-            return npc_interaction_result # This dict should be suitable for LogosCore
+            # Now, determine subjective reaction and trigger Hexus update
+            if not npc_interaction_result.get("error"): # Only if NPC interaction itself was successful
+                pathos_utterance_for_reaction = pathos_utterance
+                npc_response_for_reaction = npc_interaction_result.get("npc_response_text", "")
+                npc_name_for_reaction = npc_interaction_result.get("npc_name", npc_id)
+
+                event_data_summary = f"Pathos said to {npc_name_for_reaction}: \"{pathos_utterance_for_reaction[:100]}\"\n{npc_name_for_reaction} responded: \"{npc_response_for_reaction[:100]}\""
+
+                # Define available reactions for dialogue context
+                dialogue_reactions = [
+                    "REACTION_SOCIALLY_CONNECTED", "REACTION_AMUSED_ENTERTAINED",
+                    "REACTION_ENGAGED_LEARNING", "REACTION_VALIDATED_CONFIRMED",
+                    "REACTION_INDIFFERENT_UNEFFECTED", "REACTION_FRUSTRATED_SETBACK",
+                    "REACTION_STRESSED_CONCERNED", "REACTION_FEELING_ANGER_IRRITATION",
+                    "REACTION_CURIOSITY_PIQUED"
+                ]
+
+                subjective_reaction_type = await self.logos_core.determine_subjective_reaction(
+                    event_description=f"Dialogue turn with NPC {npc_name_for_reaction}",
+                    event_data_summary=event_data_summary,
+                    current_hexus_scores=self.ethos_core.get_hexus_scores(), # Synchronous call
+                    persona_directives=self.ethos_core.get_persona_directives(), # Synchronous call
+                    available_reactions=dialogue_reactions
+                )
+
+                # Map subjective_reaction_type to specific Hexus event
+                hexus_event_to_trigger = "GENERAL_INTERACTION" # Default fallback
+                if subjective_reaction_type == "REACTION_SOCIALLY_CONNECTED" or subjective_reaction_type == "REACTION_AMUSED_ENTERTAINED":
+                    hexus_event_to_trigger = "NPC_DIALOGUE_POSITIVE_CONNECTION"
+                elif subjective_reaction_type == "REACTION_FRUSTRATED_SETBACK" or subjective_reaction_type == "REACTION_FEELING_ANGER_IRRITATION":
+                    hexus_event_to_trigger = "NPC_DIALOGUE_NEGATIVE_FRUSTRATION"
+                elif subjective_reaction_type == "REACTION_STRESSED_CONCERNED":
+                    hexus_event_to_trigger = "NPC_DIALOGUE_CONCERNING_STRESSFUL"
+                elif subjective_reaction_type == "REACTION_ENGAGED_LEARNING" or subjective_reaction_type == "REACTION_CURIOSITY_PIQUED" or subjective_reaction_type == "REACTION_INDIFFERENT_UNEFFECTED":
+                    hexus_event_to_trigger = "NPC_DIALOGUE_NEUTRAL_INFORMATIVE"
+
+                hexus_payload = {
+                    "interaction_type": "npc_dialogue_turn_assessed",
+                    "npc_id": npc_id,
+                    "npc_name": npc_name_for_reaction,
+                    "pathos_utterance_snippet": pathos_utterance_for_reaction[:75],
+                    "npc_response_snippet": npc_response_for_reaction[:75],
+                    "subjective_reaction_assessment": subjective_reaction_type,
+                    "triggered_hexus_event": hexus_event_to_trigger,
+                    "activity_title": current_block_data.get('activity_title', 'Unknown Activity'),
+                    "location": current_block_data.get('location_hint', 'Unknown Location')
+                }
+                await self.ethos_core.process_event_for_hexus_update(
+                    event_type=hexus_event_to_trigger,
+                    payload=hexus_payload
+                )
+                logger.info(f"FirmamentModule: Processed Hexus update for NPC dialogue. Reaction: {subjective_reaction_type}, Event: {hexus_event_to_trigger}")
+
+            return npc_interaction_result
 
         except Exception as e:
             logger.error(f"FirmamentModule: Error handling Pathos dialogue with NPC {npc_id}: {e}", exc_info=True)

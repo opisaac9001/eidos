@@ -170,6 +170,13 @@ HEXUS_EVENT_DEFINITIONS = {
     "ACTIVITY_EFFECT_EXERCISE": {"joy": 0.02, "stress": -0.02, "tiredness": 0.015, "contentment": 0.01, "focus": 0.005},
     "ACTIVITY_EFFECT_TRAVEL": {"tiredness": 0.01, "stress": 0.005, "focus": -0.01},
     "ACTIVITY_EFFECT_ERRAND": {"tiredness": 0.01, "stress": 0.005, "contentment": 0.01, "focus": -0.005},
+
+    # NPC Dialogue Specific Effects
+    "NPC_DIALOGUE_POSITIVE_CONNECTION": {"joy": 0.03, "contentment": 0.02, "loneliness": -0.03, "craving_connection": -0.02, "stress": -0.015, "comfort": 0.01},
+    "NPC_DIALOGUE_NEGATIVE_FRUSTRATION": {"stress": 0.03, "resentment": 0.02, "joy": -0.02, "contentment": -0.02, "focus": -0.01},
+    "NPC_DIALOGUE_NEUTRAL_INFORMATIVE": {"curiosity": 0.015, "focus": 0.01, "contentment": 0.005},
+    "NPC_DIALOGUE_CONCERNING_STRESSFUL": {"stress": 0.025, "melancholy": 0.01, "general_caution": 0.01, "joy": -0.015, "comfort": -0.01},
+
     # Firmament Intention Simulation Outcomes
     "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
     "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
