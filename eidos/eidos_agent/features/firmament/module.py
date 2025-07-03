@@ -255,6 +255,65 @@ class FirmamentModule:
         #     await plugin_manager.initialize_active_plugins_async()
         logger.info("FirmamentModule started.")
 
+    async def handle_pathos_dialogue_with_npc(self,
+                                            npc_id: str,
+                                            pathos_utterance: str,
+                                            conversation_id: Optional[str],
+                                            user_id_context: Optional[str] # This is Pathos's user_id
+                                            ) -> Dict[str, Any]:
+        """
+        Handles Pathos initiating dialogue with an NPC.
+        This method is called by LogosCore's execute_interact_with_npc tool.
+        It uses NPCController to manage the dialogue turn and get NPC's response.
+        """
+        logger.info(f"FirmamentModule: Handling Pathos dialogue. NPC ID: {npc_id}, Utterance: '{pathos_utterance[:50]}...', Conv ID: {conversation_id}")
+
+        if not self.npc_controller:
+            logger.error("FirmamentModule: NPCController not available. Cannot handle Pathos dialogue with NPC.")
+            return {"error": "NPC interaction system is not available.", "npc_response_text": "[System error: NPC controller offline]"}
+
+        try:
+            # Get current simulation block for scene context
+            # The chronos_adapter.get_current_block_for_firmament() returns the formatted block Firmament uses.
+            current_block_data = await self.chronos_adapter.get_current_block_for_firmament()
+            if not current_block_data:
+                logger.warning("FirmamentModule: Could not get current activity block for NPC dialogue context. Proceeding without it.")
+                current_block_data = {} # Provide an empty dict if None
+
+            # Call NPCController to manage the turn (gets NPC response, logs memory)
+            # user_id_context is Pathos's ID, which NPCController might use for logging memories about Pathos.
+            # The npc_id is the target of Pathos's utterance.
+            npc_interaction_result = await self.npc_controller.manage_npc_dialogue_turn(
+                pathos_utterance=pathos_utterance,
+                npc_id=npc_id,
+                conversation_id=conversation_id,
+                current_block_data=current_block_data
+            )
+
+            # npc_interaction_result is expected to be like:
+            # {"npc_response_text": "...", "npc_id": "...", "npc_name": "...", "conversation_id": "..."}
+            # or {"error": "...", "npc_response_text": "..."}
+
+            # Pass the conversation_id back, it might be new or the same.
+            # If NPCController created/updated it, it should be in the result.
+            # For now, let's assume npc_interaction_result contains what LogosCore needs.
+            # We might want to explicitly add the conversation_id to the return if it's managed here or by NPCController.
+            # The current NPCController.manage_npc_dialogue_turn does not explicitly return conversation_id,
+            # but it uses it internally. This needs to be consistent.
+            # Let's assume for now the input conversation_id is passed through or a new one is handled by NPCController's state.
+            # The `interact_with_npc` tool definition includes `conversation_id` in its parameters,
+            # suggesting the LLM might manage it or we provide it back.
+            # For now, this method will just return what NPCController gives.
+            # If NPCController updates/generates a conv_id, it should return it.
+            # Let's assume npc_interaction_result includes 'conversation_id' if it was managed.
+
+            return npc_interaction_result # This dict should be suitable for LogosCore
+
+        except Exception as e:
+            logger.error(f"FirmamentModule: Error handling Pathos dialogue with NPC {npc_id}: {e}", exc_info=True)
+            return {"error": f"An unexpected error occurred: {str(e)}", "npc_response_text": "[An unexpected glitch occurred in the simulation.]"}
+
+
     async def run_simulation_tick(self):
         """
         Executes a single tick of the Firmament simulation.

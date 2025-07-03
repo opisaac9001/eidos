@@ -361,38 +361,82 @@ class PathosInterface:
                 logger.info(f"LLM requested tool calls: {[tc.function.name for tc in llm_output.tool_calls]}")
                 tool_results: List[ToolResult] = await self.logos_core.execute_tools(llm_output.tool_calls, user_id_context=self.current_active_user_id)
 
-                for tr in tool_results:
+                for tool_idx, tr in enumerate(tool_results):
+                    # Default tool response message structure
+                    tool_response_content_for_llm = tr.result_summary_for_llm or json.dumps(tr.result_payload)
+
+                    # Specific handling for 'interact_with_npc' results
+                    if tr.tool_name == "interact_with_npc" and tr.status == "success" and tr.result_payload:
+                        npc_payload = tr.result_payload
+                        npc_response_text = npc_payload.get("npc_response")
+                        npc_name = npc_payload.get("npc_name_responded", npc_payload.get("npc_id_responded", "NPC"))
+                        # current_conv_id = npc_payload.get("conversation_id") # NPCController now manages history internally based on this
+
+                        # Find Pathos's original utterance from the tool call that led to this result
+                        pathos_original_utterance_to_npc = "Pathos spoke to the NPC." # Default
+                        original_tool_call = None
+                        if llm_output.tool_calls and tool_idx < len(llm_output.tool_calls): # Ensure index is valid
+                            # Assuming tool_results are in the same order as tool_calls
+                            # And that tr.call_id matches llm_output.tool_calls[idx].id
+                            # A more robust way is to match tr.call_id with the id in llm_output.tool_calls
+                            for tc_original in llm_output.tool_calls:
+                                if tc_original.id == tr.call_id:
+                                    original_tool_call = tc_original
+                                    break
+
+                        if original_tool_call:
+                            try:
+                                original_args = json.loads(original_tool_call.function.arguments) if isinstance(original_tool_call.function.arguments, str) else original_tool_call.function.arguments
+                                pathos_original_utterance_to_npc = original_args.get("utterance", pathos_original_utterance_to_npc)
+                            except Exception:
+                                logger.warning("Could not parse original utterance for interact_with_npc tool call.")
+
+                        # Remove the standard "tool" role message for this specific tool,
+                        # as we will add more descriptive assistant/user like messages.
+                        # Instead of adding to history here, we'll modify how it's added below.
+                        # We need to make sure the LLM knows Pathos spoke, and then the NPC responded.
+
+                        # 1. Pathos's speech to NPC (already added to history as assistant's tool_call request)
+                        # The assistant message with the tool_call (interact_with_npc) is already in history.
+                        # We now add the NPC's response as if it's a new message in the dialogue.
+
+                        # 2. NPC's response
+                        npc_response_message_for_history = {
+                            "role": "assistant", # Or "user" if we want Pathos to treat NPC as external input?
+                                                # Let's try "assistant" but with a "name" field to clarify it's an NPC.
+                                                # Or, more directly, a "user" role message that represents the NPC.
+                                                # The key is how the MAIN Pathos LLM best understands this.
+                                                # If we treat NPC response like a user message, Pathos then formulates a reply.
+                                                # Let's use a system/context message or a specially formatted user message.
+                            "content": f"<npc_response speaker_name=\"{npc_name}\" speaker_id=\"{npc_payload.get('npc_id_responded')}\">\n{npc_response_text}\n</npc_response>"
+                            # The content for the next LLM prompt should clearly indicate the NPC spoke.
+                            # Using a structured message or clear prefix.
+                        }
+                        context.conversation_history.append(npc_response_message_for_history)
+                        turn_specific_history.append(npc_response_message_for_history)
+                        logger.info(f"Appended NPC '{npc_name}' response to history for Main LLM.")
+
+                        # No need to set tool_response_content_for_llm here as we added a more descriptive message.
+                        # We skip appending the generic tool role message for this specific tool.
+                        continue # Go to next tool result if any, or next iteration of main loop
+
+                    # For other tools, or if interact_with_npc failed:
                     tool_response_message = {
                         "role": "tool",
                         "tool_call_id": tr.call_id,
                         "name": tr.tool_name,
-                        "content": tr.result_summary_for_llm or json.dumps(tr.result_payload)
+                        "content": tool_response_content_for_llm
                     }
                     context.conversation_history.append(tool_response_message)
                     turn_specific_history.append(tool_response_message)
                 continue # Loop back to invoke_main_llm with updated context
 
-            elif llm_output.dialogue_to_npc and llm_output.target_npc_id and self.firmament_module:
-                logger.info(f"Pathos to NPC '{llm_output.target_npc_id}': '{llm_output.dialogue_to_npc[:50]}...'")
-
-                npc_interaction_input = NPCInteractionInput(
-                    pathos_utterance=llm_output.dialogue_to_npc,
-                    npc_id=llm_output.target_npc_id
-                )
-                # The current_context for Firmament should be context.simulation_context
-                npc_response: NPCInteractionOutput = await self.firmament_module.process_pathos_utterance_to_npc(npc_interaction_input)
-
-                npc_response_message = {
-                    "role": "assistant", # From Pathos's perspective, NPC is providing content for him to process
-                    "name": npc_response.npc_id,
-                    "content": npc_response.npc_response_utterance
-                }
-                context.conversation_history.append(npc_response_message)
-                turn_specific_history.append(npc_response_message)
-
-                if npc_response.updated_simulation_context_summary and context.simulation_context and isinstance(context.simulation_context.get('ambient_details'), list):
-                    context.simulation_context["ambient_details"].append(f"Following interaction with {npc_response.npc_id}: {npc_response.updated_simulation_context_summary}")
-                continue # Loop back to invoke_main_llm
+            # This elif block for llm_output.dialogue_to_npc is now superseded by the interact_with_npc tool.
+            # The LLM should use the tool to talk to NPCs.
+            # elif llm_output.dialogue_to_npc and llm_output.target_npc_id and self.firmament_module:
+            #     logger.info(f"Pathos to NPC '{llm_output.target_npc_id}': '{llm_output.dialogue_to_npc[:50]}...'")
+            #     # ... (old direct NPC dialogue logic) ...
+            #     continue # Loop back to invoke_main_llm
 
             elif llm_output.dialogue_to_user:
                 logger.info(f"LLM generated dialogue for user: '{llm_output.dialogue_to_user[:70]}...'")
