@@ -164,6 +164,12 @@ HEXUS_EVENT_DEFINITIONS = {
     "ACTIVITY_EFFECT_LEISURE_ACTIVE": {"joy": 0.015, "tiredness": 0.005, "stress": -0.01},
     "ACTIVITY_EFFECT_LEISURE_PASSIVE": {"comfort": 0.01, "tiredness": -0.005},
     "ACTIVITY_EFFECT_CHORE": {"tiredness": 0.005, "contentment": 0.005, "stress": 0.002},
+    "ACTIVITY_EFFECT_REFLECTIVE": {"focus": 0.01, "contentment": 0.01, "stress": -0.005, "comfort": 0.005, "tiredness": 0.002},
+    "ACTIVITY_EFFECT_MEAL": {"comfort": 0.02, "contentment": 0.015, "tiredness": -0.01, "stress": -0.01},
+    "ACTIVITY_EFFECT_PERSONAL_CARE": {"comfort": 0.02, "contentment": 0.01, "stress": -0.005},
+    "ACTIVITY_EFFECT_EXERCISE": {"joy": 0.02, "stress": -0.02, "tiredness": 0.015, "contentment": 0.01, "focus": 0.005},
+    "ACTIVITY_EFFECT_TRAVEL": {"tiredness": 0.01, "stress": 0.005, "focus": -0.01},
+    "ACTIVITY_EFFECT_ERRAND": {"tiredness": 0.01, "stress": 0.005, "contentment": 0.01, "focus": -0.005},
     # Firmament Intention Simulation Outcomes
     "INTENTION_ACTION_CURIOSITY": {"curiosity": 0.03, "contentment": 0.01, "focus": 0.01},
     "INTENTION_ACTION_SOCIAL": {"joy": 0.02, "craving_connection": 0.02, "loneliness": -0.01},
