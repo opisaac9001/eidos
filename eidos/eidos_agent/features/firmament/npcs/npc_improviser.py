@@ -227,6 +227,93 @@ class NPCImproviser:
         except Exception as e: # Catch-all for other unexpected errors
             logger.error(f"NPCImproviser: Unexpected error during NPC improvisation: {e}", exc_info=True); return None
 
+    async def generate_npc_dialogue_response(
+        self,
+        npc_profile: Dict[str, Any],
+        pathos_utterance: str,
+        scene_context: Dict[str, Any],
+        conversation_history_summary: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Generates a dialogue response for an existing NPC.
+
+        Args:
+            npc_profile: The profile dictionary of the NPC who is speaking.
+            pathos_utterance: The utterance from Pathos to which the NPC is responding
+                              (or a directive if NPC is initiating).
+            scene_context: Dictionary describing the current scene (location, Pathos's mood/activity, time).
+            conversation_history_summary: Optional string summarizing recent turns of this conversation.
+
+        Returns:
+            The NPC's generated dialogue response string, or None if an error occurs.
+        """
+        if not self.llm_config:
+            logger.error(f"NPCImproviser: LLM config for role '{self.llm_role_name}' is missing. Cannot generate dialogue.")
+            return None
+        if not self.llm_client:
+            logger.error(f"NPCImproviser: LLMClient not initialized. Cannot generate dialogue.")
+            return None
+
+        npc_name = npc_profile.get("name", "NPC")
+        npc_personality = npc_profile.get("personality", "A typical person.")
+        npc_role_in_scene = npc_profile.get("role", "present in the scene.")
+
+        # Constructing the system prompt for the NPC's "mind"
+        system_prompt_parts = [
+            f"You are playing the role of an NPC named {npc_name}.",
+            f"Your personality: {npc_personality}",
+            f"Your current role/context in this scene: {npc_role_in_scene}",
+            "Current Scene Context:",
+            f"  - Location: {scene_context.get('location_description', 'an unspecified place')}",
+            f"  - Pathos (the person you are talking to) seems to be feeling: {scene_context.get('pathos_mood_state', 'neutral')}",
+            f"  - Pathos is currently engaged in: {scene_context.get('current_activity_name', 'an unspecified activity')}",
+            f"  - Time: {scene_context.get('time_of_day', 'current time')}"
+        ]
+        if conversation_history_summary:
+            system_prompt_parts.append("\nHere's a summary of your recent conversation with Pathos to help you respond contextually:")
+            system_prompt_parts.append(conversation_history_summary)
+
+        system_prompt_parts.append("\nBased on all this, respond naturally and in character to Pathos's last statement or action. Keep your response concise, like a normal turn in a conversation. Do NOT break character or explain you are an AI. Just provide the dialogue line.")
+
+        npc_system_prompt = "\n".join(system_prompt_parts)
+
+        # Pathos's utterance is the user message for the NPC's LLM
+        messages = [
+            {"role": "system", "content": npc_system_prompt},
+            {"role": "user", "content": pathos_utterance}
+        ]
+
+        logger.debug(f"NPCImproviser: Generating dialogue response for {npc_name}. Pathos said: '{pathos_utterance[:100]}...'. History summary provided: {bool(conversation_history_summary)}")
+
+        try:
+            response_payload: LLMResponsePayload = await self.llm_client.call_llm_api(
+                llm_config=self.llm_config, # Use the configured LLM for Firmament
+                messages=messages,
+                stream=False,
+                max_tokens_override=150 # NPC responses should generally be concise
+            )
+
+            if response_payload.success() and response_payload.content:
+                npc_response_text = response_payload.content.strip()
+                # Basic cleanup: remove common LLM self-corrections or out-of-character remarks if any slip through.
+                npc_response_text = re.sub(r'\[.*?As.*?NPC.*?I would say:.*?\]\s*', '', npc_response_text, flags=re.IGNORECASE | re.DOTALL)
+                npc_response_text = npc_response_text.strip('" ') # Remove leading/trailing quotes
+
+                if not npc_response_text:
+                    logger.warning(f"NPCImproviser: LLM for {npc_name} returned empty content after stripping.")
+                    return f"[{npc_name} seems to ponder but says nothing.]" # Fallback
+
+                logger.info(f"NPCImproviser: Generated dialogue for {npc_name}: '{npc_response_text[:100]}...'")
+                return npc_response_text
+            else:
+                error_msg = response_payload.error_message or "LLM call for NPC dialogue failed with no content."
+                logger.error(f"NPCImproviser: {error_msg} (Status: {response_payload.status_code}) for NPC {npc_name}")
+                return f"[{npc_name} seems momentarily distracted.]" # Fallback
+
+        except Exception as e:
+            logger.error(f"NPCImproviser: Unexpected error during NPC dialogue generation for {npc_name}: {e}", exc_info=True)
+            return f"[{npc_name} stammers, at a loss for words due to a simulation glitch.]" # Fallback
+
 
 if __name__ == '__main__':  # pragma: no cover
     import random # For dummy LLMClient if used

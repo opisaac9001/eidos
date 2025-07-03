@@ -34,7 +34,86 @@ class NPCController:
 
         # State for active conversations, e.g., Dict[conversation_id, List[turn_dict]]
         self.active_conversations: Dict[str, List[Dict[str, str]]] = {}
-        logger.info("NPCController initialized.")
+        self.npc_last_initiated_time: Dict[str, datetime] = {} # For cooldown
+        # Ensure EthosCore type is available for EthosMemory hint
+        if TYPE_CHECKING:
+            from ....persona_logic.ethos_core.memory_storage import MemoryEntry as EthosMemory # Or the Pydantic model if preferred
+
+        self.npc_initiation_cooldown_seconds = self.firmament_module.firmament_config.get("npc_initiation_cooldown_seconds", 300) # 5 mins default
+        self.npc_initiation_base_chance = self.firmament_module.firmament_config.get("npc_initiation_base_chance", 0.05) # 5% chance per opportunity
+
+        logger.info(f"NPCController initialized. Cooldown: {self.npc_initiation_cooldown_seconds}s, Base Chance: {self.npc_initiation_base_chance}")
+
+    def _format_dialogue_history_for_prompt(self, history_mems: List['EthosMemory'], npc_name: str, pathos_user_id: str, num_turns_to_include: int) -> Optional[str]:
+        """
+        Formats a list of npc_dialogue_event memories into a string for an LLM prompt.
+        Orders from oldest to newest of the selected turns.
+        """
+        if not history_mems:
+            return None
+
+        formatted_turns = []
+        # Memories are typically newest first from get_relevant_memories
+        # We want the last N exchanges, so we take the first N memories, then reverse for chronological order in prompt.
+        selected_mems = history_mems[:num_turns_to_include]
+
+        for mem in reversed(selected_mems): # Iterate from oldest of the selection to newest
+            pathos_utterance = mem.metadata.get("pathos_utterance")
+            npc_response = mem.metadata.get("npc_response")
+
+            # Determine who spoke first in the memory's content if not using metadata directly
+            # This is a fallback if direct metadata fields aren't populated as expected.
+            # For now, relying on metadata.
+            if pathos_utterance:
+                formatted_turns.append(f"Pathos: \"{pathos_utterance}\"")
+            if npc_response:
+                formatted_turns.append(f"{npc_name}: \"{npc_response}\"")
+
+        if not formatted_turns:
+            return None
+
+        return "Previous conversation context with Pathos:\n" + "\n".join(formatted_turns)
+
+    def _is_npc_on_cooldown(self, npc_id: str) -> bool:
+        """Checks if the NPC is currently on cooldown for initiating dialogue."""
+        if npc_id in self.npc_last_initiated_time:
+            time_since_last = datetime.now(timezone.utc) - self.npc_last_initiated_time[npc_id]
+            if time_since_last.total_seconds() < self.npc_initiation_cooldown_seconds:
+                logger.debug(f"NPC {npc_id} is on initiation cooldown. Time remaining: {self.npc_initiation_cooldown_seconds - time_since_last.total_seconds():.0f}s")
+                return True
+        return False
+
+    def _update_npc_initiation_cooldown(self, npc_id: str):
+        """Updates the last initiation time for the NPC."""
+        self.npc_last_initiated_time[npc_id] = datetime.now(timezone.utc)
+
+    def _does_npc_decide_to_initiate(self, npc_profile: Dict[str, Any], current_block_data: Dict[str, Any]) -> bool:
+        """Determines if an NPC should initiate dialogue based on various factors."""
+        activity_type_str = current_block_data.get('activity_type')
+
+        # Higher chance during social or active leisure in public-like places
+        conducive_activity = False
+        if activity_type_str == ChronosActivityTypeEnum.SOCIAL.value:
+            conducive_activity = True
+        elif activity_type_str == ChronosActivityTypeEnum.LEISURE_ACTIVE.value and "park" in current_block_data.get('location_hint', '').lower(): # Example
+            conducive_activity = True
+
+        if not conducive_activity:
+            # Lower chance for other non-focused activities if desired, or just return False
+            if random.random() < (self.npc_initiation_base_chance / 5): # Much lower chance
+                 logger.debug(f"NPC {npc_profile.get('name')} considering initiation during non-highly-social activity '{activity_type_str}' (low chance).")
+                 # Allow a small chance even for non-ideal activities, but don't make it the norm.
+            else:
+                return False
+
+        # TODO: Incorporate NPC traits (extroversion, etc.) from npc_profile if available
+        # For now, using base random chance
+        if random.random() < self.npc_initiation_base_chance:
+            logger.info(f"NPC {npc_profile.get('name')} passed random chance to initiate.")
+            return True
+
+        logger.debug(f"NPC {npc_profile.get('name')} did not pass random chance to initiate.")
+        return False
 
     async def assess_interaction_opportunity(self,
                                            current_block_data: Dict[str, Any],
@@ -153,20 +232,36 @@ class NPCController:
         # It gets Pathos's utterance and needs to orchestrate NPC's response and logging.
 
         # 1. Get NPC Response (using NPCImproviser for now, this might be refactored to use a dedicated NPC LLM call)
+
+        # Fetch and format dialogue history
+        pathos_user_id = getattr(self.ethos_core, 'PATHOS_USER_ID', 'pathos_internal_user')
+        formatted_history_str: Optional[str] = None
+        try:
+            history_mems = await self.ethos_core.get_relevant_memories(
+                query=f"dialogue with {npc_name} {npc_id}",
+                user_id_context=pathos_user_id,
+                allowed_types=["npc_dialogue_event"],
+                limit=5 # Fetch a few recent memories to select turns from
+            )
+            if history_mems:
+                formatted_history_str = self._format_dialogue_history_for_prompt(history_mems, npc_name, pathos_user_id, num_turns_to_include=3)
+        except Exception as e_hist:
+            logger.error(f"Error fetching/formatting dialogue history for NPC {npc_id} in manage_npc_dialogue_turn: {e_hist}", exc_info=True)
+
         # Scene context for NPC improviser:
         scene_context_for_improviser = {
             "location_description": current_block_data.get('location_hint', 'an unknown place') if current_block_data else 'an unknown place',
-            "pathos_mood_state": (await self.ethos_core.get_current_mood_state()).name if self.ethos_core else "neutral", # Get current mood
+            "pathos_mood_state": (await self.ethos_core.get_current_mood_state()).name if self.ethos_core else "neutral",
             "current_activity_name": current_block_data.get('activity_title', 'an ongoing activity') if current_block_data else 'an ongoing activity',
-            "time_of_day": datetime.now(timezone.utc).isoformat(), # Or from current_block_data if available
-            "conversation_history_summary": self._get_conversation_history_summary(conversation_id, last_n=3) # Get recent turns
+            "time_of_day": datetime.now(timezone.utc).isoformat(),
+            # "conversation_history_summary": self._get_conversation_history_summary(conversation_id, last_n=3) # Replaced by direct history injection
         }
 
         npc_response_text = await self.npc_improviser.generate_npc_dialogue_response(
-            npc_profile=npc_profile_dict, # Pass the full profile
+            npc_profile=npc_profile_dict,
             pathos_utterance=pathos_utterance,
             scene_context=scene_context_for_improviser,
-            # conversation_history could be passed if maintained per NPC
+            conversation_history_summary=formatted_history_str # Pass the formatted history
         )
 
         if not npc_response_text:
@@ -284,12 +379,33 @@ class NPCController:
         directive_for_npc_llm = f"[You, {npc_name}, decide to initiate a conversation with Pathos. Pathos is currently {scene_context.get('current_activity_name', 'nearby')} at {scene_context.get('location_description', 'this location')}. Pathos's mood seems to be {scene_context.get('pathos_mood_state', 'neutral')}. What do you say to start the conversation? Keep it natural and brief.]"
 
         try:
-            # generate_npc_dialogue_response expects npc_profile, pathos_utterance, scene_context
-            # We pass our directive as the "pathos_utterance" to guide the LLM for the NPC.
+            # Fetch brief history for NPC initiation context
+            pathos_user_id = getattr(self.ethos_core, 'PATHOS_USER_ID', 'pathos_internal_user')
+            brief_history_summary: Optional[str] = None
+            npc_id_for_history = npc_profile.get("id")
+            if npc_id_for_history:
+                try:
+                    last_interaction_mems = await self.ethos_core.get_relevant_memories(
+                        query=f"last interaction with {npc_name} {npc_id_for_history}",
+                        user_id_context=pathos_user_id,
+                        allowed_types=["npc_dialogue_event"],
+                        limit=1 # Fetch only the very last interaction memory
+                    )
+                    if last_interaction_mems:
+                        # Use num_turns_to_include=1 for a very brief summary
+                        brief_history_summary = self._format_dialogue_history_for_prompt(
+                            last_interaction_mems, npc_name, pathos_user_id, num_turns_to_include=1
+                        )
+                        logger.debug(f"Retrieved brief history summary for {npc_name}'s initiation: {brief_history_summary[:100] if brief_history_summary else 'None'}")
+                except Exception as e_hist_init:
+                    logger.error(f"Error fetching brief history for NPC {npc_id_for_history} initiation: {e_hist_init}", exc_info=True)
+
+            # generate_npc_dialogue_response expects npc_profile, pathos_utterance, scene_context, and now conversation_history_summary
             initiated_utterance = await self.npc_improviser.generate_npc_dialogue_response(
                 npc_profile=npc_profile,
                 pathos_utterance=directive_for_npc_llm, # This guides the NPC's LLM
-                scene_context=scene_context
+                scene_context=scene_context,
+                conversation_history_summary=brief_history_summary # Pass the brief history
             )
 
             if initiated_utterance and initiated_utterance.strip():
