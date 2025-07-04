@@ -842,8 +842,11 @@ class PathosInterface:
         logger.debug(f"TTS_SEND ({user_id}, {sequence_num}, {log_prefix}): START for sentence: '{sentence[:30]}...'")
 
         audio_bytes: Optional[bytes] = None
-        try: audio_bytes = await self.eidos_tts_service_instance.synthesize(text=sentence)
-        except Exception as e_synth: logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception during synthesize: {e_synth}", exc_info=True); return
+        try:
+            audio_bytes = await self.eidos_tts_service_instance.synthesize(text=sentence)
+        except Exception as e_synth:
+            logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception during synthesize: {e_synth}", exc_info=True)
+            return
 
         if audio_bytes:
             logger.info(f"TTS_SEND ({user_id}, {sequence_num}): Audio bytes received. Caching with chunk_id: {final_chunk_id}.")
