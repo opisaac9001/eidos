@@ -628,9 +628,11 @@ class ChronosEngine:
                                     pathos_local_dt_at_event_end = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
                                     pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
                                     pathos_tz = timezone.utc
-                                    if ZoneInfo and pathos_tz_str.lower() != "utc":
-                                        try: pathos_tz = ZoneInfo(pathos_tz_str)
-                                        except Exception as e_tz: logger.warning(f"Could not resolve TZ '{pathos_tz_str}': {e_tz}. Using UTC.")
+                                    if ZoneInfo and pathos_tz_str and pathos_tz_str.lower() != "utc": # Added check for pathos_tz_str being non-empty
+                                        try:
+                                            pathos_tz = ZoneInfo(pathos_tz_str)
+                                        except Exception as e_tz:
+                                            logger.warning(f"Could not resolve TZ '{pathos_tz_str}': {e_tz}. Using UTC.")
                                     pathos_local_dt_at_event_end = pathos_local_dt_at_event_end.replace(tzinfo=pathos_tz)
                                     event_to_update.actual_end_datetime = pathos_local_dt_at_event_end.astimezone(timezone.utc)
                                 await self.memory_storage.add_event_to_db(event_to_update)
