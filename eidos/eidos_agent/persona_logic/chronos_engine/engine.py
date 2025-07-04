@@ -10,11 +10,7 @@ except ImportError:
 import random
 
 from eidos_agent.core.config import Config, LLMConfig
-# Relative import for models within the same package
-from .models import (
-    ActivitySlot, PathosEvent,
-    ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
-)
+# Relative import for models within the same package is moved to TYPE_CHECKING
 from eidos_agent.utils.logger import get_logger
 import httpx
 
@@ -23,6 +19,12 @@ if TYPE_CHECKING:
     from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryStorage
     from eidos_agent.persona_logic.ethos_core.core import EthosCore
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+    from .models import (
+        ActivitySlot, PathosEvent,
+        ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
+    )
+
+from . import models as chronos_models # For runtime access
 
 logger = get_logger(__name__)
 
