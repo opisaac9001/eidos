@@ -10,11 +10,7 @@ except ImportError:
 import random
 
 from eidos_agent.core.config import Config, LLMConfig
-# Relative import for models within the same package
-from .models import (
-    ActivitySlot, PathosEvent,
-    ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
-)
+# Relative import for models within the same package is moved to TYPE_CHECKING
 from eidos_agent.utils.logger import get_logger
 import httpx
 
@@ -23,6 +19,12 @@ if TYPE_CHECKING:
     from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryStorage
     from eidos_agent.persona_logic.ethos_core.core import EthosCore
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
+    from .models import (
+        ActivitySlot, PathosEvent,
+        ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
+    )
+
+from . import models as chronos_models # For runtime access
 
 logger = get_logger(__name__)
 
@@ -38,7 +40,7 @@ class ChronosEngine:
         self.ethos_core = ethos_core
         self.logos_core = logos_core
 
-        self._todays_schedule_cache: Dict[str, List[ActivitySlot]] = {}
+        self._todays_schedule_cache: Dict[str, List['chronos_models.ActivitySlot']] = {}
         self._cache_date: Optional[date] = None
         self._schedule_generation_lock = asyncio.Lock()
         self._schedule_update_listeners: List[ScheduleUpdateListener] = []
@@ -65,7 +67,7 @@ class ChronosEngine:
 
         logger.info("ChronosEngine initialized.")
 
-    ACTIVITY_TYPE_TO_IMPORTANCE: Dict[ActivityType, Literal['high', 'medium', 'low']] = {
+    ACTIVITY_TYPE_TO_IMPORTANCE: Dict[str, Literal['high', 'medium', 'low']] = { # Changed key type to str for simplicity with Literal values as keys
         'work': 'high', 'intellectual': 'high',
         'event_related': 'high',
         'social': 'medium', 'learning': 'medium', 'creative': 'medium',
@@ -73,14 +75,14 @@ class ChronosEngine:
         'reflective': 'low', 'leisure': 'low', 'maintenance': 'low', 'other': 'low'
     }
 
-    def _get_slot_duration(self, slot: ActivitySlot) -> timedelta:
+    def _get_slot_duration(self, slot: 'chronos_models.ActivitySlot') -> timedelta:
         # Ensure start_time and end_time are valid time objects
         if not isinstance(slot.start_time, time) or not isinstance(slot.end_time, time):
             logger.error(f"Slot {slot.id} has invalid time types for duration calculation. Start: {type(slot.start_time)}, End: {type(slot.end_time)}")
             return timedelta(0)
         return datetime.combine(slot.date, slot.end_time) - datetime.combine(slot.date, slot.start_time)
 
-    def _get_slot_importance(self, slot: ActivitySlot, event_map: Dict[str, PathosEvent]) -> Literal['critical', 'high', 'medium', 'low']:
+    def _get_slot_importance(self, slot: 'chronos_models.ActivitySlot', event_map: Dict[str, 'chronos_models.PathosEvent']) -> Literal['critical', 'high', 'medium', 'low']:
         if slot.activity_details and slot.activity_details.metadata:
             source_event_id = slot.activity_details.metadata.get('source_event_id')
             if source_event_id and source_event_id in event_map:
@@ -155,10 +157,10 @@ class ChronosEngine:
 
     async def generate_activity_for_slot(
         self, slot_name: str, slot_start_time: time, slot_end_time: time,
-        target_date: date, default_activity_type: ActivityType,
+        target_date: date, default_activity_type: 'chronos_models.ActivityType',
         default_slot_location: Optional[str], # Added default_slot_location
-        current_event_context: Optional[PathosEvent] # Renamed from current_event
-    ) -> ActivitySlot:
+        current_event_context: Optional['chronos_models.PathosEvent'] # Renamed from current_event
+    ) -> 'chronos_models.ActivitySlot':
         llm_config = self._get_llm_for_activity_generation()
 
         # Default fallback values
@@ -202,7 +204,7 @@ class ChronosEngine:
             current_mood = self.ethos_core.get_current_mood()
             recent_memories = await self.ethos_core.retrieve_relevant_memories(query="recent user interactions or Pathos's recent thoughts", top_k=1, allowed_types=['interaction', 'queued_discussion_point'], user_id_context=PATHOS_USER_ID)
             context_str = f"- {recent_memories[0].get('content', '')[:100]}..." if recent_memories else "No specific recent context."
-            valid_types_str = ", ".join(ActivityType.__args__) # type: ignore
+            valid_types_str = ", ".join(chronos_models.ActivityType.__args__) # type: ignore
 
             system_prompt = "You are planning a segment of Pathos's day. Pathos is a 47-year-old British tech consultant. Respond ONLY with the requested JSON object."
             user_prompt_parts = [
@@ -240,7 +242,7 @@ class ChronosEngine:
                 llm_title = llm_generated_data.get('activity_title', fallback_title)
                 llm_desc = details_data.get('description', fallback_desc)
                 llm_activity_type = llm_generated_data.get('activity_type', fallback_type)
-                final_activity_type: ActivityType = llm_activity_type if llm_activity_type in ActivityType.__args__ else fallback_type # type: ignore
+                final_activity_type: chronos_models.ActivityType = llm_activity_type if llm_activity_type in chronos_models.ActivityType.__args__ else fallback_type # type: ignore
 
                 llm_sub_focus = details_data.get('sub_focus')
                 # Prioritize event-derived sub_focus if a specific event is active for the slot
@@ -251,28 +253,28 @@ class ChronosEngine:
                 current_location_context = final_location_context # from event or default slot
                 if llm_location_context: current_location_context = llm_location_context # LLM overrides
 
-                activity_details = ActivitySlotDetails(
+                activity_details = chronos_models.ActivitySlotDetails(
                     description=llm_desc,
                     mood_influence=details_data.get('mood_influence'),
                     sub_focus=current_sub_focus,
                     location_context=current_location_context
                 )
-                return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=llm_title, activity_type=final_activity_type, activity_details=activity_details)
+                return chronos_models.ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=llm_title, activity_type=final_activity_type, activity_details=activity_details)
             except Exception as e: logger.error(f"Error parsing LLM output for slot '{slot_name}': {e}. LLM Output: {llm_generated_data}", exc_info=True)
 
         # Fallback if LLM fails or no LLM config
-        fallback_details = ActivitySlotDetails(description=fallback_desc, sub_focus=final_sub_focus, location_context=final_location_context)
-        return ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=fallback_title, activity_type=fallback_type, activity_details=fallback_details)
+        fallback_details = chronos_models.ActivitySlotDetails(description=fallback_desc, sub_focus=final_sub_focus, location_context=final_location_context)
+        return chronos_models.ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=slot_start_time, end_time=slot_end_time, slot_name=slot_name, activity_title=fallback_title, activity_type=fallback_type, activity_details=fallback_details)
 
-    async def generate_schedule_for_date(self, target_date: date) -> List[ActivitySlot]:
-        new_schedule: List[ActivitySlot] = []
-        active_events: List[PathosEvent] = []
+    async def generate_schedule_for_date(self, target_date: date) -> List['chronos_models.ActivitySlot']:
+        new_schedule: List[chronos_models.ActivitySlot] = []
+        active_events: List['chronos_models.PathosEvent'] = []
         try:
             active_events = await asyncio.to_thread(self.memory_storage.get_events_for_date_range, PATHOS_USER_ID, target_date, target_date)
         except Exception as e: logger.error(f"Error fetching events for {target_date}: {e}", exc_info=True)
 
-        all_day_or_multi_day_events: List[PathosEvent] = []
-        timed_events_on_target_date: List[PathosEvent] = []
+        all_day_or_multi_day_events: List['chronos_models.PathosEvent'] = []
+        timed_events_on_target_date: List['chronos_models.PathosEvent'] = []
 
         for event in active_events:
             if event.specific_time and event.start_date == target_date: # Timed event for the target date
@@ -312,7 +314,7 @@ class ChronosEngine:
 
 
         for slot_name, start_t, end_t, default_type_val_str, default_slot_location_str in processed_slots_template:
-            specific_event_for_this_slot: Optional[PathosEvent] = None
+            specific_event_for_this_slot: Optional['chronos_models.PathosEvent'] = None
             for timed_event in timed_events_on_target_date:
                 if timed_event.specific_time and start_t <= timed_event.specific_time < end_t:
                     specific_event_for_this_slot = timed_event
@@ -323,7 +325,7 @@ class ChronosEngine:
 
             event_context_to_pass = specific_event_for_this_slot if specific_event_for_this_slot else primary_event_for_template_selection
 
-            default_type: ActivityType = default_type_val_str # type: ignore
+            default_type: chronos_models.ActivityType = default_type_val_str # type: ignore
             activity = await self.generate_activity_for_slot(
                 slot_name=slot_name, slot_start_time=start_t, slot_end_time=end_t,
                 target_date=target_date, default_activity_type=default_type,
@@ -341,8 +343,8 @@ class ChronosEngine:
                 if event_context_to_pass and event_context_to_pass.location:
                     final_fallback_location = event_context_to_pass.location
 
-                fallback_details = ActivitySlotDetails(description=fallback_details_desc, location_context=final_fallback_location)
-                new_schedule.append(ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=start_t, end_time=end_t, slot_name=slot_name, activity_title=f"Fallback: {slot_name}", activity_type=default_type, activity_details=fallback_details))
+                fallback_details = chronos_models.ActivitySlotDetails(description=fallback_details_desc, location_context=final_fallback_location)
+                new_schedule.append(chronos_models.ActivitySlot(user_id=PATHOS_USER_ID, date=target_date, start_time=start_t, end_time=end_t, slot_name=slot_name, activity_title=f"Fallback: {slot_name}", activity_type=default_type, activity_details=fallback_details))
 
         if new_schedule:
             new_schedule.sort(key=lambda x: x.start_time)
@@ -357,9 +359,9 @@ class ChronosEngine:
             logger.warning(f"No activities generated for schedule on {target_date}.")
         return new_schedule
 
-    async def get_current_activity(self, current_datetime: datetime) -> Optional[ActivitySlot]:
+    async def get_current_activity(self, current_datetime: datetime) -> Optional['chronos_models.ActivitySlot']:
         target_date, current_time_val = current_datetime.date(), current_datetime.time()
-        schedule_to_check: List[ActivitySlot] = []
+        schedule_to_check: List[chronos_models.ActivitySlot] = []
         async with self._schedule_generation_lock:
             if self._cache_date == target_date and PATHOS_USER_ID in self._todays_schedule_cache and self._todays_schedule_cache[PATHOS_USER_ID]:
                 schedule_to_check = self._todays_schedule_cache[PATHOS_USER_ID]
@@ -372,7 +374,7 @@ class ChronosEngine:
             if activity.start_time <= current_time_val < activity.end_time: return activity
         return None
 
-    async def get_todays_schedule_for_user(self) -> List[ActivitySlot]:
+    async def get_todays_schedule_for_user(self) -> List['chronos_models.ActivitySlot']:
         pathos_local_now = await self.ethos_core.get_local_datetime_for_user(PATHOS_USER_ID)
         today = pathos_local_now.date()
         async with self._schedule_generation_lock:
@@ -385,16 +387,16 @@ class ChronosEngine:
             return self._todays_schedule_cache.get(PATHOS_USER_ID, [])
 
 
-    async def get_upcoming_events(self, user_id: str = PATHOS_USER_ID, days_ahead: int = 7) -> List[PathosEvent]:
+    async def get_upcoming_events(self, user_id: str = PATHOS_USER_ID, days_ahead: int = 7) -> List['chronos_models.PathosEvent']:
         pathos_local_now = await self.ethos_core.get_local_datetime_for_user(user_id)
         start_date_val, end_date_val = pathos_local_now.date(), pathos_local_now.date() + timedelta(days=days_ahead)
         return await self.memory_storage.get_events_for_date_range(user_id, start_date_val, end_date_val)
 
-    async def add_planned_event(self, event_data: Dict[str, Any]) -> Optional[PathosEvent]:
+    async def add_planned_event(self, event_data: Dict[str, Any]) -> Optional['chronos_models.PathosEvent']:
         try:
             event_data.setdefault('user_id', PATHOS_USER_ID)
             if 'details' not in event_data or not isinstance(event_data['details'], dict): event_data['details'] = {}
-            event = PathosEvent(**event_data)
+            event = chronos_models.PathosEvent(**event_data)
             if await self.memory_storage.add_event_to_db(event):
                 logger.info(f"Added planned event '{event.title}' for Pathos.")
                 async with self._schedule_generation_lock:
@@ -453,7 +455,7 @@ class ChronosEngine:
         user_id = slot_to_update.user_id
 
         async with self._schedule_generation_lock:
-            todays_schedule: List[ActivitySlot] = await self.memory_storage.load_schedule_from_db(target_date, user_id)
+            todays_schedule: List['chronos_models.ActivitySlot'] = await self.memory_storage.load_schedule_from_db(target_date, user_id)
 
             if not todays_schedule:
                 logger.warning(f"report_activity_outcome: Could not load schedule for date {target_date} to update slot {slot_id}. Saving only the updated slot.")
@@ -488,7 +490,7 @@ class ChronosEngine:
             final_processing_shift_needed = deviation # Initialize with original deviation
 
             if current_slot_index != -1 and abs(deviation) > SIGNIFICANT_DEVIATION_THRESHOLD:
-                event_id_to_event_map: Dict[str, PathosEvent] = {}
+                event_id_to_event_map: Dict[str, 'chronos_models.PathosEvent'] = {}
                 source_event_ids = list(set(
                     s.activity_details.metadata.get('source_event_id')
                     for s in todays_schedule
@@ -628,9 +630,11 @@ class ChronosEngine:
                                     pathos_local_dt_at_event_end = datetime.combine(slot_to_update.date, slot_to_update.actual_end_time)
                                     pathos_tz_str = self.ethos_core.ethos_config.get('pathos_home_timezone', "UTC")
                                     pathos_tz = timezone.utc
-                                    if ZoneInfo and pathos_tz_str.lower() != "utc":
-                                        try: pathos_tz = ZoneInfo(pathos_tz_str)
-                                        except Exception as e_tz: logger.warning(f"Could not resolve TZ '{pathos_tz_str}': {e_tz}. Using UTC.")
+                                    if ZoneInfo and pathos_tz_str and pathos_tz_str.lower() != "utc": # Added check for pathos_tz_str being non-empty
+                                        try:
+                                            pathos_tz = ZoneInfo(pathos_tz_str)
+                                        except Exception as e_tz:
+                                            logger.warning(f"Could not resolve TZ '{pathos_tz_str}': {e_tz}. Using UTC.")
                                     pathos_local_dt_at_event_end = pathos_local_dt_at_event_end.replace(tzinfo=pathos_tz)
                                     event_to_update.actual_end_datetime = pathos_local_dt_at_event_end.astimezone(timezone.utc)
                                 await self.memory_storage.add_event_to_db(event_to_update)
