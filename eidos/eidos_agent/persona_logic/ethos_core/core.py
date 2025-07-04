@@ -42,10 +42,10 @@ if TYPE_CHECKING:
     from eidos_agent.persona_logic.chronos_engine.engine import ChronosEngine # Assuming engine.py
     from eidos_agent.persona_logic.chronos_engine.models import ActivitySlot # Assuming models.py
 
-from eidos_agent.persona_logic.chronos_engine.models import PATHOS_USER_ID # Adjusted import
-
 # PATHOS_USER_ID is now imported via TYPE_CHECKING block or directly if not under TYPE_CHECKING
 # from eidos_agent.modules.chronos_engine import PATHOS_USER_ID # This line is removed
+# Corrected import for PATHOS_USER_ID:
+from eidos_agent.persona_logic.chronos_engine import PATHOS_USER_ID
 
 from eidos_agent.persona_logic.chronos_engine import ChronosEngine, ActivitySlot
 try:
