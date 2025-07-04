@@ -835,7 +835,8 @@ class PathosInterface:
 
     async def send_sentence_to_tts_and_notify_client(self, sentence: str, user_id: str, sequence_num: int, forced_chunk_id: Optional[str] = None, chunk_id_prefix: str = "chat_tts_main_"):
         if not self.eidos_tts_service_instance or not self.connection_manager or self.audio_cache is None or not self.eidos_tts_service_instance.is_available():
-            logger.error(f"TTS prerequisites missing for user {user_id}. TTS Service: {self.eidos_tts_service_instance}, ConnMgr: {self.connection_manager}, AudioCache: {self.audio_cache}, TTS Available: {self.eidos_tts_service_instance.is_available() if self.eidos_tts_service_instance else False}"); return
+            logger.error(f"TTS prerequisites missing for user {user_id}. TTS Service: {self.eidos_tts_service_instance}, ConnMgr: {self.connection_manager}, AudioCache: {self.audio_cache}, TTS Available: {self.eidos_tts_service_instance.is_available() if self.eidos_tts_service_instance else False}")
+            return
 
         final_chunk_id = forced_chunk_id if forced_chunk_id else f"{chunk_id_prefix}{user_id}_{uuid.uuid4().hex[:10]}_{sequence_num}"
         log_prefix = f"FORCED_ID({final_chunk_id})" if forced_chunk_id else f"PREFIX({chunk_id_prefix})"
@@ -857,18 +858,29 @@ class PathosInterface:
                         if self.audio_cache is not None:
                             self.audio_cache[final_chunk_id] = audio_bytes
                             cache_successful = True
-                elif self.audio_cache is not None: self.audio_cache[final_chunk_id] = audio_bytes; cache_successful = True
-            except Exception as e_cache: logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception caching chunk {final_chunk_id}: {e_cache}", exc_info=True); return
+                elif self.audio_cache is not None:
+                    self.audio_cache[final_chunk_id] = audio_bytes
+                    cache_successful = True
+            except Exception as e_cache:
+                logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception caching chunk {final_chunk_id}: {e_cache}", exc_info=True)
+                return
 
-            if not cache_successful: logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Caching failed for chunk {final_chunk_id}."); return
+            if not cache_successful:
+                logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Caching failed for chunk {final_chunk_id}.")
+                return
 
             audio_url = f"/v1/tts/audio_chunk/{final_chunk_id}"
             is_proactive = final_chunk_id.startswith("proactive_tts_")
             ws_payload = {"type": "tts_audio_chunk_ready", "payload": {"url": audio_url, "sequence": sequence_num, "text_for_indicator": sentence, "chunk_id": final_chunk_id, "is_proactive_audio": is_proactive}}
 
-            try: await self.connection_manager.send_personal_message(ws_payload, user_id); logger.info(f"TTS_SEND ({user_id}, {sequence_num}): Notification sent for chunk {final_chunk_id}.")
-            except Exception as e_ws: logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception sending WebSocket for chunk {final_chunk_id}: {e_ws}", exc_info=True)
-        else: logger.warning(f"TTS_SEND ({user_id}, {sequence_num}): No audio bytes from synthesis for: '{sentence[:30]}...'.")
+            try:
+                await self.connection_manager.send_personal_message(ws_payload, user_id)
+                logger.info(f"TTS_SEND ({user_id}, {sequence_num}): Notification sent for chunk {final_chunk_id}.")
+            except Exception as e_ws:
+                logger.error(f"TTS_SEND ({user_id}, {sequence_num}): Exception sending WebSocket for chunk {final_chunk_id}: {e_ws}", exc_info=True)
+        else:
+            logger.warning(f"TTS_SEND ({user_id}, {sequence_num}): No audio bytes from synthesis for: '{sentence[:30]}...'.")
+
         logger.debug(f"TTS_SEND ({user_id}, {sequence_num}, {log_prefix}): END for sentence: '{sentence[:30]}...'")
 
     async def process_feedback(self, feedback_data: Dict[str, Any]):

@@ -15,13 +15,12 @@ from .models import (
     ActivitySlot, PathosEvent,
     ActivitySlotDetails, PathosEventDetails, ActivityType, EventType
 )
-# EthosCore imports are already updated to persona_logic in this file
-from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryStorage
 from eidos_agent.utils.logger import get_logger
 import httpx
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Coroutine # Added Callable, Coroutine
 if TYPE_CHECKING:
+    from eidos_agent.persona_logic.ethos_core.memory_storage import MemoryStorage
     from eidos_agent.persona_logic.ethos_core.core import EthosCore
     from eidos_agent.persona_logic.logos_core.handler import LogosCore # Updated import
 
@@ -33,7 +32,7 @@ PATHOS_USER_ID = "pathos_agent_internal"
 ScheduleUpdateListener = Callable[[date, str], Coroutine[Any, Any, None]]
 
 class ChronosEngine:
-    def __init__(self, config: Config, memory_storage: MemoryStorage, ethos_core: 'EthosCore', logos_core: 'LogosCore'):
+    def __init__(self, config: Config, memory_storage: 'MemoryStorage', ethos_core: 'EthosCore', logos_core: 'LogosCore'):
         self.config = config
         self.memory_storage = memory_storage
         self.ethos_core = ethos_core
