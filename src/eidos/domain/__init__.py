@@ -1,0 +1,1 @@
+"""Deterministic Eidos domain model."""
