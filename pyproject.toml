@@ -10,6 +10,9 @@ requires-python = ">=3.12"
 authors = [{ name = "Isaac Lamb" }]
 dependencies = []
 
+[project.scripts]
+eidos = "eidos.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "mypy>=1.11",

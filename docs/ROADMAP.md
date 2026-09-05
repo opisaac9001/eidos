@@ -11,9 +11,10 @@
 Exit condition: a clean repository whose tests run without models or external
 services and whose next implementation steps are unambiguous.
 
-## Milestone 1: Persistent day
+## Milestone 1: Persistent day (in progress)
 
-- PostgreSQL event store and projections
+- SQLite event store with an interface for future database adapters (implemented)
+- Authored daily routine and restart-safe journal (implemented)
 - Chronos clock, pause, resume, and restart behavior
 - Firmament locations, actors, and scheduled activities
 - Ethos episodic memory with provenance
@@ -22,6 +23,10 @@ services and whose next implementation steps are unambiguous.
 
 Exit condition: Pathos completes and remembers a small deterministic day across
 application restarts.
+
+Current verification covers restart equivalence, atomic rollback, stale-writer
+conflicts, clock bounds, schema versions, and layer dependencies. A complete
+model-backed day still requires cognition, interactions, and an operator API.
 
 ## Milestone 2: Living character
 

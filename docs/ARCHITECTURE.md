@@ -31,7 +31,9 @@ capability such as `pathos-dialogue`, `npc-dialogue`, `reflection`, or
 ## Start as a modular monolith
 
 The simulation, API, scheduler, and persistence layer initially ship as one
-Python application and one PostgreSQL database. Background work uses a durable
+Python application and one SQLite database for the local foundation. PostgreSQL
+remains an option for multiple application processes; the event-store port isolates
+that decision. Background work will use a durable
 job table before introducing a message broker. This keeps transactions and
 debugging straightforward while the domain is still changing.
 
@@ -102,7 +104,8 @@ the simulated world. Model output alone never grants permission.
 
 ## Persistence
 
-PostgreSQL is the intended durable store. The initial schema will combine:
+SQLite currently stores versioned event batches with optimistic concurrency.
+State and the journal are rebuilt from those events. The planned schema will combine:
 
 - an append-only domain event table;
 - relational projections for current state;
@@ -111,8 +114,10 @@ PostgreSQL is the intended durable store. The initial schema will combine:
 - vector columns when semantic retrieval is introduced;
 - inference traces containing metadata, not hidden chain-of-thought.
 
-SQLite may be used in unit tests, but production semantics must not depend on
-SQLite-specific behavior.
+The current port requires atomic appends and revision conflicts, independent of
+database engine. A PostgreSQL adapter must satisfy the same persistence tests.
+Materialized projections, scheduled jobs, vectors, and inference traces are not
+implemented yet.
 
 ## Model contract
 

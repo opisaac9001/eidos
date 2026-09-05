@@ -27,20 +27,40 @@ docs/               Product vision, architecture, decisions, and roadmap
 infra/dell-t630/     Deployment contract for the local AI host
 src/eidos/domain/    Deterministic simulation concepts and rules
 src/eidos/ports/     Interfaces to models, storage, clocks, and external tools
+src/eidos/application/ Simulation use cases
+src/eidos/adapters/  SQLite persistence implementation
 tests/               Executable architecture and domain expectations
 ```
 
 ## Current milestone
 
-Milestone 0 establishes the contracts that future work must preserve. It does
-not attempt to recreate the old feature list. See the
+The foundation now runs a persistent, authored day with a clock, locations,
+energy changes, and a factual journal. SQLite stores atomic event batches;
+the application reconstructs state from the history on restart. AI generation,
+NPC dialogue, semantic retrieval, and a web interface are still future work. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
 and [architecture](docs/ARCHITECTURE.md).
 
 ## Development
 
-Python 3.12 or newer is recommended.
+Python 3.12 or newer is required. With mise installed:
 
 ```bash
-python -m unittest discover -s tests
+mise trust
+mise exec -- python -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/eidos status
+.venv/bin/eidos advance --hours 24
+.venv/bin/eidos journal
+.venv/bin/eidos status
 ```
+
+Commands default to `data/eidos.sqlite3`. Use `eidos --database PATH ...` to
+create independent worlds. Time advances only on request, by up to seven days
+per command; closing the program pauses the simulation. The seed world starts
+at midnight UTC on January 1, 2026. Journal entries are explicitly authored
+routine events, not outputs from a language model.
+
+Original code: `git show main:eidos/README.md`. The rebuild does not import the
+legacy packages. Both histories are available locally; no push is needed to run.
