@@ -9,9 +9,11 @@ from eidos.application.cognition import perform
 from eidos.application.first_story import story_events
 from eidos.application.inner_life import active_concerns, waking_dream_events
 from eidos.application.memory import memory_view, recall, terms
+from eidos.application.planner import overdue_plan_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
+from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name, npc_location
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
@@ -124,12 +126,18 @@ class Life:
                 "dream.recalled",
                 "day.summarized",
                 "request.made",
+                "social.request_opened",
+                "social.request_negotiated",
+                "social.request_accepted",
+                "social.request_declined",
                 "intention.adopted",
                 "intention.completed",
                 "action.accepted",
                 "action.rejected",
                 "schedule.interrupted",
                 "commitment.fulfilled",
+                "commitment.missed",
+                "planning.rejected",
                 "relationship.changed",
                 "memory.recorded",
                 "role.failed",
@@ -146,6 +154,7 @@ class Life:
         ]
         memories = memory_view(history, state.simulated_at)
         planning = project_planning(history)
+        social = project_social(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -169,6 +178,7 @@ class Life:
             "calendar": [vars_for(item) for item in planning.calendar.values()],
             "objects": [vars_for(item) for item in planning.objects.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
+            "requests": [vars_for(item) for item in social.requests.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
@@ -234,10 +244,14 @@ class Life:
                         },
                     )
                 )
-            story = story_events(current, history + pending, state.location_id)
+            story = story_events(current, history + pending, state.location_id, state.energy)
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
+            overdue = overdue_plan_events(project_planning(history + pending), current)
+            if overdue:
+                project_planning(history + pending + overdue)
+                pending.extend(overdue)
             if current.hour == 7:
                 waking = waking_dream_events(history + pending, state, at)
                 for event in waking:

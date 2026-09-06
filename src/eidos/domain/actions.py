@@ -173,6 +173,13 @@ def resolve_action(
             return reject("invalid_schedule_time", "The scheduled start time is invalid")
         if simulated_at < starts_at:
             return reject("too_early", "The scheduled work has not started")
+        if schedule.ends_at is not None:
+            try:
+                ends_at = datetime.fromisoformat(schedule.ends_at)
+            except ValueError:
+                return reject("invalid_schedule_time", "The scheduled end time is invalid")
+            if simulated_at < ends_at:
+                return reject("work_incomplete", "The scheduled work duration has not elapsed")
         effects.extend(
             (
                 effect(

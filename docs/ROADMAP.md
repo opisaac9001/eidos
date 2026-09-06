@@ -222,9 +222,9 @@ boundaries and must not rely on emotional coercion.
 1. Extend the shipped action/intention/world-event v1 envelopes to speech and beliefs.
 2. Add job deadlines/backpressure and detach optional result application from callers.
 3. Persist the in-memory entity/goal memory indexes and add relationship/diversity indexes.
-4. Generalize planning beyond the authored lamp story.
-5. Make the lamp request a bounded accept/decline/negotiate scene.
-6. Add appraisal, needs and choice policy around dream residue.
+4. Expand the reusable accepted-work planner beyond repair with travel/resources.
+5. Extend bounded social scenes from work requests to invitations and follow-ups.
+6. Add appraisal and durable needs around choice and dream residue.
 7. Add consolidation and owned beliefs, then adversarial perspective tests.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,

@@ -114,9 +114,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
 - NPC schedules, a first causal promise/repair story and relationship metrics
-  persist by replay. The lamp repair now passes through a versioned action
-  proposal with stale-state, custody, location, condition, schedule and time
-  checks; autonomous NPC planning remains future work.
+  persist by replay. The lamp request now negotiates explicit terms before a
+  reusable planner creates linked work; its repair passes stale-state, intention,
+  custody, location, schedule and elapsed-time checks. Broader autonomous NPC
+  planning remains future work.
 - Memories have provenance, importance, cue-based recall, accessibility fading
   and capped rehearsal. Entity/semantic retrieval and consolidation are pending.
 - The server is loopback-only. Authentication and hardened LAN deployment belong

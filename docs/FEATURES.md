@@ -39,18 +39,18 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: energy/valence | P2 |
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Planned | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Planned | P2–P4 |
-| SELF-05 | Decisions balance values, needs, commitments and feasible options | Planned | P3 |
+| SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: request capacity/window policy | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Planned | P6 |
 
 ## Planning and time — Chronos / Pathos
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: state and first story | P3 |
-| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: owned intentions + commitment state | P3 |
-| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: schedule transitions/routine | P3 |
-| PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair feasibility/stale checks | P3 |
-| PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Planned | P3 |
+| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: linked accepted-work goals | P3 |
+| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments | P3 |
+| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/transitions | P3 |
+| PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
+| PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption/reschedule and social deadline negotiation | P3 |
 | PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: proposed/accepted/rejected action audit | P3 |
 | PLAN-07 | Bounded catch-up, meaningful decisions, interval summaries | Planned: restart pauses | P5 |
 
@@ -73,7 +73,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | SOCIAL-01 | User dialogue, remembered visits, contextual replies, idempotent sends | Partial: limited context | P2–P3 |
 | SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: single encounter | P3 |
-| SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Planned | P3 |
+| SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: bounded work requests with explicit consent | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Planned | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Planned | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |

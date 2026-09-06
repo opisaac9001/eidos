@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Any, Mapping, TypeVar
 
 from eidos.domain.events import DomainEvent
@@ -24,6 +25,8 @@ class Commitment:
     creditor_id: str
     due_at: str
     status: str = "active"
+    request_id: str | None = None
+    goal_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +37,12 @@ class CalendarEntry:
     location_id: str
     status: str = "scheduled"
     reason: str | None = None
+    ends_at: str | None = None
+    actor_id: str | None = None
+    action: str | None = None
+    target_id: str | None = None
+    commitment_id: str | None = None
+    goal_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,9 +88,20 @@ class PlanningState:
                 goals[goal_id] = Goal(goal_id, _required(payload, "title"))
             case "goal.achieved":
                 goal = _existing(goals, payload, "goal_id")
-                if not any(item.status == "fulfilled" for item in commitments.values()):
+                linked_commitments = [
+                    item for item in commitments.values() if item.goal_id == goal.goal_id
+                ]
+                commitment_evidence = linked_commitments or [
+                    item for item in commitments.values() if item.goal_id is None
+                ]
+                if not any(item.status == "fulfilled" for item in commitment_evidence):
                     raise ValueError("Goal needs an accomplished commitment")
                 goals[goal.goal_id] = replace(goal, status="achieved", progress=1.0)
+            case "goal.blocked":
+                goal = _existing(goals, payload, "goal_id")
+                if goal.status != "active":
+                    raise ValueError("Only active goals can become blocked")
+                goals[goal.goal_id] = replace(goal, status="blocked")
             case "commitment.created":
                 commitment_id = _required(payload, "commitment_id")
                 if commitment_id in commitments:
@@ -92,14 +112,32 @@ class PlanningState:
                     _required(payload, "debtor_id"),
                     _required(payload, "creditor_id"),
                     _required(payload, "due_at"),
+                    request_id=_optional(payload, "request_id"),
+                    goal_id=_optional(payload, "goal_id"),
                 )
             case "commitment.fulfilled":
                 commitment = _existing(commitments, payload, "commitment_id")
                 if commitment.status != "active":
                     raise ValueError("Only active commitments can be fulfilled")
-                if not any(item.status == "completed" for item in calendar.values()):
+                linked_entries = [
+                    item
+                    for item in calendar.values()
+                    if item.commitment_id == commitment.commitment_id
+                ]
+                schedule_evidence = linked_entries or [
+                    item for item in calendar.values() if item.commitment_id is None
+                ]
+                if not any(item.status == "completed" for item in schedule_evidence):
                     raise ValueError("Commitment requires completed scheduled work")
                 commitments[commitment.commitment_id] = replace(commitment, status="fulfilled")
+            case "commitment.missed":
+                commitment = _existing(commitments, payload, "commitment_id")
+                if commitment.status != "active":
+                    raise ValueError("Only active commitments can be missed")
+                missed_at = datetime.fromisoformat(_required(payload, "simulated_at"))
+                if missed_at <= datetime.fromisoformat(commitment.due_at):
+                    raise ValueError("A commitment cannot be missed before its deadline")
+                commitments[commitment.commitment_id] = replace(commitment, status="missed")
             case "schedule.created":
                 schedule_id = _required(payload, "schedule_id")
                 if schedule_id in calendar:
@@ -109,6 +147,12 @@ class PlanningState:
                     _required(payload, "title"),
                     _required(payload, "starts_at"),
                     _required(payload, "location_id"),
+                    ends_at=_optional(payload, "ends_at"),
+                    actor_id=_optional(payload, "actor_id"),
+                    action=_optional(payload, "action"),
+                    target_id=_optional(payload, "target_id"),
+                    commitment_id=_optional(payload, "commitment_id"),
+                    goal_id=_optional(payload, "goal_id"),
                 )
             case "schedule.interrupted":
                 entry = _existing(calendar, payload, "schedule_id")
@@ -122,13 +166,23 @@ class PlanningState:
                 if entry.status != "interrupted":
                     raise ValueError("Only interrupted work can be rescheduled")
                 calendar[entry.schedule_id] = replace(
-                    entry, status="scheduled", starts_at=_required(payload, "starts_at")
+                    entry,
+                    status="scheduled",
+                    starts_at=_required(payload, "starts_at"),
+                    ends_at=_optional(payload, "ends_at") or entry.ends_at,
                 )
             case "schedule.completed":
                 entry = _existing(calendar, payload, "schedule_id")
                 if entry.status != "scheduled":
                     raise ValueError("Only scheduled work can complete")
                 calendar[entry.schedule_id] = replace(entry, status="completed")
+            case "schedule.failed":
+                entry = _existing(calendar, payload, "schedule_id")
+                if entry.status not in {"scheduled", "interrupted"}:
+                    raise ValueError("Only unfinished scheduled work can fail")
+                calendar[entry.schedule_id] = replace(
+                    entry, status="failed", reason=_required(payload, "reason")
+                )
             case "object.registered":
                 object_id = _required(payload, "object_id")
                 if object_id in objects:

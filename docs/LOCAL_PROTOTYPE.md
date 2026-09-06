@@ -33,10 +33,13 @@ confidence, simulated-time accessibility decay and capped rehearsal. Replay-buil
 term, entity and active-goal indexes contribute separately weighted scores, which
 the Memory Archive exposes for explicit conversation recalls. This is not yet
 semantic/vector retrieval; the audit history never fades.
-The authored lamp fixture exercises a goal, promise, owned intention, schedule,
-interruption and reschedule. The repair must then pass deterministic intention,
-custody, location, condition and time checks before fulfillment and its causal
-trust update. It is not yet general autonomous planning.
+The lamp fixture now opens a social request with an infeasible deadline. Pathos's
+capacity/window policy counters; Mara explicitly accepts the counteroffer; only
+then does the reusable planner create a linked goal, commitment, schedule and
+owned intention. The repair later passes deterministic intention, custody,
+location, condition and elapsed-work checks. A tested low-capacity branch declines
+without creating an implied commitment, and overdue accepted work creates linked
+failure, memory and relationship consequences. Other action families remain.
 
 The unresolved lamp concern seeds the first night's dream. Waking records it
 explicitly as a dream and applies one capped emotional residue. Duplicate

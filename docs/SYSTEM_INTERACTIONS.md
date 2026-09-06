@@ -262,6 +262,13 @@ Cancellation keeps completed batches and prevents later unapproved catch-up work
 
 ## Worked example: the lamp
 
+The deterministic integration fixture now exercises an infeasible initial
+deadline, a Pathos counteroffer, explicit acceptance by Mara, linked feasible
+planning, interruption, rescheduling, validated completion and causal trust.
+Separate fixtures prove low-capacity refusal creates no commitment, conflicting
+work is rejected, overdue accepted work has consequences, and legacy mid-story
+worlds still replay to completion.
+
 1. At the café, Mara asks Pathos to repair a lamp by tomorrow. Only participants
    and actual witnesses receive the exchange as a perception.
 2. Pathos checks obligations and may accept, decline or negotiate. If accepted,
