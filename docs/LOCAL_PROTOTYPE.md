@@ -88,7 +88,7 @@ checks exercise navigation, hour stepping, contextual replies, archive search,
 and desktop/mobile presentation. A built Python wheel must include all three
 browser assets so installation works outside an editable checkout.
 
-The suite has 57 tests and strict static typing passes. A durable queue
+The current suite has 179 tests and strict static typing passes. A durable queue
 and runner cover restart, concurrent claims, ownership, priority, leases, bounded
 retry, cancellation, invalid output and stale revisions before/after inference.
 wraps normal CLI and browser inference and exposes aggregate queue counts. Work

@@ -30,17 +30,20 @@ UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are 
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
 
-Hourly associations, reflection, dreams and a daybook run at fixed times.
-The first authored story now exercises a promise, object, calendar, interruption,
-repair, fulfillment, concern and directed trust. Concern-seeded dreams can create
-one capped waking effect and explicit dream recollection. Lexical recall includes
-importance, simulated-time fading and capped rehearsal. Normal CLI and browser model
-calls use supervised durable workers and reuse completed work after restart. Pathos
-makes a narrow class of value/capacity-aware social choices; NPCs have persistent
-offscreen locations, needs, and private activities but not general autonomous
-planning. Term, entity, goal, and relationship recall indexes, owned beliefs,
-conservative imperfect recall, and source-linked consolidation are replay projections
-rather than durable database indexes.
+Hourly associations, reflection, dreams and a factual daybook run at fixed times.
+The connected week exercises a promise, interruption, repair, personal bookbinding
+project, explicitly accepted tool loan/return, scheduled learning, skill growth,
+concern, dream residue, temporary non-authoritative inspiration, and directed trust.
+Goals support evidence-based progress, abandonment, and mutually accepted versioned
+deadline changes. Catch-up has preview, atomic daily chunks, restart, cancellation,
+and a bounded source-linked factual recap. Lexical recall includes importance,
+simulated-time fading and capped rehearsal. Normal CLI and browser model calls use
+supervised durable workers and reuse completed work after restart. Pathos makes a
+narrow class of value/capacity-aware social choices; NPCs have persistent offscreen
+locations, needs, private beliefs, activities, and one bounded private plan rather
+than general autonomous planning. Term, entity, goal, and relationship recall indexes,
+owned beliefs, conservative imperfect recall, and source-linked consolidation remain
+replay projections rather than durable database indexes.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -222,13 +225,18 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend the shipped typed v1 envelopes to speech and memory associations.
-2. Detach optional cognition result application from simulation callers.
-3. Persist the in-memory entity/goal memory indexes and add relationship/diversity indexes.
-4. Expand the reusable accepted-work planner beyond repair with travel/resources.
-5. Extend bounded social scenes from work requests to invitations and follow-ups.
-6. Add baseline mood recovery, episodes and broader value-based choice.
-7. Add testimony reliability, correction UX and broader adversarial perspective fixtures.
+1. Add bounded materialized checkpoints/index maintenance so years of history do not
+   require rebuilding every projection and recall index from the beginning.
+2. Generalize NPC goals and feasible planning beyond the single perception-grounded
+   Rowan sketch fixture while preserving private knowledge boundaries.
+3. Add bounded multi-turn NPC scenes with interruption, exits, topic state, and
+   observer-specific memories.
+4. Broaden paced world events, recurring activities, seasons, resource dependencies,
+   and project variety without forcing drama.
+5. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
+6. Capture the Dell inventory, then benchmark and pin its private inference stack.
+7. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
+   repeated prose, and low-quality but schema-valid model output.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,
 operator visibility, known limitations and migration notes. Real-model probes

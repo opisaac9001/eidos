@@ -34,9 +34,10 @@ tests/               Executable architecture and domain expectations
 
 ## Current milestone
 
-The local prototype has five connected views: Observatory, World, Conversation,
-Memory Archive, and Ensemble. A background clock runs routines, NPC encounters,
-thoughts, weather, memory formation, reflection, dreams, and a daybook. All eight
+The local prototype has six connected views: Observatory, World, Conversation,
+Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
+NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
+scheduled activities, and a factual daybook. All eight
 performers can use deterministic stand-ins or a real compatible model endpoint;
 a ninth, the continuity critic, performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
@@ -69,11 +70,13 @@ opened directly with `--database` to prove that the event history replays before
 it is promoted during a recovery.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
-catch-up (maximum seven days), or resume one interrupted between atomic chunks:
+catch-up (maximum seven days), resume one interrupted between atomic chunks, or
+cancel it at its last committed checkpoint:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 catch-up --hours 48
 PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 resume-catch-up
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 cancel-catch-up
 ```
 
 Python 3.12 or newer is required. With mise installed:
@@ -133,17 +136,19 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
 - NPC movement, needs, private activity, a causal promise/repair story, public-event
-  perception, and relationship metrics persist by replay. The planner checks terms,
-  resources, schedules, open hours, and travel buffers. Broader autonomous NPC
-  beliefs and planning remain future work.
+  perception, private beliefs, one bounded NPC plan, and relationship metrics persist
+  by replay. Pathos completes a resource-backed personal project; the planner checks
+  consent, custody, terms, resources, schedules, open hours, travel buffers,
+  abandonment, and renegotiation. General autonomous planning remains future work.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
-- Full-history replay passes the current thirty-day offline gate. Longer deployments
-  still need snapshots and pagination. Verified online backups and supervised durable
-  model workers are implemented.
+- Full-history replay passes restart-spanning seven-day acceptance and thirty-day
+  offline soak gates. Event history has stable revision pagination; longer deployments
+  still need materialized checkpoints and archive maintenance. Verified online backups
+  and supervised durable model workers are implemented.
 - Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the

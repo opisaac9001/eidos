@@ -27,6 +27,7 @@ def main() -> None:
     catch_up = commands.add_parser("catch-up", help="Explicitly catch up at most seven days")
     catch_up.add_argument("--hours", type=float, required=True)
     commands.add_parser("resume-catch-up", help="Resume an interrupted catch-up session")
+    commands.add_parser("cancel-catch-up", help="Cancel an interrupted catch-up session")
     commands.add_parser("journal", help="Read accepted autobiographical events")
     backup = commands.add_parser("backup", help="Create a verified online SQLite backup")
     backup.add_argument("--output", type=Path, required=True)
@@ -139,6 +140,8 @@ def main() -> None:
             simulation.catch_up(args.hours)
         elif args.command == "resume-catch-up":
             simulation.resume_catch_up()
+        elif args.command == "cancel-catch-up":
+            simulation.cancel_catch_up()
         state = simulation.project(simulation.history())
         print(
             json.dumps(
