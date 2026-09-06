@@ -465,6 +465,15 @@ cast. New objects enter ordinary ownership/condition planning. New places and th
 routes appear in the world catalog and observatory. This is what lets the world expand
 without turning every model sentence into hidden state.
 
+Operator-authored world packs use that same registration boundary. A strict manifest
+contains one to thirty-two ordered entity proposals; a place can therefore be added
+before people or objects that depend on it. Pack ID, sequential version and canonical
+manifest checksum are recorded with individual registration links. Validation occurs
+against a projected catalog before one atomic append, so a collision or impossible
+route leaves no partial neighborhood behind. An identical release is idempotent, but
+an already-imported version cannot be rewritten and version gaps are rejected. Packs
+are additive history, never an in-place replacement of people or places.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows

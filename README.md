@@ -124,6 +124,18 @@ world events, model failures and exact narrative repetition. It deliberately avo
 a misleading single "human-ness" score and never merges or rewrites the canonical
 database.
 
+Import the bundled first world-pack release when you want Eidos's canonical world
+to gain a reading room, Imani Cole, and a community radio:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/canal-quarter-v1.json
+```
+
+World packs are strict, additive JSON releases. Places must be declared before pack
+entities that live there. Every entity passes the ordinary collision, route, opening
+hours and provenance rules; one invalid entity rejects the whole pack. Reimporting an
+unchanged release is safe, while rewriting or skipping a published version is refused.
+
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or
 cancel it at its last committed checkpoint:

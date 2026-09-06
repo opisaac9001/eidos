@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "pack_id": "canal-quarter",
+  "version": 1,
+  "name": "The Canal Quarter",
+  "description": "A reading room, a local oral historian, and a community radio introduce slower public life beyond the original four places.",
+  "entities": [
+    {
+      "entity_kind": "place",
+      "entity_id": "reading-room",
+      "name": "The Reading Room",
+      "description": "A narrow volunteer-run room beside the canal, with local papers, mismatched chairs, and a noticeboard that is always slightly out of date.",
+      "location_id": "park",
+      "purpose": "Give the neighborhood a quiet public place for research, talks, and chance encounters",
+      "color": "#738b82",
+      "label": "Reading room",
+      "x": 48,
+      "y": 52,
+      "opens_hour": 10,
+      "closes_hour": 19,
+      "travel_minutes": 16
+    },
+    {
+      "entity_kind": "person",
+      "entity_id": "imani-cole",
+      "name": "Imani Cole",
+      "description": "A patient oral historian who collects contradictory accounts before deciding what she believes.",
+      "location_id": "reading-room",
+      "purpose": "Record neighborhood stories and help residents trace the histories of ordinary objects",
+      "color": "#b37aa5",
+      "label": "Imani",
+      "x": 48,
+      "y": 52,
+      "opens_hour": 10,
+      "closes_hour": 19,
+      "travel_minutes": 16
+    },
+    {
+      "entity_kind": "object",
+      "entity_id": "community-radio",
+      "name": "Community radio",
+      "description": "A portable radio used for interviews, notices, music, and occasional live broadcasts from the reading room.",
+      "location_id": "reading-room",
+      "purpose": "Create shared projects, public conversations, technical mishaps, and reasons to visit",
+      "color": "#7f8c8d",
+      "label": "Radio",
+      "x": 48,
+      "y": 52,
+      "opens_hour": 10,
+      "closes_hour": 19,
+      "travel_minutes": 16
+    }
+  ]
+}

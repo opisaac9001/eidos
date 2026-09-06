@@ -80,6 +80,10 @@ def main() -> None:
         "experiment-compare", help="Compare an experiment with its canonical life"
     )
     experiment_compare.add_argument("--input", type=Path, required=True)
+    world_pack = commands.add_parser(
+        "world-pack-import", help="Atomically add a validated world content release"
+    )
+    world_pack.add_argument("--input", type=Path, required=True)
     inventory = commands.add_parser(
         "inventory-server", help="Read hardware and firmware inventory from iDRAC"
     )
@@ -158,6 +162,18 @@ def main() -> None:
             else:
                 experiment_result = compare_experiment(args.database, args.input)
             print(json.dumps(asdict(experiment_result), indent=2, default=str))
+            return
+        if args.command == "world-pack-import":
+            from eidos.application.world_packs import import_world_pack
+
+            pack_store = SQLiteEventStore(args.database)
+            pack_history = pack_store.read("pathos")
+            pack_result = import_world_pack(
+                pack_store,
+                args.input,
+                simulated_at=Life.project(pack_history).simulated_at,
+            )
+            print(json.dumps(asdict(pack_result), indent=2, default=str))
             return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"

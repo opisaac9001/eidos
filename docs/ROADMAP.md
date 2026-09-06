@@ -321,7 +321,10 @@ Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
   unknown. At most three later direct contacts can gently reduce Pathos's own tension
   and add familiarity without restoring trust or claiming forgiveness; thirty days
   without contact makes the attempt dormant rather than silently resolving it.
-- Versioned world/character packs with validated seeds; controlled content expansion.
+- Versioned world packs now import bounded additive releases atomically through the
+  ordinary entity-continuity rules; the bundled Canal Quarter release adds a place,
+  person and project-capable object. Add character-history overlays only when their
+  private knowledge can be validated without leaking it to Pathos.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.
 - Verified experiment branches now copy an exact life, discard inherited cognition
