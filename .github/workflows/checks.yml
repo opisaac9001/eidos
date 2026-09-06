@@ -10,7 +10,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e .
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: ruff format --check src tests
       - run: python -m unittest discover -s tests -v
       - run: eidos --database /tmp/eidos-smoke.sqlite3 advance --hours 24
       - run: eidos --database /tmp/eidos-smoke.sqlite3 status

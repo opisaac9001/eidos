@@ -11,22 +11,22 @@
 Exit condition: a clean repository whose tests run without models or external
 services and whose next implementation steps are unambiguous.
 
-## Milestone 1: Persistent day (in progress)
+## Milestone 1: Persistent day (stand-in prototype implemented)
 
 - SQLite event store with an interface for future database adapters (implemented)
 - Authored daily routine and restart-safe journal (implemented)
-- Chronos clock, pause, resume, and restart behavior
-- Firmament locations, actors, and scheduled activities
-- Ethos episodic memory with provenance
-- One model-backed Pathos dialogue capability
-- Minimal operator API and health view
+- Chronos clock, pause, resume, and restart behavior (implemented)
+- Firmament locations, actors, and scheduled activities (implemented)
+- Ethos episodic memory with provenance (implemented)
+- Pathos dialogue through a model port (stand-in implemented; real inference pending)
+- Operator API, health view, and five-view browser interface (implemented)
 
 Exit condition: Pathos completes and remembers a small deterministic day across
 application restarts.
 
 Current verification covers restart equivalence, atomic rollback, stale-writer
-conflicts, clock bounds, schema versions, and layer dependencies. A complete
-model-backed day still requires cognition, interactions, and an operator API.
+conflicts, clock bounds, schema versions, layer dependencies, all role loops,
+chat idempotency, proposal rejection, HTTP validation, and background pause/resume.
 
 ## Milestone 2: Living character
 
@@ -37,6 +37,10 @@ model-backed day still requires cognition, interactions, and an operator API.
 - Proactive but rate-limited user interaction
 - Web conversation and timeline interface
 
+Stand-in implementations now cover basic affect, encounter counts, conversations,
+memory formation, and evening reflection. Nuanced relationships, semantic
+retrieval, character evolution, and autonomous outreach remain open.
+
 ## Milestone 3: Inner life
 
 - Subconscious association jobs
@@ -44,6 +48,10 @@ model-backed day still requires cognition, interactions, and an operator API.
 - Goals, unfinished intentions, and longer narrative arcs
 - Multiple model capability profiles
 - Evaluation suite for continuity and contradiction
+
+Hourly associations, 23:00 dreams, and a daybook now run with deterministic
+performers. Dreams remain outside factual memory. Goal planning, narrative
+direction beyond weather, and semantic continuity evaluation remain open.
 
 ## Milestone 4: Embodiment and tools
 

@@ -28,16 +28,19 @@ infra/dell-t630/     Deployment contract for the local AI host
 src/eidos/domain/    Deterministic simulation concepts and rules
 src/eidos/ports/     Interfaces to models, storage, clocks, and external tools
 src/eidos/application/ Simulation use cases
-src/eidos/adapters/  SQLite persistence implementation
+src/eidos/adapters/  SQLite, stand-in performers, HTTP server, and browser assets
 tests/               Executable architecture and domain expectations
 ```
 
 ## Current milestone
 
-The foundation now runs a persistent, authored day with a clock, locations,
-energy changes, and a factual journal. SQLite stores atomic event batches;
-the application reconstructs state from the history on restart. AI generation,
-NPC dialogue, semantic retrieval, and a web interface are still future work. See the
+The local prototype has five connected views: Observatory, World, Conversation,
+Memory Archive, and Ensemble. A background clock runs routines, NPC encounters,
+thoughts, weather, memory formation, reflection, dreams, and a daybook. All eight
+performers are deterministic stand-ins; a ninth, the continuity critic, performs
+schema validation. These are authored templates, not actual AI models or a
+general contradiction detector. SQLite stores atomic event batches and rebuilds
+state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
 and [architecture](docs/ARCHITECTURE.md).
 
@@ -49,18 +52,62 @@ Python 3.12 or newer is required. With mise installed:
 mise trust
 mise exec -- python -m venv .venv
 .venv/bin/python -m pip install -e .
-.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/eidos serve
+```
+
+Open **http://127.0.0.1:8765**. A new browser world starts at 08:00 on its first
+day, paused. Click **Resume world**, choose a speed, or step one hour. One clock
+tick occurs every three seconds and advances 5, 15, or 60 simulated minutes.
+
+The browser can close while the server continues running. Stopping the server
+stops the clock; starting it again restores history and pauses for explicit
+resume. No offline catch-up occurs. Press Ctrl+C in the terminal to stop.
+
+Alternatively, run `./run.command` from the repository. It uses the existing
+virtual environment and loads source directly, including on Macs that hide
+editable-install path files. It restores `data/observatory.sqlite3` by default;
+set `EIDOS_DATABASE` to select another file. Override the port with
+`./run.command --port 8766`.
+
+The command line and browser share one application engine:
+
+```bash
 .venv/bin/eidos status
 .venv/bin/eidos advance --hours 24
 .venv/bin/eidos journal
-.venv/bin/eidos status
 ```
 
 Commands default to `data/eidos.sqlite3`. Use `eidos --database PATH ...` to
-create independent worlds. Time advances only on request, by up to seven days
-per command; closing the program pauses the simulation. The seed world starts
-at midnight UTC on January 1, 2026. Journal entries are explicitly authored
-routine events, not outputs from a language model.
+create independent worlds. Manual advances are bounded to 24 hours. The seed
+calendar begins January 1, 2026, UTC. The preview built during development uses
+`data/observatory.sqlite3`; run it again with
+`.venv/bin/eidos --database data/observatory.sqlite3 serve`.
+
+## Verify
+
+```bash
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/ruff check src tests
+.venv/bin/ruff format --check src tests
+```
+
+No Node runtime is needed to serve the UI. The browser assets ship in the Python
+wheel and use no CDN, external fonts, or frontend build pipeline.
+
+## Prototype boundaries
+
+- Everything runs locally; the Dell and real inference are not connected yet.
+- Chat uses a handful of templates plus recent memories. It does not understand
+  arbitrary questions. Failure and stand-in states are visible.
+- NPC schedules and encounter counts persist by replaying deterministic rules
+  and events; autonomous NPC planning and nuanced relationships are future work.
+- Memories use text search and provenance links; semantic retrieval is pending.
+- The server is loopback-only. Authentication and hardened LAN deployment belong
+  to the server installation phase.
+- Full-history replay is appropriate for short prototype runs. Longer runs need
+  snapshots, pagination, backups, and a durable job queue before real inference.
+- Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the
 legacy packages. Both histories are available locally; no push is needed to run.

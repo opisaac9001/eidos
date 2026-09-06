@@ -1,5 +1,23 @@
 # Architecture
 
+## Implemented local prototype
+
+`cli.py` wires SQLite and stand-in model adapters into `application/life.py`.
+Both CLI advances and HTTP actions use that single scene engine. The HTTP
+adapter serves bundled static HTML/CSS/JavaScript on loopback. A serialized
+worker advances simulated time every three seconds while running. Client
+polling reads state every 1.5 seconds; it never drives simulation time.
+
+Each scene builds a batch of events, including role traces and accepted prose.
+The batch commits with a stream revision check. A failed model proposal records
+an error; unexpected scene failures do not commit partial state. Chat retries
+use request IDs. The application restores state on startup and requires explicit
+resume. Event payloads are immutable scalar values with a versioned datetime
+codec that also reads the original time-event format.
+
+The rest of this document describes the target architecture. External inference,
+durable job scheduling, vector retrieval, and real-world tools are not implemented.
+
 ## Two systems, one product
 
 Eidos is split by a hard network boundary:
@@ -116,8 +134,8 @@ State and the journal are rebuilt from those events. The planned schema will com
 
 The current port requires atomic appends and revision conflicts, independent of
 database engine. A PostgreSQL adapter must satisfy the same persistence tests.
-Materialized projections, scheduled jobs, vectors, and inference traces are not
-implemented yet.
+Materialized projections, scheduled jobs, and vectors are not implemented yet.
+Role traces currently record status, model/backend, latency, and a trace ID.
 
 ## Model contract
 

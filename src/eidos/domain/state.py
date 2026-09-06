@@ -34,7 +34,9 @@ class PathosState:
                     raise ValueError("pathos.moved requires a location_id")
                 return replace(self, location_id=location_id)
             case "affect.changed":
-                energy = _bounded_dimension(event.payload.get("energy", self.energy), "energy", 0, 1)
+                energy = _bounded_dimension(
+                    event.payload.get("energy", self.energy), "energy", 0, 1
+                )
                 valence = _bounded_dimension(
                     event.payload.get("valence", self.valence), "valence", -1, 1
                 )
@@ -44,7 +46,7 @@ class PathosState:
 
 
 def _bounded_dimension(value: object, name: str, lower: float, upper: float) -> float:
-    if not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be numeric")
     result = float(value)
     if not lower <= result <= upper:

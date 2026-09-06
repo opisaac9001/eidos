@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111512" />
+    <title>Eidos · A life unfolding</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#observatory"
+        ><span class="brand-mark">e</span> eidos<span class="edition"
+          >/ 01</span
+        ></a
+      >
+      <div class="sidebar-label">A LIFE UNFOLDING</div>
+      <nav aria-label="Main navigation">
+        <button class="nav active" data-view="observatory">
+          <span>◉</span> Observatory <span class="nav-index">01</span>
+        </button>
+        <button class="nav" data-view="world">
+          <span>⌘</span> The world <span class="nav-index">02</span>
+        </button>
+        <button class="nav" data-view="conversation">
+          <span>◌</span> Conversation <span class="nav-index">03</span>
+        </button>
+        <button class="nav" data-view="memories">
+          <span>▤</span> Memory archive <span class="nav-index">04</span>
+        </button>
+        <button class="nav" data-view="engine">
+          <span>⏣</span> The ensemble <span class="nav-index">05</span>
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="connection">
+          <span id="connection-dot" class="dot"></span
+          ><span id="connection">Connecting</span>
+        </div>
+        <p>Local world · persistent history</p>
+        <div class="mode-badge">STAND-IN PERFORMERS</div>
+        <p class="disclosure">
+          Authored voices are running the roles. Real models can join later.
+        </p>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div class="breadcrumbs">
+          EIDOS <span>/</span> <span id="view-label">OBSERVATORY</span>
+        </div>
+        <div class="world-clock">
+          <span class="dot amber"></span><span id="clock">Loading world…</span
+          ><span id="weather" class="weather"></span>
+        </div>
+      </header>
+      <div id="error" role="alert" hidden></div>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow" id="page-eyebrow">THE PRESENT MOMENT</div>
+          <h1 id="page-title">A life in motion.</h1>
+          <p class="mobile-mode">Stand-in performers · saved locally</p>
+        </div>
+        <div class="controls">
+          <label class="sr-only" for="speed">Simulation speed</label
+          ><select id="speed">
+            <option value="5">5 min / tick</option>
+            <option value="15" selected>15 min / tick</option>
+            <option value="60">1 hour / tick</option></select
+          ><button id="step" class="button quiet">+1 hour</button
+          ><button id="play" class="button primary" disabled>
+            Resume world <span>▷</span>
+          </button>
+        </div>
+      </div>
+
+      <section id="view-observatory" class="view">
+        <div class="overview-grid">
+          <article class="panel presence">
+            <div class="panel-kicker">
+              PATHOS <span id="life-status" class="status-tag">PAUSED</span>
+            </div>
+            <div class="presence-main">
+              <div class="identity-disc" aria-hidden="true">
+                P<span class="orbit-dot"></span>
+              </div>
+              <div>
+                <div class="eyebrow muted">RIGHT NOW</div>
+                <h2 id="presence-mood">Quietly curious</h2>
+                <p id="presence-location">At the apartment</p>
+              </div>
+            </div>
+            <blockquote id="latest-thought">
+              The day is just beginning.
+            </blockquote>
+            <div class="presence-bottom">
+              <span
+                >INNER MONOLOGUE <span class="small-tag">STAND-IN</span></span
+              ><button class="text-button" data-view="conversation">
+                Say hello ↗
+              </button>
+            </div>
+          </article>
+          <article class="panel vitals">
+            <div class="panel-kicker">
+              INTERNAL WEATHER <span class="muted">HEXUS</span>
+            </div>
+            <h2>
+              A little more human,<br />
+              one moment at a time.
+            </h2>
+            <div class="vital-label">
+              <span>Energy</span><span id="energy-value">—</span>
+            </div>
+            <div class="meter"><span id="energy-meter"></span></div>
+            <div class="vital-label">
+              <span>Emotional tone</span><span id="valence-value">—</span>
+            </div>
+            <div class="meter tone"><span id="valence-meter"></span></div>
+            <div class="vitals-note">
+              State grows from accepted experiences.<br />The history stays with
+              him.
+            </div>
+          </article>
+        </div>
+        <div class="lower-grid">
+          <article class="panel">
+            <div class="panel-kicker">
+              FIRMAMENT
+              <button class="text-button" data-view="world">
+                Explore the world ↗
+              </button>
+            </div>
+            <div
+              id="mini-map"
+              class="world-map compact"
+              aria-label="Neighborhood map"
+            ></div>
+            <div class="map-footer">
+              <span><i class="dot amber"></i> Pathos</span
+              ><span id="neighborhood-status"
+                >A small world with room to grow.</span
+              >
+            </div>
+          </article>
+          <article class="panel activity-panel">
+            <div class="panel-kicker">
+              THE THREAD OF A DAY
+              <span id="feed-live" class="muted">LIVE HISTORY</span>
+            </div>
+            <div id="recent-feed" class="feed"></div>
+          </article>
+        </div>
+        <div class="bottom-strip">
+          <span>EVERY MOMENT LEAVES A TRACE</span
+          ><span
+            ><b id="event-count">0</b> events <i>·</i>
+            <b id="memory-count">0</b> memories <i>·</i> Day
+            <b id="day-count">1</b></span
+          >
+        </div>
+      </section>
+
+      <section id="view-world" class="view" hidden>
+        <div class="world-layout">
+          <article class="panel">
+            <div class="panel-kicker">
+              THE NEIGHBORHOOD <span class="muted" id="world-weather"></span>
+            </div>
+            <div
+              id="large-map"
+              class="world-map large"
+              aria-label="Interactive neighborhood map"
+            ></div>
+            <div class="map-footer">Select a place to see who's there.</div>
+          </article>
+          <article class="panel place-detail" id="place-detail"></article>
+        </div>
+        <div class="section-heading">
+          <h2>The people around him</h2>
+          <span>Schedules continue across the neighborhood</span>
+        </div>
+        <div id="people" class="people-grid"></div>
+      </section>
+
+      <section id="view-conversation" class="view" hidden>
+        <div class="conversation-layout">
+          <article class="panel chat-panel">
+            <div class="panel-kicker">
+              <span><i class="dot amber"></i> A CONVERSATION WITH PATHOS</span
+              ><span class="small-tag">STAND-IN VOICE</span>
+            </div>
+            <div
+              id="messages"
+              class="messages"
+              role="log"
+              aria-label="Conversation history"
+            ></div>
+            <form id="chat-form">
+              <label for="message" class="sr-only">Your message to Pathos</label
+              ><textarea
+                id="message"
+                rows="2"
+                maxlength="2000"
+                placeholder="What's on your mind?"
+                required
+              ></textarea>
+              <div class="compose-footer">
+                <span>Enter to send · Shift + Enter for a new line</span
+                ><button id="send" class="button primary" type="submit">
+                  Send ↗
+                </button>
+              </div>
+            </form>
+          </article>
+          <aside class="panel conversation-context">
+            <div class="panel-kicker">HE BRINGS HIS DAY WITH HIM</div>
+            <h2 id="chat-context-mood"></h2>
+            <p id="chat-context-location"></p>
+            <hr />
+            <div class="eyebrow">RECENT EXPERIENCES</div>
+            <div id="chat-memories"></div>
+            <div class="context-note">
+              This voice uses templates and recorded context. It won't
+              understand arbitrary requests yet, but conversations and memories
+              persist.
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-memories" class="view" hidden>
+        <div class="archive-toolbar">
+          <label class="search"
+            ><span>⌕</span
+            ><input
+              id="memory-search"
+              type="search"
+              placeholder="Search his memories…"
+              aria-label="Search memories" /></label
+          ><select id="memory-filter" aria-label="Memory category">
+            <option value="all">All memories</option>
+            <option value="experience">Daily life</option>
+            <option value="encounter">Encounters</option>
+            <option value="conversation">Conversations</option></select
+          ><button id="export" class="button quiet">Export history ↓</button>
+        </div>
+        <div id="archive-count" class="archive-count"></div>
+        <div id="memory-list" class="memory-list"></div>
+      </section>
+
+      <section id="view-engine" class="view" hidden>
+        <div class="engine-intro">
+          <h2>Many voices. One continuous life.</h2>
+          <p>
+            Each performer has a bounded role. Proposals become history only
+            after validation.
+          </p>
+          <div class="engine-summary">
+            <span><i class="dot amber"></i> Deterministic stand-ins</span
+            ><span id="worker-status">Worker ready</span
+            ><span id="tick-count">0 ticks</span>
+          </div>
+        </div>
+        <div id="roles" class="role-grid"></div>
+        <article class="panel engine-bottom">
+          <div>
+            <div class="eyebrow">THE NEXT CONNECTION</div>
+            <h2>Dell T630 · local inference</h2>
+            <p>
+              The simulation is ready for model adapters. GPU allocation, model
+              selection, and deployment await the server.
+            </p>
+          </div>
+          <div class="mode-badge">NOT CONNECTED</div>
+        </article>
+        <div class="section-heading">
+          <h2>Across the layers</h2>
+          <select id="feed-filter" aria-label="Activity filter">
+            <option value="all">All activity</option>
+            <option value="thought.recorded">Thoughts</option>
+            <option value="npc.encountered">Encounters</option>
+            <option value="reflection.recorded">Reflections</option>
+            <option value="dream.recorded">Dreams</option>
+            <option value="day.summarized">Daybook</option>
+            <option value="role.failed">Errors</option>
+          </select>
+        </div>
+        <div id="engine-feed" class="panel feed expanded"></div>
+      </section>
+      <footer>
+        FIRMAMENT / LOCAL EDITION
+        <span>Nothing disappears when you close the window.</span>
+      </footer>
+    </main>
+    <div id="toast" role="status" hidden></div>
+  </body>
+</html>

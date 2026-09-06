@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -12,6 +12,11 @@ from eidos.domain.state import PathosState
 
 
 class DomainEventTests(unittest.TestCase):
+    def test_nested_mutable_payloads_and_nonfinite_numbers_are_rejected(self) -> None:
+        for payload in ({"nested": {"x": 1}}, {"values": [1]}, {"number": float("nan")}):
+            with self.assertRaises(ValueError):
+                DomainEvent("test", "pathos", payload)
+
     def test_payload_is_copied_and_read_only(self) -> None:
         source = {"location_id": "library"}
         event = DomainEvent("pathos.moved", "pathos", source)

@@ -46,16 +46,25 @@ class SQLiteEventStore:
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT kind, payload, occurred_at, event_id FROM events "
-                "WHERE aggregate_id = ? ORDER BY revision", (aggregate_id,)
+                "WHERE aggregate_id = ? ORDER BY revision",
+                (aggregate_id,),
             ).fetchall()
         result = []
         for kind, encoded, occurred_at, event_id in rows:
             payload = json.loads(encoded)
-            if kind == "time.advanced":
+            payload = {
+                key: datetime.fromisoformat(value["$datetime"])
+                if isinstance(value, dict) and set(value) == {"$datetime"}
+                else value
+                for key, value in payload.items()
+            }
+            if kind == "time.advanced" and isinstance(payload["simulated_at"], str):
                 payload["simulated_at"] = datetime.fromisoformat(payload["simulated_at"])
-            result.append(DomainEvent(
-                kind, aggregate_id, payload, datetime.fromisoformat(occurred_at), UUID(event_id)
-            ))
+            result.append(
+                DomainEvent(
+                    kind, aggregate_id, payload, datetime.fromisoformat(occurred_at), UUID(event_id)
+                )
+            )
         return result
 
     def append(
@@ -65,17 +74,25 @@ class SQLiteEventStore:
         for offset, event in enumerate(events, 1):
             if event.aggregate_id != aggregate_id:
                 raise ValueError("Cannot append an event for another aggregate")
-            payload = dict(event.payload)
-            if event.kind == "time.advanced":
-                payload["simulated_at"] = payload["simulated_at"].isoformat()
-            rows.append((aggregate_id, expected_revision + offset, str(event.event_id),
-                         event.kind, event.occurred_at.isoformat(),
-                         json.dumps(payload, allow_nan=False)))
+            payload = {
+                key: {"$datetime": value.isoformat()} if isinstance(value, datetime) else value
+                for key, value in event.payload.items()
+            }
+            rows.append(
+                (
+                    aggregate_id,
+                    expected_revision + offset,
+                    str(event.event_id),
+                    event.kind,
+                    event.occurred_at.isoformat(),
+                    json.dumps(payload, allow_nan=False),
+                )
+            )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             revision = connection.execute(
                 "SELECT COALESCE(MAX(revision), 0) FROM events WHERE aggregate_id = ?",
-                (aggregate_id,)
+                (aggregate_id,),
             ).fetchone()[0]
             if revision != expected_revision:
                 raise RevisionConflict(f"Expected revision {expected_revision}, found {revision}")
