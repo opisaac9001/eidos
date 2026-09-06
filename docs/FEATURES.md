@@ -59,7 +59,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed routes/open hours | P3 |
-| WORLD-02 | Actor observations, offscreen facts, information propagation | Planned | P3 |
+| WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: authored routine | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted movement and private low-detail needs/activity | P3 |

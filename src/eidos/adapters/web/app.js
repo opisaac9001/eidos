@@ -12,6 +12,7 @@ const labels = {
   "thought.recorded": "INNER MONOLOGUE",
   "npc.encountered": "AN ENCOUNTER",
   "world.weather": "THE WORLD OUTSIDE",
+  "world_event.occurred": "IN THE NEIGHBORHOOD",
   "reflection.recorded": "EVENING REFLECTION",
   "dream.recorded": "A DREAM · NOT WORLD HISTORY",
   "day.summarized": "THE DAYBOOK",

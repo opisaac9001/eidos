@@ -25,6 +25,7 @@ from eidos.application.memory import memory_view, recall, terms
 from eidos.application.offscreen import npc_world_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
@@ -167,6 +168,7 @@ class Life:
                 "thought.recorded",
                 "npc.encountered",
                 "world.weather",
+                "world_event.occurred",
                 "reflection.recorded",
                 "dream.recorded",
                 "dream.recalled",
@@ -368,6 +370,20 @@ class Life:
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
+            pending.extend(
+                authored_community_schedule(history + pending, current, len(history) + len(pending))
+            )
+            npc_locations = {
+                actor_id: person.location_id
+                for actor_id, person in project_npcs(history + pending, current).people.items()
+            }
+            pending.extend(
+                due_world_observations(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    current,
+                )
+            )
             overdue = overdue_plan_events(project_planning(history + pending), current)
             if overdue:
                 project_planning(history + pending + overdue)

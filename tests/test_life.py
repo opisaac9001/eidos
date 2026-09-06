@@ -222,6 +222,29 @@ class LifeTests(unittest.TestCase):
         applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
         self.assertEqual(len(applied), 1)
 
+    def test_public_world_event_only_enters_memories_of_present_observers(self):
+        self.life.advance(24)
+        self.life.advance(24)
+        events = self.life.history()
+        occurred = next(event for event in events if event.kind == "world_event.occurred")
+        perceptions = [
+            event
+            for event in events
+            if event.kind == "perception.recorded"
+            and event.payload.get("source_event_id") == str(occurred.event_id)
+        ]
+        self.assertEqual({event.payload["owner"] for event in perceptions}, {"pathos", "rowan"})
+        pathos_perception = next(
+            event for event in perceptions if event.payload["owner"] == "pathos"
+        )
+        self.assertTrue(
+            any(
+                memory.kind == "memory.recorded"
+                and memory.payload.get("source_event_id") == str(pathos_perception.event_id)
+                for memory in events
+            )
+        )
+
     def test_accepted_invitation_requires_co_presence_and_becomes_shared_history(self):
         for hours in (24, 24, 24, 9):
             self.life.advance(hours)
