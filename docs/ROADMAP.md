@@ -35,7 +35,9 @@ lead time, duration, theme and opportunity; rejected or failed generations produ
 quiet interval instead of falling back to a scripted event.
 Replayable added places now contribute their own opening hours and connected roads to
 planning, travel, and promise-retiming feasibility instead of acting as display-only
-map markers.
+map markers. Newly introduced people also use their introduced place for generic
+need-driven goals, travel there during the day, and can complete validated activity
+there rather than being silently folded into the seed cast's routines.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,

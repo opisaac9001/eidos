@@ -53,7 +53,7 @@ class MonthSoakTests(unittest.TestCase):
                     for item in snapshot["npc_states"]
                     if item["plan_status"] == "completed"
                 },
-                {"mara", "ellis", "rowan"},
+                {"mara", "ellis", "rowan", "nina-vale"},
             )
             self.assertEqual(
                 {

@@ -146,7 +146,9 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
         need, level = min(needs.items(), key=lambda item: (item[1], item[0]))
         if level >= 0.58:
             continue
-        action, location_id, title, scheduled_for = _need_plan(actor_id, need, now)
+        action, location_id, title, scheduled_for = _need_plan(
+            actor_id, need, now, person.usual_location_id
+        )
         goal_id = f"{actor_id}-{need}-goal-{evidence.event_id}"
         motivation = f"restore {need} from {level:.2f}"
         goal = DomainEvent(
@@ -222,14 +224,16 @@ def _next_noon(now: datetime) -> datetime:
     return candidate if candidate > now else candidate + timedelta(days=1)
 
 
-def _need_plan(actor_id: str, need: str, now: datetime) -> tuple[str, str, str, datetime]:
+def _need_plan(
+    actor_id: str, need: str, now: datetime, usual_location_id: str = "park"
+) -> tuple[str, str, str, datetime]:
     if need == "energy":
         midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         return "rest", "home", "Protect an unhurried stretch of rest", midnight
     if need == "connection" and actor_id == "ellis":
         evening = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
         return "walk", "park", "Take an evening walk where neighbors may be around", evening
-    profile = npc_plan_profile(actor_id)
+    profile = npc_plan_profile(actor_id, usual_location_id)
     title = (
         "Make room for people at the café"
         if actor_id == "mara" and need == "connection"

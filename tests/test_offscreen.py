@@ -130,6 +130,38 @@ class OffscreenWorldTests(unittest.TestCase):
             {"completed"},
         )
 
+    def test_a_new_person_can_live_and_complete_a_plan_in_a_new_place(self):
+        person = DomainEvent(
+            "world.person_registered",
+            "pathos",
+            {
+                "entity_id": "nina-vale",
+                "name": "Nina Vale",
+                "purpose": "Volunteer gardener",
+                "description": "Keeps a neglected glasshouse alive.",
+                "color": "#739b73",
+                "location_id": "old-glasshouse",
+            },
+        )
+        plan = DomainEvent(
+            "npc.plan_created",
+            "pathos",
+            {
+                "actor_id": "nina-vale",
+                "plan_id": "nina-tend-glasshouse",
+                "title": "Spend time tending the glasshouse",
+                "action": "attend",
+                "location_id": "old-glasshouse",
+                "owner": "nina-vale",
+                "visibility": "private",
+            },
+        )
+        noon = self.now.replace(hour=12)
+        events = npc_world_events([person, plan], noon)
+        state = project_npcs([person, plan, *events], noon)
+        self.assertEqual(state.people["nina-vale"].location_id, "old-glasshouse")
+        self.assertEqual(state.people["nina-vale"].plan_status, "completed")
+
     def test_overdue_plan_expires_without_becoming_an_action(self):
         plan = DomainEvent(
             "npc.plan_created",

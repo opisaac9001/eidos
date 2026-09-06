@@ -155,6 +155,41 @@ class NPCCognitionTests(unittest.TestCase):
         )
         self.assertEqual(npc_need_plan_events([evidence], "2026-01-10T19:00:00+00:00"), [])
 
+    def test_new_people_make_need_driven_plans_in_their_introduced_place(self):
+        person = DomainEvent(
+            "world.person_registered",
+            "pathos",
+            {
+                "entity_id": "nina-vale",
+                "name": "Nina Vale",
+                "purpose": "Volunteer gardener",
+                "description": "Keeps a neglected glasshouse alive.",
+                "color": "#739b73",
+                "location_id": "old-glasshouse",
+            },
+        )
+        evidence = DomainEvent(
+            "npc.needs_changed",
+            "pathos",
+            {
+                "actor_id": "nina-vale",
+                "energy": 0.7,
+                "connection": 0.7,
+                "purpose": 0.3,
+                "owner": "nina-vale",
+                "visibility": "private",
+            },
+        )
+        events = npc_need_plan_events([person, evidence], "2026-01-10T19:00:00+00:00")
+        plan = next(event for event in events if event.kind == "npc.plan_created")
+        self.assertEqual(
+            (plan.payload["action"], plan.payload["location_id"]),
+            (
+                "attend",
+                "old-glasshouse",
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
