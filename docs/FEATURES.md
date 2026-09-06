@@ -61,7 +61,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers + finite community-event resources | P3 |
-| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans, completed bookbinding, and feasible two-visit exploration of introduced places | P3 |
+| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans, completed bookbinding, feasible exploration, and source-linked delivered objects that exist only after receipt | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people receive varied private projects, planned movement/actions, audited priorities, and critical-energy replanning | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, resource-backed events, and schema-checked open-ended Moira proposals with lead time/novelty/cooldowns | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
@@ -79,7 +79,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: materialized directed metrics whose trust/familiarity/tension affect competing-call decisions | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked reminders from calls, visits, apologies, and shared time now prioritize the relevant person/topic and close only against later contact evidence | P5 |
-| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, pause/resume current company | Partial: connection-goal-sourced calls and physical visits with weighted choices, callbacks, presence, plus post-interruption resume/end decisions from energy, time pressure, co-presence, and stable variability | P3–P5 |
+| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, pause/resume current company | Partial: calls, physical visits, and two-attempt deliveries with presence checks plus post-interruption resume/end decisions from energy, time pressure, co-presence, and stable variability | P3–P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
 vs public speech, interruption/resume, observer-specific memories and validated

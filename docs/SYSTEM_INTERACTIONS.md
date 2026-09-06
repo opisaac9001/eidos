@@ -279,6 +279,15 @@ time pressure; otherwise a replay-stable inclination can still favor either resu
 leaving the conversation there. The user receives a visible system explanation in both
 cases, and replay retains the exact decision rather than rerolling it.
 
+A delivery is never invented merely because the clock reached a scripted weekday. A
+public neighborhood event Pathos personally perceived may, under a stable sparse
+selection, cause a follow-up parcel two days later. The first absent handoff schedules
+one retry; the second returns the parcel. Answering the door pauses an active user
+scene, temporarily blocks another visit request, and completes on a later tick. Only a
+completed receipt registers the parcel as a Pathos-owned object at home and creates a
+source-linked memory. The handoff then enters the ordinary resume-or-end decision, and
+other phone interruptions are paced out of the same hour.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

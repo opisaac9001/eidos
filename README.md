@@ -151,7 +151,10 @@ network authorization; the server remains loopback-only until authenticated depl
   produce next-day visits: Pathos may miss, defer, or admit the visitor based on his
   location, energy, emotion, and relationship with them. An admitted visitor is
   physically present, blocks new visits, and leaves before a paused user conversation
-  resumes. Simulation controls remain operator-facing.
+  may resume. Public events Pathos actually witnesses can also cause a later
+  neighborhood parcel. Deliveries have two attempts, can be missed or returned, and
+  become physical owned objects only after a completed door handoff. Simulation
+  controls remain operator-facing.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair

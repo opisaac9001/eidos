@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Sequence
 
+from eidos.application.deliveries import active_delivery
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.scenes import project_scenes
@@ -55,6 +56,10 @@ def communication_availability(
     ):
         return CommunicationAvailability(
             "occupied", "He has someone visiting at home.", False, False
+        )
+    if active_delivery(history) is not None:
+        return CommunicationAvailability(
+            "occupied", "He is answering a delivery at the door.", False, False
         )
     planning = project_planning(list(history))
     now = state.simulated_at

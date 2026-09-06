@@ -21,6 +21,7 @@ from eidos.application.catchup import (
 )
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
+from eidos.application.deliveries import delivery_events
 from eidos.application.development import development_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
@@ -556,6 +557,12 @@ class Life:
                 "visitor.deferred",
                 "visitor.missed",
                 "visitor.departed",
+                "delivery.scheduled",
+                "delivery.redelivery_scheduled",
+                "delivery.arrived",
+                "delivery.missed",
+                "delivery.received",
+                "delivery.returned",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",
@@ -1159,39 +1166,65 @@ class Life:
                 phone_emotion.arousal,
                 phone_emotion.sustained_low_hours,
             )
-            pending.extend(
-                visitor_events(
-                    history + pending,
-                    current,
-                    len(history) + len(pending),
-                    actor_locations={
-                        "pathos": state.location_id,
-                        "user": state.location_id,
-                        **npc_locations,
-                    },
-                    pathos_awake=state.awake,
-                    pathos_energy=state.energy,
-                    social_openness=phone_bias.social_openness,
-                    relationships=self._relationships(history + pending).relationships,
-                )
+            visit_output = visitor_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                actor_locations={
+                    "pathos": state.location_id,
+                    "user": state.location_id,
+                    **npc_locations,
+                },
+                pathos_awake=state.awake,
+                pathos_energy=state.energy,
+                social_openness=phone_bias.social_openness,
+                relationships=self._relationships(history + pending).relationships,
             )
+            pending.extend(visit_output)
             npc_locations.update(visitor_locations(history + pending))
-            pending.extend(
-                phone_call_events(
-                    history + pending,
-                    current,
-                    len(history) + len(pending),
-                    actor_locations={
-                        "pathos": state.location_id,
-                        "user": state.location_id,
-                        **npc_locations,
-                    },
-                    pathos_awake=state.awake,
-                    pathos_energy=state.energy,
-                    social_openness=phone_bias.social_openness,
-                    relationships=self._relationships(history + pending).relationships,
-                )
+            delivery_output = delivery_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                actor_locations={
+                    "pathos": state.location_id,
+                    "user": state.location_id,
+                    **npc_locations,
+                },
+                pathos_awake=state.awake,
+                pathos_energy=state.energy,
             )
+            pending.extend(delivery_output)
+            interruption_kinds = {
+                "visitor.arrived",
+                "visitor.admitted",
+                "visitor.deferred",
+                "visitor.missed",
+                "visitor.departed",
+                "delivery.arrived",
+                "delivery.missed",
+                "delivery.received",
+                "delivery.returned",
+            }
+            if not any(
+                event.kind in interruption_kinds for event in [*visit_output, *delivery_output]
+            ):
+                pending.extend(
+                    phone_call_events(
+                        history + pending,
+                        current,
+                        len(history) + len(pending),
+                        actor_locations={
+                            "pathos": state.location_id,
+                            "user": state.location_id,
+                            **npc_locations,
+                        },
+                        pathos_awake=state.awake,
+                        pathos_energy=state.energy,
+                        social_openness=phone_bias.social_openness,
+                        relationships=self._relationships(history + pending).relationships,
+                    )
+                )
             pending.extend(
                 relational_arc_events(
                     history + pending,

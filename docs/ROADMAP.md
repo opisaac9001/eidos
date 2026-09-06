@@ -207,8 +207,11 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   planner and calendar, while refusal creates no implied plan. Extend the interruption
   After a call or visitor leaves, resumption is no longer automatic: co-presence,
   exhaustion, an imminent commitment, and replay-stable inclination decide whether
-  Pathos returns or ends the visit with an explicit reason. Extend the interruption
-  mechanism to deliveries and additional urgency sources. Simulation controls and
+  Pathos returns or ends the visit with an explicit reason. A public event he actually
+  perceived can now cause a later neighborhood parcel; its two delivery attempts can
+  be received, missed, or returned, and an object enters his home only after receipt.
+  Door handoffs use the same interruption and recovery rules. Extend this mechanism to
+  additional urgency sources. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
@@ -280,8 +283,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend the completed call/visitor resumption choices to deliveries and additional
-   sources of urgency, with distinct consequences for accepted or missed arrivals.
+1. Extend the completed call, visitor, and delivery resumption choices to additional
+   sources of urgency with distinct consequences and remembered aftermath.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
