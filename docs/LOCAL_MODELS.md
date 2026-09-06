@@ -76,6 +76,10 @@ The worker preserves raw JSON only after a complete object envelope; the ordinar
 ambient/entity domain parsers still decide whether it is valid enough to schedule or
 register. A worker restart therefore cannot turn partial prose into world state, and a
 structured result can be replayed without wrapping it in the text-role envelope.
+A seven-day deterministic acceptance world now runs the role router, two supervised
+workers, durable text and structured jobs, deferred Murmur application, Moira event
+acceptance, and full-state restart replay together. This guards the deployment seam
+that the Dell configuration will use, not merely the individual adapters.
 
 ## What is checked
 
