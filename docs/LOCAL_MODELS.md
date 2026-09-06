@@ -30,6 +30,38 @@ Unsetting the two model variables restores offline mode. No implicit fallback
 occurs when real inference fails: rejected proposals produce failure traces.
 Do not expose Ollama or the operator interface publicly.
 
+## Route roles to different models
+
+For a multi-model host, set `EIDOS_MODEL_ROUTES_FILE` to an untracked JSON file instead
+of setting the single base URL/model pair. A default endpoint may handle inexpensive
+roles while measured overrides handle demanding work:
+
+```json
+{
+  "default": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "model": "efficient-general-model"
+  },
+  "routes": {
+    "pathos": {
+      "base_url": "http://127.0.0.1:11435/v1",
+      "model": "conversation-model"
+    },
+    "oneiros": {
+      "base_url": "http://127.0.0.1:11436/v1",
+      "model": "creative-model",
+      "api_key_env": "EIDOS_CREATIVE_MODEL_KEY"
+    }
+  }
+}
+```
+
+Inline credentials and unknown roles are rejected. `api_key_env` names an environment
+variable without copying its value into the file. A configuration without a default
+must explicitly cover all ten generated capabilities, including Moira's event and
+world-expansion proposals. Routing selects a performer; it does not bypass that
+performer's schema, semantic warnings, world rules, timeouts, or provenance.
+
 ## What is checked
 
 The probe invokes Pathos, Murmur, Firmament, Moira, Mnemosyne, Reflection,

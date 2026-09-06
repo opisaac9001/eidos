@@ -42,6 +42,11 @@ def main() -> None:
     parser.add_argument("--database", type=Path, default=Path("data/eidos.sqlite3"))
     parser.add_argument("--base-url", default=os.environ.get("EIDOS_MODEL_BASE_URL"))
     parser.add_argument("--model", default=os.environ.get("EIDOS_MODEL_NAME"))
+    parser.add_argument(
+        "--routes-file",
+        type=Path,
+        default=Path(value) if (value := os.environ.get("EIDOS_MODEL_ROUTES_FILE")) else None,
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="Inspect current state")
     commands.add_parser("probe-model", help="Test every performer against the configured model")
@@ -113,7 +118,14 @@ def main() -> None:
             return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"
-        if args.base_url or args.model:
+        if args.routes_file is not None:
+            if args.base_url or args.model:
+                raise ValueError("Choose either a routes file or one base URL/model pair")
+            from eidos.adapters.routed_gateway import routed_gateway_from_file
+
+            gateway = routed_gateway_from_file(args.routes_file, os.environ)
+            mode = "routed-local-models"
+        elif args.base_url or args.model:
             if not args.base_url or not args.model:
                 raise ValueError("Set both --base-url and --model")
             from eidos.adapters.http_gateway import HTTPModelGateway

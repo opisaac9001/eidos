@@ -156,6 +156,10 @@ network authorization; the server remains loopback-only until authenticated depl
 - Offline chat uses templates; model mode uses the configured HTTP endpoint and
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
+- Local inference can use one endpoint/model or an untracked strict routing file that
+  assigns Pathos, Murmur, Firmament, weather, memory, reflection, dreams, daybook, and
+  Moira's two world-building capabilities independently. Inline secrets and incomplete
+  no-default route maps are rejected; routing never bypasses validation or provenance.
 - The browser is functional. Messages now enter a persistent inbox and show as
   delivered until a replay-stable, availability-aware response time arrives; sleep
   and existing scenes can defer a reply. When Pathos is available, the user can begin

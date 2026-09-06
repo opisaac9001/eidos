@@ -314,7 +314,8 @@ boundaries and must not rely on emotional coercion.
    per role. Do not assume one GPU per role or choose models from RAM totals alone.
 5. Deploy reproducible private authenticated inference, storage, monitoring,
    restart supervision and backups. Keep credentials out of Git.
-6. Route capabilities by measured results; retain stand-ins and honest failure modes.
+6. Route capabilities by measured results using the strict per-role routing adapter;
+   retain stand-ins and honest failure modes.
 7. Add embeddings, speech and images only when useful and supported reliably.
 
 ## Immediate implementation queue
