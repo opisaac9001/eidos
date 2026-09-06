@@ -35,3 +35,25 @@ than aggregate memory alone.
 - Available network interfaces and switch speed
 - Power supplies, power budget, and cooling state
 - Current BIOS, lifecycle controller, and iDRAC firmware
+
+## Read-only first contact
+
+Before choosing or installing an operating system, export the iDRAC HTTPS
+certificate and run the bounded Redfish inventory command from a trusted machine.
+It performs GET requests only and refuses plain HTTP or URLs containing embedded
+credentials:
+
+```bash
+export EIDOS_IDRAC_URL=https://IDRAC_HOST
+export EIDOS_IDRAC_USERNAME=YOUR_IDRAC_USER
+export EIDOS_IDRAC_PASSWORD=YOUR_IDRAC_PASSWORD
+PYTHONPATH=src .venv/bin/python -m eidos inventory-server \
+  --ca-file /path/to/idrac-ca.pem \
+  --output infra/dell-t630/inventory.local.json
+```
+
+Keep `inventory.local.json` private because serial numbers and network addresses
+can appear in it; local inventory reports are ignored by Git. Review the report
+before any disk, firmware, BIOS, boot, RAID, or operating-system change. If the
+certificate cannot be validated, fix trust or replace the iDRAC certificate—the
+tool deliberately has no insecure TLS switch.

@@ -32,10 +32,36 @@ def main() -> None:
     backup.add_argument("--output", type=Path, required=True)
     verify = commands.add_parser("verify-backup", help="Verify a SQLite backup without changing it")
     verify.add_argument("--input", type=Path, required=True)
+    inventory = commands.add_parser(
+        "inventory-server", help="Read hardware and firmware inventory from iDRAC"
+    )
+    inventory.add_argument("--output", type=Path)
+    inventory.add_argument("--ca-file", type=Path)
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     try:
+        if args.command == "inventory-server":
+            from urllib.parse import urlsplit
+
+            from eidos.adapters.redfish import RedfishClient
+            from eidos.application.hardware_inventory import collect_redfish_inventory
+
+            base_url = os.environ.get("EIDOS_IDRAC_URL", "")
+            username = os.environ.get("EIDOS_IDRAC_USERNAME", "")
+            password = os.environ.get("EIDOS_IDRAC_PASSWORD", "")
+            client = RedfishClient(base_url, username, password, ca_file=args.ca_file)
+            inventory_report = collect_redfish_inventory(
+                client.get_json, urlsplit(base_url).hostname or "unknown"
+            )
+            encoded = json.dumps(inventory_report, indent=2, sort_keys=True) + "\n"
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(encoded)
+                print(f"Wrote read-only inventory to {args.output}")
+            else:
+                print(encoded, end="")
+            return
         if args.command in {"backup", "verify-backup"}:
             from eidos.adapters.sqlite_backup import create_backup, verify_backup
 
