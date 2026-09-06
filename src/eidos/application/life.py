@@ -38,6 +38,7 @@ from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_eve
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
+from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
@@ -350,6 +351,13 @@ class Life:
                 "social.activity_completed",
                 "scene.interrupted",
                 "scene.resumed",
+                "visit.ended",
+                "phone.call_received",
+                "phone.call_answered",
+                "phone.call_declined",
+                "phone.call_completed",
+                "phone.callback_scheduled",
+                "phone.callback_completed",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",
@@ -438,7 +446,7 @@ class Life:
             (
                 item
                 for item in scenes.scenes.values()
-                if item.status == "active"
+                if item.status in {"active", "paused"}
                 and {item.initiator_id, item.partner_id} == {"pathos", "user"}
             ),
             None,
@@ -887,6 +895,27 @@ class Life:
             )
             pending.extend(npc_belief_events(history + pending, at))
             pending.extend(npc_need_plan_events(history + pending, at))
+            phone_emotion = project_emotion(history + pending)
+            phone_bias = emotional_planning_bias(
+                phone_emotion.valence,
+                phone_emotion.arousal,
+                phone_emotion.sustained_low_hours,
+            )
+            pending.extend(
+                phone_call_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    actor_locations={
+                        "pathos": state.location_id,
+                        "user": state.location_id,
+                        **npc_locations,
+                    },
+                    pathos_awake=state.awake,
+                    pathos_energy=state.energy,
+                    social_openness=phone_bias.social_openness,
+                )
+            )
             pending.extend(
                 relational_arc_events(
                     history + pending,
@@ -1355,7 +1384,7 @@ class Life:
             (
                 item
                 for item in project_scenes(history).scenes.values()
-                if item.status == "active"
+                if item.status in {"active", "paused"}
                 and {item.initiator_id, item.partner_id} == {"pathos", "user"}
             ),
             None,
@@ -1418,12 +1447,14 @@ class Life:
             (
                 scene
                 for scene in project_scenes(history).scenes.values()
-                if scene.status == "active"
+                if scene.status in {"active", "paused"}
                 and {scene.initiator_id, scene.partner_id} == {"pathos", "user"}
             ),
             None,
         )
         if user_scene is not None:
+            if user_scene.status == "paused":
+                raise ValueError("The live conversation is temporarily interrupted")
             if user_scene.next_actor_id != "user":
                 raise ValueError("Pathos is still responding")
             asyncio.run(self._live_exchange(user_scene.scene_id, text.strip(), request_id))

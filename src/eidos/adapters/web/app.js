@@ -28,6 +28,13 @@ const labels = {
   "social.activity_completed": "TIME TOGETHER",
   "scene.interrupted": "CONVERSATION PAUSED",
   "scene.resumed": "CONVERSATION RESUMED",
+  "visit.ended": "VISIT ENDED",
+  "phone.call_received": "PHONE CALL",
+  "phone.call_answered": "CALL ANSWERED",
+  "phone.call_declined": "CALL DECLINED",
+  "phone.call_completed": "CALL ENDED",
+  "phone.callback_scheduled": "CALLBACK PLANNED",
+  "phone.callback_completed": "CALLBACK MADE",
   "speech.delivered": "SOMETHING SAID",
   "travel.completed": "ARRIVED",
   "intention.adopted": "AN INTENTION FORMED",
@@ -167,6 +174,10 @@ function setBusy(value) {
   ["play", "step", "catch-up", "cancel-catch-up", "speed", "send", "visit", "end-visit"].forEach((id) => {
     $(id).disabled = value || !state;
   });
+  if (state) {
+    $("visit").disabled = value || !state.communication?.can_visit;
+    $("send").disabled = value || state.communication?.status === "interrupted";
+  }
 }
 
 async function mutate(path, body) {

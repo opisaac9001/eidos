@@ -237,8 +237,13 @@ delivered with a replay-stable response time; sleep, occupied scenes, appointmen
 energy and personal variability can defer it. A live visit must first pass the same
 availability projection. When accepted, the user and Pathos enter a private
 alternating scene for up to 40 turns, either can end it, and a routine departure ends
-the visit through a sourced interruption before travel occurs. Future interruptors
-such as calls should use this same lifecycle rather than appearing only in dialogue.
+the visit through a sourced interruption before travel occurs. Calls use this same
+lifecycle rather than appearing only in dialogue. A neighbor's private connection
+goal can now cause a source-linked call. If Pathos is with the user, his energy,
+social openness and replay-stable variability influence whether he answers or
+declines. Answering pauses the visit until the call completes; declining schedules a
+callback that waits until he is awake and no longer in an active scene. These events
+are auditable and cannot be asserted into existence by the dialogue performer.
 
 ## 8. Dream and reflection feedback loop
 

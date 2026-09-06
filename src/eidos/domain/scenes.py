@@ -378,7 +378,7 @@ def resolve_scene_end(
     if proposal.expected_revision != actual_revision:
         return _reject(proposed, "stale_revision", "The scene changed before it ended")
     scene = state.scenes.get(proposal.scene_id)
-    if scene is None or scene.status != "active":
+    if scene is None or scene.status not in {"active", "paused"}:
         return _reject(proposed, "closed_scene", "The scene is not active")
     if proposal.actor_id not in {scene.initiator_id, scene.partner_id}:
         return _reject(proposed, "not_participant", "Only a participant can leave the scene")

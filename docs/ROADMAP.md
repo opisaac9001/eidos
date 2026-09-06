@@ -175,8 +175,9 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   state-derived response timing and visible delivered/answered state. Optional
   co-present visits now require availability and use an alternating, bounded live
   scene that either party can leave; a scheduled departure already ends the visit.
-  Extend this so Pathos may answer or defer a call, pause/resume when appropriate,
-  and genuinely follow up later. Keep simulation controls in a distinct operator surface so the
+  Connection-goal-sourced phone calls now support answer/decline, visit pause/resume,
+  and callbacks that wait for a free waking interval. Extend the same mechanism to
+  visitors, deliveries, urgency and remembered follow-up. Keep simulation controls in a distinct operator surface so the
   life-facing UI changes the world only through communication.
 - Opt-in in-app outreach, quiet hours, rate limits and an off switch. No guilt,
   pressure or punishment for user absence.
