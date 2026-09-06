@@ -6,6 +6,7 @@ from eidos.application.planner import overdue_plan_events, plan_accepted_work
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.social import SocialRequest
+from eidos.domain.world_catalog import project_world_catalog
 
 
 class PlannerTests(unittest.TestCase):
@@ -181,6 +182,77 @@ class PlannerTests(unittest.TestCase):
             preferred_start=self.now + timedelta(days=1, minutes=15),
         )
         self.assertTrue(enough_transition.accepted)
+
+    def test_replayed_places_participate_in_open_hours_and_travel_checks(self):
+        place = DomainEvent(
+            "world.place_registered",
+            "pathos",
+            {
+                "entity_id": "glasshouse",
+                "connected_to_id": "park",
+                "name": "The old glasshouse",
+                "label": "Glasshouse",
+                "description": "An overgrown public glasshouse.",
+                "x": 40,
+                "y": 65,
+                "opens_hour": 10,
+                "closes_hour": 16,
+                "travel_minutes": 12,
+            },
+        )
+        catalog = project_world_catalog((place,))
+        self.assertEqual(catalog.route_minutes[frozenset(("park", "glasshouse"))], 12)
+        visit = self.request(
+            request_id="glasshouse-visit",
+            action="attend",
+            target_id="glasshouse",
+            title="Visit the old glasshouse",
+            location_id="glasshouse",
+            duration_hours=1,
+        )
+        closed = plan_accepted_work(
+            visit,
+            state=self.state(),
+            actual_revision=2,
+            simulated_at=self.now,
+            preferred_start=(self.now + timedelta(days=1)).replace(hour=9),
+            opening_hours=catalog.opening_hours,
+            route_minutes=catalog.route_minutes,
+        )
+        self.assertEqual(closed.code, "location_closed")
+
+        park_plan = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "park-first",
+                "title": "Walk in the park",
+                "starts_at": (self.now + timedelta(days=1)).replace(hour=9).isoformat(),
+                "ends_at": (self.now + timedelta(days=1)).replace(hour=10).isoformat(),
+                "location_id": "park",
+                "actor_id": "pathos",
+            },
+        )
+        too_soon = plan_accepted_work(
+            visit,
+            state=self.state((park_plan,)),
+            actual_revision=3,
+            simulated_at=self.now,
+            preferred_start=(self.now + timedelta(days=1)).replace(hour=10, minute=5),
+            opening_hours=catalog.opening_hours,
+            route_minutes=catalog.route_minutes,
+        )
+        self.assertEqual(too_soon.code, "travel_conflict")
+        feasible = plan_accepted_work(
+            visit,
+            state=self.state((park_plan,)),
+            actual_revision=3,
+            simulated_at=self.now,
+            preferred_start=(self.now + timedelta(days=1)).replace(hour=10, minute=12),
+            opening_hours=catalog.opening_hours,
+            route_minutes=catalog.route_minutes,
+        )
+        self.assertTrue(feasible.accepted)
 
     def test_overdue_commitment_has_linked_failure_and_social_consequences_once(self):
         planned = plan_accepted_work(

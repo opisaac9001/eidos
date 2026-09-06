@@ -3,7 +3,12 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from eidos.domain.proposals import ProposalRejected
-from eidos.domain.travel import TravelProposal, parse_travel_proposal, resolve_travel
+from eidos.domain.travel import (
+    TravelProposal,
+    parse_travel_proposal,
+    resolve_travel,
+    route_duration,
+)
 
 
 class TravelTests(unittest.TestCase):
@@ -67,6 +72,28 @@ class TravelTests(unittest.TestCase):
         )
         self.assertTrue(result.accepted)
         self.assertEqual(result.events[-1].payload["location_id"], "old-glasshouse")
+
+    def test_connected_routes_make_a_new_place_reachable_across_the_map(self):
+        routes = {
+            frozenset(("home", "park")): 15,
+            frozenset(("park", "old-glasshouse")): 8,
+        }
+        self.assertEqual(route_duration("home", "old-glasshouse", routes), timedelta(minutes=23))
+        proposal = self.proposal(
+            proposal_id="home-to-glasshouse",
+            destination_id="old-glasshouse",
+            depart_at=self.now - timedelta(minutes=23),
+        )
+        result = resolve_travel(
+            proposal,
+            history=[],
+            actor_location_id="home",
+            known_location_ids={"home", "park", "old-glasshouse"},
+            actual_revision=3,
+            simulated_at=self.now,
+            route_minutes=routes,
+        )
+        self.assertTrue(result.accepted)
 
     def test_json_contract_is_exact_and_timezone_aware(self):
         proposal = self.proposal()

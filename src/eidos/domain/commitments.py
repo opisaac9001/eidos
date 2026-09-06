@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, time
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
@@ -109,6 +109,7 @@ def resolve_renegotiation_offer(
     negotiations: RenegotiationState,
     actual_revision: int,
     simulated_at: datetime,
+    opening_hours: Mapping[str, tuple[time, time]] | None = None,
 ) -> RenegotiationResolution:
     common = {
         "proposal_id": proposal.proposal_id,
@@ -183,7 +184,9 @@ def resolve_renegotiation_offer(
     if len(entries) != 1:
         return reject("missing_schedule", "Renegotiation requires one unfinished linked schedule")
     entry = entries[0]
-    if not location_allows_interval(entry.location_id, proposal.starts_at, proposal.ends_at):
+    if not location_allows_interval(
+        entry.location_id, proposal.starts_at, proposal.ends_at, opening_hours
+    ):
         return reject("location_closed", "The new interval falls outside opening hours")
     for other in planning.calendar.values():
         if other.schedule_id == entry.schedule_id or other.status != "scheduled":
@@ -207,6 +210,7 @@ def resolve_renegotiation_response(
     negotiations: RenegotiationState,
     actual_revision: int,
     simulated_at: datetime,
+    opening_hours: Mapping[str, tuple[time, time]] | None = None,
 ) -> RenegotiationResolution:
     common = {
         "proposal_id": proposal.proposal_id,
@@ -279,7 +283,7 @@ def resolve_renegotiation_response(
     due_at = datetime.fromisoformat(offer.due_at)
     if not simulated_at < starts_at < ends_at <= due_at:
         return reject("infeasible_interval", "The proposed interval is no longer feasible")
-    if not location_allows_interval(entry.location_id, starts_at, ends_at):
+    if not location_allows_interval(entry.location_id, starts_at, ends_at, opening_hours):
         return reject("location_closed", "The proposed location is unavailable at that time")
     for other in planning.calendar.values():
         if other.schedule_id == entry.schedule_id or other.status != "scheduled":

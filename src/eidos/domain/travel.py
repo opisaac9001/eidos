@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from heapq import heappop, heappush
 from typing import Mapping, Sequence
 from uuid import UUID
 
@@ -49,14 +50,28 @@ _FIELDS = {
 def route_duration(
     origin_id: str,
     destination_id: str,
-    route_minutes: Mapping[frozenset[str], int] = ROUTE_MINUTES,
+    route_minutes: Mapping[frozenset[str], int] | None = None,
 ) -> timedelta:
     if origin_id == destination_id:
         return timedelta(0)
-    minutes = route_minutes.get(frozenset((origin_id, destination_id)))
-    if minutes is None:
-        raise ValueError("No route connects those locations")
-    return timedelta(minutes=minutes)
+    routes = route_minutes or ROUTE_MINUTES
+    frontier: list[tuple[int, str]] = [(0, origin_id)]
+    shortest: dict[str, int] = {origin_id: 0}
+    while frontier:
+        elapsed, location_id = heappop(frontier)
+        if location_id == destination_id:
+            return timedelta(minutes=elapsed)
+        if elapsed != shortest[location_id]:
+            continue
+        for edge, edge_minutes in routes.items():
+            if location_id not in edge or len(edge) != 2:
+                continue
+            neighbor = next(item for item in edge if item != location_id)
+            candidate = elapsed + edge_minutes
+            if candidate < shortest.get(neighbor, candidate + 1):
+                shortest[neighbor] = candidate
+                heappush(frontier, (candidate, neighbor))
+    raise ValueError("No route connects those locations")
 
 
 def parse_travel_proposal(content: str) -> TravelProposal:

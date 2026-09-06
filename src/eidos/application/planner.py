@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+from typing import Mapping
 
 from eidos.domain.actions import ActionKind
 from eidos.domain.events import DomainEvent
@@ -29,6 +30,8 @@ def plan_accepted_work(
     actual_revision: int,
     simulated_at: datetime,
     preferred_start: datetime,
+    opening_hours: Mapping[str, tuple[time, time]] | None = None,
+    route_minutes: Mapping[frozenset[str], int] | None = None,
 ) -> PlanResolution:
     """Create a linked goal, commitment, schedule and intention as one candidate batch."""
     correlation = f"plan-{request.request_id}"
@@ -82,7 +85,7 @@ def plan_accepted_work(
     end = start + timedelta(hours=request.duration_hours)
     if end > due:
         return reject("deadline_infeasible", "The accepted deadline has no feasible work window")
-    if not location_allows_interval(request.location_id, start, end):
+    if not location_allows_interval(request.location_id, start, end, opening_hours):
         return reject("location_closed", "The activity falls outside the location's open hours")
     for entry in state.calendar.values():
         if entry.status != "scheduled" or entry.actor_id not in {None, request.responder_id}:
@@ -97,10 +100,10 @@ def plan_accepted_work(
             return reject("schedule_conflict", f"The work overlaps {entry.title}")
         try:
             if other_end <= start:
-                transition = route_duration(entry.location_id, request.location_id)
+                transition = route_duration(entry.location_id, request.location_id, route_minutes)
                 transition_fits = other_end + transition <= start
             else:
-                transition = route_duration(request.location_id, entry.location_id)
+                transition = route_duration(request.location_id, entry.location_id, route_minutes)
                 transition_fits = end + transition <= other_start
         except ValueError:
             transition_fits = False

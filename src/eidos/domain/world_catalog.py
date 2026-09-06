@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import time
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Mapping, Sequence
@@ -133,6 +134,19 @@ class WorldCatalog:
         if place is None:
             raise ValueError("Unknown world location")
         return place.name
+
+    @property
+    def opening_hours(self) -> Mapping[str, tuple[time, time]]:
+        """Expose replayed place hours in the form used by scheduling policy."""
+        return MappingProxyType(
+            {
+                place_id: (
+                    time(place.opens_hour),
+                    time.max if place.closes_hour == 24 else time(place.closes_hour),
+                )
+                for place_id, place in self.places.items()
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)

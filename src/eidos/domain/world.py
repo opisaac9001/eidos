@@ -1,6 +1,7 @@
 """Authored world facts and deterministic schedules shared by every role."""
 
 from datetime import datetime, time
+from typing import Mapping
 
 LOCATIONS = (
     {
@@ -101,9 +102,14 @@ OPEN_HOURS = {
 }
 
 
-def location_allows_interval(location_id: str, starts_at: datetime, ends_at: datetime) -> bool:
+def location_allows_interval(
+    location_id: str,
+    starts_at: datetime,
+    ends_at: datetime,
+    opening_hours: Mapping[str, tuple[time, time]] | None = None,
+) -> bool:
     """Return whether one same-day activity fits within a known place's hours."""
-    hours = OPEN_HOURS.get(location_id)
+    hours = (opening_hours or OPEN_HOURS).get(location_id)
     if hours is None or starts_at.tzinfo is None or ends_at.tzinfo is None:
         return False
     if ends_at <= starts_at:
