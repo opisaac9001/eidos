@@ -127,7 +127,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: lab probes/critic | Every phase |
 | QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Partial: owned recall/belief and source-membership fixtures | P2 |
 | QA-05 | Dream/fact separation, affect caps, no action bypass | Partial: category/label checks | P4 |
-| QA-06 | Seven-day plan/relationship causality and coherent recall | Partial: deterministic multi-day causal fixtures | P5 |
+| QA-06 | Seven-day plan/relationship causality and coherent recall | Partial: restart-spanning integrated week with dream/fact source isolation | P5 |
 | QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Partial: offline month replay/drift/storage gate | P6 |
 
 ## Optional expansion

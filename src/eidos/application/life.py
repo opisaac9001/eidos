@@ -797,7 +797,19 @@ class Life:
                 ("chronicler", 23, "day.summarized"),
             ):
                 if current.hour == scheduled_hour:
-                    text = await perform(self.gateway, role, context, at, pending)
+                    role_sources = selected_context
+                    role_context = context
+                    if role == "chronicler":
+                        role_sources = [
+                            item
+                            for item in selected_context
+                            if item.event.payload.get("category") != "dream"
+                        ]
+                        role_context = {
+                            **context,
+                            "memories": [item.recalled_text for item in role_sources],
+                        }
+                    text = await perform(self.gateway, role, role_context, at, pending)
                     if text:
                         if role == "oneiros":
                             seeds = dream_seed_sources(
@@ -807,7 +819,7 @@ class Life:
                             pending.extend(dream_events)
                             event = dream_events[0]
                         else:
-                            primary_memory = selected_context[0].event if selected_context else None
+                            primary_memory = role_sources[0].event if role_sources else None
                             event = DomainEvent(
                                 kind,
                                 "pathos",
@@ -817,7 +829,7 @@ class Life:
                                     "source": self.mode,
                                     "role": role,
                                     "source_count": (
-                                        len(selected_context)
+                                        len(role_sources)
                                         if role == "chronicler"
                                         else int(primary_memory is not None)
                                     ),
@@ -844,7 +856,7 @@ class Life:
                                         causation_id=item.event.event_id,
                                         correlation_id=event.correlation_id,
                                     )
-                                    for position, item in enumerate(selected_context, 1)
+                                    for position, item in enumerate(role_sources, 1)
                                 )
                         if role == "oneiros" and concerns_now:
                             pending.append(
