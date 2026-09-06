@@ -26,6 +26,15 @@ class LifeTests(unittest.TestCase):
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)
         self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))
+        reflection = next(
+            event for event in self.life.history() if event.kind == "reflection.recorded"
+        )
+        self.assertIsNotNone(reflection.payload["source_memory_id"])
+        summary = next(event for event in self.life.history() if event.kind == "day.summarized")
+        summary_links = [
+            event for event in self.life.history() if event.kind == "summary.source_linked"
+        ]
+        self.assertEqual(len(summary_links), summary.payload["source_count"])
         dreams = [e for e in self.life.history() if e.kind == "dream.recorded"]
         self.assertEqual(len(dreams), 1)
         self.assertFalse(any(e["text"] == dreams[0].payload["text"] for e in snapshot["memories"]))

@@ -23,7 +23,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: in-memory indexes + weighted explanations | P2 |
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership | P2 |
-| MEM-06 | Associations, resurfacing cues, unfinished-concern links | Planned | P2 |
+| MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
 | MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: evidence-linked form/revise/contest/correct | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Planned: conservative opt-in | P2 |
 | MEM-09 | Long-run retention/index maintenance and archive policy | Planned | P6 |
@@ -90,12 +90,12 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly thought | P4 |
-| INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: scheduled prose | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: sourced private/surfaced associations | P4 |
+| INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs and complete lineage | P4 |
 | INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: explicit recall/capped effect | P4 |
-| INNER-07 | Source-linked subjective/objective journals and interval summaries | Partial: daybook/events | P4–P5 |
+| INNER-07 | Source-linked subjective/objective journals and interval summaries | Partial: factual daybook with complete source membership | P4–P5 |
 
 ## UX
 

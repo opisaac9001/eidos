@@ -19,6 +19,7 @@ from eidos.application.inner_life import (
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.planner import overdue_plan_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
@@ -72,7 +73,16 @@ class Life:
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
-        memories, feed, conversations, recalls, consolidations, dreams = [], [], [], [], [], []
+        memories, feed, conversations, recalls, consolidations, dreams, associations = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
+        surfaced_associations: set[str] = set()
         dream_seeds: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
         concerns = {}
@@ -134,6 +144,10 @@ class Life:
                 dreams.append(item)
             if event.kind == "dream.seed_linked":
                 dream_seeds.setdefault(str(payload["dream_id"]), []).append(item)
+            if event.kind == "association.formed":
+                associations.append(item)
+            if event.kind == "association.surfaced":
+                surfaced_associations.add(str(payload["association_id"]))
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -217,6 +231,10 @@ class Life:
             "dreams": [
                 {**dream, "seeds": dream_seeds.get(str(dream["id"]), [])}
                 for dream in reversed(dreams[-100:])
+            ],
+            "associations": [
+                {**item, "surfaced": str(item["id"]) in surfaced_associations}
+                for item in reversed(associations[-100:])
             ],
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
@@ -355,19 +373,30 @@ class Life:
                     pending.extend(resolution.events)
             if 7 <= current.hour < 23:
                 text = await perform(self.gateway, "murmur", context, at, pending)
-                if text:
-                    pending.append(
-                        DomainEvent(
-                            "thought.recorded",
-                            "pathos",
-                            {
-                                "text": text,
-                                "simulated_at": at,
-                                "source": self.mode,
-                                "role": "murmur",
-                            },
-                        )
+                if text and selected_context:
+                    source = selected_context[0]
+                    importance = float(source.event.payload.get("importance", 0.5))
+                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if concerns_now else 0))
+                    cue = (
+                        source.matched_terms[0]
+                        if source.matched_terms
+                        else str(source.event.payload.get("category", state.location_id))
                     )
+                    association = resolve_association(
+                        AssociationProposal(
+                            proposal_id=f"associate-{at}-{source.event.event_id}",
+                            actor_id="pathos",
+                            source_memory_id=source.event.event_id,
+                            cue=cue,
+                            text=text,
+                            salience=salience,
+                            expected_revision=len(history) + len(pending),
+                        ),
+                        history=history + pending,
+                        actual_revision=len(history) + len(pending),
+                        simulated_at=at,
+                    )
+                    pending.extend(association.events)
             if beat and state.location_id != "home":
                 for person in PEOPLE:
                     if npc_location(person["id"], current.hour) != state.location_id:
@@ -466,6 +495,7 @@ class Life:
                             pending.extend(dream_events)
                             event = dream_events[0]
                         else:
+                            primary_memory = selected_context[0].event if selected_context else None
                             event = DomainEvent(
                                 kind,
                                 "pathos",
@@ -474,9 +504,36 @@ class Life:
                                     "simulated_at": at,
                                     "source": self.mode,
                                     "role": role,
+                                    "source_count": (
+                                        len(selected_context)
+                                        if role == "chronicler"
+                                        else int(primary_memory is not None)
+                                    ),
+                                    "source_memory_id": (
+                                        str(primary_memory.event_id) if primary_memory else None
+                                    ),
+                                    "factual": role == "chronicler",
                                 },
+                                causation_id=primary_memory.event_id if primary_memory else None,
+                                correlation_id=f"{role}-{at}",
                             )
                             pending.append(event)
+                            if role == "chronicler":
+                                pending.extend(
+                                    DomainEvent(
+                                        "summary.source_linked",
+                                        "pathos",
+                                        {
+                                            "summary_id": str(event.event_id),
+                                            "source_memory_id": str(item.event.event_id),
+                                            "position": position,
+                                            "simulated_at": at,
+                                        },
+                                        causation_id=item.event.event_id,
+                                        correlation_id=event.correlation_id,
+                                    )
+                                    for position, item in enumerate(selected_context, 1)
+                                )
                         if role == "oneiros" and concerns_now:
                             pending.append(
                                 DomainEvent(
