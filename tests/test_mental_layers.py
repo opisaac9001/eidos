@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.mental_layers import mental_layer_events, mind_context
@@ -156,6 +157,41 @@ class MentalLayerTests(unittest.TestCase):
         self.assertEqual(
             (attention.payload["focus_type"], attention.payload["focus_id"]), ("commitment", "soon")
         )
+
+    def test_household_load_is_not_continuous_attention(self):
+        evening = datetime(2026, 1, 10, 18, tzinfo=timezone.utc)
+        home = PathosState(
+            simulated_at=evening,
+            location_id="home",
+            awake=True,
+            rest=0.7,
+            connection=0.7,
+            curiosity=0.7,
+            mastery=0.7,
+            energy=0.7,
+            hunger=0.2,
+        )
+        noticed = mental_layer_events(
+            [],
+            home,
+            evening,
+            {},
+            household_loads={"dishes": 0.9, "laundry": 0.2},
+        )
+        attention = next(event for event in noticed if event.payload["layer"] == "attention")
+        self.assertEqual(
+            (attention.payload["focus_type"], attention.payload["focus_id"]),
+            ("household", "dishes"),
+        )
+        away = mental_layer_events(
+            [],
+            replace(home, location_id="park"),
+            evening,
+            {},
+            household_loads={"dishes": 0.9},
+        )
+        attention = next(event for event in away if event.payload["layer"] == "attention")
+        self.assertNotEqual(attention.payload["focus_type"], "household")
 
 
 if __name__ == "__main__":

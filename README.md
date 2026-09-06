@@ -47,6 +47,9 @@ Pathos can experience rare, bounded bouts of ordinary physical discomfort. These
 explicitly non-clinical, recover within one to three simulated days, and can change
 his attention, mood, pace, plans, willingness to host a visit and response time. The
 Observatory shows the active condition and reduced physical capacity when present.
+The home also accumulates bounded dishes, laundry, tidying and paperwork from actual
+living. These loads can attract attention and occasionally replace free time with a
+completed household task, while plans and the authored opening remain protected.
 Live visits now consume five to fifteen simulated minutes per accepted exchange.
 Approaching routines or appointments appear as visible time pressure; crossing their
 time can make Pathos leave or expose the conversation to the same calls, visitors,

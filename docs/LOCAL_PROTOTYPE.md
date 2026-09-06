@@ -75,6 +75,13 @@ and later open-ended activity/project proposals but cannot perform an action. A
 separate feasibility rule lets a genuinely critical unmet need redirect at most one
 optional routine hour per day; obligations, appointments, incidents and the opening
 story remain protected, and the reason is retained in the resulting memory.
+Home now has replayable unfinished work rather than decorative chore prose. Home meals
+add dishes; ordinary lived days add laundry and tidying; received deliveries add
+clutter; and household obligations add paperwork. Once a load becomes substantial it
+can win one optional hour, only at home, and completed work lowers that exact load.
+Sources are applied once, pre-feature history is not reinterpreted, domestic pressure
+can enter attention and model context, and the Observatory shows the largest current
+load without flooding the public feed with every small accumulation.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe

@@ -87,6 +87,40 @@ class MonthSoakTests(unittest.TestCase):
                 if event.kind == "mind.layer_pulsed" and event.payload.get("layer") == "attention"
             }
             self.assertTrue({"need", "concern", "goal", "person", "commitment"} <= attention_types)
+            household_tasks = [
+                event for event in events if event.kind == "household.task_completed"
+            ]
+            self.assertTrue(household_tasks)
+            household_days = {str(event.payload["simulated_at"])[:10] for event in household_tasks}
+            self.assertEqual(len(household_tasks), len(household_days))
+            self.assertGreaterEqual(
+                len({event.payload["task_kind"] for event in household_tasks}), 3
+            )
+            self.assertTrue(
+                all(0 <= value <= 1 for value in snapshot["household"]["loads"].values())
+            )
+            household_task_ids = {event.event_id for event in household_tasks}
+            self.assertTrue(
+                all(
+                    any(
+                        memory.kind == "memory.recorded" and memory.causation_id == task_id
+                        for memory in events
+                    )
+                    for task_id in household_task_ids
+                )
+            )
+            sourced_loads = [
+                event
+                for event in events
+                if event.kind == "household.load_added" and event.payload.get("source_event_id")
+            ]
+            self.assertTrue(sourced_loads)
+            self.assertTrue(
+                all(
+                    str(event.causation_id) == event.payload["source_event_id"]
+                    for event in sourced_loads
+                )
+            )
             disagreement = next(event for event in events if event.kind == "disagreement.expressed")
             apology = next(event for event in events if event.kind == "apology.offered")
             self.assertLess(events.index(disagreement), events.index(apology))

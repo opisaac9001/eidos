@@ -2,7 +2,7 @@
 
 import asyncio
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -29,6 +29,12 @@ from eidos.application.economy import financial_consequence_events, financial_fo
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
+from eidos.application.household import (
+    household_adjusted_beat,
+    household_completion_events,
+    household_foundation_events,
+    household_load_events,
+)
 from eidos.application.inner_life import (
     active_concerns,
     active_dream_inspirations,
@@ -97,6 +103,7 @@ from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState, project_finances
+from eidos.domain.household import HouseholdState, project_household
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
@@ -166,6 +173,9 @@ def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
     return "Content" if valence > 0.15 else "Reflective" if valence < -0.1 else "Quietly curious"
 
 
+_AUTHORED_OPENING_END = date(2026, 1, 9)
+
+
 class Life:
     """Caller serializes operations; the store also rejects stale stream revisions."""
 
@@ -188,6 +198,7 @@ class Life:
         self._consolidation_cache: tuple[int, str, ConsolidationIndex] | None = None
         self._finance_cache: tuple[int, str, FinancialState] | None = None
         self._wellbeing_cache: tuple[int, str, WellbeingState] | None = None
+        self._household_cache: tuple[int, str, HouseholdState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -323,6 +334,22 @@ class Life:
         anchor = str(history[-1].event_id) if history else ""
         self._wellbeing_cache = (len(history), anchor, wellbeing)
         return wellbeing
+
+    def _household(self, history: list[DomainEvent]) -> HouseholdState:
+        if self._household_cache is not None:
+            revision, anchor, household = self._household_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    household = household.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._household_cache = (len(history), anchor, household)
+                return household
+        household = project_household(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._household_cache = (len(history), anchor, household)
+        return household
 
     def _planning(self, history: list[DomainEvent]) -> PlanningState:
         if self._planning_cache is not None:
@@ -561,6 +588,7 @@ class Life:
         conversation_clocks = project_conversation_clocks(history)
         finances = self._finances(history)
         wellbeing = self._wellbeing(history)
+        household = self._household(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         outreach_config = project_outreach_config(history)
@@ -837,6 +865,7 @@ class Life:
                 "wellbeing.episode_started",
                 "wellbeing.episode_progressed",
                 "wellbeing.episode_resolved",
+                "household.task_completed",
                 "catch_up.summarized",
                 "catch_up.cancelled",
                 "sleep.window_selected",
@@ -1005,6 +1034,11 @@ class Life:
             "wellbeing": {
                 "active": vars_for(wellbeing.active) if wellbeing.active is not None else None,
                 "episodes": [vars_for(item) for item in wellbeing.episodes.values()],
+            },
+            "household": {
+                "established": household.established,
+                "loads": dict(household.loads),
+                "completed": [vars_for(item) for item in list(household.completed.values())[-30:]],
             },
             "sleep_windows": [
                 vars_for(item)
@@ -1227,6 +1261,22 @@ class Life:
             if account:
                 self._finances(history + pending + account)
                 pending.extend(account)
+            household_seed = (
+                household_foundation_events(history + pending, current)
+                if current.date() > _AUTHORED_OPENING_END
+                else []
+            )
+            if household_seed:
+                self._household(history + pending + household_seed)
+                pending.extend(household_seed)
+            domestic_load = household_load_events(
+                history + pending,
+                self._household(history + pending),
+                current,
+            )
+            if domestic_load:
+                self._household(history + pending + domestic_load)
+                pending.extend(domestic_load)
             pending.extend(
                 await asyncio.to_thread(
                     town_signal_events,
@@ -1316,6 +1366,7 @@ class Life:
             active_wellbeing = self._wellbeing(history + pending).active
             physical_capacity = 1.0 if active_wellbeing is None else 1 - active_wellbeing.severity
             effective_energy = min(state.energy, physical_capacity)
+            household_now = self._household(history + pending)
             project_history = history + pending
             project_feeling = project_emotion(project_history)
             project_identity_state = project_identity(project_history)
@@ -1338,6 +1389,7 @@ class Life:
                         1.0, self._finances(project_history).balance_pence / 20_000
                     ),
                     "physical_capacity": physical_capacity,
+                    **{f"household_{task}": load for task, load in household_now.loads.items()},
                 },
                 emotion={
                     "label": project_feeling.label,
@@ -1382,6 +1434,7 @@ class Life:
                         1.0, self._finances(agency_history).balance_pence / 20_000
                     ),
                     "physical_capacity": physical_capacity,
+                    **{f"household_{task}": load for task, load in household_now.loads.items()},
                 },
                 emotion={
                     "label": current_emotion.label,
@@ -1423,11 +1476,25 @@ class Life:
             meals: list[DomainEvent] = []
             meal_checked = False
             if beat:
+                household_reason = None
+                if current.date() > _AUTHORED_OPENING_END:
+                    beat, household_reason = household_adjusted_beat(
+                        beat,
+                        household_now,
+                        protected=incident_beat is not None or planned_beat is not None,
+                        already_completed_today=any(
+                            event.kind == "household.task_completed"
+                            and str(event.payload.get("simulated_at", "")).startswith(
+                                current.date().isoformat()
+                            )
+                            for event in history + pending
+                        ),
+                    )
                 need_reason = None
                 if (
                     incident_beat is None
                     and planned_beat is None
-                    and current.date() > datetime(2026, 1, 9, tzinfo=current.tzinfo).date()
+                    and current.date() > _AUTHORED_OPENING_END
                     and not any(
                         event.kind == "memory.recorded"
                         and event.payload.get("need_decision_reason")
@@ -1464,6 +1531,8 @@ class Life:
                     social_openness=bias.social_openness,
                     sustained_low_hours=emotion_before_beat.sustained_low_hours,
                 )
+                if not beat.activity.startswith("household_"):
+                    household_reason = None
                 arrival = None
                 if state.location_id != beat.location_id:
                     user_scene = next(
@@ -1566,6 +1635,13 @@ class Life:
                 energy = DomainEvent("affect.changed", "pathos", {"energy": beat.energy})
                 pending.append(energy)
                 state = state.apply(energy)
+                household_work = household_completion_events(
+                    self._household(history + pending), beat, current
+                )
+                if household_work:
+                    self._household(history + pending + household_work)
+                    pending.extend(household_work)
+                household_event = household_work[0] if household_work else None
                 meal_busy = incident_location is not None or any(
                     scene.status in {"active", "paused"}
                     and "pathos" in {scene.initiator_id, scene.partner_id}
@@ -1613,18 +1689,23 @@ class Life:
                             "emotional_decision_reason": emotional_reason,
                             "need_decision_reason": need_reason,
                             "physical_decision_reason": physical_reason,
+                            "household_decision_reason": household_reason,
                             "location_id": beat.location_id,
                             "owner": "pathos",
                             "importance": 0.45,
                             "confidence": 1.0,
                         },
-                        causation_id=meal_event.event_id
+                        causation_id=household_event.event_id
+                        if household_event is not None
+                        else meal_event.event_id
                         if meal_event is not None
                         else arrival.event_id
                         if arrival
                         else None,
                         correlation_id=(
-                            meal_event.correlation_id
+                            household_event.correlation_id
+                            if household_event is not None
+                            else meal_event.correlation_id
                             if meal_event is not None
                             else arrival.correlation_id
                             if arrival
@@ -1649,6 +1730,14 @@ class Life:
                 pending.extend(meals)
                 for meal in meals:
                     state = state.apply(meal)
+            domestic_load = household_load_events(
+                history + pending,
+                self._household(history + pending),
+                current,
+            )
+            if domestic_load:
+                self._household(history + pending + domestic_load)
+                pending.extend(domestic_load)
             money = financial_consequence_events(
                 history + pending,
                 self._finances(history + pending),
@@ -1710,7 +1799,15 @@ class Life:
                 actor_id: person.location_id
                 for actor_id, person in project_npcs(history + pending, current).people.items()
             }
-            pending.extend(mental_layer_events(history + pending, state, current, npc_locations))
+            pending.extend(
+                mental_layer_events(
+                    history + pending,
+                    state,
+                    current,
+                    npc_locations,
+                    household_loads=self._household(history + pending).loads,
+                )
+            )
             observation_output = due_world_observations(
                 history + pending,
                 {"pathos": state.location_id, **npc_locations},

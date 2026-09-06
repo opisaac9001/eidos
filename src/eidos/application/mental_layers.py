@@ -19,6 +19,8 @@ def mental_layer_events(
     state: PathosState,
     at: datetime,
     npc_locations: Mapping[str, str],
+    *,
+    household_loads: Mapping[str, float] | None = None,
 ) -> list[DomainEvent]:
     """Emit bounded hourly layer activations from Pathos-accessible state."""
     if at.utcoffset() is None:
@@ -55,6 +57,7 @@ def mental_layer_events(
         npc_locations,
         need_name,
         need_value,
+        household_loads or {},
     )
     sustained_low_hours = previous_emotion.sustained_low_hours if state.valence <= -0.35 else 0
     emotion_label = classify_emotion(state.valence, state.arousal, sustained_low_hours)
@@ -175,6 +178,7 @@ def _attention_focus(
     npc_locations: Mapping[str, str],
     need_name: str,
     need_value: float,
+    household_loads: Mapping[str, float],
 ) -> tuple[str, str, str, float]:
     """Choose one foreground focus while preserving bounded attentional inertia."""
     candidates: list[tuple[float, str, str, str]] = [
@@ -186,6 +190,17 @@ def _attention_focus(
         ),
         (0.3, "place", state.location_id, f"Notice {state.location_id}"),
     ]
+    if household_loads and state.awake and state.location_id == "home" and at.hour in {7, 18, 21}:
+        task, load = max(household_loads.items(), key=lambda item: (item[1], item[0]))
+        if load >= 0.48:
+            candidates.append(
+                (
+                    0.3 + 0.45 * load,
+                    "household",
+                    task,
+                    f"Notice the accumulating {task}",
+                )
+            )
     if concerns:
         concern = concerns[-1]
         candidates.append(

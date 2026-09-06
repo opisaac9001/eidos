@@ -38,6 +38,10 @@ Hourly foreground attention now competes among needs, concerns, goals, people, p
 and imminent commitments with bounded inertia. It informs generative context without
 gaining action authority. Critical need pressure may redirect one free-time beat per
 day through an auditable rule while commitments and the authored opening stay intact.
+Domestic continuity now connects meals, deliveries, obligations and daily use to
+bounded dishes, laundry, tidying and paperwork loads. High load can compete for
+attention and one optional at-home task per day; completion reduces projected state,
+while existing worlds receive a clean introduction cutoff rather than retroactive work.
 Moira can also submit open-vocabulary fictional incidents with explicit cause, place,
 lead time, duration, theme and opportunity; rejected or failed generations produce a
 quiet interval instead of falling back to a scripted event.
@@ -210,6 +214,9 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   charges café meals and provision orders, refunds failed deliveries, and resolves
   weekly housing costs as paid or explicitly missed. Affordability constrains food
   choices and enters agency context; balances cannot silently become negative.
+- Domestic work accumulates from actual living and can occupy optional time at home.
+  Each source applies once, completed work lowers the corresponding load, and neither
+  narration nor a migration can fabricate a backlog or a finished task.
 - Rare physical discomfort is explicitly non-clinical and time-bounded. Its severity
   can defer optional activity or interrupt a plan, but does not bypass emergencies,
   travel, schedule consequences, communication availability or ordinary recovery.

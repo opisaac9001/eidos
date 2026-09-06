@@ -43,6 +43,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded skills/habit, capped week-spanning preference lifecycle, and one-point month-spanning behavioral trait drift | P6 |
 | SELF-07 | Household income, costs, affordability, obligations and missed-payment consequences | Partial: source-linked GBP ledger for workshop shifts, café meals, provision orders/refunds and weekly housing without overdrafts | P3–P6 |
 | SELF-08 | Physical comfort, minor illness, recovery and capacity effects | Partial: rare replayable non-clinical one-to-three-day episodes with monotonic recovery and bounded effects on attention, mood, plans and availability | P3–P6 |
+| SELF-09 | Domestic upkeep, accumulating chores and ordinary household consequences | Partial: replayable dishes, laundry, tidying and paperwork loads sourced from daily living, home meals, deliveries and obligations; high load can claim bounded free time | P3–P6 |
 
 ## Planning and time — Chronos / Pathos
 
@@ -62,8 +63,8 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception, owner-specific scene memory, public resident conversation overhearing, and confidence-decaying resident testimony chains | P3 |
-| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite household provisions, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
-| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended one-off and multi-day self-chosen projects, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
+| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite household provisions, domestic load, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
+| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended one-off and multi-day self-chosen projects, domestic work, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people originate schema-checked open-vocabulary private plans from owner-only context, including their own private biography, then move/act or fail; model-invented residents gain bounded private histories from public context; audited priorities and critical-energy replanning remain deterministic | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, attributed inspiration, open-ended resource-backed events, witnessed urgent responses, and multi-stage aftermath | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement, six-hour activity, and cooldown-paced resident-to-resident scenes with need consequences | P5 |
@@ -93,7 +94,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus inertial foreground competition among needs, concerns, goals, people, places and imminent commitments | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: replayable nightly windows shaped by condition and commitments, with occupied-time delay and legacy fallback | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs, complete lineage, and varied replay-stable offline dreams | P4 |

@@ -128,6 +128,7 @@ const labels = {
   "wellbeing.episode_started": "FEELING PHYSICALLY OFF",
   "wellbeing.episode_progressed": "PHYSICAL RECOVERY",
   "wellbeing.episode_resolved": "FEELING PHYSICALLY BETTER",
+  "household.task_completed": "HOME WAS CARED FOR",
   "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
@@ -664,7 +665,8 @@ function render(next) {
     .join(" · ");
   const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
   const attention = (state.mind?.layers || []).find((item) => item.layer === "attention");
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${attention ? ` · Attention: ${attention.focus_text}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
+  const domestic = Object.entries(state.household?.loads || {}).sort((a, b) => b[1] - a[1])[0];
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${domestic && domestic[1] >= 0.35 ? ` · Home: ${domestic[0]} ${Math.round(domestic[1] * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${attention ? ` · Attention: ${attention.focus_text}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   const preferences = state.identity?.preferences || [];
   const traits = Object.entries(state.identity?.traits || {})
     .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)
