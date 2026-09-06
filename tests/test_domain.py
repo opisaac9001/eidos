@@ -70,6 +70,8 @@ class PathosStateTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             state.apply(DomainEvent("affect.changed", "pathos", {"energy": 1.1}))
+        with self.assertRaises(ValueError):
+            state.apply(DomainEvent("affect.changed", "pathos", {"arousal": -0.1}))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,12 @@
 import unittest
 from datetime import datetime, timezone
 
-from eidos.application.appraisal import appraisal_events, sleep_and_need_events
+from eidos.application.appraisal import (
+    affect_episode_events,
+    appraisal_events,
+    baseline_affect_events,
+    sleep_and_need_events,
+)
 from eidos.domain.events import DomainEvent
 from eidos.domain.state import PathosState
 
@@ -58,6 +63,33 @@ class AppraisalTests(unittest.TestCase):
         )
         self.assertEqual(evening_events[0].kind, "sleep.started")
         self.assertFalse(asleep.awake)
+
+    def test_appraisals_create_one_bounded_affect_episode_with_source_lineage(self):
+        source = DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {"person_id": "mara", "simulated_at": self.now.isoformat()},
+        )
+        appraisals, state = appraisal_events([source], PathosState(), self.now)
+        events, affected = affect_episode_events([source, *appraisals], state, self.now)
+        self.assertEqual(
+            [event.kind for event in events], ["affect.episode_started", "affect.changed"]
+        )
+        self.assertEqual(events[0].causation_id, appraisals[0].event_id)
+        self.assertGreater(affected.valence, state.valence)
+        self.assertGreater(affected.arousal, state.arousal)
+        repeated, same = affect_episode_events([source, *appraisals, *events], affected, self.now)
+        self.assertEqual(repeated, [])
+        self.assertEqual(same, affected)
+
+    def test_transient_affect_recovers_toward_baseline_without_overshoot(self):
+        state = PathosState(valence=0.5, arousal=0.8, awake=True)
+        events, recovered = baseline_affect_events(state, self.now)
+        self.assertEqual(len(events), 1)
+        self.assertLess(recovered.valence, state.valence)
+        self.assertLess(recovered.arousal, state.arousal)
+        settled = PathosState(valence=0.0, arousal=0.35, awake=True)
+        self.assertEqual(baseline_affect_events(settled, self.now), ([], settled))
 
 
 if __name__ == "__main__":

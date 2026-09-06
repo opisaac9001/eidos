@@ -5,7 +5,12 @@ import math
 from datetime import timedelta
 from typing import Any
 
-from eidos.application.appraisal import appraisal_events, sleep_and_need_events
+from eidos.application.appraisal import (
+    affect_episode_events,
+    appraisal_events,
+    baseline_affect_events,
+    sleep_and_need_events,
+)
 from eidos.application.belief_review import relationship_belief_events
 from eidos.application.cognition import perform
 from eidos.application.consolidation import consolidation_events
@@ -32,9 +37,11 @@ from eidos.ports.event_store import EventStore
 from eidos.ports.model_gateway import ModelGateway
 
 
-def mood_name(energy: float, valence: float) -> str:
+def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
     if energy < 0.3:
         return "Sleepy"
+    if arousal > 0.65:
+        return "Animated" if valence >= 0 else "Tense"
     return "Content" if valence > 0.15 else "Reflective" if valence < -0.1 else "Quietly curious"
 
 
@@ -73,7 +80,8 @@ class Life:
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
-        memories, feed, conversations, recalls, consolidations, dreams, associations = (
+        memories, feed, conversations, recalls, consolidations, dreams, associations, episodes = (
+            [],
             [],
             [],
             [],
@@ -148,6 +156,8 @@ class Life:
                 associations.append(item)
             if event.kind == "association.surfaced":
                 surfaced_associations.add(str(payload["association_id"]))
+            if event.kind == "affect.episode_started":
+                episodes.append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -202,6 +212,7 @@ class Life:
                 "location": location_name(state.location_id),
                 "energy": state.energy,
                 "valence": state.valence,
+                "arousal": state.arousal,
                 "needs": {
                     "rest": state.rest,
                     "connection": state.connection,
@@ -209,7 +220,7 @@ class Life:
                     "mastery": state.mastery,
                 },
                 "awake": state.awake,
-                "mood": mood_name(state.energy, state.valence),
+                "mood": mood_name(state.energy, state.valence, state.arousal),
             },
             "weather": weather,
             "config": config,
@@ -236,6 +247,7 @@ class Life:
                 {**item, "surfaced": str(item["id"]) in surfaced_associations}
                 for item in reversed(associations[-100:])
             ],
+            "affect_episodes": list(reversed(episodes[-100:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
             "mode": self.mode,
@@ -276,6 +288,8 @@ class Life:
             state = state.apply(pending[-1])
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)
+            recovery, state = baseline_affect_events(state, current)
+            pending.extend(recovery)
             beat = beats.get(current)
             if beat:
                 for event in (
@@ -460,16 +474,6 @@ class Life:
                                     },
                                 )
                             )
-                        state = state.apply(
-                            DomainEvent(
-                                "affect.changed",
-                                "pathos",
-                                {"valence": min(0.7, state.valence + 0.05)},
-                            )
-                        )
-                        pending.append(
-                            DomainEvent("affect.changed", "pathos", {"valence": state.valence})
-                        )
             social_activity = scheduled_social_events(
                 project_planning(history + pending),
                 actor_location_id=state.location_id,
@@ -551,6 +555,8 @@ class Life:
                             )
             appraisals, state = appraisal_events(history + pending, state, current)
             pending.extend(appraisals)
+            episodes, state = affect_episode_events(history + pending, state, current)
+            pending.extend(episodes)
             if current.hour == 0:
                 pending.extend(consolidation_events(history + pending, current))
         pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
@@ -639,7 +645,7 @@ class Life:
             "message": text.strip(),
             "time": at,
             "location": location_name(state.location_id),
-            "mood": mood_name(state.energy, state.valence),
+            "mood": mood_name(state.energy, state.valence, state.arousal),
             "memories": [item.event.payload["text"] for item in selected],
             "beliefs": [
                 {

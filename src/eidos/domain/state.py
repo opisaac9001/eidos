@@ -15,6 +15,7 @@ class PathosState:
     simulated_at: datetime = datetime(2026, 1, 1, tzinfo=timezone.utc)
     energy: float = 1.0
     valence: float = 0.0
+    arousal: float = 0.35
     rest: float = 0.75
     connection: float = 0.5
     curiosity: float = 0.5
@@ -45,7 +46,10 @@ class PathosState:
                 valence = _bounded_dimension(
                     event.payload.get("valence", self.valence), "valence", -1, 1
                 )
-                return replace(self, energy=energy, valence=valence)
+                arousal = _bounded_dimension(
+                    event.payload.get("arousal", self.arousal), "arousal", 0, 1
+                )
+                return replace(self, energy=energy, valence=valence, arousal=arousal)
             case "needs.changed":
                 return replace(
                     self,

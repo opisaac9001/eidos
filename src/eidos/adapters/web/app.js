@@ -380,6 +380,12 @@ function render(next) {
         ? "Low"
         : "Balanced";
   $("valence-meter").style.width = `${(state.pathos.valence + 1) * 50}%`;
+  $("arousal-value").textContent = `${Math.round(state.pathos.arousal * 100)}%`;
+  $("arousal-meter").style.width = `${state.pathos.arousal * 100}%`;
+  const episode = state.affect_episodes?.[0];
+  $("affect-source").textContent = episode
+    ? `Latest episode: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
+    : "No affect episode recorded yet.";
   const needs = state.pathos.needs;
   $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%`;
   $("mini-map").innerHTML = mapMarkup(false);

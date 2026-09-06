@@ -36,7 +36,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: character/prompts | P2 |
-| SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: source-linked appraisal + energy/valence | P2 |
+| SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: source-linked valence/arousal episodes + recovery | P2 |
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
 | SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: energy/rest/mastery and window policy | P3 |
@@ -127,8 +127,8 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: lab probes/critic | Every phase |
 | QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Partial: owned recall/belief and source-membership fixtures | P2 |
 | QA-05 | Dream/fact separation, affect caps, no action bypass | Partial: category/label checks | P4 |
-| QA-06 | Seven-day plan/relationship causality and coherent recall | Planned | P5 |
-| QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Planned | P6 |
+| QA-06 | Seven-day plan/relationship causality and coherent recall | Partial: deterministic multi-day causal fixtures | P5 |
+| QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Partial: offline month replay/drift/storage gate | P6 |
 
 ## Optional expansion
 
