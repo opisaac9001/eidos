@@ -51,6 +51,31 @@ class OffscreenWorldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             project_npcs([bad], self.now)
 
+    def test_matching_private_activity_completes_an_npc_plan(self):
+        plan = DomainEvent(
+            "npc.plan_created",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "plan_id": "rowan-sketch",
+                "title": "Sketch the seed table",
+                "action": "sketch",
+                "location_id": "park",
+            },
+        )
+        noon = self.now.replace(hour=12)
+        events = npc_world_events([plan], noon)
+        activity = next(
+            event
+            for event in events
+            if event.kind == "npc.activity_recorded" and event.payload["actor_id"] == "rowan"
+        )
+        completed = next(event for event in events if event.kind == "npc.plan_completed")
+        self.assertEqual(completed.causation_id, activity.event_id)
+        self.assertEqual(
+            project_npcs([plan, *events], noon).people["rowan"].plan_status, "completed"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

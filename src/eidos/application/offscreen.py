@@ -75,6 +75,28 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         )
         output.extend((activity, changed))
         state = state.apply(activity).apply(changed)
+        if (
+            current.plan_status == "active"
+            and current.plan_action == "sketch"
+            and current.plan_location_id == desired
+            and "sketching" in str(activity.payload["activity"])
+            and current.plan_id is not None
+        ):
+            completed = DomainEvent(
+                "npc.plan_completed",
+                "pathos",
+                {
+                    "actor_id": actor_id,
+                    "plan_id": current.plan_id,
+                    "owner": actor_id,
+                    "visibility": "private",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=activity.event_id,
+                correlation_id=current.plan_id,
+            )
+            output.append(completed)
+            state = state.apply(completed)
     return output
 
 

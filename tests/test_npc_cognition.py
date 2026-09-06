@@ -24,6 +24,11 @@ class NPCCognitionTests(unittest.TestCase):
         self.assertEqual(belief.owner_id, "rowan")
         self.assertEqual(belief.subject_id, "park")
         self.assertEqual(belief.last_evidence_id, str(perception.event_id))
+        plan = next(event for event in events if event.kind == "npc.plan_created")
+        formed = next(event for event in events if event.kind == "belief.formed")
+        self.assertEqual(plan.causation_id, formed.event_id)
+        self.assertEqual(plan.payload["owner"], "rowan")
+        self.assertEqual(plan.payload["visibility"], "private")
         self.assertEqual(npc_belief_events([perception, *events], "2026-01-03T13:00:00+00:00"), [])
 
     def test_pathos_perception_is_left_to_pathos_belief_policy(self):

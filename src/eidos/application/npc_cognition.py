@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.beliefs import BeliefProposal, project_beliefs, resolve_belief
@@ -48,4 +49,26 @@ def npc_belief_events(history: Sequence[DomainEvent], simulated_at: str) -> list
             state = state.apply(event)
         if resolution.accepted:
             used_evidence.add(str(perception.event_id))
+            formed = next(event for event in resolution.events if event.kind == "belief.formed")
+            output.append(
+                DomainEvent(
+                    "npc.plan_created",
+                    "pathos",
+                    {
+                        "actor_id": owner,
+                        "plan_id": f"{owner}-sketch-seed-swap",
+                        "title": "Make a small sketch of the neighborhood seed swap",
+                        "action": "sketch",
+                        "location_id": location_id,
+                        "due_at": (
+                            datetime.fromisoformat(simulated_at) + timedelta(days=2)
+                        ).isoformat(),
+                        "owner": owner,
+                        "visibility": "private",
+                        "simulated_at": simulated_at,
+                    },
+                    causation_id=formed.event_id,
+                    correlation_id=formed.correlation_id,
+                )
+            )
     return output

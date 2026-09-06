@@ -46,6 +46,10 @@ class MonthSoakTests(unittest.TestCase):
             self.assertLess(rowan["tension"], 0.08)
             self.assertTrue(snapshot["followups"])
             self.assertTrue(all(item["status"] == "ready" for item in snapshot["followups"]))
+            rowan_state = next(
+                item for item in snapshot["npc_states"] if item["actor_id"] == "rowan"
+            )
+            self.assertEqual(rowan_state["plan_status"], "completed")
             thoughts = {
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }

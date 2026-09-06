@@ -19,6 +19,11 @@ class NPCState:
     connection: float = 0.5
     purpose: float = 0.5
     private_activity: str = "unrecorded"
+    plan_id: str | None = None
+    plan_title: str | None = None
+    plan_action: str | None = None
+    plan_location_id: str | None = None
+    plan_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +51,21 @@ class NPCWorldState:
                 connection=_bounded(event, "connection"),
                 purpose=_bounded(event, "purpose"),
             )
+        elif event.kind == "npc.plan_created":
+            if person.plan_status == "active":
+                raise ValueError("NPC already has an active plan")
+            people[actor_id] = replace(
+                person,
+                plan_id=_required(event, "plan_id"),
+                plan_title=_required(event, "title"),
+                plan_action=_required(event, "action"),
+                plan_location_id=_required(event, "location_id"),
+                plan_status="active",
+            )
+        elif event.kind == "npc.plan_completed":
+            if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
+                raise ValueError("Only the active NPC plan can complete")
+            people[actor_id] = replace(person, plan_status="completed")
         return NPCWorldState(people)
 
 
