@@ -24,6 +24,7 @@ from eidos.application.inner_life import (
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.offscreen import npc_world_events
 from eidos.application.planner import overdue_plan_events
+from eidos.application.relational_arc import relational_arc_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.associations import AssociationProposal, resolve_association
@@ -194,6 +195,9 @@ class Life:
                 "belief.contested",
                 "belief.corrected",
                 "relationship.changed",
+                "disagreement.expressed",
+                "boundary.stated",
+                "apology.offered",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -382,6 +386,14 @@ class Life:
                     history + pending,
                     {"pathos": state.location_id, **npc_locations},
                     current,
+                )
+            )
+            pending.extend(
+                relational_arc_events(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    current,
+                    len(history) + len(pending),
                 )
             )
             overdue = overdue_plan_events(project_planning(history + pending), current)

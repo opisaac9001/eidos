@@ -37,6 +37,13 @@ class MonthSoakTests(unittest.TestCase):
                 all(item["status"] in {"fulfilled", "missed"} for item in snapshot["commitments"])
             )
             self.assertLess(path.stat().st_size, 10_000_000)
+            disagreement = next(event for event in events if event.kind == "disagreement.expressed")
+            apology = next(event for event in events if event.kind == "apology.offered")
+            self.assertLess(events.index(disagreement), events.index(apology))
+            self.assertEqual(apology.payload["target_id"], disagreement.payload["target_id"])
+            rowan = next(person for person in snapshot["people"] if person["id"] == "rowan")
+            self.assertGreater(rowan["tension"], 0)
+            self.assertLess(rowan["tension"], 0.08)
             thoughts = {
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }

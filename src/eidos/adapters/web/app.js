@@ -40,6 +40,9 @@ const labels = {
   "belief.contested": "A BELIEF QUESTIONED",
   "belief.corrected": "A BELIEF CORRECTED",
   "relationship.changed": "RELATIONSHIP CHANGED",
+  "disagreement.expressed": "A DISAGREEMENT",
+  "boundary.stated": "A BOUNDARY",
+  "apology.offered": "AN APOLOGY",
   "dream.recalled": "A DREAM REMEMBERED",
 };
 const views = {

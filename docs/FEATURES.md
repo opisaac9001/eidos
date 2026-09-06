@@ -9,7 +9,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
-| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/speech/belief/association/travel + trace migration | P1 |
+| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/speech/belief/association/travel/relating + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers, capacity/deadlines/cancel; callers still await | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role filtering + speech audience perceptions | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
@@ -75,7 +75,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: single encounter | P3 |
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: bounded favors and scheduled invitations with explicit consent | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
-| SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Planned | P3 |
+| SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology with unresolved-rupture rule | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Planned | P5 |
