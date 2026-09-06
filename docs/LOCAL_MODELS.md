@@ -1,9 +1,9 @@
 # Local model testing
 
-Eidos can run all eight performer roles through an OpenAI-compatible chat
-completion endpoint supporting JSON-schema responses. They are logical roles in
-one application, not eight separately deployed services. The continuity critic
-remains deterministic code. Offline stand-ins are still the default.
+Eidos can run eight narrative performers and three structured proposal roles through
+an OpenAI-compatible chat completion endpoint supporting JSON-schema responses. They
+are logical roles in one application, not separately deployed services. The continuity
+critic remains deterministic code. Offline stand-ins are still the default.
 
 ## Connect
 
@@ -90,10 +90,12 @@ separately exposes `semantic_passed` and per-role `semantic_findings` for fragme
 output, lost first-person voice, prompt/AI-role leakage, time-of-day contradictions,
 explicit evidence contradictions, forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
-`benchmark-model` repeats a three-context synthetic corpus one to five times and reports
+`benchmark-model` repeats a three-context synthetic corpus one to five times for the
+eight narrative performers and a varied structured agency case for Pathos. It reports
 per-role contract/finding counts, retained samples, median/max latency, tokens, and a
-minimum three-sample screening floor. Passing that floor only nominates a role/model
-pair for human review; it never changes production routing automatically.
+minimum three-sample screening floor. The agency case must also parse and pass the real
+place/time/travel/resource planner. Passing that floor only nominates a role/model pair
+for human review; it never changes production routing automatically.
 Roles receive only their relevant context fields. Responses must finish, parse
 as exactly one text field, and meet role-specific rules. Weather is enumerated;
 factual memory must reproduce its source experience exactly. Outputs are bounded

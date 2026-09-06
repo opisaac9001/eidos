@@ -37,9 +37,10 @@ tests/               Executable architecture and domain expectations
 The local prototype has six connected views: Observatory, World, Conversation,
 Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
 NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
-scheduled activities, and a factual daybook. All eight
-performers can use deterministic stand-ins or a real compatible model endpoint;
-a ninth, the continuity critic, performs schema and factual-memory source checks,
+scheduled activities, and a factual daybook. All eight narrative performers plus
+Moira's two structured world proposers and Pathos's structured agency proposer can use
+deterministic stand-ins or a real compatible model endpoint. The continuity critic
+performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 SQLite stores atomic event batches and rebuilds

@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from statistics import median
+from time import perf_counter
 
 from eidos.application.cognition import perform
 from eidos.application.semantic_quality import semantic_quality_findings
+from eidos.domain.agency import (
+    agency_output_schema,
+    parse_agency_candidate,
+    resolve_agency_candidate,
+)
 from eidos.domain.events import DomainEvent
+from eidos.domain.planning import PlanningState
+from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world import ROLES
-from eidos.ports.model_gateway import ModelGateway
+from eidos.domain.world_catalog import project_world_catalog
+from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 
 def benchmark_contexts() -> tuple[dict[str, object], ...]:
@@ -75,13 +86,16 @@ def benchmark_contexts() -> tuple[dict[str, object], ...]:
 async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, object]:
     if isinstance(runs, bool) or not isinstance(runs, int) or not 1 <= runs <= 5:
         raise ValueError("Benchmark runs must be between one and five")
-    roles = [str(role["id"]) for role in ROLES if role["id"] != "critic"]
+    roles = [str(role["id"]) for role in ROLES if role["id"] != "critic"] + ["pathos_agency"]
     contexts = benchmark_contexts()
     samples: list[dict[str, object]] = []
     prior_by_role: dict[str, list[str]] = {role: [] for role in roles}
     for run in range(runs):
         context = contexts[run % len(contexts)]
         for role in roles:
+            if role == "pathos_agency":
+                samples.append(await _agency_sample(gateway, run))
+                continue
             events: list[DomainEvent] = []
             text = await perform(gateway, role, context, str(context["time"]), events)
             trace = next(
@@ -159,4 +173,83 @@ async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, obj
         "roles": summaries,
         "samples": samples,
         "note": "Semantic findings are conservative warnings, not proof of coherence.",
+    }
+
+
+async def _agency_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
+    catalog = project_world_catalog([])
+    at = datetime.fromisoformat(f"2026-01-{11 + run * 2:02d}T10:00:00+00:00")
+    places = {
+        item.place_id: {
+            "name": item.name,
+            "description": item.description,
+            "opens_hour": item.opens_hour,
+            "closes_hour": item.closes_hour,
+        }
+        for item in catalog.places.values()
+    }
+    people = {
+        item.person_id: {"name": item.name, "occupation": item.occupation}
+        for item in catalog.people.values()
+    }
+    context = {
+        "time": at.isoformat(),
+        "needs": {"rest": 0.65, "connection": 0.42, "curiosity": 0.78, "mastery": 0.51},
+        "emotion": {"label": ("quiet", "contentment", "melancholy")[run % 3]},
+        "values": {"curiosity": 0.8, "care": 0.7},
+        "recent_memories": [
+            "I noticed rain collecting on the old bench.",
+            "Ellis showed me a carefully repaired wooden joint.",
+        ],
+        "known_places": places,
+        "usable_resources": {},
+        "known_people": people,
+        "calendar": [],
+        "permission": "Propose only; do not claim completion, spending, new property, or guaranteed attendance.",
+    }
+    request = ModelRequest(
+        capability="pathos_agency",
+        task_version="1",
+        temperature=0.9,
+        max_output_tokens=320,
+        output_schema=agency_output_schema(list(places), [], list(people)),
+        messages=(ModelMessage("user", json.dumps(context)),),
+    )
+    started = perf_counter()
+    response = None
+    findings: list[str] = []
+    text: str | None = None
+    error_code: str | None = None
+    try:
+        response = await gateway.generate(request)
+        if response.finish_reason != "stop":
+            raise ProposalRejected("incomplete", "Agency response did not finish")
+        candidate = parse_agency_candidate(response.content)
+        resolution = resolve_agency_candidate(
+            candidate,
+            proposal_id=f"benchmark-agency-{run + 1}",
+            state=PlanningState(),
+            catalog=catalog,
+            known_companion_ids=set(people),
+            actual_revision=0,
+            simulated_at=at,
+        )
+        if not resolution.accepted:
+            findings.append(resolution.code)
+        text = response.content
+    except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
+        error_code = error.code if isinstance(error, ProposalRejected) else "invalid_completion"
+    return {
+        "run": run + 1,
+        "case_id": f"open-agency-{run + 1}",
+        "role": "pathos_agency",
+        "contract_passed": text is not None,
+        "semantic_findings": findings,
+        "text": text,
+        "latency_ms": round((perf_counter() - started) * 1000, 2),
+        "prompt_tokens": response.prompt_tokens if response else None,
+        "output_tokens": response.output_tokens if response else None,
+        "error_code": error_code,
+        "model": response.resolved_model if response else getattr(gateway, "model", "unknown"),
+        "backend": response.backend if response else "unknown",
     }
