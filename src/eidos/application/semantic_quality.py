@@ -62,6 +62,13 @@ def semantic_quality_findings(
                 findings.append("forbidden_knowledge_leak")
                 break
 
+    forbidden_claims = context.get("forbidden_claims", ())
+    if isinstance(forbidden_claims, (list, tuple)):
+        for claim in forbidden_claims:
+            if isinstance(claim, str) and len(claim.strip()) >= 4 and claim.lower() in lowered:
+                findings.append("factual_contradiction")
+                break
+
     forbidden_identities = context.get("forbidden_identity_claims", ())
     if isinstance(forbidden_identities, (list, tuple)):
         for name in forbidden_identities:

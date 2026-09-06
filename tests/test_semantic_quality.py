@@ -34,6 +34,17 @@ class SemanticQualityTests(unittest.TestCase):
         self.assertIn("forbidden_knowledge_leak", findings)
         self.assertIn("near_duplicate_prose", findings)
 
+    def test_detects_explicit_claim_that_contradicts_supplied_evidence(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            "I repaired the lamp before returning home.",
+            {
+                "time": "2026-01-01T14:00:00+00:00",
+                "forbidden_claims": ["I repaired the lamp"],
+            },
+        )
+        self.assertIn("factual_contradiction", findings)
+
     def test_clean_first_person_output_has_no_warning(self):
         findings = semantic_quality_findings(
             "pathos",

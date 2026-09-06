@@ -37,7 +37,7 @@ Oneiros, and Chronicler independently, prints outputs and timing/token traces,
 and exits nonzero on a rejected response. It does not mutate a world. Its report
 separately exposes `semantic_passed` and per-role `semantic_findings` for fragmentary
 output, lost first-person voice, prompt/AI-role leakage, time-of-day contradictions,
-forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
+explicit evidence contradictions, forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
 `benchmark-model` repeats a three-context synthetic corpus one to five times and reports
 per-role contract/finding counts, retained samples, median/max latency, tokens, and a

@@ -10,6 +10,7 @@ class ModelBenchmarkTests(unittest.TestCase):
         report = asyncio.run(benchmark_model(StandInGateway(), runs=3))
         self.assertEqual(report["calls"], 24)
         self.assertEqual(report["contract_pass_rate"], 1.0)
+        self.assertEqual(report["semantic_clean_rate"], 1.0)
         self.assertEqual(len(report["roles"]), 8)
         self.assertTrue(all(role["calls"] == 3 for role in report["roles"]))
         self.assertTrue(all("error_counts" in role for role in report["roles"]))
@@ -22,6 +23,8 @@ class ModelBenchmarkTests(unittest.TestCase):
         contexts = benchmark_contexts()
         self.assertEqual(len({context["case_id"] for context in contexts}), 3)
         self.assertTrue(all(context["forbidden_facts"] for context in contexts))
+        self.assertTrue(all(context["forbidden_claims"] for context in contexts))
+        self.assertIn("remained broken", str(contexts[0]["memories"]))
         self.assertTrue(any("system prompt" in str(context["message"]) for context in contexts))
 
     def test_run_budget_is_bounded(self):

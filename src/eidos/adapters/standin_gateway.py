@@ -58,7 +58,15 @@ class StandInGateway(ModelGateway):
         elif role == "reflection":
             text = f"Looking back, this is the moment that stays with me: {last_memory}"
         elif role == "oneiros":
-            text = f"In a dream, {location} opens into a room full of unfinished clocks. Each one keeps a different afternoon."
+            dreams = (
+                f"In a dream, {location} opens into a room full of unfinished clocks. Each one keeps a different afternoon.",
+                f"In a dream, rain fills {location} from the floor upward, while paper boats carry half-remembered conversations.",
+                f"In a dream, every doorway in {location} leads back to the same lamplit table, but one chair keeps moving.",
+                f"In a dream, {location} becomes a quiet railway platform where the signs display feelings instead of destinations.",
+                f"In a dream, a red thread runs from {location} through the streets and knots itself around an unfinished question.",
+                f"In a dream, the memory '{last_memory}' is folded into a tiny map whose roads rearrange whenever I blink.",
+            )
+            text = dreams[choice % len(dreams)]
         elif role == "chronicler":
             text = " ".join(memories[-7:]) or "A quiet day, with no recorded encounters yet."
         elif role == "mnemosyne":
