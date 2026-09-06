@@ -308,7 +308,59 @@ def _return_due_loan(
         or locations.get("pathos") != item.location_id
         or locations.get(owner_id) != item.location_id
     ):
-        return []
+        if any(
+            event.kind == "object.loan_return_overdue"
+            and event.payload.get("source_loan_id") == str(loan.event_id)
+            for event in history
+        ):
+            return []
+        overdue = DomainEvent(
+            "object.loan_return_overdue",
+            "pathos",
+            {
+                "source_loan_id": str(loan.event_id),
+                "object_id": object_id,
+                "owner_id": owner_id,
+                "due_at": str(loan.payload["due_at"]),
+                "reason": "The agreed return time passed before borrower and owner met again.",
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=loan.event_id,
+            correlation_id=loan.correlation_id,
+        )
+        relationship = DomainEvent(
+            "relationship.changed",
+            "pathos",
+            {
+                "person_id": owner_id,
+                "evidence_actor_id": "pathos",
+                "trust_delta": -0.03,
+                "tension_delta": 0.04,
+                "reason": "Pathos still held a borrowed object after its agreed return time.",
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=overdue.event_id,
+            correlation_id=loan.correlation_id,
+        )
+        memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": f"I still owe {owner_id.title()} the return of {item.name if item else object_id}.",
+                "owner": "pathos",
+                "category": "commitment",
+                "source": "deterministic-consequence",
+                "source_event_id": str(overdue.event_id),
+                "object_id": object_id,
+                "person_id": owner_id,
+                "importance": 0.78,
+                "confidence": 1.0,
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=overdue.event_id,
+            correlation_id=loan.correlation_id,
+        )
+        return [overdue, relationship, memory]
     offer_id = f"return-{loan.payload['offer_id']}"
     offered = resolve_transfer_offer(
         TransferOfferProposal(

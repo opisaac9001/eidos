@@ -39,7 +39,10 @@ from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_maintenance import object_maintenance_events
-from eidos.application.object_opportunities import object_opportunity_events
+from eidos.application.object_opportunities import (
+    borrowed_object_opportunity_events,
+    object_opportunity_events,
+)
 from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
@@ -638,6 +641,9 @@ class Life:
                 "object.loan_request_declined",
                 "object.recovery_loaned",
                 "object.recovery_loan_returned",
+                "object.loan_use_planned",
+                "object.loan_use_skipped",
+                "object.loan_return_overdue",
                 "object.replacement_ordered",
                 "object.replacement_missed",
                 "object.replacement_received",
@@ -1007,6 +1013,15 @@ class Life:
             if object_opportunity:
                 self._planning(history + pending + object_opportunity)
                 pending.extend(object_opportunity)
+            borrowed_opportunity = borrowed_object_opportunity_events(
+                history + pending,
+                current,
+                expansion_catalog,
+                self._planning(history + pending),
+            )
+            if borrowed_opportunity:
+                self._planning(history + pending + borrowed_opportunity)
+                pending.extend(borrowed_opportunity)
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)

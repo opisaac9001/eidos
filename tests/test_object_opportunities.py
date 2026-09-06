@@ -1,7 +1,10 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.object_opportunities import object_opportunity_events
+from eidos.application.object_opportunities import (
+    borrowed_object_opportunity_events,
+    object_opportunity_events,
+)
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
@@ -129,6 +132,116 @@ class ObjectOpportunityTests(unittest.TestCase):
         self.assertTrue(all(entry.status == "failed" for entry in final.calendar.values()))
         self.assertTrue(all(item.status == "abandoned" for item in final.intentions.values()))
         self.assertEqual(next(iter(final.goals.values())).status, "abandoned")
+
+    def test_borrowed_substitute_gets_bounded_real_use_before_return(self):
+        registered = DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "borrowed-cart",
+                "name": "Borrowed handcart",
+                "owner_id": "mara",
+                "custodian_id": "pathos",
+                "location_id": "park",
+                "condition": "usable",
+            },
+        )
+        loaned = DomainEvent(
+            "object.recovery_loaned",
+            "pathos",
+            {
+                "offer_id": "cart-loan",
+                "object_id": "borrowed-cart",
+                "owner_id": "mara",
+                "due_at": (self.now + timedelta(days=3)).isoformat(),
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        history = [registered, loaned]
+        planned = borrowed_object_opportunity_events(
+            history,
+            self.now,
+            project_world_catalog(history),
+            project_planning(history),
+        )
+        state = project_planning([*history, *planned])
+        self.assertIn("object.loan_use_planned", [event.kind for event in planned])
+        self.assertEqual(len(state.calendar), 2)
+        self.assertTrue(
+            all(
+                entry.resource_id == "borrowed-cart"
+                and datetime.fromisoformat(str(entry.ends_at))
+                <= datetime.fromisoformat(str(loaned.payload["due_at"]))
+                for entry in state.calendar.values()
+            )
+        )
+        for entry in list(state.calendar.values()):
+            completed = scheduled_activity_events(
+                state,
+                actor_location_id="park",
+                simulated_at=datetime.fromisoformat(entry.starts_at),
+                actual_revision=len(history) + len(planned),
+            )
+            history.extend(completed)
+            state = project_planning([registered, loaned, *planned, *history[2:]])
+        self.assertEqual(state.goals["use-borrowed-cart-loan"].status, "achieved")
+
+    def test_too_short_loan_does_not_imply_use_that_cannot_fit(self):
+        registered = DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "short-loan",
+                "name": "Short loan",
+                "owner_id": "mara",
+                "custodian_id": "pathos",
+                "location_id": "park",
+                "condition": "usable",
+            },
+        )
+        loaned = DomainEvent(
+            "object.recovery_loaned",
+            "pathos",
+            {
+                "offer_id": "short",
+                "object_id": "short-loan",
+                "owner_id": "mara",
+                "due_at": (self.now + timedelta(hours=2)).isoformat(),
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        events = borrowed_object_opportunity_events(
+            [registered, loaned],
+            self.now,
+            project_world_catalog([registered, loaned]),
+            project_planning([registered, loaned]),
+        )
+        self.assertEqual([event.kind for event in events], ["object.loan_use_skipped"])
+
+    def test_distinct_replacement_can_enter_normal_object_choice(self):
+        for index in range(300):
+            registration = DomainEvent(
+                "object.registered",
+                "pathos",
+                {
+                    "object_id": f"replacement-{index}",
+                    "name": "Replacement handcart",
+                    "owner_id": "community",
+                    "custodian_id": "community",
+                    "location_id": "park",
+                    "condition": "good",
+                    "source": "replacement-lifecycle",
+                },
+            )
+            events = self.evaluate(registration)
+            if any(
+                event.kind == "object.opportunity_evaluated"
+                and event.payload["decision"] == "pursue"
+                for event in events
+            ):
+                self.assertTrue(project_planning([registration, *events]).goals)
+                return
+        self.fail("No deterministic replacement fixture became a project")
 
     def _find_decision(
         self,

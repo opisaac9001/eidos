@@ -38,7 +38,10 @@ def object_opportunity_events(
             event
             for event in history
             if event.kind == "object.registered"
-            and event.payload.get("entity_kind") == "object"
+            and (
+                event.payload.get("entity_kind") == "object"
+                or event.payload.get("source") == "replacement-lifecycle"
+            )
             and str(event.event_id) not in considered
         ),
         None,
@@ -160,6 +163,124 @@ def object_opportunity_events(
     return events
 
 
+def borrowed_object_opportunity_events(
+    history: Sequence[DomainEvent],
+    simulated_at: datetime,
+    catalog: WorldCatalog,
+    planning: PlanningState,
+) -> list[DomainEvent]:
+    """Fit actual use of a consented temporary substitute before its return date."""
+    handled = {
+        str(event.payload["source_loan_id"])
+        for event in history
+        if event.kind in {"object.loan_use_planned", "object.loan_use_skipped"}
+    }
+    loan = next(
+        (
+            event
+            for event in history
+            if event.kind == "object.recovery_loaned" and str(event.event_id) not in handled
+        ),
+        None,
+    )
+    if loan is None:
+        return []
+    object_id = str(loan.payload["object_id"])
+    item = planning.objects.get(object_id)
+    due_at = datetime.fromisoformat(str(loan.payload["due_at"]))
+    windows = (
+        feasible_activity_windows(planning, simulated_at, catalog, item.location_id, count=2)
+        if item is not None
+        and item.custodian_id == "pathos"
+        and item.location_id in catalog.places
+        and item.condition in {"good", "usable", "repaired"}
+        else []
+    )
+    windows = [window for window in windows if window + timedelta(hours=1) <= due_at]
+    offer_id = str(loan.payload["offer_id"])
+    correlation = f"use-borrowed-{offer_id}"
+    marker = DomainEvent(
+        "object.loan_use_planned" if len(windows) == 2 else "object.loan_use_skipped",
+        "pathos",
+        {
+            "source_loan_id": str(loan.event_id),
+            "offer_id": offer_id,
+            "object_id": object_id,
+            "reason": (
+                "Two feasible uses fit before the agreed return time."
+                if len(windows) == 2
+                else "The temporary loan did not leave two honest use windows."
+            ),
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=loan.event_id,
+        correlation_id=correlation,
+    )
+    if len(windows) != 2 or item is None:
+        return [marker]
+    events = [
+        marker,
+        DomainEvent(
+            "goal.activated",
+            "pathos",
+            {
+                "goal_id": correlation,
+                "title": f"Use the borrowed {item.name} before returning it",
+                "motivation": "Make bounded practical use of a temporary, consented substitute.",
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=marker.event_id,
+            correlation_id=correlation,
+        ),
+    ]
+    for number, starts_at in enumerate(windows, 1):
+        events.append(
+            DomainEvent(
+                "schedule.created",
+                "pathos",
+                {
+                    "schedule_id": f"{correlation}-session-{number}",
+                    "title": f"Use borrowed {item.name}",
+                    "starts_at": starts_at.isoformat(),
+                    "ends_at": (starts_at + timedelta(hours=1)).isoformat(),
+                    "location_id": item.location_id,
+                    "actor_id": "pathos",
+                    "action": ActionKind.ATTEND.value,
+                    "target_id": object_id,
+                    "resource_id": object_id,
+                    "goal_id": correlation,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=marker.event_id,
+                correlation_id=correlation,
+            )
+        )
+    projected = planning
+    for event in events:
+        projected = projected.apply(event)
+    for number in range(1, 3):
+        intention = resolve_intention(
+            IntentionProposal(
+                f"intend-{correlation}-session-{number}",
+                f"{correlation}-session-{number}-intention",
+                "pathos",
+                ActionKind.ATTEND,
+                f"Use {item.name} within the explicitly limited loan.",
+                0.72,
+                len(history) + len(events),
+                goal_id=correlation,
+                target_id=object_id,
+            ),
+            state=projected,
+            actual_revision=len(history) + len(events),
+            simulated_at=simulated_at,
+        )
+        events.extend(intention.events)
+        for event in intention.events:
+            projected = projected.apply(event)
+    return events
+
+
 def _expired_object_plan_events(
     planning: PlanningState, simulated_at: datetime
 ) -> list[DomainEvent]:
@@ -169,7 +290,7 @@ def _expired_object_plan_events(
     for entry in planning.calendar.values():
         if (
             entry.status != "scheduled"
-            or not entry.schedule_id.startswith("use-introduced-")
+            or not entry.schedule_id.startswith(("use-introduced-", "use-borrowed-"))
             or entry.ends_at is None
             or datetime.fromisoformat(entry.ends_at) >= simulated_at
         ):

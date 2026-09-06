@@ -61,6 +61,11 @@ the owner, Eidos, and the object co-present; the owner independently accepts or 
 Eidos explicitly accepts custody, and return waits for later co-presence. A replacement
 has delayed fallible handoffs and registers as a distinct object, preserving the old
 object and its history instead of laundering condition through an identity swap.
+Borrowed substitutes now create two resource-backed use sessions only when both fit
+before the agreed return time. Otherwise Eidos records that the loan was too short to
+use honestly. An overdue return changes trust and tension once and remains returnable
+when owner, borrower, and object later meet. Received replacements enter the ordinary
+curiosity/capability choice and can develop their own use and maintenance history.
 Selected delivered supplies now carry an explicit quantity, unit, and low-stock point.
 Ordinary co-located use decrements stock; Pathos can instead save it. Low stock creates
 an order-or-go-without decision, and ordered stock arrives after a delay with one retry
@@ -314,9 +319,7 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Let replacement objects and borrowed substitutes enter later projects, with explicit
-   utility matching, loan-duration pressure, and consequences for overdue returns.
-2. Let Moira propose additions to the completed sixteen-event, resource-backed
+1. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
@@ -324,11 +327,11 @@ boundaries and must not rely on emotional coercion.
    places, and Pathos can accept or decline a resource-backed project around an
    introduced object, with co-present neighbors able to join or decline and seed later
    invitations; next, let additions create broader durable world consequences.
-3. Add an optional source-attributed British-town signal adapter for weather, daylight,
+2. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
-6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
-7. Capture the Dell inventory, then benchmark and pin its private inference stack.
-8. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
+3. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
+4. Capture the Dell inventory, then benchmark and pin its private inference stack.
+5. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
    repeated prose, and low-quality but schema-valid model output.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,

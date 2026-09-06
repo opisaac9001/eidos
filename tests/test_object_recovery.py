@@ -103,6 +103,23 @@ class ObjectRecoveryTests(unittest.TestCase):
                 return
         self.fail("No deterministic fixture produced declined loan consent")
 
+    def test_overdue_return_changes_relationship_once_but_can_still_be_completed(self):
+        person = NPCState("mara", location_id="workshop", energy=1.0, connection=1.0, purpose=1.0)
+        history, events = self._find("seek_loan", substitute=True, person=person)
+        combined = [*history, *events]
+        loaned = next(event for event in events if event.kind == "object.recovery_loaned")
+        due = datetime.fromisoformat(str(loaned.payload["due_at"]))
+        away_owner = NPCState("mara", location_id="home", energy=1.0, connection=1.0, purpose=1.0)
+        overdue = self.recover(combined, person=away_owner, at=due)
+        self.assertEqual(
+            [event.kind for event in overdue],
+            ["object.loan_return_overdue", "relationship.changed", "memory.recorded"],
+        )
+        combined.extend(overdue)
+        self.assertEqual(self.recover(combined, person=away_owner, at=due), [])
+        returned = self.recover(combined, person=person, at=due.replace(hour=11))
+        self.assertIn("object.recovery_loan_returned", [event.kind for event in returned])
+
     def test_replacement_arrives_as_distinct_object_without_rewriting_original(self):
         history, events = self._find("replace", substitute=False, reliability=1.0)
         order = next(event for event in events if event.kind == "object.replacement_ordered")

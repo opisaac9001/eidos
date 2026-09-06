@@ -200,7 +200,10 @@ network authorization; the server remains loopback-only until authenticated depl
   or order a replacement. Loans require owner/object/Pathos co-presence, independent
   owner consent, Pathos's acceptance, custody tracking, and eventual co-present return.
   Replacements have two fallible handoffs and arrive under a new identity while the
-  original remains broken or retired.
+  original remains broken or retired. A loan becomes useful only if two real sessions
+  fit before its return date; otherwise Eidos explicitly skips the project. Late returns
+  create remembered trust and tension consequences once, but remain returnable later.
+  Received replacements enter the same pursue-or-decline project choice as new objects.
 - Delivered seeds, repair materials, drawing paper, and tea are finite stocks rather
   than decorative names. Pathos may use or save one when awake and co-located with it.
   Low stock produces an explicit order-or-go-without choice; an order has a delayed

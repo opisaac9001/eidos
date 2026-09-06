@@ -406,6 +406,17 @@ Receipt registers a new object ID with `replacement_for` provenance while the or
 condition stays broken or retired. Thus continuity queries can distinguish two physical
 objects even when one functionally succeeds the other.
 
+An accepted recovery loan is not treated as useful merely because custody changed. On
+the following planning pass, two open, conflict-free, resource-backed sessions must both
+end before the recorded return time. If they cannot, a sourced skip marker is recorded
+and no goal is implied. If they can, ordinary travel and action validation govern both
+uses. A due loan that cannot be returned because the participants are apart creates one
+overdue fact, directed trust/tension change, and memory; it does not transfer custody or
+repeat punishment hourly. Later co-presence can still complete the normal return.
+Replacement registrations are eligible for the ordinary object-opportunity evaluator
+and later wear rules, so a replacement has a new independent history rather than serving
+as a terminal success flag.
+
 Consumability is explicit object state, never inferred for every object. Qualifying
 delivered supplies register a non-negative quantity, reorder point, and unit; legacy
 objects retain null stock fields. When awake at the object's location, Pathos makes one

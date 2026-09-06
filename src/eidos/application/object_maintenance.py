@@ -27,7 +27,11 @@ def object_maintenance_events(
     registrations = {
         str(event.payload["object_id"]): event
         for event in history
-        if event.kind == "object.registered" and event.payload.get("entity_kind") == "object"
+        if event.kind == "object.registered"
+        and (
+            event.payload.get("entity_kind") == "object"
+            or event.payload.get("source") == "replacement-lifecycle"
+        )
     }
     maintained = {
         str(event.payload["object_id"])
