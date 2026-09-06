@@ -43,7 +43,7 @@ def npc_belief_events(
         location_id = perception.payload.get("location_id")
         if (
             perception.kind != "perception.recorded"
-            or perception.payload.get("source_kind") != "world_event"
+            or perception.payload.get("source_kind") not in {"world_event", "world_thread"}
             or not isinstance(owner, str)
             or owner == "pathos"
             or owner not in npc_state.people
@@ -51,6 +51,7 @@ def npc_belief_events(
             or str(perception.event_id) in used_evidence
         ):
             continue
+        continuing = perception.payload.get("source_kind") == "world_thread"
         belief_id = f"{owner}-{location_id}-community-activity"
         resolution = resolve_belief(
             BeliefProposal(
@@ -59,7 +60,11 @@ def npc_belief_events(
                 owner_id=owner,
                 subject_id=location_id,
                 predicate="community_activity",
-                object_value="neighbors gather here",
+                object_value=(
+                    "a neighborhood event is still developing"
+                    if continuing
+                    else "neighbors gather here"
+                ),
                 confidence=0.85,
                 evidence_event_id=perception.event_id,
                 expected_revision=len(history) + len(output),

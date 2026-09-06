@@ -55,6 +55,30 @@ class AppraisalTests(unittest.TestCase):
         self.assertGreater(updated.mastery, state.mastery)
         self.assertEqual(events[0].causation_id, source.event_id)
 
+    def test_unperceived_world_fact_does_not_change_pathos_but_owned_memory_does(self):
+        occurred = DomainEvent(
+            "world_event.occurred",
+            "pathos",
+            {"simulated_at": self.now.isoformat()},
+        )
+        state = PathosState(curiosity=0.4)
+        events, unchanged = appraisal_events([occurred], state, self.now)
+        self.assertEqual(events, [])
+        self.assertEqual(unchanged, state)
+        memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "owner": "pathos",
+                "source": "direct-perception",
+                "category": "world-thread",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        events, changed = appraisal_events([occurred, memory], state, self.now)
+        self.assertEqual(events[0].causation_id, memory.event_id)
+        self.assertGreater(changed.curiosity, state.curiosity)
+
     def test_sleep_recovers_rest_while_waking_hours_create_need_pressure(self):
         sleeping = PathosState(rest=0.4)
         night_events, rested = sleep_and_need_events(

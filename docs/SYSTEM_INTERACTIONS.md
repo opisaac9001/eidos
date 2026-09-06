@@ -495,6 +495,9 @@ pacing—extends once for two days before resolving. Every transition cites the 
 stage and replay rejects early, stale, source-changing, or fabricated transitions.
 The operator sees these world facts. An actor receives a perception, and Pathos a
 memory, only when physically present at the thread's place for that transition.
+Pathos appraises the owned direct-perception memory rather than the global occurrence;
+an unwitnessed event cannot alter his needs or mood. A co-present resident may instead
+form or revise their own private belief from their owned thread perception.
 Events from worlds created before this lifecycle are left alone once their opening
 hour has passed; upgrading does not manufacture aftermath in the present.
 

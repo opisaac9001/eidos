@@ -194,6 +194,19 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
             "park": ("curiosity", 0.05, 0.35, 0.35, 0.8),
             "workshop": ("mastery", 0.04, 0.4, 0.25, 0.85),
         }.get(location)
+    if (
+        event.kind == "memory.recorded"
+        and event.payload.get("owner") == "pathos"
+        and event.payload.get("source") == "direct-perception"
+        and event.payload.get("category") in {"world-event", "world-thread"}
+    ):
+        return (
+            "curiosity",
+            0.03 if event.payload.get("category") == "world-event" else 0.02,
+            0.35,
+            0.5 if event.payload.get("category") == "world-event" else 0.3,
+            0.55,
+        )
     if event.kind == "npc.encountered":
         return ("connection", 0.05, 0.4, 0.45, 0.6)
     if event.kind == "social.activity_completed":
@@ -213,8 +226,6 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", -0.08, -0.75, 0.3, 0.65)
     if event.kind == "goal.achieved":
         return ("mastery", 0.08, 0.8, 0.4, 0.9)
-    if event.kind == "world_event.occurred":
-        return ("curiosity", 0.03, 0.35, 0.5, 0.55)
     if event.kind == "incident.response_completed":
         return ("connection", 0.04, 0.45, 0.55, 0.75)
     if event.kind in {"incident.response_declined", "incident.response_abandoned"}:
