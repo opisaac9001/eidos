@@ -68,6 +68,14 @@ Backup creation refuses to overwrite an existing file. A verified backup can be
 opened directly with `--database` to prove that the event history replays before
 it is promoted during a recovery.
 
+Downtime is never simulated automatically. To preview and explicitly run a bounded
+catch-up (maximum seven days), or resume one interrupted between atomic chunks:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 catch-up --hours 48
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 resume-catch-up
+```
+
 Python 3.12 or newer is required. With mise installed:
 
 ```bash

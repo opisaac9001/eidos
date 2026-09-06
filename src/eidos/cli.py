@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -23,6 +24,9 @@ def main() -> None:
     commands.add_parser("probe-model", help="Test every performer against the configured model")
     advance = commands.add_parser("advance", help="Advance an authored simulated routine")
     advance.add_argument("--hours", type=float, default=24)
+    catch_up = commands.add_parser("catch-up", help="Explicitly catch up at most seven days")
+    catch_up.add_argument("--hours", type=float, required=True)
+    commands.add_parser("resume-catch-up", help="Resume an interrupted catch-up session")
     commands.add_parser("journal", help="Read accepted autobiographical events")
     backup = commands.add_parser("backup", help="Create a verified online SQLite backup")
     backup.add_argument("--output", type=Path, required=True)
@@ -103,6 +107,12 @@ def main() -> None:
             return
         if args.command == "advance":
             simulation.advance(args.hours)
+        elif args.command == "catch-up":
+            preview = simulation.preview_catch_up(args.hours)
+            print(json.dumps({"preview": asdict(preview)}, indent=2))
+            simulation.catch_up(args.hours)
+        elif args.command == "resume-catch-up":
+            simulation.resume_catch_up()
         state = simulation.project(simulation.history())
         print(
             json.dumps(

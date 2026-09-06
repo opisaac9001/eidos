@@ -2,9 +2,9 @@
 
 import asyncio
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from eidos.application.appraisal import (
     affect_episode_events,
@@ -13,6 +13,7 @@ from eidos.application.appraisal import (
     sleep_and_need_events,
 )
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
+from eidos.application.catchup import CatchUpPreview, active_catch_up, preview_catch_up
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
@@ -300,6 +301,89 @@ class Life:
         ):
             raise ValueError("Advance must be greater than zero and at most 24 hours")
         asyncio.run(self._advance(hours))
+
+    def preview_catch_up(self, hours: float) -> CatchUpPreview:
+        history = self.history()
+        return preview_catch_up(history, self.project(history).simulated_at, hours)
+
+    def catch_up(self, hours: float) -> None:
+        history = self.history()
+        if active_catch_up(history) is not None:
+            raise ValueError("A catch-up session is already active; resume it instead")
+        preview = preview_catch_up(history, self.project(history).simulated_at, hours)
+        catch_up_id = str(uuid4())
+        started = DomainEvent(
+            "catch_up.started",
+            "pathos",
+            {
+                "catch_up_id": catch_up_id,
+                "starts_at": preview.starts_at,
+                "target_at": preview.ends_at,
+                "hours": preview.hours,
+                "simulated_at": preview.starts_at,
+            },
+            correlation_id=catch_up_id,
+        )
+        self.store.append("pathos", [started], len(history))
+        self._resume_catch_up(
+            catch_up_id, datetime.fromisoformat(preview.ends_at), started.event_id
+        )
+
+    def resume_catch_up(self) -> None:
+        history = self.history()
+        session = active_catch_up(history)
+        if session is None:
+            raise ValueError("There is no active catch-up session")
+        self._resume_catch_up(
+            session.catch_up_id,
+            datetime.fromisoformat(session.target_at),
+            UUID(session.start_event_id),
+        )
+
+    def _resume_catch_up(self, catch_up_id: str, target: datetime, cause: UUID) -> None:
+        while True:
+            history = self.history()
+            current = self.project(history).simulated_at
+            if current >= target:
+                break
+            hours = min(24.0, (target - current).total_seconds() / 3600)
+            self.advance(hours)
+            after = self.history()
+            through = self.project(after).simulated_at
+            self.store.append(
+                "pathos",
+                [
+                    DomainEvent(
+                        "catch_up.chunk_completed",
+                        "pathos",
+                        {
+                            "catch_up_id": catch_up_id,
+                            "through": through.isoformat(),
+                            "simulated_at": through.isoformat(),
+                        },
+                        causation_id=cause,
+                        correlation_id=catch_up_id,
+                    )
+                ],
+                len(after),
+            )
+        history = self.history()
+        self.store.append(
+            "pathos",
+            [
+                DomainEvent(
+                    "catch_up.completed",
+                    "pathos",
+                    {
+                        "catch_up_id": catch_up_id,
+                        "simulated_at": target.isoformat(),
+                    },
+                    causation_id=cause,
+                    correlation_id=catch_up_id,
+                )
+            ],
+            len(history),
+        )
 
     async def _advance(self, hours: float) -> None:
         history = self.history()

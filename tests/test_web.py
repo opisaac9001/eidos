@@ -167,6 +167,20 @@ class WebTests(unittest.TestCase):
         self.assertEqual(snapshot["pathos"]["location_id"], "cafe")
         self.assertEqual(len(snapshot["conversations"]), 2)
 
+    def test_catch_up_requires_explicit_preview_and_request(self):
+        before = self.runtime.snapshot()["time"]
+        status, body = self.request("GET", "/api/catch-up/preview?hours=2")
+        preview = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(preview["hours"], 2.0)
+        self.assertEqual(self.runtime.snapshot()["time"], before)
+        status, body = self.request("POST", "/api/catch-up", {"hours": 2})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["time"], preview["ends_at"])
+        self.assertTrue(
+            any(event.kind == "catch_up.completed" for event in self.runtime.life.history())
+        )
+
     def test_restart_restores_time_but_requires_explicit_resume(self):
         self.runtime.close()
         with self.runtime.lock:

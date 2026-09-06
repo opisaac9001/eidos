@@ -52,7 +52,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption/reschedule and social deadline negotiation | P3 |
 | PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: proposed/accepted/rejected action audit | P3 |
-| PLAN-07 | Bounded catch-up, meaningful decisions, interval summaries | Planned: restart pauses | P5 |
+| PLAN-07 | Bounded catch-up, meaningful decisions, interval summaries | Partial: explicit seven-day preview/chunks/restart resume; no automatic downtime | P5 |
 
 ## World — Firmament / Moira
 

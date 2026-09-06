@@ -173,6 +173,18 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
             path = urlsplit(self.path).path
             if path == "/api/state":
                 self.respond(200, runtime.snapshot())
+            elif path == "/api/catch-up/preview":
+                try:
+                    query = parse_qs(urlsplit(self.path).query)
+                    hours = float(query.get("hours", ["24"])[0])
+                    with runtime.lock:
+                        preview = runtime.life.preview_catch_up(hours)
+                    self.respond(
+                        200,
+                        {name: getattr(preview, name) for name in preview.__dataclass_fields__},
+                    )
+                except (ValueError, TypeError) as error:
+                    self.respond(400, {"error": str(error)})
             elif path == "/api/events":
                 try:
                     query = parse_qs(urlsplit(self.path).query)
@@ -242,6 +254,10 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         runtime.life.configure(body["running"], body["minutes_per_tick"])
                     elif self.path == "/api/step":
                         runtime.life.advance(body.get("hours", 1))
+                    elif self.path == "/api/catch-up":
+                        runtime.life.catch_up(body.get("hours", 24))
+                    elif self.path == "/api/catch-up/resume":
+                        runtime.life.resume_catch_up()
                     elif self.path == "/api/chat":
                         text_value = body.get("text")
                         request_id = body.get("request_id")
