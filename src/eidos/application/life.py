@@ -62,6 +62,7 @@ from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import PlanningState, project_planning
+from eidos.domain.relationships import RelationshipState, project_relationships
 from eidos.domain.routine import beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import (
     SceneEndProposal,
@@ -122,6 +123,7 @@ class Life:
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
         self._planning_cache: tuple[int, str, PlanningState] | None = None
         self._belief_cache: tuple[int, str, BeliefState] | None = None
+        self._relationship_cache: tuple[int, str, RelationshipState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -325,6 +327,49 @@ class Life:
             )
         )
 
+    def _relationships(self, history: list[DomainEvent]) -> RelationshipState:
+        if self._relationship_cache is not None:
+            revision, anchor, relationships = self._relationship_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    relationships = relationships.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._relationship_cache = (len(history), anchor, relationships)
+                return relationships
+        if isinstance(self.store, MaterializedProjectionStore):
+            projection = self.store.load_projection("pathos", "relationships", 1, len(history))
+            if projection is not None:
+                try:
+                    relationships = RelationshipState.from_materialized_state(projection.state)
+                    for event in history[projection.revision :]:
+                        relationships = relationships.apply(event)
+                    anchor = str(history[-1].event_id) if history else ""
+                    self._relationship_cache = (len(history), anchor, relationships)
+                    return relationships
+                except (KeyError, TypeError, ValueError):
+                    pass
+        relationships = project_relationships(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._relationship_cache = (len(history), anchor, relationships)
+        return relationships
+
+    def _save_relationships(self, history: list[DomainEvent]) -> None:
+        if not history or not isinstance(self.store, MaterializedProjectionStore):
+            return
+        relationships = self._relationships(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "relationships",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                relationships.materialized_state(),
+            )
+        )
+
     @staticmethod
     def project(history: list[DomainEvent]) -> PathosState:
         state = PathosState()
@@ -344,15 +389,7 @@ class Life:
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
-        relationships: dict[str, dict[str, Any]] = {
-            person.person_id: {
-                "encounters": 0,
-                "trust": 0.3,
-                "familiarity": 0.2,
-                "tension": 0.0,
-            }
-            for person in catalog.people.values()
-        }
+        relationship_state = self._relationships(history)
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
@@ -389,19 +426,6 @@ class Life:
                 config.update(payload)
             elif event.kind == "world.weather":
                 weather = payload["text"]
-            elif event.kind == "npc.encountered":
-                person_id = payload["person_id"]
-                relationships[person_id]["encounters"] += 1
-                relationships[person_id]["familiarity"] = min(
-                    1.0, relationships[person_id]["familiarity"] + 0.01
-                )
-            elif event.kind == "relationship.changed":
-                relation = relationships[payload["person_id"]]
-                for dimension in ("trust", "familiarity", "tension"):
-                    relation[dimension] = max(
-                        0.0,
-                        min(1.0, relation[dimension] + float(payload.get(f"{dimension}_delta", 0))),
-                    )
             elif event.kind == "concern.opened":
                 concerns[payload["concern_id"]] = {**item, "status": "active"}
             elif event.kind == "concern.resolved" and payload["concern_id"] in concerns:
@@ -532,7 +556,10 @@ class Life:
                 "description": person.description,
                 "introduced": person.introduced,
                 "location_id": npc_state.people[person.person_id].location_id,
-                **relationships[person.person_id],
+                "encounters": relationship_state.for_person(person.person_id).encounters,
+                "trust": relationship_state.for_person(person.person_id).trust,
+                "familiarity": relationship_state.for_person(person.person_id).familiarity,
+                "tension": relationship_state.for_person(person.person_id).tension,
             }
             for person in catalog.people.values()
         ]
@@ -1077,6 +1104,7 @@ class Life:
                     pathos_awake=state.awake,
                     pathos_energy=state.energy,
                     social_openness=phone_bias.social_openness,
+                    relationships=self._relationships(history + pending).relationships,
                 )
             )
             pending.extend(
@@ -1451,6 +1479,7 @@ class Life:
         self._save_memory_index(committed)
         self._save_planning(committed)
         self._save_beliefs(committed)
+        self._save_relationships(committed)
         await self._respond_to_due_messages()
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
@@ -1934,6 +1963,7 @@ class Life:
         self._save_memory_index(committed)
         self._save_planning(committed)
         self._save_beliefs(committed)
+        self._save_relationships(committed)
 
 
 def vars_for(value: Any) -> dict[str, Any]:

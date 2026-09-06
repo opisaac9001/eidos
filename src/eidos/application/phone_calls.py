@@ -7,6 +7,7 @@ from hashlib import sha256
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
     SceneResumeProposal,
@@ -25,6 +26,7 @@ def phone_call_events(
     pathos_awake: bool,
     pathos_energy: float = 0.5,
     social_openness: float = 0.5,
+    relationships: Mapping[str, Relationship] | None = None,
 ) -> list[DomainEvent]:
     """Advance existing calls, then allow one unmet connection goal to cause a call."""
     output = _complete_answered_call(
@@ -80,7 +82,23 @@ def phone_call_events(
         None,
     )
     sample = int(sha256(call_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
-    answer_threshold = 0.25 + 0.35 * social_openness + 0.2 * pathos_energy
+    relationship = (
+        relationships.get(caller_id, Relationship(caller_id))
+        if relationships is not None
+        else Relationship(caller_id)
+    )
+    relationship_pull = (
+        0.12 * (relationship.trust - 0.3)
+        + 0.08 * (relationship.familiarity - 0.2)
+        - 0.15 * relationship.tension
+    )
+    answer_threshold = max(
+        0.05,
+        min(
+            0.95,
+            0.25 + 0.35 * social_openness + 0.2 * pathos_energy + relationship_pull,
+        ),
+    )
     answer = sample < answer_threshold
     if scene is not None and not answer:
         output.extend(
@@ -93,6 +111,9 @@ def phone_call_events(
                         "reason": "Pathos chose not to leave the current conversation.",
                         "decision_energy": pathos_energy,
                         "decision_social_openness": social_openness,
+                        "decision_trust": relationship.trust,
+                        "decision_familiarity": relationship.familiarity,
+                        "decision_tension": relationship.tension,
                         "simulated_at": simulated_at.isoformat(),
                     },
                     causation_id=received.event_id,
@@ -122,6 +143,9 @@ def phone_call_events(
             "scene_id": scene.scene_id if scene else None,
             "decision_energy": pathos_energy,
             "decision_social_openness": social_openness,
+            "decision_trust": relationship.trust,
+            "decision_familiarity": relationship.familiarity,
+            "decision_tension": relationship.tension,
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=received.event_id,

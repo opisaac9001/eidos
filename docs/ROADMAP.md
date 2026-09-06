@@ -60,9 +60,10 @@ goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
 Their option vocabulary remains bounded rather than generally autonomous. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Planning and
-actor-owned beliefs now do the same with ordered, semantically checked disposable
-snapshots so restarts preserve exact presentation order. Relationship and
-consolidation projections still rebuild from event history.
+actor-owned beliefs and directed relationships now do the same with ordered,
+semantically checked disposable snapshots so restarts preserve exact presentation
+order. Relationship state also influences whether Pathos interrupts a live visit to
+answer someone else's call. Consolidation still rebuilds from event history.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -255,9 +256,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend materialization beyond the completed incremental memory, planning, and
-   belief projections into the remaining high-cost relationship and consolidation
-   projections.
+1. Extend materialization beyond the completed incremental memory, planning, belief,
+   and relationship projections into the remaining high-cost consolidation view.
 2. Expand the completed perception- and need-driven NPC goal loop with more personal
    projects, competing priorities, interruption, and relationship-motivated choices.
 3. Generalize the now-integrated four-turn interruption/resume scene into recurring

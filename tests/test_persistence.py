@@ -178,6 +178,17 @@ class PersistenceTests(unittest.TestCase):
         restarted = Life(SQLiteEventStore(self.path), StandInGateway())
         self.assertEqual(restarted._beliefs(history), project_beliefs(history))
 
+    def test_life_materializes_relationships_at_the_committed_revision(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(24)
+        history = life.history()
+        projection = self.store.load_projection("pathos", "relationships", 1, len(history))
+        self.assertIsNotNone(projection)
+        assert projection is not None
+        self.assertEqual(projection.revision, len(history))
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        self.assertEqual(restarted.snapshot()["people"], life.snapshot()["people"])
+
     def test_checkpoint_refuses_an_unmatched_or_backward_anchor(self) -> None:
         events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]
         self.store.append("pathos", events, 0)

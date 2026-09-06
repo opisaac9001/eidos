@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from eidos.application.phone_calls import phone_call_events
 from eidos.domain.events import DomainEvent
+from eidos.domain.relationships import Relationship
 
 
 class PhoneCallTests(unittest.TestCase):
@@ -103,6 +104,38 @@ class PhoneCallTests(unittest.TestCase):
         )
         self.assertTrue(any(event.kind == "phone.call_completed" for event in second))
         self.assertTrue(any(event.kind == "scene.resumed" for event in second))
+
+    def test_relationship_can_change_whether_pathos_leaves_current_company(self):
+        scene = self.scene()
+        warm = {"mara": Relationship("mara", trust=1.0, familiarity=1.0)}
+        strained = {"mara": Relationship("mara", trust=0.0, familiarity=0.0, tension=1.0)}
+        for index in range(100):
+            goal = self.goal(f"relationship-{index}")
+            warm_events = phone_call_events(
+                [goal, scene],
+                self.now,
+                2,
+                actor_locations=self.locations,
+                pathos_awake=True,
+                relationships=warm,
+            )
+            strained_events = phone_call_events(
+                [goal, scene],
+                self.now,
+                2,
+                actor_locations=self.locations,
+                pathos_awake=True,
+                relationships=strained,
+            )
+            if any(event.kind == "phone.call_answered" for event in warm_events) and any(
+                event.kind == "phone.call_declined" for event in strained_events
+            ):
+                decision = next(
+                    event for event in warm_events if event.kind == "phone.call_answered"
+                )
+                self.assertEqual(decision.payload["decision_trust"], 1.0)
+                return
+        self.fail("No stable call sample demonstrated relationship-weighted choice")
 
     def _find_visit_decision(self, kind, scene):
         for index in range(100):
