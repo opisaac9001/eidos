@@ -11,6 +11,28 @@ from eidos.domain.proposals import ProposalRejected, validate_proposal
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 
+def request_for(role: str, context: Mapping[str, object]) -> ModelRequest:
+    return ModelRequest(
+        capability=role,
+        messages=(ModelMessage("user", json.dumps(context)),),
+        output_schema={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    **(
+                        {"enum": ["Clear", "Cloudy", "Light rain", "Breezy"]}
+                        if role == "moira"
+                        else {}
+                    ),
+                }
+            },
+            "required": ["text"],
+            "additionalProperties": False,
+        },
+    )
+
+
 async def perform(
     gateway: ModelGateway,
     role: str,
@@ -23,27 +45,7 @@ async def perform(
     response = None
     try:
         response = await asyncio.wait_for(
-            gateway.generate(
-                ModelRequest(
-                    capability=role,
-                    messages=(ModelMessage("user", json.dumps(context)),),
-                    output_schema={
-                        "type": "object",
-                        "properties": {
-                            "text": {
-                                "type": "string",
-                                **(
-                                    {"enum": ["Clear", "Cloudy", "Light rain", "Breezy"]}
-                                    if role == "moira"
-                                    else {}
-                                ),
-                            }
-                        },
-                        "required": ["text"],
-                        "additionalProperties": False,
-                    },
-                )
-            ),
+            gateway.generate(request_for(role, context)),
             timeout=50,
         )
         text = validate_proposal(role, response.content, context)

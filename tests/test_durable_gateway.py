@@ -2,10 +2,12 @@ import asyncio
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from eidos.adapters.durable_gateway import DurableModelGateway
 from eidos.adapters.sqlite_jobs import SQLiteJobStore
+from eidos.application.job_runner import CognitionJobRunner
 from eidos.ports.model_gateway import ModelMessage, ModelRequest, ModelResponse
 
 
@@ -66,6 +68,33 @@ class DurableGatewayTests(unittest.TestCase):
         job = self.jobs.list_jobs()[0]
         self.assertEqual(job.status, "failed")
         self.assertEqual(job.error_code, "invalid_completion")
+
+    def test_deferred_submission_returns_before_inference_and_exposes_terminal_result(self):
+        inner = CountingGateway()
+        gateway = DurableModelGateway(inner, self.jobs, lambda _: self.revision)
+        request = self.request()
+        context = json.loads(request.messages[0].content)
+        context["deferred_kind"] = "association"
+        deferred = ModelRequest(
+            capability=request.capability,
+            messages=(ModelMessage("user", json.dumps(context)),),
+            output_schema=request.output_schema,
+        )
+        job_id = gateway.submit_deferred(deferred)
+        self.assertIsNotNone(job_id)
+        self.assertEqual(inner.calls, 0)
+        runner = CognitionJobRunner(
+            self.jobs,
+            inner,
+            lambda _: self.revision,
+            "test-worker",
+            now=lambda: datetime.now(timezone.utc),
+        )
+        runner.run_once()
+        result = gateway.deferred_results()[0]
+        self.assertEqual(result.job_id, job_id)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.result, "remembered result")
 
 
 if __name__ == "__main__":

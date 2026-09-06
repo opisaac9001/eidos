@@ -13,7 +13,7 @@ from eidos.application.cognition_supervisor import CognitionSupervisor
 from eidos.domain.jobs import CognitionJob
 from eidos.domain.proposals import validate_proposal
 from eidos.ports.job_store import JobConflict, JobStore
-from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
+from eidos.ports.model_gateway import DeferredModelResult, ModelGateway, ModelRequest, ModelResponse
 
 
 class DurableModelGateway(ModelGateway):
@@ -47,28 +47,7 @@ class DurableModelGateway(ModelGateway):
         return "model:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
-        context_value = json.loads(request.messages[-1].content)
-        if not isinstance(context_value, dict):
-            raise ValueError("Durable model context must be an object")
-        context: dict[str, object] = context_value
-        aggregate_id = "pathos"
-        revision = self.revision_for(aggregate_id)
-        now = datetime.now(timezone.utc)
-        job = self.jobs.enqueue(
-            CognitionJob(
-                capability=request.capability,
-                aggregate_id=aggregate_id,
-                context=context,
-                expected_revision=revision,
-                simulated_at=str(context.get("time", "unknown")),
-                priority=90 if request.capability == "pathos" else 50,
-                idempotency_key=self._key(request, context),
-                job_id=UUID(str(request.correlation_id)),
-                created_at=now,
-                available_at=now,
-                deadline_at=now + timedelta(seconds=60 if request.capability == "pathos" else 120),
-            )
-        )
+        job = self._enqueue(request)
         if self.supervisor is not None:
             self.supervisor.start()
         if job.status == "completed" and job.result is not None:
@@ -83,17 +62,45 @@ class DurableModelGateway(ModelGateway):
             return await self._await_result(job.job_id)
         if self.supervisor is not None:
             return await self._await_result(job.job_id)
+        return await self._run_inline(request, job)
+
+    def _enqueue(self, request: ModelRequest) -> CognitionJob:
+        context_value = json.loads(request.messages[-1].content)
+        if not isinstance(context_value, dict):
+            raise ValueError("Durable model context must be an object")
+        context: dict[str, object] = context_value
+        aggregate_id = "pathos"
+        revision = self.revision_for(aggregate_id)
+        now = datetime.now(timezone.utc)
+        return self.jobs.enqueue(
+            CognitionJob(
+                capability=request.capability,
+                aggregate_id=aggregate_id,
+                context=context,
+                expected_revision=revision,
+                simulated_at=str(context.get("time", "unknown")),
+                priority=90 if request.capability == "pathos" else 50,
+                idempotency_key=self._key(request, context),
+                job_id=UUID(str(request.correlation_id)),
+                created_at=now,
+                available_at=now,
+                deadline_at=now + timedelta(seconds=60 if request.capability == "pathos" else 120),
+            )
+        )
+
+    async def _run_inline(self, request: ModelRequest, job: CognitionJob) -> ModelResponse:
+        now = datetime.now(timezone.utc)
         claimed = self.jobs.claim_job(job.job_id, self.worker_id, now, timedelta(seconds=60))
-        if self.revision_for(aggregate_id) != claimed.expected_revision:
+        if self.revision_for(job.aggregate_id) != claimed.expected_revision:
             self.jobs.fail(job.job_id, self.worker_id, "stale_context")
             raise OSError("World changed before inference")
         try:
             response = await self.inner.generate(request)
-            text = validate_proposal(request.capability, response.content, context)
+            text = validate_proposal(request.capability, response.content, dict(job.context))
             if job.deadline_at is not None and datetime.now(timezone.utc) >= job.deadline_at:
                 self.jobs.expire_deadlines(datetime.now(timezone.utc))
                 raise TimeoutError("Inference result arrived after its deadline")
-            if self.revision_for(aggregate_id) != claimed.expected_revision:
+            if self.revision_for(job.aggregate_id) != claimed.expected_revision:
                 self.jobs.fail(job.job_id, self.worker_id, "stale_context")
                 raise OSError("World changed during inference")
             self.jobs.complete(job.job_id, self.worker_id, text)
@@ -113,6 +120,30 @@ class DurableModelGateway(ModelGateway):
             if latest and latest.status == "running":
                 self.jobs.fail(job.job_id, self.worker_id, "invalid_completion")
             raise
+
+    def submit_deferred(self, request: ModelRequest) -> UUID | None:
+        try:
+            job = self._enqueue(request)
+        except JobConflict:
+            return None
+        if self.supervisor is not None:
+            self.supervisor.start()
+        return job.job_id
+
+    def deferred_results(self) -> list[DeferredModelResult]:
+        return [
+            DeferredModelResult(
+                job.job_id,
+                job.capability,
+                job.context,
+                job.status,
+                job.result,
+                job.error_code,
+            )
+            for job in self.jobs.list_jobs(limit=1000)
+            if job.context.get("deferred_kind") is not None
+            and job.status in {"completed", "failed", "cancelled"}
+        ]
 
     async def _await_result(self, job_id: UUID) -> ModelResponse:
         while True:

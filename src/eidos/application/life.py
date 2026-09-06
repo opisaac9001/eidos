@@ -4,6 +4,7 @@ import asyncio
 import math
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 from eidos.application.appraisal import (
     affect_episode_events,
@@ -12,7 +13,7 @@ from eidos.application.appraisal import (
     sleep_and_need_events,
 )
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
-from eidos.application.cognition import perform
+from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
@@ -41,7 +42,7 @@ from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.event_store import EventStore
-from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.model_gateway import DeferredModelGateway, ModelGateway, ModelRequest
 
 
 def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
@@ -300,7 +301,8 @@ class Life:
         target = state.simulated_at + timedelta(hours=hours)
         if target <= state.simulated_at:
             raise ValueError("Advance is smaller than clock precision")
-        pending = []
+        pending = _deferred_cognition_events(self.gateway, history, state.simulated_at.isoformat())
+        deferred_requests: list[ModelRequest] = []
         if not project_identity(history).established:
             pending.append(identity_established_event(state.simulated_at.isoformat()))
         beats = dict(beats_between(state.simulated_at, target))
@@ -474,7 +476,30 @@ class Life:
                     )
                     pending.extend(resolution.events)
             if 7 <= current.hour < 23:
-                text = await perform(self.gateway, "murmur", context, at, pending)
+                if isinstance(self.gateway, DeferredModelGateway) and selected_context:
+                    source = selected_context[0]
+                    importance = float(source.event.payload.get("importance", 0.5))
+                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if concerns_now else 0))
+                    cue = (
+                        source.matched_terms[0]
+                        if source.matched_terms
+                        else str(source.event.payload.get("category", state.location_id))
+                    )
+                    deferred_requests.append(
+                        request_for(
+                            "murmur",
+                            {
+                                **context,
+                                "deferred_kind": "association",
+                                "source_memory_id": str(source.event.event_id),
+                                "cue": cue,
+                                "salience": salience,
+                            },
+                        )
+                    )
+                    text = None
+                else:
+                    text = await perform(self.gateway, "murmur", context, at, pending)
                 if text and selected_context:
                     source = selected_context[0]
                     importance = float(source.event.payload.get("importance", 0.5))
@@ -650,6 +675,9 @@ class Life:
                 pending.extend(consolidation_events(history + pending, current))
         pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
         self.store.append("pathos", pending, expected_revision=len(history))
+        if isinstance(self.gateway, DeferredModelGateway):
+            for request in deferred_requests:
+                self.gateway.submit_deferred(request)
 
     def configure(self, running: bool, minutes_per_tick: int) -> None:
         if (
@@ -839,3 +867,112 @@ class Life:
 
 def vars_for(value: Any) -> dict[str, Any]:
     return {name: getattr(value, name) for name in value.__dataclass_fields__}
+
+
+def _deferred_cognition_events(
+    gateway: ModelGateway, history: list[DomainEvent], simulated_at: str
+) -> list[DomainEvent]:
+    if not isinstance(gateway, DeferredModelGateway):
+        return []
+    settled = {
+        str(event.payload["job_id"])
+        for event in history
+        if event.kind in {"cognition.result_applied", "cognition.result_discarded"}
+    }
+    output: list[DomainEvent] = []
+    for result in gateway.deferred_results():
+        job_id = str(result.job_id)
+        if job_id in settled:
+            continue
+
+        def discard(code: str, cause: UUID | None = None) -> DomainEvent:
+            return DomainEvent(
+                "cognition.result_discarded",
+                "pathos",
+                {
+                    "job_id": job_id,
+                    "capability": result.capability,
+                    "code": code,
+                    "simulated_at": simulated_at,
+                },
+                causation_id=cause,
+                correlation_id=job_id,
+            )
+
+        if result.status != "completed" or result.result is None:
+            failed = DomainEvent(
+                "role.failed",
+                "pathos",
+                {
+                    "role": result.capability,
+                    "text": f"Deferred {result.capability} work was not applied.",
+                    "error_code": result.error_code or result.status,
+                    "simulated_at": simulated_at,
+                    "trace_id": job_id,
+                },
+            )
+            output.extend(
+                (
+                    failed,
+                    discard(result.error_code or result.status, failed.event_id),
+                )
+            )
+            continue
+        if result.context.get("deferred_kind") != "association":
+            output.append(discard("unsupported_deferred_kind"))
+            continue
+        try:
+            source_memory_id = UUID(str(result.context["source_memory_id"]))
+            cue = str(result.context["cue"])
+            salience = float(result.context["salience"])
+        except (KeyError, TypeError, ValueError):
+            output.append(discard("invalid_deferred_context"))
+            continue
+        completed = DomainEvent(
+            "role.completed",
+            "pathos",
+            {
+                "role": result.capability,
+                "simulated_at": simulated_at,
+                "status": "ok",
+                "trace_id": job_id,
+                "latency_ms": 0,
+                "model": getattr(gateway, "model", "unknown"),
+                "backend": "deferred-worker",
+            },
+        )
+        output.append(completed)
+        association = resolve_association(
+            AssociationProposal(
+                proposal_id=f"deferred-association-{job_id}",
+                actor_id="pathos",
+                source_memory_id=source_memory_id,
+                cue=cue,
+                text=result.result,
+                salience=salience,
+                expected_revision=len(history) + len(output),
+            ),
+            history=[*history, *output],
+            actual_revision=len(history) + len(output),
+            simulated_at=simulated_at,
+        )
+        output.extend(association.events)
+        terminal = association.events[-1]
+        output.append(
+            DomainEvent(
+                "cognition.result_applied"
+                if association.accepted
+                else "cognition.result_discarded",
+                "pathos",
+                {
+                    "job_id": job_id,
+                    "capability": result.capability,
+                    "code": association.code,
+                    "simulated_at": simulated_at,
+                },
+                causation_id=terminal.event_id,
+                correlation_id=job_id,
+            )
+        )
+        settled.add(job_id)
+    return output

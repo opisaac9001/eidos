@@ -23,8 +23,9 @@ The critic has conservative contract checks, not general semantic understanding.
 The durable SQLite job store and isolated runner are implemented and tested for
 priority, concurrent claims, leases, bounded retry, cancellation and stale
 results before/after inference. Normal CLI and browser model paths use the queue
-through a durable gateway decorator with supervised background workers. Callers still
-await their requested result; detached optional-effect reconciliation remains pending.
+through a durable gateway decorator with supervised background workers. Optional
+Murmur associations submit after the authoritative tick and are revalidated and
+reconciled idempotently later; other callers still await their requested result.
 Explainable term/entity/goal/relationship recall is implemented; vector retrieval and
 outside tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
