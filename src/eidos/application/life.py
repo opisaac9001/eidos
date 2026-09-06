@@ -37,6 +37,7 @@ from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
+from eidos.application.object_opportunities import object_opportunity_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
@@ -619,6 +620,8 @@ class Life:
                 "transfer.response_rejected",
                 "object.custody_changed",
                 "object.ownership_changed",
+                "object.opportunity_evaluated",
+                "object.used",
                 "catch_up.summarized",
                 "catch_up.cancelled",
             }:
@@ -964,6 +967,18 @@ class Life:
                     self._planning(history + pending),
                 )
             )
+            object_opportunity = object_opportunity_events(
+                history + pending,
+                current,
+                expansion_catalog,
+                self._planning(history + pending),
+                curiosity=state.curiosity,
+                mastery=state.mastery,
+                values=project_identity(history + pending).values,
+            )
+            if object_opportunity:
+                self._planning(history + pending + object_opportunity)
+                pending.extend(object_opportunity)
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)

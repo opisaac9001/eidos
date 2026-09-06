@@ -40,7 +40,10 @@ need-driven goals, travel there during the day, and can complete validated activ
 there rather than being silently folded into the seed cast's routines. Pathos now
 turns an introduced place into a source-linked, two-visit exploration goal, fits it
 around existing plans and travel, physically goes there, and completes it through
-the ordinary action resolver.
+the ordinary action resolver. Introduced useful objects can likewise become optional
+two-session projects according to Pathos's current curiosity, mastery, and stable
+values. Their sessions require the real shared object at its projected location and
+end in completion, refusal, or explicit access failure rather than narrated success.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,
@@ -289,14 +292,15 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Let useful-object choices and shared social consequences spread beyond the completed
-   urgent-incident lifecycle into general projects, invitations, and ordinary events.
+1. Propagate useful-object consequences into invitations, shared activities, and
+   maintenance or consumption lifecycles instead of ending after individual use.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
    feasibility. Pathos and introduced NPCs now form bounded goals that select new
-   places; next, let social consequences and useful-object choices do the same.
+   places, and Pathos can accept or decline a resource-backed project around an
+   introduced object; next, let additions create broader shared consequences.
 3. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.

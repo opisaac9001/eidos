@@ -95,6 +95,8 @@ const labels = {
   "transfer.response_rejected": "OBJECT TRANSFER BLOCKED",
   "object.custody_changed": "OBJECT HANDED OVER",
   "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
+  "object.opportunity_evaluated": "A USEFUL OBJECT CONSIDERED",
+  "object.used": "AN OBJECT USED",
   "catch_up.summarized": "WHILE YOU WERE AWAY",
   "catch_up.cancelled": "CATCH-UP CANCELLED",
   "commitment.renegotiation_offered": "NEW PROMISE TERMS OFFERED",

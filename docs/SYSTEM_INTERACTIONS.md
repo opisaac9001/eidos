@@ -358,6 +358,15 @@ cast. New objects enter ordinary ownership/condition planning. New places and th
 routes appear in the world catalog and observatory. This is what lets the world expand
 without turning every model sentence into hidden state.
 
+An introduced object is evaluated once against Pathos's current curiosity and mastery
+plus stable curiosity and craft values. Declining records the choice without silently
+creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows
+at the object's actual location. Each session goes through the normal intention and
+action resolver, which permits a community-held object only for co-located attendance
+and rejects missing or unusable resources. Successful use is an explicit sourced event
+and memory; two completed sessions achieve the goal. Expired inaccessible sessions and
+their intentions fail before the goal is abandoned, preserving a complete causal trail.
+
 Examples include a neighborhood gathering, workshop delay, weather disruption,
 request for help, or opportunity related to an existing goal.
 Each needs cause, prerequisites, lead time, affected entities, likely duration,

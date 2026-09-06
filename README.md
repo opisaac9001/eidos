@@ -185,6 +185,11 @@ network authorization; the server remains loopback-only until authenticated depl
   can register a new person, useful object, or connected place after strict identity,
   collision, location, route, hours, and layout checks. Existing databases project
   the original world unchanged; accepted additions are ordinary replayable events.
+  Pathos independently weighs whether a newly introduced useful object fits his
+  curiosity, capability, and values. If it does, he schedules two feasible visits,
+  must physically reach the shared object while it remains usable, and learns through
+  ordinary validated actions; he may also decline, or explicitly abandon the project
+  when access fails.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

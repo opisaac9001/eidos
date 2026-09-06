@@ -278,9 +278,18 @@ def resolve_action(
             resource = state.objects.get(schedule.resource_id)
             if resource is None:
                 return reject("missing_resource", "The scheduled resource does not exist")
-            if resource.custodian_id != proposal.actor_id:
+            shared_at_site = (
+                proposal.action is ActionKind.ATTEND
+                and resource.owner_id == "community"
+                and resource.custodian_id == "community"
+            )
+            if resource.custodian_id != proposal.actor_id and not shared_at_site:
                 return reject("resource_unavailable", "The actor does not hold the resource")
-            if resource.location_id != actor_location_id or resource.condition == "broken":
+            if resource.location_id != actor_location_id or resource.condition not in {
+                "good",
+                "usable",
+                "repaired",
+            }:
                 return reject("resource_unavailable", "The resource is not usable at this place")
         starts_at = datetime.fromisoformat(schedule.starts_at)
         ends_at = datetime.fromisoformat(schedule.ends_at) if schedule.ends_at else starts_at

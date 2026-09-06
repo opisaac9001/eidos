@@ -43,7 +43,7 @@ def exploration_plan_events(
     place = catalog.places.get(place_id)
     if place is None:
         return []
-    windows = _feasible_windows(planning, simulated_at, catalog, place_id, count=2)
+    windows = feasible_activity_windows(planning, simulated_at, catalog, place_id, count=2)
     if len(windows) != 2:
         return []
     goal_id = f"explore-{place_id}"
@@ -140,7 +140,7 @@ def planned_activity_beat(
     )
 
 
-def _feasible_windows(
+def feasible_activity_windows(
     planning: PlanningState,
     simulated_at: datetime,
     catalog: WorldCatalog,

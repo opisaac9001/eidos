@@ -79,6 +79,20 @@ def scheduled_activity_events(
                 correlation_id=correlation,
             )
 
+        if entry.resource_id is not None:
+            output.append(
+                consequence(
+                    "object.used",
+                    {
+                        "object_id": entry.resource_id,
+                        "schedule_id": entry.schedule_id,
+                        "action": action.value,
+                        "location_id": entry.location_id,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                )
+            )
+
         if entry.commitment_id is not None:
             fulfilled = consequence(
                 "commitment.fulfilled",
@@ -107,6 +121,7 @@ def scheduled_activity_events(
                 "source": "deterministic-consequence",
                 "source_event_id": str(activity.event_id),
                 "goal_id": entry.goal_id,
+                "object_id": entry.resource_id,
                 "location_id": entry.location_id,
                 "importance": 0.7,
                 "confidence": 1.0,

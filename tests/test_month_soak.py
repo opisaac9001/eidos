@@ -196,6 +196,42 @@ class MonthSoakTests(unittest.TestCase):
             self.assertIn("nina-vale", {person["id"] for person in snapshot["people"]})
             self.assertIn("old-glasshouse", {place["id"] for place in snapshot["locations"]})
             self.assertIn("blue-handcart", {item["object_id"] for item in snapshot["objects"]})
+            handcart_registration = next(
+                event
+                for event in events
+                if event.kind == "object.registered"
+                and event.payload.get("object_id") == "blue-handcart"
+            )
+            handcart_choice = next(
+                event
+                for event in events
+                if event.kind == "object.opportunity_evaluated"
+                and event.payload.get("object_id") == "blue-handcart"
+            )
+            self.assertEqual(handcart_choice.causation_id, handcart_registration.event_id)
+            if handcart_choice.payload["decision"] == "pursue":
+                handcart_goal = next(
+                    goal
+                    for goal in snapshot["goals"]
+                    if goal["goal_id"] == "use-introduced-blue-handcart"
+                )
+                self.assertEqual(
+                    (handcart_goal["status"], handcart_goal["progress"]),
+                    ("achieved", 1.0),
+                )
+                self.assertEqual(
+                    sum(
+                        event.kind == "object.used"
+                        and event.payload.get("object_id") == "blue-handcart"
+                        for event in events
+                    ),
+                    2,
+                )
+            else:
+                self.assertNotIn(
+                    "use-introduced-blue-handcart",
+                    {goal["goal_id"] for goal in snapshot["goals"]},
+                )
 
 
 if __name__ == "__main__":
