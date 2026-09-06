@@ -9,23 +9,31 @@ from urllib.request import Request, urlopen
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 ROLE_PROMPTS = {
-    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied memories, beliefs, mood, and location. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
+    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied memories, beliefs, mood, and location. Dream inspirations are temporary possibilities from fiction, never facts or completed actions. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
     "murmur": "Write one quiet first-person association grounded in the supplied location and memories. Do not introduce new factual events or actions.",
     "firmament": "Describe one brief encounter between Pathos and the named person at the supplied location. Use only these actors. This is a proposed fictional scene.",
     "moira": "Choose exactly one weather value: Clear, Cloudy, Light rain, or Breezy. The text field must contain only that value.",
     "mnemosyne": "Copy the supplied experience verbatim into the text field. This is a factual memory record; add nothing and omit nothing.",
-    "reflection": "Write one first-person reflection on a supplied memory. Do not add events, people, or places. Express interpretation rather than new facts.",
+    "reflection": "Write one first-person reflection on a supplied memory. Dream inspirations are temporary possibilities from fiction, not evidence or actions. Do not add events, people, or places. Express interpretation rather than new facts.",
     "oneiros": "Write a brief surreal dream inspired by the supplied memories and location. Begin with 'In a dream'. It is explicitly fiction, never factual memory.",
     "chronicler": "Summarize only the supplied memories in two sentences. Do not invent events, people, places, or causality.",
 }
 
 ROLE_FIELDS = {
-    "pathos": ("message", "time", "location", "mood", "memories", "beliefs"),
+    "pathos": (
+        "message",
+        "time",
+        "location",
+        "mood",
+        "memories",
+        "beliefs",
+        "dream_inspirations",
+    ),
     "murmur": ("time", "location", "memories"),
     "firmament": ("time", "location", "person"),
     "moira": ("time", "location"),
     "mnemosyne": ("experience",),
-    "reflection": ("memories",),
+    "reflection": ("memories", "dream_inspirations"),
     "oneiros": ("location", "memories", "concern"),
     "chronicler": ("memories",),
 }

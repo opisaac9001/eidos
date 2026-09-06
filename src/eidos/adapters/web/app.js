@@ -68,6 +68,7 @@ const labels = {
   "commitment.renegotiation_declined": "NEW PROMISE TERMS DECLINED",
   "commitment.renegotiated": "PROMISE RETIMED",
   "schedule.retimed": "PLAN RETIMED",
+  "dream.inspiration_considered": "A DREAM-LINKED POSSIBILITY",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -418,6 +419,11 @@ function render(next) {
   $("latest-thought").textContent = thought
     ? `“${thought.text}”`
     : "The day is just beginning.";
+  const inspiration = state.dream_inspirations?.[0];
+  $("dream-inspiration").hidden = !inspiration;
+  $("dream-inspiration").textContent = inspiration
+    ? `A dream left a temporary possibility—not a fact or plan: ${inspiration.suggestion}`
+    : "";
   $("energy-value").textContent = `${Math.round(state.pathos.energy * 100)}%`;
   $("energy-meter").style.width = `${state.pathos.energy * 100}%`;
   $("valence-value").textContent =

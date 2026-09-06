@@ -2,10 +2,49 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.state import PathosState
+
+
+@dataclass(frozen=True, slots=True)
+class DreamInspiration:
+    source_dream_id: str
+    motif: str
+    suggestion: str
+    expires_at: str
+
+
+def active_dream_inspirations(
+    events: Sequence[DomainEvent], simulated_at: datetime
+) -> list[DreamInspiration]:
+    """Project unexpired, explicitly non-authoritative ideas from recalled dreams."""
+
+    if simulated_at.utcoffset() is None:
+        raise ValueError("Dream inspiration projection requires an aware time")
+    inspirations: dict[str, DreamInspiration] = {}
+    dismissed: set[str] = set()
+    for event in events:
+        if event.kind == "dream.inspiration_considered":
+            dream_id = str(event.payload["source_dream_id"])
+            if dream_id in inspirations:
+                raise ValueError("A dream can create at most one waking inspiration")
+            inspirations[dream_id] = DreamInspiration(
+                dream_id,
+                str(event.payload["motif"]),
+                str(event.payload["suggestion"]),
+                str(event.payload["expires_at"]),
+            )
+        elif event.kind == "dream.inspiration_dismissed":
+            dismissed.add(str(event.payload["source_dream_id"]))
+    return [
+        item
+        for dream_id, item in inspirations.items()
+        if dream_id not in dismissed and datetime.fromisoformat(item.expires_at) > simulated_at
+    ]
 
 
 def active_concerns(events: list[DomainEvent]) -> list[DomainEvent]:
@@ -135,16 +174,42 @@ def waking_dream_events(
         if event.kind == "dream.recorded" and str(event.event_id) == dream_id
     )
     delta = max(-0.12, min(0.12, float(effect.payload["valence_delta"])))
+    waking_at = datetime.fromisoformat(simulated_at)
+    motif = str(dream.payload.get("motif", "unfinished_time"))
+    recalled = DomainEvent(
+        "dream.recalled",
+        "pathos",
+        {
+            "text": "A dream lingered after waking.",
+            "simulated_at": simulated_at,
+            "source_dream_id": dream_id,
+        },
+        causation_id=dream.event_id,
+        correlation_id=dream.correlation_id,
+    )
+    suggestion = {
+        "light": "Consider whether something unfinished needs patient attention.",
+        "mending": "Consider making time for careful repair or practice.",
+        "growth": "Consider spending attentive time outdoors.",
+        "companionship": "Consider whether a quiet social follow-up would feel welcome.",
+    }.get(motif, "Consider leaving a little unscheduled room today.")
+    inspiration = DomainEvent(
+        "dream.inspiration_considered",
+        "pathos",
+        {
+            "source_dream_id": dream_id,
+            "motif": motif,
+            "suggestion": suggestion,
+            "expires_at": (waking_at + timedelta(hours=12)).isoformat(),
+            "fiction_source": True,
+            "action_authority": False,
+            "simulated_at": simulated_at,
+        },
+        causation_id=recalled.event_id,
+        correlation_id=dream.correlation_id,
+    )
     return [
-        DomainEvent(
-            "dream.recalled",
-            "pathos",
-            {
-                "text": "A dream lingered after waking.",
-                "simulated_at": simulated_at,
-                "source_dream_id": dream_id,
-            },
-        ),
+        recalled,
         DomainEvent(
             "memory.recorded",
             "pathos",
@@ -179,4 +244,5 @@ def waking_dream_events(
                 "valence_delta": delta,
             },
         ),
+        inspiration,
     ]

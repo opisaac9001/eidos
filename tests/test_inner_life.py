@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from eidos.application.inner_life import (
     active_concerns,
+    active_dream_inspirations,
     dream_seed_sources,
     record_dream_events,
     waking_dream_events,
@@ -48,6 +49,14 @@ class InnerLifeTests(unittest.TestCase):
         self.assertEqual(memory.payload["category"], "dream")
         self.assertEqual(memory.payload["source_event_id"], str(dream.event_id))
         self.assertIn("I remember dreaming:", memory.payload["text"])
+        inspiration = next(
+            event for event in events if event.kind == "dream.inspiration_considered"
+        )
+        self.assertTrue(inspiration.payload["fiction_source"])
+        self.assertFalse(inspiration.payload["action_authority"])
+        at = datetime(2026, 1, 2, 7, tzinfo=timezone.utc)
+        self.assertEqual(len(active_dream_inspirations(events, at)), 1)
+        self.assertEqual(active_dream_inspirations(events, at.replace(hour=19)), [])
         self.assertEqual(waking_dream_events([dream, effect, *events], state, "later"), [])
 
     def test_dream_seeds_are_bounded_owned_source_links_without_recursive_dreams(self):

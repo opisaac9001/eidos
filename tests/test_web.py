@@ -70,6 +70,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'data-view="plans"', body)
                 self.assertIn(b'id="calendar-list"', body)
                 self.assertIn(b'id="catch-up"', body)
+                self.assertIn(b'id="dream-inspiration"', body)
             if path == "/app.js":
                 self.assertIn(b"function renderPlans()", body)
             if path == "/api/export":

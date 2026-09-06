@@ -94,7 +94,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs and complete lineage | P4 |
-| INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: explicit recall/capped effect | P4 |
+| INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: recall/capped affect + expiring non-authoritative possibility | P4 |
 | INNER-07 | Source-linked subjective/objective journals and interval summaries | Partial: factual daybook with complete source membership | P4–P5 |
 
 ## UX

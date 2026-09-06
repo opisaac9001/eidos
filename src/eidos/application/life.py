@@ -26,6 +26,7 @@ from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.inner_life import (
     active_concerns,
+    active_dream_inspirations,
     dream_seed_sources,
     record_dream_events,
     waking_dream_events,
@@ -192,6 +193,7 @@ class Life:
                 "reflection.recorded",
                 "dream.recorded",
                 "dream.recalled",
+                "dream.inspiration_considered",
                 "day.summarized",
                 "request.made",
                 "social.request_opened",
@@ -266,6 +268,7 @@ class Life:
         transfers = project_transfers(history)
         renegotiations = project_renegotiations(history)
         catch_up = active_catch_up(history)
+        inspirations = active_dream_inspirations(history, state.simulated_at)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -317,6 +320,7 @@ class Life:
             "skills": [vars_for(item) for item in development.skills.values()],
             "habits": [vars_for(item) for item in development.habits.values()],
             "concerns": list(concerns.values()),
+            "dream_inspirations": [vars_for(item) for item in inspirations],
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
             "consolidations": list(reversed(consolidations[-100:])),
@@ -601,6 +605,7 @@ class Life:
                     pending.append(event)
                     state = state.apply(event)
             planning_now = project_planning(history + pending)
+            inspirations_now = active_dream_inspirations(history + pending, current)
             active_goal_ids = {
                 goal.goal_id for goal in planning_now.goals.values() if goal.status == "active"
             }
@@ -645,6 +650,15 @@ class Life:
                         habit.habit_id: habit.strength for habit in development_now.habits.values()
                     },
                 },
+                "dream_inspirations": [
+                    {
+                        "suggestion": item.suggestion,
+                        "motif": item.motif,
+                        "fiction_source": True,
+                        "action_authority": False,
+                    }
+                    for item in inspirations_now
+                ],
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
@@ -1004,6 +1018,15 @@ class Life:
                 }
                 for belief in project_beliefs(history).beliefs.values()
                 if belief.owner_id == "pathos"
+            ],
+            "dream_inspirations": [
+                {
+                    "suggestion": item.suggestion,
+                    "motif": item.motif,
+                    "fiction_source": True,
+                    "action_authority": False,
+                }
+                for item in active_dream_inspirations(history, state.simulated_at)
             ],
         }
         pending.extend(
