@@ -9,7 +9,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
-| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention v1 + event trace migration | P1 |
+| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event v1 + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: normal paths wired; background supervision pending | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
@@ -63,7 +63,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: authored routine | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: schedules | P3 |
-| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: weather only | P5 |
+| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather pacing/causes | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Planned | P5 |
 | WORLD-08 | Seasons, recurring events, evolving projects, world packs | Planned | P6 |
 

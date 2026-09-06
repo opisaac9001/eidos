@@ -61,6 +61,10 @@ class WebTests(unittest.TestCase):
             status, body = self.request("GET", path)
             self.assertEqual(status, 200, path)
             self.assertTrue(body)
+            if path == "/api/export":
+                exported = json.loads(body)
+                self.assertEqual(exported["schema"], 2)
+                self.assertIn("correlation_id", exported["events"][0])
 
     def test_boundary_rejects_cross_origin_and_bad_requests(self):
         status, _ = self.request(

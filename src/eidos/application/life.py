@@ -14,6 +14,7 @@ from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.state import PathosState
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name, npc_location
+from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.event_store import EventStore
 from eidos.ports.model_gateway import ModelGateway
 
@@ -64,7 +65,14 @@ class Life:
         concerns = {}
         for event in history:
             payload = dict(event.payload)
-            item = {**payload, "id": str(event.event_id), "kind": event.kind}
+            item = {
+                **payload,
+                "id": str(event.event_id),
+                "kind": event.kind,
+                "schema_version": event.schema_version,
+                "causation_id": str(event.causation_id) if event.causation_id else None,
+                "correlation_id": event.correlation_id,
+            }
             if event.kind == "runtime.configured":
                 config.update(payload)
             elif event.kind == "world.weather":
@@ -246,18 +254,25 @@ class Life:
             if current.hour in (6, 12, 18):
                 text = await perform(self.gateway, "moira", context, at, pending)
                 if text:
-                    pending.append(
-                        DomainEvent(
-                            "world.weather",
-                            "pathos",
-                            {
-                                "text": text,
-                                "simulated_at": at,
-                                "source": self.mode,
-                                "role": "moira",
-                            },
-                        )
+                    proposal = WorldEventProposal(
+                        proposal_id=f"weather-{at}",
+                        director_id="moira",
+                        event_kind=WorldEventKind.WEATHER,
+                        description=text,
+                        location_id=state.location_id,
+                        starts_at=current,
+                        intensity=0.2,
+                        expected_revision=len(history) + len(pending),
+                        source=self.mode,
                     )
+                    resolution = resolve_world_event(
+                        proposal,
+                        history=history + pending,
+                        known_location_ids={str(place["id"]) for place in LOCATIONS},
+                        actual_revision=len(history) + len(pending),
+                        simulated_at=current,
+                    )
+                    pending.extend(resolution.events)
             if 7 <= current.hour < 23:
                 text = await perform(self.gateway, "murmur", context, at, pending)
                 if text:

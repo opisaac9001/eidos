@@ -171,6 +171,9 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         {
                             "id": str(e.event_id),
                             "kind": e.kind,
+                            "schema_version": e.schema_version,
+                            "causation_id": str(e.causation_id) if e.causation_id else None,
+                            "correlation_id": e.correlation_id,
                             "occurred_at": e.occurred_at.isoformat(),
                             "payload": {
                                 k: v.isoformat() if hasattr(v, "isoformat") else v
@@ -179,7 +182,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         }
                         for e in runtime.life.history()
                     ]
-                self.respond(200, {"schema": 1, "events": events})
+                self.respond(200, {"schema": 2, "events": events})
             elif path in ("/", "/app.js", "/style.css"):
                 asset = STATIC / ("index.html" if path == "/" else path[1:])
                 self.respond(

@@ -110,7 +110,8 @@ Representative contracts:
 | Waking effect is accepted | `affect.changed` / `attention.cued` | Hexus, recall and later decisions | Caps, decay, source dream ID; no direct factual update |
 | Moira proposes a neighborhood event | `world_event.scheduled` | Calendar, world, eligible observers | Plausible cause, lead time, budget and actors/resources |
 
-Names above are target contracts, not implemented API endpoints. Speech about an
+Action, intention and world-event v1 envelopes now implement the corresponding
+subset above; other names remain target contracts, not API endpoints. Speech about an
 action is different from resolving it. Events form atomic consequence batches:
 an object transfer cannot commit without the matching ownership change.
 

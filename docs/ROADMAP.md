@@ -219,7 +219,7 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend the shipped action/intention-v1 envelopes to world events and speech.
+1. Extend the shipped action/intention/world-event v1 envelopes to speech and beliefs.
 2. Move inline durable execution to supervised background workers and expose cancellation.
 3. Add entity/relationship/goal indexes and richer retrieval explanations.
 4. Generalize planning beyond the authored lamp story.
