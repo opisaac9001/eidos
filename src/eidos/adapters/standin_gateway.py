@@ -61,6 +61,116 @@ class StandInGateway(ModelGateway):
             text = context["experience"]
         elif role == "moira":
             text = ("Clear", "Cloudy", "Light rain", "Breezy")[choice % 4]
+        elif role == "moira_event":
+            palette = (
+                (
+                    "wandering_mender",
+                    "A bicycle mender sets up a folding repair stand beside the park gate after a touring strap snaps.",
+                    "park",
+                    "a broken touring strap",
+                    "usefulness",
+                    "offer help",
+                    2,
+                    0.28,
+                    5,
+                ),
+                (
+                    "misdirected_delivery",
+                    "A crate of hand-painted theatre masks is delivered to the cafe while the touring company searches the neighborhood.",
+                    "cafe",
+                    "a rain-smeared address label",
+                    "mistaken identity",
+                    "trace the owner",
+                    3,
+                    0.34,
+                    7,
+                ),
+                (
+                    "brief_power_fault",
+                    "The workshop lights begin pulsing unevenly as an old junction box warms beneath the stairwell.",
+                    "workshop",
+                    "a loose aging connection",
+                    "fragility",
+                    "investigate safely",
+                    1,
+                    0.43,
+                    4,
+                ),
+                (
+                    "injured_migrating_bird",
+                    "A tired ringed swift settles beneath the park noticeboard after being driven inland by the wind.",
+                    "park",
+                    "an unexpected coastal wind",
+                    "care",
+                    "find local expertise",
+                    4,
+                    0.31,
+                    6,
+                ),
+                (
+                    "forgotten_recording",
+                    "A pocket recorder found behind a cafe radiator plays fragments of an unfinished oral-history interview.",
+                    "cafe",
+                    "spring cleaning dislodged it",
+                    "unfinished stories",
+                    "identify the voices",
+                    2,
+                    0.37,
+                    12,
+                ),
+                (
+                    "water_main_markings",
+                    "Fresh survey marks appear outside the workshop before anyone nearby has heard about planned street work.",
+                    "workshop",
+                    "a contractor's early survey",
+                    "change",
+                    "ask what is planned",
+                    5,
+                    0.26,
+                    18,
+                ),
+                (
+                    "seedling_gift",
+                    "Someone leaves six carefully labelled tomato seedlings on the park bench with a note inviting strangers to adopt them.",
+                    "park",
+                    "a gardener raised too many",
+                    "generosity",
+                    "care for something",
+                    3,
+                    0.22,
+                    8,
+                ),
+                (
+                    "after_hours_rehearsal",
+                    "A lone cellist asks to rehearse quietly in the closed cafe because the community hall has flooded.",
+                    "cafe",
+                    "a burst pipe at the hall",
+                    "hospitality",
+                    "listen or assist",
+                    6,
+                    0.35,
+                    3,
+                ),
+            )
+            item = palette[choice % len(palette)]
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "event_type": item[0],
+                        "description": item[1],
+                        "location_id": item[2],
+                        "cause": item[3],
+                        "theme": item[4],
+                        "opportunity": item[5],
+                        "starts_in_hours": item[6],
+                        "intensity": item[7],
+                        "duration_hours": item[8],
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         else:
             raise ValueError(f"Unknown stand-in capability: {role}")
         return ModelResponse(

@@ -269,8 +269,21 @@ change Mara's trust, or supply a repair skill he has not acquired.
 
 ## 9. Moira, pacing and catch-up
 
-Moira supplies candidate circumstances: a neighborhood gathering, workshop delay,
-weather disruption, request for help, or opportunity related to an existing goal.
+Moira supplies candidate circumstances without choosing from a closed event list.
+The initial contract accepts any concise event type and asks for a specific cause,
+known place, start delay, duration, theme and opportunity. A strict parser, recent
+novelty check and world-event rules decide whether the candidate can become scheduled
+fiction. Generated prose never makes the event occur by itself. The deterministic
+sixteen-event neighborhood pack remains an offline fixture and minimum texture, not
+the production generator's creative boundary.
+
+Future proposal versions can introduce persistent actors, objects and places, but
+only by explicit entity-registration effects with collision, provenance and
+continuity checks. This is what lets the world expand without turning every model
+sentence into hidden state.
+
+Examples include a neighborhood gathering, workshop delay, weather disruption,
+request for help, or opportunity related to an existing goal.
 Each needs cause, prerequisites, lead time, affected entities, likely duration,
 visibility, stakes, cooldown and novelty/pacing cost. Kernel rules decide whether
 it can occur. Actors decide how to respond.

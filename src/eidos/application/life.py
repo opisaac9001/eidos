@@ -42,6 +42,7 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.world_improvisation import improvised_world_events
 from eidos.application.world_perception import (
     authored_community_schedule,
     community_resource_events,
@@ -74,6 +75,17 @@ from eidos.ports.event_store import (
     StateCheckpointStore,
 )
 from eidos.ports.model_gateway import DeferredModelGateway, ModelGateway, ModelRequest
+
+
+def _latest_weather(history: list[DomainEvent]) -> str:
+    return next(
+        (
+            str(event.payload["text"])
+            for event in reversed(history)
+            if event.kind == "world.weather" and "text" in event.payload
+        ),
+        "Clear",
+    )
 
 
 def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
@@ -736,6 +748,16 @@ class Life:
                 pending.extend(personal_project)
             pending.extend(
                 authored_community_schedule(history + pending, current, len(history) + len(pending))
+            )
+            pending.extend(
+                await improvised_world_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    self.gateway,
+                    season=season_for(current),
+                    weather=_latest_weather(history + pending),
+                )
             )
             npc_locations = {
                 actor_id: person.location_id

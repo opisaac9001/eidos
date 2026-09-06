@@ -15,6 +15,7 @@ from eidos.domain.proposals import ProposalRejected
 class WorldEventKind(StrEnum):
     WEATHER = "weather"
     COMMUNITY = "community"
+    AMBIENT = "ambient"
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,12 +152,11 @@ def resolve_world_event(
         return reject("unknown_location", "The proposed location does not exist")
     if proposal.starts_at < simulated_at:
         return reject("past_start", "A world event cannot begin in the past")
-    if (
-        proposal.event_kind is WorldEventKind.COMMUNITY
-        and proposal.starts_at < simulated_at + timedelta(hours=1)
+    if proposal.event_kind in {WorldEventKind.COMMUNITY, WorldEventKind.AMBIENT} and (
+        proposal.starts_at < simulated_at + timedelta(hours=1)
     ):
         return reject(
-            "insufficient_lead_time", "Community events need at least one hour of lead time"
+            "insufficient_lead_time", "Scheduled events need at least one hour of lead time"
         )
     if proposal.event_kind is WorldEventKind.WEATHER and proposal.description not in _WEATHER:
         return reject("invalid_weather", "Weather is outside the world's vocabulary")
@@ -171,7 +171,13 @@ def resolve_world_event(
     )
     if last_same is not None:
         previous = datetime.fromisoformat(str(last_same.payload["starts_at"]))
-        cooldown = timedelta(hours=6 if proposal.event_kind is WorldEventKind.WEATHER else 24)
+        cooldown = timedelta(
+            hours=6
+            if proposal.event_kind is WorldEventKind.WEATHER
+            else 48
+            if proposal.event_kind is WorldEventKind.AMBIENT
+            else 24
+        )
         if proposal.starts_at < previous + cooldown:
             return reject("cooldown", "A similar world event happened too recently")
 

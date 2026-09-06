@@ -316,11 +316,19 @@ def due_world_observations(
         for event in history
         if event.kind == "world_event.resource_linked"
     }
-    themes = {
-        str(event.payload["proposal_id"]): (
-            str(event.payload["theme"]),
-            str(event.payload["opportunity"]),
-        )
+    event_metadata = {
+        str(event.payload["proposal_id"]): {
+            key: event.payload[key]
+            for key in (
+                "theme",
+                "opportunity",
+                "event_type",
+                "cause",
+                "duration_hours",
+                "generated_fiction",
+            )
+            if key in event.payload
+        }
         for event in history
         if event.kind == "world_event.theme_linked"
     }
@@ -363,8 +371,7 @@ def due_world_observations(
                 "simulated_at": simulated_at.isoformat(),
                 "source_event_id": str(scheduled.event_id),
                 "resource_id": resource_id,
-                "theme": themes.get(proposal_id, (None, None))[0],
-                "opportunity": themes.get(proposal_id, (None, None))[1],
+                **event_metadata.get(proposal_id, {}),
             },
             causation_id=scheduled.event_id,
             correlation_id=scheduled.correlation_id,
@@ -384,8 +391,7 @@ def due_world_observations(
                     "privacy": "public",
                     "location_id": location_id,
                     "reported": False,
-                    "theme": themes.get(proposal_id, (None, None))[0],
-                    "opportunity": themes.get(proposal_id, (None, None))[1],
+                    **event_metadata.get(proposal_id, {}),
                     "simulated_at": simulated_at.isoformat(),
                 },
                 causation_id=occurred.event_id,
@@ -404,8 +410,7 @@ def due_world_observations(
                             "source": "direct-perception",
                             "source_event_id": str(perception.event_id),
                             "location_id": location_id,
-                            "theme": themes.get(proposal_id, (None, None))[0],
-                            "opportunity": themes.get(proposal_id, (None, None))[1],
+                            **event_metadata.get(proposal_id, {}),
                             "importance": float(scheduled.payload.get("intensity", 0.5)),
                             "confidence": 1.0,
                             "simulated_at": simulated_at.isoformat(),

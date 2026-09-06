@@ -23,6 +23,10 @@ the town's evolving state rather than a fixed daily content rotation.
 Invented detail is welcome inside the fiction. A model may propose a new resident,
 street incident, conversation, or opportunity; continuity rules decide whether and
 how it becomes true. The critic protects established facts and agency, not blandness.
+The authored neighborhood pack is an offline reliability floor, not a menu or a
+ceiling. Moira's event type is deliberately open vocabulary. The current first
+contract grounds invented incidents in known places; later contracts may introduce
+new people, objects and places through explicit persistent state changes.
 
 Real-world signals from a chosen British town may later inspire weather, daylight,
 public events, and local concerns. Their source and retrieval time must be retained.
@@ -162,3 +166,11 @@ The first playable arc spans seven simulated days and is designed to test:
 Success is not measured by whether every response sounds profound. Success is
 the user's sense that Pathos was somewhere before the chat opened and will still
 be somewhere after it closes.
+
+The ordinary interface is observational. A user may inspect the life but can affect
+it only by communicating with Pathos. A text enters an inbox and may wait while he
+sleeps, works, travels, speaks with someone else or simply chooses to answer later.
+When both parties arrange to be co-present, they may instead have a sustained live
+conversation. That scene remains inside the running world: Pathos can be hurried,
+decline or leave; a call, visitor, obligation or incident can interrupt it; and any
+promise to resume must survive as a real follow-up rather than a convenient reset.

@@ -94,6 +94,38 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["beliefs"][0]["status"], "contested")
         self.assertNotIn("private_operator_field", context)
 
+    def test_open_world_director_keeps_creative_temperature_and_strict_schema(self):
+        request = ModelRequest(
+            capability="moira_event",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps(
+                        {
+                            "time": "2026-01-07T18:00:00+00:00",
+                            "season": "winter",
+                            "weather": "Clear",
+                            "known_locations": ["park"],
+                            "recent_events": [],
+                            "permission": "invent fiction",
+                            "private_state": "must not pass",
+                        }
+                    ),
+                ),
+            ),
+            temperature=0.85,
+            max_output_tokens=300,
+            output_schema={"type": "object", "properties": {}},
+        )
+        asyncio.run(self.gateway.generate(request))
+        self.assertEqual(self.payload["temperature"], 0.85)
+        self.assertEqual(self.payload["max_tokens"], 300)
+        system = self.payload["messages"][0]["content"]
+        self.assertIn("conforming exactly to the supplied schema", system)
+        self.assertIn("do not select from a fixed menu", system)
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertNotIn("private_state", context)
+
     def test_incomplete_and_invalid_envelopes_rejected(self):
         self.envelope["choices"][0]["finish_reason"] = "length"
         with self.assertRaises(ValueError):

@@ -63,7 +63,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers + finite community-event resources | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans + completed bookbinding project | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted state + perception- and need-driven private goals with causal scheduled plans | P3 |
-| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather + resource-backed weekly events with lead time/cooldowns | P5 |
+| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, resource-backed events, and schema-checked open-ended Moira proposals with lead time/novelty/cooldowns | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
 | WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons + daily texture + upgradeable sixteen-event resource-backed neighborhood pack | P6 |
 
@@ -102,7 +102,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard | P5 |
-| UX-02 | Conversation: recall context, availability, uncertainty, stream/cancel/retry | Partial: chat/sidebar | P2–P3 |
+| UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: functioning immediate chat/sidebar; inbox delay and user visit scenes remain | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export + revision-cursor event API | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |
