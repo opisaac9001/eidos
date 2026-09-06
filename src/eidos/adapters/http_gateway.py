@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 ROLE_PROMPTS = {
-    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied identity, memories, beliefs, mood, location, emotion, and current mind-layer focus. Values, preferences, and behavioral traits guide voice and attention without dictating a response. Emotion and its planning bias guide tone, attention, pace, and willingness; they do not prove a cause or authorize an action. Mind-layer focus guides attention but is not a fact or completed action. Dream inspirations are temporary possibilities from fiction, never facts or completed actions. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
+    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied identity, memories, beliefs, mood, location, emotion, and current mind-layer focus. When outreach_reason is present, initiate one warm ordinary in-app message grounded in source_memory; do not mention waiting, absence, loneliness caused by the user, obligation, or notifications. Values, preferences, and behavioral traits guide voice and attention without dictating a response. Emotion and its planning bias guide tone, attention, pace, and willingness; they do not prove a cause or authorize an action. Mind-layer focus guides attention but is not a fact or completed action. Dream inspirations are temporary possibilities from fiction, never facts or completed actions. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
     "murmur": "Write one quiet first-person association grounded in the supplied location, memories, emotion, and current mind-layer focus. Emotion guides tone and association, but does not prove why it is felt. Layer focus is attention, not evidence. Do not introduce new factual events or actions.",
     "firmament": "Describe one brief encounter between Pathos and the named person at the supplied location. If scene_speaker is supplied, write only one natural line spoken by that actor to scene_audience about scene_topic, consistent with prior_turns. Use only supplied actors and facts. This is a proposed fictional scene.",
     "moira": "Choose exactly one weather value: Clear, Cloudy, Light rain, or Breezy. The text field must contain only that value.",
@@ -31,6 +31,8 @@ ROLE_FIELDS = {
         "location",
         "mood",
         "identity",
+        "outreach_reason",
+        "source_memory",
         "memories",
         "beliefs",
         "dream_inspirations",

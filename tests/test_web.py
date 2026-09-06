@@ -178,6 +178,15 @@ class WebTests(unittest.TestCase):
         self.assertEqual(snapshot["pathos"]["location_id"], "cafe")
         self.assertEqual(len(snapshot["conversations"]), 2)
 
+    def test_user_can_opt_in_and_back_out_of_in_app_outreach(self):
+        self.assertFalse(self.runtime.snapshot()["outreach"]["enabled"])
+        status, body = self.request("POST", "/api/outreach", {"enabled": True})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["outreach"]["enabled"])
+        status, body = self.request("POST", "/api/outreach", {"enabled": False})
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(body)["outreach"]["enabled"])
+
     def test_live_visit_and_immediate_exchange_work_through_http(self):
         status, body = self.request("POST", "/api/visit", {"request_id": "http-visit-1"})
         self.assertEqual(status, 200)

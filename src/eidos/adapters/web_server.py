@@ -274,6 +274,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         if not isinstance(text_value, str) or not isinstance(request_id, str):
                             raise ValueError("Chat text and request ID must be strings")
                         runtime.life.chat(text_value, request_id)
+                    elif self.path == "/api/outreach":
+                        enabled = body.get("enabled")
+                        if type(enabled) is not bool:
+                            raise ValueError("Outreach enabled must be true or false")
+                        runtime.life.configure_outreach(enabled)
                     elif self.path == "/api/visit":
                         request_id = body.get("request_id")
                         if not isinstance(request_id, str):

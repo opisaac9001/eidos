@@ -338,6 +338,15 @@ follow-up; leaving it unfinished may instead add tension. Resource use is separa
 typed and allowed only for a suitable, undamaged object whose projected location already
 matches the response site. The response never creates or teleports a convenient tool.
 
+User outreach is a local communication preference, not a simulated need. It defaults
+off and becomes eligible only after the user has initiated contact. When enabled,
+Pathos may send one in-app message at 18:00 from a cited non-dream memory, no more than
+once per 72 simulated hours. Outreach is suppressed while he owes the user a reply or
+a live visit is active, and the fixed 22:00–08:00 quiet window cannot be weakened by
+an event. The user can disable it immediately. Nothing invokes an operating-system or
+third-party notification. Output that pressures the user through absence, waiting,
+loneliness, or dependency is retained as a rejected audit result and never delivered.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

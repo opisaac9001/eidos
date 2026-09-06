@@ -59,6 +59,11 @@ Accepted neighborhood events now remain as replayable world threads: they progre
 sometimes continue for two more days, and resolve instead of disappearing after one
 feed item. Only co-present actors perceive later stages, and the World view shows the
 operator what is still unfolding without making Pathos omniscient.
+After the user has started a relationship, they may opt in to occasional messages
+initiated by Pathos. Outreach stays inside the local app, is grounded in one real
+Pathos-owned memory, waits while he owes a reply or is in a live visit, observes
+22:00–08:00 quiet hours and a 72-hour minimum interval, and can be disabled instantly.
+Generated absence, guilt, or dependency pressure is rejected rather than delivered.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),

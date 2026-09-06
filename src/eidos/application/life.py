@@ -50,6 +50,7 @@ from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
+from eidos.application.outreach import outreach_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
@@ -85,6 +86,7 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
+from eidos.domain.outreach import project_outreach_config
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.relationships import RelationshipState, project_relationships
 from eidos.domain.routine import RoutineBeat, beats_between, emotionally_adjusted_beat
@@ -471,6 +473,7 @@ class Life:
         world_threads = project_world_threads(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
+        outreach_config = project_outreach_config(history)
         weather = "Clear"
         relationship_state = self._relationships(history)
         roles: dict[str, dict[str, Any]] = {
@@ -797,6 +800,12 @@ class Life:
             ],
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
+            "outreach": {
+                "enabled": outreach_config.enabled,
+                "quiet_start_hour": outreach_config.quiet_start_hour,
+                "quiet_end_hour": outreach_config.quiet_end_hour,
+                "minimum_interval_hours": outreach_config.minimum_interval_hours,
+            },
             "locations": [
                 {
                     "id": place.place_id,
@@ -1948,6 +1957,15 @@ class Life:
                                     correlation_id=event.correlation_id,
                                 )
                             )
+            pending.extend(
+                await outreach_events(
+                    history + pending,
+                    current,
+                    self.gateway,
+                    pathos_awake=state.awake,
+                    context=context,
+                )
+            )
             appraisals, state = appraisal_events(history + pending, state, current)
             pending.extend(appraisals)
             episodes, state = affect_episode_events(history + pending, state, current)
@@ -1993,6 +2011,31 @@ class Life:
                     "runtime.configured",
                     "pathos",
                     {"running": running, "minutes_per_tick": minutes_per_tick},
+                )
+            ],
+            len(history),
+        )
+
+    def configure_outreach(self, enabled: bool) -> None:
+        if type(enabled) is not bool:
+            raise ValueError("Outreach enabled must be true or false")
+        history = self.history()
+        current = project_outreach_config(history)
+        if current.enabled == enabled:
+            return
+        self.store.append(
+            "pathos",
+            [
+                DomainEvent(
+                    "outreach.configured",
+                    "pathos",
+                    {
+                        "enabled": enabled,
+                        "quiet_start_hour": current.quiet_start_hour,
+                        "quiet_end_hour": current.quiet_end_hour,
+                        "minimum_interval_hours": current.minimum_interval_hours,
+                        "simulated_at": self._project_state(history).simulated_at.isoformat(),
+                    },
                 )
             ],
             len(history),

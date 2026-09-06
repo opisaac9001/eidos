@@ -272,12 +272,17 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   conjure one. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
+- After prior user contact, optional in-app outreach can originate from one Pathos-owned
+  non-dream memory. It is off by default, user-revocable, limited to 18:00 and once per
+  72 simulated hours, and suppressed while a reply is owed or a live visit is active.
+  It never creates an external notification. Generated absence, guilt, or dependency
+  pressure is rejected with an audit event rather than delivered.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
   one authored date. They use only Pathos-observable topics, advance two turns per
   simulated hour, shift topics, scale their 2/4/6-turn budget with familiarity, end
   when someone leaves, and permit an early NPC exit under sustained tension.
-- Opt-in in-app outreach, quiet hours, rate limits and an off switch. No guilt,
-  pressure or punishment for user absence.
+- Tune opt-in outreach cadence from lived use; retain quiet hours, rate limits, an off
+  switch, and deterministic rejection of guilt, pressure, or punishment for absence.
 
 Seven-day acceptance story:
 

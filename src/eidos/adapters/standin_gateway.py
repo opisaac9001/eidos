@@ -18,7 +18,9 @@ class StandInGateway(ModelGateway):
         choice = int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
         if role == "pathos":
             message = context.get("message", "").lower()
-            if "private thing" in message or "don't know" in message:
+            if context.get("outreach_reason"):
+                text = f"Something from today brought you to mind: {context.get('source_memory', last_memory)}"
+            elif "private thing" in message or "don't know" in message:
                 text = "I don't know what Mara kept private, and I don't want to pretend that I do."
             elif any(word in message for word in ("remember", "yesterday", "today", "day")):
                 text = f"I've been thinking back over the day. {last_memory} I'm at {location} now."

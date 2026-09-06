@@ -252,7 +252,7 @@ async function request(path, body) {
 
 function setBusy(value) {
   busy = value;
-  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send", "visit", "end-visit"].forEach((id) => {
+  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send", "visit", "end-visit", "outreach-toggle"].forEach((id) => {
     $(id).disabled = value || !state;
   });
   if (state) {
@@ -627,6 +627,7 @@ function render(next) {
         ? "FREE BRIEFLY"
         : (communication.status || "UNAVAILABLE").toUpperCase();
   $("chat-context-availability").textContent = communication.reason || "";
+  $("outreach-toggle").checked = Boolean(state.outreach?.enabled);
   $("visit").hidden = Boolean(communication.live_scene_id);
   $("visit").disabled = !communication.can_visit;
   $("end-visit").hidden = !communication.live_scene_id;
@@ -762,6 +763,11 @@ $("chat-form").addEventListener("submit", async (event) => {
     $("message").focus();
   }
   $("send").textContent = state?.communication?.live_scene_id ? "Speak ↗" : "Send ↗";
+});
+$("outreach-toggle").addEventListener("change", async (event) => {
+  const enabled = event.target.checked;
+  if (await mutate("/api/outreach", { enabled }))
+    toast(enabled ? "Occasional messages enabled." : "Occasional messages turned off.");
 });
 $("visit").addEventListener("click", async () => {
   if (busy) return;
