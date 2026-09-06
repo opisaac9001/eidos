@@ -55,6 +55,9 @@ class LifeTests(unittest.TestCase):
         snapshot = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
         self.assertEqual([m["speaker"] for m in snapshot["conversations"]], ["you", "pathos"])
         self.assertIn("breakfast", snapshot["conversations"][-1]["text"])
+        self.assertGreater(len(snapshot["recalls"]), 0)
+        self.assertIn("lexical_score", snapshot["recalls"][0])
+        self.assertIn("accessibility_score", snapshot["recalls"][0])
         with self.assertRaises(ValueError):
             self.life.chat("Different content", "visit-1")
 

@@ -20,7 +20,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | --- | --- | --- | --- |
 | MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: owner/source/confidence/importance | P2 |
 | MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: recent seven | P2 |
-| MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: explainable lexical cues | P2 |
+| MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: in-memory indexes + weighted explanations | P2 |
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: daybook prose | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Planned | P2 |

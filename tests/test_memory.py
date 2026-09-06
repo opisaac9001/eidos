@@ -9,7 +9,7 @@ class MemoryTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 3, 1, tzinfo=timezone.utc)
 
-    def memory(self, text, when, importance=0.5):
+    def memory(self, text, when, importance=0.5, **metadata):
         return DomainEvent(
             "memory.recorded",
             "pathos",
@@ -19,6 +19,7 @@ class MemoryTests(unittest.TestCase):
                 "owner": "pathos",
                 "importance": importance,
                 "confidence": 1.0,
+                **metadata,
             },
         )
 
@@ -70,6 +71,29 @@ class MemoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(recall([private], "key", self.now), [])
+
+    def test_entity_and_goal_indexes_explain_nonlexical_recall(self):
+        linked = self.memory(
+            "I said I would take care of it.",
+            self.now - timedelta(days=10),
+            0.7,
+            person_id="mara",
+            object_id="lamp",
+            goal_id="repair-lamp",
+        )
+        unrelated = self.memory("I said I would take care of it.", self.now, 0.7)
+        results = recall(
+            [linked, unrelated],
+            "promise",
+            self.now,
+            entity_ids={"mara", "lamp"},
+            goal_ids={"repair-lamp"},
+        )
+        self.assertEqual(results[0].event.event_id, linked.event_id)
+        self.assertEqual(results[0].matched_entities, ("lamp", "mara"))
+        self.assertEqual(results[0].matched_goals, ("repair-lamp",))
+        self.assertIn("entity link", results[0].reason)
+        self.assertAlmostEqual(sum(results[0].components.values()), results[0].score, places=3)
 
 
 if __name__ == "__main__":

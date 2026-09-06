@@ -145,9 +145,11 @@ State and the journal are rebuilt from those events. The planned schema will com
 
 The current port requires atomic appends and revision conflicts, independent of
 database engine. A PostgreSQL adapter must satisfy the same persistence tests.
-Materialized projections and vectors are not implemented yet. Durable cognition
-jobs run inline today; separate supervised workers and cancellation UX remain.
-Role traces currently record status, model/backend, latency, and a trace ID.
+Materialized projections and vectors are not implemented yet. Replay currently
+builds in-memory term, entity, and goal memory indexes with weighted recall
+explanations. Durable cognition jobs run on supervised workers with lease recovery
+and operator cancellation, although required callers still await their results.
+Role traces record status, model/backend, latency, and a trace ID.
 
 ## Model contract
 

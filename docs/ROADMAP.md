@@ -221,7 +221,7 @@ boundaries and must not rely on emotional coercion.
 
 1. Extend the shipped action/intention/world-event v1 envelopes to speech and beliefs.
 2. Add job deadlines/backpressure and detach optional result application from callers.
-3. Add entity/relationship/goal indexes and richer retrieval explanations.
+3. Persist the in-memory entity/goal memory indexes and add relationship/diversity indexes.
 4. Generalize planning beyond the authored lamp story.
 5. Make the lamp request a bounded accept/decline/negotiate scene.
 6. Add appraisal, needs and choice policy around dream residue.

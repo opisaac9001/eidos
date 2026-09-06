@@ -8,7 +8,7 @@ from typing import Any
 from eidos.application.cognition import perform
 from eidos.application.first_story import story_events
 from eidos.application.inner_life import active_concerns, waking_dream_events
-from eidos.application.memory import memory_view, recall
+from eidos.application.memory import memory_view, recall, terms
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
@@ -60,7 +60,7 @@ class Life:
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
-        memories, feed, conversations = [], [], []
+        memories, feed, conversations, recalls = [], [], [], []
         diagnostics = []
         concerns = {}
         for event in history:
@@ -113,6 +113,8 @@ class Life:
                 memories.append(item)
             if event.kind == "conversation.message":
                 conversations.append(item)
+            if event.kind == "memory.accessed":
+                recalls.append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -169,6 +171,7 @@ class Life:
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
+            "recalls": list(reversed(recalls[-100:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
             "mode": self.mode,
@@ -240,15 +243,32 @@ class Life:
                 for event in waking:
                     pending.append(event)
                     state = state.apply(event)
-            memories = [
-                e.payload["text"] for e in history + pending if e.kind == "memory.recorded"
-            ][-7:]
+            planning_now = project_planning(history + pending)
+            active_goal_ids = {
+                goal.goal_id for goal in planning_now.goals.values() if goal.status == "active"
+            }
+            concerns_now = active_concerns(history + pending)
+            recall_query = " ".join(
+                [
+                    location_name(state.location_id),
+                    *(str(concern.payload["text"]) for concern in concerns_now[-2:]),
+                    *(planning_now.goals[goal_id].title for goal_id in active_goal_ids),
+                ]
+            )
+            selected_context = recall(
+                history + pending,
+                recall_query,
+                current,
+                7,
+                entity_ids={state.location_id},
+                goal_ids=active_goal_ids,
+            )
+            memories = [item.event.payload["text"] for item in selected_context]
             context = {
                 "location": location_name(state.location_id),
                 "time": at,
                 "memories": memories,
             }
-            concerns_now = active_concerns(history + pending)
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
             if current.hour in (6, 12, 18):
@@ -343,6 +363,7 @@ class Life:
                                         "source": "source-archive" if recovered else self.mode,
                                         "source_event_id": str(encounter.event_id),
                                         "location_id": state.location_id,
+                                        "person_id": person["id"],
                                         "role": "source-archive" if recovered else "mnemosyne",
                                         "owner": "pathos",
                                         "importance": 0.75,
@@ -454,7 +475,31 @@ class Life:
                 },
             )
         ]
-        selected = recall(history, text.strip(), state.simulated_at, 7)
+        query_terms = terms(text)
+        planning = project_planning(history)
+        entity_ids = {
+            str(entity["id"])
+            for entity in (*PEOPLE, *LOCATIONS)
+            if terms(str(entity["name"])) & query_terms or str(entity["id"]) in query_terms
+        }
+        entity_ids.update(
+            item.object_id
+            for item in planning.objects.values()
+            if terms(item.name) & query_terms or item.object_id in query_terms
+        )
+        goal_ids = {
+            goal.goal_id
+            for goal in planning.goals.values()
+            if goal.status == "active" and terms(goal.title) & query_terms
+        }
+        selected = recall(
+            history,
+            text.strip(),
+            state.simulated_at,
+            7,
+            entity_ids=entity_ids,
+            goal_ids=goal_ids,
+        )
         context = {
             "message": text.strip(),
             "time": at,
@@ -471,6 +516,14 @@ class Life:
                     "simulated_at": at,
                     "reason": item.reason,
                     "score": item.score,
+                    "lexical_score": item.components["lexical"],
+                    "entity_score": item.components["entity"],
+                    "goal_score": item.components["goal"],
+                    "accessibility_score": item.components["accessibility"],
+                    "importance_score": item.components["importance"],
+                    "confidence_score": item.components["confidence"],
+                    "matched_entity_count": len(item.matched_entities),
+                    "matched_goal_count": len(item.matched_goals),
                     "query_source": "user-conversation",
                 },
             )

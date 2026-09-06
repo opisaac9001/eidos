@@ -29,8 +29,10 @@ The Ensemble's expandable call inspector shows the latest 100 traces, model,
 backend, latency, token count when available, and outcome.
 
 Conversation context now uses explainable cue-based recall with importance,
-confidence, simulated-time accessibility decay and capped rehearsal. This is
-lexical retrieval, not semantic understanding; the audit history never fades.
+confidence, simulated-time accessibility decay and capped rehearsal. Replay-built
+term, entity and active-goal indexes contribute separately weighted scores, which
+the Memory Archive exposes for explicit conversation recalls. This is not yet
+semantic/vector retrieval; the audit history never fades.
 The authored lamp fixture exercises a goal, promise, owned intention, schedule,
 interruption and reschedule. The repair must then pass deterministic intention,
 custody, location, condition and time checks before fulfillment and its causal
