@@ -410,6 +410,9 @@ function render(next) {
   const jobCounts = state.jobs?.counts || {};
   $("job-count").textContent =
     `${jobCounts.queued || 0} queued · ${jobCounts.running || 0} running · ${jobCounts.failed || 0} failed`;
+  $("index-status").textContent = state.indexes
+    ? `${state.indexes.memory_count} memories · ${state.indexes.term_count} cues indexed at r${state.indexes.memory_revision}`
+    : "Memory index unavailable";
   if (state.runtime.error) showError(state.runtime.error);
   setBusy(busy);
   if (!changed) return;

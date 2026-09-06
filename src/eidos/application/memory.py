@@ -77,20 +77,76 @@ class MemoryIndex:
     by_entity: Mapping[str, frozenset[UUID]]
     by_goal: Mapping[str, frozenset[UUID]]
     by_relationship: Mapping[str, frozenset[UUID]]
+    access_counts: Mapping[UUID, int]
+    revision: int
 
     @classmethod
-    def build(cls, history: list[DomainEvent]) -> MemoryIndex:
-        memories = tuple(
-            event
-            for event in history
-            if event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos"
-        )
-        term_sets: dict[UUID, frozenset[str]] = {}
-        terms_map: dict[str, set[UUID]] = {}
-        entities_map: dict[str, set[UUID]] = {}
-        goals_map: dict[str, set[UUID]] = {}
-        relationships_map: dict[str, set[UUID]] = {}
-        for event in memories:
+    def build(
+        cls,
+        history: list[DomainEvent],
+        *,
+        materialized_state: Mapping[str, Any] | None = None,
+        materialized_revision: int = 0,
+        base_index: MemoryIndex | None = None,
+    ) -> MemoryIndex:
+        if base_index is not None and materialized_state is not None:
+            raise ValueError("Choose either an in-memory or materialized memory index base")
+        if base_index is not None:
+            materialized_revision = base_index.revision
+        if not 0 <= materialized_revision <= len(history):
+            raise ValueError("Materialized memory revision is outside the supplied history")
+        memories: list[DomainEvent]
+        term_sets: dict[UUID, frozenset[str]]
+        terms_map: dict[str, set[UUID]]
+        entities_map: dict[str, set[UUID]]
+        goals_map: dict[str, set[UUID]]
+        relationships_map: dict[str, set[UUID]]
+        accesses: dict[UUID, int]
+        if base_index is not None:
+            memories = list(base_index.memories)
+            term_sets = dict(base_index.terms_by_memory)
+            terms_map = {key: set(values) for key, values in base_index.by_term.items()}
+            entities_map = {key: set(values) for key, values in base_index.by_entity.items()}
+            goals_map = {key: set(values) for key, values in base_index.by_goal.items()}
+            relationships_map = {
+                key: set(values) for key, values in base_index.by_relationship.items()
+            }
+            accesses = dict(base_index.access_counts)
+        elif materialized_state is None:
+            memories = []
+            term_sets = {}
+            terms_map = {}
+            entities_map = {}
+            goals_map = {}
+            relationships_map = {}
+            accesses = {}
+            materialized_revision = 0
+        else:
+            (
+                memories,
+                term_sets,
+                terms_map,
+                entities_map,
+                goals_map,
+                relationships_map,
+                accesses,
+            ) = cls._restore(history, materialized_state, materialized_revision)
+
+        known_memory_ids = {event.event_id for event in memories}
+        for event in history[materialized_revision:]:
+            if event.kind == "memory.accessed":
+                try:
+                    memory_id = UUID(str(event.payload["memory_id"]))
+                except (KeyError, ValueError):
+                    continue
+                accesses[memory_id] = accesses.get(memory_id, 0) + 1
+                continue
+            if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
+                continue
+            if event.event_id in known_memory_ids:
+                raise ValueError("Materialized memory index contains a duplicate memory")
+            memories.append(event)
+            known_memory_ids.add(event.event_id)
             memory_terms = frozenset(terms(str(event.payload["text"])))
             term_sets[event.event_id] = memory_terms
             for term in memory_terms:
@@ -112,14 +168,122 @@ class MemoryIndex:
         def freeze(values: dict[str, set[UUID]]) -> Mapping[str, frozenset[UUID]]:
             return MappingProxyType({key: frozenset(ids) for key, ids in values.items()})
 
+        accesses = {
+            memory_id: count
+            for memory_id, count in accesses.items()
+            if memory_id in known_memory_ids
+        }
         return cls(
-            memories,
+            tuple(memories),
             MappingProxyType(term_sets),
             freeze(terms_map),
             freeze(entities_map),
             freeze(goals_map),
             freeze(relationships_map),
+            MappingProxyType(accesses),
+            len(history),
         )
+
+    @classmethod
+    def _restore(
+        cls,
+        history: list[DomainEvent],
+        state: Mapping[str, Any],
+        revision: int,
+    ) -> tuple[
+        list[DomainEvent],
+        dict[UUID, frozenset[str]],
+        dict[str, set[UUID]],
+        dict[str, set[UUID]],
+        dict[str, set[UUID]],
+        dict[str, set[UUID]],
+        dict[UUID, int],
+    ]:
+        if state.get("schema") != 1:
+            raise ValueError("Unsupported materialized memory index schema")
+        prefix = history[:revision]
+        events_by_id = {str(event.event_id): event for event in prefix}
+        raw_ids = _string_list(state.get("memory_ids"), "memory IDs")
+        try:
+            memories = [events_by_id[memory_id] for memory_id in raw_ids]
+        except KeyError as error:
+            raise ValueError("Materialized memory is outside its event prefix") from error
+        expected = [
+            event
+            for event in prefix
+            if event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos"
+        ]
+        if memories != expected:
+            raise ValueError("Materialized memories do not match their event prefix")
+        memory_ids = {event.event_id for event in memories}
+
+        raw_terms = state.get("terms_by_memory")
+        if not isinstance(raw_terms, dict) or set(raw_terms) != set(raw_ids):
+            raise ValueError("Materialized memory terms are incomplete")
+        term_sets = {
+            UUID(str(memory_id)): frozenset(_string_list(values, "memory terms"))
+            for memory_id, values in raw_terms.items()
+        }
+        if set(term_sets) != memory_ids:
+            raise ValueError("Materialized term keys do not match memories")
+
+        def restore_map(name: str) -> dict[str, set[UUID]]:
+            raw = state.get(name)
+            if not isinstance(raw, dict):
+                raise ValueError(f"Materialized {name} map is invalid")
+            restored = {
+                str(key): {UUID(item) for item in _string_list(values, name)}
+                for key, values in raw.items()
+            }
+            if any(not ids <= memory_ids for ids in restored.values()):
+                raise ValueError(f"Materialized {name} references an unknown memory")
+            return restored
+
+        raw_accesses = state.get("access_counts")
+        if not isinstance(raw_accesses, dict):
+            raise ValueError("Materialized access counts are invalid")
+        accesses: dict[UUID, int] = {}
+        for memory_id, count in raw_accesses.items():
+            parsed = UUID(str(memory_id))
+            if (
+                parsed not in memory_ids
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
+            ):
+                raise ValueError("Materialized access count is invalid")
+            accesses[parsed] = count
+        return (
+            memories,
+            term_sets,
+            restore_map("by_term"),
+            restore_map("by_entity"),
+            restore_map("by_goal"),
+            restore_map("by_relationship"),
+            accesses,
+        )
+
+    def materialized_state(self) -> Mapping[str, Any]:
+        def encode(values: Mapping[str, frozenset[UUID]]) -> dict[str, list[str]]:
+            return {
+                key: sorted(str(memory_id) for memory_id in memory_ids)
+                for key, memory_ids in values.items()
+            }
+
+        return {
+            "schema": 1,
+            "memory_ids": [str(event.event_id) for event in self.memories],
+            "terms_by_memory": {
+                str(memory_id): sorted(values) for memory_id, values in self.terms_by_memory.items()
+            },
+            "by_term": encode(self.by_term),
+            "by_entity": encode(self.by_entity),
+            "by_goal": encode(self.by_goal),
+            "by_relationship": encode(self.by_relationship),
+            "access_counts": {
+                str(memory_id): count for memory_id, count in self.access_counts.items()
+            },
+        }
 
 
 def _simulated_time(event: DomainEvent) -> datetime:
@@ -147,6 +311,7 @@ def recall(
     goal_ids: set[str] | None = None,
     relationship_ids: set[str] | None = None,
     diverse: bool = False,
+    index: MemoryIndex | None = None,
 ) -> list[RecalledMemory]:
     """Rank accessible Pathos memories without treating similarity as proof."""
     if now.utcoffset() is None or not 1 <= limit <= 1000:
@@ -155,19 +320,16 @@ def recall(
     entity_ids = entity_ids or set()
     goal_ids = goal_ids or set()
     relationship_ids = relationship_ids or set()
-    index = MemoryIndex.build(history)
-    accesses: dict[str, int] = {}
-    for event in history:
-        if event.kind == "memory.accessed":
-            memory_id = str(event.payload["memory_id"])
-            accesses[memory_id] = accesses.get(memory_id, 0) + 1
+    index = index or MemoryIndex.build(history)
+    if index.revision != len(history):
+        raise ValueError("Memory index revision does not match supplied history")
     ranked = []
     for event in index.memories:
         importance, confidence = _metadata(event)
         age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
-        rehearsals = min(5, accesses.get(str(event.event_id), 0))
+        rehearsals = min(5, index.access_counts.get(event.event_id, 0))
         accessibility = min(1.0, base_access + rehearsals * 0.04)
         matched_terms = tuple(sorted(query_terms & index.terms_by_memory[event.event_id]))
         matched_entities = tuple(
@@ -292,17 +454,21 @@ def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]
     return selected
 
 
-def memory_view(history: list[DomainEvent], now: datetime) -> list[dict[str, Any]]:
+def memory_view(
+    history: list[DomainEvent], now: datetime, *, index: MemoryIndex | None = None
+) -> list[dict[str, Any]]:
     """Return every Pathos-owned memory with current accessibility, without rehearsal."""
     owned_count = sum(
         event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos"
         for event in history
     )
+    index = index or MemoryIndex.build(history)
     ranked = recall(
         history,
         "",
         now,
         limit=min(1000, max(1, owned_count)),
+        index=index,
     )
     by_id = {str(item.event.event_id): item for item in ranked}
     views = []
@@ -324,3 +490,9 @@ def memory_view(history: list[DomainEvent], now: datetime) -> list[dict[str, Any
             }
         )
     return views
+
+
+def _string_list(value: object, name: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Materialized {name} must be a string list")
+    return value

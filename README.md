@@ -167,7 +167,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   context but have no authority to become memories or actions by themselves.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
-  consolidation. Vector retrieval remains optional and unimplemented.
+  consolidation. The recall maps are maintained as a versioned, checksummed,
+  event-anchored projection that can be discarded and rebuilt safely. Existing
+  databases migrate in place without rewriting events. Vector retrieval remains
+  optional and unimplemented.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay passes restart-spanning seven-day acceptance and thirty-day

@@ -46,6 +46,8 @@ class LifeTests(unittest.TestCase):
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
         self.assertTrue(snapshot["emotion"]["label"])
+        self.assertEqual(snapshot["indexes"]["memory_revision"], len(self.life.history()))
+        self.assertGreater(snapshot["indexes"]["memory_count"], 0)
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)
         self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))

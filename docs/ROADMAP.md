@@ -46,9 +46,9 @@ supervised durable workers and reuse completed work after restart. Pathos makes 
 narrow class of value/capacity-aware social choices; NPCs have persistent offscreen
 locations, needs, private beliefs, activities, and actor-specific private plans with
 cooldowns, deadlines, and activity-validated outcomes rather than general autonomous
-planning. Term, entity, goal, and relationship recall indexes,
-owned beliefs, conservative imperfect recall, and source-linked consolidation remain
-replay projections rather than durable database indexes.
+planning. Term, entity, goal, relationship, and rehearsal recall indexes now persist
+as a versioned disposable projection and increment from the event tail. Other
+projections, including beliefs and consolidation, still rebuild from event history.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -232,9 +232,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend the new disposable core-state checkpoint into bounded materialized index
-   maintenance so years of history do not rebuild every remaining projection and recall
-   index from the beginning.
+1. Extend materialization beyond the completed incremental memory index into the
+   remaining high-cost belief, planning, relationship, and consolidation projections.
 2. Broaden NPC goal formation beyond the first community-perception trigger and three
    authored feasible activity profiles while preserving private knowledge boundaries.
 3. Expand the new bounded scene lifecycle beyond its first integrated two-turn

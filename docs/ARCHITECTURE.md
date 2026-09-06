@@ -148,11 +148,12 @@ State and the journal are rebuilt from those events. The planned schema will com
 
 The current port requires atomic appends and revision conflicts, independent of
 database engine. A PostgreSQL adapter must satisfy the same persistence tests.
-An anchored, checksummed, disposable checkpoint now shortens core Pathos-state
-projection and falls back to full replay if it is stale or corrupt. Other projections
-and memory indexes still rebuild from history; broader materialization and vectors
-are not implemented yet. Replay currently builds in-memory term, entity, and goal
-memory indexes with weighted recall explanations. Durable cognition jobs run on
+Anchored, checksummed, disposable projections now shorten core Pathos-state replay
+and persist the memory term/entity/goal/relationship/rehearsal indexes. Both fall back
+to full replay if stale, corrupt, or semantically invalid. Schema 4 adds only the
+rebuildable projection table and leaves existing event history unchanged. Belief,
+planning, relationship, and consolidation projections still rebuild from history;
+broader materialization and vectors are not implemented yet. Durable cognition jobs run on
 supervised workers with lease recovery and operator cancellation, although required
 callers still await their results.
 Role traces record status, model/backend, latency, and a trace ID.

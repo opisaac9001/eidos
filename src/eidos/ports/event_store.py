@@ -30,11 +30,34 @@ class StateCheckpoint:
     state: Mapping[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class MaterializedProjection:
+    aggregate_id: str
+    name: str
+    schema_version: int
+    revision: int
+    last_event_id: str
+    state: Mapping[str, Any]
+
+
 @runtime_checkable
 class StateCheckpointStore(Protocol):
     def load_checkpoint(self, aggregate_id: str, max_revision: int) -> StateCheckpoint | None: ...
 
     def save_checkpoint(self, checkpoint: StateCheckpoint) -> None: ...
+
+
+@runtime_checkable
+class MaterializedProjectionStore(Protocol):
+    def load_projection(
+        self,
+        aggregate_id: str,
+        name: str,
+        schema_version: int,
+        max_revision: int,
+    ) -> MaterializedProjection | None: ...
+
+    def save_projection(self, projection: MaterializedProjection) -> None: ...
 
 
 class EventStore(Protocol):

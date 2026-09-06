@@ -1,7 +1,8 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
-from eidos.application.memory import memory_view, recall
+from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.domain.events import DomainEvent
 
 
@@ -152,6 +153,34 @@ class MemoryTests(unittest.TestCase):
         texts = [str(item.event.payload["text"]) for item in results]
         self.assertEqual(texts.count("Visited the cafe before work."), 1)
         self.assertGreaterEqual(len({item.event.payload.get("category") for item in results}), 3)
+
+    def test_materialized_index_only_tokenizes_new_tail_memories(self):
+        old = self.memory("An old promise about the lamp.", self.now - timedelta(days=5))
+        base = MemoryIndex.build([old])
+        new = self.memory("A new conversation beside the willow.", self.now)
+        calls = []
+
+        def counted(value: str) -> set[str]:
+            calls.append(value)
+            return terms(value)
+
+        with patch("eidos.application.memory.terms", side_effect=counted):
+            restored = MemoryIndex.build(
+                [old, new],
+                materialized_state=base.materialized_state(),
+                materialized_revision=1,
+            )
+        self.assertEqual(calls, [new.payload["text"]])
+        self.assertEqual(
+            restored.materialized_state(), MemoryIndex.build([old, new]).materialized_state()
+        )
+
+    def test_semantically_invalid_materialized_index_is_rejected(self):
+        memory = self.memory("Mara returned the lamp.", self.now)
+        state = dict(MemoryIndex.build([memory]).materialized_state())
+        state["memory_ids"] = []
+        with self.assertRaises(ValueError):
+            MemoryIndex.build([memory], materialized_state=state, materialized_revision=1)
 
 
 if __name__ == "__main__":

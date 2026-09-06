@@ -10,7 +10,13 @@ from typing import Iterator, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.ports.event_store import EventPage, EventRecord, RevisionConflict, StateCheckpoint
+from eidos.ports.event_store import (
+    EventPage,
+    EventRecord,
+    MaterializedProjection,
+    RevisionConflict,
+    StateCheckpoint,
+)
 
 
 class SQLiteEventStore:
@@ -19,7 +25,7 @@ class SQLiteEventStore:
         self.path = path
         with self._connect() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2, 3):
+            if version not in (0, 1, 2, 3, 4):
                 raise ValueError(f"Unsupported database schema version: {version}")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS events (
@@ -51,7 +57,20 @@ class SQLiteEventStore:
                     created_at TEXT NOT NULL
                 )
             """)
-            connection.execute("PRAGMA user_version = 3")
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS materialized_projections (
+                    aggregate_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    schema_version INTEGER NOT NULL,
+                    revision INTEGER NOT NULL,
+                    last_event_id TEXT NOT NULL,
+                    state_json TEXT NOT NULL,
+                    checksum TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (aggregate_id, name)
+                )
+            """)
+            connection.execute("PRAGMA user_version = 4")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -253,6 +272,94 @@ class SQLiteEventStore:
                     checkpoint.aggregate_id,
                     checkpoint.revision,
                     checkpoint.last_event_id,
+                    encoded,
+                    checksum,
+                    datetime.now().astimezone().isoformat(),
+                ),
+            )
+
+    def load_projection(
+        self,
+        aggregate_id: str,
+        name: str,
+        schema_version: int,
+        max_revision: int,
+    ) -> MaterializedProjection | None:
+        if not name.strip() or schema_version < 1:
+            raise ValueError("Projection name and schema version are required")
+        if isinstance(max_revision, bool) or max_revision < 0:
+            raise ValueError("Projection revision bound must be non-negative")
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT schema_version, revision, last_event_id, state_json, checksum "
+                "FROM materialized_projections WHERE aggregate_id = ? AND name = ? "
+                "AND schema_version = ? AND revision <= ?",
+                (aggregate_id, name, schema_version, max_revision),
+            ).fetchone()
+            if row is None:
+                return None
+            stored_schema, revision, last_event_id, encoded, checksum = row
+            anchor = connection.execute(
+                "SELECT event_id FROM events WHERE aggregate_id = ? AND revision = ?",
+                (aggregate_id, revision),
+            ).fetchone()
+        if anchor is None or anchor[0] != last_event_id:
+            return None
+        if hashlib.sha256(str(encoded).encode()).hexdigest() != checksum:
+            return None
+        try:
+            state = json.loads(str(encoded))
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(state, dict):
+            return None
+        return MaterializedProjection(
+            aggregate_id,
+            name,
+            int(stored_schema),
+            int(revision),
+            str(last_event_id),
+            state,
+        )
+
+    def save_projection(self, projection: MaterializedProjection) -> None:
+        if (
+            not projection.name.strip()
+            or projection.schema_version < 1
+            or projection.revision < 1
+            or not projection.last_event_id
+        ):
+            raise ValueError("Projection requires a name, version, and positive anchor")
+        encoded = json.dumps(dict(projection.state), allow_nan=False, sort_keys=True)
+        checksum = hashlib.sha256(encoded.encode()).hexdigest()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            anchor = connection.execute(
+                "SELECT event_id FROM events WHERE aggregate_id = ? AND revision = ?",
+                (projection.aggregate_id, projection.revision),
+            ).fetchone()
+            if anchor is None or anchor[0] != projection.last_event_id:
+                raise ValueError("Projection anchor does not match immutable event history")
+            current = connection.execute(
+                "SELECT revision FROM materialized_projections WHERE aggregate_id = ? AND name = ?",
+                (projection.aggregate_id, projection.name),
+            ).fetchone()
+            if current is not None and int(current[0]) > projection.revision:
+                raise ValueError("Projection revision cannot move backwards")
+            connection.execute(
+                "INSERT INTO materialized_projections "
+                "(aggregate_id, name, schema_version, revision, last_event_id, state_json, "
+                "checksum, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(aggregate_id, name) DO UPDATE SET "
+                "schema_version=excluded.schema_version, revision=excluded.revision, "
+                "last_event_id=excluded.last_event_id, state_json=excluded.state_json, "
+                "checksum=excluded.checksum, created_at=excluded.created_at",
+                (
+                    projection.aggregate_id,
+                    projection.name,
+                    projection.schema_version,
+                    projection.revision,
+                    projection.last_event_id,
                     encoded,
                     checksum,
                     datetime.now().astimezone().isoformat(),

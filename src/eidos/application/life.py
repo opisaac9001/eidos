@@ -31,7 +31,7 @@ from eidos.application.inner_life import (
     record_dream_events,
     waking_dream_events,
 )
-from eidos.application.memory import memory_view, recall, terms
+from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.npc_cognition import npc_belief_events
 from eidos.application.object_story import object_story_events
@@ -66,7 +66,13 @@ from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
-from eidos.ports.event_store import EventStore, StateCheckpoint, StateCheckpointStore
+from eidos.ports.event_store import (
+    EventStore,
+    MaterializedProjection,
+    MaterializedProjectionStore,
+    StateCheckpoint,
+    StateCheckpointStore,
+)
 from eidos.ports.model_gateway import DeferredModelGateway, ModelGateway, ModelRequest
 
 
@@ -85,6 +91,7 @@ class Life:
         self.store = store
         self.gateway = gateway
         self.mode = mode
+        self._memory_cache: tuple[int, str, MemoryIndex] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -139,6 +146,50 @@ class Life:
                     "mastery": state.mastery,
                     "awake": state.awake,
                 },
+            )
+        )
+
+    def _memory_index(self, history: list[DomainEvent]) -> MemoryIndex:
+        if self._memory_cache is not None:
+            revision, anchor, cached = self._memory_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                if revision == len(history):
+                    return cached
+                extended = MemoryIndex.build(history, base_index=cached)
+                self._memory_cache = (len(history), str(history[-1].event_id), extended)
+                return extended
+        if isinstance(self.store, MaterializedProjectionStore):
+            projection = self.store.load_projection("pathos", "memory-index", 1, len(history))
+            if projection is not None:
+                try:
+                    index = MemoryIndex.build(
+                        history,
+                        materialized_state=projection.state,
+                        materialized_revision=projection.revision,
+                    )
+                    self._memory_cache = (len(history), str(history[-1].event_id), index)
+                    return index
+                except (KeyError, TypeError, ValueError):
+                    pass
+        index = MemoryIndex.build(history)
+        if history:
+            self._memory_cache = (len(history), str(history[-1].event_id), index)
+        return index
+
+    def _save_memory_index(self, history: list[DomainEvent]) -> None:
+        if not history or not isinstance(self.store, MaterializedProjectionStore):
+            return
+        index = self._memory_index(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "memory-index",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                index.materialized_state(),
             )
         )
 
@@ -328,7 +379,8 @@ class Life:
             }
             for person in PEOPLE
         ]
-        memories = memory_view(history, state.simulated_at)
+        memory_index = self._memory_index(history)
+        memories = memory_view(history, state.simulated_at, index=memory_index)
         planning = project_planning(history)
         social = project_social(history)
         scenes = project_scenes(history)
@@ -386,6 +438,11 @@ class Life:
                         emotion.valence, emotion.arousal, emotion.sustained_low_hours
                     )
                 ),
+            },
+            "indexes": {
+                "memory_revision": memory_index.revision,
+                "memory_count": len(memory_index.memories),
+                "term_count": len(memory_index.by_term),
             },
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
@@ -747,6 +804,7 @@ class Life:
                     if terms(str(person["name"])) & terms(recall_query)
                 },
                 diverse=True,
+                index=self._memory_index(history + pending),
             )
             memories = [item.recalled_text for item in selected_context]
             identity_now = project_identity(history + pending)
@@ -1039,7 +1097,9 @@ class Life:
         pending.append(final_time)
         state = state.apply(final_time)
         self.store.append("pathos", pending, expected_revision=len(history))
-        self._save_state_checkpoint([*history, *pending], state)
+        committed = [*history, *pending]
+        self._save_state_checkpoint(committed, state)
+        self._save_memory_index(committed)
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
                 self.gateway.submit_deferred(request)
@@ -1131,6 +1191,7 @@ class Life:
             goal_ids=goal_ids,
             relationship_ids=relationship_ids,
             diverse=True,
+            index=self._memory_index(history),
         )
         context = {
             "message": text.strip(),
@@ -1248,6 +1309,7 @@ class Life:
                 )
             )
         self.store.append("pathos", pending, len(history))
+        self._save_memory_index([*history, *pending])
 
 
 def vars_for(value: Any) -> dict[str, Any]:

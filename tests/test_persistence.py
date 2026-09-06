@@ -13,7 +13,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.domain.events import DomainEvent
-from eidos.ports.event_store import RevisionConflict, StateCheckpoint
+from eidos.ports.event_store import MaterializedProjection, RevisionConflict, StateCheckpoint
 
 
 class PersistenceTests(unittest.TestCase):
@@ -60,7 +60,39 @@ class PersistenceTests(unittest.TestCase):
         migrated = SQLiteEventStore(legacy_path)
         self.assertEqual(migrated.read("pathos"), [event])
         with sqlite3.connect(legacy_path) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 4)
+
+    def test_materialized_projection_is_versioned_anchored_and_disposable(self) -> None:
+        events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]
+        self.store.append("pathos", events, 0)
+        projection = MaterializedProjection(
+            "pathos", "memory-index", 1, 2, str(events[-1].event_id), {"ids": ["one"]}
+        )
+        self.store.save_projection(projection)
+        self.assertEqual(self.store.load_projection("pathos", "memory-index", 1, 2), projection)
+        self.assertIsNone(self.store.load_projection("pathos", "memory-index", 2, 2))
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "UPDATE materialized_projections SET state_json = ? "
+                "WHERE aggregate_id = ? AND name = ?",
+                ('{"ids": ["corrupt"]}', "pathos", "memory-index"),
+            )
+        self.assertIsNone(self.store.load_projection("pathos", "memory-index", 1, 2))
+
+    def test_materialized_projection_rejects_bad_or_backward_anchor(self) -> None:
+        events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]
+        self.store.append("pathos", events, 0)
+        with self.assertRaises(ValueError):
+            self.store.save_projection(
+                MaterializedProjection("pathos", "memory-index", 1, 2, "wrong", {})
+            )
+        self.store.save_projection(
+            MaterializedProjection("pathos", "memory-index", 1, 2, str(events[-1].event_id), {})
+        )
+        with self.assertRaises(ValueError):
+            self.store.save_projection(
+                MaterializedProjection("pathos", "memory-index", 1, 1, str(events[0].event_id), {})
+            )
 
     def test_checkpoint_is_anchored_rebuildable_and_corruption_falls_back(self) -> None:
         life = Life(self.store, StandInGateway())
@@ -71,6 +103,17 @@ class PersistenceTests(unittest.TestCase):
         assert checkpoint is not None
         self.assertEqual(checkpoint.last_event_id, str(history[-1].event_id))
         self.assertEqual(life._project_state(history), Life.project(history))
+
+    def test_life_keeps_memory_projection_at_the_committed_revision(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(24)
+        history = life.history()
+        projection = self.store.load_projection("pathos", "memory-index", 1, len(history))
+        self.assertIsNotNone(projection)
+        assert projection is not None
+        self.assertEqual(projection.revision, len(history))
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        self.assertEqual(restarted.snapshot()["indexes"]["memory_revision"], len(history))
         with sqlite3.connect(self.path) as connection:
             connection.execute(
                 "UPDATE state_checkpoints SET state_json = ? WHERE aggregate_id = ?",

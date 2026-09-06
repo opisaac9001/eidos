@@ -72,6 +72,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'id="calendar-list"', body)
                 self.assertIn(b'id="catch-up"', body)
                 self.assertIn(b'id="dream-inspiration"', body)
+                self.assertIn(b'id="index-status"', body)
             if path == "/app.js":
                 self.assertIn(b"function renderPlans()", body)
                 self.assertIn(b"person.plan_scheduled_for", body)
