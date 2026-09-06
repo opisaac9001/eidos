@@ -218,7 +218,14 @@ Separate familiarity, trust, affection and tension rather than one friendship
 meter. Change only dimensions supported by the experience; apply inertia and
 allow recovery. No automatic large reward for every encounter.
 
-NPCs act offscreen through inexpensive schedules/decisions. Important consequences
+NPCs act offscreen through inexpensive schedules/decisions. The authored opening uses
+stable fixtures; afterward a structured resident-agency performer may invent the plan's
+activity and action vocabulary from that resident's needs and owner-visible perceptions.
+The performer never receives another resident's private context. Known-place hours,
+offscreen tick alignment, cooldowns, and owner/visibility rules remain deterministic.
+The plan still completes only when its resident moves to the place and records the
+matching activity; malformed or outcome-claiming prose becomes a private rejection.
+Important consequences
 are committed even if Pathos is absent. He learns them later through observation
 or testimony, not because the summarizer read the world database.
 

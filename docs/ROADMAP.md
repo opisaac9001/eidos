@@ -91,10 +91,12 @@ Need-driven choices now record all three competing levels and their selected pri
 critical exhaustion can interrupt and causally replace a lower-priority private plan
 without making ordinary fluctuations rewrite the day. Shared familiarity can make a
 connection need more attractive, but Pathos's one-sided trust is never treated as
-proof of an NPC's hidden reciprocal feeling. Purpose and connection plans now rotate
-through person-specific, replay-stable project palettes, and the offscreen actor moves
-to the planned place and performs the planned action rather than a stock routine.
-Their option vocabulary remains bounded rather than generally autonomous. Term,
+proof of an NPC's hidden reciprocal feeling. The authored opening uses person-specific,
+replay-stable project palettes. After that foundation, each offscreen resident can
+submit an open-vocabulary private activity proposal grounded only in their own needs,
+public identity, owned perceptions, and known places. Passing plans move the resident
+to the planned place and require a matching offscreen action; invalid proposals become
+private, rate-limited failures rather than facts. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Planning and
 actor-owned beliefs and directed relationships now do the same with ordered,

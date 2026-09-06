@@ -38,7 +38,7 @@ The local prototype has six connected views: Observatory, World, Conversation,
 Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
 NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
 scheduled activities, and a factual daybook. All eight narrative performers plus
-Moira's two structured world proposers and Pathos's structured agency proposer can use
+Moira's two structured world proposers plus structured Pathos and resident agency can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
@@ -183,7 +183,9 @@ network authorization; the server remains loopback-only until authenticated depl
   a suitable undamaged object is used only when it already exists at the incident site.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
-  events or changing needs persist by replay. Pathos completes a causal promise/repair
+  events or changing needs persist by replay. After the authored opening, residents
+  propose open-vocabulary private plans from only their own needs, identity, perceptions,
+  and public places; rejected proposals remain private audited failures. Pathos completes a causal promise/repair
   story and a resource-backed personal
   project. Pathos can also originate open-vocabulary ordinary activities from current
   needs, emotion, values, memories, people, places, objects, and free time. The model

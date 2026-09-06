@@ -38,6 +38,7 @@ from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
+from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_maintenance import object_maintenance_events
@@ -1325,13 +1326,24 @@ class Life:
             pending.extend(
                 npc_belief_events(history + pending, at, self._beliefs(history + pending))
             )
-            pending.extend(
-                npc_need_plan_events(
-                    history + pending,
-                    at,
-                    self._relationships(history + pending).relationships,
-                )
+            open_npc_agency = (current.date() - datetime(2026, 1, 1).date()).days + 1 >= 11
+            npc_replans = npc_need_plan_events(
+                history + pending,
+                at,
+                self._relationships(history + pending).relationships,
+                allow_new_plans=not open_npc_agency,
             )
+            pending.extend(npc_replans)
+            if open_npc_agency:
+                pending.extend(
+                    await autonomous_npc_plan_events(
+                        history + pending,
+                        current,
+                        self.gateway,
+                        self._world_catalog(history + pending),
+                        self._relationships(history + pending).relationships,
+                    )
+                )
             phone_emotion = project_emotion(history + pending)
             phone_bias = emotional_planning_bias(
                 phone_emotion.valence,

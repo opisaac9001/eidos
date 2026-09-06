@@ -348,6 +348,74 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "npc_agency":
+            actor = context["actor"]
+            need = context["selected_need"]
+            places = context["known_places"]
+            npc_palette = (
+                (
+                    "window_light_notes",
+                    "Make a sequence of notes about changing window light",
+                    "observe",
+                    "cafe",
+                ),
+                (
+                    "tool_sound_catalog",
+                    "Record the different sounds of hand tools in use",
+                    "catalog",
+                    "workshop",
+                ),
+                (
+                    "small_kindness_route",
+                    "Leave three useful handwritten directions around the neighborhood",
+                    "prepare",
+                    "park",
+                ),
+                (
+                    "material_weather_test",
+                    "Compare how scrap materials respond to the damp air",
+                    "study",
+                    "workshop",
+                ),
+                ("unhurried_rest", "Keep an evening entirely free of obligations", "rest", "home"),
+                (
+                    "local_question_list",
+                    "Write five questions to ask familiar neighbors",
+                    "write",
+                    "home",
+                ),
+                (
+                    "seasonal_color_walk",
+                    "Collect a palette of the neighborhood's seasonal colors",
+                    "observe",
+                    "park",
+                ),
+                (
+                    "counter_story_notes",
+                    "Write down the small stories implied by objects left on tables",
+                    "write",
+                    "cafe",
+                ),
+            )
+            npc_item = npc_palette[choice % len(npc_palette)]
+            preferred = "home" if need == "energy" else npc_item[3]
+            location = preferred if preferred in places else actor["usual_location_id"]
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "activity_type": npc_item[0],
+                        "title": npc_item[1],
+                        "motivation": f"Give {actor['name']} a concrete way to tend a low {need} need without assuming an outcome.",
+                        "action": "rest" if need == "energy" else npc_item[2],
+                        "location_id": location,
+                        "day_offset": 1,
+                        "scheduled_hour": 0 if need == "energy" else 12,
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         else:
             raise ValueError(f"Unknown stand-in capability: {role}")
         return ModelResponse(

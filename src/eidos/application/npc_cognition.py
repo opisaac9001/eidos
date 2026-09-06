@@ -115,6 +115,8 @@ def npc_need_plan_events(
     history: Sequence[DomainEvent],
     simulated_at: str,
     shared_relationships: Mapping[str, Relationship] | None = None,
+    *,
+    allow_new_plans: bool = True,
 ) -> list[DomainEvent]:
     """Let private needs form bounded goals without leaking them into Pathos's context."""
     now = datetime.fromisoformat(simulated_at)
@@ -126,7 +128,7 @@ def npc_need_plan_events(
     used_evidence = {
         str(event.payload["evidence_need_event_id"])
         for event in history
-        if event.kind == "npc.plan_created"
+        if event.kind in {"npc.plan_created", "npc.agency_rejected"}
         and isinstance(event.payload.get("evidence_need_event_id"), str)
     }
     latest_plan_at = _latest_plan_times(history)
@@ -191,6 +193,8 @@ def npc_need_plan_events(
         if person.plan_status == "active" or (
             not replaced and _in_plan_cooldown(latest_plan_at.get(actor_id), now)
         ):
+            continue
+        if not allow_new_plans:
             continue
         needs = {
             "energy": person.energy,

@@ -100,6 +100,23 @@ class MonthSoakTests(unittest.TestCase):
                 {event.payload["actor_id"] for event in events if event.kind == "npc.goal_formed"},
                 {"mara", "ellis", "rowan", "nina-vale"},
             )
+            npc_agency = [event for event in events if event.kind == "npc.agency_accepted"]
+            self.assertTrue(npc_agency)
+            self.assertTrue(
+                all(
+                    event.payload["owner"] == event.payload["actor_id"]
+                    and event.payload["visibility"] == "private"
+                    and event.payload.get("activity_type")
+                    for event in npc_agency
+                )
+            )
+            self.assertTrue(
+                any(
+                    event.kind == "npc.plan_completed"
+                    and str(event.correlation_id).startswith("npc-agency-")
+                    for event in events
+                )
+            )
             priorities = [event for event in events if event.kind == "npc.priority_evaluated"]
             self.assertEqual(
                 {event.payload["actor_id"] for event in priorities},

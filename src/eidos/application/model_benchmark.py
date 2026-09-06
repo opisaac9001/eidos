@@ -8,6 +8,7 @@ from statistics import median
 from time import perf_counter
 
 from eidos.application.cognition import perform
+from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.domain.agency import (
     agency_output_schema,
@@ -86,7 +87,10 @@ def benchmark_contexts() -> tuple[dict[str, object], ...]:
 async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, object]:
     if isinstance(runs, bool) or not isinstance(runs, int) or not 1 <= runs <= 5:
         raise ValueError("Benchmark runs must be between one and five")
-    roles = [str(role["id"]) for role in ROLES if role["id"] != "critic"] + ["pathos_agency"]
+    roles = [str(role["id"]) for role in ROLES if role["id"] != "critic"] + [
+        "pathos_agency",
+        "npc_agency",
+    ]
     contexts = benchmark_contexts()
     samples: list[dict[str, object]] = []
     prior_by_role: dict[str, list[str]] = {role: [] for role in roles}
@@ -95,6 +99,9 @@ async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, obj
         for role in roles:
             if role == "pathos_agency":
                 samples.append(await _agency_sample(gateway, run))
+                continue
+            if role == "npc_agency":
+                samples.append(await _npc_agency_sample(gateway, run))
                 continue
             events: list[DomainEvent] = []
             text = await perform(gateway, role, context, str(context["time"]), events)
@@ -252,4 +259,44 @@ async def _agency_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
         "error_code": error_code,
         "model": response.resolved_model if response else getattr(gateway, "model", "unknown"),
         "backend": response.backend if response else "unknown",
+    }
+
+
+async def _npc_agency_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
+    at = datetime.fromisoformat(f"2026-01-{11 + run * 2:02d}T19:00:00+00:00")
+    evidence = DomainEvent(
+        "npc.needs_changed",
+        "pathos",
+        {
+            "actor_id": "rowan",
+            "energy": 0.7,
+            "connection": 0.65,
+            "purpose": (0.2, 0.3, 0.4)[run % 3],
+            "owner": "rowan",
+            "visibility": "private",
+            "simulated_at": at.isoformat(),
+        },
+    )
+    events = await autonomous_npc_plan_events([evidence], at, gateway, project_world_catalog([]))
+    trace = next(
+        event
+        for event in events
+        if event.kind == "role.completed" and event.payload.get("role") == "npc_agency"
+    )
+    plan = next((event for event in events if event.kind == "npc.plan_created"), None)
+    rejected = next((event for event in events if event.kind == "npc.agency_rejected"), None)
+    findings = [str(rejected.payload["code"])] if rejected is not None else []
+    return {
+        "run": run + 1,
+        "case_id": f"private-npc-agency-{run + 1}",
+        "role": "npc_agency",
+        "contract_passed": plan is not None,
+        "semantic_findings": findings,
+        "text": plan.payload.get("title") if plan is not None else None,
+        "latency_ms": trace.payload.get("latency_ms", 0.0),
+        "prompt_tokens": trace.payload.get("prompt_tokens"),
+        "output_tokens": trace.payload.get("output_tokens"),
+        "error_code": trace.payload.get("error_code"),
+        "model": trace.payload.get("model", getattr(gateway, "model", "unknown")),
+        "backend": trace.payload.get("backend", "unknown"),
     }
