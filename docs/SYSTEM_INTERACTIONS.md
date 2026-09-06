@@ -375,14 +375,20 @@ shared fact enters the ordinary follow-up system and can later motivate a mutual
 accepted invitation through the existing availability and feasibility rules.
 
 Two validated uses of an introduced object cause one source-linked maintenance need.
-The condition changes to broken before new uses are allowed, and a two-stage goal fits
-inspection and repair into real opening hours, calendar gaps, and travel constraints.
+The condition changes to broken before new uses are allowed. Current mastery, care,
+craft values, replay-stable inclination, and whether two feasible windows exist decide
+between retirement and a two-stage inspection/repair goal. Retirement changes condition
+without inventing work. A repair goal fits into real opening hours, calendar gaps, and
+travel constraints.
 The inspection contributes bounded progress but does not alter condition. Repair accepts
 a community-held object only while Eidos and the object remain at its site, after the
-scheduled work duration has elapsed; it then records the repaired condition, remaining
-goal progress, completion, skill evidence, and memory. Ordinary routines cannot move
-Eidos away halfway through scheduled work. This rule is additive, so historical objects
-without a maintenance event preserve their projected condition.
+scheduled work duration has elapsed. Physical uncertainty then compares present mastery
+with a stable outcome sample. Success records the repaired condition, remaining goal
+progress, completion, skill evidence, and memory. Failure preserves the broken condition
+and explicitly fails the schedule, abandons the intention and goal, and records a setback
+memory. Ordinary routines cannot move Eidos away halfway through scheduled work. This
+rule is additive, so historical objects without a maintenance event preserve their
+projected condition.
 
 Consumability is explicit object state, never inferred for every object. Qualifying
 delivered supplies register a non-negative quantity, reorder point, and unit; legacy

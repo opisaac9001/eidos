@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Sequence
+from hashlib import sha256
+from typing import Mapping, Sequence
 
 from eidos.application.world_exploration import feasible_activity_windows
 from eidos.domain.actions import ActionKind
@@ -18,8 +19,11 @@ def object_maintenance_events(
     simulated_at: datetime,
     planning: PlanningState,
     catalog: WorldCatalog,
+    *,
+    mastery: float,
+    values: Mapping[str, float],
 ) -> list[DomainEvent]:
-    """Wear an introduced object after two uses and schedule inspection plus repair."""
+    """Wear an introduced object, then choose repair or retirement."""
     registrations = {
         str(event.payload["object_id"]): event
         for event in history
@@ -45,11 +49,6 @@ def object_maintenance_events(
             or item.location_id not in catalog.places
         ):
             continue
-        windows = feasible_activity_windows(
-            planning, simulated_at, catalog, item.location_id, count=2
-        )
-        if len(windows) != 2:
-            return []
         correlation = f"maintain-introduced-{object_id}"
         required = DomainEvent(
             "object.maintenance_required",
@@ -76,10 +75,51 @@ def object_maintenance_events(
             causation_id=required.event_id,
             correlation_id=correlation,
         )
+        windows = feasible_activity_windows(
+            planning, simulated_at, catalog, item.location_id, count=2
+        )
+        craft = max(0.0, min(1.0, float(values.get("craft", 0.5))))
+        care = max(0.0, min(1.0, float(values.get("care", 0.5))))
+        score = max(0.1, min(0.9, 0.2 + 0.3 * mastery + 0.25 * craft + 0.15 * care))
+        sample = _sample(f"maintenance-choice-{object_id}")
+        repair = len(windows) == 2 and sample < score
+        decision = DomainEvent(
+            "object.maintenance_decided",
+            "pathos",
+            {
+                "object_id": object_id,
+                "decision": "repair" if repair else "retire",
+                "decision_score": score,
+                "decision_sample": sample,
+                "feasible_windows": len(windows),
+                "reason": (
+                    "Pathos judged the worn object worth a bounded repair attempt."
+                    if repair
+                    else "Pathos chose not to commit scarce time and capability to this repair."
+                ),
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=worn.event_id,
+            correlation_id=correlation,
+        )
+        if not repair:
+            retired = DomainEvent(
+                "object.condition_changed",
+                "pathos",
+                {
+                    "object_id": object_id,
+                    "condition": "retired",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=decision.event_id,
+                correlation_id=correlation,
+            )
+            return [required, worn, decision, retired]
         name = item.name
         events = [
             required,
             worn,
+            decision,
             DomainEvent(
                 "goal.activated",
                 "pathos",
@@ -89,7 +129,7 @@ def object_maintenance_events(
                     "motivation": "Care for a useful shared object instead of treating it as disposable.",
                     "simulated_at": simulated_at.isoformat(),
                 },
-                causation_id=worn.event_id,
+                causation_id=decision.event_id,
                 correlation_id=correlation,
             ),
         ]
@@ -112,7 +152,7 @@ def object_maintenance_events(
                         "goal_id": correlation,
                         "simulated_at": simulated_at.isoformat(),
                     },
-                    causation_id=required.event_id,
+                    causation_id=decision.event_id,
                     correlation_id=correlation,
                 )
             )
@@ -141,3 +181,7 @@ def object_maintenance_events(
                 projected = projected.apply(event)
         return events
     return []
+
+
+def _sample(key: str) -> float:
+    return int(sha256(key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF

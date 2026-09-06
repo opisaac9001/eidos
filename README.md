@@ -193,8 +193,9 @@ network authorization; the server remains loopback-only until authenticated depl
   decline that practical activity. Joining creates shared relationship evidence and a
   later follow-up; merely being named in narration does not. Two completed uses expose
   physical wear, make the object temporarily unusable, and create a feasible inspection
-  and repair project. Eidos must remain at the site through the repair interval before
-  the shared object becomes usable again.
+  and maintenance choice. Eidos may retire it rather than silently committing to repair.
+  If he tries, he must remain at the site through the repair interval, and the attempt
+  can still fail against his present mastery; only success makes the object usable again.
 - Delivered seeds, repair materials, drawing paper, and tea are finite stocks rather
   than decorative names. Pathos may use or save one when awake and co-located with it.
   Low stock produces an explicit order-or-go-without choice; an order has a delayed

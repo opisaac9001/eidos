@@ -628,6 +628,9 @@ class Life:
                 "object.collaboration_decided",
                 "object.shared_use",
                 "object.maintenance_required",
+                "object.maintenance_decided",
+                "object.repair_attempted",
+                "object.repair_failed",
                 "object.consumption_decided",
                 "object.consumed",
                 "object.stock_changed",
@@ -1610,6 +1613,7 @@ class Life:
                 actor_location_id=state.location_id,
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
+                repair_mastery=state.mastery,
             )
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)
@@ -1627,6 +1631,8 @@ class Life:
                 current,
                 self._planning(history + pending),
                 self._world_catalog(history + pending),
+                mastery=state.mastery,
+                values=project_identity(history + pending).values,
             )
             if maintenance:
                 self._planning(history + pending + maintenance)

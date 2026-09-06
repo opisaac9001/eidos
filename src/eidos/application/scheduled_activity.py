@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from hashlib import sha256
 
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
@@ -18,6 +19,7 @@ def scheduled_activity_events(
     actor_location_id: str,
     simulated_at: datetime,
     actual_revision: int,
+    repair_mastery: float = 1.0,
 ) -> list[DomainEvent]:
     """Complete due non-conversation plans and their linked obligations."""
 
@@ -47,6 +49,97 @@ def scheduled_activity_events(
         )
         if intention is None:
             continue
+        if action is ActionKind.REPAIR and entry.schedule_id.startswith("maintain-introduced-"):
+            success_score = max(0.1, min(0.9, 0.25 + 0.65 * repair_mastery))
+            sample = _sample(f"repair-attempt-{entry.schedule_id}")
+            if sample >= success_score:
+                correlation = entry.goal_id or entry.schedule_id
+                attempted = DomainEvent(
+                    "object.repair_attempted",
+                    "pathos",
+                    {
+                        "object_id": entry.target_id or "unknown",
+                        "schedule_id": entry.schedule_id,
+                        "success_score": success_score,
+                        "outcome_sample": sample,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    correlation_id=correlation,
+                )
+                failed = DomainEvent(
+                    "object.repair_failed",
+                    "pathos",
+                    {
+                        "object_id": entry.target_id or "unknown",
+                        "schedule_id": entry.schedule_id,
+                        "reason": "The attempted repair exceeded Pathos's present capability.",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=attempted.event_id,
+                    correlation_id=correlation,
+                )
+                schedule_failed = DomainEvent(
+                    "schedule.failed",
+                    "pathos",
+                    {
+                        "schedule_id": entry.schedule_id,
+                        "reason": "The physical repair attempt did not succeed.",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=failed.event_id,
+                    correlation_id=correlation,
+                )
+                abandoned_intention = DomainEvent(
+                    "intention.abandoned",
+                    "pathos",
+                    {
+                        "intention_id": intention.intention_id,
+                        "reason": "The linked repair attempt failed.",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=failed.event_id,
+                    correlation_id=correlation,
+                )
+                consequences = [attempted, failed, schedule_failed, abandoned_intention]
+                for event in consequences:
+                    projected = projected.apply(event)
+                if entry.goal_id is not None:
+                    abandoned_goal = DomainEvent(
+                        "goal.abandoned",
+                        "pathos",
+                        {
+                            "goal_id": entry.goal_id,
+                            "reason": "The repair attempt failed and the object remains broken.",
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        causation_id=failed.event_id,
+                        correlation_id=correlation,
+                    )
+                    consequences.append(abandoned_goal)
+                    projected = projected.apply(abandoned_goal)
+                consequences.append(
+                    DomainEvent(
+                        "memory.recorded",
+                        "pathos",
+                        {
+                            "text": f"My repair attempt failed: {entry.title}.",
+                            "owner": "pathos",
+                            "category": "setback",
+                            "source": "deterministic-consequence",
+                            "source_event_id": str(failed.event_id),
+                            "goal_id": entry.goal_id,
+                            "object_id": entry.target_id,
+                            "location_id": entry.location_id,
+                            "importance": 0.76,
+                            "confidence": 1.0,
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        causation_id=failed.event_id,
+                        correlation_id=correlation,
+                    )
+                )
+                output.extend(consequences)
+                continue
         resolution = resolve_action(
             ActionProposal(
                 proposal_id=f"complete-{entry.schedule_id}",
@@ -151,3 +244,7 @@ def scheduled_activity_events(
         )
         output.append(memory)
     return output
+
+
+def _sample(key: str) -> float:
+    return int(sha256(key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF

@@ -50,8 +50,11 @@ that can enter the existing invitation lifecycle.
 After two validated uses, an introduced shared object now develops explicit wear and
 becomes unavailable. Eidos schedules an inspection followed by repair around opening
 hours, conflicts, and travel, remains at the site for the work interval, and restores
-the object only through the ordinary repair resolver. This creates a reusable causal
-loop from discovery through use, social consequence, wear, and care.
+the object only through the ordinary repair resolver. He can instead retire an object
+that does not justify the time and effort. A chosen repair can fail against present
+mastery, leaving the condition broken and resolving its schedule, intention, goal, and
+setback memory honestly. This creates a reusable causal loop from discovery through
+use, social consequence, wear, judgment, and imperfect care.
 Selected delivered supplies now carry an explicit quantity, unit, and low-stock point.
 Ordinary co-located use decrements stock; Pathos can instead save it. Low stock creates
 an order-or-go-without decision, and ordered stock arrives after a delay with one retry
@@ -305,8 +308,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add failed-maintenance outcomes and choices about whether scarce useful objects are
-   worth repairing, borrowing a substitute for, or replacing.
+1. Let a retired or unsuccessfully repaired object motivate a grounded borrow-or-replace
+   choice, with consent, acquisition delay, and no identity-swapping shortcuts.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
