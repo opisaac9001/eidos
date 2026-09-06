@@ -25,6 +25,7 @@ from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import development_events
+from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
@@ -94,6 +95,7 @@ from eidos.domain.development import project_development
 from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
+from eidos.domain.finances import FinancialState, project_finances
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
@@ -177,6 +179,7 @@ class Life:
         self._belief_cache: tuple[int, str, BeliefState] | None = None
         self._relationship_cache: tuple[int, str, RelationshipState] | None = None
         self._consolidation_cache: tuple[int, str, ConsolidationIndex] | None = None
+        self._finance_cache: tuple[int, str, FinancialState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -280,6 +283,22 @@ class Life:
         anchor = str(history[-1].event_id) if history else ""
         self._world_catalog_cache = (len(history), anchor, catalog)
         return catalog
+
+    def _finances(self, history: list[DomainEvent]) -> FinancialState:
+        if self._finance_cache is not None:
+            revision, anchor, finances = self._finance_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    finances = finances.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._finance_cache = (len(history), anchor, finances)
+                return finances
+        finances = project_finances(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._finance_cache = (len(history), anchor, finances)
+        return finances
 
     def _planning(self, history: list[DomainEvent]) -> PlanningState:
         if self._planning_cache is not None:
@@ -516,6 +535,7 @@ class Life:
         regulation = project_regulation(history)
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
+        finances = self._finances(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         outreach_config = project_outreach_config(history)
@@ -787,6 +807,8 @@ class Life:
                 "object.replenishment_cancelled",
                 "meal.eaten",
                 "meal.unavailable",
+                "finance.transaction_recorded",
+                "finance.payment_missed",
                 "catch_up.summarized",
                 "catch_up.cancelled",
                 "sleep.window_selected",
@@ -867,6 +889,7 @@ class Life:
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
                     "hunger": state.hunger,
+                    "financial_margin": min(1.0, finances.balance_pence / 20_000),
                 },
                 "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence, state.arousal),
@@ -943,6 +966,14 @@ class Life:
             "goals": [vars_for(goal) for goal in planning.goals.values()],
             "commitments": [vars_for(item) for item in planning.commitments.values()],
             "calendar": [vars_for(item) for item in planning.calendar.values()],
+            "finances": {
+                "currency": "GBP",
+                "balance_pence": finances.balance_pence,
+                "transactions": [
+                    vars_for(item) for item in list(finances.transactions.values())[-50:]
+                ],
+                "missed_payments": [vars_for(item) for item in finances.missed_payments.values()],
+            },
             "sleep_windows": [
                 vars_for(item)
                 for item in sorted(
@@ -1160,6 +1191,10 @@ class Life:
             if provisions:
                 self._planning(history + pending + provisions)
                 pending.extend(provisions)
+            account = financial_foundation_events(history + pending, current)
+            if account:
+                self._finances(history + pending + account)
+                pending.extend(account)
             pending.extend(
                 await asyncio.to_thread(
                     town_signal_events,
@@ -1260,6 +1295,9 @@ class Life:
                     "mastery": state.mastery,
                     "energy": state.energy,
                     "hunger": state.hunger,
+                    "financial_margin": min(
+                        1.0, self._finances(project_history).balance_pence / 20_000
+                    ),
                 },
                 emotion={
                     "label": project_feeling.label,
@@ -1300,6 +1338,9 @@ class Life:
                     "mastery": state.mastery,
                     "energy": state.energy,
                     "hunger": state.hunger,
+                    "financial_margin": min(
+                        1.0, self._finances(agency_history).balance_pence / 20_000
+                    ),
                 },
                 emotion={
                     "label": current_emotion.label,
@@ -1467,6 +1508,7 @@ class Life:
                     state,
                     current,
                     self._planning(history + pending),
+                    self._finances(history + pending).balance_pence,
                     pathos_busy=meal_busy,
                 )
                 meal_checked = True
@@ -1531,11 +1573,20 @@ class Life:
                     state,
                     current,
                     self._planning(history + pending),
+                    self._finances(history + pending).balance_pence,
                     pathos_busy=meal_busy,
                 )
                 pending.extend(meals)
                 for meal in meals:
                     state = state.apply(meal)
+            money = financial_consequence_events(
+                history + pending,
+                self._finances(history + pending),
+                current,
+            )
+            if money:
+                self._finances(history + pending + money)
+                pending.extend(money)
             story = story_events(
                 current,
                 history + pending,
@@ -2080,10 +2131,19 @@ class Life:
                 pathos_energy=state.energy,
                 curiosity=state.curiosity,
                 values=project_identity(history + pending).values,
+                available_pence=self._finances(history + pending).balance_pence,
             )
             if supply:
                 self._planning(history + pending + supply)
                 pending.extend(supply)
+                money = financial_consequence_events(
+                    history + pending,
+                    self._finances(history + pending),
+                    current,
+                )
+                if money:
+                    self._finances(history + pending + money)
+                    pending.extend(money)
             recovery_people = project_npcs(history + pending, current).people
             recovery = object_recovery_events(
                 history + pending,

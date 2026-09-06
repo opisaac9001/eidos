@@ -199,6 +199,10 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   independently propose owner-private open-vocabulary plans after the authored opening.
 - Persistent objects and validated actions: move, meet, borrow, give, repair,
   learn, rest, work and attend. Narration alone cannot perform an action.
+- A replayable household ledger now makes workshop attendance produce bounded income,
+  charges café meals and provision orders, refunds failed deliveries, and resolves
+  weekly housing costs as paid or explicitly missed. Affordability constrains food
+  choices and enters agency context; balances cannot silently become negative.
 - NPC-private knowledge, needs, plans and directed relationships. Bounded multi-turn
   scenes with intent, response, observation and validated consequences.
 - Invitations, favors, promises, cooperation, disagreement, misunderstandings,

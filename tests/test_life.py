@@ -84,6 +84,15 @@ class LifeTests(unittest.TestCase):
             item for item in snapshot["objects"] if item["object_id"] == "household-provisions"
         )
         self.assertEqual(provisions["quantity"], 9)
+        self.assertEqual(snapshot["finances"]["currency"], "GBP")
+        self.assertEqual(snapshot["finances"]["balance_pence"], 15_200)
+        self.assertEqual(
+            [item["category"] for item in snapshot["finances"]["transactions"]],
+            ["work_income"],
+        )
+        self.assertEqual(
+            sum(event.kind == "finance.account_opened" for event in self.life.history()), 1
+        )
         self.assertEqual(snapshot["indexes"]["memory_revision"], len(self.life.history()))
         self.assertGreater(snapshot["indexes"]["memory_count"], 0)
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)

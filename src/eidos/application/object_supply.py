@@ -20,6 +20,7 @@ def object_supply_events(
     pathos_energy: float,
     curiosity: float,
     values: Mapping[str, float],
+    available_pence: int | None = None,
 ) -> list[DomainEvent]:
     """Resolve deliveries, then make at most one grounded use or replenishment choice."""
     pending = _pending_order(history)
@@ -31,7 +32,9 @@ def object_supply_events(
     if not pathos_awake:
         return []
     if pending is None and 9 <= simulated_at.hour < 18:
-        replenish = _replenishment_choice(history, simulated_at, planning, values)
+        replenish = _replenishment_choice(
+            history, simulated_at, planning, values, available_pence=available_pence
+        )
         if replenish:
             return replenish
     if simulated_at.hour not in {16, 19}:
@@ -153,6 +156,8 @@ def _replenishment_choice(
     simulated_at: datetime,
     planning: PlanningState,
     values: Mapping[str, float],
+    *,
+    available_pence: int | None,
 ) -> list[DomainEvent]:
     handled = {
         str(event.payload["source_stock_event_id"])
@@ -175,7 +180,10 @@ def _replenishment_choice(
         reliability = max(0.0, min(1.0, float(values.get("reliability", 0.5))))
         score = 0.25 + 0.55 * reliability
         sample = _sample(f"replenish-{object_id}-{item.quantity}-{source.event_id}")
-        order = sample < score
+        affordable = (
+            item.unit != "meal portions" or available_pence is None or available_pence >= 2400
+        )
+        order = sample < score and affordable
         order_id = f"replenish-{source.event_id}"
         decision = DomainEvent(
             "object.replenishment_decided",
@@ -189,6 +197,8 @@ def _replenishment_choice(
                 "reason": (
                     "Pathos chose to replace the dwindling finite supply."
                     if order
+                    else "The household balance could not cover new provisions."
+                    if not affordable
                     else "Pathos chose to go without instead of automatically replenishing it."
                 ),
                 "simulated_at": simulated_at.isoformat(),

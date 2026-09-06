@@ -123,6 +123,8 @@ const labels = {
   "emotion.mixed_state_resolved": "A MIXED FEELING EASED",
   "meal.eaten": "A MEAL",
   "meal.unavailable": "A MEAL COULD NOT HAPPEN",
+  "finance.transaction_recorded": "HOUSEHOLD MONEY CHANGED",
+  "finance.payment_missed": "A PAYMENT COULD NOT BE MADE",
   "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
@@ -467,6 +469,10 @@ function renderEngineFeed() {
 
 function renderPlans() {
   const empty = (text) => `<p class="muted">${esc(text)}</p>`;
+  const money = (pence) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
+      pence / 100,
+    );
   $("goal-list").innerHTML = state.goals.length
     ? state.goals
         .map(
@@ -498,6 +504,21 @@ function renderPlans() {
         ),
       ].join("")
     : empty("The calendar is open.");
+  const finances = state.finances || { balance_pence: 0, transactions: [], missed_payments: [] };
+  $("finance-balance").textContent = `${money(finances.balance_pence)} available`;
+  const financeItems = [
+    ...[...finances.transactions].reverse().map(
+      (item) =>
+        `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.amount_pence > 0 ? "+" : ""}${esc(money(item.amount_pence))}</span></div><p>${esc(item.description)}</p><div class="memory-source">Balance ${esc(money(item.balance_pence))} · ${esc(item.category.replaceAll("_", " "))}</div></article>`,
+    ),
+    ...finances.missed_payments.map(
+      (item) =>
+        `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>MISSED ${esc(money(item.amount_pence))}</span></div><p>${esc(item.reason)}</p><div class="memory-source">${esc(item.category.replaceAll("_", " "))}</div></article>`,
+    ),
+  ];
+  $("finance-list").innerHTML = financeItems.length
+    ? financeItems.slice(0, 20).join("")
+    : empty("No household transactions yet.");
   const changes = state.feed.filter((item) =>
     [
       "planning.rejected",
@@ -511,6 +532,7 @@ function renderPlans() {
       "goal.progressed",
       "goal.achieved",
       "goal.abandoned",
+      "finance.payment_missed",
     ].includes(item.kind),
   );
   $("plan-change-list").innerHTML = feedMarkup(changes, true);

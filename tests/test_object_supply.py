@@ -35,6 +35,7 @@ class ObjectSupplyTests(unittest.TestCase):
         location: str = "home",
         curiosity: float = 1.0,
         reliability: float = 1.0,
+        available_pence: int | None = None,
     ) -> list[DomainEvent]:
         return object_supply_events(
             history,
@@ -45,6 +46,7 @@ class ObjectSupplyTests(unittest.TestCase):
             pathos_energy=0.4,
             curiosity=curiosity,
             values={"reliability": reliability},
+            available_pence=available_pence,
         )
 
     def test_pathos_can_use_or_save_a_finite_supply_without_duplicate_daily_choice(self):
@@ -94,6 +96,37 @@ class ObjectSupplyTests(unittest.TestCase):
             [event.kind for event in cancelled],
             ["object.replenishment_missed", "object.replenishment_cancelled"],
         )
+
+    def test_food_replenishment_requires_money_before_an_order_exists(self):
+        registration = DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "household-provisions",
+                "name": "Household provisions",
+                "owner_id": "pathos",
+                "custodian_id": "pathos",
+                "location_id": "home",
+                "condition": "usable",
+                "quantity": 1,
+                "reorder_at": 3,
+                "unit": "meal portions",
+            },
+        )
+        stock = DomainEvent(
+            "object.stock_changed",
+            "pathos",
+            {"object_id": "household-provisions", "from_quantity": 1, "quantity": 0},
+        )
+        events = self.supply(
+            [registration, stock],
+            self.now.replace(hour=9),
+            reliability=1.0,
+            available_pence=0,
+        )
+        self.assertEqual([event.kind for event in events], ["object.replenishment_decided"])
+        self.assertEqual(events[0].payload["decision"], "go_without")
+        self.assertIn("balance", str(events[0].payload["reason"]))
 
     def _find_consumption(
         self, decision: str, *, curiosity: float

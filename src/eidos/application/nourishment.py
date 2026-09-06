@@ -42,6 +42,7 @@ def nourishment_events(
     state: PathosState,
     at: datetime,
     planning: PlanningState,
+    available_pence: int,
     *,
     pathos_busy: bool,
 ) -> list[DomainEvent]:
@@ -93,7 +94,15 @@ def nourishment_events(
     description = options[sample % len(options)]
     provisions = planning.objects.get(PROVISIONS_ID)
     uses_household_stock = state.location_id != "cafe"
-    if uses_household_stock and (provisions is None or not provisions.quantity):
+    cannot_afford_cafe = not uses_household_stock and available_pence < 600
+    if cannot_afford_cafe or (
+        uses_household_stock and (provisions is None or not provisions.quantity)
+    ):
+        reason = (
+            "The household balance could not cover a cafe meal."
+            if cannot_afford_cafe
+            else "There were no household provisions available here."
+        )
         return [
             DomainEvent(
                 "meal.unavailable",
@@ -102,7 +111,7 @@ def nourishment_events(
                     "meal_id": meal_id,
                     "meal_kind": meal_kind,
                     "location_id": state.location_id,
-                    "reason": "There were no household provisions available here.",
+                    "reason": reason,
                     "simulated_at": at.isoformat(),
                 },
                 correlation_id=meal_id,

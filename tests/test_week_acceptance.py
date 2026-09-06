@@ -21,6 +21,12 @@ class SevenDayAcceptanceTests(unittest.TestCase):
 
             history = life.history()
             snapshot = life.snapshot()
+            self.assertGreaterEqual(snapshot["finances"]["balance_pence"], 0)
+            self.assertTrue(snapshot["finances"]["transactions"])
+            transaction_sources = {
+                item["source_event_id"] for item in snapshot["finances"]["transactions"]
+            }
+            self.assertTrue(transaction_sources <= {str(event.event_id) for event in history})
             goals = {item["goal_id"]: item for item in snapshot["goals"]}
             self.assertEqual(goals["bind-pocket-notebook"]["status"], "achieved")
             self.assertEqual(goals["repair-mara-lamp-goal"]["status"], "achieved")

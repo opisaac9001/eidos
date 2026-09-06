@@ -55,7 +55,12 @@ encounters, interruptions, completed actions and missed commitments. The work
 request policy combines energy, rest and mastery with schedule feasibility.
 Non-café meals consume owned household provisions. Low stock uses the established
 order, handoff, retry and cancellation lifecycle instead of silently refilling; café
-meals identify their external source, while money accounting is not yet simulated.
+meals identify their external source and cost. The prototype opens an additive GBP
+household ledger. Actual weekday
+workshop evidence earns income; café meals and accepted provision orders cost money;
+failed deliveries refund only an earlier charge; and weekly housing costs are either
+paid or explicitly missed without overdrawing the account. Older experiences before
+the ledger was introduced are not retroactively charged or paid.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe

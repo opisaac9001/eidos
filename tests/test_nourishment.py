@@ -28,7 +28,7 @@ class NourishmentTests(unittest.TestCase):
     def test_hunger_and_free_time_produce_one_replayable_meal(self):
         state = PathosState(simulated_at=self.noon, awake=True, hunger=0.56, energy=0.5)
         history, planning = self.provisions()
-        events = nourishment_events(history, state, self.noon, planning, pathos_busy=False)
+        events = nourishment_events(history, state, self.noon, planning, 12_000, pathos_busy=False)
         self.assertEqual([event.kind for event in events], ["meal.eaten", "object.stock_changed"])
         self.assertEqual(events[0].payload["meal_kind"], "lunch")
         after = state.apply(events[0])
@@ -37,7 +37,9 @@ class NourishmentTests(unittest.TestCase):
         after_stock = project_planning([*history, *events]).objects["household-provisions"]
         self.assertEqual(after_stock.quantity, 3)
         self.assertEqual(
-            nourishment_events([*history, *events], after, self.noon, planning, pathos_busy=False),
+            nourishment_events(
+                [*history, *events], after, self.noon, planning, 12_000, pathos_busy=False
+            ),
             [],
         )
 
@@ -45,10 +47,10 @@ class NourishmentTests(unittest.TestCase):
         state = PathosState(simulated_at=self.noon, awake=True, hunger=0.5)
         history, planning = self.provisions()
         self.assertEqual(
-            nourishment_events(history, state, self.noon, planning, pathos_busy=True), []
+            nourishment_events(history, state, self.noon, planning, 12_000, pathos_busy=True), []
         )
         later = self.noon + timedelta(hours=2)
-        events = nourishment_events(history, state, later, planning, pathos_busy=False)
+        events = nourishment_events(history, state, later, planning, 12_000, pathos_busy=False)
         self.assertEqual(events[0].payload["meal_kind"], "lunch")
         self.assertEqual(events[0].payload["simulated_at"], later.isoformat())
 
@@ -56,16 +58,18 @@ class NourishmentTests(unittest.TestCase):
         sleeping = PathosState(simulated_at=self.noon, awake=False, hunger=0.9)
         _, planning = self.provisions()
         self.assertEqual(
-            nourishment_events([], sleeping, self.noon, planning, pathos_busy=False), []
+            nourishment_events([], sleeping, self.noon, planning, 12_000, pathos_busy=False), []
         )
         full = PathosState(simulated_at=self.noon, awake=True, hunger=0.1)
-        self.assertEqual(nourishment_events([], full, self.noon, planning, pathos_busy=False), [])
+        self.assertEqual(
+            nourishment_events([], full, self.noon, planning, 12_000, pathos_busy=False), []
+        )
 
     def test_pressing_hunger_can_produce_a_bounded_snack_outside_mealtime(self):
         at = self.noon.replace(hour=16)
         state = PathosState(simulated_at=at, awake=True, hunger=0.82, energy=0.3)
         history, planning = self.provisions()
-        events = nourishment_events(history, state, at, planning, pathos_busy=False)
+        events = nourishment_events(history, state, at, planning, 12_000, pathos_busy=False)
         self.assertEqual(events[0].payload["meal_kind"], "snack")
         after = state.apply(events[0])
         self.assertGreaterEqual(after.hunger, 0.04)
@@ -74,12 +78,15 @@ class NourishmentTests(unittest.TestCase):
     def test_empty_home_stock_prevents_a_meal_but_cafe_service_is_explicit(self):
         history, empty = self.provisions(0)
         home = PathosState(simulated_at=self.noon, awake=True, hunger=0.7)
-        unavailable = nourishment_events(history, home, self.noon, empty, pathos_busy=False)
+        unavailable = nourishment_events(history, home, self.noon, empty, 12_000, pathos_busy=False)
         self.assertEqual([event.kind for event in unavailable], ["meal.unavailable"])
         cafe = PathosState(simulated_at=self.noon, location_id="cafe", awake=True, hunger=0.7)
-        served = nourishment_events(history, cafe, self.noon, empty, pathos_busy=False)
+        served = nourishment_events(history, cafe, self.noon, empty, 12_000, pathos_busy=False)
         self.assertEqual([event.kind for event in served], ["meal.eaten"])
         self.assertEqual(served[0].payload["provision_source"], "cafe_service")
+        unaffordable = nourishment_events(history, cafe, self.noon, empty, 599, pathos_busy=False)
+        self.assertEqual([event.kind for event in unaffordable], ["meal.unavailable"])
+        self.assertIn("balance", str(unaffordable[0].payload["reason"]))
 
     def test_household_provisions_are_seeded_once(self):
         events = provision_foundation_events([], self.noon)
