@@ -18,6 +18,7 @@ from eidos.application.inner_life import (
 )
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.planner import overdue_plan_events
+from eidos.application.social_activity import scheduled_social_events
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
@@ -146,6 +147,8 @@ class Life:
                 "social.request_negotiated",
                 "social.request_accepted",
                 "social.request_declined",
+                "invitation.made",
+                "social.activity_completed",
                 "intention.adopted",
                 "intention.completed",
                 "action.accepted",
@@ -438,6 +441,15 @@ class Life:
                         pending.append(
                             DomainEvent("affect.changed", "pathos", {"valence": state.valence})
                         )
+            social_activity = scheduled_social_events(
+                project_planning(history + pending),
+                actor_location_id=state.location_id,
+                simulated_at=current,
+                actual_revision=len(history) + len(pending),
+            )
+            if social_activity:
+                project_planning(history + pending + social_activity)
+                pending.extend(social_activity)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),

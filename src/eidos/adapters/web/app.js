@@ -23,6 +23,8 @@ const labels = {
   "social.request_negotiated": "TERMS NEGOTIATED",
   "social.request_accepted": "TERMS ACCEPTED",
   "social.request_declined": "REQUEST DECLINED",
+  "invitation.made": "AN INVITATION",
+  "social.activity_completed": "TIME TOGETHER",
   "intention.adopted": "AN INTENTION FORMED",
   "intention.completed": "AN INTENTION COMPLETED",
   "action.accepted": "ACTION VALIDATED",

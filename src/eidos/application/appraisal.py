@@ -119,6 +119,8 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         }.get(location)
     if event.kind == "npc.encountered":
         return ("connection", 0.05, 0.4, 0.45, 0.6)
+    if event.kind == "social.activity_completed":
+        return ("connection", 0.06, 0.55, 0.35, 0.8)
     if event.kind == "schedule.interrupted":
         return ("mastery", -0.04, -0.35, 0.5, 0.4)
     if event.kind == "action.accepted" and event.payload.get("action") == "repair":

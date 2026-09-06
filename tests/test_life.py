@@ -146,6 +146,7 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(finished["objects"][0]["condition"], "repaired")
         self.assertEqual(finished["intentions"][0]["status"], "completed")
         self.assertEqual(finished["beliefs"][0]["owner_id"], "pathos")
+        self.assertEqual(finished["beliefs"][0]["subject_id"], "pathos")
         self.assertEqual(finished["beliefs"][0]["object_value"], "reliable")
         self.assertGreater(finished["people"][0]["trust"], active["people"][0]["trust"])
         kinds = [event.kind for event in self.life.history()]
@@ -173,3 +174,35 @@ class LifeTests(unittest.TestCase):
         self.assertLess(after_waking["pathos"]["valence"], before_waking["pathos"]["valence"])
         applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
         self.assertEqual(len(applied), 1)
+
+    def test_accepted_invitation_requires_co_presence_and_becomes_shared_history(self):
+        for hours in (24, 24, 24, 9):
+            self.life.advance(hours)
+        snapshot = self.life.snapshot()
+        request = next(item for item in snapshot["requests"] if item["action"] == "talk")
+        calendar = next(item for item in snapshot["calendar"] if item["action"] == "talk")
+        commitment = next(
+            item for item in snapshot["commitments"] if item["request_id"] == request["request_id"]
+        )
+        self.assertEqual(request["status"], "accepted")
+        self.assertEqual(calendar["status"], "completed")
+        self.assertEqual(commitment["status"], "fulfilled")
+        events = self.life.history()
+        activity = next(event for event in events if event.kind == "social.activity_completed")
+        memory = next(
+            event
+            for event in events
+            if event.kind == "memory.recorded"
+            and event.payload.get("source_event_id") == str(activity.causation_id)
+        )
+        self.assertEqual(memory.payload["person_id"], "mara")
+        self.assertLess(
+            next(index for index, event in enumerate(events) if event.kind == "invitation.made"),
+            next(
+                index
+                for index, event in enumerate(events)
+                if event.kind == "social.activity_completed"
+            ),
+        )
+        replay = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        self.assertEqual(replay["calendar"], snapshot["calendar"])

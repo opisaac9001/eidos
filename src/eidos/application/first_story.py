@@ -238,6 +238,7 @@ def story_events(
                 "pathos",
                 {
                     "person_id": "mara",
+                    "evidence_actor_id": "pathos",
                     "trust_delta": 0.08,
                     "familiarity_delta": 0.04,
                     "reason": "Pathos kept the lamp-repair promise.",
@@ -258,6 +259,86 @@ def story_events(
                     "goal_id": goal_id,
                     "owner": "pathos",
                     "importance": 0.9,
+                    "confidence": 1.0,
+                },
+            ),
+        ]
+    social = project_social(existing)
+    if day == 3 and current.hour == 9 and "coffee-with-mara" not in social.requests:
+        meeting = (current + timedelta(days=1)).replace(hour=9)
+        due = meeting.replace(hour=11)
+        request = DomainEvent(
+            "social.request_opened",
+            "pathos",
+            {
+                "request_id": "coffee-with-mara",
+                "requester_id": "mara",
+                "responder_id": "pathos",
+                "action": "talk",
+                "target_id": "mara",
+                "title": "Coffee with Mara",
+                "due_at": due.isoformat(),
+                "earliest_start": meeting.isoformat(),
+                "location_id": "cafe",
+                "duration_hours": 1,
+                "simulated_at": at,
+            },
+        )
+        opened = [
+            DomainEvent(
+                "invitation.made",
+                "pathos",
+                {
+                    "person_id": "mara",
+                    "text": "Mara invited Pathos to sit for coffee the next morning.",
+                    "simulated_at": at,
+                },
+            ),
+            request,
+        ]
+        pending_social = project_social(existing + opened)
+        choice = choose_request_response(
+            pending_social.requests["coffee-with-mara"],
+            actor_id="pathos",
+            energy=actor_energy,
+            rest=actor_rest,
+            mastery=actor_mastery,
+            expected_revision=len(existing) + len(opened),
+        )
+        response = resolve_social_move(
+            choice,
+            state=pending_social,
+            actual_revision=len(existing) + len(opened),
+            simulated_at=current,
+        )
+        exchange = [*opened, *response.events]
+        accepted = project_social(existing + exchange).requests["coffee-with-mara"]
+        if accepted.status != "accepted":
+            return exchange
+        plan = plan_accepted_work(
+            accepted,
+            state=project_planning(existing + exchange),
+            actual_revision=len(existing) + len(exchange),
+            simulated_at=current,
+            preferred_start=meeting,
+        )
+        return [
+            *exchange,
+            *plan.events,
+            DomainEvent(
+                "memory.recorded",
+                "pathos",
+                {
+                    "text": "Mara invited me to coffee tomorrow, and I chose to make time for it.",
+                    "simulated_at": at,
+                    "source": "authored-first-story",
+                    "source_event_id": str(request.event_id),
+                    "category": "commitment",
+                    "location_id": "cafe",
+                    "person_id": "mara",
+                    "goal_id": "coffee-with-mara-goal",
+                    "owner": "pathos",
+                    "importance": 0.7,
                     "confidence": 1.0,
                 },
             ),

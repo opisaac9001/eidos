@@ -1,4 +1,4 @@
-"""Deterministic planning of explicitly accepted work requests."""
+"""Deterministic planning of explicitly accepted social requests."""
 
 from __future__ import annotations
 
@@ -55,11 +55,20 @@ def plan_accepted_work(
         return reject("request_not_accepted", "Planning cannot imply consent")
     if request.responder_id != "pathos":
         return reject("wrong_responsible_actor", "This planner only owns Pathos's commitments")
-    item = state.objects.get(request.target_id)
-    if item is None:
-        return reject("unknown_target", "The requested object does not exist")
-    if item.custodian_id != request.responder_id or item.location_id != request.location_id:
-        return reject("resource_unavailable", "The object is not available at the work location")
+    try:
+        action = ActionKind(request.action)
+    except ValueError:
+        return reject("unsupported_action", "No deterministic planner exists for this action yet")
+    if action is ActionKind.REPAIR:
+        item = state.objects.get(request.target_id)
+        if item is None:
+            return reject("unknown_target", "The requested object does not exist")
+        if item.custodian_id != request.responder_id or item.location_id != request.location_id:
+            return reject(
+                "resource_unavailable", "The object is not available at the work location"
+            )
+    elif action is not ActionKind.TALK:
+        return reject("unsupported_action", "No deterministic planner exists for this action yet")
     earliest = datetime.fromisoformat(request.earliest_start)
     due = datetime.fromisoformat(request.due_at)
     start = max(preferred_start, earliest, simulated_at)
@@ -77,9 +86,6 @@ def plan_accepted_work(
         )
         if start < other_end and other_start < end:
             return reject("schedule_conflict", f"The work overlaps {entry.title}")
-    if request.action != ActionKind.REPAIR.value:
-        return reject("unsupported_action", "No deterministic planner exists for this action yet")
-
     goal_id = f"{request.request_id}-goal"
     commitment_id = f"{request.request_id}-commitment"
     schedule_id = f"{request.request_id}-schedule"
@@ -133,7 +139,7 @@ def plan_accepted_work(
             proposal_id=f"intend-{request.request_id}",
             intention_id=intention_id,
             actor_id=request.responder_id,
-            action=ActionKind(request.action),
+            action=action,
             motivation=f"Honor the explicitly accepted request from {request.requester_id}.",
             priority=0.9,
             expected_revision=actual_revision + len(base),
@@ -229,6 +235,7 @@ def overdue_plan_events(state: PlanningState, simulated_at: datetime) -> list[Do
                     "relationship.changed",
                     {
                         "person_id": commitment.creditor_id,
+                        "evidence_actor_id": "pathos",
                         "trust_delta": -0.06,
                         "tension_delta": 0.05,
                         "reason": "Pathos missed an explicitly accepted commitment.",

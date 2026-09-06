@@ -12,7 +12,12 @@ class BeliefReviewTests(unittest.TestCase):
         positive = DomainEvent(
             "relationship.changed",
             "pathos",
-            {"person_id": "mara", "trust_delta": 0.08, "simulated_at": at},
+            {
+                "person_id": "pathos",
+                "evidence_actor_id": "mara",
+                "trust_delta": 0.08,
+                "simulated_at": at,
+            },
         )
         events = [positive]
         formed = relationship_belief_events(events, at)
@@ -25,13 +30,26 @@ class BeliefReviewTests(unittest.TestCase):
         negative = DomainEvent(
             "relationship.changed",
             "pathos",
-            {"person_id": "mara", "trust_delta": -0.1, "simulated_at": at},
+            {
+                "person_id": "pathos",
+                "evidence_actor_id": "mara",
+                "trust_delta": -0.1,
+                "simulated_at": at,
+            },
         )
         events.append(negative)
         events.extend(relationship_belief_events(events, at))
         belief = project_beliefs(events).beliefs["pathos-mara-commitment-reliability"]
         self.assertEqual(belief.status, "contested")
         self.assertEqual(belief.alternative_value, "unreliable")
+
+    def test_relationship_delta_without_behavior_actor_does_not_invent_a_belief(self):
+        legacy = DomainEvent(
+            "relationship.changed",
+            "pathos",
+            {"person_id": "mara", "trust_delta": 0.08, "simulated_at": "legacy"},
+        )
+        self.assertEqual(relationship_belief_events([legacy], "now"), [])
 
 
 if __name__ == "__main__":

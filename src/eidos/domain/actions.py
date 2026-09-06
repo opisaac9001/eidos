@@ -217,6 +217,24 @@ def resolve_action(
     elif proposal.action is ActionKind.TALK:
         if proposal.target_id is None:
             return reject("missing_argument", "Talk requires target_id")
+        if proposal.intention_id is not None and proposal.schedule_id is None:
+            return reject("missing_argument", "A planned conversation requires schedule_id")
+        if proposal.schedule_id is not None:
+            schedule = state.calendar.get(proposal.schedule_id)
+            if schedule is None:
+                return reject("unknown_schedule", "The scheduled conversation does not exist")
+            if schedule.status != "scheduled":
+                return reject("inactive_schedule", "The conversation is not currently scheduled")
+            if schedule.location_id != actor_location_id:
+                return reject("wrong_location", "The actor must be at the meeting place")
+            if simulated_at < datetime.fromisoformat(schedule.starts_at):
+                return reject("too_early", "The scheduled conversation has not started")
+            effects.append(
+                effect(
+                    "schedule.completed",
+                    {"schedule_id": schedule.schedule_id, "simulated_at": simulated_at},
+                )
+            )
         effects.append(
             effect(
                 "conversation.requested",

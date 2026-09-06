@@ -149,6 +149,65 @@ class ActionTests(unittest.TestCase):
         self.assertFalse(result.accepted)
         self.assertEqual(result.code, "intention_mismatch")
 
+    def test_planned_conversation_requires_its_time_and_place(self):
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "coffee",
+                "title": "Coffee with Mara",
+                "starts_at": self.now.isoformat(),
+                "ends_at": self.now.replace(hour=15).isoformat(),
+                "location_id": "cafe",
+                "actor_id": "pathos",
+                "action": "talk",
+                "target_id": "mara",
+            },
+        )
+        intention = DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "coffee-intention",
+                "actor_id": "pathos",
+                "action": "talk",
+                "target_id": "mara",
+                "motivation": "Spend time together",
+                "priority": 0.6,
+            },
+        )
+        state = self.state().apply(schedule).apply(intention)
+        proposal = ActionProposal(
+            "talk-to-mara",
+            "pathos",
+            ActionKind.TALK,
+            4,
+            target_id="mara",
+            schedule_id="coffee",
+            intention_id="coffee-intention",
+        )
+        accepted = resolve_action(
+            proposal,
+            state=state,
+            actor_location_id="cafe",
+            actual_revision=4,
+            simulated_at=self.now,
+        )
+        self.assertTrue(accepted.accepted)
+        final = state
+        for event in accepted.events:
+            final = final.apply(event)
+        self.assertEqual(final.calendar["coffee"].status, "completed")
+        self.assertEqual(final.intentions["coffee-intention"].status, "completed")
+        wrong_place = resolve_action(
+            proposal,
+            state=state,
+            actor_location_id="workshop",
+            actual_revision=4,
+            simulated_at=self.now,
+        )
+        self.assertEqual(wrong_place.code, "wrong_location")
+
     def test_action_json_contract_is_exact_and_versioned(self):
         raw = {
             "schema_version": 1,

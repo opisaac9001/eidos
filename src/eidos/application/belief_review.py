@@ -16,10 +16,10 @@ def relationship_belief_events(history: list[DomainEvent], simulated_at: str) ->
     for evidence in history:
         if evidence.kind != "relationship.changed" or str(evidence.event_id) in considered:
             continue
-        person_id = evidence.payload.get("person_id")
+        subject_id = evidence.payload.get("evidence_actor_id")
         trust_delta = evidence.payload.get("trust_delta", 0.0)
         if (
-            not isinstance(person_id, str)
+            not isinstance(subject_id, str)
             or isinstance(trust_delta, bool)
             or not isinstance(trust_delta, (int, float))
         ):
@@ -27,9 +27,9 @@ def relationship_belief_events(history: list[DomainEvent], simulated_at: str) ->
         combined = [*history, *output]
         proposal = BeliefProposal(
             proposal_id=f"review-relationship-{evidence.event_id}",
-            belief_id=f"pathos-{person_id}-commitment-reliability",
+            belief_id=f"pathos-{subject_id}-commitment-reliability",
             owner_id="pathos",
-            subject_id=person_id,
+            subject_id=subject_id,
             predicate="commitment_reliability",
             object_value="reliable" if trust_delta > 0 else "unreliable",
             confidence=min(0.9, 0.6 + abs(float(trust_delta))),

@@ -73,8 +73,8 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | SOCIAL-01 | User dialogue, remembered visits, contextual replies, idempotent sends | Partial: limited context | P2–P3 |
 | SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: single encounter | P3 |
-| SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: bounded work requests with explicit consent | P3 |
-| SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Planned | P3 |
+| SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: bounded favors and scheduled invitations with explicit consent | P3 |
+| SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Planned | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Planned | P3 |

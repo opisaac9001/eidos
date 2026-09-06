@@ -64,6 +64,27 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(intention.goal_id, commitment.goal_id)
         self.assertEqual(schedule.ends_at, (self.now + timedelta(days=1, hours=4)).isoformat())
 
+    def test_accepted_invitation_becomes_a_timed_talk_intention_without_an_object(self):
+        invitation = self.request(
+            request_id="coffee",
+            action="talk",
+            target_id="mara",
+            title="Coffee with Mara",
+            location_id="cafe",
+            duration_hours=1,
+        )
+        result = plan_accepted_work(
+            invitation,
+            state=self.state(),
+            actual_revision=1,
+            simulated_at=self.now,
+            preferred_start=self.now + timedelta(days=1),
+        )
+        self.assertTrue(result.accepted)
+        planning = self.state(result.events)
+        self.assertEqual(planning.calendar["coffee-schedule"].action, "talk")
+        self.assertEqual(planning.intentions["coffee-intention"].target_id, "mara")
+
     def test_unaccepted_infeasible_and_conflicting_requests_do_not_create_plans(self):
         unaccepted = plan_accepted_work(
             self.request(status="pending"),
