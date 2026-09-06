@@ -34,7 +34,7 @@ from eidos.application.inner_life import (
     waking_dream_events,
 )
 from eidos.application.invitations import follow_up_invitation_events
-from eidos.application.memory import MemoryIndex, memory_view, recall, terms
+from eidos.application.memory import MemoryIndex, memory_archive_page, memory_view, recall, terms
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
@@ -471,6 +471,26 @@ class Life:
         if self.history():
             return
         self.advance(8)
+
+    def browse_memories(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        query: str = "",
+        category: str = "all",
+    ) -> dict[str, Any]:
+        history = self.history()
+        state = self._project_state(history)
+        return memory_archive_page(
+            history,
+            state.simulated_at,
+            offset=offset,
+            limit=limit,
+            query=query,
+            category=category,
+            index=self._memory_index(history),
+        )
 
     def snapshot(self) -> dict[str, Any]:
         history = self.history()

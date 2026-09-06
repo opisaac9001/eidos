@@ -189,7 +189,11 @@ let state = null,
 let lastMessageSignature = "",
   pendingChat = null,
   toastTimer,
-  disconnected = false;
+  disconnected = false,
+  archivePage = null,
+  archiveLoading = false,
+  archiveSearchTimer = null,
+  archiveRequest = 0;
 document.querySelectorAll("[data-operator-only]").forEach((element) => {
   element.hidden = !operatorMode;
 });
@@ -226,6 +230,7 @@ function showView(view) {
   if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
+  if (view === "memories") loadMemoryArchive(true);
 }
 
 function toast(message) {
@@ -325,14 +330,30 @@ function renderArchive() {
   if (!state) return;
   const query = $("memory-search").value.toLowerCase().trim();
   const category = $("memory-filter").value;
-  const memoryPool = category === "archived" ? state.archived_memories || [] : state.memories;
-  const items = memoryPool.filter(
-    (item) =>
-      (!query || item.text.toLowerCase().includes(query)) &&
-      (category === "all" || category === "archived" || (item.category || "experience") === category),
-  );
-  $("archive-count").textContent =
-    `${items.length} matching memories · ${state.counts.memories} recorded in total · ${state.counts.archived_memories || 0} in cold archive${state.counts.memories > 300 ? " · browsing up to 300 per shelf" : ""}`;
+  const remote =
+    archivePage &&
+    archivePage.query.toLowerCase() === query &&
+    archivePage.category === category;
+  const memoryPool = remote
+    ? archivePage.items
+    : category === "archived"
+      ? state.archived_memories || []
+      : state.memories;
+  const items = remote
+    ? memoryPool
+    : memoryPool.filter(
+        (item) =>
+          (!query || item.text.toLowerCase().includes(query)) &&
+          (category === "all" ||
+            category === "archived" ||
+            (item.category || "experience") === category),
+      );
+  $("archive-count").textContent = remote
+    ? `${items.length} shown · ${archivePage.matching} matching memories · ${archivePage.total} recorded in total · ${archivePage.archived} in cold archive`
+    : `${items.length} matching recent memories · ${state.counts.memories} recorded in total · loading the full archive…`;
+  $("load-memories").hidden = !remote || archivePage.next_offset == null;
+  $("load-memories").disabled = archiveLoading;
+  $("load-memories").textContent = archiveLoading ? "Loading…" : "Load older memories";
   $("belief-list").innerHTML = (state.beliefs || []).length
     ? `<div class="eyebrow">PATHOS'S BELIEFS · EVIDENCE IS NOT WORLD TRUTH</div>${state.beliefs
         .map(
@@ -387,6 +408,42 @@ function renderArchive() {
         })
         .join("")
     : "<p>No explicit recall decisions recorded yet.</p>";
+}
+
+async function loadMemoryArchive(reset) {
+  if (!state || (archiveLoading && !reset)) return;
+  const query = $("memory-search").value.trim();
+  const category = $("memory-filter").value;
+  const offset = reset ? 0 : archivePage?.next_offset;
+  if (offset == null) return;
+  const requestNumber = ++archiveRequest;
+  archiveLoading = true;
+  renderArchive();
+  try {
+    const parameters = new URLSearchParams({
+      offset: String(offset),
+      limit: "50",
+      q: query,
+      category,
+    });
+    const page = await request(`/api/memories?${parameters}`);
+    if (requestNumber !== archiveRequest) return;
+    archivePage =
+      reset ||
+      !archivePage ||
+      archivePage.query !== page.query ||
+      archivePage.category !== page.category
+        ? page
+        : { ...page, items: [...archivePage.items, ...page.items] };
+    showError("");
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    if (requestNumber === archiveRequest) {
+      archiveLoading = false;
+      renderArchive();
+    }
+  }
 }
 
 function renderEngineFeed() {
@@ -678,6 +735,8 @@ function render(next) {
     : '<p class="context-note">You have not told him a clear preference yet.</p>';
   renderMessages();
   renderArchive();
+  if (currentView === "memories" && !archivePage && !archiveLoading)
+    loadMemoryArchive(true);
   renderPlans();
   renderEngineFeed();
   $("diagnostics").innerHTML =
@@ -781,8 +840,12 @@ $("catch-up").addEventListener("click", async () => {
 $("cancel-catch-up").addEventListener("click", async () => {
   if (await mutate("/api/catch-up/cancel", {})) toast("Catch-up cancelled at its last saved point.");
 });
-$("memory-search").addEventListener("input", renderArchive);
-$("memory-filter").addEventListener("change", renderArchive);
+$("memory-search").addEventListener("input", () => {
+  clearTimeout(archiveSearchTimer);
+  archiveSearchTimer = setTimeout(() => loadMemoryArchive(true), 250);
+});
+$("memory-filter").addEventListener("change", () => loadMemoryArchive(true));
+$("load-memories").addEventListener("click", () => loadMemoryArchive(false));
 $("feed-filter").addEventListener("change", renderEngineFeed);
 $("chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();

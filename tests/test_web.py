@@ -73,6 +73,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'id="catch-up"', body)
                 self.assertIn(b'id="dream-inspiration"', body)
                 self.assertIn(b'id="index-status"', body)
+                self.assertIn(b'id="load-memories"', body)
                 self.assertIn(b'class="controls" data-operator-only hidden', body)
             if path == "/operator":
                 self.assertIn(b"data-operator-only hidden", body)
@@ -81,6 +82,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b"person.plan_scheduled_for", body)
                 self.assertIn(b"state.scenes", body)
                 self.assertIn(b"state.emotion", body)
+                self.assertIn(b"function loadMemoryArchive", body)
                 self.assertIn(b'window.location.pathname === "/operator"', body)
             if path == "/api/export":
                 exported = json.loads(body)
@@ -103,6 +105,14 @@ class WebTests(unittest.TestCase):
             & {item["revision"] for item in second_page["events"]}
         )
         status, _ = self.request("GET", "/api/events?limit=999")
+        self.assertEqual(status, 400)
+        status, body = self.request("GET", "/api/memories?limit=2&q=lamp&category=all")
+        memories = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertLessEqual(len(memories["items"]), 2)
+        self.assertEqual(memories["category"], "all")
+        self.assertTrue(all(item.get("owner", "pathos") == "pathos" for item in memories["items"]))
+        status, _ = self.request("GET", "/api/memories?limit=500")
         self.assertEqual(status, 400)
 
     def test_boundary_rejects_cross_origin_and_bad_requests(self):

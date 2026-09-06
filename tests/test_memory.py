@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from eidos.application.memory import MemoryIndex, memory_view, recall, terms
+from eidos.application.memory import MemoryIndex, memory_archive_page, memory_view, recall, terms
 from eidos.domain.events import DomainEvent
 
 
@@ -87,6 +87,43 @@ class MemoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(recall([private], "key", self.now), [])
+
+    def test_complete_archive_pages_searches_without_exposing_private_npc_memory(self):
+        memories = [
+            self.memory(
+                f"Day {day} with the lamp.",
+                self.now - timedelta(days=day),
+                category="experience" if day % 2 else "encounter",
+            )
+            for day in range(5)
+        ]
+        private = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "Mara privately hid a key.",
+                "simulated_at": self.now.isoformat(),
+                "owner": "mara",
+            },
+        )
+        archived = DomainEvent(
+            "memory.archived",
+            "pathos",
+            {"memory_id": str(memories[-1].event_id), "simulated_at": self.now.isoformat()},
+        )
+        history = [*memories, private, archived]
+        first = memory_archive_page(history, self.now, limit=2, query="LAMP")
+        second = memory_archive_page(
+            history, self.now, offset=first["next_offset"], limit=2, query="lamp"
+        )
+        self.assertEqual((first["total"], first["matching"], first["archived"]), (5, 5, 1))
+        self.assertEqual(first["next_offset"], 2)
+        self.assertEqual(len(second["items"]), 2)
+        self.assertNotIn("privately hid", " ".join(item["text"] for item in first["items"]))
+        cold = memory_archive_page(history, self.now, category="archived")
+        self.assertEqual([item["id"] for item in cold["items"]], [str(memories[-1].event_id)])
+        with self.assertRaisesRegex(ValueError, "category"):
+            memory_archive_page(history, self.now, category="private")
 
     def test_entity_and_goal_indexes_explain_nonlexical_recall(self):
         linked = self.memory(

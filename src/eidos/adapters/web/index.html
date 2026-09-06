@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#111512" />
     <title>Eidos · A life unfolding</title>
     <link rel="stylesheet" href="/style.css" />
-    <script src="/app.js?v=20260905-2" defer></script>
+    <script src="/app.js?v=20260906-1" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -302,6 +302,11 @@
         <div id="dream-journal" class="memory-list"></div>
         <div id="consolidations" class="memory-list"></div>
         <div id="memory-list" class="memory-list"></div>
+        <div class="archive-actions">
+          <button id="load-memories" class="button quiet" hidden>
+            Load older memories
+          </button>
+        </div>
         <details class="panel call-inspector" data-operator-only hidden>
           <summary>Why memories surfaced</summary>
           <div id="recall-traces" aria-label="Memory recall explanations"></div>

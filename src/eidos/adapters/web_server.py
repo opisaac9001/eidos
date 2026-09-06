@@ -215,6 +215,23 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     )
                 except (ValueError, TypeError) as error:
                     self.respond(400, {"error": str(error)})
+            elif path == "/api/memories":
+                try:
+                    query_values = parse_qs(urlsplit(self.path).query)
+                    offset = int(query_values.get("offset", ["0"])[0])
+                    limit = int(query_values.get("limit", ["50"])[0])
+                    query_text = query_values.get("q", [""])[0]
+                    category = query_values.get("category", ["all"])[0]
+                    with runtime.lock:
+                        memory_page = runtime.life.browse_memories(
+                            offset=offset,
+                            limit=limit,
+                            query=query_text,
+                            category=category,
+                        )
+                    self.respond(200, memory_page)
+                except (ValueError, TypeError) as error:
+                    self.respond(400, {"error": str(error)})
             elif path == "/api/export":
                 with runtime.lock:
                     events = [event_json(event) for event in runtime.life.history()]

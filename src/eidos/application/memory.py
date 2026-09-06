@@ -504,6 +504,68 @@ def memory_view(
     return views
 
 
+def memory_archive_page(
+    history: list[DomainEvent],
+    now: datetime,
+    *,
+    offset: int = 0,
+    limit: int = 100,
+    query: str = "",
+    category: str = "all",
+    index: MemoryIndex | None = None,
+) -> dict[str, Any]:
+    """Page newest-first through Pathos's complete owned archive without rehearsal."""
+    if (
+        isinstance(offset, bool)
+        or isinstance(limit, bool)
+        or not isinstance(offset, int)
+        or not isinstance(limit, int)
+        or offset < 0
+        or not 1 <= limit <= 100
+    ):
+        raise ValueError("Memory archive offset and limit are invalid")
+    clean_query = query.strip().casefold()
+    if len(clean_query) > 200:
+        raise ValueError("Memory archive search must be at most 200 characters")
+    allowed = {
+        "all",
+        "archived",
+        "experience",
+        "encounter",
+        "conversation",
+        "commitment",
+        "plan-change",
+        "accomplishment",
+        "dream",
+    }
+    if category not in allowed:
+        raise ValueError("Memory archive category is unknown")
+    memories = list(reversed(memory_view(history, now, index=index)))
+    filtered = [
+        item
+        for item in memories
+        if (not clean_query or clean_query in str(item.get("text", "")).casefold())
+        and (
+            category == "all"
+            or (category == "archived" and item["archived"])
+            or item.get("category", "experience") == category
+        )
+    ]
+    items = filtered[offset : offset + limit]
+    next_offset = offset + len(items) if offset + len(items) < len(filtered) else None
+    return {
+        "revision": len(history),
+        "items": items,
+        "offset": offset,
+        "next_offset": next_offset,
+        "matching": len(filtered),
+        "total": len(memories),
+        "archived": sum(bool(item["archived"]) for item in memories),
+        "query": query.strip(),
+        "category": category,
+    }
+
+
 def _string_list(value: object, name: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"Materialized {name} must be a string list")

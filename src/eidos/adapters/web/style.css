@@ -830,6 +830,11 @@ hr {
   color: var(--muted);
   padding: 20px 0;
 }
+.archive-actions {
+  display: flex;
+  justify-content: center;
+  padding: 22px 0;
+}
 .memory-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

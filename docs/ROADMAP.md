@@ -286,6 +286,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   per relationship. At 08:00 on its annual recurrence, Pathos records a factual memory;
   an NPC date can enter the ordinary follow-up and invitation path, while a user date
   remains in-app context and cannot bypass outreach consent or create an external alert.
+- The Memory Archive now searches and pages through the complete Pathos-owned history
+  rather than silently stopping at a recent display window. Cold-archive state and
+  current accessibility remain visible, while NPC-private memories stay outside the
+  ordinary endpoint and interface.
 - Explicit first-person user statements and structured NPC self-reports create private
   remembered likes or avoidances. Later direct statements revise rather than erase the
   record; unsupported knowledge becomes uncertain after 180 simulated days. A held

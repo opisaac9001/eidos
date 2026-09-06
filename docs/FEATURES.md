@@ -105,7 +105,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard with communication-only ordinary surface and separate local operator view | P5 |
 | UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: occupied-aware delayed inbox plus start/leave controls, elapsed simulated time, and approaching-obligation context for live visits | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
-| UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export + revision-cursor event API | P2–P5 |
+| UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: complete Pathos-owned archive search/pagination, latest recall context, export, and revision-cursor event API | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |
 | UX-06 | Ensemble: traces, recovery, queue, budgets, context/causal inspector | Partial: latest 100 traces | P1 onward |
 | UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Partial: motif/seed journal and waking effects | P4 |
