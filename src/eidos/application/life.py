@@ -10,7 +10,12 @@ from eidos.application.belief_review import relationship_belief_events
 from eidos.application.cognition import perform
 from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
-from eidos.application.inner_life import active_concerns, waking_dream_events
+from eidos.application.inner_life import (
+    active_concerns,
+    dream_seed_sources,
+    record_dream_events,
+    waking_dream_events,
+)
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.planner import overdue_plan_events
 from eidos.domain.beliefs import project_beliefs
@@ -66,7 +71,8 @@ class Life:
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
-        memories, feed, conversations, recalls, consolidations = [], [], [], [], []
+        memories, feed, conversations, recalls, consolidations, dreams = [], [], [], [], [], []
+        dream_seeds: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
         concerns = {}
         for event in history:
@@ -123,6 +129,10 @@ class Life:
                 recalls.append(item)
             if event.kind == "memory.consolidated":
                 consolidations.append(item)
+            if event.kind == "dream.recorded":
+                dreams.append(item)
+            if event.kind == "dream.seed_linked":
+                dream_seeds.setdefault(str(payload["dream_id"]), []).append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -201,6 +211,10 @@ class Life:
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
             "consolidations": list(reversed(consolidations[-100:])),
+            "dreams": [
+                {**dream, "seeds": dream_seeds.get(str(dream["id"]), [])}
+                for dream in reversed(dreams[-100:])
+            ],
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
             "mode": self.mode,
@@ -432,22 +446,25 @@ class Life:
                 if current.hour == scheduled_hour:
                     text = await perform(self.gateway, role, context, at, pending)
                     if text:
-                        event = DomainEvent(
-                            kind,
-                            "pathos",
-                            {
-                                "text": text,
-                                "simulated_at": at,
-                                "source": self.mode,
-                                "role": role,
-                                **(
-                                    {"seed_concern_id": concerns_now[-1].payload["concern_id"]}
-                                    if role == "oneiros" and concerns_now
-                                    else {}
-                                ),
-                            },
-                        )
-                        pending.append(event)
+                        if role == "oneiros":
+                            seeds = dream_seed_sources(
+                                [item.event for item in selected_context], concerns_now
+                            )
+                            dream_events = record_dream_events(text, seeds, at, self.mode)
+                            pending.extend(dream_events)
+                            event = dream_events[0]
+                        else:
+                            event = DomainEvent(
+                                kind,
+                                "pathos",
+                                {
+                                    "text": text,
+                                    "simulated_at": at,
+                                    "source": self.mode,
+                                    "role": role,
+                                },
+                            )
+                            pending.append(event)
                         if role == "oneiros" and concerns_now:
                             pending.append(
                                 DomainEvent(
@@ -459,6 +476,8 @@ class Life:
                                         "valence_delta": -0.05,
                                         "reason": "unresolved concern carried into sleep",
                                     },
+                                    causation_id=event.event_id,
+                                    correlation_id=event.correlation_id,
                                 )
                             )
             appraisals, state = appraisal_events(history + pending, state, current)

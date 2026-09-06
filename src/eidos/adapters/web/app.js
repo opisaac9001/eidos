@@ -194,6 +194,15 @@ function renderArchive() {
   );
   $("archive-count").textContent =
     `${items.length} matching memories · ${state.counts.memories} recorded in total${state.counts.memories > 300 ? " · browsing the latest 300" : ""}`;
+  $("dream-journal").innerHTML = (state.dreams || []).length
+    ? `<div class="eyebrow">DREAM JOURNAL · FICTIONAL EXPERIENCE</div>${state.dreams
+        .slice(0, 6)
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(item.motif.replaceAll("_", " "))}</span><span>${item.seed_count} bounded seed${item.seed_count === 1 ? "" : "s"}</span></div><p>${esc(item.text)}</p><div class="memory-source">NOT WORLD FACT · ${item.seeds.length} source link${item.seeds.length === 1 ? "" : "s"} retained</div></article>`,
+        )
+        .join("")}`
+    : "";
   $("consolidations").innerHTML = (state.consolidations || []).length
     ? `<div class="eyebrow">SOURCE-LINKED THEMES</div>${state.consolidations
         .slice(0, 6)

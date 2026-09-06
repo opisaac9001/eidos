@@ -93,7 +93,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly thought | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: scheduled prose | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
-| INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: recent-context dream | P4 |
+| INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs and complete lineage | P4 |
 | INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: explicit recall/capped effect | P4 |
 | INNER-07 | Source-linked subjective/objective journals and interval summaries | Partial: daybook/events | P4–P5 |
 
@@ -107,7 +107,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Planned | P3 |
 | UX-06 | Ensemble: traces, recovery, queue, budgets, context/causal inspector | Partial: latest 100 traces | P1 onward |
-| UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Planned | P4 |
+| UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Partial: motif/seed journal and waking effects | P4 |
 | UX-08 | Keyboard/mobile/accessibility, reduced motion, onboarding, error/recovery states | Partial: five-view prototype | Every phase |
 
 Operator visibility is not character knowledge. Generated private associations

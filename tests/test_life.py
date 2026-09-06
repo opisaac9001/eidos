@@ -160,7 +160,11 @@ class LifeTests(unittest.TestCase):
         self.life.advance(24)
         before_waking = self.life.snapshot()
         dream = next(e for e in self.life.history() if e.kind == "dream.recorded")
-        self.assertEqual(dream.payload["seed_concern_id"], "finish-mara-lamp")
+        self.assertTrue(dream.payload["fiction"])
+        self.assertGreaterEqual(dream.payload["seed_count"], 1)
+        links = [e for e in self.life.history() if e.kind == "dream.seed_linked"]
+        self.assertEqual(len(links), dream.payload["seed_count"])
+        self.assertTrue(any(e.payload["seed_kind"] == "concern" for e in links))
         self.life.advance(7)
         after_waking = self.life.snapshot()
         recalled = [memory for memory in after_waking["memories"] if memory["category"] == "dream"]
