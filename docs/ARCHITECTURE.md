@@ -2,7 +2,7 @@
 
 ## Implemented local prototype
 
-`cli.py` wires SQLite and stand-in model adapters into `application/life.py`.
+`cli.py` wires SQLite and stand-in or HTTP model adapters into `application/life.py`.
 Both CLI advances and HTTP actions use that single scene engine. The HTTP
 adapter serves bundled static HTML/CSS/JavaScript on loopback. A serialized
 worker advances simulated time every three seconds while running. Client
@@ -15,8 +15,16 @@ use request IDs. The application restores state on startup and requires explicit
 resume. Event payloads are immutable scalar values with a versioned datetime
 codec that also reads the original time-event format.
 
-The rest of this document describes the target architecture. External inference,
-durable job scheduling, vector retrieval, and real-world tools are not implemented.
+Real HTTP inference and a recent-call inspector are implemented. State reads use
+a cached committed snapshot while inference holds the serialized mutation lock.
+Source archiving recovers accepted encounters when memory-model copying fails.
+The critic has conservative contract checks, not general semantic understanding.
+
+The rest of this document describes the target architecture. Durable job
+scheduling, vector retrieval, and real-world tools are not implemented.
+The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
+[system interactions](SYSTEM_INTERACTIONS.md) define the delivery sequence and
+behavioral contracts. Their richer event fields require explicit schema evolution.
 
 ## Two systems, one product
 

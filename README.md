@@ -46,6 +46,15 @@ state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
 and [architecture](docs/ARCHITECTURE.md).
 
+## Planning the complete experience
+
+The [master roadmap](docs/ROADMAP.md) sets the dependency order and acceptance
+milestones. The [feature inventory](docs/FEATURES.md) separates implemented,
+partial, planned and optional capabilities. The
+[system interaction specification](docs/SYSTEM_INTERACTIONS.md) explains how
+memories, emotion, relationships, plans, dreams and world events influence one
+another without confusing character beliefs with historical truth.
+
 ## Development
 
 Python 3.12 or newer is required. With mise installed:
@@ -99,16 +108,18 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 
 ## Prototype boundaries
 
-- Everything runs locally; the Dell and real inference are not connected yet.
-- Chat uses a handful of templates plus recent memories. It does not understand
-  arbitrary questions. Failure and stand-in states are visible.
+- The application runs locally; real inference has been tested on the small lab
+  server. Dell deployment remains pending.
+- Offline chat uses templates; model mode uses the configured HTTP endpoint and
+  recent memories. The lab model's semantic reliability is limited. Failure,
+  source-archive recovery and stand-in states are visible.
 - NPC schedules and encounter counts persist by replaying deterministic rules
   and events; autonomous NPC planning and nuanced relationships are future work.
 - Memories use text search and provenance links; semantic retrieval is pending.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay is appropriate for short prototype runs. Longer runs need
-  snapshots, pagination, backups, and a durable job queue before real inference.
+  snapshots, pagination, backups, and a durable job queue before sustained operation.
 - Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the
