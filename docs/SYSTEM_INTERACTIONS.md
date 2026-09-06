@@ -143,6 +143,17 @@ inspectable to the operator. Privacy deletion is a separate authorized workflow
 that must also address indexes, summaries and backup retention. It must never be
 blocked by a fictional requirement that "nothing can be forgotten."
 
+On the first simulated day of each month, a deterministic retention review moves at
+most 200 cold, ordinary Pathos memories older than 180 days into a subjective archive.
+Memories at importance 0.75 or above and memories accessed within 90 days remain in
+ordinary working retrieval. Archiving is an event that points to the original memory;
+it deletes zero audit events. Archived material no longer enters background context,
+but a matching word, entity, goal, or relationship cue can still resurface it. The
+observatory exposes both the review and a searchable cold-archive shelf. A two-year
+deterministic policy soak checks batching, idempotency, unique archive identities, and
+source preservation. Physical event-log retention and privacy deletion remain distinct
+operator policies.
+
 Important invariants: high confidence is not guaranteed truth; a dream can be
 remembered as an experience without its content becoming fact; embedding
 similarity is relevance, not proof; generated associations never manufacture

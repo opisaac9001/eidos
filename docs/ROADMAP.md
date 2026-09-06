@@ -319,15 +319,19 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
-2. Capture the Dell inventory, then benchmark and pin its private inference stack.
-3. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
+1. Capture the Dell inventory, then benchmark and pin its private inference stack.
+2. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
    repeated prose, and low-quality but schema-valid model output.
 
 Completed: the opt-in British-town adapter now records attributed, expiring
 Open-Meteo weather/daylight and optional RSS headlines. Moira can cite them only as
 non-authoritative inspiration; deterministic validation, replay, failure visibility,
 and the observatory preserve the seed-versus-world-fact boundary.
+
+Completed: a bounded monthly retention review now moves cold ordinary memories out of
+background recall without deleting evidence. Important or recently accessed memories
+stay active, direct cues can resurface archived material, the observatory exposes the
+cold shelf, and a deterministic two-year policy soak preserves every source event.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,
 operator visibility, known limitations and migration notes. Real-model probes

@@ -254,13 +254,17 @@ network authorization; the server remains loopback-only until authenticated depl
   consolidation. The recall maps are maintained as a versioned, checksummed,
   event-anchored projection that can be discarded and rebuilt safely. Existing
   databases migrate in place without rewriting events. Vector retrieval remains
-  optional and unimplemented.
+  optional and unimplemented. A monthly bounded retention review moves cold ordinary
+  memories out of background context after 180 simulated days while preserving every
+  source event; important/recently accessed memories stay active, direct cues can
+  resurface the cold archive, and the archive remains visible to the operator.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay passes restart-spanning seven-day acceptance and thirty-day
   offline soak gates. Event history has stable revision pagination and a checksummed,
-  event-anchored core-state checkpoint; longer deployments still need broader
-  materialized indexes and archive maintenance. Verified online backups and supervised
+  event-anchored core-state checkpoint; memory retention also has a deterministic
+  two-year policy soak. Longer deployments still need broader materialized indexes and
+  physical event-log retention policy. Verified online backups and supervised
   durable model workers are implemented.
 - Export history downloads the entire event log, including conversations.
 

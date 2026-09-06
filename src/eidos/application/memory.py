@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any, Mapping
 from uuid import UUID
 
+from eidos.application.memory_retention import archived_memory_ids
 from eidos.domain.events import DomainEvent
 
 WORDS = re.compile(r"[a-z0-9]+")
@@ -312,6 +313,7 @@ def recall(
     relationship_ids: set[str] | None = None,
     diverse: bool = False,
     index: MemoryIndex | None = None,
+    include_archived: bool = False,
 ) -> list[RecalledMemory]:
     """Rank accessible Pathos memories without treating similarity as proof."""
     if now.utcoffset() is None or not 1 <= limit <= 1000:
@@ -324,6 +326,7 @@ def recall(
     if index.revision != len(history):
         raise ValueError("Memory index revision does not match supplied history")
     ranked = []
+    archived = archived_memory_ids(history)
     for event in index.memories:
         importance, confidence = _metadata(event)
         age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
@@ -353,6 +356,12 @@ def recall(
         relationship_relevance = min(
             1.0, len(matched_relationships) / max(1, len(relationship_ids))
         )
+        is_archived = str(event.event_id) in archived
+        has_direct_cue = bool(
+            matched_terms or matched_entities or matched_goals or matched_relationships
+        )
+        if is_archived and not include_archived and not has_direct_cue and importance < 0.75:
+            continue
         components = {
             "lexical": 0.27 * relevance,
             "entity": 0.14 * entity_relevance,
@@ -469,9 +478,11 @@ def memory_view(
         now,
         limit=min(1000, max(1, owned_count)),
         index=index,
+        include_archived=True,
     )
     by_id = {str(item.event.event_id): item for item in ranked}
     views = []
+    archived = archived_memory_ids(history)
     for event in history:
         if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
             continue
@@ -487,6 +498,7 @@ def memory_view(
                 "recall_score": item.score,
                 "recalled_text": item.recalled_text,
                 "detail_level": item.detail_level,
+                "archived": str(event.event_id) in archived,
             }
         )
     return views

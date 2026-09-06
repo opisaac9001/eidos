@@ -26,6 +26,8 @@ const labels = {
   "memory.recorded": "A MEMORY FORMED",
   "role.failed": "PERFORMER ERROR",
   "memory.recovered": "SOURCE ARCHIVE RECOVERY",
+  "memory.retention_reviewed": "MEMORY RETENTION REVIEW",
+  "memory.archived": "MEMORY MOVED TO COLD ARCHIVE",
   "request.made": "A REQUEST",
   "social.request_opened": "REQUEST OPENED",
   "social.request_negotiated": "TERMS NEGOTIATED",
@@ -296,13 +298,14 @@ function renderArchive() {
   if (!state) return;
   const query = $("memory-search").value.toLowerCase().trim();
   const category = $("memory-filter").value;
-  const items = state.memories.filter(
+  const memoryPool = category === "archived" ? state.archived_memories || [] : state.memories;
+  const items = memoryPool.filter(
     (item) =>
       (!query || item.text.toLowerCase().includes(query)) &&
-      (category === "all" || (item.category || "experience") === category),
+      (category === "all" || category === "archived" || (item.category || "experience") === category),
   );
   $("archive-count").textContent =
-    `${items.length} matching memories · ${state.counts.memories} recorded in total${state.counts.memories > 300 ? " · browsing the latest 300" : ""}`;
+    `${items.length} matching memories · ${state.counts.memories} recorded in total · ${state.counts.archived_memories || 0} in cold archive${state.counts.memories > 300 ? " · browsing up to 300 per shelf" : ""}`;
   $("belief-list").innerHTML = (state.beliefs || []).length
     ? `<div class="eyebrow">PATHOS'S BELIEFS · EVIDENCE IS NOT WORLD TRUTH</div>${state.beliefs
         .map(
@@ -342,7 +345,7 @@ function renderArchive() {
     ? items
         .map(
           (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${esc((item.category || "experience").toUpperCase())} · ${Math.round((item.accessibility ?? 1) * 100)}% ACCESSIBLE</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(item.source || "authored-routine")}${item.source_event_id ? ` · linked to event ${esc(item.source_event_id.slice(0, 8))}` : ""}</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.archived ? "COLD ARCHIVE · " : ""}${esc((item.category || "experience").toUpperCase())} · ${Math.round((item.accessibility ?? 1) * 100)}% ACCESSIBLE</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(item.source || "authored-routine")}${item.source_event_id ? ` · linked to event ${esc(item.source_event_id.slice(0, 8))}` : ""}${item.archived ? " · ORIGINAL EVIDENCE RETAINED" : ""}</div></article>`,
         )
         .join("")
     : '<div class="empty">No memories match that search.</div>';

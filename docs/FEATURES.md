@@ -26,7 +26,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
 | MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: discounted testimony, direct confirmation, revision ledger, and checked incremental materialization | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Partial: conservative detail omission in working context | P2 |
-| MEM-09 | Long-run retention/index maintenance and archive policy | Partial: incremental event-anchored memory index; retention/archive planned | P6 |
+| MEM-09 | Long-run retention/index maintenance and archive policy | Partial: incremental event-anchored index plus monthly bounded cold archive with direct-cue resurfacing; physical compaction remains separate | P6 |
 
 Accepted encounter evidence already has explicit deterministic archive recovery.
 Actual user-requested data deletion is a privacy workflow, not simulated fading.

@@ -34,6 +34,7 @@ from eidos.application.inner_life import (
 )
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.memory import MemoryIndex, memory_view, recall, terms
+from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
@@ -636,6 +637,8 @@ class Life:
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
+                "memory.retention_reviewed",
+                "memory.archived",
                 "transfer.offered",
                 "transfer.accepted",
                 "transfer.declined",
@@ -819,6 +822,9 @@ class Life:
             "concerns": list(concerns.values()),
             "dream_inspirations": [vars_for(item) for item in inspirations],
             "memories": list(reversed(memories[-300:])),
+            "archived_memories": list(
+                reversed([item for item in memories if item["archived"]][-300:])
+            ),
             "recalls": list(reversed(recalls[-100:])),
             "consolidations": list(reversed(consolidations[-100:])),
             "dreams": [
@@ -848,6 +854,7 @@ class Life:
             "counts": {
                 "events": len(history),
                 "memories": len(memories),
+                "archived_memories": sum(item["archived"] for item in memories),
                 "conversations": len(conversations),
             },
         }
@@ -1814,6 +1821,7 @@ class Life:
             episodes, state = affect_episode_events(history + pending, state, current)
             pending.extend(episodes)
             pending.extend(emotion_sample_events(history + pending, state, current))
+            pending.extend(memory_retention_events(history + pending, current))
             if current.hour == 0:
                 pending.extend(
                     consolidation_events(

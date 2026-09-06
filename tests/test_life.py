@@ -7,6 +7,7 @@ from pathlib import Path
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
 from eidos.ports.town_signals import TownSignal
 
@@ -120,6 +121,38 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(
             any(item["kind"] == "external_signal.observed" for item in snapshot["feed"])
         )
+
+    def test_monthly_retention_is_integrated_and_visible(self):
+        store = SQLiteEventStore(self.path)
+        old = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I noticed an ordinary receipt near the bus stop.",
+                "owner": "pathos",
+                "importance": 0.2,
+                "confidence": 1.0,
+                "simulated_at": "2026-01-01T00:00:00+00:00",
+            },
+        )
+        store.append(
+            "pathos",
+            [
+                old,
+                DomainEvent(
+                    "time.advanced",
+                    "pathos",
+                    {"simulated_at": "2026-08-01T00:00:00+00:00"},
+                ),
+            ],
+            0,
+        )
+        life = Life(store, StandInGateway())
+        life.advance(1)
+        snapshot = life.snapshot()
+        self.assertEqual(snapshot["counts"]["archived_memories"], 1)
+        self.assertEqual(snapshot["archived_memories"][0]["id"], str(old.event_id))
+        self.assertTrue(any(event.kind == "memory.retention_reviewed" for event in life.history()))
 
     def test_multi_day_snapshot_with_private_plans_is_json_serializable(self):
         for _ in range(3):
