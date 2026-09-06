@@ -140,6 +140,7 @@ class GatewayTests(unittest.TestCase):
                             "time": "2026-01-16T09:00:00+00:00",
                             "needs": {"curiosity": 0.8},
                             "preferences": ["spending reflective time outdoors"],
+                            "traits": {"openness": 0.69},
                             "known_places": {"home": {"name": "Home"}},
                             "calendar": [],
                             "private_operator_field": "must not pass",
@@ -156,6 +157,7 @@ class GatewayTests(unittest.TestCase):
         context = json.loads(self.payload["messages"][1]["content"])
         self.assertEqual(context["needs"], {"curiosity": 0.8})
         self.assertEqual(context["preferences"], ["spending reflective time outdoors"])
+        self.assertEqual(context["traits"], {"openness": 0.69})
         self.assertIn("slowly learned preferences", self.payload["messages"][0]["content"])
         self.assertNotIn("private_operator_field", context)
 

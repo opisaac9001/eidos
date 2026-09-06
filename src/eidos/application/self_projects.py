@@ -33,6 +33,7 @@ async def autonomous_project_events(
     emotion: Mapping[str, object],
     values: Mapping[str, float],
     preferences: Sequence[str],
+    traits: Mapping[str, float],
     memories: Sequence[str],
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
@@ -73,6 +74,7 @@ async def autonomous_project_events(
         "emotion": dict(emotion),
         "values": dict(values),
         "preferences": list(preferences),
+        "traits": dict(traits),
         "recent_memories": list(memories[-10:]),
         "known_places": places,
         "usable_resources": resources,

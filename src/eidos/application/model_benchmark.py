@@ -321,6 +321,7 @@ async def _self_project_sample(gateway: ModelGateway, run: int) -> dict[str, obj
         emotion={"label": ("quiet", "contentment", "melancholy")[run % 3]},
         values={"curiosity": 0.8, "care": 0.7},
         preferences=("quiet mornings",),
+        traits={"openness": 0.68, "sociability": 0.52, "follow_through": 0.64},
         memories=["The workshop sounded different in the rain."],
     )
     trace = next(

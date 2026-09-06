@@ -85,6 +85,7 @@ const labels = {
   "self_project.step_failed": "A PROJECT STEP FAILED",
   "preference.emerged": "A PREFERENCE TOOK SHAPE",
   "preference.retired": "A PREFERENCE FADED",
+  "trait.adjusted": "A TENDENCY SHIFTED",
   "goal.activated": "A PERSONAL GOAL",
   "goal.progressed": "GOAL PROGRESS",
   "goal.achieved": "GOAL ACHIEVED",
@@ -550,8 +551,11 @@ function render(next) {
   const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
   $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   const preferences = state.identity?.preferences || [];
+  const traits = Object.entries(state.identity?.traits || {})
+    .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)
+    .join(" · ");
   $("preferences-summary").textContent = preferences.length
-    ? `Drawn toward: ${preferences.join(" · ")}`
+    ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}`
     : "Preferences are still taking shape…";
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);

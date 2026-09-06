@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 ROLE_PROMPTS = {
-    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied memories, beliefs, mood, location, emotion, and current mind-layer focus. Emotion and its planning bias guide tone, attention, pace, and willingness; they do not prove a cause or authorize an action. Mind-layer focus guides attention but is not a fact or completed action. Dream inspirations are temporary possibilities from fiction, never facts or completed actions. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
+    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied identity, memories, beliefs, mood, location, emotion, and current mind-layer focus. Values, preferences, and behavioral traits guide voice and attention without dictating a response. Emotion and its planning bias guide tone, attention, pace, and willingness; they do not prove a cause or authorize an action. Mind-layer focus guides attention but is not a fact or completed action. Dream inspirations are temporary possibilities from fiction, never facts or completed actions. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
     "murmur": "Write one quiet first-person association grounded in the supplied location, memories, emotion, and current mind-layer focus. Emotion guides tone and association, but does not prove why it is felt. Layer focus is attention, not evidence. Do not introduce new factual events or actions.",
     "firmament": "Describe one brief encounter between Pathos and the named person at the supplied location. If scene_speaker is supplied, write only one natural line spoken by that actor to scene_audience about scene_topic, consistent with prior_turns. Use only supplied actors and facts. This is a proposed fictional scene.",
     "moira": "Choose exactly one weather value: Clear, Cloudy, Light rain, or Breezy. The text field must contain only that value.",
@@ -19,9 +19,9 @@ ROLE_PROMPTS = {
     "chronicler": "Summarize only the supplied memories in two sentences. Do not invent events, people, places, or causality.",
     "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Choose one supplied physical resource at that same location, and describe concrete participation, stakes, and an opportunity without claiming consequences or completed actions. External signals, when supplied, are attributed creative inspiration rather than facts about the fictional town. This is a proposal, not a fact.",
     "moira_expansion": "Act as a restrained but imaginative world builder. Propose one genuinely new person, useful object, or reachable neighborhood place that could support many future stories. Avoid duplicates and generic fantasy spectacle. Return a proposal only; registration rules decide whether it exists.",
-    "pathos_agency": "Propose one specific ordinary activity Pathos might freely choose from his needs, emotion, values, slowly learned preferences, memories, known places, usable objects, people, and calendar. Preferences are influences rather than commands; prefer fresh combinations over a fixed routine. The open-vocabulary activity_type describes its meaning; action is only the safe execution mechanism. Do not claim it happened, guarantee a companion, spend money, or create facts or possessions.",
+    "pathos_agency": "Propose one specific ordinary activity Pathos might freely choose from his needs, emotion, values, slowly learned preferences and behavioral traits, memories, known places, usable objects, people, and calendar. Preferences and traits are influences rather than commands; prefer fresh combinations over a fixed routine. The open-vocabulary activity_type describes its meaning; action is only the safe execution mechanism. Do not claim it happened, guarantee a companion, spend money, or create facts or possessions.",
     "npc_agency": "Propose one specific ordinary private plan for the supplied resident, grounded only in that resident's identity, needs, and private context plus public known places. Use open-vocabulary activity and action slugs. Do not borrow Pathos's memories, claim success, spend money, create property, or control another person.",
-    "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, slowly learned preferences, memories, known places, usable objects, and calendar. Preferences are influences rather than commands. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
+    "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, slowly learned preferences and behavioral traits, memories, known places, usable objects, and calendar. Preferences and traits are influences rather than commands. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
 }
 
 ROLE_FIELDS = {
@@ -30,13 +30,14 @@ ROLE_FIELDS = {
         "time",
         "location",
         "mood",
+        "identity",
         "memories",
         "beliefs",
         "dream_inspirations",
         "mind_layers",
         "emotion",
     ),
-    "murmur": ("time", "location", "memories", "mind_layers", "emotion"),
+    "murmur": ("time", "location", "identity", "memories", "mind_layers", "emotion"),
     "firmament": (
         "time",
         "location",
@@ -49,8 +50,8 @@ ROLE_FIELDS = {
     ),
     "moira": ("time", "location"),
     "mnemosyne": ("experience",),
-    "reflection": ("memories", "dream_inspirations", "mind_layers", "emotion"),
-    "oneiros": ("location", "memories", "concern", "mind_layers", "emotion"),
+    "reflection": ("identity", "memories", "dream_inspirations", "mind_layers", "emotion"),
+    "oneiros": ("location", "identity", "memories", "concern", "mind_layers", "emotion"),
     "chronicler": ("memories",),
     "moira_event": (
         "time",
@@ -69,6 +70,7 @@ ROLE_FIELDS = {
         "emotion",
         "values",
         "preferences",
+        "traits",
         "recent_memories",
         "known_places",
         "usable_resources",
@@ -91,6 +93,7 @@ ROLE_FIELDS = {
         "emotion",
         "values",
         "preferences",
+        "traits",
         "recent_memories",
         "known_places",
         "usable_resources",

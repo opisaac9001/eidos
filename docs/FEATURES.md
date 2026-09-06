@@ -40,7 +40,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
 | SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows | P3 |
-| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair/bookbinding skills, morning habit, and capped week-spanning behavioral preference emergence/retirement | P6 |
+| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded skills/habit, capped week-spanning preference lifecycle, and one-point month-spanning behavioral trait drift | P6 |
 
 ## Planning and time — Chronos / Pathos
 

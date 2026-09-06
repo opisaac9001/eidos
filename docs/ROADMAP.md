@@ -94,6 +94,10 @@ changes in fourteen days, only five learned preferences may coexist, and 120 day
 behavioral disuse retires one without altering the character-pack identity. Active
 preferences are visible and feed subsequent activity and project proposals as soft
 influences rather than scripts.
+Behavioral openness, sociability, and follow-through are separate slow tendencies:
+five matching resolved outcomes across at least thirty days can move one by 0.01,
+only once per month and no farther than 0.15 from its character baseline. The active
+levels ground conversation and future proposals, but never override feasibility.
 Critical exhaustion can interrupt and causally replace a lower-priority private plan
 without making ordinary fluctuations rewrite the day. Shared familiarity can make a
 connection need more attractive, but Pathos's one-sided trust is never treated as

@@ -61,6 +61,7 @@ from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
+from eidos.application.trait_development import trait_development_events
 from eidos.application.urgent_incidents import (
     active_incident_location,
     urgent_incident_events,
@@ -100,6 +101,7 @@ from eidos.domain.scenes import (
 from eidos.domain.seasons import project_season, season_change_events, season_for
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
+from eidos.domain.traits import project_traits
 from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import ROLES
@@ -463,6 +465,7 @@ class Life:
         history = self.history()
         state = self._project_state(history)
         identity = project_identity(history)
+        traits = project_traits(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
@@ -651,6 +654,7 @@ class Life:
                 "habit.reinforced",
                 "preference.emerged",
                 "preference.retired",
+                "trait.adjusted",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -776,6 +780,7 @@ class Life:
                 "name": identity.name,
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
+                "traits": dict(traits.levels),
                 "established": identity.established,
             },
             "weather": weather,
@@ -1079,6 +1084,7 @@ class Life:
             project_history = history + pending
             project_feeling = project_emotion(project_history)
             project_identity_state = project_identity(project_history)
+            project_trait_state = project_traits(project_history)
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1101,6 +1107,7 @@ class Life:
                 },
                 values=project_identity_state.values,
                 preferences=project_identity_state.preferences,
+                traits=project_trait_state.levels,
                 memories=[
                     str(event.payload["text"])
                     for event in project_history
@@ -1114,6 +1121,7 @@ class Life:
             agency_history = history + pending
             current_emotion = project_emotion(agency_history)
             agency_identity = project_identity(agency_history)
+            agency_traits = project_traits(agency_history)
             agency = await autonomous_activity_events(
                 agency_history,
                 current,
@@ -1136,6 +1144,7 @@ class Life:
                 },
                 values=agency_identity.values,
                 preferences=agency_identity.preferences,
+                traits=agency_traits.levels,
                 memories=[
                     str(event.payload["text"])
                     for event in agency_history
@@ -1534,6 +1543,7 @@ class Life:
             )
             pending.extend(development_events(history + pending, at))
             pending.extend(preference_development_events(history + pending, current))
+            pending.extend(trait_development_events(history + pending, current))
             overdue = overdue_plan_events(self._planning(history + pending), current)
             if overdue:
                 self._planning(history + pending + overdue)
@@ -1580,6 +1590,7 @@ class Life:
             )
             memories = [item.recalled_text for item in selected_context]
             identity_now = project_identity(history + pending)
+            traits_now = project_traits(history + pending)
             development_now = project_development(history + pending)
             context = {
                 "location": catalog_now.location_name(state.location_id),
@@ -1588,6 +1599,7 @@ class Life:
                 "identity": {
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
+                    "traits": dict(traits_now.levels),
                 },
                 "development": {
                     "skills": {
@@ -2261,6 +2273,7 @@ class Life:
         at = state.simulated_at.isoformat()
         pending: list[DomainEvent] = []
         identity = project_identity(history)
+        traits = project_traits(history)
         if not identity.established:
             pending.append(identity_established_event(at))
             identity = project_identity(history + pending)
@@ -2308,6 +2321,7 @@ class Life:
             "identity": {
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
+                "traits": dict(traits.levels),
             },
             "memories": [item.recalled_text for item in selected],
             "beliefs": [

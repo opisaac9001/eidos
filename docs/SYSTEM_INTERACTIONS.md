@@ -511,6 +511,15 @@ what can happen. If no supporting voluntary behavior recurs for 120 days, a sour
 retirement removes only that learned preference. The default character pack is never
 silently edited. Both changes remain in the event history and are shown in the feed.
 
+Traits are slower numeric tendencies, not moods or moral scores. Openness,
+sociability, and follow-through begin from the character pack. Five matching realized
+choices or resolved project/commitment outcomes must span thirty days before one level
+can move by 0.01. Only one trait changes per thirty days and each remains within 0.15
+of baseline. Replay validates the prior value, direction, result, source category,
+source times, cadence, and bound. Failed outcomes may support a small downward
+follow-through tendency; they do not erase values, diagnose pathology, or prove what
+Pathos will do next.
+
 ## 10. Failure, safety and inference boundaries
 
 - Queue jobs only from committed state, or use an atomic outbox. Input snapshots

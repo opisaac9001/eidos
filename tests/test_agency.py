@@ -154,6 +154,7 @@ class AgencyTests(unittest.TestCase):
                 emotion={"label": "quiet", "valence": 0.1},
                 values={"curiosity": 0.8},
                 preferences=("quiet mornings",),
+                traits={"openness": 0.68},
                 memories=["I noticed rain collecting on the old bench."],
             )
         )
