@@ -3072,6 +3072,7 @@ class Life:
                     "accessibility_score": item.components["accessibility"],
                     "importance_score": item.components["importance"],
                     "confidence_score": item.components["confidence"],
+                    "mood_congruence_score": item.components["mood_congruence"],
                     "matched_entity_count": len(item.matched_entities),
                     "matched_goal_count": len(item.matched_goals),
                     "matched_relationship_count": len(item.matched_relationships),
