@@ -35,6 +35,7 @@ class Scene:
     status: str = "active"
     turn_count: int = 0
     end_reason: str | None = None
+    interruption_source_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,10 +86,30 @@ class SceneState:
                 next_actor_id=next_actor,
                 turn_count=scene.turn_count + 1,
             )
-        elif event.kind == "scene.ended":
+        elif event.kind == "scene.interrupted":
             scene = _existing(scenes, payload)
             if scene.status != "active":
-                raise ValueError("Only an active scene can end")
+                raise ValueError("Only an active scene can be interrupted")
+            actor = _required(payload, "actor_id")
+            if actor not in {scene.initiator_id, scene.partner_id}:
+                raise ValueError("Only a participant can acknowledge an interruption")
+            scenes[scene.scene_id] = replace(
+                scene,
+                status="paused",
+                interruption_source_id=_required(payload, "source_event_id"),
+            )
+        elif event.kind == "scene.resumed":
+            scene = _existing(scenes, payload)
+            if scene.status != "paused":
+                raise ValueError("Only a paused scene can resume")
+            actor = _required(payload, "actor_id")
+            if actor not in {scene.initiator_id, scene.partner_id}:
+                raise ValueError("Only a participant can resume a scene")
+            scenes[scene.scene_id] = replace(scene, status="active", interruption_source_id=None)
+        elif event.kind == "scene.ended":
+            scene = _existing(scenes, payload)
+            if scene.status not in {"active", "paused"}:
+                raise ValueError("Only an unfinished scene can end")
             actor = _required(payload, "actor_id")
             if actor not in {scene.initiator_id, scene.partner_id}:
                 raise ValueError("Only a scene participant can end it")
@@ -134,6 +155,23 @@ class SceneEndProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class SceneInterruptProposal:
+    proposal_id: str
+    scene_id: str
+    actor_id: str
+    source_event_id: UUID
+    expected_revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class SceneResumeProposal:
+    proposal_id: str
+    scene_id: str
+    actor_id: str
+    expected_revision: int
+
+
+@dataclass(frozen=True, slots=True)
 class SceneResolution:
     accepted: bool
     code: str
@@ -165,6 +203,12 @@ def resolve_scene_start(
         return _reject(proposed, "invalid_text", "Scene identifiers and topic are required")
     if proposal.scene_id in state.scenes:
         return _reject(proposed, "duplicate_scene", "The scene already exists")
+    if any(
+        scene.status in {"active", "paused"}
+        and {proposal.initiator_id, proposal.partner_id} & {scene.initiator_id, scene.partner_id}
+        for scene in state.scenes.values()
+    ):
+        return _reject(proposed, "actor_busy", "A participant is already in a scene")
     if proposal.initiator_id == proposal.partner_id:
         return _reject(proposed, "same_actor", "A scene needs two distinct participants")
     if {proposal.initiator_id, proposal.partner_id} - known_actor_ids:
@@ -215,7 +259,11 @@ def resolve_scene_turn(
     ):
         return _reject(proposed, "duplicate_proposal", "This scene turn already happened")
     scene = state.scenes.get(proposal.scene_id)
-    if scene is None or scene.status != "active":
+    if scene is None:
+        return _reject(proposed, "closed_scene", "The scene is not active")
+    if scene.status == "paused":
+        return _reject(proposed, "paused_scene", "The scene must resume before another turn")
+    if scene.status != "active":
         return _reject(proposed, "closed_scene", "The scene is not active")
     if proposal.actor_id != scene.next_actor_id:
         return _reject(proposed, "wrong_turn", "Another participant is awaited")
@@ -353,6 +401,76 @@ def resolve_scene_end(
         correlation_id=scene.scene_id,
     )
     return SceneResolution(True, "ended", (proposed, ended))
+
+
+def resolve_scene_interruption(
+    proposal: SceneInterruptProposal,
+    *,
+    state: SceneState,
+    history: Sequence[DomainEvent],
+    actual_revision: int,
+    simulated_at: str,
+) -> SceneResolution:
+    proposed = _proposal_event(
+        "scene.interruption_proposed", proposal.proposal_id, proposal.scene_id
+    )
+    if proposal.expected_revision != actual_revision:
+        return _reject(proposed, "stale_revision", "The scene changed before interruption")
+    scene = state.scenes.get(proposal.scene_id)
+    if scene is None or scene.status != "active":
+        return _reject(proposed, "closed_scene", "Only an active scene can be interrupted")
+    if proposal.actor_id not in {scene.initiator_id, scene.partner_id}:
+        return _reject(proposed, "not_participant", "Only a participant can pause the scene")
+    if not any(event.event_id == proposal.source_event_id for event in history):
+        return _reject(proposed, "missing_interruption", "An interruption needs a real source")
+    interrupted = DomainEvent(
+        "scene.interrupted",
+        "pathos",
+        {
+            "scene_id": scene.scene_id,
+            "actor_id": proposal.actor_id,
+            "source_event_id": str(proposal.source_event_id),
+            "simulated_at": simulated_at,
+        },
+        causation_id=proposal.source_event_id,
+        correlation_id=scene.scene_id,
+    )
+    return SceneResolution(True, "interrupted", (proposed, interrupted))
+
+
+def resolve_scene_resume(
+    proposal: SceneResumeProposal,
+    *,
+    state: SceneState,
+    actor_locations: Mapping[str, str],
+    actual_revision: int,
+    simulated_at: str,
+) -> SceneResolution:
+    proposed = _proposal_event("scene.resume_proposed", proposal.proposal_id, proposal.scene_id)
+    if proposal.expected_revision != actual_revision:
+        return _reject(proposed, "stale_revision", "The world changed before scene resumption")
+    scene = state.scenes.get(proposal.scene_id)
+    if scene is None or scene.status != "paused":
+        return _reject(proposed, "not_paused", "Only a paused scene can resume")
+    if proposal.actor_id not in {scene.initiator_id, scene.partner_id}:
+        return _reject(proposed, "not_participant", "Only a participant can resume the scene")
+    if any(
+        actor_locations.get(actor_id) != scene.location_id
+        for actor_id in (scene.initiator_id, scene.partner_id)
+    ):
+        return _reject(proposed, "not_co_present", "Both participants must return to the place")
+    resumed = DomainEvent(
+        "scene.resumed",
+        "pathos",
+        {
+            "scene_id": scene.scene_id,
+            "actor_id": proposal.actor_id,
+            "simulated_at": simulated_at,
+        },
+        causation_id=proposed.event_id,
+        correlation_id=scene.scene_id,
+    )
+    return SceneResolution(True, "resumed", (proposed, resumed))
 
 
 def project_scenes(events: Sequence[DomainEvent]) -> SceneState:

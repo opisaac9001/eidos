@@ -39,7 +39,7 @@ from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
-from eidos.application.scene_story import bounded_scene_events
+from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import (
@@ -322,6 +322,8 @@ class Life:
                 "social.request_declined",
                 "invitation.made",
                 "social.activity_completed",
+                "scene.interrupted",
+                "scene.resumed",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",
@@ -759,6 +761,15 @@ class Life:
             )
             pending.extend(
                 await bounded_scene_events(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    current,
+                    len(history) + len(pending),
+                    self.gateway,
+                )
+            )
+            pending.extend(
+                await continuing_scene_events(
                     history + pending,
                     {"pathos": state.location_id, **npc_locations},
                     current,

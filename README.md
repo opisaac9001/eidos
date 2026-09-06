@@ -144,8 +144,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   abandonment, and renegotiation. General autonomous planning remains future work.
 - A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
   a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
-  memories. The integrated two-turn scene requests performer-generated dialogue and
-  uses explicit audited authored fallbacks when generation fails.
+  memories. Integrated two- and four-turn scenes request performer-generated dialogue;
+  the longer exchange pauses for a sourced world incident and resumes a day later with
+  its topic and turn order intact. Both use explicit audited authored fallbacks when
+  generation fails.
 - A calm four-week neighborhood rhythm plans seed swaps, repair tables, shared tea,
   and sketch walks with explicit lead time and cooldowns. Only co-present residents
   perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for

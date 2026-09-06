@@ -219,12 +219,14 @@ the deadline expires. Plan cooldowns bound repetition. These private plans appea
 in the operator lens and are never inserted into Pathos's context automatically.
 
 Social scenes now have an explicit start, alternating typed turns, mutable topic,
-one-to-six-turn budget, voluntary exit, sourced interruption, and terminal status.
+one-to-six-turn budget, voluntary exit, sourced pause/resume, and terminal status.
 Private turns create memories only for their audience; public turns also reach
 co-present observers. The first two-turn bench exchange is an authored acceptance
-fixture whose individual lines are performer proposals. Invalid or unavailable model
-output records a failure and uses a labeled authored fallback without bypassing the
-scene resolver. Broader dialogue and interruption policies remain future work.
+fixture whose individual lines are performer proposals. A four-turn workshop exchange
+is interrupted by a durable incident and resumes the next day only after both actors
+return; topic and awaited speaker survive replay. Invalid or unavailable model output
+records a failure and uses a labeled authored fallback without bypassing the scene
+resolver. Broader recurring dialogue and voluntary-exit policies remain future work.
 
 ## 8. Dream and reflection feedback loop
 

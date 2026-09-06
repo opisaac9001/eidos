@@ -5,11 +5,15 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.scenes import (
     SceneEndProposal,
     SceneEndReason,
+    SceneInterruptProposal,
     ScenePrivacy,
+    SceneResumeProposal,
     SceneStartProposal,
     SceneTurnProposal,
     project_scenes,
     resolve_scene_end,
+    resolve_scene_interruption,
+    resolve_scene_resume,
     resolve_scene_start,
     resolve_scene_turn,
 )
@@ -163,6 +167,74 @@ class SceneTests(unittest.TestCase):
         )
         self.assertTrue(accepted.accepted)
         self.assertEqual(accepted.events[-1].causation_id, source.event_id)
+
+    def test_interrupted_scene_preserves_turn_and_topic_then_resumes(self):
+        started = self.start(4)
+        source = DomainEvent("world.incident_occurred", "pathos", {"text": "A delivery arrived"})
+        history = [*started.events, source]
+        interrupted = resolve_scene_interruption(
+            SceneInterruptProposal("pause", "bench", "pathos", source.event_id, len(history)),
+            state=project_scenes(history),
+            history=history,
+            actual_revision=len(history),
+            simulated_at=self.at,
+        )
+        history.extend(interrupted.events)
+        paused = project_scenes(history).scenes["bench"]
+        self.assertEqual(
+            (paused.status, paused.turn_count, paused.topic_id), ("paused", 0, "bench-care")
+        )
+        blocked_turn = resolve_scene_turn(
+            SceneTurnProposal(
+                "paused-turn",
+                "bench",
+                "rowan",
+                "One more thing.",
+                "continue",
+                "bench-care",
+                ScenePrivacy.PRIVATE,
+                len(history),
+            ),
+            state=project_scenes(history),
+            history=history,
+            actor_locations=self.locations,
+            actual_revision=len(history),
+            simulated_at=self.at,
+        )
+        self.assertEqual(blocked_turn.code, "paused_scene")
+        resumed = resolve_scene_resume(
+            SceneResumeProposal("resume", "bench", "rowan", len(history)),
+            state=project_scenes(history),
+            actor_locations=self.locations,
+            actual_revision=len(history),
+            simulated_at=self.at,
+        )
+        history.extend(resumed.events)
+        scene = project_scenes(history).scenes["bench"]
+        self.assertEqual(
+            (scene.status, scene.next_actor_id, scene.topic_id), ("active", "rowan", "bench-care")
+        )
+
+    def test_scene_cannot_resume_until_both_people_return(self):
+        started = self.start()
+        source = DomainEvent("world.incident_occurred", "pathos")
+        history = [*started.events, source]
+        interrupted = resolve_scene_interruption(
+            SceneInterruptProposal("pause", "bench", "rowan", source.event_id, len(history)),
+            state=project_scenes(history),
+            history=history,
+            actual_revision=len(history),
+            simulated_at=self.at,
+        )
+        history.extend(interrupted.events)
+        resumed = resolve_scene_resume(
+            SceneResumeProposal("resume", "bench", "pathos", len(history)),
+            state=project_scenes(history),
+            actor_locations={**self.locations, "rowan": "home"},
+            actual_revision=len(history),
+            simulated_at=self.at,
+        )
+        self.assertEqual(resumed.code, "not_co_present")
 
 
 if __name__ == "__main__":

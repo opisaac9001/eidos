@@ -26,6 +26,8 @@ const labels = {
   "social.request_declined": "REQUEST DECLINED",
   "invitation.made": "AN INVITATION",
   "social.activity_completed": "TIME TOGETHER",
+  "scene.interrupted": "CONVERSATION PAUSED",
+  "scene.resumed": "CONVERSATION RESUMED",
   "speech.delivered": "SOMETHING SAID",
   "travel.completed": "ARRIVED",
   "intention.adopted": "AN INTENTION FORMED",
@@ -530,7 +532,7 @@ function render(next) {
     (state.scenes || [])
       .map(
         (scene) =>
-          `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`,
+          `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`,
       )
       .join(""),
   );

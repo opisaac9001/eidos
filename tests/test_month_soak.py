@@ -86,6 +86,29 @@ class MonthSoakTests(unittest.TestCase):
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }
             self.assertGreaterEqual(len(thoughts), 4)
+            continued_scene = next(
+                item
+                for item in snapshot["scenes"]
+                if item["scene_id"] == "ellis-shared-tools-scene"
+            )
+            self.assertEqual(
+                (
+                    continued_scene["status"],
+                    continued_scene["turn_count"],
+                    continued_scene["end_reason"],
+                ),
+                ("ended", 4, "turn_budget"),
+            )
+            interrupted = next(event for event in events if event.kind == "scene.interrupted")
+            resumed = next(event for event in events if event.kind == "scene.resumed")
+            self.assertLess(events.index(interrupted), events.index(resumed))
+            self.assertTrue(
+                any(
+                    event.event_id == interrupted.causation_id
+                    and event.kind == "world.incident_occurred"
+                    for event in events
+                )
+            )
 
 
 if __name__ == "__main__":

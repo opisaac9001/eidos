@@ -237,8 +237,8 @@ boundaries and must not rely on emotional coercion.
    remaining high-cost belief, planning, relationship, and consolidation projections.
 2. Expand the completed perception- and need-driven NPC goal loop with more personal
    projects, competing priorities, interruption, and relationship-motivated choices.
-3. Expand the new bounded scene lifecycle beyond its first integrated two-turn
-   performer-driven exchange into richer dialogue policies and interruption/resume.
+3. Generalize the now-integrated four-turn interruption/resume scene into recurring
+   dialogue policies with topic selection, voluntary exits, and relationship pacing.
 4. Expand the new seasonal, resource-backed neighborhood rhythm into a broad palette
    of ordinary generated events and project opportunities without forcing drama.
 5. Add an optional source-attributed British-town signal adapter for weather, daylight,
