@@ -24,6 +24,7 @@ const labels = {
   "world_thread.resolved": "A NEIGHBORHOOD THREAD SETTLED",
   "world.expansion_accepted": "THE WORLD GREW",
   "world.expansion_rejected": "WORLD ADDITION DECLINED",
+  "world.pack_imported": "A WORLD RELEASE WAS ADDED",
   "reflection.recorded": "EVENING REFLECTION",
   "dream.recorded": "A DREAM · NOT WORLD HISTORY",
   "day.summarized": "THE DAYBOOK",
@@ -660,6 +661,14 @@ function render(next) {
         )
         .join("")
     : '<p class="muted">No neighborhood story is unfolding right now.</p>';
+  const worldPacks = state.world_packs || [];
+  $("world-pack-section").hidden = !worldPacks.length;
+  $("world-packs").innerHTML = worldPacks
+    .map(
+      (pack) =>
+        `<article class="panel person-card"><div class="panel-kicker">RELEASE ${pack.version} · VERIFIED MANIFEST</div><h2>${esc(pack.name)}</h2><p>${esc(pack.description)}</p><div class="person-foot"><span>${pack.entity_count} persistent additions</span><span>${pack.entity_ids.map((id) => esc(id)).join(" · ")}</span></div></article>`,
+    )
+    .join("");
   $("town-signals").innerHTML = (state.external_signals || []).length
     ? state.external_signals
         .slice(0, 6)

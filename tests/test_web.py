@@ -74,6 +74,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'id="dream-inspiration"', body)
                 self.assertIn(b'id="index-status"', body)
                 self.assertIn(b'id="load-memories"', body)
+                self.assertIn(b'id="world-pack-section"', body)
                 self.assertIn(b'class="controls" data-operator-only hidden', body)
             if path == "/operator":
                 self.assertIn(b"data-operator-only hidden", body)

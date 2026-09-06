@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
+from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.life import Life
 from eidos.application.world_packs import import_world_pack
 from eidos.domain.world_catalog import project_world_catalog
 
@@ -71,6 +73,11 @@ class WorldPackTests(unittest.TestCase):
         self.assertEqual(imported.payload["checksum"], report.checksum)
         self.assertEqual(
             project_world_catalog(SQLiteEventStore(self.store.path).read("pathos")), catalog
+        )
+        visible = Life(self.store, StandInGateway()).snapshot()["world_packs"]
+        self.assertEqual(visible[0]["pack_id"], "canal-quarter")
+        self.assertEqual(
+            visible[0]["entity_ids"], ["reading-room", "imani-cole", "community-radio"]
         )
 
     def test_invalid_entity_rejects_the_entire_pack_without_partial_registration(self):

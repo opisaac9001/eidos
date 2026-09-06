@@ -526,6 +526,8 @@ class Life:
         catch_up_summaries = []
         npc_memories = []
         external_signals = []
+        world_packs = []
+        world_pack_entities: dict[tuple[str, int], list[str]] = {}
         concerns = {}
         for event in history:
             payload: dict[str, Any] = {
@@ -590,6 +592,12 @@ class Life:
                 catch_up_summaries.append(item)
             if event.kind == "external_signal.observed":
                 external_signals.append(item)
+            if event.kind == "world.pack_entity_linked":
+                key = (str(payload["pack_id"]), int(payload["version"]))
+                world_pack_entities.setdefault(key, []).append(str(payload["entity_id"]))
+            if event.kind == "world.pack_imported":
+                key = (str(payload["pack_id"]), int(payload["version"]))
+                world_packs.append({**item, "entity_ids": world_pack_entities.get(key, [])})
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -605,6 +613,7 @@ class Life:
                 "world_thread.resolved",
                 "world.expansion_accepted",
                 "world.expansion_rejected",
+                "world.pack_imported",
                 "reflection.recorded",
                 "dream.recorded",
                 "dream.recalled",
@@ -835,6 +844,7 @@ class Life:
             },
             "weather": weather,
             "external_signals": list(reversed(external_signals[-30:])),
+            "world_packs": list(reversed(world_packs)),
             "world_threads": [
                 vars_for(thread) for thread in reversed(list(world_threads.values())[-30:])
             ],
