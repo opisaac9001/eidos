@@ -23,8 +23,10 @@ The critic has conservative contract checks, not general semantic understanding.
 The durable SQLite job store and isolated runner are implemented and tested for
 priority, concurrent claims, leases, bounded retry, cancellation and stale
 results before/after inference. Normal CLI and browser model paths use the queue
-through a durable gateway decorator; background supervision remains pending.
-Explainable lexical recall is implemented; vector retrieval and tools are not.
+through a durable gateway decorator with supervised background workers. Callers still
+await their requested result; detached optional-effect reconciliation remains pending.
+Explainable term/entity/goal/relationship recall is implemented; vector retrieval and
+outside tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
 [system interactions](SYSTEM_INTERACTIONS.md) define the delivery sequence and
 behavioral contracts. Their richer event fields require explicit schema evolution.

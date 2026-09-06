@@ -23,22 +23,24 @@ scientifically faithful human psychology. The first substantial release is
 
 ## Current baseline
 
-Implemented: SQLite event history, atomic writes/replay, fixed daily routines,
-pause/resume, four places, three scheduled neighbors, basic energy/emotional
-tone, source-linked memories, conversations, and five UX views. Eight logical AI
-roles use stand-ins or real HTTP inference; they are not eight deployed services.
-A deterministic critic checks contracts. The latest suite has 54 passing tests
-and the complete source tree passes strict static typing.
+Implemented: SQLite event history, atomic writes/replay, verified backups, daily
+routines, typed travel, open hours, four places, three persistent neighbors,
+multidimensional affect and needs, source-linked memories, conversations, and five
+UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
+eight deployed services. A deterministic critic checks contracts. The offline suite
+includes unit, replay, seven-day, and thirty-day gates under strict static typing.
 
 Hourly associations, reflection, dreams and a daybook run at fixed times.
 The first authored story now exercises a promise, object, calendar, interruption,
 repair, fulfillment, concern and directed trust. Concern-seeded dreams can create
 one capped waking effect and explicit dream recollection. Lexical recall includes
-importance, simulated-time fading and capped rehearsal. Normal CLI and browser
-model calls now use the durable queue and reuse completed work after restart.
-**Pathos does not yet choose plans and NPCs do not have independent minds.**
-Entity and goal indexes, owned beliefs and daily source-linked consolidation are
-implemented in memory; durable relationship/diversity indexes remain.
+importance, simulated-time fading and capped rehearsal. Normal CLI and browser model
+calls use supervised durable workers and reuse completed work after restart. Pathos
+makes a narrow class of value/capacity-aware social choices; NPCs have persistent
+offscreen locations, needs, and private activities but not general autonomous
+planning. Term, entity, goal, and relationship recall indexes, owned beliefs,
+conservative imperfect recall, and source-linked consolidation are replay projections
+rather than durable database indexes.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
