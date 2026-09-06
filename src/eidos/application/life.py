@@ -75,6 +75,7 @@ from eidos.application.world_perception import (
     community_resource_events,
     due_world_observations,
 )
+from eidos.application.world_threads import world_thread_events
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import BeliefState, project_beliefs
 from eidos.domain.commitments import project_renegotiations
@@ -107,6 +108,7 @@ from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import ROLES
 from eidos.domain.world_catalog import WorldCatalog, project_world_catalog
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
+from eidos.domain.world_threads import project_world_threads
 from eidos.ports.event_store import (
     EventStore,
     MaterializedProjection,
@@ -466,6 +468,7 @@ class Life:
         state = self._project_state(history)
         identity = project_identity(history)
         traits = project_traits(history)
+        world_threads = project_world_threads(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
@@ -562,6 +565,10 @@ class Life:
                 "world.signal_inspiration",
                 "world_event.signal_linked",
                 "world_event.occurred",
+                "world_thread.opened",
+                "world_thread.progressed",
+                "world_thread.extended",
+                "world_thread.resolved",
                 "world.expansion_accepted",
                 "world.expansion_rejected",
                 "reflection.recorded",
@@ -785,6 +792,9 @@ class Life:
             },
             "weather": weather,
             "external_signals": list(reversed(external_signals[-30:])),
+            "world_threads": [
+                vars_for(thread) for thread in reversed(list(world_threads.values())[-30:])
+            ],
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
             "locations": [
@@ -1366,6 +1376,13 @@ class Life:
                 current,
             )
             pending.extend(observation_output)
+            pending.extend(
+                world_thread_events(
+                    history + pending,
+                    current,
+                    {"pathos": state.location_id, **npc_locations},
+                )
+            )
             incident_output = urgent_incident_events(
                 history + pending,
                 current,

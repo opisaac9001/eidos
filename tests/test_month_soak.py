@@ -210,6 +210,14 @@ class MonthSoakTests(unittest.TestCase):
                 and str(event.payload.get("scene_id", "")).startswith("ordinary-")
             ]
             self.assertGreaterEqual(len(ordinary_scenes), 20)
+            self.assertTrue(snapshot["world_threads"])
+            self.assertTrue(
+                all(
+                    thread["status"] in {"active", "resolved"} and thread["stage"] >= 1
+                    for thread in snapshot["world_threads"]
+                )
+            )
+            self.assertTrue(any(event.kind == "world_thread.resolved" for event in events))
             self.assertEqual(
                 {event.payload["partner_id"] for event in ordinary_scenes},
                 {"mara", "ellis", "rowan", "nina-vale"},

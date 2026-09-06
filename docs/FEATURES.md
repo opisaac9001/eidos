@@ -63,9 +63,9 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite supplies, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended one-off and multi-day self-chosen projects, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people originate schema-checked open-vocabulary private plans from owner-only context, then move/act or fail; audited priorities and critical-energy replanning remain deterministic | P3 |
-| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, source-attributed expiring real-town inspiration, schema-valid open-ended resource-backed events with novelty scores, plus witnessed urgent incidents with independent response | P5 |
+| WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, attributed inspiration, open-ended resource-backed events, witnessed urgent responses, and multi-stage aftermath | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
-| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons, daily texture, sixteen-event baseline plus open-ended Moira events, and rare schema-checked entities entering goals | P6 |
+| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons/daily texture, open-ended Moira events that become bounded evolving world threads, and rare schema-checked entities entering goals | P6 |
 
 ## Interaction catalog — Pathos and NPC performers
 

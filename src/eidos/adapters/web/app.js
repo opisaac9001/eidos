@@ -18,6 +18,10 @@ const labels = {
   "world.signal_inspiration": "CREATIVE INSPIRATION",
   "world_event.signal_linked": "INSPIRED FICTION",
   "world_event.occurred": "IN THE NEIGHBORHOOD",
+  "world_thread.opened": "A NEIGHBORHOOD THREAD BEGAN",
+  "world_thread.progressed": "A NEIGHBORHOOD THREAD CONTINUED",
+  "world_thread.extended": "A NEIGHBORHOOD THREAD DEEPENED",
+  "world_thread.resolved": "A NEIGHBORHOOD THREAD SETTLED",
   "world.expansion_accepted": "THE WORLD GREW",
   "world.expansion_rejected": "WORLD ADDITION DECLINED",
   "reflection.recorded": "EVENING REFLECTION",
@@ -582,6 +586,14 @@ function render(next) {
   $("memory-count").textContent = state.counts.memories.toLocaleString();
   $("day-count").textContent = state.day;
   $("world-weather").textContent = `${state.weather} · ${state.season}`.toUpperCase();
+  $("world-threads").innerHTML = (state.world_threads || []).length
+    ? state.world_threads
+        .map(
+          (thread) =>
+            `<article class="panel person-card"><div class="panel-kicker">${esc(thread.event_type.replaceAll("_", " ").toUpperCase())} · ${esc(thread.status.toUpperCase())}</div><h2>${esc(thread.theme)}</h2><p>${esc(thread.summary)}</p><div class="person-foot"><span>${esc(state.locations.find((place) => place.id === thread.location_id)?.name || thread.location_id)}</span><span>${thread.status === "active" ? `Stage ${thread.stage} · due ${esc(date(thread.due_at))} ${esc(time(thread.due_at))}` : esc(thread.outcome || "resolved")}</span></div></article>`,
+        )
+        .join("")
+    : '<p class="muted">No neighborhood story is unfolding right now.</p>';
   $("town-signals").innerHTML = (state.external_signals || []).length
     ? state.external_signals
         .slice(0, 6)

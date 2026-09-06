@@ -488,6 +488,16 @@ it can occur. Actors decide how to respond.
 Start with quiet routines plus sparse meaningful disruptions, not constant crises.
 Avoid coincidences that repeatedly solve problems or manipulate user attachment.
 
+An accepted ambient event is not an isolated feed card. Its occurrence can open one
+bounded `world_thread` with a source event, place, theme, start, and due time. The
+thread progresses after half its duration, then either resolves or—by replay-stable
+pacing—extends once for two days before resolving. Every transition cites the prior
+stage and replay rejects early, stale, source-changing, or fabricated transitions.
+The operator sees these world facts. An actor receives a perception, and Pathos a
+memory, only when physically present at the thread's place for that transition.
+Events from worlds created before this lifecycle are left alone once their opening
+hour has passed; upgrading does not manufacture aftermath in the present.
+
 Catch-up uses an explicit time horizon and budgets. Advance routine low-impact
 state cheaply; stop at consequential choices for normal resolution. Preserve
 commitment deadlines, sleep, resource accounting and causal order. If the budget

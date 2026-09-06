@@ -33,6 +33,10 @@ includes unit, replay, seven-day, and thirty-day gates under strict static typin
 Moira can also submit open-vocabulary fictional incidents with explicit cause, place,
 lead time, duration, theme and opportunity; rejected or failed generations produce a
 quiet interval instead of falling back to a scripted event.
+When one occurs, a source-linked neighborhood thread now persists beyond the opening:
+it progresses, may extend once, and resolves to a bounded outcome. Later stages become
+memories only for co-present actors, while the operator can see active and resolved
+threads in the World view. Pre-existing old events are not retroactively reinterpreted.
 Replayable added places now contribute their own opening hours and connected roads to
 planning, travel, and promise-retiming feasibility instead of acting as display-only
 map markers. Newly introduced people also use their introduced place for generic

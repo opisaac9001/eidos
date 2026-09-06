@@ -55,6 +55,10 @@ See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,
 future commitments, structured activities, resident plans, and multi-step projects.
+Accepted neighborhood events now remain as replayable world threads: they progress,
+sometimes continue for two more days, and resolve instead of disappearing after one
+feed item. Only co-present actors perceive later stages, and the World view shows the
+operator what is still unfolding without making Pathos omniscient.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
