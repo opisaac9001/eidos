@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.sleep import sleep_window_at
 from eidos.domain.state import PathosState
 
 
@@ -87,19 +88,31 @@ def affect_episode_events(
 
 
 def sleep_and_need_events(
-    state: PathosState, simulated_at: datetime
+    state: PathosState,
+    simulated_at: datetime,
+    history: Sequence[DomainEvent] = (),
+    *,
+    pathos_busy: bool = False,
 ) -> tuple[list[DomainEvent], PathosState]:
-    """Apply circadian state and modest pressure/recovery for one simulated hour."""
+    """Apply selected sleep or a legacy circadian fallback and hourly needs."""
     events: list[DomainEvent] = []
     current = state
-    should_be_awake = 7 <= simulated_at.hour < 23
+    window = sleep_window_at(history, simulated_at) if history else None
+    if window is None:
+        should_be_awake = 7 <= simulated_at.hour < 23
+        reason = "circadian fallback"
+    else:
+        should_be_awake = not (window.bed <= simulated_at < window.wake)
+        reason = f"selected nightly window: {window.reason}"
+    if not should_be_awake and current.awake and pathos_busy:
+        should_be_awake = True
     if should_be_awake != current.awake:
         transition = DomainEvent(
             "sleep.ended" if should_be_awake else "sleep.started",
             "pathos",
             {
                 "simulated_at": simulated_at.isoformat(),
-                "reason": "circadian boundary",
+                "reason": reason,
             },
         )
         events.append(transition)

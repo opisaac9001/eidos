@@ -193,7 +193,7 @@ class SQLiteEventStore:
                     str(event.event_id),
                     event.kind,
                     event.occurred_at.isoformat(),
-                    json.dumps(payload, allow_nan=False),
+                    json.dumps(payload, allow_nan=False, separators=(",", ":")),
                     event.schema_version,
                     str(event.causation_id) if event.causation_id else None,
                     event.correlation_id,
@@ -245,7 +245,9 @@ class SQLiteEventStore:
     def save_checkpoint(self, checkpoint: StateCheckpoint) -> None:
         if checkpoint.revision < 1 or not checkpoint.last_event_id:
             raise ValueError("Checkpoint requires a positive anchored revision")
-        encoded = json.dumps(dict(checkpoint.state), allow_nan=False, sort_keys=True)
+        encoded = json.dumps(
+            dict(checkpoint.state), allow_nan=False, sort_keys=True, separators=(",", ":")
+        )
         checksum = hashlib.sha256(encoded.encode()).hexdigest()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -330,7 +332,9 @@ class SQLiteEventStore:
             or not projection.last_event_id
         ):
             raise ValueError("Projection requires a name, version, and positive anchor")
-        encoded = json.dumps(dict(projection.state), allow_nan=False, sort_keys=True)
+        encoded = json.dumps(
+            dict(projection.state), allow_nan=False, sort_keys=True, separators=(",", ":")
+        )
         checksum = hashlib.sha256(encoded.encode()).hexdigest()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

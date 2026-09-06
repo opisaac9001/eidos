@@ -67,6 +67,9 @@ class LifeTests(unittest.TestCase):
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
         self.assertTrue(snapshot["emotion"]["label"])
+        self.assertEqual(len(snapshot["sleep_windows"]), 1)
+        self.assertEqual(snapshot["sleep_windows"][0]["night_date"], "2026-01-01")
+        self.assertTrue(any(item["kind"] == "sleep.window_selected" for item in snapshot["feed"]))
         self.assertEqual(snapshot["indexes"]["memory_revision"], len(self.life.history()))
         self.assertGreater(snapshot["indexes"]["memory_count"], 0)
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)

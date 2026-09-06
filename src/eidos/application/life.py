@@ -65,6 +65,7 @@ from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
+from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
@@ -114,6 +115,7 @@ from eidos.domain.scenes import (
     resolve_scene_turn,
 )
 from eidos.domain.seasons import project_season, season_change_events, season_for
+from eidos.domain.sleep import project_sleep_windows
 from eidos.domain.social import project_social
 from eidos.domain.social_preferences import project_social_preferences
 from eidos.domain.state import PathosState
@@ -782,6 +784,9 @@ class Life:
                 "object.replenishment_cancelled",
                 "catch_up.summarized",
                 "catch_up.cancelled",
+                "sleep.window_selected",
+                "sleep.started",
+                "sleep.ended",
             }:
                 feed.append(item)
         npc_state = project_npcs(history, state.simulated_at)
@@ -932,6 +937,12 @@ class Life:
             "goals": [vars_for(goal) for goal in planning.goals.values()],
             "commitments": [vars_for(item) for item in planning.commitments.values()],
             "calendar": [vars_for(item) for item in planning.calendar.values()],
+            "sleep_windows": [
+                vars_for(item)
+                for item in sorted(
+                    project_sleep_windows(history).values(), key=lambda value: value.selected_at
+                )[-30:]
+            ],
             "objects": [vars_for(item) for item in planning.objects.values()],
             "transfers": [vars_for(item) for item in transfers.offers.values()],
             "renegotiations": [vars_for(item) for item in renegotiations.offers.values()],
@@ -1195,7 +1206,29 @@ class Life:
                 self._planning(history + pending + borrowed_opportunity)
                 pending.extend(borrowed_opportunity)
             pending.extend(npc_world_events(history + pending, current))
-            need_events, state = sleep_and_need_events(state, current)
+            pending.extend(
+                sleep_window_events(
+                    history + pending,
+                    state,
+                    current,
+                    self._planning(history + pending),
+                )
+            )
+            active_scenes = project_scenes(history + pending).scenes.values()
+            pathos_busy = (
+                any(
+                    scene.status in {"active", "paused"}
+                    and "pathos" in {scene.initiator_id, scene.partner_id}
+                    for scene in active_scenes
+                )
+                or active_incident_location(history + pending, current) is not None
+            )
+            need_events, state = sleep_and_need_events(
+                state,
+                current,
+                history + pending,
+                pathos_busy=pathos_busy,
+            )
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)

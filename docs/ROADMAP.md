@@ -218,6 +218,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
 - Reflection proposes interpretations, memory links and plan reconsideration,
   never retroactive fact changes.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
+- Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
+  reserves, arousal, and nearby commitments. Active conversations and incidents delay
+  the transition rather than ending abruptly; older worlds retain a safe fallback.
 - Select dreams from salient memories, unresolved concerns and emotional state.
   Record seed IDs, symbolic transformations, recurring motifs and intensity limits.
 - Permit mundane dreams, nightmares and no recalled dream. Avoid forced profoundness.

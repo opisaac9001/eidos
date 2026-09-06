@@ -481,14 +481,20 @@ function renderPlans() {
         )
         .join("")
     : empty("No promises have been accepted.");
-  $("calendar-list").innerHTML = state.calendar.length
-    ? [...state.calendar]
+  const sleepCards = (state.sleep_windows || []).slice(-7).map(
+    (item) =>
+      `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.bedtime))} · ${esc(time(item.bedtime))}–${esc(time(item.wake_at))}</span><span>REST</span></div><p>Night's sleep</p><div class="memory-source">${esc(item.reason)}</div></article>`,
+  );
+  $("calendar-list").innerHTML = state.calendar.length || sleepCards.length
+    ? [
+        ...sleepCards,
+        ...[...state.calendar]
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
         .map(
           (item) =>
             `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.resource_id ? ` · needs ${esc(state.objects.find((object) => object.object_id === item.resource_id)?.name || item.resource_id)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
-        )
-        .join("")
+        ),
+      ].join("")
     : empty("The calendar is open.");
   const changes = state.feed.filter((item) =>
     [
