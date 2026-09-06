@@ -13,6 +13,7 @@ from eidos.domain.social import (
     project_social,
     resolve_social_move,
 )
+from eidos.domain.speech import Privacy, SpeechProposal, resolve_speech
 
 
 def story_events(
@@ -155,7 +156,7 @@ def story_events(
         legacy = "repair-mara-lamp-slot" in planning.calendar
         schedule_id = "repair-mara-lamp-slot" if legacy else "repair-mara-lamp-schedule"
         goal_id = "repair-mara-lamp" if legacy else "repair-mara-lamp-goal"
-        return [
+        interrupted = [
             DomainEvent(
                 "schedule.interrupted",
                 "pathos",
@@ -165,32 +166,63 @@ def story_events(
                     "simulated_at": at,
                 },
             ),
-            DomainEvent(
-                "schedule.rescheduled",
-                "pathos",
-                {
-                    "schedule_id": schedule_id,
-                    "starts_at": current.replace(hour=14).isoformat(),
-                    "ends_at": current.replace(hour=17).isoformat(),
-                    "reason": "Ellis found a spare switch.",
-                    "simulated_at": at,
-                },
+        ]
+        speech = resolve_speech(
+            SpeechProposal(
+                proposal_id="ellis-found-lamp-switch",
+                speaker_id="ellis",
+                audience_id="pathos",
+                text="I found a replacement switch for Mara's lamp. You can use it this afternoon.",
+                privacy=Privacy.PRIVATE,
+                topic_id="mara-lamp",
+                expected_revision=len(existing) + len(interrupted),
             ),
+            history=existing + interrupted,
+            actor_locations={"pathos": actor_location_id, "ellis": "workshop"},
+            known_actor_ids={"pathos", "mara", "ellis", "rowan"},
+            actual_revision=len(existing) + len(interrupted),
+            simulated_at=at,
+        )
+        if not speech.accepted:
+            return [*interrupted, *speech.events]
+        delivered = next(event for event in speech.events if event.kind == "speech.delivered")
+        perceived = next(event for event in speech.events if event.kind == "perception.recorded")
+        rescheduled = DomainEvent(
+            "schedule.rescheduled",
+            "pathos",
+            {
+                "schedule_id": schedule_id,
+                "starts_at": current.replace(hour=14).isoformat(),
+                "ends_at": current.replace(hour=17).isoformat(),
+                "reason": "Ellis reported an available replacement switch.",
+                "simulated_at": at,
+            },
+            causation_id=delivered.event_id,
+            correlation_id=delivered.correlation_id,
+        )
+        return [
+            *interrupted,
+            *speech.events,
+            rescheduled,
             DomainEvent(
                 "memory.recorded",
                 "pathos",
                 {
-                    "text": "The lamp repair was interrupted because it needed a replacement switch; Ellis found one for this afternoon.",
+                    "text": "The lamp repair was interrupted because it needed a replacement switch; Ellis told me he found one for this afternoon.",
                     "simulated_at": at,
-                    "source": "authored-first-story",
+                    "source": "perceived-speech",
+                    "source_event_id": str(perceived.event_id),
                     "category": "plan-change",
                     "location_id": "workshop",
+                    "person_id": "ellis",
                     "object_id": "mara-lamp",
                     "goal_id": goal_id,
                     "owner": "pathos",
                     "importance": 0.75,
-                    "confidence": 1.0,
+                    "confidence": 0.85,
                 },
+                causation_id=perceived.event_id,
+                correlation_id=delivered.correlation_id,
             ),
         ]
     if day == 2 and current.hour == 17 and "commitment.fulfilled" not in kinds:

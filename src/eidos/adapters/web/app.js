@@ -25,6 +25,7 @@ const labels = {
   "social.request_declined": "REQUEST DECLINED",
   "invitation.made": "AN INVITATION",
   "social.activity_completed": "TIME TOGETHER",
+  "speech.delivered": "SOMETHING SAID",
   "intention.adopted": "AN INTENTION FORMED",
   "intention.completed": "AN INTENTION COMPLETED",
   "action.accepted": "ACTION VALIDATED",

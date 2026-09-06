@@ -173,6 +173,7 @@ class Life:
                 "social.request_declined",
                 "invitation.made",
                 "social.activity_completed",
+                "speech.delivered",
                 "intention.adopted",
                 "intention.completed",
                 "action.accepted",
