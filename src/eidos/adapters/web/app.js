@@ -109,6 +109,8 @@ const labels = {
   "apology.offered": "AN APOLOGY",
   "follow_up.ready": "A FOLLOW-UP",
   "follow_up.completed": "FOLLOW-UP COMPLETED",
+  "relationship.milestone_recorded": "A SHARED DATE WAS KEPT",
+  "relationship.anniversary_remembered": "A RELATIONSHIP DATE RETURNED",
   "skill.practiced": "SKILL PRACTICE",
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",
@@ -641,6 +643,18 @@ function render(next) {
     .slice(0, 3)
     .map((item) => `<div class="context-memory">${esc(item.text)}</div>`)
     .join("");
+  $("relationship-dates").innerHTML = (state.relationship_dates || []).length
+    ? state.relationship_dates
+        .map((item) => {
+          const person = state.people.find((candidate) => candidate.id === item.person_id);
+          const who = item.person_id === "user" ? "You and Pathos" : person?.name || item.person_id;
+          const years = item.anniversaries
+            ? ` · remembered ${item.anniversaries} year${item.anniversaries === 1 ? "" : "s"}`
+            : "";
+          return `<div class="context-memory"><strong>${esc(who)}</strong><br>${esc(item.origin_date)}${years}</div>`;
+        })
+        .join("")
+    : '<p class="context-note">No shared date has formed yet.</p>';
   renderMessages();
   renderArchive();
   renderPlans();

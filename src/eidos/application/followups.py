@@ -64,6 +64,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             "phone.callback_completed",
             "incident.shared_aftermath",
             "object.shared_use",
+            "relationship.anniversary_remembered",
         } and not (
             source.kind == "scene.ended"
             and str(source.payload.get("scene_id", "")).startswith("ordinary-")
@@ -79,6 +80,8 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         reason = (
             "Check in after offering an apology; do not assume it was accepted."
             if source.kind == "apology.offered"
+            else "The relationship date returned; make room to reconnect without assuming sentiment."
+            if source.kind == "relationship.anniversary_remembered"
             else "Remember the contact and make room to reconnect."
         )
         scheduled = DomainEvent(
@@ -179,6 +182,8 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
     elif event.kind == "incident.shared_aftermath":
         value = event.payload.get("person_id")
     elif event.kind == "object.shared_use":
+        value = event.payload.get("person_id")
+    elif event.kind == "relationship.anniversary_remembered":
         value = event.payload.get("person_id")
     elif event.kind == "scene.ended" and str(event.payload.get("scene_id", "")).startswith(
         "ordinary-"

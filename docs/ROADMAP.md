@@ -277,6 +277,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   72 simulated hours, and suppressed while a reply is owed or a live visit is active.
   It never creates an external notification. Generated absence, guilt, or dependency
   pressure is rejected with an audit event rather than delivered.
+- A first completed meaningful interaction establishes one private, source-linked date
+  per relationship. At 08:00 on its annual recurrence, Pathos records a factual memory;
+  an NPC date can enter the ordinary follow-up and invitation path, while a user date
+  remains in-app context and cannot bypass outreach consent or create an external alert.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
   one authored date. They use only Pathos-observable topics, advance two turns per
   simulated hour, shift topics, scale their 2/4/6-turn budget with familiarity, end

@@ -64,6 +64,10 @@ initiated by Pathos. Outreach stays inside the local app, is grounded in one rea
 Pathos-owned memory, waits while he owes a reply or is in a live visit, observes
 22:00–08:00 quiet hours and a 72-hour minimum interval, and can be disabled instantly.
 Generated absence, guilt, or dependency pressure is rejected rather than delivered.
+The first completed meaningful interaction with each person also establishes a
+source-linked private date. Its annual return becomes a factual memory and may make
+room for an ordinary, consent-respecting NPC follow-up; dates involving the user never
+create external contact.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),

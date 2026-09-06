@@ -347,6 +347,15 @@ an event. The user can disable it immediately. Nothing invokes an operating-syst
 third-party notification. Output that pressures the user through absence, waiting,
 loneliness, or dependency is retained as a rejected audit result and never delivered.
 
+Relationship dates are projections of shared evidence, not generated biography. The
+first completed social activity, call, visit, shared incident aftermath, or shared
+object use with a person establishes one private milestone and preserves that source's
+simulated calendar date. At 08:00 on each annual recurrence, including February 28 for
+a February 29 origin in a non-leap year, the engine emits one causally linked anniversary
+and one factual memory. An NPC anniversary can use the normal follow-up and invitation
+machinery, where availability and NPC consent still apply. A date involving the user
+is visible only as local context and cannot itself send a message or notification.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.
