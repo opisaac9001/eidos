@@ -15,6 +15,7 @@ from eidos.application.belief_review import relationship_belief_events, testimon
 from eidos.application.cognition import perform
 from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
+from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.inner_life import (
     active_concerns,
     dream_seed_sources,
@@ -198,6 +199,7 @@ class Life:
                 "disagreement.expressed",
                 "boundary.stated",
                 "apology.offered",
+                "follow_up.ready",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -216,6 +218,7 @@ class Life:
         planning = project_planning(history)
         social = project_social(history)
         beliefs = project_beliefs(history)
+        followups = project_followups(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -256,6 +259,7 @@ class Life:
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
             "beliefs": [vars_for(item) for item in beliefs.beliefs.values()],
+            "followups": [vars_for(item) for item in followups.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
@@ -396,6 +400,7 @@ class Life:
                     len(history) + len(pending),
                 )
             )
+            pending.extend(follow_up_events(history + pending, current))
             overdue = overdue_plan_events(project_planning(history + pending), current)
             if overdue:
                 project_planning(history + pending + overdue)

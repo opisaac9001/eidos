@@ -43,6 +43,7 @@ const labels = {
   "disagreement.expressed": "A DISAGREEMENT",
   "boundary.stated": "A BOUNDARY",
   "apology.offered": "AN APOLOGY",
+  "follow_up.ready": "A FOLLOW-UP",
   "dream.recalled": "A DREAM REMEMBERED",
 };
 const views = {

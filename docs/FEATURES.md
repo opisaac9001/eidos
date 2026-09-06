@@ -78,7 +78,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology with unresolved-rupture rule | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
-| SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Planned | P5 |
+| SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked internal follow-up reminders | P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
 vs public speech, interruption/resume, observer-specific memories and validated

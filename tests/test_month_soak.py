@@ -44,6 +44,8 @@ class MonthSoakTests(unittest.TestCase):
             rowan = next(person for person in snapshot["people"] if person["id"] == "rowan")
             self.assertGreater(rowan["tension"], 0)
             self.assertLess(rowan["tension"], 0.08)
+            self.assertTrue(snapshot["followups"])
+            self.assertTrue(all(item["status"] == "ready" for item in snapshot["followups"]))
             thoughts = {
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }
