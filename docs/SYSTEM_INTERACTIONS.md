@@ -205,6 +205,9 @@ The initial world rhythm schedules one low-stakes neighborhood occurrence each w
 rotating among seed sharing, repair, tea, and sketching. Each is announced five
 simulated hours before it begins, has a unique occurrence ID, obeys the community-event
 cooldown, and becomes knowledge only for actors present at its location.
+Calendar-derived season transitions are separate replayable world facts. Weather and
+season are therefore durable inputs for later planning, not implications extracted
+from narration.
 
 The current deterministic baseline lets each resident turn owned public-event
 perception into a private, evidence-linked plan suited to their routine. A structured

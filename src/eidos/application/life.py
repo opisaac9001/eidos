@@ -52,6 +52,7 @@ from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.scenes import project_scenes
+from eidos.domain.seasons import project_season, season_change_events, season_for
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
 from eidos.domain.transfers import project_transfers
@@ -324,6 +325,7 @@ class Life:
         planning = project_planning(history)
         social = project_social(history)
         scenes = project_scenes(history)
+        season = project_season(history)
         beliefs = project_beliefs(history)
         followups = project_followups(history)
         development = project_development(history)
@@ -358,6 +360,7 @@ class Life:
                 "established": identity.established,
             },
             "weather": weather,
+            "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
             "locations": LOCATIONS,
             "people": population,
@@ -557,6 +560,7 @@ class Life:
             at = current.isoformat()
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            pending.extend(season_change_events(history + pending, current))
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)

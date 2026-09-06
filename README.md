@@ -149,6 +149,8 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   and sketch walks with explicit lead time and cooldowns. Only co-present residents
   perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for
   their own private plans during the month soak.
+- The simulation calendar records season transitions as replayable world facts and
+  exposes the current season beside weather; it does not depend on generated prose.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.

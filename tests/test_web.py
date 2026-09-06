@@ -59,6 +59,7 @@ class WebTests(unittest.TestCase):
             "POST", "/api/control", {"running": False, "minutes_per_tick": 60}
         )
         paused_time = json.loads(body)["time"]
+        self.assertIn(json.loads(body)["season"], {"winter", "spring", "summer", "autumn"})
         self.runtime.stop.wait(0.08)
         self.assertEqual(self.runtime.snapshot()["time"], paused_time)
         self.assertEqual(self.runtime.snapshot()["jobs"]["counts"]["queued"], 0)

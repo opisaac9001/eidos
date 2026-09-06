@@ -16,6 +16,7 @@ class MonthSoakTests(unittest.TestCase):
                 life.advance(24)
             events = life.history()
             snapshot = life.snapshot()
+            self.assertEqual(snapshot["season"], "winter")
             replay = Life(SQLiteEventStore(path), StandInGateway()).snapshot()
             self.assertEqual(snapshot, replay)
             self.assertEqual(

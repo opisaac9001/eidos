@@ -391,7 +391,7 @@ function render(next) {
     : "var(--green)";
   $("clock").textContent =
     `Day ${state.day} · ${date(state.time)} · ${time(state.time)}`;
-  $("weather").textContent = state.weather;
+  $("weather").textContent = `${state.weather} · ${state.season}`;
   $("life-status").textContent = state.config.running ? "LIVING" : "PAUSED";
   $("play").innerHTML = state.config.running
     ? "Pause world <span>Ⅱ</span>"
@@ -470,7 +470,7 @@ function render(next) {
   $("event-count").textContent = state.counts.events.toLocaleString();
   $("memory-count").textContent = state.counts.memories.toLocaleString();
   $("day-count").textContent = state.day;
-  $("world-weather").textContent = state.weather.toUpperCase();
+  $("world-weather").textContent = `${state.weather} · ${state.season}`.toUpperCase();
   renderPlace();
   $("people").innerHTML = state.people
     .map(
