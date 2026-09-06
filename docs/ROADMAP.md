@@ -319,12 +319,15 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add an optional source-attributed British-town signal adapter for weather, daylight,
-   public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
-2. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
-3. Capture the Dell inventory, then benchmark and pin its private inference stack.
-4. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
+1. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
+2. Capture the Dell inventory, then benchmark and pin its private inference stack.
+3. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
    repeated prose, and low-quality but schema-valid model output.
+
+Completed: the opt-in British-town adapter now records attributed, expiring
+Open-Meteo weather/daylight and optional RSS headlines. Moira can cite them only as
+non-authoritative inspiration; deterministic validation, replay, failure visibility,
+and the observatory preserve the seed-versus-world-fact boundary.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,
 operator visibility, known limitations and migration notes. Real-model probes

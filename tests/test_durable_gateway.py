@@ -69,6 +69,20 @@ class DurableGatewayTests(unittest.TestCase):
         self.assertEqual(job.status, "failed")
         self.assertEqual(job.error_code, "invalid_completion")
 
+    def test_structured_world_proposal_reaches_its_application_validator_intact(self):
+        proposal = '{"event_type":"new_kind","inspiration_signal_id":"none"}'
+        inner = CountingGateway(proposal)
+        gateway = DurableModelGateway(inner, self.jobs, lambda _: self.revision)
+        request = ModelRequest(
+            capability="moira_event",
+            messages=(ModelMessage("user", "{}"),),
+            output_schema={"type": "object", "properties": {"event_type": {"type": "string"}}},
+        )
+        response = asyncio.run(gateway.generate(request))
+        self.assertEqual(response.content, proposal)
+        self.assertEqual(inner.calls, 1)
+        self.assertEqual(self.jobs.list_jobs(), [])
+
     def test_deferred_submission_returns_before_inference_and_exposes_terminal_result(self):
         inner = CountingGateway()
         gateway = DurableModelGateway(inner, self.jobs, lambda _: self.revision)

@@ -20,6 +20,7 @@ AMBIENT_FIELDS = {
     "participation",
     "stakes",
     "resource_id",
+    "inspiration_signal_id",
     "starts_in_hours",
     "intensity",
     "duration_hours",
@@ -38,6 +39,7 @@ class AmbientCandidate:
     participation: str
     stakes: str
     resource_id: str
+    inspiration_signal_id: str
     starts_in_hours: int
     intensity: float
     duration_hours: int
@@ -49,7 +51,7 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
     except (TypeError, ValueError):
         raise ProposalRejected("invalid_json", "Ambient proposal was not valid JSON") from None
     if not isinstance(raw, dict) or set(raw) != AMBIENT_FIELDS:
-        raise ProposalRejected("invalid_shape", "Ambient proposal fields did not match schema v1")
+        raise ProposalRejected("invalid_shape", "Ambient proposal fields did not match schema v3")
     text_values = {}
     for field, maximum in {
         "description": 220,
@@ -61,6 +63,7 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
         "participation": 100,
         "stakes": 100,
         "resource_id": 80,
+        "inspiration_signal_id": 80,
     }.items():
         value = raw[field]
         if not isinstance(value, str) or not value.strip() or len(value) > maximum:
@@ -92,6 +95,7 @@ def validate_ambient_candidate(
     *,
     known_locations: set[str],
     known_resources: Mapping[str, str],
+    known_signal_ids: set[str],
     history: Sequence[DomainEvent],
 ) -> float:
     if candidate.location_id not in known_locations:
@@ -101,6 +105,13 @@ def validate_ambient_candidate(
     if known_resources[candidate.resource_id] != candidate.location_id:
         raise ProposalRejected(
             "resource_location_mismatch", "Ambient resource is not at the proposed place"
+        )
+    if (
+        candidate.inspiration_signal_id != "none"
+        and candidate.inspiration_signal_id not in known_signal_ids
+    ):
+        raise ProposalRejected(
+            "unknown_inspiration_signal", "Ambient event names an unknown external signal"
         )
     description_terms = _terms(candidate.description)
     if len(description_terms) < 3:
@@ -153,6 +164,7 @@ def ambient_output_schema(
         "shared-tea-service",
         "community-sketch-basket",
     ),
+    known_signal_ids: Sequence[str] = (),
 ) -> Mapping[str, object]:
     return {
         "type": "object",
@@ -166,6 +178,10 @@ def ambient_output_schema(
             "participation": {"type": "string", "minLength": 1, "maxLength": 100},
             "stakes": {"type": "string", "minLength": 1, "maxLength": 100},
             "resource_id": {"type": "string", "enum": list(known_resource_ids)},
+            "inspiration_signal_id": {
+                "type": "string",
+                "enum": ["none", *known_signal_ids],
+            },
             "starts_in_hours": {"type": "integer", "minimum": 1, "maximum": 12},
             "intensity": {"type": "number", "minimum": 0.05, "maximum": 1.0},
             "duration_hours": {"type": "integer", "minimum": 1, "maximum": 72},

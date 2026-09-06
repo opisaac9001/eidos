@@ -17,7 +17,7 @@ ROLE_PROMPTS = {
     "reflection": "Write one first-person reflection on a supplied memory, emotion, and current mind-layer focus. Emotion guides interpretation but does not prove its own cause. Dream inspirations are temporary possibilities from fiction, not evidence or actions. Do not add events, people, or places. Express interpretation rather than new facts.",
     "oneiros": "Write a brief surreal dream inspired by the supplied memories, location, emotion, and dream-layer focus. Emotion may color the dream but does not establish facts or causes. Begin with 'In a dream'. It is explicitly fiction, never factual memory.",
     "chronicler": "Summarize only the supplied memories in two sentences. Do not invent events, people, places, or causality.",
-    "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Choose one supplied physical resource at that same location, and describe concrete participation, stakes, and an opportunity without claiming consequences or completed actions. This is a proposal, not a fact.",
+    "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Choose one supplied physical resource at that same location, and describe concrete participation, stakes, and an opportunity without claiming consequences or completed actions. External signals, when supplied, are attributed creative inspiration rather than facts about the fictional town. This is a proposal, not a fact.",
     "moira_expansion": "Act as a restrained but imaginative world builder. Propose one genuinely new person, useful object, or reachable neighborhood place that could support many future stories. Avoid duplicates and generic fantasy spectacle. Return a proposal only; registration rules decide whether it exists.",
 }
 
@@ -55,6 +55,7 @@ ROLE_FIELDS = {
         "weather",
         "known_locations",
         "known_resources",
+        "external_signals",
         "recent_events",
         "permission",
     ),

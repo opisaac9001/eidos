@@ -22,6 +22,7 @@ class AmbientCandidateTests(unittest.TestCase):
             "participation": "A passerby may listen, speak with the player, or continue walking.",
             "stakes": "A brief connection or a missed ordinary encounter.",
             "resource_id": "community-sketch-basket",
+            "inspiration_signal_id": "none",
             "starts_in_hours": 3,
             "intensity": 0.3,
             "duration_hours": 4,
@@ -36,6 +37,7 @@ class AmbientCandidateTests(unittest.TestCase):
             candidate,
             known_locations={"park"},
             known_resources={"community-sketch-basket": "park"},
+            known_signal_ids=set(),
             history=[],
         )
         with self.assertRaises(ProposalRejected):
@@ -47,6 +49,7 @@ class AmbientCandidateTests(unittest.TestCase):
                 self.candidate(location_id="moon"),
                 known_locations={"park"},
                 known_resources={"community-sketch-basket": "park"},
+                known_signal_ids=set(),
                 history=[],
             )
         with self.assertRaisesRegex(ProposalRejected, "not at the proposed place"):
@@ -54,6 +57,7 @@ class AmbientCandidateTests(unittest.TestCase):
                 self.candidate(),
                 known_locations={"park"},
                 known_resources={"community-sketch-basket": "cafe"},
+                known_signal_ids=set(),
                 history=[],
             )
         previous = DomainEvent(
@@ -69,6 +73,7 @@ class AmbientCandidateTests(unittest.TestCase):
                 self.candidate(),
                 known_locations={"park"},
                 known_resources={"community-sketch-basket": "park"},
+                known_signal_ids=set(),
                 history=[previous],
             )
 
@@ -78,7 +83,9 @@ class AmbientCandidateTests(unittest.TestCase):
         self.assertNotIn("enum", schema["properties"]["event_type"])
         self.assertFalse(schema["additionalProperties"])
         expanded = ambient_output_schema(
-            ("park", "old-glasshouse"), ("community-sketch-basket", "glasshouse-tools")
+            ("park", "old-glasshouse"),
+            ("community-sketch-basket", "glasshouse-tools"),
+            ("signal-1",),
         )
         self.assertEqual(
             expanded["properties"]["location_id"]["enum"],
@@ -88,6 +95,20 @@ class AmbientCandidateTests(unittest.TestCase):
             expanded["properties"]["resource_id"]["enum"],
             ["community-sketch-basket", "glasshouse-tools"],
         )
+        self.assertEqual(
+            expanded["properties"]["inspiration_signal_id"]["enum"],
+            ["none", "signal-1"],
+        )
+
+    def test_external_inspiration_must_name_a_supplied_signal(self):
+        with self.assertRaisesRegex(ProposalRejected, "unknown external signal"):
+            validate_ambient_candidate(
+                self.candidate(inspiration_signal_id="invented-source"),
+                known_locations={"park"},
+                known_resources={"community-sketch-basket": "park"},
+                known_signal_ids={"actual-source"},
+                history=[],
+            )
 
     def test_novelty_score_compares_open_metadata_not_only_exact_description(self):
         accepted = DomainEvent(
@@ -115,6 +136,7 @@ class AmbientCandidateTests(unittest.TestCase):
             ),
             known_locations={"park"},
             known_resources={"community-sketch-basket": "park"},
+            known_signal_ids=set(),
             history=[accepted, linked],
         )
         self.assertGreater(novelty, 0.35)

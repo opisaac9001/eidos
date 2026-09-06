@@ -339,6 +339,17 @@ change Mara's trust, or supply a repair skill he has not acquired.
 
 ## 9. Moira, pacing and catch-up
 
+An optional morning adapter polls current weather/daylight plus a configured local RSS
+feed for one British town. Every accepted external report retains a credential-free
+HTTPS source, external observation time, poll identity, and expiry. Both
+`world_fact=false` and `action_authority=false` are explicit. Failure is visible but
+creates no substitute report and changes no fictional state. Active reports enter
+Moira's context only as an ID-to-summary inspiration map. A proposal must cite an ID
+from that map or `none`; a citation is recorded on the schedule but does not prove that
+the corresponding circumstance exists in Eidos's neighborhood. Only the ordinary
+scheduled-event and co-present perception lifecycle can make the invented circumstance
+a fact or memory.
+
 Moira supplies candidate circumstances without choosing from a closed event list.
 The initial contract accepts any concise event type and asks for a specific cause,
 known place, start delay, duration, theme, opportunity, concrete participation, stakes,

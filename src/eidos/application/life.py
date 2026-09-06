@@ -55,6 +55,7 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.urgent_incidents import (
     active_incident_location,
     urgent_incident_events,
@@ -107,6 +108,7 @@ from eidos.ports.event_store import (
     StateCheckpointStore,
 )
 from eidos.ports.model_gateway import DeferredModelGateway, ModelGateway, ModelRequest
+from eidos.ports.town_signals import TownSignalSource
 
 
 def _latest_weather(history: list[DomainEvent]) -> str:
@@ -131,10 +133,17 @@ def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
 class Life:
     """Caller serializes operations; the store also rejects stale stream revisions."""
 
-    def __init__(self, store: EventStore, gateway: ModelGateway, mode: str = "stand-in") -> None:
+    def __init__(
+        self,
+        store: EventStore,
+        gateway: ModelGateway,
+        mode: str = "stand-in",
+        town_signal_source: TownSignalSource | None = None,
+    ) -> None:
         self.store = store
         self.gateway = gateway
         self.mode = mode
+        self.town_signal_source = town_signal_source
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
         self._planning_cache: tuple[int, str, PlanningState] | None = None
@@ -471,6 +480,7 @@ class Life:
         diagnostics = []
         catch_up_summaries = []
         npc_memories = []
+        external_signals = []
         concerns = {}
         for event in history:
             payload: dict[str, Any] = {
@@ -533,10 +543,16 @@ class Life:
                 episodes.append(item)
             if event.kind == "catch_up.summarized":
                 catch_up_summaries.append(item)
+            if event.kind == "external_signal.observed":
+                external_signals.append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
                 "world.weather",
+                "external_signal.observed",
+                "external_signal.poll_failed",
+                "world.signal_inspiration",
+                "world_event.signal_linked",
                 "world_event.occurred",
                 "world.expansion_accepted",
                 "world.expansion_rejected",
@@ -743,6 +759,7 @@ class Life:
                 "established": identity.established,
             },
             "weather": weather,
+            "external_signals": list(reversed(external_signals[-30:])),
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
             "locations": [
@@ -982,6 +999,14 @@ class Life:
             at = current.isoformat()
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            pending.extend(
+                await asyncio.to_thread(
+                    town_signal_events,
+                    history + pending,
+                    current,
+                    self.town_signal_source,
+                )
+            )
             pending.extend(season_change_events(history + pending, current))
             pending.extend(community_resource_events(history + pending, current))
             pending.extend(
@@ -1224,6 +1249,7 @@ class Life:
                         for item in self._planning(history + pending).objects.values()
                         if item.condition in {"good", "usable", "repaired"} and item.quantity != 0
                     },
+                    external_signals=active_town_signal_context(history + pending, current),
                 )
             )
             npc_locations = {

@@ -47,6 +47,10 @@ class DurableModelGateway(ModelGateway):
         return "model:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
+        # Durable jobs currently persist validated text, not arbitrary JSON documents.
+        # Structured world proposals remain bounded by their application validators.
+        if request.capability in {"moira_event", "moira_expansion"}:
+            return await self.inner.generate(request)
         job = self._enqueue(request)
         if self.supervisor is not None:
             self.supervisor.start()

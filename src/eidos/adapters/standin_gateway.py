@@ -174,6 +174,9 @@ class StandInGateway(ModelGateway):
                         "participation": f"A present neighbor may {item[5]} without a guaranteed outcome.",
                         "stakes": "The event may change an ordinary plan or relationship, but need not.",
                         "resource_id": resource_id,
+                        "inspiration_signal_id": next(
+                            iter(context.get("external_signals", {})), "none"
+                        ),
                         "starts_in_hours": item[6],
                         "intensity": item[7],
                         "duration_hours": item[8],

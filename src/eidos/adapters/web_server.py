@@ -17,6 +17,7 @@ from eidos.domain.events import DomainEvent
 from eidos.ports.event_store import RevisionConflict
 from eidos.ports.job_store import JobConflict
 from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.town_signals import TownSignalSource
 
 STATIC = Path(__file__).parent / "web"
 logger = logging.getLogger(__name__)
@@ -309,7 +310,11 @@ def event_json(event: DomainEvent) -> dict[str, Any]:
 
 
 def serve(
-    database: Path, port: int = 8765, gateway: ModelGateway | None = None, mode: str = "stand-in"
+    database: Path,
+    port: int = 8765,
+    gateway: ModelGateway | None = None,
+    mode: str = "stand-in",
+    town_signal_source: TownSignalSource | None = None,
 ) -> None:
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
@@ -331,7 +336,7 @@ def serve(
         revision_for,
         supervisor=supervisor,
     )
-    life = Life(store, durable, mode=mode)
+    life = Life(store, durable, mode=mode, town_signal_source=town_signal_source)
     runtime = Runtime(life)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()

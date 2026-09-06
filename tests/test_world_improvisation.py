@@ -56,13 +56,14 @@ class WorldImprovisationTests(unittest.TestCase):
                 "participation": "Visitors may ask questions or help annotate a local route.",
                 "stakes": "The mapmaker may leave with gaps in the neighborhood record.",
                 "resource_id": "shared-tea-service",
+                "inspiration_signal_id": "none",
                 "starts_in_hours": 2,
                 "intensity": 0.3,
                 "duration_hours": 4,
             }
         )
 
-    def generate_events(self, gateway, history=None):
+    def generate_events(self, gateway, history=None, external_signals=None):
         return asyncio.run(
             improvised_world_events(
                 history or [],
@@ -71,6 +72,7 @@ class WorldImprovisationTests(unittest.TestCase):
                 gateway,
                 season="winter",
                 weather="Clear",
+                external_signals=external_signals,
             )
         )
 
@@ -99,6 +101,26 @@ class WorldImprovisationTests(unittest.TestCase):
         self.assertTrue(any(event.kind == "world_event.generation_requested" for event in events))
         self.assertTrue(any(event.kind == "role.failed" for event in events))
         self.assertFalse(any(event.kind == "world_event.scheduled" for event in events))
+
+    def test_attributed_signal_can_inspire_but_cannot_become_world_fact_directly(self):
+        proposal = json.loads(self.proposal())
+        proposal["inspiration_signal_id"] = "news-1"
+        events = self.generate_events(
+            FixedGateway(json.dumps(proposal)),
+            external_signals={"news-1": "A real town library announced a repair cafe."},
+        )
+        linked = next(event for event in events if event.kind == "world_event.signal_linked")
+        self.assertEqual(linked.payload["signal_id"], "news-1")
+        self.assertFalse(linked.payload["world_fact"])
+        self.assertFalse(linked.payload["action_authority"])
+
+        proposal["inspiration_signal_id"] = "made-up-signal"
+        rejected = self.generate_events(
+            FixedGateway(json.dumps(proposal)),
+            external_signals={"news-1": "Attributed inspiration"},
+        )
+        failure = next(event for event in rejected if event.kind == "role.failed")
+        self.assertEqual(failure.payload["error_code"], "unknown_inspiration_signal")
         self.assertEqual(self.generate_events(FixedGateway(self.proposal()), events), [])
 
     def test_offline_stand_in_exercises_the_same_open_event_contract(self):

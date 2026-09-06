@@ -12,6 +12,29 @@ from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.ports.event_store import RevisionConflict
 from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.town_signals import TownSignalSource
+
+
+def _town_source_from_env() -> TownSignalSource | None:
+    values = {
+        "town": os.environ.get("EIDOS_TOWN_NAME"),
+        "latitude": os.environ.get("EIDOS_TOWN_LATITUDE"),
+        "longitude": os.environ.get("EIDOS_TOWN_LONGITUDE"),
+    }
+    if not any(values.values()):
+        return None
+    if not all(values.values()):
+        raise ValueError(
+            "Set EIDOS_TOWN_NAME, EIDOS_TOWN_LATITUDE, and EIDOS_TOWN_LONGITUDE together"
+        )
+    from eidos.adapters.british_town_signals import BritishTownSignalAdapter
+
+    return BritishTownSignalAdapter(
+        str(values["town"]),
+        float(str(values["latitude"])),
+        float(str(values["longitude"])),
+        news_feed_url=os.environ.get("EIDOS_TOWN_NEWS_RSS_URL"),
+    )
 
 
 def main() -> None:
@@ -85,6 +108,7 @@ def main() -> None:
             )
             return
         gateway: ModelGateway = StandInGateway()
+        town_signal_source = _town_source_from_env()
         mode = "stand-in"
         if args.base_url or args.model:
             if not args.base_url or not args.model:
@@ -108,7 +132,13 @@ def main() -> None:
         if args.command == "serve":
             from eidos.adapters.web_server import serve
 
-            serve(args.database, args.port, gateway=gateway, mode=mode)
+            serve(
+                args.database,
+                args.port,
+                gateway=gateway,
+                mode=mode,
+                town_signal_source=town_signal_source,
+            )
             return
         from eidos.adapters.durable_gateway import DurableModelGateway
         from eidos.adapters.sqlite_jobs import SQLiteJobStore
@@ -122,7 +152,7 @@ def main() -> None:
 
         supervisor = CognitionSupervisor(jobs, gateway, revision_for)
         durable = DurableModelGateway(gateway, jobs, revision_for, supervisor=supervisor)
-        simulation = Life(store, durable, mode=mode)
+        simulation = Life(store, durable, mode=mode, town_signal_source=town_signal_source)
         if args.command == "journal":
             print(
                 json.dumps(

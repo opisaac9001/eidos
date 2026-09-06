@@ -1,12 +1,30 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.ports.model_gateway import ModelResponse
+from eidos.ports.town_signals import TownSignal
+
+
+class TownSource:
+    def read(self):
+        return [
+            TownSignal(
+                "signal-1",
+                "weather",
+                "Frome",
+                "Current weather",
+                "A cloudy morning.",
+                datetime(2026, 1, 1, 6, tzinfo=timezone.utc),
+                "Open-Meteo",
+                "https://api.open-meteo.com/v1/forecast",
+            )
+        ]
 
 
 class LifeTests(unittest.TestCase):
@@ -53,6 +71,7 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))
         self.assertTrue(any(event.kind == "npc.activity_recorded" for event in self.life.history()))
         self.assertTrue(all("private_activity" not in person for person in snapshot["people"]))
+
         self.assertTrue(all("private_activity" in person for person in snapshot["npc_states"]))
         private_texts = {
             event.payload["activity"]
@@ -87,6 +106,20 @@ class LifeTests(unittest.TestCase):
         self.assertGreater(len(moves), 0)
         self.assertTrue(all(move.causation_id in completed_trips for move in moves))
         self.assertTrue(all(move.correlation_id for move in moves))
+
+    def test_optional_town_source_is_ingested_and_visible_without_changing_weather(self):
+        life = Life(SQLiteEventStore(self.path), StandInGateway(), town_signal_source=TownSource())
+        life.advance(6)
+        snapshot = life.snapshot()
+        baseline = Life(
+            SQLiteEventStore(Path(self.directory.name) / "baseline.sqlite3"), StandInGateway()
+        )
+        baseline.advance(6)
+        self.assertEqual(snapshot["external_signals"][0]["signal_id"], "signal-1")
+        self.assertEqual(snapshot["weather"], baseline.snapshot()["weather"])
+        self.assertTrue(
+            any(item["kind"] == "external_signal.observed" for item in snapshot["feed"])
+        )
 
     def test_multi_day_snapshot_with_private_plans_is_json_serializable(self):
         for _ in range(3):

@@ -13,6 +13,10 @@ const labels = {
   "thought.recorded": "INNER MONOLOGUE",
   "npc.encountered": "AN ENCOUNTER",
   "world.weather": "THE WORLD OUTSIDE",
+  "external_signal.observed": "REAL-TOWN SIGNAL",
+  "external_signal.poll_failed": "SIGNAL UNAVAILABLE",
+  "world.signal_inspiration": "CREATIVE INSPIRATION",
+  "world_event.signal_linked": "INSPIRED FICTION",
   "world_event.occurred": "IN THE NEIGHBORHOOD",
   "world.expansion_accepted": "THE WORLD GREW",
   "world.expansion_rejected": "WORLD ADDITION DECLINED",
@@ -554,6 +558,15 @@ function render(next) {
   $("memory-count").textContent = state.counts.memories.toLocaleString();
   $("day-count").textContent = state.day;
   $("world-weather").textContent = `${state.weather} · ${state.season}`.toUpperCase();
+  $("town-signals").innerHTML = (state.external_signals || []).length
+    ? state.external_signals
+        .slice(0, 6)
+        .map(
+          (signal) =>
+            `<article class="panel person-card"><div class="panel-kicker">${esc(signal.signal_kind.replaceAll("_", " ").toUpperCase())} · ${esc(signal.town)}</div><h2>${esc(signal.title)}</h2><p>${esc(signal.summary)}</p><p class="context-note">External inspiration only. This did not happen to Pathos.</p><div class="person-foot"><span>${esc(signal.source_name)}</span><a href="${esc(signal.source_url)}" target="_blank" rel="noreferrer">View source</a></div></article>`,
+        )
+        .join("")
+    : '<p class="muted">No real-town source is configured. This world is currently self-contained.</p>';
   renderPlace();
   $("people").innerHTML = state.people
     .map(

@@ -107,6 +107,7 @@ class GatewayTests(unittest.TestCase):
                             "weather": "Clear",
                             "known_locations": ["park"],
                             "known_resources": {"community-sketch-basket": "park"},
+                            "external_signals": {"signal-1": "Attributed weather report"},
                             "recent_events": [],
                             "permission": "invent fiction",
                             "private_state": "must not pass",
@@ -125,6 +126,7 @@ class GatewayTests(unittest.TestCase):
         self.assertIn("conforming exactly to the supplied schema", system)
         self.assertIn("do not select from a fixed menu", system)
         context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["external_signals"], {"signal-1": "Attributed weather report"})
         self.assertNotIn("private_state", context)
 
     def test_incomplete_and_invalid_envelopes_rejected(self):

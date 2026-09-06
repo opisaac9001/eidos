@@ -28,10 +28,12 @@ ceiling. Moira's event type is deliberately open vocabulary. The current first
 contract grounds invented incidents in known places; later contracts may introduce
 new people, objects and places through explicit persistent state changes.
 
-Real-world signals from a chosen British town may later inspire weather, daylight,
-public events, and local concerns. Their source and retrieval time must be retained.
-They are creative seeds and ambient context unless explicitly imported as world facts;
+Real-world weather, daylight, and optional RSS reports from a configured British town
+can inspire the world. Their source and retrieval time are retained and the signals
+expire. They are creative seeds and ambient context, never imported world facts;
 Pathos does not claim to have witnessed a news report merely because Moira read it.
+Moira must cite a supplied signal ID when it uses one, and its resulting fiction still
+passes normal place, resource, novelty, scheduling, and perception rules.
 
 ## A cast of intelligences
 

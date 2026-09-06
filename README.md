@@ -116,6 +116,22 @@ calendar begins January 1, 2026, UTC. The preview built during development uses
 `data/observatory.sqlite3`; run it again with
 `PYTHONPATH=src .venv/bin/eidos --database data/observatory.sqlite3 serve`.
 
+An optional real-town inspiration layer can be enabled with a British town name and
+coordinates. It reads current weather and daylight from Open-Meteo once each simulated
+morning. An optional credential-free HTTPS RSS feed adds local headlines:
+
+```bash
+export EIDOS_TOWN_NAME=Frome
+export EIDOS_TOWN_LATITUDE=51.2308
+export EIDOS_TOWN_LONGITUDE=-2.3201
+export EIDOS_TOWN_NEWS_RSS_URL=https://example.org/local-news.xml
+```
+
+These attributed, expiring reports are visible in the observatory and may inspire a
+Moira proposal. They never directly change Eidos's weather, memories, actions, or the
+fictional world's facts. Omit all four variables for a fully offline world; the RSS
+variable is optional.
+
 ## Verify
 
 ```bash
@@ -187,6 +203,10 @@ network authorization; the server remains loopback-only until authenticated depl
   opportunity metadata. Cross-field novelty is scored against recent events. Passing
   proposals enter the ordinary scheduled-event lifecycle; invalid output produces a
   visible quiet interval, and later resource loss cancels rather than invents the event.
+  If the optional British-town adapter is configured, Moira can explicitly link one
+  source-attributed, expiring weather/daylight/news signal as inspiration. The report
+  remains non-authoritative external context; only the separately validated scheduled
+  fiction can later occur through ordinary perception.
 - The seed cast and map are no longer hard ceilings. Rare Moira expansion proposals
   can register a new person, useful object, or connected place after strict identity,
   collision, location, route, hours, and layout checks. Existing databases project

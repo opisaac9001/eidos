@@ -30,6 +30,7 @@ async def improvised_world_events(
     weather: str,
     known_locations: Mapping[str, str] | None = None,
     known_resources: Mapping[str, str] | None = None,
+    external_signals: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Ask Moira periodically; rejection or failure means an ordinary quiet interval."""
     if simulated_at.utcoffset() is None:
@@ -66,12 +67,13 @@ async def improvised_world_events(
     )
     if not resources:
         return []
+    signals = dict(external_signals or {})
     request = ModelRequest(
         capability="moira_event",
-        task_version="2",
+        task_version="3",
         temperature=0.85,
         max_output_tokens=300,
-        output_schema=ambient_output_schema(tuple(locations), tuple(resources)),
+        output_schema=ambient_output_schema(tuple(locations), tuple(resources), tuple(signals)),
         messages=(
             ModelMessage(
                 "user",
@@ -83,7 +85,12 @@ async def improvised_world_events(
                         "known_locations": locations,
                         "known_resources": resources,
                         "recent_events": recent,
-                        "permission": "Invent new fictional material; do not claim it already happened.",
+                        "external_signals": signals,
+                        "permission": (
+                            "Invent new fictional material; do not claim it already happened. "
+                            "External signals are attributed inspiration only, not reports about "
+                            "the fictional town. Cite one signal ID if used, otherwise use none."
+                        ),
                     }
                 ),
             ),
@@ -113,6 +120,7 @@ async def improvised_world_events(
             candidate,
             known_locations=set(locations),
             known_resources=resources,
+            known_signal_ids=set(signals),
             history=history,
         )
     except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
@@ -151,7 +159,7 @@ async def improvised_world_events(
                     trace_id,
                     simulated_at,
                     started,
-                    "schema-rules-v1",
+                    "schema-rules-v3",
                     "rules",
                     code,
                 )
@@ -175,7 +183,7 @@ async def improvised_world_events(
                 trace_id,
                 simulated_at,
                 started,
-                "schema-rules-v1",
+                "schema-rules-v3",
                 "rules",
                 None,
             ),
@@ -216,6 +224,23 @@ async def improvised_world_events(
                 correlation_id=proposal_id,
             )
         )
+        if candidate.inspiration_signal_id != "none":
+            output.append(
+                DomainEvent(
+                    "world_event.signal_linked",
+                    "pathos",
+                    {
+                        "proposal_id": proposal_id,
+                        "signal_id": candidate.inspiration_signal_id,
+                        "signal_text": signals[candidate.inspiration_signal_id],
+                        "world_fact": False,
+                        "action_authority": False,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=scheduled.event_id,
+                    correlation_id=proposal_id,
+                )
+            )
         output.append(
             DomainEvent(
                 "world_event.theme_linked",
