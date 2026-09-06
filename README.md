@@ -157,8 +157,8 @@ network authorization; the server remains loopback-only until authenticated depl
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
 - Local inference can use one endpoint/model or an untracked strict routing file that
-  assigns Pathos, Murmur, Firmament, weather, memory, reflection, dreams, daybook, and
-  Moira's two world-building capabilities independently. Inline secrets and incomplete
+  assigns Pathos, Murmur, Firmament, weather, memory, reflection, dreams, daybook,
+  Pathos's activity agency, and Moira's two world-building capabilities independently. Inline secrets and incomplete
   no-default route maps are rejected; routing never bypasses validation or provenance.
 - The browser is functional. Messages now enter a persistent inbox and show as
   delivered until a replay-stable, availability-aware response time arrives; sleep
@@ -184,9 +184,12 @@ network authorization; the server remains loopback-only until authenticated depl
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair
   story and a resource-backed personal
-  project; the planner checks
+  project. Pathos can also originate open-vocabulary ordinary activities from current
+  needs, emotion, values, memories, people, places, objects, and free time. The model
+  supplies meaning, not authority: the planner checks
   consent, custody, terms, resources, schedules, open hours, travel buffers,
-  abandonment, and renegotiation. General autonomous planning remains future work.
+  abandonment, and renegotiation. Accepted ideas remain intentions and calendar entries
+  until the normal action path completes them; unavailable companions can make them fail.
 - A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
   a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
   memories. Integrated two- and four-turn scenes request performer-generated dialogue;

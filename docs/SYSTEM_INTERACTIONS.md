@@ -193,6 +193,16 @@ Interruptions have priority, duration, impact and available choices. Replanning
 checks travel, actor availability, needs, existing commitments and resources.
 Bound the number of replans per scene; record inability to find a feasible plan.
 
+Pathos's agency performer periodically proposes an ordinary activity using an
+open-vocabulary activity type. It may combine current needs, emotional stance, sourced
+values, memories, known people, places, usable objects, and calendar openings. It may
+not invent a place or possession, spend money, guarantee another actor, or narrate an
+outcome. A rules layer checks opening hours, duration, calendar overlap, travel buffers,
+custody, condition, stock, and known companions before creating a schedule and owned
+intention. Completion later passes through the ordinary action resolver. If a named
+companion is elsewhere when the activity is due, the schedule fails and the intention
+is abandoned rather than silently fabricating attendance.
+
 ## 7. Social scenes and independent NPCs
 
 Scene lifecycle: establish location/participants → assemble each actor's own

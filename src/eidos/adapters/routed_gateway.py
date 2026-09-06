@@ -21,6 +21,7 @@ CAPABILITIES = {
     "chronicler",
     "moira_event",
     "moira_expansion",
+    "pathos_agency",
 }
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

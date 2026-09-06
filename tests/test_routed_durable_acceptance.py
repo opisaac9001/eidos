@@ -22,6 +22,7 @@ class RoutedDurableAcceptanceTests(unittest.TestCase):
                     "oneiros": StandInGateway(),
                     "moira_event": StandInGateway(),
                     "moira_expansion": StandInGateway(),
+                    "pathos_agency": StandInGateway(),
                 },
                 StandInGateway(),
             )

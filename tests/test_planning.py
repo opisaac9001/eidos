@@ -100,6 +100,19 @@ class PlanningTests(unittest.TestCase):
 
         legacy = {
             **materialized,
+            "calendar": [
+                {
+                    key: value
+                    for key, value in materialized["calendar"][0].items()
+                    if key
+                    not in {
+                        "companion_id",
+                        "activity_type",
+                        "source_proposal_id",
+                        "intention_id",
+                    }
+                }
+            ],
             "objects": [
                 {
                     key: value

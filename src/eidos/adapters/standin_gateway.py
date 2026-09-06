@@ -74,7 +74,7 @@ class StandInGateway(ModelGateway):
         elif role == "moira":
             text = ("Clear", "Cloudy", "Light rain", "Breezy")[choice % 4]
         elif role == "moira_event":
-            palette = (
+            agency_palette = (
                 (
                     "wandering_mender",
                     "A bicycle mender sets up a folding repair stand beside the park gate after a touring strap snaps.",
@@ -164,7 +164,7 @@ class StandInGateway(ModelGateway):
                     3,
                 ),
             )
-            item = palette[choice % len(palette)]
+            item = agency_palette[choice % len(agency_palette)]
             resource_id = next(
                 object_id
                 for object_id, resource_location in context["known_resources"].items()
@@ -246,6 +246,104 @@ class StandInGateway(ModelGateway):
             )[occurrence]
             return ModelResponse(
                 content=json.dumps(expansion),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "pathos_agency":
+            places = context["known_places"]
+            people = context["known_people"]
+            activity_palette = (
+                (
+                    "street_texture_walk",
+                    "Make a texture map of the neighborhood",
+                    "Notice overlooked surfaces and patterns without needing a useful result.",
+                    "attend",
+                    "park",
+                    "none",
+                    "none",
+                    24,
+                    2,
+                    0.42,
+                ),
+                (
+                    "recipe_annotation",
+                    "Annotate a familiar recipe by hand",
+                    "Pay attention to how memory and habit shape a small domestic ritual.",
+                    "learn",
+                    "home",
+                    "none",
+                    "none",
+                    24,
+                    1,
+                    0.38,
+                ),
+                (
+                    "repair_sketch_study",
+                    "Sketch the joints on repaired furniture",
+                    "Understand why some repairs remain visible and others disappear.",
+                    "learn",
+                    "workshop",
+                    "none",
+                    "none",
+                    24,
+                    2,
+                    0.55,
+                ),
+                (
+                    "quiet_observation",
+                    "Keep a one-hour table-side observation log",
+                    "Make room for curiosity about the ordinary rhythms of the cafe.",
+                    "attend",
+                    "cafe",
+                    "none",
+                    "none",
+                    24,
+                    1,
+                    0.34,
+                ),
+                (
+                    "shared_question_walk",
+                    "Take a question for a walk with someone",
+                    "Let an unfinished thought change through conversation and movement.",
+                    "attend",
+                    "park",
+                    "none",
+                    next(iter(people), "none"),
+                    24,
+                    1,
+                    0.48,
+                ),
+                (
+                    "object_story_notes",
+                    "Write imagined histories for three worn objects",
+                    "Practice noticing material clues while keeping invention separate from fact.",
+                    "work",
+                    "home",
+                    "none",
+                    "none",
+                    24,
+                    2,
+                    0.51,
+                ),
+            )
+            agency_item = activity_palette[choice % len(activity_palette)]
+            location = agency_item[4] if agency_item[4] in places else next(iter(places))
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "activity_type": agency_item[0],
+                        "title": agency_item[1],
+                        "motivation": agency_item[2],
+                        "action": agency_item[3],
+                        "location_id": location,
+                        "resource_id": agency_item[5],
+                        "companion_id": agency_item[6],
+                        "starts_in_hours": agency_item[7],
+                        "duration_hours": agency_item[8],
+                        "priority": agency_item[9],
+                    }
+                ),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",

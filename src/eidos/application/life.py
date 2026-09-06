@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
+from eidos.application.agency import autonomous_activity_events
 from eidos.application.appraisal import (
     affect_episode_events,
     appraisal_events,
@@ -606,6 +607,11 @@ class Life:
                 "action.accepted",
                 "action.rejected",
                 "activity.completed",
+                "agency.activity_proposed",
+                "agency.activity_accepted",
+                "agency.activity_rejected",
+                "agency.activity_realized",
+                "agency.activity_missed",
                 "goal.activated",
                 "goal.progressed",
                 "goal.achieved",
@@ -1059,6 +1065,39 @@ class Life:
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
+            agency_history = history + pending
+            current_emotion = project_emotion(agency_history)
+            agency = await autonomous_activity_events(
+                agency_history,
+                current,
+                len(agency_history),
+                self.gateway,
+                planning=self._planning(agency_history),
+                catalog=self._world_catalog(agency_history),
+                needs={
+                    "rest": state.rest,
+                    "connection": state.connection,
+                    "curiosity": state.curiosity,
+                    "mastery": state.mastery,
+                    "energy": state.energy,
+                },
+                emotion={
+                    "label": current_emotion.label,
+                    "valence": current_emotion.valence,
+                    "arousal": current_emotion.arousal,
+                    "sustained_low_hours": current_emotion.sustained_low_hours,
+                },
+                values=project_identity(agency_history).values,
+                memories=[
+                    str(event.payload["text"])
+                    for event in agency_history
+                    if event.kind == "memory.recorded"
+                    and isinstance(event.payload.get("text"), str)
+                ],
+            )
+            if agency:
+                self._planning(agency_history + agency)
+                pending.extend(agency)
             incident_location = active_incident_location(history + pending, current)
             incident_beat = (
                 RoutineBeat(
@@ -1678,6 +1717,10 @@ class Life:
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
                 repair_mastery=state.mastery,
+                actor_locations={
+                    person_id: person.location_id
+                    for person_id, person in project_npcs(history + pending, current).people.items()
+                },
             )
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)

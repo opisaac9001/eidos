@@ -4,7 +4,7 @@ import json
 import re
 from typing import Mapping
 
-STRUCTURED_CAPABILITIES = {"moira_event", "moira_expansion"}
+STRUCTURED_CAPABILITIES = {"moira_event", "moira_expansion", "pathos_agency"}
 
 
 class ProposalRejected(ValueError):

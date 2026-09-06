@@ -47,6 +47,10 @@ class CalendarEntry:
     commitment_id: str | None = None
     goal_id: str | None = None
     resource_id: str | None = None
+    companion_id: str | None = None
+    activity_type: str | None = None
+    source_proposal_id: str | None = None
+    intention_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,10 +112,24 @@ class PlanningState:
                 else value
                 for value in object_records
             ]
+        calendar_records = raw["calendar"]
+        if isinstance(calendar_records, list):
+            calendar_records = [
+                {
+                    "companion_id": None,
+                    "activity_type": None,
+                    "source_proposal_id": None,
+                    "intention_id": None,
+                    **value,
+                }
+                if isinstance(value, dict)
+                else value
+                for value in calendar_records
+            ]
         state = cls(
             goals=_restore_records(raw["goals"], Goal, "goal_id"),
             commitments=_restore_records(raw["commitments"], Commitment, "commitment_id"),
-            calendar=_restore_records(raw["calendar"], CalendarEntry, "schedule_id"),
+            calendar=_restore_records(calendar_records, CalendarEntry, "schedule_id"),
             objects=_restore_records(object_records, WorldObject, "object_id"),
             intentions=_restore_records(raw["intentions"], Intention, "intention_id"),
         )
@@ -254,6 +272,10 @@ class PlanningState:
                     commitment_id=_optional(payload, "commitment_id"),
                     goal_id=_optional(payload, "goal_id"),
                     resource_id=_optional(payload, "resource_id"),
+                    companion_id=_optional(payload, "companion_id"),
+                    activity_type=_optional(payload, "activity_type"),
+                    source_proposal_id=_optional(payload, "source_proposal_id"),
+                    intention_id=_optional(payload, "intention_id"),
                 )
             case "schedule.interrupted":
                 entry = _existing(calendar, payload, "schedule_id")

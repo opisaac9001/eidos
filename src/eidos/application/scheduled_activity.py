@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from hashlib import sha256
+from typing import Mapping
 
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import PlanningState
+from eidos.domain.planning import CalendarEntry, PlanningState
 
 SCHEDULED_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND, ActionKind.REPAIR}
 SCHEDULED_ACTION_VALUES = {action.value for action in SCHEDULED_ACTIONS}
@@ -20,6 +21,7 @@ def scheduled_activity_events(
     simulated_at: datetime,
     actual_revision: int,
     repair_mastery: float = 1.0,
+    actor_locations: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Complete due non-conversation plans and their linked obligations."""
 
@@ -31,16 +33,19 @@ def scheduled_activity_events(
         action = ActionKind(entry.action)
         starts_at = datetime.fromisoformat(entry.starts_at)
         ends_at = datetime.fromisoformat(entry.ends_at) if entry.ends_at else starts_at
-        due = starts_at if action is ActionKind.ATTEND else ends_at
-        if simulated_at < due or entry.location_id != actor_location_id:
-            continue
-        if action is ActionKind.ATTEND and simulated_at > ends_at:
+        due = (
+            ends_at
+            if entry.activity_type is not None
+            else (starts_at if action is ActionKind.ATTEND else ends_at)
+        )
+        if simulated_at < due:
             continue
         intention = next(
             (
                 item
                 for item in projected.intentions.values()
-                if item.goal_id == entry.goal_id
+                if (entry.intention_id is None or item.intention_id == entry.intention_id)
+                and item.goal_id == entry.goal_id
                 and item.action == action.value
                 and item.target_id == entry.target_id
                 and item.status == "active"
@@ -48,6 +53,33 @@ def scheduled_activity_events(
             None,
         )
         if intention is None:
+            continue
+        if entry.location_id != actor_location_id or (
+            action is ActionKind.ATTEND and simulated_at > ends_at
+        ):
+            if entry.activity_type is not None and simulated_at > ends_at:
+                missed_events = _missed_agency_events(
+                    entry,
+                    intention.intention_id,
+                    "Pathos was not able to be at the planned place in time.",
+                    simulated_at,
+                )
+                output.extend(missed_events)
+                for event in missed_events:
+                    projected = projected.apply(event)
+            continue
+        if entry.companion_id is not None and (
+            actor_locations is None or actor_locations.get(entry.companion_id) != entry.location_id
+        ):
+            companion_consequences = _missed_agency_events(
+                entry,
+                intention.intention_id,
+                "The hoped-for companion was not present when the activity was due.",
+                simulated_at,
+            )
+            output.extend(companion_consequences)
+            for event in companion_consequences:
+                projected = projected.apply(event)
             continue
         if action is ActionKind.REPAIR and entry.schedule_id.startswith("maintain-introduced-"):
             success_score = max(0.1, min(0.9, 0.25 + 0.65 * repair_mastery))
@@ -168,6 +200,24 @@ def scheduled_activity_events(
         )
         correlation = entry.commitment_id or entry.goal_id or entry.schedule_id
 
+        if entry.activity_type is not None:
+            output.append(
+                DomainEvent(
+                    "agency.activity_realized",
+                    "pathos",
+                    {
+                        "schedule_id": entry.schedule_id,
+                        "activity_type": entry.activity_type,
+                        "title": entry.title,
+                        "companion_id": entry.companion_id,
+                        "location_id": entry.location_id,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=completion.event_id,
+                    correlation_id=entry.source_proposal_id or correlation,
+                )
+            )
+
         def consequence(kind: str, payload: dict[str, object]) -> DomainEvent:
             return DomainEvent(
                 kind,
@@ -244,6 +294,52 @@ def scheduled_activity_events(
         )
         output.append(memory)
     return output
+
+
+def _missed_agency_events(
+    entry: CalendarEntry,
+    intention_id: str,
+    reason: str,
+    simulated_at: datetime,
+) -> tuple[DomainEvent, DomainEvent, DomainEvent]:
+    correlation = entry.source_proposal_id or entry.schedule_id
+    missed = DomainEvent(
+        "agency.activity_missed",
+        "pathos",
+        {
+            "schedule_id": entry.schedule_id,
+            "activity_type": entry.activity_type,
+            "companion_id": entry.companion_id,
+            "reason": reason,
+            "simulated_at": simulated_at.isoformat(),
+        },
+        correlation_id=correlation,
+    )
+    return (
+        missed,
+        DomainEvent(
+            "schedule.failed",
+            "pathos",
+            {
+                "schedule_id": entry.schedule_id,
+                "reason": reason,
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=missed.event_id,
+            correlation_id=correlation,
+        ),
+        DomainEvent(
+            "intention.abandoned",
+            "pathos",
+            {
+                "intention_id": intention_id,
+                "reason": reason,
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=missed.event_id,
+            correlation_id=correlation,
+        ),
+    )
 
 
 def _sample(key: str) -> float:
