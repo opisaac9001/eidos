@@ -59,8 +59,10 @@ locations, needs, private beliefs, activities, and perception- or need-driven pr
 goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
 Need-driven choices now record all three competing levels and their selected priority;
 critical exhaustion can interrupt and causally replace a lower-priority private plan
-without making ordinary fluctuations rewrite the day. Their option vocabulary remains
-bounded rather than generally autonomous. Term,
+without making ordinary fluctuations rewrite the day. Shared familiarity can make a
+connection need more attractive, but Pathos's one-sided trust is never treated as
+proof of an NPC's hidden reciprocal feeling. Their option vocabulary remains bounded
+rather than generally autonomous. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Planning and
 actor-owned beliefs and directed relationships now do the same with ordered,
@@ -261,8 +263,8 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Expand the completed perception- and need-driven NPC goal loop with more personal
-   projects and relationship-motivated choices; competing priorities and critical
-   energy interruption now have a causal replacement path.
+   projects; competing priorities, critical-energy interruption, and familiarity-
+   motivated connection choices now have causal paths.
 2. Generalize the now-integrated four-turn interruption/resume scene into recurring
    dialogue policies with topic selection, voluntary exits, and relationship pacing.
 3. Let Moira propose additions to the completed sixteen-event, resource-backed

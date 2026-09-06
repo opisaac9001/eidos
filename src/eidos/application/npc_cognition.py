@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
+from eidos.domain.relationships import Relationship
 from eidos.domain.world import npc_plan_profile
 
 
@@ -110,7 +111,11 @@ def npc_belief_events(
     return output
 
 
-def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> list[DomainEvent]:
+def npc_need_plan_events(
+    history: Sequence[DomainEvent],
+    simulated_at: str,
+    shared_relationships: Mapping[str, Relationship] | None = None,
+) -> list[DomainEvent]:
     """Let private needs form bounded goals without leaking them into Pathos's context."""
     now = datetime.fromisoformat(simulated_at)
     if now.utcoffset() is None:
@@ -192,9 +197,22 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
             "connection": person.connection,
             "purpose": person.purpose,
         }
-        need, level = min(needs.items(), key=lambda item: (item[1], item[0]))
-        if level >= 0.58:
+        eligible = {need: level for need, level in needs.items() if level < 0.58}
+        if not eligible:
             continue
+        familiarity = (
+            shared_relationships.get(actor_id, Relationship(actor_id)).familiarity
+            if shared_relationships is not None
+            else Relationship(actor_id).familiarity
+        )
+        scores = {
+            candidate: candidate_level
+            - (0.12 * familiarity if candidate == "connection" else 0.0)
+            - (0.1 if candidate == "energy" and candidate_level <= 0.25 else 0.0)
+            for candidate, candidate_level in eligible.items()
+        }
+        need = min(eligible, key=lambda candidate: (scores[candidate], candidate))
+        level = eligible[need]
         action, location_id, title, scheduled_for = _need_plan(
             actor_id, need, now, person.usual_location_id
         )
@@ -208,6 +226,10 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
                 "energy_level": needs["energy"],
                 "connection_level": needs["connection"],
                 "purpose_level": needs["purpose"],
+                "energy_priority": scores.get("energy"),
+                "connection_priority": scores.get("connection"),
+                "purpose_priority": scores.get("purpose"),
+                "shared_familiarity": familiarity,
                 "selected_need": need,
                 "selected_level": level,
                 "replacement": replaced,

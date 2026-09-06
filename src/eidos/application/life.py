@@ -1131,7 +1131,13 @@ class Life:
             pending.extend(
                 npc_belief_events(history + pending, at, self._beliefs(history + pending))
             )
-            pending.extend(npc_need_plan_events(history + pending, at))
+            pending.extend(
+                npc_need_plan_events(
+                    history + pending,
+                    at,
+                    self._relationships(history + pending).relationships,
+                )
+            )
             phone_emotion = project_emotion(history + pending)
             phone_bias = emotional_planning_bias(
                 phone_emotion.valence,

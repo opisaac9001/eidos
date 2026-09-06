@@ -4,6 +4,7 @@ from uuid import uuid4
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
+from eidos.domain.relationships import Relationship
 
 
 class NPCCognitionTests(unittest.TestCase):
@@ -206,6 +207,39 @@ class NPCCognitionTests(unittest.TestCase):
             },
         )
         self.assertEqual(npc_need_plan_events([evidence], "2026-01-10T19:00:00+00:00"), [])
+
+    def test_shared_familiarity_can_make_connection_the_chosen_priority(self):
+        evidence = DomainEvent(
+            "npc.needs_changed",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "energy": 0.7,
+                "connection": 0.55,
+                "purpose": 0.5,
+                "owner": "rowan",
+                "visibility": "private",
+            },
+        )
+        unfamiliar = npc_need_plan_events(
+            [evidence],
+            "2026-01-10T19:00:00+00:00",
+            {"rowan": Relationship("rowan", familiarity=0.2)},
+        )
+        familiar = npc_need_plan_events(
+            [evidence],
+            "2026-01-10T19:00:00+00:00",
+            {"rowan": Relationship("rowan", encounters=20, familiarity=1.0)},
+        )
+        unfamiliar_priority = next(
+            event for event in unfamiliar if event.kind == "npc.priority_evaluated"
+        )
+        familiar_priority = next(
+            event for event in familiar if event.kind == "npc.priority_evaluated"
+        )
+        self.assertEqual(unfamiliar_priority.payload["selected_need"], "purpose")
+        self.assertEqual(familiar_priority.payload["selected_need"], "connection")
+        self.assertEqual(familiar_priority.payload["shared_familiarity"], 1.0)
 
     def test_new_people_make_need_driven_plans_in_their_introduced_place(self):
         person = DomainEvent(
