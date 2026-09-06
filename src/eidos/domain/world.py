@@ -61,6 +61,24 @@ PEOPLE = (
     },
 )
 
+NPC_PLAN_PROFILES = {
+    "mara": {
+        "action": "host",
+        "location_id": "cafe",
+        "title": "Host a welcoming hour for neighborhood conversation",
+    },
+    "ellis": {
+        "action": "repair",
+        "location_id": "workshop",
+        "title": "Repair an item for the next community gathering",
+    },
+    "rowan": {
+        "action": "sketch",
+        "location_id": "park",
+        "title": "Sketch the next community gathering",
+    },
+}
+
 ROLES = (
     {"id": "pathos", "name": "Pathos", "purpose": "Voice & conscious response"},
     {"id": "murmur", "name": "The Murmur", "purpose": "Associations & inner life"},
@@ -104,6 +122,23 @@ def npc_location(person_id: str, hour: int) -> str:
     if person_id == "ellis":
         return "workshop" if 9 <= hour < 18 else "park" if 18 <= hour < 20 else "home"
     return "park" if 11 <= hour < 16 else "cafe" if 8 <= hour < 11 else "home"
+
+
+def npc_activity(person_id: str, location_id: str) -> tuple[str, str]:
+    """Return the structured action and private narration for an ordinary activity."""
+    if location_id == "home":
+        return "rest", "resting at home"
+    return {
+        "mara": ("host", "running the cafe"),
+        "ellis": (
+            ("repair", "working on repairs")
+            if location_id == "workshop"
+            else ("walk", "taking a walk")
+        ),
+        "rowan": (
+            ("sketch", "sketching") if location_id == "park" else ("visit", "visiting the cafe")
+        ),
+    }[person_id]
 
 
 def location_name(location_id: str) -> str:

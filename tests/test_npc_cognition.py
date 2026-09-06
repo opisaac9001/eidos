@@ -31,6 +31,79 @@ class NPCCognitionTests(unittest.TestCase):
         self.assertEqual(plan.payload["visibility"], "private")
         self.assertEqual(npc_belief_events([perception, *events], "2026-01-03T13:00:00+00:00"), [])
 
+    def test_each_npc_builds_an_owned_feasible_plan_from_private_evidence(self):
+        perceptions = [
+            DomainEvent(
+                "perception.recorded",
+                "pathos",
+                {
+                    "owner": owner,
+                    "source_kind": "world_event",
+                    "source_event_id": str(uuid4()),
+                    "location_id": "park",
+                    "text": "Neighbors gather in the square.",
+                },
+            )
+            for owner in ("mara", "ellis", "rowan")
+        ]
+        events = npc_belief_events(perceptions, "2026-01-02T13:00:00+00:00")
+        plans = {
+            event.payload["actor_id"]: event for event in events if event.kind == "npc.plan_created"
+        }
+        self.assertEqual(set(plans), {"mara", "ellis", "rowan"})
+        self.assertEqual(
+            {
+                owner: (plan.payload["action"], plan.payload["location_id"])
+                for owner, plan in plans.items()
+            },
+            {
+                "mara": ("host", "cafe"),
+                "ellis": ("repair", "workshop"),
+                "rowan": ("sketch", "park"),
+            },
+        )
+        self.assertTrue(
+            all(
+                plan.payload["owner"] == owner
+                and plan.payload["visibility"] == "private"
+                and plan.payload["belief_id"].startswith(owner)
+                and plan.causation_id is not None
+                for owner, plan in plans.items()
+            )
+        )
+
+    def test_old_belief_evidence_is_never_reprocessed_after_revision(self):
+        first = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "rowan",
+                "source_kind": "world_event",
+                "source_event_id": str(uuid4()),
+                "location_id": "park",
+                "text": "Neighbors gather.",
+            },
+        )
+        first_events = npc_belief_events([first], "2026-01-02T13:00:00+00:00")
+        second = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "rowan",
+                "source_kind": "world_event",
+                "source_event_id": str(uuid4()),
+                "location_id": "park",
+                "text": "Neighbors gather again.",
+            },
+        )
+        history = [first, *first_events, second]
+        second_events = npc_belief_events(history, "2026-01-03T13:00:00+00:00")
+        self.assertTrue(any(event.kind == "belief.revised" for event in second_events))
+        self.assertFalse(any(event.kind == "npc.plan_created" for event in second_events))
+        self.assertEqual(
+            npc_belief_events([*history, *second_events], "2026-01-04T13:00:00+00:00"), []
+        )
+
     def test_pathos_perception_is_left_to_pathos_belief_policy(self):
         perception = DomainEvent(
             "perception.recorded",

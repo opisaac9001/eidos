@@ -68,6 +68,21 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(all(move.causation_id in completed_trips for move in moves))
         self.assertTrue(all(move.correlation_id for move in moves))
 
+    def test_multi_day_snapshot_with_private_plans_is_json_serializable(self):
+        for _ in range(3):
+            self.life.advance(24)
+        snapshot = self.life.snapshot()
+        json.dumps(snapshot, allow_nan=False)
+        rowan = next(item for item in snapshot["npc_states"] if item["actor_id"] == "rowan")
+        self.assertIsInstance(rowan["plan_scheduled_for"], str)
+        self.assertTrue(
+            all(
+                isinstance(item["simulated_at"], str)
+                for item in snapshot["feed"]
+                if "simulated_at" in item
+            )
+        )
+
     def test_fractional_steps_and_restart_do_not_duplicate_scenes(self):
         self.life.advance(8.5)
         restarted = Life(SQLiteEventStore(self.path), StandInGateway())

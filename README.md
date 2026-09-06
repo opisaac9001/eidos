@@ -136,8 +136,9 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
 - NPC movement, needs, private activity, a causal promise/repair story, public-event
-  perception, private beliefs, one bounded NPC plan, and relationship metrics persist
-  by replay. Pathos completes a resource-backed personal project; the planner checks
+  perception, private beliefs, three actor-specific bounded plan profiles, and
+  relationship metrics persist by replay. Pathos completes a resource-backed personal
+  project; the planner checks
   consent, custody, terms, resources, schedules, open hours, travel buffers,
   abandonment, and renegotiation. General autonomous planning remains future work.
 - Memories have provenance, importance, diversified term/entity/goal/relationship

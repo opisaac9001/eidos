@@ -509,8 +509,12 @@ function render(next) {
       .join("") || "<p>No durable jobs recorded yet.</p>";
   $("npc-states").innerHTML = (state.npc_states || [])
     .map(
-      (person) =>
-        `<article class="memory-card"><div class="memory-meta"><span>${esc(person.actor_id)} · ${esc(person.location_id)}</span><span>PRIVATE OPERATOR LENS</span></div><p>${esc(person.private_activity)}</p><div class="memory-source">energy ${Math.round(person.energy * 100)}% · connection ${Math.round(person.connection * 100)}% · purpose ${Math.round(person.purpose * 100)}% · never passed to Pathos automatically</div></article>`,
+      (person) => {
+        const plan = person.plan_title
+          ? `<p><strong>${esc(person.plan_title)}</strong> · ${esc(person.plan_status || "unknown")}${person.plan_scheduled_for ? ` · ${esc(date(person.plan_scheduled_for))} ${esc(time(person.plan_scheduled_for))}` : ""}</p>`
+          : "";
+        return `<article class="memory-card"><div class="memory-meta"><span>${esc(person.actor_id)} · ${esc(person.location_id)}</span><span>PRIVATE OPERATOR LENS</span></div><p>${esc(person.private_activity)}</p>${plan}<div class="memory-source">energy ${Math.round(person.energy * 100)}% · connection ${Math.round(person.connection * 100)}% · purpose ${Math.round(person.purpose * 100)}% · never passed to Pathos automatically</div></article>`;
+      },
     )
     .join("");
   $("roles").innerHTML = state.roles

@@ -201,6 +201,12 @@ NPCs act offscreen through inexpensive schedules/decisions. Important consequenc
 are committed even if Pathos is absent. He learns them later through observation
 or testimony, not because the summarizer read the world database.
 
+The current deterministic baseline lets each resident turn owned public-event
+perception into a private, evidence-linked plan suited to their routine. A structured
+matching activity must occur on or after its scheduled time to complete it; otherwise
+the deadline expires. Plan cooldowns bound repetition. These private plans appear only
+in the operator lens and are never inserted into Pathos's context automatically.
+
 ## 8. Dream and reflection feedback loop
 
 1. During waking, track perceived experiences, unfinished concerns and affect.

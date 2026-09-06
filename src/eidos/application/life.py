@@ -173,7 +173,10 @@ class Life:
         catch_up_summaries = []
         concerns = {}
         for event in history:
-            payload = dict(event.payload)
+            payload: dict[str, Any] = {
+                key: value.isoformat() if isinstance(value, datetime) else value
+                for key, value in event.payload.items()
+            }
             item = {
                 **payload,
                 "id": str(event.event_id),
@@ -1161,7 +1164,11 @@ class Life:
 
 
 def vars_for(value: Any) -> dict[str, Any]:
-    return {name: getattr(value, name) for name in value.__dataclass_fields__}
+    output: dict[str, Any] = {}
+    for name in value.__dataclass_fields__:
+        item = getattr(value, name)
+        output[name] = item.isoformat() if isinstance(item, datetime) else item
+    return output
 
 
 def _deferred_cognition_events(

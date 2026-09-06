@@ -40,8 +40,9 @@ and a bounded source-linked factual recap. Lexical recall includes importance,
 simulated-time fading and capped rehearsal. Normal CLI and browser model calls use
 supervised durable workers and reuse completed work after restart. Pathos makes a
 narrow class of value/capacity-aware social choices; NPCs have persistent offscreen
-locations, needs, private beliefs, activities, and one bounded private plan rather
-than general autonomous planning. Term, entity, goal, and relationship recall indexes,
+locations, needs, private beliefs, activities, and actor-specific private plans with
+cooldowns, deadlines, and activity-validated outcomes rather than general autonomous
+planning. Term, entity, goal, and relationship recall indexes,
 owned beliefs, conservative imperfect recall, and source-linked consolidation remain
 replay projections rather than durable database indexes.
 
@@ -228,8 +229,8 @@ boundaries and must not rely on emotional coercion.
 1. Extend the new disposable core-state checkpoint into bounded materialized index
    maintenance so years of history do not rebuild every remaining projection and recall
    index from the beginning.
-2. Generalize NPC goals and feasible planning beyond the single perception-grounded
-   Rowan sketch fixture while preserving private knowledge boundaries.
+2. Broaden NPC goal formation beyond the first community-perception trigger and three
+   authored feasible activity profiles while preserving private knowledge boundaries.
 3. Add bounded multi-turn NPC scenes with interruption, exits, topic state, and
    observer-specific memories.
 4. Broaden paced world events, recurring activities, seasons, resource dependencies,

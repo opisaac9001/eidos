@@ -23,6 +23,8 @@ class NPCState:
     plan_title: str | None = None
     plan_action: str | None = None
     plan_location_id: str | None = None
+    plan_scheduled_for: datetime | None = None
+    plan_due_at: datetime | None = None
     plan_status: str | None = None
 
 
@@ -54,18 +56,33 @@ class NPCWorldState:
         elif event.kind == "npc.plan_created":
             if person.plan_status == "active":
                 raise ValueError("NPC already has an active plan")
+            if (
+                event.payload.get("owner") != actor_id
+                or event.payload.get("visibility") != "private"
+            ):
+                raise ValueError("NPC plans must remain private to their owner")
+            scheduled_for = _optional_datetime(event, "scheduled_for")
+            due_at = _optional_datetime(event, "due_at")
+            if scheduled_for is not None and due_at is not None and due_at < scheduled_for:
+                raise ValueError("NPC plan deadline cannot precede its scheduled activity")
             people[actor_id] = replace(
                 person,
                 plan_id=_required(event, "plan_id"),
                 plan_title=_required(event, "title"),
                 plan_action=_required(event, "action"),
                 plan_location_id=_required(event, "location_id"),
+                plan_scheduled_for=scheduled_for,
+                plan_due_at=due_at,
                 plan_status="active",
             )
         elif event.kind == "npc.plan_completed":
             if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
                 raise ValueError("Only the active NPC plan can complete")
             people[actor_id] = replace(person, plan_status="completed")
+        elif event.kind == "npc.plan_expired":
+            if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
+                raise ValueError("Only the active NPC plan can expire")
+            people[actor_id] = replace(person, plan_status="expired")
         return NPCWorldState(people)
 
 
@@ -99,3 +116,18 @@ def _bounded(event: DomainEvent, key: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
         raise ValueError(f"{key} must be between zero and one")
     return float(value)
+
+
+def _optional_datetime(event: DomainEvent, key: str) -> datetime | None:
+    value = event.payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be an ISO timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f"{key} must be an ISO timestamp") from None
+    if parsed.utcoffset() is None:
+        raise ValueError(f"{key} must be timezone-aware")
+    return parsed

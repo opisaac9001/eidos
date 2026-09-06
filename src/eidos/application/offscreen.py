@@ -7,7 +7,7 @@ from typing import Sequence
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
-from eidos.domain.world import PEOPLE, npc_location
+from eidos.domain.world import PEOPLE, npc_activity, npc_location
 
 
 def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> list[DomainEvent]:
@@ -41,15 +41,39 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             output.append(moved)
             state = state.apply(moved)
             current = state.people[actor_id]
+        if (
+            current.plan_status == "active"
+            and current.plan_due_at is not None
+            and simulated_at > current.plan_due_at
+            and current.plan_id is not None
+        ):
+            expired = DomainEvent(
+                "npc.plan_expired",
+                "pathos",
+                {
+                    "actor_id": actor_id,
+                    "plan_id": current.plan_id,
+                    "owner": actor_id,
+                    "visibility": "private",
+                    "simulated_at": simulated_at.isoformat(),
+                    "reason": "No matching feasible activity occurred before the deadline",
+                },
+                correlation_id=current.plan_id,
+            )
+            output.append(expired)
+            state = state.apply(expired)
+            current = state.people[actor_id]
         if simulated_at.hour not in {0, 6, 12, 18}:
             continue
+        action, activity_text = npc_activity(actor_id, desired)
         activity = DomainEvent(
             "npc.activity_recorded",
             "pathos",
             {
                 "actor_id": actor_id,
                 "location_id": desired,
-                "activity": _activity(actor_id, desired),
+                "action": action,
+                "activity": activity_text,
                 "simulated_at": simulated_at.isoformat(),
                 "visibility": "private",
                 "owner": actor_id,
@@ -77,9 +101,9 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         state = state.apply(activity).apply(changed)
         if (
             current.plan_status == "active"
-            and current.plan_action == "sketch"
+            and current.plan_action == action
             and current.plan_location_id == desired
-            and "sketching" in str(activity.payload["activity"])
+            and (current.plan_scheduled_for is None or simulated_at >= current.plan_scheduled_for)
             and current.plan_id is not None
         ):
             completed = DomainEvent(
@@ -98,16 +122,6 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             output.append(completed)
             state = state.apply(completed)
     return output
-
-
-def _activity(actor_id: str, location_id: str) -> str:
-    if location_id == "home":
-        return "resting at home"
-    return {
-        "mara": "running the cafe",
-        "ellis": "working on repairs" if location_id == "workshop" else "taking a walk",
-        "rowan": "sketching" if location_id == "park" else "visiting the cafe",
-    }[actor_id]
 
 
 def _clamp(value: float) -> float:
