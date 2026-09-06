@@ -122,7 +122,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised bounded queue with deadlines | P1 |
 | OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/memory/planning/belief/relationship/consolidation projections | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
-| OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Partial: verified non-merging life forks with clean inference queues, immutable provenance and divergence comparison | P6 |
+| OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Partial: verified non-merging life forks with clean inference queues, immutable provenance and evidence-based divergence review | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |
 | QA-02 | Timeout/crash/duplicate/cancellation/stale-result fault injection | Partial: HTTP/concurrency tests | P1 |
 | QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: contract-separated semantic probe warnings plus open-world semantic critic | Every phase |

@@ -63,6 +63,17 @@ class ExperimentBranchTests(unittest.TestCase):
             self.assertGreater(comparison.canonical_events_since_fork, 0)
             self.assertGreater(comparison.experiment_events_since_fork, 0)
             self.assertTrue(comparison.histories_diverged)
+            self.assertEqual(
+                comparison.canonical_review.event_count,
+                comparison.canonical_events_since_fork,
+            )
+            self.assertEqual(
+                comparison.experiment_review.event_count,
+                comparison.experiment_events_since_fork,
+            )
+            self.assertGreater(comparison.experiment_review.model_calls, 0)
+            self.assertGreaterEqual(comparison.experiment_review.simulated_hours, 4)
+            self.assertGreater(comparison.experiment_review.distinct_event_kinds, 5)
             self.assertEqual(inspect_experiment(branch).experiment_id, report.experiment_id)
 
     def test_tampered_history_or_unrelated_canonical_is_rejected(self):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -42,7 +43,40 @@ class ExperimentComparison:
     experiment_events_since_fork: int
     canonical_kinds_since_fork: Mapping[str, int]
     experiment_kinds_since_fork: Mapping[str, int]
+    canonical_review: LifeEvidenceReview
+    experiment_review: LifeEvidenceReview
     histories_diverged: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LifeEvidenceReview:
+    event_count: int
+    simulated_hours: float
+    distinct_event_kinds: int
+    activities: tuple[str, ...]
+    conversation_scenes: int
+    conversation_turns: int
+    conversation_partners: tuple[str, ...]
+    conversation_topics: tuple[str, ...]
+    relationship_contacts: int
+    memories: int
+    thoughts: int
+    dreams: int
+    dream_motifs: tuple[str, ...]
+    emotion_labels: tuple[str, ...]
+    minimum_valence: float | None
+    maximum_valence: float | None
+    intentions_adopted: int
+    intentions_completed: int
+    plans_created: int
+    plans_completed: int
+    independent_npc_actions: int
+    active_npc_actors: tuple[str, ...]
+    world_events: int
+    model_calls: int
+    model_failures: int
+    narrative_lines: int
+    repeated_narrative_lines: int
 
 
 _EVENT_COLUMNS = (
@@ -227,6 +261,153 @@ def _kind_counts(path: Path, offset: int) -> dict[str, int]:
     return {str(kind): int(count) for kind, count in rows}
 
 
+def _payload(row: tuple[object, ...]) -> dict[str, object]:
+    value = json.loads(str(row[5]))
+    return value if isinstance(value, dict) else {}
+
+
+def _payload_text(payload: Mapping[str, object], key: str) -> str | None:
+    value = payload.get(key)
+    if isinstance(value, dict) and set(value) == {"$datetime"}:
+        value = value["$datetime"]
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _simulated_time(row: tuple[object, ...]) -> datetime | None:
+    raw_time = _payload_text(_payload(row), "simulated_at")
+    if not raw_time:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw_time)
+    except ValueError:
+        return None
+    return parsed if parsed.utcoffset() is not None else None
+
+
+def _life_review(path: Path, offset: int) -> LifeEvidenceReview:
+    uri = f"file:{path.resolve()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as connection:
+        all_rows = _event_rows(connection)
+    rows = all_rows[offset:]
+    fork_times: list[datetime] = []
+    for prefix_row in all_rows[:offset]:
+        prefix_time = _simulated_time(prefix_row)
+        if prefix_time is not None:
+            fork_times.append(prefix_time)
+    kinds = Counter(str(row[3]) for row in rows)
+    activities: set[str] = set()
+    partners: set[str] = set()
+    topics: set[str] = set()
+    motifs: set[str] = set()
+    emotion_labels: set[str] = set()
+    npc_actors: set[str] = set()
+    valences: list[float] = []
+    simulated_times: list[datetime] = []
+    narrative: list[str] = []
+    model_failures = 0
+    relationship_contacts = 0
+    for row in rows:
+        kind = str(row[3])
+        payload = _payload(row)
+        if simulated_time := _simulated_time(row):
+            simulated_times.append(simulated_time)
+        if kind in {"activity.completed", "memory.recorded"}:
+            activity = _payload_text(payload, "activity")
+            if activity:
+                activities.add(activity)
+        if kind == "scene.started":
+            relationship_contacts += 1
+            partner = _payload_text(payload, "partner_id")
+            if partner:
+                partners.add(partner)
+        if kind == "scene.turn_taken":
+            topic = _payload_text(payload, "topic_id")
+            if topic:
+                topics.add(topic)
+        if kind == "dream.recorded":
+            motif = _payload_text(payload, "motif")
+            if motif:
+                motifs.add(motif)
+        if kind == "emotion.sampled":
+            label = _payload_text(payload, "label")
+            if label:
+                emotion_labels.add(label)
+            value = payload.get("valence")
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                valences.append(float(value))
+        if kind == "npc.activity_recorded":
+            actor = _payload_text(payload, "actor_id")
+            if actor:
+                npc_actors.add(actor)
+        if kind == "role.completed" and payload.get("status") != "ok":
+            model_failures += 1
+        if kind == "phone.call_received":
+            relationship_contacts += 1
+        if kind == "conversation.message" and payload.get("speaker") == "you":
+            relationship_contacts += 1
+        if kind in {
+            "conversation.message",
+            "memory.recorded",
+            "thought.recorded",
+            "dream.recorded",
+            "scene.turn_taken",
+            "speech.delivered",
+        }:
+            text = (
+                None
+                if kind == "conversation.message" and payload.get("speaker") == "you"
+                else _payload_text(payload, "text")
+            )
+            if text:
+                narrative.append(" ".join(text.casefold().split()))
+    repeated = sum(count - 1 for count in Counter(narrative).values() if count > 1)
+    simulated_hours = 0.0
+    if simulated_times and fork_times:
+        simulated_hours = max(0.0, (max(simulated_times) - max(fork_times)).total_seconds() / 3600)
+    elif len(simulated_times) > 1:
+        simulated_hours = max(
+            0.0, (max(simulated_times) - min(simulated_times)).total_seconds() / 3600
+        )
+    return LifeEvidenceReview(
+        event_count=len(rows),
+        simulated_hours=round(simulated_hours, 2),
+        distinct_event_kinds=len(kinds),
+        activities=tuple(sorted(activities)),
+        conversation_scenes=kinds["scene.started"],
+        conversation_turns=kinds["scene.turn_taken"],
+        conversation_partners=tuple(sorted(partners)),
+        conversation_topics=tuple(sorted(topics)),
+        relationship_contacts=relationship_contacts,
+        memories=kinds["memory.recorded"],
+        thoughts=kinds["thought.recorded"],
+        dreams=kinds["dream.recorded"],
+        dream_motifs=tuple(sorted(motifs)),
+        emotion_labels=tuple(sorted(emotion_labels)),
+        minimum_valence=round(min(valences), 3) if valences else None,
+        maximum_valence=round(max(valences), 3) if valences else None,
+        intentions_adopted=kinds["intention.adopted"],
+        intentions_completed=kinds["intention.completed"],
+        plans_created=(
+            kinds["schedule.created"] + kinds["npc.plan_created"] + kinds["self_project.accepted"]
+        ),
+        plans_completed=(
+            kinds["schedule.completed"]
+            + kinds["npc.plan_completed"]
+            + kinds["self_project.completed"]
+        ),
+        independent_npc_actions=kinds["npc.activity_recorded"],
+        active_npc_actors=tuple(sorted(npc_actors)),
+        world_events=kinds["world_event.occurred"],
+        model_calls=kinds["role.completed"],
+        model_failures=model_failures,
+        narrative_lines=len(narrative),
+        repeated_narrative_lines=repeated,
+    )
+
+
 def compare_experiment(canonical: Path, experiment: Path) -> ExperimentComparison:
     report = inspect_experiment(experiment)
     canonical_backup = verify_backup(canonical)
@@ -253,6 +434,8 @@ def compare_experiment(canonical: Path, experiment: Path) -> ExperimentCompariso
         report.backup.event_count - report.fork_event_count,
         canonical_kinds,
         experiment_kinds,
+        _life_review(canonical, report.fork_event_count),
+        _life_review(experiment, report.fork_event_count),
         canonical_ids != experiment_ids,
     )
 

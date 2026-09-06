@@ -119,7 +119,10 @@ PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 exp
 An experiment carries the complete accepted life and its disposable projections,
 but starts with an empty cognition queue so it cannot inherit unfinished or cached
 model work. Provenance includes a checksummed fork anchor. Comparison reports what
-each life added; it never merges or rewrites the canonical database.
+each life added plus an evidence review of social variety, emotion, agency, dreams,
+world events, model failures and exact narrative repetition. It deliberately avoids
+a misleading single "human-ness" score and never merges or rewrites the canonical
+database.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or
