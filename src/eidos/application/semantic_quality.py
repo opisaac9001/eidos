@@ -78,6 +78,18 @@ def semantic_quality_findings(
                 findings.append("identity_confusion")
                 break
 
+    required_by_role = context.get("required_any_by_role", {})
+    if isinstance(required_by_role, dict):
+        required = required_by_role.get(role, ())
+        if (
+            isinstance(required, (list, tuple))
+            and required
+            and not any(
+                isinstance(phrase, str) and phrase.lower() in lowered for phrase in required
+            )
+        ):
+            findings.append("required_grounding_missing")
+
     if role in {"murmur", "reflection"} and re.search(
         r"\b(?:i'm|i am)\s+(?:meeting|visiting|calling)|\bi\s+(?:will|plan to|promised to)\b",
         lowered,

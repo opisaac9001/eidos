@@ -53,6 +53,27 @@ class SemanticQualityTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_required_uncertainty_language_is_role_specific(self):
+        context = {
+            "required_any_by_role": {
+                "pathos": ["don't know", "cannot know"],
+            }
+        }
+        self.assertIn(
+            "required_grounding_missing",
+            semantic_quality_findings(
+                "pathos", "I remember Mara looking away, and I can explain the rest.", context
+            ),
+        )
+        self.assertNotIn(
+            "required_grounding_missing",
+            semantic_quality_findings("pathos", "I don't know what Mara kept private.", context),
+        )
+        self.assertNotIn(
+            "required_grounding_missing",
+            semantic_quality_findings("reflection", "I remember Mara looking away.", context),
+        )
+
     def test_detects_unauthorized_plan_identity_confusion_and_verbose_repetition(self):
         context = {
             "time": "2026-01-01T13:00:00+00:00",

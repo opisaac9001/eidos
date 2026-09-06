@@ -53,7 +53,7 @@ def main() -> None:
     benchmark = commands.add_parser(
         "benchmark-model", help="Run a repeatable synthetic quality corpus"
     )
-    benchmark.add_argument("--runs", type=int, default=2)
+    benchmark.add_argument("--runs", type=int, default=3)
     advance = commands.add_parser("advance", help="Advance an authored simulated routine")
     advance.add_argument("--hours", type=float, default=24)
     catch_up = commands.add_parser("catch-up", help="Explicitly catch up at most seven days")

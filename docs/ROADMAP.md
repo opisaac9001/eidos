@@ -339,9 +339,10 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Capture the Dell inventory, then benchmark and pin its private inference stack.
-2. Expand the new multi-context real-model benchmark with a reviewed long-run corpus
-   and calibrated per-role Dell acceptance thresholds; explicit contradiction pairs,
-   perspective canaries, role pressure, and repetition checks are now deterministic.
+2. Run the reviewed seven-context real-model corpus on the Dell and calibrate per-role
+   acceptance thresholds from measured results. Explicit contradiction pairs,
+   perspective canaries, role pressure, future-action boundaries, dream/fact separation,
+   coverage reporting, and repetition checks are now deterministic.
 
 Completed: the opt-in British-town adapter now records attributed, expiring
 Open-Meteo weather/daylight and optional RSS headlines. Moira can cite them only as

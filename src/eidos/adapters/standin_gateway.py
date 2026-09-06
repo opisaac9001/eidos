@@ -18,7 +18,9 @@ class StandInGateway(ModelGateway):
         choice = int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
         if role == "pathos":
             message = context.get("message", "").lower()
-            if any(word in message for word in ("remember", "yesterday", "today", "day")):
+            if "private thing" in message or "don't know" in message:
+                text = "I don't know what Mara kept private, and I don't want to pretend that I do."
+            elif any(word in message for word in ("remember", "yesterday", "today", "day")):
                 text = f"I've been thinking back over the day. {last_memory} I'm at {location} now."
             elif any(word in message for word in ("feel", "mood", "how are")):
                 text = f"{context.get('mood', 'Quiet')} is probably the word. Being at {location} suits me right now."

@@ -52,6 +52,9 @@ month can nudge one tendency by one percentage point, with hard drift and cadenc
 limits. Conversation, activity, and project performers receive the resulting identity
 context, while replay verifies every cited source.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
+The model benchmark now reports a seven-case reviewed coverage pass across factual
+state changes, private knowledge, dreams, relationship perspective, prompt pressure,
+future commitments, structured activities, resident plans, and multi-step projects.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),

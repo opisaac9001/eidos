@@ -20,7 +20,7 @@ Then, from this repository:
 export EIDOS_MODEL_BASE_URL=http://127.0.0.1:11435/v1
 export EIDOS_MODEL_NAME=qwen2.5:1.5b
 PYTHONPATH=src .venv/bin/python -m eidos probe-model
-PYTHONPATH=src .venv/bin/python -m eidos benchmark-model --runs 3
+PYTHONPATH=src .venv/bin/python -m eidos benchmark-model --runs 7
 EIDOS_DATABASE=data/lab.sqlite3 ./run.command --port 8766
 ```
 
@@ -90,7 +90,7 @@ separately exposes `semantic_passed` and per-role `semantic_findings` for fragme
 output, lost first-person voice, prompt/AI-role leakage, time-of-day contradictions,
 explicit evidence contradictions, forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
-`benchmark-model` repeats a three-context synthetic corpus one to five times for the
+`benchmark-model` walks a seven-context reviewed synthetic corpus for one to ten runs for the
 eight narrative performers plus varied structured cases for Pathos activities,
 multi-step projects, and one independent resident. It reports
 per-role contract/finding counts, retained samples, median/max latency, tokens, and a
@@ -98,6 +98,10 @@ minimum three-sample screening floor. Pathos agency must also parse and pass the
 place/time/travel/resource planner; resident agency must preserve private ownership and
 produce a physically executable known-place plan. Passing that floor only nominates a role/model pair
 for human review; it never changes production routing automatically.
+The corpus contains a paired broken/repaired lamp state, private-knowledge and
+relationship-perspective canaries, role-pressure, dream/fact separation, and a
+future-promise boundary. Reports list the exact case IDs and coverage tags exercised;
+use seven runs for one full pass before comparing candidate Dell routes.
 Roles receive only their relevant context fields. Responses must finish, parse
 as exactly one text field, and meet role-specific rules. Weather is enumerated;
 factual memory must reproduce its source experience exactly. Outputs are bounded
