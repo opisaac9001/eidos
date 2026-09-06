@@ -6,14 +6,13 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
-    SceneResumeProposal,
     project_scenes,
     resolve_scene_interruption,
-    resolve_scene_resume,
 )
 
 
@@ -29,7 +28,9 @@ def visitor_events(
     relationships: Mapping[str, Relationship],
 ) -> list[DomainEvent]:
     """Advance one visit lifecycle, or reserve one eligible connection goal."""
-    completed = _complete_admitted_visit(history, simulated_at, actual_revision, actor_locations)
+    completed = _complete_admitted_visit(
+        history, simulated_at, actual_revision, actor_locations, pathos_energy
+    )
     if completed:
         return completed
     due = _resolve_due_plan(
@@ -259,6 +260,7 @@ def _complete_admitted_visit(
     simulated_at: datetime,
     actual_revision: int,
     actor_locations: Mapping[str, str],
+    pathos_energy: float,
 ) -> list[DomainEvent]:
     departed = {
         str(event.payload["visit_id"]) for event in history if event.kind == "visitor.departed"
@@ -294,19 +296,18 @@ def _complete_admitted_visit(
     scene_id = admitted.payload.get("scene_id")
     scene = project_scenes(history).scenes.get(str(scene_id)) if scene_id else None
     if scene is not None and scene.status == "paused":
-        resumed = resolve_scene_resume(
-            SceneResumeProposal(
-                f"visitor-resume-{admitted.payload['visit_id']}",
+        output.extend(
+            recover_user_scene(
+                [*history, *output],
                 scene.scene_id,
-                "pathos",
+                simulated_at,
                 actual_revision + len(output),
-            ),
-            state=project_scenes([*history, *output]),
-            actor_locations=actor_locations,
-            actual_revision=actual_revision + len(output),
-            simulated_at=simulated_at.isoformat(),
+                actor_locations=actor_locations,
+                pathos_energy=pathos_energy,
+                source_event=departed_event,
+                decision_key=f"visitor-{admitted.payload['visit_id']}",
+            )
         )
-        output.extend(resumed.events)
     return output
 
 

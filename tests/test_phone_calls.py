@@ -101,9 +101,16 @@ class PhoneCallTests(unittest.TestCase):
             len(history),
             actor_locations=self.locations,
             pathos_awake=True,
+            pathos_energy=1.0,
         )
         self.assertTrue(any(event.kind == "phone.call_completed" for event in second))
         self.assertTrue(any(event.kind == "scene.resumed" for event in second))
+        self.assertEqual(
+            next(event for event in second if event.kind == "scene.resumption_decided").payload[
+                "decision"
+            ],
+            "resume",
+        )
 
     def test_relationship_can_change_whether_pathos_leaves_current_company(self):
         scene = self.scene()

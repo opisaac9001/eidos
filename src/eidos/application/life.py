@@ -543,6 +543,7 @@ class Life:
                 "social.activity_completed",
                 "scene.interrupted",
                 "scene.resumed",
+                "scene.resumption_decided",
                 "visit.ended",
                 "phone.call_received",
                 "phone.call_answered",

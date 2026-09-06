@@ -79,7 +79,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: materialized directed metrics whose trust/familiarity/tension affect competing-call decisions | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked reminders from calls, visits, apologies, and shared time now prioritize the relevant person/topic and close only against later contact evidence | P5 |
-| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, pause/resume current company | Partial: connection-goal-sourced calls and physical visits with emotion/relationship-weighted choices, callbacks, presence, and durable interruption lifecycles | P3–P5 |
+| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, pause/resume current company | Partial: connection-goal-sourced calls and physical visits with weighted choices, callbacks, presence, plus post-interruption resume/end decisions from energy, time pressure, co-presence, and stable variability | P3–P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
 vs public speech, interruption/resume, observer-specific memories and validated

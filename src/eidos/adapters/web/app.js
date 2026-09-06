@@ -33,6 +33,7 @@ const labels = {
   "social.activity_completed": "TIME TOGETHER",
   "scene.interrupted": "CONVERSATION PAUSED",
   "scene.resumed": "CONVERSATION RESUMED",
+  "scene.resumption_decided": "AFTER THE INTERRUPTION",
   "visit.ended": "VISIT ENDED",
   "phone.call_received": "PHONE CALL",
   "phone.call_answered": "CALL ANSWERED",

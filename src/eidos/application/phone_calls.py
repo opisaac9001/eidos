@@ -6,14 +6,13 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
-    SceneResumeProposal,
     project_scenes,
     resolve_scene_interruption,
-    resolve_scene_resume,
 )
 
 
@@ -30,7 +29,11 @@ def phone_call_events(
 ) -> list[DomainEvent]:
     """Advance existing calls, then allow one unmet connection goal to cause a call."""
     output = _complete_answered_call(
-        history, simulated_at, actual_revision, actor_locations=actor_locations
+        history,
+        simulated_at,
+        actual_revision,
+        actor_locations=actor_locations,
+        pathos_energy=pathos_energy,
     )
     if output:
         return output
@@ -179,6 +182,7 @@ def _complete_answered_call(
     actual_revision: int,
     *,
     actor_locations: Mapping[str, str],
+    pathos_energy: float,
 ) -> list[DomainEvent]:
     completed = {
         str(event.payload["call_id"])
@@ -201,19 +205,18 @@ def _complete_answered_call(
     scene_id = answered.payload.get("scene_id")
     scene = project_scenes(history).scenes.get(str(scene_id)) if scene_id else None
     if scene is not None and scene.status == "paused":
-        resumed = resolve_scene_resume(
-            SceneResumeProposal(
-                f"phone-resume-{answered.payload['call_id']}",
+        output.extend(
+            recover_user_scene(
+                [*history, *output],
                 scene.scene_id,
-                "pathos",
+                simulated_at,
                 actual_revision + len(output),
-            ),
-            state=project_scenes([*history, *output]),
-            actor_locations=actor_locations,
-            actual_revision=actual_revision + len(output),
-            simulated_at=simulated_at.isoformat(),
+                actor_locations=actor_locations,
+                pathos_energy=pathos_energy,
+                source_event=output[0],
+                decision_key=f"phone-{answered.payload['call_id']}",
+            )
         )
-        output.extend(resumed.events)
     return output
 
 

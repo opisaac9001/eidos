@@ -271,6 +271,14 @@ hours, schedule-conflict, and travel-feasibility planner as other commitments. T
 appointment then moves Pathos through the ordinary routine override and only completes
 if both people are actually co-present.
 
+Completion of an answered call or admitted visit does not automatically reset a user
+conversation to its prior state. A separate causal decision records current energy,
+whether the user and Pathos are still together, and the next scheduled commitment. An
+exhausted or absent Pathos ends the scene; a commitment within an hour creates genuine
+time pressure; otherwise a replay-stable inclination can still favor either resuming or
+leaving the conversation there. The user receives a visible system explanation in both
+cases, and replay retains the exact decision rather than rerolling it.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.
