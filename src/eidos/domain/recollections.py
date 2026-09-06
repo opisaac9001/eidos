@@ -17,6 +17,7 @@ class Recollection:
     text: str
     confidence: float
     detail_level: str
+    affective_bias: float
     changed_at: datetime
 
 
@@ -65,6 +66,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 raise ValueError("Uncorrected reconsolidation cannot restore lost detail")
             if event.payload.get("epistemic_status") != "subjective_recollection":
                 raise ValueError("Reconsolidation must remain explicitly subjective")
+            affective_bias = _signed_level(event.payload.get("affective_bias", 0.0))
             changed_at = _aware(event, "simulated_at")
             if prior is not None and changed_at < prior.changed_at:
                 raise ValueError("Reconsolidation time cannot move backwards")
@@ -74,6 +76,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 _required(event, "recalled_text"),
                 confidence,
                 detail_level,
+                affective_bias,
                 changed_at,
             )
             used_accesses.add(cause)
@@ -105,6 +108,12 @@ def _source_confidence(event: DomainEvent) -> float:
     value = event.payload.get("confidence", 1.0)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
         raise ValueError("Memory confidence must be between zero and one")
+    return float(value)
+
+
+def _signed_level(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not -1 <= value <= 1:
+        raise ValueError("Recollection affective bias must be between negative and positive one")
     return float(value)
 
 

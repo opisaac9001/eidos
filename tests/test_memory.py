@@ -33,6 +33,59 @@ class MemoryTests(unittest.TestCase):
         self.assertEqual(results[0].event.event_id, promise.event_id)
         self.assertIn("cue terms", results[0].reason)
 
+    def test_current_mood_slightly_favors_memories_with_matching_recorded_tone(self):
+        welcome = DomainEvent(
+            "social.activity_completed",
+            "pathos",
+            {"simulated_at": (self.now - timedelta(days=2)).isoformat()},
+        )
+        setback = DomainEvent(
+            "commitment.missed",
+            "pathos",
+            {"simulated_at": (self.now - timedelta(days=2)).isoformat()},
+        )
+        warm = self.memory(
+            "Mara and I spent an afternoon together.",
+            self.now - timedelta(days=2),
+            source_event_id=str(welcome.event_id),
+        )
+        difficult = self.memory(
+            "Mara and I had a difficult afternoon.",
+            self.now - timedelta(days=2),
+            source_event_id=str(setback.event_id),
+        )
+        positive_appraisal = DomainEvent(
+            "appraisal.recorded",
+            "pathos",
+            {"source_event_id": str(welcome.event_id), "desirability": 0.8},
+        )
+        negative_appraisal = DomainEvent(
+            "appraisal.recorded",
+            "pathos",
+            {"source_event_id": str(setback.event_id), "desirability": -0.8},
+        )
+        low_mood = DomainEvent(
+            "emotion.sampled",
+            "pathos",
+            {"simulated_at": self.now.isoformat(), "valence": -0.8},
+        )
+        history = [
+            welcome,
+            setback,
+            warm,
+            difficult,
+            positive_appraisal,
+            negative_appraisal,
+            low_mood,
+        ]
+
+        results = recall(history, "Mara afternoon", self.now)
+
+        self.assertEqual(results[0].event.event_id, difficult.event_id)
+        self.assertGreater(results[0].components["mood_congruence"], 0)
+        self.assertLess(results[1].components["mood_congruence"], 0)
+        self.assertIn("mood-congruent", results[0].reason)
+
     def test_accessibility_fades_but_history_remains(self):
         recent = self.memory("A mundane bus passed.", self.now, 0.2)
         old = self.memory("A mundane bus passed.", self.now - timedelta(days=90), 0.2)

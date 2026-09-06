@@ -183,10 +183,12 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   relationships and goals; search beyond recent items. Embeddings are optional.
 - Fade accessibility/detail in simulated time. Reminders and rehearsal strengthen
   access within bounds; the historical audit record does not decay.
-- Hazy recollections now reconsolidate at most monthly into a persistent subjective
-  version with lower confidence and altered emphasis. Later thought begins from that
-  version while immutable evidence remains separate; future work adds emotional bias,
-  similarity blending, and evidence-driven correction.
+- Current mood now slightly biases recall toward memories with matching source-linked
+  emotional appraisals. Hazy recollections reconsolidate at most monthly into a
+  persistent subjective version with lower confidence, altered emphasis, and a bounded
+  trace of how Pathos felt while remembering. Later thought begins from that version
+  while immutable evidence remains separate; future work adds similarity blending and
+  evidence-driven correction.
 - Consolidate repeated episodes into source-linked summaries and associations.
   Maintain uncertainty and correction history; summaries are not new events.
 - Stable values/preferences/traits plus separately changing needs, emotional

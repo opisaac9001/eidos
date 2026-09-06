@@ -67,6 +67,7 @@ class RecalledMemory:
     components: Mapping[str, float]
     recalled_text: str
     detail_level: str
+    affective_bias: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +330,7 @@ def recall(
     ranked = []
     archived = archived_memory_ids(history)
     recollections = project_recollections(history).latest
+    current_affect, emotional_tones = _affective_context(history, now, recollections)
     for event in index.memories:
         importance, confidence = _metadata(event)
         subjective = recollections.get(str(event.event_id))
@@ -361,6 +363,8 @@ def recall(
         relationship_relevance = min(
             1.0, len(matched_relationships) / max(1, len(relationship_ids))
         )
+        emotional_tone = emotional_tones.get(str(event.event_id), 0.0)
+        mood_congruence = 0.04 * current_affect * emotional_tone
         is_archived = str(event.event_id) in archived
         has_direct_cue = bool(
             matched_terms or matched_entities or matched_goals or matched_relationships
@@ -375,6 +379,7 @@ def recall(
             "accessibility": 0.17 * accessibility,
             "importance": 0.12 * importance,
             "confidence": 0.05 * confidence,
+            "mood_congruence": mood_congruence,
         }
         score = sum(components.values())
         reasons = []
@@ -392,6 +397,10 @@ def recall(
             reasons.append("recent")
         if rehearsals:
             reasons.append(f"recalled {rehearsals}×")
+        if mood_congruence >= 0.005:
+            reasons.append("mood-congruent emotional tone")
+        elif mood_congruence <= -0.005:
+            reasons.append("mood-incongruent emotional tone")
         ranked.append(
             RecalledMemory(
                 event,
@@ -405,6 +414,7 @@ def recall(
                 matched_relationships,
                 MappingProxyType({key: round(value, 4) for key, value in components.items()}),
                 *_render_recollection(event, accessibility, importance, subjective),
+                subjective.affective_bias if subjective is not None else 0.0,
             )
         )
     ranked.sort(
@@ -508,10 +518,60 @@ def memory_view(
                 "recall_score": item.score,
                 "recalled_text": item.recalled_text,
                 "detail_level": item.detail_level,
+                "affective_bias": item.affective_bias,
                 "archived": str(event.event_id) in archived,
             }
         )
     return views
+
+
+def _affective_context(
+    history: list[DomainEvent],
+    now: datetime,
+    recollections: Mapping[str, Recollection],
+) -> tuple[float, dict[str, float]]:
+    """Derive bounded mood congruence from recorded affect and sourced appraisals."""
+    current = 0.0
+    for event in reversed(history):
+        if event.kind not in {"emotion.sampled", "affect.changed"}:
+            continue
+        value = event.payload.get("valence")
+        raw_time = event.payload.get("simulated_at")
+        if (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and -1 <= value <= 1
+            and isinstance(raw_time, str)
+        ):
+            sampled_at = datetime.fromisoformat(raw_time)
+            if sampled_at.utcoffset() is not None and sampled_at <= now:
+                current = float(value)
+                break
+    appraisals: dict[str, float] = {}
+    for event in history:
+        if event.kind != "appraisal.recorded":
+            continue
+        source_id = event.payload.get("source_event_id")
+        desirability = event.payload.get("desirability")
+        if (
+            isinstance(source_id, str)
+            and isinstance(desirability, (int, float))
+            and not isinstance(desirability, bool)
+        ):
+            appraisals[source_id] = max(-1.0, min(1.0, float(desirability)))
+    tones: dict[str, float] = {}
+    for event in history:
+        if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
+            continue
+        memory_id = str(event.event_id)
+        linked_source = event.payload.get("source_event_id")
+        source_tone = appraisals.get(memory_id, 0.0)
+        if isinstance(linked_source, str):
+            source_tone = appraisals.get(linked_source, source_tone)
+        subjective = recollections.get(memory_id)
+        bias = subjective.affective_bias if subjective is not None else 0.0
+        tones[memory_id] = max(-1.0, min(1.0, source_tone * 0.8 + bias * 0.2))
+    return current, tones
 
 
 def memory_archive_page(

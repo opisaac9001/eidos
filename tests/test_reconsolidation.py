@@ -76,6 +76,31 @@ class ReconsolidationTests(unittest.TestCase):
             [],
         )
 
+    def test_current_feeling_can_color_but_not_replace_a_hazy_recollection(self):
+        memory = self.memory()
+        low_mood = DomainEvent(
+            "affect.changed",
+            "pathos",
+            {
+                "valence": -0.7,
+                "arousal": 0.3,
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        recalled = recall([memory, low_mood], "Mara cup", self.now)
+        access = DomainEvent(
+            "memory.accessed",
+            "pathos",
+            {"memory_id": str(memory.event_id), "simulated_at": self.now.isoformat()},
+        )
+
+        changed = reconsolidation_events([memory, low_mood, access], recalled, self.now)
+
+        self.assertEqual(changed[0].payload["affective_bias"], -0.7)
+        self.assertIn("feels heavier", changed[0].payload["recalled_text"])
+        state = project_recollections([memory, low_mood, access, *changed])
+        self.assertEqual(state.latest[str(memory.event_id)].affective_bias, -0.7)
+
     def test_only_the_most_salient_imperfect_memory_reconsolidates_per_recall(self):
         first = self.memory()
         second = DomainEvent(
