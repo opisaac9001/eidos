@@ -106,7 +106,12 @@ from eidos.domain.relationship_dates import project_relationship_dates
 from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import RelationshipState, project_relationships
 from eidos.domain.resident_relationships import project_resident_relationships
-from eidos.domain.routine import RoutineBeat, beats_between, emotionally_adjusted_beat
+from eidos.domain.routine import (
+    RoutineBeat,
+    beats_between,
+    emotionally_adjusted_beat,
+    needs_adjusted_beat,
+)
 from eidos.domain.scenes import (
     SceneEndProposal,
     SceneEndReason,
@@ -1418,6 +1423,28 @@ class Life:
             meals: list[DomainEvent] = []
             meal_checked = False
             if beat:
+                need_reason = None
+                if (
+                    incident_beat is None
+                    and planned_beat is None
+                    and current.date() > datetime(2026, 1, 9, tzinfo=current.tzinfo).date()
+                    and not any(
+                        event.kind == "memory.recorded"
+                        and event.payload.get("need_decision_reason")
+                        and str(event.payload.get("simulated_at", "")).startswith(
+                            current.date().isoformat()
+                        )
+                        for event in history + pending
+                    )
+                ):
+                    beat, need_reason = needs_adjusted_beat(
+                        beat,
+                        rest=state.rest,
+                        connection=state.connection,
+                        curiosity=state.curiosity,
+                        mastery=state.mastery,
+                        hunger=state.hunger,
+                    )
                 beat, physical_reason = physically_adjusted_beat(
                     beat,
                     active_wellbeing,
@@ -1584,6 +1611,7 @@ class Life:
                             if meal_claim and meal_event is None
                             else beat.activity,
                             "emotional_decision_reason": emotional_reason,
+                            "need_decision_reason": need_reason,
                             "physical_decision_reason": physical_reason,
                             "location_id": beat.location_id,
                             "owner": "pathos",

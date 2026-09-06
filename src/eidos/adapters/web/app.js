@@ -663,7 +663,8 @@ function render(next) {
     .map(([name]) => name[0].toUpperCase() + name.slice(1))
     .join(" · ");
   const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
+  const attention = (state.mind?.layers || []).find((item) => item.layer === "attention");
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${attention ? ` · Attention: ${attention.focus_text}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   const preferences = state.identity?.preferences || [];
   const traits = Object.entries(state.identity?.traits || {})
     .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)

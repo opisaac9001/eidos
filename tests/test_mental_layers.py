@@ -113,6 +113,50 @@ class MentalLayerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             project_mind([bad])
 
+    def test_attention_competes_between_need_concern_and_imminent_commitment(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        hungry = PathosState(
+            simulated_at=at,
+            awake=True,
+            hunger=0.9,
+            rest=0.8,
+            connection=0.8,
+            curiosity=0.8,
+            mastery=0.8,
+            energy=0.8,
+        )
+        need_events = mental_layer_events([], hungry, at, {})
+        attention = next(event for event in need_events if event.payload["layer"] == "attention")
+        self.assertEqual(
+            (attention.payload["focus_type"], attention.payload["focus_id"]),
+            ("need", "nourishment"),
+        )
+        concern = DomainEvent(
+            "concern.opened",
+            "pathos",
+            {"concern_id": "loose-end", "text": "The unanswered letter."},
+        )
+        concerned = mental_layer_events([concern], PathosState(simulated_at=at), at, {})
+        attention = next(event for event in concerned if event.payload["layer"] == "attention")
+        self.assertEqual(attention.payload["focus_type"], "concern")
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "soon",
+                "title": "Meet Mara",
+                "starts_at": (at + timedelta(minutes=30)).isoformat(),
+                "ends_at": (at + timedelta(hours=1, minutes=30)).isoformat(),
+                "location_id": "cafe",
+                "actor_id": "pathos",
+            },
+        )
+        committed = mental_layer_events([concern, schedule], PathosState(simulated_at=at), at, {})
+        attention = next(event for event in committed if event.payload["layer"] == "attention")
+        self.assertEqual(
+            (attention.payload["focus_type"], attention.payload["focus_id"]), ("commitment", "soon")
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,9 +8,19 @@ from eidos.application.agency import autonomous_activity_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.actions import ActionKind
 from eidos.domain.agency import AgencyCandidate, parse_agency_candidate, resolve_agency_candidate
+from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_catalog import project_world_catalog
+
+
+class CapturingStandIn(StandInGateway):
+    def __init__(self):
+        self.requests = []
+
+    async def generate(self, request):
+        self.requests.append(request)
+        return await super().generate(request)
 
 
 class AgencyTests(unittest.TestCase):
@@ -142,12 +152,28 @@ class AgencyTests(unittest.TestCase):
 
     def test_stand_in_originates_an_open_ended_activity(self):
         at = datetime(2026, 1, 11, 10, tzinfo=timezone.utc)
+        attention = DomainEvent(
+            "mind.layer_pulsed",
+            "pathos",
+            {
+                "pulse_id": "attention",
+                "layer": "attention",
+                "mode": "foreground",
+                "focus_type": "concern",
+                "focus_id": "unfinished-letter",
+                "focus_text": "The unfinished letter",
+                "activation": 0.78,
+                "simulated_at": (at - timedelta(hours=1)).isoformat(),
+                "action_authority": False,
+            },
+        )
+        gateway = CapturingStandIn()
         events = asyncio.run(
             autonomous_activity_events(
-                [],
+                [attention],
                 at,
-                0,
-                StandInGateway(),
+                1,
+                gateway,
                 planning=PlanningState(),
                 catalog=project_world_catalog([]),
                 needs={"rest": 0.7, "connection": 0.4, "curiosity": 0.8},
@@ -164,6 +190,8 @@ class AgencyTests(unittest.TestCase):
         schedule = next(event for event in events if event.kind == "schedule.created")
         self.assertTrue(schedule.payload["activity_type"])
         self.assertNotIn("activity.completed", kinds)
+        context = json.loads(gateway.requests[0].messages[0].content)
+        self.assertEqual(context["current_attention"]["focus_id"], "unfinished-letter")
 
 
 if __name__ == "__main__":

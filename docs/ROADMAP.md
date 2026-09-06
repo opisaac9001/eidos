@@ -34,6 +34,10 @@ includes unit, replay, seven-day, and thirty-day gates under strict static typin
 Rare non-clinical physical discomfort now forms a replayable one-to-three-day arc:
 onset, monotonic recovery and resolution can alter somatic attention, mood, effective
 capacity, routine choices, plans, visit availability and queued response timing.
+Hourly foreground attention now competes among needs, concerns, goals, people, place
+and imminent commitments with bounded inertia. It informs generative context without
+gaining action authority. Critical need pressure may redirect one free-time beat per
+day through an auditable rule while commitments and the authored opening stay intact.
 Moira can also submit open-vocabulary fictional incidents with explicit cause, place,
 lead time, duration, theme and opportunity; rejected or failed generations produce a
 quiet interval instead of falling back to a scripted event.

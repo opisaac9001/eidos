@@ -37,9 +37,9 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: persisted sourced values + default and evidence-developed preferences in bounded context | P2 |
 | SELF-02 | Multidimensional affect, named emotion, duration, appraisal, episodes and baseline mood | Partial: replayable primary/secondary mixed emotion, prolonged-low tracking, source-linked valence/arousal episodes + recovery | P2 |
-| SELF-03 | Rest, hunger, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable need pressure with condition- and commitment-shaped sleep plus opportunity- and interruption-aware meals | P2–P4 |
+| SELF-03 | Rest, hunger, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable need pressure with condition- and commitment-shaped sleep, opportunity- and interruption-aware meals, and critical-need redirection of free time | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle, capped non-action dream appraisal, and source-linked regulation that can lower arousal or protect actual sleep without erasing low valence | P2–P4 |
-| SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + primary/mixed emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows | P3 |
+| SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + primary/mixed emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows; critical needs can redirect one optional hour per day | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded skills/habit, capped week-spanning preference lifecycle, and one-point month-spanning behavioral trait drift | P6 |
 | SELF-07 | Household income, costs, affordability, obligations and missed-payment consequences | Partial: source-linked GBP ledger for workshop shifts, café meals, provision orders/refunds and weekly housing without overdrafts | P3–P6 |
 | SELF-08 | Physical comfort, minor illness, recovery and capacity effects | Partial: rare replayable non-clinical one-to-three-day episodes with monotonic recovery and bounded effects on attention, mood, plans and availability | P3–P6 |
@@ -93,7 +93,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/attention/association pulses + sourced associations | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus inertial foreground competition among needs, concerns, goals, people, places and imminent commitments | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: replayable nightly windows shaped by condition and commitments, with occupied-time delay and legacy fallback | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs, complete lineage, and varied replay-stable offline dreams | P4 |

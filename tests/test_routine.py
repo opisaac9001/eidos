@@ -5,6 +5,7 @@ from eidos.domain.routine import (
     RoutineBeat,
     beats_between,
     emotionally_adjusted_beat,
+    needs_adjusted_beat,
     routine_for_day,
 )
 
@@ -51,6 +52,52 @@ class RoutineTests(unittest.TestCase):
         )
         self.assertEqual(unchanged, work)
         self.assertIsNone(reason)
+
+    def test_strongest_need_can_redirect_free_time_but_not_an_obligation(self):
+        outing = RoutineBeat(13, "park", "Walk in the park.", 0.6, "walk")
+        connected, reason = needs_adjusted_beat(
+            outing,
+            rest=0.8,
+            connection=0.2,
+            curiosity=0.7,
+            mastery=0.7,
+            hunger=0.2,
+        )
+        self.assertEqual((connected.location_id, connected.activity), ("cafe", "social_presence"))
+        self.assertIn("connection", reason or "")
+        nourished, reason = needs_adjusted_beat(
+            outing,
+            rest=0.8,
+            connection=0.8,
+            curiosity=0.8,
+            mastery=0.8,
+            hunger=0.85,
+        )
+        self.assertEqual((nourished.location_id, nourished.activity), ("home", "need_driven_meal"))
+        self.assertIn("hunger", reason or "")
+        evening = RoutineBeat(18, "park", "Walk home through the park.", 0.45, "evening_walk")
+        practiced, reason = needs_adjusted_beat(
+            evening,
+            rest=0.8,
+            connection=0.8,
+            curiosity=0.8,
+            mastery=0.2,
+            hunger=0.2,
+        )
+        self.assertEqual((practiced.location_id, practiced.activity), ("home", "craft_practice"))
+        self.assertIn("mastery", reason or "")
+        work = RoutineBeat(10, "workshop", "Go to work.", 0.7, "work")
+        self.assertEqual(
+            needs_adjusted_beat(
+                work,
+                rest=0.1,
+                connection=0.8,
+                curiosity=0.8,
+                mastery=0.8,
+                hunger=0.1,
+            ),
+            (work, None),
+        )
 
 
 if __name__ == "__main__":

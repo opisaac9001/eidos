@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.application.inner_life import active_concerns
 from eidos.domain.emotions import classify_emotion, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
-from eidos.domain.planning import project_planning
+from eidos.domain.planning import Goal, PlanningState, project_planning
 from eidos.domain.state import PathosState
 from eidos.domain.wellbeing import project_wellbeing
 
@@ -45,20 +45,16 @@ def mental_layer_events(
     if physical is not None and physical.severity > 1 - need_value:
         need_name = physical.kind
         need_value = 1 - physical.severity
-    focus_type = "concern" if concerns else "goal" if active_goals else "place"
-    focus_id = (
-        str(concerns[-1].payload["concern_id"])
-        if concerns
-        else active_goals[0].goal_id
-        if active_goals
-        else state.location_id
-    )
-    focus_text = (
-        str(concerns[-1].payload["text"])
-        if concerns
-        else active_goals[0].title
-        if active_goals
-        else state.location_id
+    focus_type, focus_id, focus_text, focus_activation = _attention_focus(
+        history,
+        state,
+        at,
+        planning,
+        concerns,
+        active_goals,
+        npc_locations,
+        need_name,
+        need_value,
     )
     sustained_low_hours = previous_emotion.sustained_low_hours if state.valence <= -0.35 else 0
     emotion_label = classify_emotion(state.valence, state.arousal, sustained_low_hours)
@@ -77,7 +73,7 @@ def mental_layer_events(
             focus_type,
             focus_id,
             focus_text,
-            0.75 if concerns else 0.6,
+            focus_activation,
         ),
         (
             CognitiveLayer.AFFECTIVE,
@@ -167,6 +163,92 @@ def mental_layer_events(
             )
         )
     return output
+
+
+def _attention_focus(
+    history: Sequence[DomainEvent],
+    state: PathosState,
+    at: datetime,
+    planning: PlanningState,
+    concerns: Sequence[DomainEvent],
+    active_goals: Sequence[Goal],
+    npc_locations: Mapping[str, str],
+    need_name: str,
+    need_value: float,
+) -> tuple[str, str, str, float]:
+    """Choose one foreground focus while preserving bounded attentional inertia."""
+    candidates: list[tuple[float, str, str, str]] = [
+        (
+            0.3 + 0.6 * (1 - need_value),
+            "need",
+            need_name,
+            f"Notice the need for {need_name.replace('_', ' ')}",
+        ),
+        (0.3, "place", state.location_id, f"Notice {state.location_id}"),
+    ]
+    if concerns:
+        concern = concerns[-1]
+        candidates.append(
+            (
+                0.78,
+                "concern",
+                str(concern.payload["concern_id"]),
+                str(concern.payload["text"]),
+            )
+        )
+    if active_goals:
+        goal = active_goals[0]
+        candidates.append((0.62, "goal", goal.goal_id, goal.title))
+    companions = sorted(
+        actor_id for actor_id, location in npc_locations.items() if location == state.location_id
+    )
+    if companions:
+        person_id = companions[0]
+        candidates.append(
+            (
+                0.45 + 0.4 * (1 - state.connection),
+                "person",
+                person_id,
+                f"Notice {person_id}",
+            )
+        )
+    calendar = planning.calendar
+    upcoming = sorted(
+        (
+            (datetime.fromisoformat(item.starts_at), item)
+            for item in calendar.values()
+            if item.status == "scheduled"
+            and item.actor_id in {None, "pathos"}
+            and at <= datetime.fromisoformat(item.starts_at) <= at + timedelta(hours=2)
+        ),
+        key=lambda pair: (pair[0], pair[1].schedule_id),
+    )
+    if upcoming:
+        starts_at, item = upcoming[0]
+        minutes = max(0, int((starts_at - at).total_seconds() / 60))
+        candidates.append(
+            (
+                0.9 if minutes <= 30 else 0.72,
+                "commitment",
+                item.schedule_id,
+                f"Prepare for {item.title}",
+            )
+        )
+    previous = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
+    scored = [
+        (
+            min(1.0, score + (0.08 if previous and previous.focus_id == item_id else 0.0)),
+            focus_type,
+            item_id,
+            text,
+        )
+        for score, focus_type, item_id, text in candidates
+    ]
+    score, focus_type, item_id, text = max(
+        scored,
+        key=lambda item: (item[0], item[1], item[2]),
+    )
+    return focus_type, item_id, text, score
 
 
 def mind_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:

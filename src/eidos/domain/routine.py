@@ -204,6 +204,85 @@ def emotionally_adjusted_beat(
     return beat, None
 
 
+def needs_adjusted_beat(
+    beat: RoutineBeat,
+    *,
+    rest: float,
+    connection: float,
+    curiosity: float,
+    mastery: float,
+    hunger: float,
+    protected: bool = False,
+) -> tuple[RoutineBeat, str | None]:
+    """Let the strongest unmet need redirect free time without erasing obligations."""
+    levels = {
+        "rest": rest,
+        "connection": connection,
+        "curiosity": curiosity,
+        "mastery": mastery,
+    }
+    if any(not 0 <= value <= 1 for value in (*levels.values(), hunger)):
+        raise ValueError("Need levels must be between zero and one")
+    obligations = {"breakfast", "work", "dinner", "bedtime", "incident_response"}
+    if protected or beat.activity in obligations:
+        return beat, None
+    pressures = {name: 1 - value if value < 0.35 else 0.0 for name, value in levels.items()}
+    pressures["rest"] = 1 - rest if rest < 0.28 else 0.0
+    pressures["hunger"] = hunger if hunger > 0.82 else 0.0
+    need, pressure = max(pressures.items(), key=lambda item: (item[1], item[0]))
+    if pressure < 0.62:
+        return beat, None
+    alternatives = {
+        "rest": RoutineBeat(
+            beat.hour,
+            "home",
+            "Let the loose hour go quiet at home instead of pushing through it.",
+            min(0.78, max(beat.energy, 0.62)),
+            "restorative_pause",
+        ),
+        "connection": RoutineBeat(
+            beat.hour,
+            "cafe",
+            "Went to Juniper Café and left room for ordinary company.",
+            min(beat.energy, 0.68),
+            "social_presence",
+        ),
+        "curiosity": RoutineBeat(
+            beat.hour,
+            "park",
+            "Followed whatever caught the eye on an unhurried walk through the square.",
+            min(beat.energy, 0.7),
+            "noticing_walk",
+        ),
+        "mastery": RoutineBeat(
+            beat.hour,
+            "workshop" if beat.hour < 18 else "home",
+            (
+                "Used the open hour to practice one small, difficult piece of craft."
+                if beat.hour < 18
+                else "Practiced one small, difficult piece of craft at the kitchen table."
+            ),
+            min(beat.energy, 0.64),
+            "craft_practice",
+        ),
+        "hunger": RoutineBeat(
+            beat.hour,
+            "home" if beat.location_id != "cafe" else "cafe",
+            (
+                "Stopped at the café for something substantial to eat."
+                if beat.location_id == "cafe"
+                else "Went home and made time for something substantial to eat."
+            ),
+            min(0.76, max(beat.energy, 0.58)),
+            "need_driven_meal",
+        ),
+    }
+    adjusted = alternatives[need]
+    if adjusted.location_id == beat.location_id and adjusted.activity == beat.activity:
+        return beat, None
+    return adjusted, f"{need} was the strongest unmet need"
+
+
 def _choice(
     options: tuple[tuple[str, str, float, str], ...], key: str
 ) -> tuple[str, str, float, str]:

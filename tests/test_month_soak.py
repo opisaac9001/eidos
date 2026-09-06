@@ -73,6 +73,20 @@ class MonthSoakTests(unittest.TestCase):
                     for event in events
                 )
             )
+            need_redirects = [
+                event
+                for event in events
+                if event.kind == "memory.recorded" and event.payload.get("need_decision_reason")
+            ]
+            self.assertTrue(need_redirects)
+            redirect_days = {str(event.payload["simulated_at"])[:10] for event in need_redirects}
+            self.assertEqual(len(need_redirects), len(redirect_days))
+            attention_types = {
+                event.payload["focus_type"]
+                for event in events
+                if event.kind == "mind.layer_pulsed" and event.payload.get("layer") == "attention"
+            }
+            self.assertTrue({"need", "concern", "goal", "person", "commitment"} <= attention_types)
             disagreement = next(event for event in events if event.kind == "disagreement.expressed")
             apology = next(event for event in events if event.kind == "apology.offered")
             self.assertLess(events.index(disagreement), events.index(apology))

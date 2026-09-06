@@ -15,6 +15,7 @@ from eidos.domain.agency import (
     resolve_agency_candidate,
 )
 from eidos.domain.events import DomainEvent
+from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_catalog import WorldCatalog
@@ -68,6 +69,7 @@ async def autonomous_activity_events(
         }
         for place in catalog.places.values()
     }
+    attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
     context = {
         "time": simulated_at.isoformat(),
         "needs": dict(needs),
@@ -76,6 +78,16 @@ async def autonomous_activity_events(
         "preferences": list(preferences),
         "traits": dict(traits),
         "recent_memories": list(memories[-8:]),
+        "current_attention": (
+            {
+                "focus_type": attention.focus_type,
+                "focus_id": attention.focus_id,
+                "focus_text": attention.focus_text,
+                "activation": attention.activation,
+            }
+            if attention is not None
+            else None
+        ),
         "known_places": places,
         "usable_resources": resources,
         "known_people": people,
@@ -90,7 +102,8 @@ async def autonomous_activity_events(
             if entry.status == "scheduled" and entry.actor_id in {None, "pathos"}
         ],
         "permission": (
-            "Invent one specific, ordinary activity Pathos might genuinely choose. The activity "
+            "Invent one specific, ordinary activity Pathos might genuinely choose. Let his current "
+            "attention matter without treating it as a command. The activity "
             "type is open vocabulary. This is only a proposal: do not say it happened, spend money, "
             "create possessions, or guarantee another person's attendance. Use none when no object "
             "or companion is needed."

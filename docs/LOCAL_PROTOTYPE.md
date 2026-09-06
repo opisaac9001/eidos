@@ -68,6 +68,13 @@ severely constrained planned time into rest. The same condition reaches somatic
 attention, emotional appraisal, model context, visit availability, delayed texting,
 routine memory and the Observatory. The simulator does not invent a diagnosis or
 silently make a temporary symptom permanent.
+Foreground attention is no longer a fixed concern-first label. Each hour, bounded
+competition among bodily pressure, concerns, active goals, nearby people, place and
+imminent commitments selects one focus with modest inertia. The focus informs Murmur
+and later open-ended activity/project proposals but cannot perform an action. A
+separate feasibility rule lets a genuinely critical unmet need redirect at most one
+optional routine hour per day; obligations, appointments, incidents and the opening
+story remain protected, and the reason is retained in the resulting memory.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe
