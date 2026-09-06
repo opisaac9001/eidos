@@ -20,7 +20,7 @@ from eidos.application.catchup import (
     preview_catch_up,
 )
 from eidos.application.cognition import perform, request_for
-from eidos.application.consolidation import consolidation_events
+from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.development import development_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
@@ -124,6 +124,7 @@ class Life:
         self._planning_cache: tuple[int, str, PlanningState] | None = None
         self._belief_cache: tuple[int, str, BeliefState] | None = None
         self._relationship_cache: tuple[int, str, RelationshipState] | None = None
+        self._consolidation_cache: tuple[int, str, ConsolidationIndex] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -367,6 +368,52 @@ class Life:
                 len(history),
                 str(history[-1].event_id),
                 relationships.materialized_state(),
+            )
+        )
+
+    def _consolidation_index(self, history: list[DomainEvent]) -> ConsolidationIndex:
+        if self._consolidation_cache is not None:
+            revision, anchor, index = self._consolidation_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                extended = ConsolidationIndex.build(history, base_index=index)
+                anchor = str(history[-1].event_id) if history else ""
+                self._consolidation_cache = (len(history), anchor, extended)
+                return extended
+        if isinstance(self.store, MaterializedProjectionStore):
+            projection = self.store.load_projection(
+                "pathos", "consolidation-index", 1, len(history)
+            )
+            if projection is not None:
+                try:
+                    index = ConsolidationIndex.build(
+                        history,
+                        materialized_state=projection.state,
+                        materialized_revision=projection.revision,
+                    )
+                    anchor = str(history[-1].event_id) if history else ""
+                    self._consolidation_cache = (len(history), anchor, index)
+                    return index
+                except (KeyError, TypeError, ValueError):
+                    pass
+        index = ConsolidationIndex.build(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._consolidation_cache = (len(history), anchor, index)
+        return index
+
+    def _save_consolidation_index(self, history: list[DomainEvent]) -> None:
+        if not history or not isinstance(self.store, MaterializedProjectionStore):
+            return
+        index = self._consolidation_index(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "consolidation-index",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                index.materialized_state(),
             )
         )
 
@@ -1469,7 +1516,13 @@ class Life:
             pending.extend(episodes)
             pending.extend(emotion_sample_events(history + pending, state, current))
             if current.hour == 0:
-                pending.extend(consolidation_events(history + pending, current))
+                pending.extend(
+                    consolidation_events(
+                        history + pending,
+                        current,
+                        index=self._consolidation_index(history + pending),
+                    )
+                )
         final_time = DomainEvent("time.advanced", "pathos", {"simulated_at": target})
         pending.append(final_time)
         state = state.apply(final_time)
@@ -1480,6 +1533,7 @@ class Life:
         self._save_planning(committed)
         self._save_beliefs(committed)
         self._save_relationships(committed)
+        self._save_consolidation_index(committed)
         await self._respond_to_due_messages()
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
@@ -1964,6 +2018,7 @@ class Life:
         self._save_planning(committed)
         self._save_beliefs(committed)
         self._save_relationships(committed)
+        self._save_consolidation_index(committed)
 
 
 def vars_for(value: Any) -> dict[str, Any]:

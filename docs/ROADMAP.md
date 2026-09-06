@@ -63,7 +63,8 @@ as a versioned disposable projection and increment from the event tail. Planning
 actor-owned beliefs and directed relationships now do the same with ordered,
 semantically checked disposable snapshots so restarts preserve exact presentation
 order. Relationship state also influences whether Pathos interrupts a live visit to
-answer someone else's call. Consolidation still rebuilds from event history.
+answer someone else's call. Daily consolidation now keeps an incrementally grouped,
+prefix-verified source index rather than rescanning the entire life each midnight.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -256,19 +257,17 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend materialization beyond the completed incremental memory, planning, belief,
-   and relationship projections into the remaining high-cost consolidation view.
-2. Expand the completed perception- and need-driven NPC goal loop with more personal
+1. Expand the completed perception- and need-driven NPC goal loop with more personal
    projects, competing priorities, interruption, and relationship-motivated choices.
-3. Generalize the now-integrated four-turn interruption/resume scene into recurring
+2. Generalize the now-integrated four-turn interruption/resume scene into recurring
    dialogue policies with topic selection, voluntary exits, and relationship pacing.
-4. Let Moira propose additions to the completed sixteen-event, resource-backed
+3. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
    feasibility. Pathos and introduced NPCs now form bounded goals that select new
    places; next, let social consequences and useful-object choices do the same.
-5. Add an optional source-attributed British-town signal adapter for weather, daylight,
+4. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
 7. Capture the Dell inventory, then benchmark and pin its private inference stack.

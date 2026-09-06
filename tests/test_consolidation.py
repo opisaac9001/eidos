@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.consolidation import consolidation_events
+from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.domain.events import DomainEvent
 
 
@@ -51,6 +51,27 @@ class ConsolidationTests(unittest.TestCase):
         self.assertEqual({event.payload["owner"] for event in summaries}, {"pathos", "mara"})
         dream = next(event for event in summaries if event.payload["theme_id"] == "dream")
         self.assertTrue(dream.payload["dream_only"])
+
+    def test_index_extends_and_materializes_only_authoritative_event_ids(self):
+        sources = [self.memory("one"), self.memory("two")]
+        index = ConsolidationIndex.build(sources)
+        result = consolidation_events(sources, self.midnight, index=index)
+        history = [*sources, *result]
+        extended = ConsolidationIndex.build(history, base_index=index)
+        restored = ConsolidationIndex.build(
+            history,
+            materialized_state=extended.materialized_state(),
+            materialized_revision=len(history),
+        )
+        self.assertEqual(restored.memory_ids, extended.memory_ids)
+        self.assertEqual(restored.consolidation_ids, extended.consolidation_ids)
+        corrupted = {**extended.materialized_state(), "memory_ids": []}
+        with self.assertRaises(ValueError):
+            ConsolidationIndex.build(
+                history,
+                materialized_state=corrupted,
+                materialized_revision=len(history),
+            )
 
 
 if __name__ == "__main__":
