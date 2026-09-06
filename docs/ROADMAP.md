@@ -179,6 +179,9 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
 
 - Separate world facts, perceived experiences, recollections, beliefs, summaries
   and dream memories. Track owner, source, confidence, significance and access.
+- Every Pathos memory now carries a replay-derived emotional encoding from the
+  valence, arousal, intensity, and named feeling present when it formed. A dedicated
+  source appraisal overrides that background tone for mood-congruent retrieval.
 - Explainable cue-based recall using relevance, accessibility, importance,
   relationships and goals; search beyond recent items. Embeddings are optional.
 - Fade accessibility/detail in simulated time. Reminders and rehearsal strengthen

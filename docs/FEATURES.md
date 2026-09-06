@@ -18,7 +18,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: owner/source/confidence/importance | P2 |
+| MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: owner/source/confidence/importance plus replay-derived valence, arousal, intensity, and named feeling at encoding for every Pathos memory | P2 |
 | MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: recent seven | P2 |
 | MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: durable term/entity/goal/relationship indexes + diverse explanations | P2 |
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |

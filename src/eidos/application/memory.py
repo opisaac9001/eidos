@@ -70,6 +70,10 @@ class RecalledMemory:
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
     correction_evidence_id: str | None
+    encoded_valence: float
+    encoded_arousal: float
+    emotional_label: str
+    emotional_intensity: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,7 +336,9 @@ def recall(
     ranked = []
     archived = archived_memory_ids(history)
     recollections = project_recollections(history).latest
-    current_affect, emotional_tones = _affective_context(history, now, recollections)
+    current_affect, emotional_tones, emotional_tags = _affective_context(
+        history, now, recollections
+    )
     for event in index.memories:
         importance, confidence = _metadata(event)
         subjective = recollections.get(str(event.event_id))
@@ -370,6 +376,9 @@ def recall(
             1.0, len(matched_relationships) / max(1, len(relationship_ids))
         )
         emotional_tone = emotional_tones.get(str(event.event_id), 0.0)
+        encoded_valence, encoded_arousal, emotional_label, emotional_intensity = emotional_tags.get(
+            str(event.event_id), (0.0, 0.35, "quiet", 0.0)
+        )
         mood_congruence = 0.04 * current_affect * emotional_tone
         is_archived = str(event.event_id) in archived
         has_direct_cue = bool(
@@ -423,6 +432,10 @@ def recall(
                 subjective.affective_bias if subjective is not None else 0.0,
                 subjective.blended_memory_ids if subjective is not None else (),
                 subjective.correction_evidence_id if subjective is not None else None,
+                encoded_valence,
+                encoded_arousal,
+                emotional_label,
+                emotional_intensity,
             )
         )
     ranked.sort(
@@ -545,6 +558,10 @@ def memory_view(
                 "affective_bias": item.affective_bias,
                 "blended_memory_ids": list(item.blended_memory_ids),
                 "correction_evidence_id": item.correction_evidence_id,
+                "encoded_valence": item.encoded_valence,
+                "encoded_arousal": item.encoded_arousal,
+                "emotional_label": item.emotional_label,
+                "emotional_intensity": item.emotional_intensity,
                 "archived": str(event.event_id) in archived,
             }
         )
@@ -555,24 +572,43 @@ def _affective_context(
     history: list[DomainEvent],
     now: datetime,
     recollections: Mapping[str, Recollection],
-) -> tuple[float, dict[str, float]]:
+) -> tuple[float, dict[str, float], dict[str, tuple[float, float, str, float]]]:
     """Derive bounded mood congruence from recorded affect and sourced appraisals."""
     current = 0.0
-    for event in reversed(history):
-        if event.kind not in {"emotion.sampled", "affect.changed"}:
+    arousal = 0.35
+    label = "quiet"
+    tags: dict[str, tuple[float, float, str, float]] = {}
+    for event in history:
+        if event.kind not in {"emotion.sampled", "affect.changed", "memory.recorded"}:
             continue
-        value = event.payload.get("valence")
-        raw_time = event.payload.get("simulated_at")
-        if (
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and -1 <= value <= 1
-            and isinstance(raw_time, str)
-        ):
-            sampled_at = datetime.fromisoformat(raw_time)
-            if sampled_at.utcoffset() is not None and sampled_at <= now:
+        event_time = _simulated_time(event)
+        if event_time > now:
+            continue
+        if event.kind in {"emotion.sampled", "affect.changed"}:
+            value = event.payload.get("valence")
+            activation = event.payload.get("arousal")
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and -1 <= value <= 1:
                 current = float(value)
-                break
+            if (
+                isinstance(activation, (int, float))
+                and not isinstance(activation, bool)
+                and 0 <= activation <= 1
+            ):
+                arousal = float(activation)
+            explicit_label = event.payload.get("label")
+            label = (
+                explicit_label
+                if isinstance(explicit_label, str) and explicit_label.strip()
+                else _emotional_label(current, arousal)
+            )
+        if event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos":
+            intensity = min(1.0, max(abs(current), abs(arousal - 0.35) * 1.25))
+            tags[str(event.event_id)] = (
+                round(current, 4),
+                round(arousal, 4),
+                label,
+                round(intensity, 4),
+            )
     appraisals: dict[str, float] = {}
     for event in history:
         if event.kind != "appraisal.recorded":
@@ -594,10 +630,22 @@ def _affective_context(
         source_tone = appraisals.get(memory_id, 0.0)
         if isinstance(linked_source, str):
             source_tone = appraisals.get(linked_source, source_tone)
+        if source_tone == 0.0:
+            source_tone = tags.get(memory_id, (0.0, 0.35, "quiet", 0.0))[0]
         subjective = recollections.get(memory_id)
         bias = subjective.affective_bias if subjective is not None else 0.0
         tones[memory_id] = max(-1.0, min(1.0, source_tone * 0.8 + bias * 0.2))
-    return current, tones
+    return current, tones, tags
+
+
+def _emotional_label(valence: float, arousal: float) -> str:
+    if valence >= 0.3:
+        return "joyful" if arousal >= 0.55 else "content"
+    if valence <= -0.3:
+        return "anxious" if arousal >= 0.55 else "sad"
+    if arousal >= 0.65:
+        return "keyed-up"
+    return "quiet"
 
 
 def memory_archive_page(

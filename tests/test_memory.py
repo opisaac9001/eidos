@@ -86,6 +86,44 @@ class MemoryTests(unittest.TestCase):
         self.assertLess(results[1].components["mood_congruence"], 0)
         self.assertIn("mood-congruent", results[0].reason)
 
+    def test_every_memory_inherits_the_replayed_feeling_present_when_encoded(self):
+        when = self.now - timedelta(days=2)
+        positive = DomainEvent(
+            "affect.changed",
+            "pathos",
+            {"simulated_at": when.isoformat(), "valence": 0.6, "arousal": 0.45},
+        )
+        warm = self.memory("Mara and I shared an afternoon.", when)
+        negative = DomainEvent(
+            "affect.changed",
+            "pathos",
+            {"simulated_at": when.isoformat(), "valence": -0.6, "arousal": 0.4},
+        )
+        difficult = self.memory("Mara and I discussed an afternoon.", when)
+        current_low = DomainEvent(
+            "emotion.sampled",
+            "pathos",
+            {
+                "simulated_at": self.now.isoformat(),
+                "valence": -0.7,
+                "arousal": 0.4,
+                "label": "sad",
+            },
+        )
+        history = [positive, warm, negative, difficult, current_low]
+
+        results = recall(history, "Mara afternoon", self.now)
+
+        self.assertEqual(results[0].event.event_id, difficult.event_id)
+        self.assertEqual(results[0].emotional_label, "sad")
+        self.assertEqual(results[0].encoded_valence, -0.6)
+        warm_result = next(item for item in results if item.event.event_id == warm.event_id)
+        self.assertEqual(warm_result.emotional_label, "content")
+        self.assertEqual(warm_result.encoded_valence, 0.6)
+        view = {item["id"]: item for item in memory_view(history, self.now)}
+        self.assertEqual(view[str(difficult.event_id)]["emotional_label"], "sad")
+        self.assertGreater(view[str(difficult.event_id)]["emotional_intensity"], 0.5)
+
     def test_accessibility_fades_but_history_remains(self):
         recent = self.memory("A mundane bus passed.", self.now, 0.2)
         old = self.memory("A mundane bus passed.", self.now - timedelta(days=90), 0.2)
