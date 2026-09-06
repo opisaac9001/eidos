@@ -1,6 +1,7 @@
 """A small authored causal fixture that exercises planning across two days."""
 
 from datetime import datetime, timedelta
+from typing import Mapping
 
 from eidos.application.planner import plan_accepted_work
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
@@ -23,6 +24,7 @@ def story_events(
     actor_energy: float,
     actor_rest: float = 0.5,
     actor_mastery: float = 0.5,
+    actor_values: Mapping[str, float] | None = None,
 ) -> list[DomainEvent]:
     day = (current.date() - datetime(2026, 1, 1).date()).days + 1
     kinds = {event.kind for event in existing}
@@ -81,6 +83,7 @@ def story_events(
             expected_revision=len(existing) + len(foundation),
             rest=actor_rest,
             mastery=actor_mastery,
+            values=actor_values,
         )
         response = resolve_social_move(
             choice,
@@ -355,6 +358,7 @@ def story_events(
             energy=actor_energy,
             rest=actor_rest,
             mastery=actor_mastery,
+            values=actor_values,
             expected_revision=len(existing) + len(opened),
         )
         response = resolve_social_move(

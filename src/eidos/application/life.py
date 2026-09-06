@@ -363,6 +363,7 @@ class Life:
                 state.energy,
                 state.rest,
                 state.mastery,
+                project_identity(history + pending).values,
             )
             if story:
                 project_planning(history + pending + story)

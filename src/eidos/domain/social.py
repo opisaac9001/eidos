@@ -265,6 +265,7 @@ def choose_request_response(
     expected_revision: int,
     rest: float = 0.5,
     mastery: float = 0.5,
+    values: Mapping[str, float] | None = None,
 ) -> SocialMoveProposal:
     """A deterministic baseline policy; models may later propose the same envelope."""
     if actor_id != request.awaiting_actor_id:
@@ -273,6 +274,7 @@ def choose_request_response(
         raise ValueError("Choice dimensions must be between zero and one")
     proposal_id = f"respond-{request.request_id}-r{request.rounds}-{actor_id}"
     capacity = 0.5 * energy + 0.3 * rest + 0.2 * mastery
+    alignment = _request_value_alignment(request.action, values)
     if capacity < 0.35:
         return SocialMoveProposal(
             proposal_id,
@@ -280,6 +282,15 @@ def choose_request_response(
             actor_id,
             SocialMove.DECLINE,
             "My energy, rest, and confidence do not support this promise.",
+            expected_revision,
+        )
+    if values is not None and alignment < 0.4:
+        return SocialMoveProposal(
+            proposal_id,
+            request.request_id,
+            actor_id,
+            SocialMove.DECLINE,
+            f"This request has low alignment ({alignment:.2f}) with my established values.",
             expected_revision,
         )
     earliest = datetime.fromisoformat(request.earliest_start)
@@ -300,9 +311,25 @@ def choose_request_response(
         request.request_id,
         actor_id,
         SocialMove.ACCEPT,
-        "The request fits my current capacity and available window.",
+        (
+            "The request fits my current capacity and available window"
+            + (f", with value alignment {alignment:.2f}." if values is not None else ".")
+        ),
         expected_revision,
     )
+
+
+def _request_value_alignment(action: str, values: Mapping[str, float] | None) -> float:
+    if values is None:
+        return 0.5
+    keys = ("care", "reliability", "craft") if action == "repair" else ("care", "curiosity")
+    selected = []
+    for key in keys:
+        value = values.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+            raise ValueError("Decision values must contain bounded numeric dimensions")
+        selected.append(float(value))
+    return sum(selected) / len(selected)
 
 
 def _required(payload: Mapping[str, object], key: str) -> str:

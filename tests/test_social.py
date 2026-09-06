@@ -136,6 +136,25 @@ class SocialTests(unittest.TestCase):
             choose_request_response(
                 roomy,
                 actor_id="pathos",
+                energy=0.8,
+                expected_revision=1,
+                values={"care": 0.2, "reliability": 0.2, "craft": 0.2},
+            ).move,
+            SocialMove.DECLINE,
+        )
+        aligned = choose_request_response(
+            roomy,
+            actor_id="pathos",
+            energy=0.8,
+            expected_revision=1,
+            values={"care": 0.8, "reliability": 0.8, "craft": 0.8},
+        )
+        self.assertEqual(aligned.move, SocialMove.ACCEPT)
+        self.assertIn("0.80", aligned.reason)
+        self.assertEqual(
+            choose_request_response(
+                roomy,
+                actor_id="pathos",
                 energy=0.4,
                 rest=0.1,
                 mastery=0.1,
