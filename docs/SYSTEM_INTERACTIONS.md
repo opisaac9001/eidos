@@ -306,6 +306,17 @@ prose: a later typed contact event for the same person must causally complete it
 new contact may schedule a future reminder, allowing relationships to recur without a
 fixed daily script.
 
+An apology is an offered act, not evidence that the other person accepted it. A Pathos
+apology tied to a prior disagreement opens a durable repair attempt with forgiveness
+explicitly unknown. Up to three later completed calls, visits, shared activities, or
+other directly evidenced contact can reduce Pathos's own tension by a small capped
+amount and add a little familiarity. It never restores trust automatically. The
+contact event causes the repair step, which in turn causes the directed relationship
+change; replay rejects mismatched people, reused contact, and out-of-order evidence.
+After thirty simulated days without contact, the attempt becomes dormant with no
+relationship delta. A ready apology follow-up can make the unresolved topic available
+to ordinary dialogue, still labeled as cautious repair rather than forgiveness.
+
 A ready follow-up can instead prompt Pathos to make an outbound invitation while he is
 awake and has emotional and physical capacity. The other person decides independently
 from their own energy, connection need, purpose, and replay-stable variability; Pathos's

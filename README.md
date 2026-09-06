@@ -75,6 +75,10 @@ create external contact.
 Pathos also retains explicit first-person likes and dislikes from the user and
 structured NPC self-reports. Corrections remain in the event history, stale preferences
 become visibly uncertain, and held place preferences can shape later invitations.
+Apologies now open durable relationship-repair attempts rather than standing in for
+forgiveness. Later direct contact can soften Pathos's tension in three small capped
+steps without restoring trust automatically; inactivity makes the attempt dormant,
+and both the UI and dialogue context keep the other person's response unknown.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),

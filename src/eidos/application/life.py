@@ -58,6 +58,7 @@ from eidos.application.preference_development import preference_development_even
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
+from eidos.application.relationship_repairs import relationship_repair_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
@@ -92,6 +93,7 @@ from eidos.domain.npcs import project_npcs
 from eidos.domain.outreach import project_outreach_config
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.relationship_dates import project_relationship_dates
+from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import RelationshipState, project_relationships
 from eidos.domain.routine import RoutineBeat, beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import (
@@ -477,6 +479,7 @@ class Life:
         traits = project_traits(history)
         world_threads = project_world_threads(history)
         relationship_dates = project_relationship_dates(history)
+        relationship_repairs = project_relationship_repairs(history)
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
         catalog = self._world_catalog(history)
@@ -670,6 +673,9 @@ class Life:
                 "follow_up.completed",
                 "relationship.milestone_recorded",
                 "relationship.anniversary_remembered",
+                "relationship.repair_opened",
+                "relationship.repair_contacted",
+                "relationship.repair_became_dormant",
                 "social.preference_remembered",
                 "social.preference_revised",
                 "social.preference_faded",
@@ -813,6 +819,7 @@ class Life:
                 vars_for(thread) for thread in reversed(list(world_threads.values())[-30:])
             ],
             "relationship_dates": [vars_for(item) for item in relationship_dates.values()],
+            "relationship_repairs": [vars_for(item) for item in relationship_repairs.values()],
             "social_preferences": [vars_for(item) for item in social_preferences.values()],
             "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
             "season": season.name if season is not None else season_for(state.simulated_at),
@@ -1570,6 +1577,7 @@ class Life:
             )
             pending.extend(relationship_date_events(history + pending, current))
             pending.extend(social_preference_events(history + pending, current))
+            pending.extend(relationship_repair_events(history + pending, current))
             pending.extend(follow_up_events(history + pending, current))
             invitation_emotion = project_emotion(history + pending)
             invitation_bias = emotional_planning_bias(
@@ -2503,6 +2511,13 @@ class Life:
                 vars_for(item)
                 for item in project_social_preferences(history + pending).values()
                 if item.person_id == "user"
+            ],
+            "relationship_repairs": [
+                {
+                    **vars_for(item),
+                    "forgiveness_known": False,
+                }
+                for item in project_relationship_repairs(history + pending).values()
             ],
             "dream_inspirations": [
                 {

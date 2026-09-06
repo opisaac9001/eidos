@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.followups import project_followups
 from eidos.domain.events import DomainEvent
+from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneEndProposal,
@@ -268,15 +269,28 @@ def _observable_topics(
     history: Sequence[DomainEvent], location_id: str, partner_id: str
 ) -> list[str]:
     topics: list[str] = []
+    ready = any(
+        item.status == "ready" and item.person_id == partner_id
+        for item in project_followups(history).values()
+    )
+    repair = next(
+        (
+            item
+            for item in reversed(list(project_relationship_repairs(history).values()))
+            if item.person_id == partner_id and item.status in {"open", "improving"}
+        ),
+        None,
+    )
+    if ready:
+        topics.append(
+            f"cautious-repair-{repair.topic_id}-forgiveness-unknown"
+            if repair is not None
+            else f"following-up-with-{partner_id}"
+        )
     for item in project_social_preferences(history).values():
         if item.person_id == partner_id and item.status == "held":
             topics.append(f"remembered-{item.stance}-{item.topic}")
             break
-    if any(
-        item.status == "ready" and item.person_id == partner_id
-        for item in project_followups(history).values()
-    ):
-        topics.append(f"following-up-with-{partner_id}")
     for event in reversed(history):
         if (
             event.kind != "perception.recorded"

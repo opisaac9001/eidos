@@ -317,6 +317,10 @@ Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 
 - Tune saturation, retrieval bias, emotional feedback, remaining trait drift,
   relationship recovery, skills, habits, recurring events and ongoing projects.
+- An apology now opens a source-linked repair attempt whose other-party response stays
+  unknown. At most three later direct contacts can gently reduce Pathos's own tension
+  and add familiarity without restoring trust or claiming forgiveness; thirty days
+  without contact makes the attempt dormant rather than silently resolving it.
 - Versioned world/character packs with validated seeds; controlled content expansion.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.

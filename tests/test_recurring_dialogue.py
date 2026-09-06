@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.followups import follow_up_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
+from eidos.application.relationship_repairs import relationship_repair_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import project_scenes
@@ -107,6 +108,48 @@ class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
         followup_events = follow_up_events([*history, *events], self.now)
         completed = next(event for event in followup_events if event.kind == "follow_up.completed")
         self.assertEqual(completed.payload["person_id"], "rowan")
+
+    async def test_apology_follow_up_keeps_forgiveness_unknown_in_the_topic(self):
+        rupture_at = self.now - timedelta(days=4)
+        apology_at = self.now - timedelta(days=3)
+        rupture = DomainEvent(
+            "disagreement.expressed",
+            "pathos",
+            {
+                "actor_id": "pathos",
+                "target_id": "rowan",
+                "topic_id": "park-bench",
+                "simulated_at": rupture_at.isoformat(),
+            },
+        )
+        apology = DomainEvent(
+            "apology.offered",
+            "pathos",
+            {
+                "actor_id": "pathos",
+                "target_id": "rowan",
+                "topic_id": "park-bench",
+                "simulated_at": apology_at.isoformat(),
+            },
+        )
+        history = [rupture, apology]
+        history.extend(relationship_repair_events(history, apology_at))
+        history.extend(follow_up_events(history, apology_at))
+        history.extend(follow_up_events(history, self.now - timedelta(days=1)))
+        events = await recurring_dialogue_events(
+            history,
+            self.locations,
+            self.names,
+            {"rowan": Relationship("rowan")},
+            self.now,
+            len(history),
+            StandInGateway(),
+        )
+        started = next(event for event in events if event.kind == "scene.started")
+        self.assertEqual(
+            started.payload["topic_id"],
+            "cautious-repair-park-bench-forgiveness-unknown",
+        )
 
 
 if __name__ == "__main__":

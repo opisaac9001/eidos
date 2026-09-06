@@ -111,6 +111,9 @@ const labels = {
   "follow_up.completed": "FOLLOW-UP COMPLETED",
   "relationship.milestone_recorded": "A SHARED DATE WAS KEPT",
   "relationship.anniversary_remembered": "A RELATIONSHIP DATE RETURNED",
+  "relationship.repair_opened": "A REPAIR ATTEMPT OPENED",
+  "relationship.repair_contacted": "CONTACT AFTER AN APOLOGY",
+  "relationship.repair_became_dormant": "A REPAIR ATTEMPT WENT QUIET",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
   "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
@@ -617,10 +620,14 @@ function render(next) {
           (item) => item.owner_id === "pathos" && item.subject_id === person.id,
         );
         const preferences = (state.social_preferences || []).filter((item) => item.person_id === person.id);
+        const repair = (state.relationship_repairs || []).filter((item) => item.person_id === person.id).at(-1);
         const preferenceText = preferences.length
           ? `<p class="context-note">Pathos remembers: ${preferences.map((item) => `${item.status === "uncertain" ? "possibly " : ""}${esc(item.stance)} ${esc(item.topic)}`).join(" · ")}</p>`
           : "";
-        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
+        const repairText = repair
+          ? `<p class="context-note">Repair after disagreement: ${esc(repair.status)} · ${repair.contact_count} later contact${repair.contact_count === 1 ? "" : "s"}. This does not claim forgiveness.</p>`
+          : "";
+        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
       },
     )
     .join("");

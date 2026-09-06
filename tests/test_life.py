@@ -8,6 +8,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.application.messaging import reply_due_at
+from eidos.application.relationship_repairs import relationship_repair_events
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
 from eidos.ports.town_signals import TownSignal
@@ -316,6 +317,63 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(ended.payload["reason"], "conversation_complete")
         self.assertEqual(snapshot["conversations"][-1]["speaker"], "system")
         self.assertIn("natural stopping point", snapshot["conversations"][-1]["text"])
+
+    def test_reply_context_keeps_relationship_repair_and_forgiveness_separate(self):
+        class CapturingGateway(StandInGateway):
+            def __init__(self):
+                self.contexts = []
+
+            async def generate(self, request):
+                self.contexts.append(json.loads(request.messages[-1].content))
+                return await super().generate(request)
+
+        self.life.bootstrap()
+        state = self.life._project_state(self.life.history())
+        rupture = DomainEvent(
+            "disagreement.expressed",
+            "pathos",
+            {
+                "actor_id": "pathos",
+                "target_id": "rowan",
+                "topic_id": "park-bench",
+                "simulated_at": (state.simulated_at - timedelta(minutes=1)).isoformat(),
+            },
+        )
+        apology = DomainEvent(
+            "apology.offered",
+            "pathos",
+            {
+                "actor_id": "pathos",
+                "target_id": "rowan",
+                "topic_id": "park-bench",
+                "simulated_at": state.simulated_at.isoformat(),
+            },
+        )
+        history = self.life.history()
+        opened = relationship_repair_events([*history, rupture, apology], state.simulated_at)
+        self.life.store.append("pathos", [rupture, apology, *opened], len(history))
+        gateway = CapturingGateway()
+        self.life.gateway = gateway
+        request_id = next(
+            f"ask-repair-{index}"
+            for index in range(100)
+            if reply_due_at(self.life.history(), state, f"ask-repair-{index}")
+            < state.simulated_at + timedelta(hours=1)
+        )
+        self.life.chat("How are things with Rowan?", request_id)
+        due_at = datetime.fromisoformat(
+            str(
+                next(
+                    event.payload["reply_due_at"]
+                    for event in reversed(self.life.history())
+                    if event.kind == "conversation.message"
+                )
+            )
+        )
+        self.life.advance((due_at - state.simulated_at).total_seconds() / 3600 + 0.01)
+        context = next(item for item in gateway.contexts if item.get("message"))
+        self.assertEqual(context["relationship_repairs"][0]["status"], "open")
+        self.assertFalse(context["relationship_repairs"][0]["forgiveness_known"])
 
     def test_sleeping_pathos_can_decline_a_live_visit_without_starting_a_scene(self):
         self.life.request_visit("too-late")
