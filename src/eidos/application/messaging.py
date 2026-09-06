@@ -10,7 +10,8 @@ from typing import Sequence
 from eidos.application.deliveries import active_delivery
 from eidos.application.urgent_incidents import active_incident_location
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import project_planning
+from eidos.domain.planning import PlanningState, project_planning
+from eidos.domain.routine import beats_between
 from eidos.domain.scenes import project_scenes
 from eidos.domain.state import PathosState
 
@@ -21,6 +22,8 @@ class CommunicationAvailability:
     reason: str
     can_visit: bool
     hurried: bool
+    next_commitment_at: str | None = None
+    next_commitment_title: str | None = None
 
 
 def communication_availability(
@@ -28,6 +31,22 @@ def communication_availability(
 ) -> CommunicationAvailability:
     if not state.awake:
         return CommunicationAvailability("asleep", "He is asleep.", False, False)
+    planning = project_planning(list(history))
+    upcoming_at, upcoming_title = _next_commitment(state, planning)
+    minutes_until = (
+        (upcoming_at - state.simulated_at).total_seconds() / 60 if upcoming_at is not None else None
+    )
+    hurried = minutes_until is not None and minutes_until <= 60
+    timing = (
+        f" Pathos expects to leave in {max(1, round(minutes_until))} minutes for "
+        f"{upcoming_title.lower()}."
+        if hurried and minutes_until is not None and upcoming_title is not None
+        else ""
+    )
+    timing_fields = (
+        upcoming_at.isoformat() if upcoming_at is not None else None,
+        upcoming_title,
+    )
     scenes = project_scenes(history).scenes.values()
     if any(
         scene.status == "paused" and {scene.initiator_id, scene.partner_id} == {"pathos", "user"}
@@ -41,7 +60,11 @@ def communication_availability(
         for scene in scenes
     ):
         return CommunicationAvailability(
-            "in_conversation", "You are spending time together now.", True, False
+            "in_conversation",
+            f"You are spending time together now.{timing}",
+            True,
+            hurried,
+            *timing_fields,
         )
     if any(
         scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
@@ -66,7 +89,6 @@ def communication_availability(
         return CommunicationAvailability(
             "occupied", "He is responding to something nearby.", False, False
         )
-    planning = project_planning(list(history))
     now = state.simulated_at
     if any(
         item.status == "scheduled"
@@ -77,24 +99,40 @@ def communication_availability(
         return CommunicationAvailability(
             "occupied", "He is in the middle of something he planned.", False, False
         )
-    next_start = min(
-        (
-            datetime.fromisoformat(item.starts_at)
-            for item in planning.calendar.values()
-            if item.status == "scheduled" and datetime.fromisoformat(item.starts_at) > now
-        ),
-        default=None,
-    )
-    hurried = next_start is not None and next_start <= now + timedelta(hours=1)
     if state.energy < 0.25:
         return CommunicationAvailability(
             "tired", "He is awake, but does not have much energy for company.", False, hurried
         )
     if hurried:
         return CommunicationAvailability(
-            "hurried", "He is free briefly, with something else coming up.", True, True
+            "hurried",
+            f"He is free briefly.{timing}",
+            True,
+            True,
+            *timing_fields,
         )
-    return CommunicationAvailability("available", "He has room for company.", True, False)
+    return CommunicationAvailability(
+        "available", "He has room for company.", True, False, *timing_fields
+    )
+
+
+def _next_commitment(
+    state: PathosState, planning: PlanningState
+) -> tuple[datetime | None, str | None]:
+    planned = [
+        (datetime.fromisoformat(item.starts_at), item.title)
+        for item in planning.calendar.values()
+        if item.status == "scheduled"
+        and datetime.fromisoformat(item.starts_at) > state.simulated_at
+    ]
+    routine = [
+        (at, beat.description.rstrip("."))
+        for at, beat in beats_between(state.simulated_at, state.simulated_at + timedelta(hours=24))
+        if beat.location_id != state.location_id
+    ]
+    return min(
+        [*planned, *routine], default=(None, None), key=lambda item: item[0] or state.simulated_at
+    )
 
 
 def reply_due_at(history: Sequence[DomainEvent], state: PathosState, request_id: str) -> datetime:

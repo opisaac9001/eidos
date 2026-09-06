@@ -46,6 +46,28 @@ class MessagingTests(unittest.TestCase):
         self.assertGreater(first, state.simulated_at)
         self.assertLessEqual((first - state.simulated_at).total_seconds(), 3600)
 
+    def test_live_conversation_reports_real_upcoming_time_pressure(self):
+        now = datetime(2026, 1, 1, 8, 45, tzinfo=timezone.utc)
+        state = PathosState(simulated_at=now, awake=True)
+        scene = DomainEvent(
+            "scene.started",
+            "pathos",
+            {
+                "scene_id": "user-visit",
+                "initiator_id": "pathos",
+                "partner_id": "user",
+                "location_id": "home",
+                "topic_id": "open-conversation",
+                "max_turns": 40,
+                "simulated_at": now.isoformat(),
+            },
+        )
+        availability = communication_availability([scene], state)
+        self.assertEqual(availability.status, "in_conversation")
+        self.assertTrue(availability.hurried)
+        self.assertIn("15 minutes", availability.reason)
+        self.assertIn("cafe", availability.next_commitment_title.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

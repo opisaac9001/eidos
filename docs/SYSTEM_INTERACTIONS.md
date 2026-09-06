@@ -266,14 +266,22 @@ fixture whose individual lines are performer proposals. A four-turn workshop exc
 is interrupted by a durable incident and resumes the next day only after both actors
 return; topic and awaited speaker survive replay. Invalid or unavailable model output
 records a failure and uses a labeled authored fallback without bypassing the scene
-resolver. Broader recurring dialogue and voluntary-exit policies remain future work.
+resolver. Recurring NPC dialogue uses actual co-presence, relationship-paced budgets,
+observable topics, and an early voluntary exit under sustained tension.
 
 User communication has two distinct paths. An ordinary message is committed as
 delivered with a replay-stable response time; sleep, occupied scenes, appointments,
 energy and personal variability can defer it. A live visit must first pass the same
 availability projection. When accepted, the user and Pathos enter a private
 alternating scene for up to 40 turns, either can end it, and a routine departure ends
-the visit through a sourced interruption before travel occurs. Calls use this same
+the visit through a sourced interruption before travel occurs. Each accepted pair of
+turns advances a replay-validated five, ten, or fifteen simulated minutes from its
+actual word count. The UI shows cumulative time and a near-term routine or calendar
+obligation. Crossing an hour runs the ordinary life loop, so a long visit can encounter
+departures, calls, visitors, deliveries, or incidents without a separate operator step.
+The final turn budget creates a visible natural ending. A due inbox message remains
+delivered while Pathos is asleep or occupied and is answered only after capacity returns.
+Calls use this same
 lifecycle rather than appearing only in dialogue. A neighbor's private connection
 goal can now cause a source-linked call. If Pathos is with the user, his energy,
 social openness and replay-stable variability influence whether he answers or

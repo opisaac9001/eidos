@@ -71,15 +71,15 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox plus availability-gated live user visits | P2–P3 |
-| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: up-to-40-turn user visits plus recurring observable-topic NPC scenes with relationship pacing, hourly continuation, and voluntary exits | P3 |
+| SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox that waits through occupied periods plus time-bearing availability-gated live user visits | P2–P3 |
+| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: time-bearing up-to-40-turn user visits with natural endings plus recurring observable-topic NPC scenes with relationship pacing, hourly continuation, and voluntary exits | P3 |
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: authored inbound requests plus follow-up-driven outbound invitations with independent NPC consent and feasible shared plans | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology with unresolved-rupture rule | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: materialized directed metrics affect choices; shared incident aftermath creates evidence-linked changes and follow-ups | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked reminders and annual dates, explicit evidence-bound preferences with correction/fading and invitation influence, plus consented memory-grounded in-app outreach with quiet hours and anti-pressure rejection | P5 |
-| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, incidents, pause/resume current company | Partial: calls, visits, deliveries, and witnessed urgent incidents with choices, pacing, presence checks, and post-interruption resume/end decisions | P3–P5 |
+| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, incidents, pause/resume current company | Partial: calls, visits, deliveries, and witnessed urgent incidents share the advancing live-conversation clock, with choices, pacing, presence checks, and post-interruption resume/end decisions | P3–P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
 vs public speech, interruption/resume, observer-specific memories and validated
@@ -103,7 +103,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard with communication-only ordinary surface and separate local operator view | P5 |
-| UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: delayed inbox plus start/leave controls for availability-gated live visits | P2–P3 |
+| UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: occupied-aware delayed inbox plus start/leave controls, elapsed simulated time, and approaching-obligation context for live visits | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export + revision-cursor event API | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |

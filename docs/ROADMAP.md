@@ -272,6 +272,11 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   conjure one. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
+- Every accepted user/Pathos exchange now consumes a replay-validated five to fifteen
+  simulated minutes based on its bounded word count. The conversation view exposes
+  elapsed time and the next routine or calendar obligation. Crossing an hourly boundary
+  runs the ordinary world loop, so departures and eligible interruptions can genuinely
+  occur during a long visit; queued inbox replies wait until Pathos is no longer busy.
 - After prior user contact, optional in-app outreach can originate from one Pathos-owned
   non-dream memory. It is off by default, user-revocable, limited to 18:00 and once per
   72 simulated hours, and suppressed while a reply is owed or a live visit is active.

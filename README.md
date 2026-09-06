@@ -43,6 +43,10 @@ project, and resident agency can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
+Live visits now consume five to fifteen simulated minutes per accepted exchange.
+Approaching routines or appointments appear as visible time pressure; crossing their
+time can make Pathos leave or expose the conversation to the same calls, visitors,
+deliveries, and incidents as the rest of his life. Queued texts wait while he is busy.
 Repeated voluntary choices can now form a small number of learned preferences only
 after evidence spans at least a simulated week. Those preferences influence later
 activity and project proposals, appear in the Observatory, and fade only after long

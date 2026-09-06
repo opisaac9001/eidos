@@ -82,6 +82,7 @@ from eidos.application.world_threads import world_thread_events
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import BeliefState, project_beliefs
 from eidos.domain.commitments import project_renegotiations
+from eidos.domain.conversation_time import exchange_minutes, project_conversation_clocks
 from eidos.domain.development import project_development
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
@@ -477,6 +478,7 @@ class Life:
         world_threads = project_world_threads(history)
         relationship_dates = project_relationship_dates(history)
         social_preferences = project_social_preferences(history)
+        conversation_clocks = project_conversation_clocks(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         outreach_config = project_outreach_config(history)
@@ -671,6 +673,7 @@ class Life:
                 "social.preference_remembered",
                 "social.preference_revised",
                 "social.preference_faded",
+                "conversation.time_elapsed",
                 "skill.practiced",
                 "habit.reinforced",
                 "preference.emerged",
@@ -811,6 +814,7 @@ class Life:
             ],
             "relationship_dates": [vars_for(item) for item in relationship_dates.values()],
             "social_preferences": [vars_for(item) for item in social_preferences.values()],
+            "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
             "outreach": {
@@ -902,6 +906,11 @@ class Life:
                 ),
                 "live_scene_id": user_scene.scene_id if user_scene else None,
                 "live_turn_count": user_scene.turn_count if user_scene else 0,
+                "live_elapsed_minutes": (
+                    conversation_clocks[user_scene.scene_id].elapsed_minutes
+                    if user_scene is not None and user_scene.scene_id in conversation_clocks
+                    else 0
+                ),
             },
             "mode": self.mode,
             "model": getattr(self.gateway, "model", "authored-stand-in-v1"),
@@ -2304,12 +2313,90 @@ class Life:
             actual_revision=len(history),
             simulated_at=state.simulated_at.isoformat(),
         )
-        self.store.append("pathos", list(pathos_turn.events), len(history))
+        output = list(pathos_turn.events)
+        elapsed_minutes = 0
+        if pathos_turn.accepted:
+            user_turn_event = next(
+                event for event in user_turn.events if event.kind == "scene.turn_taken"
+            )
+            pathos_turn_event = next(
+                event for event in pathos_turn.events if event.kind == "scene.turn_taken"
+            )
+            elapsed_minutes = exchange_minutes(text, str(reply.payload["text"]))
+            output.append(
+                DomainEvent(
+                    "conversation.time_elapsed",
+                    "pathos",
+                    {
+                        "scene_id": scene_id,
+                        "request_id": request_id,
+                        "user_turn_event_id": str(user_turn_event.event_id),
+                        "pathos_turn_event_id": str(pathos_turn_event.event_id),
+                        "minutes": elapsed_minutes,
+                        "text": (
+                            f"{elapsed_minutes} simulated minutes passed while the conversation "
+                            "continued."
+                        ),
+                        "started_at": state.simulated_at.isoformat(),
+                        "ends_at": (
+                            state.simulated_at + timedelta(minutes=elapsed_minutes)
+                        ).isoformat(),
+                        "simulated_at": state.simulated_at.isoformat(),
+                    },
+                    causation_id=pathos_turn_event.event_id,
+                    correlation_id=scene_id,
+                )
+            )
+            ended = next(
+                (event for event in pathos_turn.events if event.kind == "scene.ended"), None
+            )
+            if ended is not None:
+                visit_ended = DomainEvent(
+                    "visit.ended",
+                    "pathos",
+                    {
+                        "request_id": f"natural-end-{scene_id}",
+                        "scene_id": scene_id,
+                        "reason": "conversation_complete",
+                        "simulated_at": state.simulated_at.isoformat(),
+                    },
+                    causation_id=ended.event_id,
+                    correlation_id=scene_id,
+                )
+                output.extend(
+                    (
+                        visit_ended,
+                        DomainEvent(
+                            "conversation.message",
+                            "pathos",
+                            {
+                                "request_id": f"natural-end-{scene_id}",
+                                "speaker": "system",
+                                "text": "The conversation reached a natural stopping point.",
+                                "channel": "live_visit",
+                                "scene_id": scene_id,
+                                "simulated_at": state.simulated_at.isoformat(),
+                            },
+                            causation_id=visit_ended.event_id,
+                            correlation_id=scene_id,
+                        ),
+                    )
+                )
+        self.store.append("pathos", output, len(history))
+        if elapsed_minutes:
+            await self._advance(elapsed_minutes / 60)
 
     async def _respond_to_due_messages(self) -> None:
         while True:
             history = self.history()
             state = self._project_state(history)
+            if communication_availability(history, state).status in {
+                "asleep",
+                "occupied",
+                "interrupted",
+                "in_conversation",
+            }:
+                return
             replied = {
                 str(event.payload["request_id"])
                 for event in history

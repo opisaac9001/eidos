@@ -1,12 +1,13 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.application.messaging import reply_due_at
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
 from eidos.ports.town_signals import TownSignal
@@ -222,6 +223,7 @@ class LifeTests(unittest.TestCase):
 
     def test_available_user_can_begin_end_and_talk_inside_a_live_visit(self):
         self.life.bootstrap()
+        before = self.life.snapshot()["time"]
         self.life.request_visit("sit-down-1")
         started = self.life.snapshot()
         self.assertEqual(started["communication"]["status"], "in_conversation")
@@ -232,11 +234,88 @@ class LifeTests(unittest.TestCase):
             [item["speaker"] for item in during["conversations"][-2:]], ["you", "pathos"]
         )
         self.assertEqual(during["communication"]["live_turn_count"], 2)
+        self.assertEqual(during["communication"]["live_elapsed_minutes"], 5)
+        self.assertGreater(datetime.fromisoformat(during["time"]), datetime.fromisoformat(before))
+        self.assertEqual(during["conversation_clocks"][0]["exchanges"], 1)
         self.assertEqual(during["conversations"][-1]["channel"], "live_visit")
         self.life.end_visit("leave-1")
         ended = self.life.snapshot()
         self.assertIsNone(ended["communication"]["live_scene_id"])
         self.assertTrue(any(event.kind == "visit.ended" for event in self.life.history()))
+
+    def test_conversation_time_reaches_a_real_departure_without_manual_stepping(self):
+        self.life.advance(8.75)
+        self.life.request_visit("quarter-hour-before-cafe")
+        self.assertIn("15 minutes", self.life.snapshot()["communication"]["reason"])
+        for index in range(3):
+            self.life.chat("Go on.", f"timed-turn-{index}")
+        snapshot = self.life.snapshot()
+        self.assertIsNone(snapshot["communication"]["live_scene_id"])
+        ended = next(
+            event for event in reversed(self.life.history()) if event.kind == "visit.ended"
+        )
+        self.assertEqual(ended.payload["reason"], "scheduled_departure")
+        self.assertEqual(snapshot["conversation_clocks"][0]["elapsed_minutes"], 15)
+
+    def test_due_text_waits_while_pathos_is_in_a_live_conversation(self):
+        self.life.bootstrap()
+        state = self.life._project_state(self.life.history())
+        request_id = next(
+            f"waiting-during-visit-{index}"
+            for index in range(100)
+            if reply_due_at(self.life.history(), state, f"waiting-during-visit-{index}")
+            < state.simulated_at + timedelta(hours=1)
+        )
+        self.life.chat("A message for later.", request_id)
+        due_at = datetime.fromisoformat(
+            str(
+                next(
+                    event.payload["reply_due_at"]
+                    for event in self.life.history()
+                    if event.kind == "conversation.message"
+                )
+            )
+        )
+        self.life.request_visit("occupy-before-reply")
+        now = datetime.fromisoformat(self.life.snapshot()["time"])
+        self.life.advance((due_at - now).total_seconds() / 3600 + 0.01)
+        self.assertEqual(
+            [item["speaker"] for item in self.life.snapshot()["conversations"]], ["you"]
+        )
+        self.life.end_visit("leave-after-wait")
+        self.life.advance(0.01)
+        self.assertEqual(
+            [item["speaker"] for item in self.life.snapshot()["conversations"]],
+            ["you", "pathos"],
+        )
+
+    def test_turn_budget_closes_a_visit_with_a_visible_natural_ending(self):
+        self.life.bootstrap()
+        history = self.life.history()
+        state = self.life._project_state(history)
+        scene = DomainEvent(
+            "scene.started",
+            "pathos",
+            {
+                "scene_id": "short-user-visit",
+                "initiator_id": "pathos",
+                "partner_id": "user",
+                "location_id": state.location_id,
+                "topic_id": "brief-conversation",
+                "max_turns": 2,
+                "simulated_at": state.simulated_at.isoformat(),
+            },
+        )
+        self.life.store.append("pathos", [scene], len(history))
+        self.life.chat("I only have a moment.", "short-visit-turn")
+        snapshot = self.life.snapshot()
+        self.assertIsNone(snapshot["communication"]["live_scene_id"])
+        ended = next(
+            event for event in reversed(self.life.history()) if event.kind == "visit.ended"
+        )
+        self.assertEqual(ended.payload["reason"], "conversation_complete")
+        self.assertEqual(snapshot["conversations"][-1]["speaker"], "system")
+        self.assertIn("natural stopping point", snapshot["conversations"][-1]["text"])
 
     def test_sleeping_pathos_can_decline_a_live_visit_without_starting_a_scene(self):
         self.life.request_visit("too-late")

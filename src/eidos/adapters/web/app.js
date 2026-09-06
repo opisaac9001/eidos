@@ -114,6 +114,7 @@ const labels = {
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
   "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
+  "conversation.time_elapsed": "TIME PASSED IN CONVERSATION",
   "skill.practiced": "SKILL PRACTICE",
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",
@@ -642,7 +643,7 @@ function render(next) {
   $("end-visit").hidden = !communication.live_scene_id;
   $("send").textContent = communication.live_scene_id ? "Speak ↗" : "Send ↗";
   $("delivery-note").textContent = communication.live_scene_id
-    ? "You are speaking together in real time."
+    ? `You are speaking together · ${communication.live_elapsed_minutes || 0} simulated minutes have passed.`
     : communication.waiting_count
     ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
     : "Messages are delivered; replies may take time.";
@@ -699,10 +700,10 @@ function render(next) {
   $("npc-states").insertAdjacentHTML(
     "beforeend",
     (state.scenes || [])
-      .map(
-        (scene) =>
-          `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`,
-      )
+      .map((scene) => {
+        const clock = (state.conversation_clocks || []).find((item) => item.scene_id === scene.scene_id);
+        return `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS${clock ? ` · ${clock.elapsed_minutes} MIN` : ""}</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`;
+      })
       .join(""),
   );
   $("roles").innerHTML = state.roles
