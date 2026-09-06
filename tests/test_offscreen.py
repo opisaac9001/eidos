@@ -162,6 +162,40 @@ class OffscreenWorldTests(unittest.TestCase):
         self.assertEqual(state.people["nina-vale"].location_id, "old-glasshouse")
         self.assertEqual(state.people["nina-vale"].plan_status, "completed")
 
+    def test_a_scheduled_personal_plan_overrides_stock_location_and_activity(self):
+        noon = self.now.replace(hour=12)
+        plan = DomainEvent(
+            "npc.plan_created",
+            "pathos",
+            {
+                "actor_id": "mara",
+                "plan_id": "mara-noticeboard",
+                "title": "Refresh the park noticeboard",
+                "action": "organize",
+                "location_id": "park",
+                "scheduled_for": noon.isoformat(),
+                "due_at": (noon + timedelta(hours=2)).isoformat(),
+                "owner": "mara",
+                "visibility": "private",
+            },
+        )
+        events = npc_world_events([plan], noon)
+        activity = next(
+            event
+            for event in events
+            if event.kind == "npc.activity_recorded" and event.payload["actor_id"] == "mara"
+        )
+        self.assertEqual(
+            (activity.payload["location_id"], activity.payload["action"]),
+            ("park", "organize"),
+        )
+        self.assertTrue(
+            any(
+                event.kind == "npc.plan_completed" and event.payload["actor_id"] == "mara"
+                for event in events
+            )
+        )
+
     def test_overdue_plan_expires_without_becoming_an_action(self):
         plan = DomainEvent(
             "npc.plan_created",

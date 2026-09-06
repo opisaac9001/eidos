@@ -61,8 +61,10 @@ Need-driven choices now record all three competing levels and their selected pri
 critical exhaustion can interrupt and causally replace a lower-priority private plan
 without making ordinary fluctuations rewrite the day. Shared familiarity can make a
 connection need more attractive, but Pathos's one-sided trust is never treated as
-proof of an NPC's hidden reciprocal feeling. Their option vocabulary remains bounded
-rather than generally autonomous. Term,
+proof of an NPC's hidden reciprocal feeling. Purpose and connection plans now rotate
+through person-specific, replay-stable project palettes, and the offscreen actor moves
+to the planned place and performs the planned action rather than a stock routine.
+Their option vocabulary remains bounded rather than generally autonomous. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Planning and
 actor-owned beliefs and directed relationships now do the same with ordered,
@@ -262,18 +264,15 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Expand the completed perception- and need-driven NPC goal loop with more personal
-   projects; competing priorities, critical-energy interruption, and familiarity-
-   motivated connection choices now have causal paths.
-2. Generalize the now-integrated four-turn interruption/resume scene into recurring
+1. Generalize the now-integrated four-turn interruption/resume scene into recurring
    dialogue policies with topic selection, voluntary exits, and relationship pacing.
-3. Let Moira propose additions to the completed sixteen-event, resource-backed
+2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
    feasibility. Pathos and introduced NPCs now form bounded goals that select new
    places; next, let social consequences and useful-object choices do the same.
-4. Add an optional source-attributed British-town signal adapter for weather, daylight,
+3. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
 7. Capture the Dell inventory, then benchmark and pin its private inference stack.

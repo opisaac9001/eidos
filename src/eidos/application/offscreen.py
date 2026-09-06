@@ -26,6 +26,14 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
     for current in state.people.values():
         actor_id = current.actor_id
         desired = npc_location(actor_id, simulated_at.hour, current.usual_location_id)
+        if (
+            current.plan_status == "active"
+            and current.plan_location_id is not None
+            and current.plan_scheduled_for is not None
+            and simulated_at >= current.plan_scheduled_for
+            and (current.plan_due_at is None or simulated_at <= current.plan_due_at)
+        ):
+            desired = current.plan_location_id
         if starting or current.location_id != desired:
             moved = DomainEvent(
                 "npc.moved",
@@ -82,6 +90,15 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         if simulated_at.hour not in {0, 6, 12, 18}:
             continue
         action, activity_text = npc_activity(actor_id, desired)
+        if (
+            current.plan_status == "active"
+            and current.plan_location_id == desired
+            and current.plan_action is not None
+            and current.plan_title is not None
+            and (current.plan_scheduled_for is None or simulated_at >= current.plan_scheduled_for)
+        ):
+            action = current.plan_action
+            activity_text = current.plan_title.lower()
         activity = DomainEvent(
             "npc.activity_recorded",
             "pathos",

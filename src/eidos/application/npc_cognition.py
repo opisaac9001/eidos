@@ -320,20 +320,47 @@ def _need_plan(
     if need == "energy":
         midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         return "rest", "home", "Protect an unhurried stretch of rest", midnight
-    if need == "connection" and actor_id == "ellis":
-        evening = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
-        return "walk", "park", "Take an evening walk where neighbors may be around", evening
-    profile = npc_plan_profile(actor_id, usual_location_id)
-    title = (
-        "Make room for people at the café"
-        if actor_id == "mara" and need == "connection"
-        else "Sketch among familiar people in the square"
-        if actor_id == "rowan" and need == "connection"
-        else str(profile["title"])
-    )
-    return (
-        str(profile["action"]),
-        str(profile["location_id"]),
-        title,
-        _next_noon(now),
-    )
+    choices: dict[tuple[str, str], tuple[tuple[str, str, str, int], ...]] = {
+        ("mara", "connection"): (
+            ("host", "cafe", "Make room for conversation at the café", 12),
+            ("welcome", "cafe", "Learn the names of two unfamiliar regulars", 12),
+            ("share", "cafe", "Put a communal pot of tea on the long table", 12),
+        ),
+        ("mara", "purpose"): (
+            ("prepare", "cafe", "Test a simple seasonal lunch for the café", 12),
+            ("organize", "cafe", "Refresh the neighborhood noticeboard", 12),
+            ("host", "cafe", "Make the quiet afternoon feel welcoming", 12),
+        ),
+        ("ellis", "connection"): (
+            ("walk", "park", "Take an evening walk where neighbors may be around", 18),
+            ("teach", "workshop", "Offer an open hour for novice repairers", 12),
+            ("visit", "cafe", "Stop for tea and an unhurried conversation", 12),
+        ),
+        ("ellis", "purpose"): (
+            ("repair", "workshop", "Restore a neglected household object", 12),
+            ("organize", "workshop", "Sort the shared fasteners and spare parts", 12),
+            ("teach", "workshop", "Write a repair note for the community shelf", 12),
+        ),
+        ("rowan", "connection"): (
+            ("sketch", "park", "Sketch among familiar people in the square", 12),
+            ("visit", "cafe", "Bring a sketchbook into the café's afternoon room", 12),
+            ("share", "park", "Show a neighbor one unfinished drawing", 12),
+        ),
+        ("rowan", "purpose"): (
+            ("sketch", "park", "Draw a changing corner of Willow Square", 12),
+            ("study", "park", "Study winter branches for a new illustration", 12),
+            ("curate", "cafe", "Choose small drawings for the café noticeboard", 12),
+        ),
+    }
+    options = choices.get((actor_id, need))
+    if options is None:
+        options = (
+            ("attend", usual_location_id, "Spend time among familiar people", 12),
+            ("care", usual_location_id, "Look after one overlooked part of this place", 12),
+            ("organize", usual_location_id, "Make this place easier for others to use", 12),
+        )
+    action, location_id, title, hour = options[
+        (now.date().toordinal() + sum(ord(character) for character in actor_id)) % len(options)
+    ]
+    scheduled = (now + timedelta(days=1)).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return action, location_id, title, scheduled

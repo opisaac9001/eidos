@@ -268,13 +268,28 @@ class NPCCognitionTests(unittest.TestCase):
         )
         events = npc_need_plan_events([person, evidence], "2026-01-10T19:00:00+00:00")
         plan = next(event for event in events if event.kind == "npc.plan_created")
-        self.assertEqual(
-            (plan.payload["action"], plan.payload["location_id"]),
-            (
-                "attend",
-                "old-glasshouse",
-            ),
-        )
+        self.assertEqual(plan.payload["location_id"], "old-glasshouse")
+        self.assertIn(plan.payload["action"], {"attend", "care", "organize"})
+
+    def test_personal_plan_palette_changes_across_replay_stable_weeks(self):
+        choices = set()
+        for day in (10, 17, 24):
+            evidence = DomainEvent(
+                "npc.needs_changed",
+                "pathos",
+                {
+                    "actor_id": "mara",
+                    "energy": 0.7,
+                    "connection": 0.7,
+                    "purpose": 0.3,
+                    "owner": "mara",
+                    "visibility": "private",
+                },
+            )
+            events = npc_need_plan_events([evidence], f"2026-01-{day:02d}T19:00:00+00:00")
+            plan = next(event for event in events if event.kind == "npc.plan_created")
+            choices.add((plan.payload["action"], plan.payload["title"]))
+        self.assertEqual(len(choices), 3)
 
 
 if __name__ == "__main__":
