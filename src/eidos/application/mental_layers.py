@@ -37,6 +37,7 @@ def mental_layer_events(
         "curiosity": state.curiosity,
         "mastery": state.mastery,
         "energy": state.energy,
+        "nourishment": 1 - state.hunger,
     }
     need_name, need_value = min(needs.items(), key=lambda item: (item[1], item[0]))
     focus_type = "concern" if concerns else "goal" if active_goals else "place"

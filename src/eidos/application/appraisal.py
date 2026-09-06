@@ -118,9 +118,21 @@ def sleep_and_need_events(
         events.append(transition)
         current = current.apply(transition)
     deltas = (
-        {"rest": -0.03, "connection": -0.012, "curiosity": -0.003, "mastery": -0.006}
+        {
+            "rest": -0.03,
+            "connection": -0.012,
+            "curiosity": -0.003,
+            "mastery": -0.006,
+            "hunger": 0.045,
+        }
         if current.awake
-        else {"rest": 0.04, "connection": -0.004, "curiosity": -0.001, "mastery": -0.002}
+        else {
+            "rest": 0.04,
+            "connection": -0.004,
+            "curiosity": -0.001,
+            "mastery": -0.002,
+            "hunger": 0.015,
+        }
     )
     payload = {
         name: max(0.0, min(1.0, float(getattr(current, name)) + delta))
@@ -226,6 +238,8 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", 0.06, 0.55, 0.35, 0.8)
     if event.kind == "scene.turn_taken":
         return ("connection", 0.025, 0.3, 0.35, 0.75)
+    if event.kind == "meal.eaten":
+        return ("affect", 0.0, 0.25, 0.1, 0.9)
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)

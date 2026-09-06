@@ -121,6 +121,7 @@ const labels = {
   "emotion.regulation_completed": "A REST INTENTION WAS FOLLOWED THROUGH",
   "emotion.mixed_state_recognized": "TWO FEELINGS REMAINED AT ONCE",
   "emotion.mixed_state_resolved": "A MIXED FEELING EASED",
+  "meal.eaten": "A MEAL",
   "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
@@ -635,7 +636,7 @@ function render(next) {
     .map(([name]) => name[0].toUpperCase() + name.slice(1))
     .join(" · ");
   const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   const preferences = state.identity?.preferences || [];
   const traits = Object.entries(state.identity?.traits || {})
     .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)

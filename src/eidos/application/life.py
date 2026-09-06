@@ -40,6 +40,7 @@ from eidos.application.memory import MemoryIndex, memory_archive_page, memory_vi
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
+from eidos.application.nourishment import nourishment_events
 from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_collaboration import object_collaboration_events
@@ -199,6 +200,7 @@ class Life:
                         connection=float(raw["connection"]),
                         curiosity=float(raw["curiosity"]),
                         mastery=float(raw["mastery"]),
+                        hunger=float(raw.get("hunger", 0.15)),
                         awake=raw["awake"],
                     )
                     start = checkpoint.revision
@@ -228,6 +230,7 @@ class Life:
                     "connection": state.connection,
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
+                    "hunger": state.hunger,
                     "awake": state.awake,
                 },
             )
@@ -782,6 +785,7 @@ class Life:
                 "object.replenishment_missed",
                 "object.replenishment_received",
                 "object.replenishment_cancelled",
+                "meal.eaten",
                 "catch_up.summarized",
                 "catch_up.cancelled",
                 "sleep.window_selected",
@@ -861,6 +865,7 @@ class Life:
                     "connection": state.connection,
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
+                    "hunger": state.hunger,
                 },
                 "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence, state.arousal),
@@ -1249,6 +1254,7 @@ class Life:
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
                     "energy": state.energy,
+                    "hunger": state.hunger,
                 },
                 emotion={
                     "label": project_feeling.label,
@@ -1288,6 +1294,7 @@ class Life:
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
                     "energy": state.energy,
+                    "hunger": state.hunger,
                 },
                 emotion={
                     "label": current_emotion.label,
@@ -1327,6 +1334,8 @@ class Life:
                 or planned_activity_beat(self._planning(history + pending), current, state.energy)
                 or beats.get(current)
             )
+            meals: list[DomainEvent] = []
+            meal_checked = False
             if beat:
                 emotion_before_beat = project_emotion(history + pending)
                 bias = emotional_planning_bias(
@@ -1443,26 +1452,77 @@ class Life:
                 energy = DomainEvent("affect.changed", "pathos", {"energy": beat.energy})
                 pending.append(energy)
                 state = state.apply(energy)
+                meal_busy = incident_location is not None or any(
+                    scene.status in {"active", "paused"}
+                    and "pathos" in {scene.initiator_id, scene.partner_id}
+                    for scene in project_scenes(history + pending).scenes.values()
+                )
+                meals = nourishment_events(
+                    history + pending,
+                    state,
+                    current,
+                    pathos_busy=meal_busy,
+                )
+                meal_checked = True
+                pending.extend(meals)
+                for meal in meals:
+                    state = state.apply(meal)
+                meal_claim = any(
+                    word in beat.description.lower()
+                    for word in ("breakfast", "porridge", "toast", "lunch", "soup", "dinner", "ate")
+                )
+                remembered_description = (
+                    "The usual meal was delayed while the hour remained occupied."
+                    if meal_claim and not meals
+                    else beat.description
+                )
                 pending.append(
                     DomainEvent(
                         "memory.recorded",
                         "pathos",
                         {
-                            "text": beat.description,
+                            "text": remembered_description,
                             "simulated_at": at,
                             "source": "authored-routine",
                             "category": "experience",
-                            "activity": beat.activity,
+                            "activity": "meal_delayed"
+                            if meal_claim and not meals
+                            else beat.activity,
                             "emotional_decision_reason": emotional_reason,
                             "location_id": beat.location_id,
                             "owner": "pathos",
                             "importance": 0.45,
                             "confidence": 1.0,
                         },
-                        causation_id=arrival.event_id if arrival else None,
-                        correlation_id=arrival.correlation_id if arrival else None,
+                        causation_id=meals[-1].event_id
+                        if meals
+                        else arrival.event_id
+                        if arrival
+                        else None,
+                        correlation_id=(
+                            meals[-1].correlation_id
+                            if meals
+                            else arrival.correlation_id
+                            if arrival
+                            else None
+                        ),
                     )
                 )
+            if not meal_checked:
+                meal_busy = incident_location is not None or any(
+                    scene.status in {"active", "paused"}
+                    and "pathos" in {scene.initiator_id, scene.partner_id}
+                    for scene in project_scenes(history + pending).scenes.values()
+                )
+                meals = nourishment_events(
+                    history + pending,
+                    state,
+                    current,
+                    pathos_busy=meal_busy,
+                )
+                pending.extend(meals)
+                for meal in meals:
+                    state = state.apply(meal)
             story = story_events(
                 current,
                 history + pending,

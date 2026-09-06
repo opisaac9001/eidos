@@ -77,9 +77,34 @@ class PathosStateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PathosState(energy=2)
         with self.assertRaises(ValueError):
+            PathosState(hunger=-0.1)
+        with self.assertRaises(ValueError):
             PathosState(simulated_at=datetime(2026, 1, 1))
         with self.assertRaises(ValueError):
             PathosState(awake=1)  # type: ignore[arg-type]
+
+    def test_meal_requires_current_bodily_evidence(self) -> None:
+        state = PathosState(hunger=0.7, energy=0.4, awake=True)
+        meal = DomainEvent(
+            "meal.eaten",
+            "pathos",
+            {
+                "meal_id": "meal:2026-01-01:lunch",
+                "meal_kind": "lunch",
+                "text": "Ate lunch.",
+                "location_id": "home",
+                "simulated_at": state.simulated_at.isoformat(),
+                "hunger_before": 0.7,
+                "hunger_after": 0.24,
+                "energy_after": 0.47,
+            },
+        )
+        after = state.apply(meal)
+        self.assertEqual((after.hunger, after.energy), (0.24, 0.47))
+        with self.assertRaises(ValueError):
+            PathosState(hunger=0.6, energy=0.4, awake=True).apply(meal)
+        with self.assertRaises(ValueError):
+            PathosState(hunger=0.7, energy=0.4, awake=False).apply(meal)
 
 
 if __name__ == "__main__":

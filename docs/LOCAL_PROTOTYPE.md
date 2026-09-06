@@ -47,8 +47,10 @@ application is prevented. Each evening now records a replayable sleep window sha
 by rest, energy, arousal, and nearby calendar obligations. An unfinished conversation
 or active incident can delay actual sleep without silently changing that intention.
 
-Pathos now has replayed, bounded rest, connection, curiosity and mastery
-satisfaction. Source-linked appraisals update those needs from routines,
+Pathos now has replayed, bounded rest, hunger, connection, curiosity and mastery.
+Hunger rises gradually, flexible meal windows wait through occupied time, and an
+actual meal leaves validated bodily evidence before it can become a memory. Source-linked
+appraisals update the other needs from routines,
 encounters, interruptions, completed actions and missed commitments. The work
 request policy combines energy, rest and mastery with schedule feasibility.
 Dream residue receives an appraisal but cannot directly change a need, belief,

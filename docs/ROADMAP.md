@@ -26,7 +26,8 @@ remain recognizably different rather than a repeated short loop.
 
 Implemented: SQLite event history, atomic writes/replay, verified backups, replayable
 weekday/weekend daily texture, typed travel, open hours, four places, three persistent neighbors,
-multidimensional affect and needs, source-linked memories, delayed inbox conversations, and five
+multidimensional affect and needs, including replayable hunger and meals, source-linked memories,
+delayed inbox conversations, and five
 UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.

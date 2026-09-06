@@ -70,6 +70,16 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(len(snapshot["sleep_windows"]), 1)
         self.assertEqual(snapshot["sleep_windows"][0]["night_date"], "2026-01-01")
         self.assertTrue(any(item["kind"] == "sleep.window_selected" for item in snapshot["feed"]))
+        meals = [event for event in self.life.history() if event.kind == "meal.eaten"]
+        self.assertGreaterEqual(len(meals), 2)
+        self.assertGreaterEqual(len({event.payload["meal_kind"] for event in meals}), 2)
+        self.assertTrue(
+            any(
+                event.kind == "memory.recorded"
+                and event.causation_id in {meal.event_id for meal in meals}
+                for event in self.life.history()
+            )
+        )
         self.assertEqual(snapshot["indexes"]["memory_revision"], len(self.life.history()))
         self.assertGreater(snapshot["indexes"]["memory_count"], 0)
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)

@@ -40,6 +40,27 @@ class MentalLayerTests(unittest.TestCase):
         self.assertTrue(all("action_authority" not in item for item in context))
         self.assertTrue(all(0 <= item["activation"] <= 1 for item in context))
 
+    def test_pressing_hunger_reaches_somatic_attention_as_need_for_nourishment(self):
+        at = datetime(2026, 1, 2, 11, tzinfo=timezone.utc)
+        events = mental_layer_events(
+            [],
+            PathosState(
+                simulated_at=at,
+                awake=True,
+                hunger=0.85,
+                energy=0.8,
+                rest=0.8,
+                connection=0.8,
+                curiosity=0.8,
+                mastery=0.8,
+            ),
+            at,
+            {},
+        )
+        somatic = next(event for event in events if event.payload["layer"] == "somatic")
+        self.assertEqual(somatic.payload["focus_id"], "nourishment")
+        self.assertGreater(somatic.payload["activation"], 0.9)
+
     def test_invalid_layer_activation_is_rejected_on_replay(self):
         bad = DomainEvent(
             "mind.layer_pulsed",

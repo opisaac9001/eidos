@@ -149,6 +149,11 @@ Emotion samples can retain opposed recent appraisals as a source-linked secondar
 feeling instead of collapsing everything to one label. Mixed feeling slows initiative
 and risk slightly. Bounded coping attempts may lower arousal or protect sleep, but do
 not manufacture happiness or erase sadness.
+Hunger now accumulates as bodily pressure across waking and sleep. Breakfast, lunch,
+an evening meal, or an occasional urgent snack happens only while Pathos is awake and
+unoccupied; conversations and incidents can delay eating within a flexible window.
+Meals reduce hunger, restore bounded energy, inform somatic attention and leave
+replayable evidence rather than relying on routine narration alone.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or

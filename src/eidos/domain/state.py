@@ -20,6 +20,7 @@ class PathosState:
     connection: float = 0.5
     curiosity: float = 0.5
     mastery: float = 0.45
+    hunger: float = 0.15
     awake: bool = False
 
     def __post_init__(self) -> None:
@@ -30,7 +31,7 @@ class PathosState:
         _bounded_dimension(self.energy, "energy", 0, 1)
         _bounded_dimension(self.valence, "valence", -1, 1)
         _bounded_dimension(self.arousal, "arousal", 0, 1)
-        for name in ("rest", "connection", "curiosity", "mastery"):
+        for name in ("rest", "connection", "curiosity", "mastery", "hunger"):
             _bounded_dimension(getattr(self, name), name, 0, 1)
         if type(self.awake) is not bool:
             raise ValueError("awake must be boolean")
@@ -76,7 +77,47 @@ class PathosState:
                     mastery=_bounded_dimension(
                         event.payload.get("mastery", self.mastery), "mastery", 0, 1
                     ),
+                    hunger=_bounded_dimension(
+                        event.payload.get("hunger", self.hunger), "hunger", 0, 1
+                    ),
                 )
+            case "meal.eaten":
+                if not self.awake:
+                    raise ValueError("Pathos cannot eat while asleep")
+                meal_id = event.payload.get("meal_id")
+                meal_kind = event.payload.get("meal_kind")
+                text = event.payload.get("text")
+                location_id = event.payload.get("location_id")
+                simulated_at = event.payload.get("simulated_at")
+                if not isinstance(meal_id, str) or not meal_id.strip():
+                    raise ValueError("A meal requires an identifier")
+                if meal_kind not in {"breakfast", "lunch", "evening_meal", "snack"}:
+                    raise ValueError("Unknown meal kind")
+                if not isinstance(text, str) or not text.strip():
+                    raise ValueError("A meal requires experienced detail")
+                if location_id != self.location_id:
+                    raise ValueError("A meal must occur at Pathos's current location")
+                if not isinstance(simulated_at, str):
+                    raise ValueError("A meal requires simulation time")
+                meal_at = datetime.fromisoformat(simulated_at)
+                if meal_at.utcoffset() is None or meal_at != self.simulated_at:
+                    raise ValueError("A meal must occur at the current aware simulation time")
+                before = _bounded_dimension(
+                    event.payload.get("hunger_before"), "hunger_before", 0, 1
+                )
+                hunger = _bounded_dimension(event.payload.get("hunger_after"), "hunger_after", 0, 1)
+                energy = _bounded_dimension(event.payload.get("energy_after"), "energy_after", 0, 1)
+                if abs(before - self.hunger) > 1e-9:
+                    raise ValueError("Meal hunger evidence does not match current state")
+                if hunger >= before:
+                    raise ValueError("A meal must reduce hunger")
+                if before - hunger > 0.46 + 1e-9:
+                    raise ValueError("A meal cannot erase excessive hunger")
+                if energy < self.energy:
+                    raise ValueError("A meal cannot directly reduce energy")
+                if energy - self.energy > 0.07 + 1e-9:
+                    raise ValueError("A meal cannot restore excessive energy")
+                return replace(self, hunger=hunger, energy=energy)
             case "sleep.started":
                 if not self.awake:
                     raise ValueError("Pathos is already asleep")

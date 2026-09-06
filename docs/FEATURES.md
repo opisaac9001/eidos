@@ -37,7 +37,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: persisted sourced values + default and evidence-developed preferences in bounded context | P2 |
 | SELF-02 | Multidimensional affect, named emotion, duration, appraisal, episodes and baseline mood | Partial: replayable primary/secondary mixed emotion, prolonged-low tracking, source-linked valence/arousal episodes + recovery | P2 |
-| SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with condition- and commitment-shaped sleep pressure/recovery | P2–P4 |
+| SELF-03 | Rest, hunger, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable need pressure with condition- and commitment-shaped sleep plus opportunity- and interruption-aware meals | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle, capped non-action dream appraisal, and source-linked regulation that can lower arousal or protect actual sleep without erasing low valence | P2–P4 |
 | SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + primary/mixed emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded skills/habit, capped week-spanning preference lifecycle, and one-point month-spanning behavioral trait drift | P6 |
