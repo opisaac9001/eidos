@@ -258,6 +258,8 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         runtime.life.catch_up(body.get("hours", 24))
                     elif self.path == "/api/catch-up/resume":
                         runtime.life.resume_catch_up()
+                    elif self.path == "/api/catch-up/cancel":
+                        runtime.life.cancel_catch_up()
                     elif self.path == "/api/chat":
                         text_value = body.get("text")
                         request_id = body.get("request_id")

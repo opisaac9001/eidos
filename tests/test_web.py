@@ -69,6 +69,7 @@ class WebTests(unittest.TestCase):
             if path == "/":
                 self.assertIn(b'data-view="plans"', body)
                 self.assertIn(b'id="calendar-list"', body)
+                self.assertIn(b'id="catch-up"', body)
             if path == "/app.js":
                 self.assertIn(b"function renderPlans()", body)
             if path == "/api/export":
@@ -180,6 +181,7 @@ class WebTests(unittest.TestCase):
         self.assertTrue(
             any(event.kind == "catch_up.completed" for event in self.runtime.life.history())
         )
+        self.assertTrue(json.loads(body)["catch_up_summaries"])
 
     def test_restart_restores_time_but_requires_explicit_resume(self):
         self.runtime.close()

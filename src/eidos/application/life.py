@@ -13,7 +13,12 @@ from eidos.application.appraisal import (
     sleep_and_need_events,
 )
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
-from eidos.application.catchup import CatchUpPreview, active_catch_up, preview_catch_up
+from eidos.application.catchup import (
+    CatchUpPreview,
+    active_catch_up,
+    catch_up_summary_events,
+    preview_catch_up,
+)
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import consolidation_events
 from eidos.application.development import development_events
@@ -110,6 +115,7 @@ class Life:
         surfaced_associations: set[str] = set()
         dream_seeds: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
+        catch_up_summaries = []
         concerns = {}
         for event in history:
             payload = dict(event.payload)
@@ -175,6 +181,8 @@ class Life:
                 surfaced_associations.add(str(payload["association_id"]))
             if event.kind == "affect.episode_started":
                 episodes.append(item)
+            if event.kind == "catch_up.summarized":
+                catch_up_summaries.append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -228,6 +236,8 @@ class Life:
                 "transfer.response_rejected",
                 "object.custody_changed",
                 "object.ownership_changed",
+                "catch_up.summarized",
+                "catch_up.cancelled",
             }:
                 feed.append(item)
         npc_state = project_npcs(history, state.simulated_at)
@@ -246,6 +256,7 @@ class Life:
         followups = project_followups(history)
         development = project_development(history)
         transfers = project_transfers(history)
+        catch_up = active_catch_up(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -308,6 +319,8 @@ class Life:
                 for item in reversed(associations[-100:])
             ],
             "affect_episodes": list(reversed(episodes[-100:])),
+            "catch_up_summaries": list(reversed(catch_up_summaries[-20:])),
+            "catch_up": vars_for(catch_up) if catch_up is not None else None,
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
             "mode": self.mode,
@@ -367,6 +380,30 @@ class Life:
             UUID(session.start_event_id),
         )
 
+    def cancel_catch_up(self) -> None:
+        history = self.history()
+        session = active_catch_up(history)
+        if session is None:
+            raise ValueError("There is no active catch-up session")
+        now = self.project(history).simulated_at
+        self.store.append(
+            "pathos",
+            [
+                DomainEvent(
+                    "catch_up.cancelled",
+                    "pathos",
+                    {
+                        "catch_up_id": session.catch_up_id,
+                        "through": now.isoformat(),
+                        "simulated_at": now.isoformat(),
+                    },
+                    causation_id=UUID(session.start_event_id),
+                    correlation_id=session.catch_up_id,
+                )
+            ],
+            len(history),
+        )
+
     def _resume_catch_up(self, catch_up_id: str, target: datetime, cause: UUID) -> None:
         while True:
             history = self.history()
@@ -395,9 +432,19 @@ class Life:
                 len(after),
             )
         history = self.history()
+        session = active_catch_up(history)
+        if session is None or session.catch_up_id != catch_up_id:
+            raise ValueError("Catch-up is no longer active")
+        start_index = next(
+            index
+            for index, event in enumerate(history)
+            if str(event.event_id) == session.start_event_id
+        )
+        summary_events = catch_up_summary_events(history[start_index + 1 :], session, target)
         self.store.append(
             "pathos",
             [
+                *summary_events,
                 DomainEvent(
                     "catch_up.completed",
                     "pathos",
@@ -407,7 +454,7 @@ class Life:
                     },
                     causation_id=cause,
                     correlation_id=catch_up_id,
-                )
+                ),
             ],
             len(history),
         )

@@ -68,7 +68,7 @@ def active_catch_up(history: Sequence[DomainEvent]) -> CatchUpSession | None:
                 "active",
                 str(event.event_id),
             )
-        elif event.kind == "catch_up.completed":
+        elif event.kind in {"catch_up.completed", "catch_up.cancelled"}:
             catch_up_id = str(event.payload["catch_up_id"])
             session = sessions.get(catch_up_id)
             if session is None or session.status != "active":
@@ -77,13 +77,95 @@ def active_catch_up(history: Sequence[DomainEvent]) -> CatchUpSession | None:
                 session.catch_up_id,
                 session.starts_at,
                 session.target_at,
-                "completed",
+                "completed" if event.kind.endswith("completed") else "cancelled",
                 session.start_event_id,
             )
     active = [session for session in sessions.values() if session.status == "active"]
     if len(active) > 1:
         raise ValueError("Only one catch-up session may be active")
     return active[0] if active else None
+
+
+def catch_up_summary_events(
+    events: Sequence[DomainEvent],
+    session: CatchUpSession,
+    simulated_at: datetime,
+    source_limit: int = 20,
+) -> list[DomainEvent]:
+    """Create one bounded factual recap with explicit important-event sources."""
+
+    if not 1 <= source_limit <= 50:
+        raise ValueError("Catch-up summary source limit must be between one and fifty")
+    important_kinds = {
+        "activity.completed",
+        "commitment.fulfilled",
+        "commitment.missed",
+        "dream.recalled",
+        "goal.achieved",
+        "goal.abandoned",
+        "npc.encountered",
+        "social.activity_completed",
+        "transfer.accepted",
+        "world_event.occurred",
+    }
+    sources = [event for event in events if event.kind in important_kinds]
+    priority = {
+        "commitment.missed": 0,
+        "commitment.fulfilled": 1,
+        "goal.abandoned": 2,
+        "goal.achieved": 2,
+        "activity.completed": 3,
+        "social.activity_completed": 3,
+        "transfer.accepted": 4,
+        "world_event.occurred": 5,
+        "dream.recalled": 6,
+        "npc.encountered": 7,
+    }
+    ranked = sorted(enumerate(sources), key=lambda item: (priority[item[1].kind], item[0]))[
+        :source_limit
+    ]
+    selected = [source for _, source in sorted(ranked)]
+    counts: dict[str, int] = {}
+    for source in sources:
+        label = source.kind.split(".")[0]
+        counts[label] = counts.get(label, 0) + 1
+    details = ", ".join(f"{count} {label}" for label, count in sorted(counts.items()))
+    text = (
+        f"While away, {details}." if details else "While away, ordinary routines continued quietly."
+    )
+    summary = DomainEvent(
+        "catch_up.summarized",
+        "pathos",
+        {
+            "catch_up_id": session.catch_up_id,
+            "text": text,
+            "starts_at": session.starts_at,
+            "ends_at": simulated_at.isoformat(),
+            "source_count": len(selected),
+            "total_important_events": len(sources),
+            "sources_truncated": len(sources) > len(selected),
+            "factual": True,
+            "simulated_at": simulated_at.isoformat(),
+        },
+        correlation_id=session.catch_up_id,
+    )
+    links = [
+        DomainEvent(
+            "catch_up.summary_source_linked",
+            "pathos",
+            {
+                "catch_up_id": session.catch_up_id,
+                "summary_id": str(summary.event_id),
+                "source_event_id": str(source.event_id),
+                "position": position,
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=source.event_id,
+            correlation_id=session.catch_up_id,
+        )
+        for position, source in enumerate(selected, 1)
+    ]
+    return [summary, *links]
 
 
 def _validate_hours(hours: float) -> None:

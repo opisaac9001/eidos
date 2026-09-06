@@ -61,6 +61,8 @@ const labels = {
   "transfer.response_rejected": "OBJECT TRANSFER BLOCKED",
   "object.custody_changed": "OBJECT HANDED OVER",
   "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
+  "catch_up.summarized": "WHILE YOU WERE AWAY",
+  "catch_up.cancelled": "CATCH-UP CANCELLED",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -154,7 +156,7 @@ async function request(path, body) {
 
 function setBusy(value) {
   busy = value;
-  ["play", "step", "speed", "send"].forEach((id) => {
+  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send"].forEach((id) => {
     $(id).disabled = value || !state;
   });
 }
@@ -389,6 +391,8 @@ function render(next) {
   if (document.activeElement !== $("speed"))
     $("speed").value = state.config.minutes_per_tick;
   $("feed-live").textContent = state.config.running ? "● LIVE" : "PAUSED";
+  $("catch-up").textContent = state.catch_up ? "Resume catch-up" : "Let a day pass";
+  $("cancel-catch-up").hidden = !state.catch_up;
   $("worker-status").textContent = state.runtime.worker_alive
     ? state.runtime.working
       ? "Generating next scene…"
@@ -544,6 +548,25 @@ $("speed").addEventListener(
 $("step").addEventListener("click", async () => {
   if (await mutate("/api/step", { hours: 1 }))
     toast("One more hour of life, recorded.");
+});
+$("catch-up").addEventListener("click", async () => {
+  if (state?.catch_up) {
+    if (await mutate("/api/catch-up/resume", {})) toast("Catch-up completed and summarized.");
+    return;
+  }
+  try {
+    const preview = await request("/api/catch-up/preview?hours=24");
+    const proceed = window.confirm(
+      `Let one simulated day pass? ${preview.routine_beats} routine moments, ${preview.scheduled_items} scheduled items, and ${preview.due_commitments} due commitments fall in that time.`,
+    );
+    if (proceed && (await mutate("/api/catch-up", { hours: 24 })))
+      toast("The day passed and a factual recap was recorded.");
+  } catch (error) {
+    showError(error.message);
+  }
+});
+$("cancel-catch-up").addEventListener("click", async () => {
+  if (await mutate("/api/catch-up/cancel", {})) toast("Catch-up cancelled at its last saved point.");
 });
 $("memory-search").addEventListener("input", renderArchive);
 $("memory-filter").addEventListener("change", renderArchive);
