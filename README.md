@@ -154,7 +154,10 @@ network authorization; the server remains loopback-only until authenticated depl
   may resume. Public events Pathos actually witnesses can also cause a later
   neighborhood parcel. Deliveries have two attempts, can be missed or returned, and
   become physical owned objects only after a completed door handoff. Simulation
-  controls remain operator-facing.
+  controls remain operator-facing. Higher-intensity or plainly hazardous public
+  incidents that Pathos directly witnesses can demand a separate respond/decline
+  choice, displace routine and appointments for a bounded interval, interrupt a live
+  visit, and leave a source-linked memory and emotional aftermath.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair

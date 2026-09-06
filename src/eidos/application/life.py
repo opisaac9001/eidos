@@ -47,6 +47,10 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.urgent_incidents import (
+    active_incident_location,
+    urgent_incident_events,
+)
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import exploration_plan_events, planned_activity_beat
@@ -67,7 +71,7 @@ from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.relationships import RelationshipState, project_relationships
-from eidos.domain.routine import beats_between, emotionally_adjusted_beat
+from eidos.domain.routine import RoutineBeat, beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import (
     SceneEndProposal,
     SceneEndReason,
@@ -563,6 +567,11 @@ class Life:
                 "delivery.missed",
                 "delivery.received",
                 "delivery.returned",
+                "incident.attention_decided",
+                "incident.response_started",
+                "incident.response_declined",
+                "incident.response_completed",
+                "incident.response_abandoned",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",
@@ -958,9 +967,23 @@ class Life:
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
-            beat = planned_activity_beat(
-                self._planning(history + pending), current, state.energy
-            ) or beats.get(current)
+            incident_location = active_incident_location(history + pending, current)
+            incident_beat = (
+                RoutineBeat(
+                    current.hour,
+                    incident_location,
+                    "Stayed with the nearby situation until the bounded response was complete.",
+                    max(0.15, state.energy - 0.06),
+                    "incident_response",
+                )
+                if incident_location is not None
+                else None
+            )
+            beat = (
+                incident_beat
+                or planned_activity_beat(self._planning(history + pending), current, state.energy)
+                or beats.get(current)
+            )
             if beat:
                 emotion_before_beat = project_emotion(history + pending)
                 bias = emotional_planning_bias(
@@ -1143,13 +1166,25 @@ class Life:
                 for actor_id, person in project_npcs(history + pending, current).people.items()
             }
             pending.extend(mental_layer_events(history + pending, state, current, npc_locations))
-            pending.extend(
-                due_world_observations(
-                    history + pending,
-                    {"pathos": state.location_id, **npc_locations},
-                    current,
-                )
+            observation_output = due_world_observations(
+                history + pending,
+                {"pathos": state.location_id, **npc_locations},
+                current,
             )
+            pending.extend(observation_output)
+            incident_output = urgent_incident_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                actor_locations={
+                    "pathos": state.location_id,
+                    "user": state.location_id,
+                    **npc_locations,
+                },
+                pathos_energy=state.energy,
+                values=project_identity(history + pending).values,
+            )
+            pending.extend(incident_output)
             pending.extend(
                 npc_belief_events(history + pending, at, self._beliefs(history + pending))
             )
@@ -1166,33 +1201,45 @@ class Life:
                 phone_emotion.arousal,
                 phone_emotion.sustained_low_hours,
             )
-            visit_output = visitor_events(
-                history + pending,
-                current,
-                len(history) + len(pending),
-                actor_locations={
-                    "pathos": state.location_id,
-                    "user": state.location_id,
-                    **npc_locations,
-                },
-                pathos_awake=state.awake,
-                pathos_energy=state.energy,
-                social_openness=phone_bias.social_openness,
-                relationships=self._relationships(history + pending).relationships,
+            incident_busy = active_incident_location(history + pending, current) is not None or any(
+                event.kind in {"incident.response_completed", "incident.response_abandoned"}
+                for event in incident_output
+            )
+            visit_output = (
+                []
+                if incident_busy
+                else visitor_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    actor_locations={
+                        "pathos": state.location_id,
+                        "user": state.location_id,
+                        **npc_locations,
+                    },
+                    pathos_awake=state.awake,
+                    pathos_energy=state.energy,
+                    social_openness=phone_bias.social_openness,
+                    relationships=self._relationships(history + pending).relationships,
+                )
             )
             pending.extend(visit_output)
             npc_locations.update(visitor_locations(history + pending))
-            delivery_output = delivery_events(
-                history + pending,
-                current,
-                len(history) + len(pending),
-                actor_locations={
-                    "pathos": state.location_id,
-                    "user": state.location_id,
-                    **npc_locations,
-                },
-                pathos_awake=state.awake,
-                pathos_energy=state.energy,
+            delivery_output = (
+                []
+                if incident_busy
+                else delivery_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    actor_locations={
+                        "pathos": state.location_id,
+                        "user": state.location_id,
+                        **npc_locations,
+                    },
+                    pathos_awake=state.awake,
+                    pathos_energy=state.energy,
+                )
             )
             pending.extend(delivery_output)
             interruption_kinds = {
@@ -1205,6 +1252,9 @@ class Life:
                 "delivery.missed",
                 "delivery.received",
                 "delivery.returned",
+                "incident.response_started",
+                "incident.response_completed",
+                "incident.response_abandoned",
             }
             if not any(
                 event.kind in interruption_kinds for event in [*visit_output, *delivery_output]

@@ -288,6 +288,15 @@ completed receipt registers the parcel as a Pathos-owned object at home and crea
 source-linked memory. The handoff then enters the ordinary resume-or-end decision, and
 other phone interruptions are paced out of the same hour.
 
+Urgency begins only from a public world event Pathos directly perceived. Intensity and
+plain hazard/help language make it eligible; private NPC knowledge and quiet ambient
+texture do not. Pathos weighs care, energy, severity, and stable inclination before a
+typed respond/decline decision. Responding pauses a live user scene and holds his
+physical location for a bounded one-to-two-hour interval, even when that displaces a
+routine or appointment. Completion or abandonment creates source-linked memory and an
+appraised emotional consequence before the normal resume-or-end choice. Declining also
+has an emotional aftermath but cannot claim that Pathos performed the response.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

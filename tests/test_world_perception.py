@@ -37,6 +37,7 @@ class WorldPerceptionTests(unittest.TestCase):
         )
         perceptions = [event for event in events if event.kind == "perception.recorded"]
         self.assertEqual({event.payload["owner"] for event in perceptions}, {"pathos", "rowan"})
+        self.assertTrue(all(event.payload["intensity"] == 0.25 for event in perceptions))
         memories = [event for event in events if event.kind == "memory.recorded"]
         self.assertEqual(len(memories), 1)
         self.assertEqual(memories[0].payload["owner"], "pathos")

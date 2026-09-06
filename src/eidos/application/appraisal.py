@@ -215,6 +215,10 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("mastery", 0.08, 0.8, 0.4, 0.9)
     if event.kind == "world_event.occurred":
         return ("curiosity", 0.03, 0.35, 0.5, 0.55)
+    if event.kind == "incident.response_completed":
+        return ("connection", 0.04, 0.45, 0.55, 0.75)
+    if event.kind in {"incident.response_declined", "incident.response_abandoned"}:
+        return ("affect", 0.0, -0.3, 0.45, 0.65)
     if event.kind == "disagreement.expressed":
         return ("affect", 0.0, -0.6, 0.65, 0.55)
     if event.kind == "boundary.stated":

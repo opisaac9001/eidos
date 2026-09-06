@@ -8,6 +8,7 @@ from hashlib import sha256
 from typing import Sequence
 
 from eidos.application.deliveries import active_delivery
+from eidos.application.urgent_incidents import active_incident_location
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.scenes import project_scenes
@@ -60,6 +61,10 @@ def communication_availability(
     if active_delivery(history) is not None:
         return CommunicationAvailability(
             "occupied", "He is answering a delivery at the door.", False, False
+        )
+    if active_incident_location(history, state.simulated_at) is not None:
+        return CommunicationAvailability(
+            "occupied", "He is responding to something nearby.", False, False
         )
     planning = project_planning(list(history))
     now = state.simulated_at
