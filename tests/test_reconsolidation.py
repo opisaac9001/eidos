@@ -131,6 +131,73 @@ class ReconsolidationTests(unittest.TestCase):
         self.assertEqual(len(changed), 1)
         self.assertEqual(changed[0].payload["memory_id"], str(recalled[0].event.event_id))
 
+    def test_two_similar_hazy_memories_can_blend_with_both_accesses_preserved(self):
+        first = self.memory()
+        second = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I watched Mara set a blue mug on the window sill that morning.",
+                "simulated_at": (self.now - timedelta(days=125)).isoformat(),
+                "owner": "pathos",
+                "importance": 0.35,
+                "confidence": 1.0,
+                "person_id": "mara",
+                "location_id": "cafe",
+            },
+        )
+        recalled = recall([first, second], "Mara blue cup window", self.now)
+        accesses = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {"memory_id": str(item.event.event_id), "simulated_at": self.now.isoformat()},
+            )
+            for item in recalled
+        ]
+
+        changed = reconsolidation_events([first, second, *accesses], recalled, self.now)
+
+        self.assertEqual(changed[0].payload["drift_kind"], "similarity_blend")
+        self.assertEqual(changed[0].payload["blended_memory_id"], str(recalled[1].event.event_id))
+        self.assertIn("I also picture", changed[0].payload["recalled_text"])
+        state = project_recollections([first, second, *accesses, *changed])
+        subjective = state.latest[str(recalled[0].event.event_id)]
+        self.assertEqual(
+            subjective.blended_memory_ids, (str(changed[0].payload["blended_memory_id"]),)
+        )
+        self.assertEqual(first.payload["text"], self.memory().payload["text"])
+
+    def test_related_memory_is_not_blended_without_a_current_access(self):
+        first = self.memory()
+        second = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I watched Mara set a blue mug on the window sill that morning.",
+                "simulated_at": (self.now - timedelta(days=125)).isoformat(),
+                "owner": "pathos",
+                "importance": 0.35,
+                "confidence": 1.0,
+                "person_id": "mara",
+                "location_id": "cafe",
+            },
+        )
+        recalled = recall([first, second], "Mara blue cup window", self.now)
+        primary_access = DomainEvent(
+            "memory.accessed",
+            "pathos",
+            {
+                "memory_id": str(recalled[0].event.event_id),
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        changed = reconsolidation_events([first, second, primary_access], recalled, self.now)
+
+        self.assertNotIn("blended_memory_id", changed[0].payload)
+        self.assertNotEqual(changed[0].payload["drift_kind"], "similarity_blend")
+
     def test_reconsolidation_cannot_cite_an_unrelated_recall(self):
         memory = self.memory()
         access = DomainEvent(

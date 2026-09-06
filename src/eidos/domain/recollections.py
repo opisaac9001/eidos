@@ -18,6 +18,7 @@ class Recollection:
     confidence: float
     detail_level: str
     affective_bias: float
+    blended_memory_ids: tuple[str, ...]
     changed_at: datetime
 
 
@@ -31,7 +32,7 @@ class RecollectionState:
 
 def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
     sources: dict[str, float] = {}
-    accesses: dict[str, str] = {}
+    accesses: dict[str, tuple[str, str | None]] = {}
     used_accesses: set[str] = set()
     latest: dict[str, Recollection] = {}
     for event in events:
@@ -40,13 +41,18 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
         elif event.kind == "memory.accessed":
             memory_id = event.payload.get("memory_id")
             if isinstance(memory_id, str):
-                accesses[str(event.event_id)] = memory_id
+                raw_time = event.payload.get("simulated_at")
+                accesses[str(event.event_id)] = (
+                    memory_id,
+                    raw_time if isinstance(raw_time, str) else None,
+                )
         elif event.kind == "memory.reconsolidated":
             memory_id = _required(event, "memory_id")
             if memory_id not in sources:
                 raise ValueError("Reconsolidation requires an existing Pathos memory")
+            changed_at = _aware(event, "simulated_at")
             cause = str(event.causation_id) if event.causation_id is not None else ""
-            if accesses.get(cause) != memory_id:
+            if not _access_matches(accesses.get(cause), memory_id, changed_at):
                 raise ValueError("Reconsolidation must be caused by recall of the same memory")
             if cause in used_accesses:
                 raise ValueError("A memory access can cause only one reconsolidation")
@@ -67,7 +73,22 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
             if event.payload.get("epistemic_status") != "subjective_recollection":
                 raise ValueError("Reconsolidation must remain explicitly subjective")
             affective_bias = _signed_level(event.payload.get("affective_bias", 0.0))
-            changed_at = _aware(event, "simulated_at")
+            blended_memory_ids = _blended_sources(event)
+            blend_access = event.payload.get("blend_access_id")
+            if blended_memory_ids:
+                if len(blended_memory_ids) != 1:
+                    raise ValueError("A recollection can blend at most one related memory")
+                blended_id = blended_memory_ids[0]
+                if blended_id == memory_id or blended_id not in sources:
+                    raise ValueError("A blend requires a different existing Pathos memory")
+                if not isinstance(blend_access, str) or not _access_matches(
+                    accesses.get(blend_access), blended_id, changed_at, require_time=True
+                ):
+                    raise ValueError("A blend must cite recall of its related memory")
+                if blend_access in used_accesses or blend_access == cause:
+                    raise ValueError("A memory access can contribute to only one reconsolidation")
+            elif blend_access is not None:
+                raise ValueError("A blend access requires a blended memory")
             if prior is not None and changed_at < prior.changed_at:
                 raise ValueError("Reconsolidation time cannot move backwards")
             latest[memory_id] = Recollection(
@@ -77,9 +98,12 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 confidence,
                 detail_level,
                 affective_bias,
+                blended_memory_ids,
                 changed_at,
             )
             used_accesses.add(cause)
+            if isinstance(blend_access, str):
+                used_accesses.add(blend_access)
     return RecollectionState(latest)
 
 
@@ -115,6 +139,33 @@ def _signed_level(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not -1 <= value <= 1:
         raise ValueError("Recollection affective bias must be between negative and positive one")
     return float(value)
+
+
+def _blended_sources(event: DomainEvent) -> tuple[str, ...]:
+    value = event.payload.get("blended_memory_id")
+    if value is None:
+        return ()
+    if not isinstance(value, str) or not value:
+        raise ValueError("Blended memory id must be a non-empty string")
+    return (value,)
+
+
+def _access_matches(
+    access: tuple[str, str | None] | None,
+    memory_id: str,
+    changed_at: datetime,
+    *,
+    require_time: bool = False,
+) -> bool:
+    if access is None or access[0] != memory_id:
+        return False
+    if access[1] is None:
+        return not require_time
+    try:
+        accessed_at = datetime.fromisoformat(access[1])
+    except ValueError:
+        return False
+    return accessed_at.utcoffset() is not None and accessed_at == changed_at
 
 
 def _aware(event: DomainEvent, key: str) -> datetime:

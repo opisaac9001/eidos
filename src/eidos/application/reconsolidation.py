@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from eidos.application.memory import RecalledMemory
+from eidos.application.memory import RecalledMemory, terms
 from eidos.domain.events import DomainEvent
 from eidos.domain.recollections import project_recollections
 
@@ -21,11 +21,15 @@ def reconsolidation_events(
     state = project_recollections(history)
     affective_bias = _current_affect(history, at)
     output: list[DomainEvent] = []
-    already_used = {
-        str(event.causation_id)
-        for event in history
-        if event.kind == "memory.reconsolidated" and event.causation_id is not None
-    }
+    already_used: set[str] = set()
+    for event in history:
+        if event.kind != "memory.reconsolidated":
+            continue
+        if event.causation_id is not None:
+            already_used.add(str(event.causation_id))
+        blend_access_id = event.payload.get("blend_access_id")
+        if isinstance(blend_access_id, str):
+            already_used.add(blend_access_id)
     for item in recalled:
         if item.detail_level not in {"partial", "vague"}:
             continue
@@ -33,41 +37,55 @@ def reconsolidation_events(
         prior = state.latest.get(memory_id)
         if prior is not None and at - prior.changed_at < _COOLDOWN:
             continue
-        access = next(
-            (
-                event
-                for event in reversed(history)
-                if event.kind == "memory.accessed"
-                and event.payload.get("memory_id") == memory_id
-                and str(event.event_id) not in already_used
-            ),
-            None,
-        )
+        access = _unused_access(history, memory_id, already_used, at)
         if access is None:
             continue
+        companion = _blend_candidate(item, recalled)
+        blend_access = (
+            _unused_access(history, str(companion.event.event_id), already_used, at)
+            if companion is not None
+            else None
+        )
+        if companion is not None and blend_access is None:
+            companion = None
         revision = prior.revision + 1 if prior else 1
         source_confidence = float(item.event.payload.get("confidence", 1.0))
         confidence = min(
             prior.confidence if prior else source_confidence,
             max(0.15, item.accessibility * (0.94**revision)),
         )
+        payload: dict[str, object] = {
+            "memory_id": memory_id,
+            "revision": revision,
+            "recalled_text": _drift_text(
+                item.recalled_text,
+                item.detail_level,
+                revision,
+                affective_bias,
+                companion.recalled_text if companion is not None else None,
+            ),
+            "confidence": round(confidence, 4),
+            "detail_level": item.detail_level,
+            "affective_bias": round(affective_bias, 4),
+            "drift_kind": (
+                "similarity_blend"
+                if companion is not None
+                else "gist_only"
+                if item.detail_level == "vague"
+                else "detail_loss"
+            ),
+            "epistemic_status": "subjective_recollection",
+            "simulated_at": at.isoformat(),
+        }
+        if blend_access is not None:
+            payload["blend_access_id"] = str(blend_access.event_id)
+        if companion is not None:
+            payload["blended_memory_id"] = str(companion.event.event_id)
         output.append(
             DomainEvent(
                 "memory.reconsolidated",
                 "pathos",
-                {
-                    "memory_id": memory_id,
-                    "revision": revision,
-                    "recalled_text": _drift_text(
-                        item.recalled_text, item.detail_level, revision, affective_bias
-                    ),
-                    "confidence": round(confidence, 4),
-                    "detail_level": item.detail_level,
-                    "affective_bias": round(affective_bias, 4),
-                    "drift_kind": "gist_only" if item.detail_level == "vague" else "detail_loss",
-                    "epistemic_status": "subjective_recollection",
-                    "simulated_at": at.isoformat(),
-                },
+                payload,
                 causation_id=access.event_id,
                 correlation_id=f"recollection-{memory_id}",
             )
@@ -80,7 +98,13 @@ def reconsolidation_events(
     return output
 
 
-def _drift_text(text: str, detail_level: str, revision: int, affective_bias: float) -> str:
+def _drift_text(
+    text: str,
+    detail_level: str,
+    revision: int,
+    affective_bias: float,
+    blended_text: str | None,
+) -> str:
     clause = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
     clause = re.sub(r"^I remember\s+", "", clause, flags=re.IGNORECASE).strip()
     if detail_level == "vague":
@@ -89,11 +113,61 @@ def _drift_text(text: str, detail_level: str, revision: int, affective_bias: flo
         drifted = f"I mostly remember {clause.lower()}, though I may be missing the context."
     else:
         drifted = f"I think {clause.lower()}, but the surrounding details no longer feel reliable."
+    if blended_text is not None:
+        blended_clause = re.split(r"[,;.!?]", blended_text, maxsplit=1)[0].strip().lower()
+        blended_clause = re.sub(r"^i (?:mostly )?(?:remember|think)\s+", "", blended_clause)
+        drifted = f"{drifted} I also picture {blended_clause} as part of it."
     if affective_bias <= -0.25:
         return f"{drifted} It feels heavier to me now."
     if affective_bias >= 0.25:
         return f"{drifted} It feels warmer to me now."
     return drifted
+
+
+def _unused_access(
+    history: Sequence[DomainEvent], memory_id: str, used: set[str], at: datetime
+) -> DomainEvent | None:
+    for event in reversed(history):
+        if (
+            event.kind != "memory.accessed"
+            or event.payload.get("memory_id") != memory_id
+            or str(event.event_id) in used
+        ):
+            continue
+        raw_time = event.payload.get("simulated_at")
+        if isinstance(raw_time, str):
+            accessed_at = datetime.fromisoformat(raw_time)
+            if accessed_at.utcoffset() is not None and accessed_at == at:
+                return event
+    return None
+
+
+def _blend_candidate(
+    primary: RecalledMemory, recalled: Sequence[RecalledMemory]
+) -> RecalledMemory | None:
+    primary_terms = terms(primary.recalled_text)
+    best: tuple[float, RecalledMemory] | None = None
+    for candidate in recalled:
+        if candidate.event.event_id == primary.event.event_id or candidate.detail_level not in {
+            "partial",
+            "vague",
+        }:
+            continue
+        candidate_terms = terms(candidate.recalled_text)
+        overlap = len(primary_terms & candidate_terms) / max(
+            1, min(len(primary_terms), len(candidate_terms))
+        )
+        metadata_bonus = 0.0
+        for key, weight in (("person_id", 0.2), ("object_id", 0.2), ("location_id", 0.1)):
+            value = primary.event.payload.get(key)
+            if isinstance(value, str) and value == candidate.event.payload.get(key):
+                metadata_bonus += weight
+        similarity = overlap + metadata_bonus
+        if similarity < 0.35:
+            continue
+        if best is None or similarity > best[0]:
+            best = (similarity, candidate)
+    return best[1] if best is not None else None
 
 
 def _current_affect(history: Sequence[DomainEvent], at: datetime) -> float:

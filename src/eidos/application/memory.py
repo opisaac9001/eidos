@@ -68,6 +68,7 @@ class RecalledMemory:
     recalled_text: str
     detail_level: str
     affective_bias: float
+    blended_memory_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -415,6 +416,7 @@ def recall(
                 MappingProxyType({key: round(value, 4) for key, value in components.items()}),
                 *_render_recollection(event, accessibility, importance, subjective),
                 subjective.affective_bias if subjective is not None else 0.0,
+                subjective.blended_memory_ids if subjective is not None else (),
             )
         )
     ranked.sort(
@@ -519,6 +521,7 @@ def memory_view(
                 "recalled_text": item.recalled_text,
                 "detail_level": item.detail_level,
                 "affective_bias": item.affective_bias,
+                "blended_memory_ids": list(item.blended_memory_ids),
                 "archived": str(event.event_id) in archived,
             }
         )
