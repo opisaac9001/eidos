@@ -293,17 +293,21 @@ def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]
 
 
 def memory_view(history: list[DomainEvent], now: datetime) -> list[dict[str, Any]]:
-    """Return every memory with current accessibility, without rehearsing it."""
+    """Return every Pathos-owned memory with current accessibility, without rehearsal."""
+    owned_count = sum(
+        event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos"
+        for event in history
+    )
     ranked = recall(
         history,
         "",
         now,
-        limit=min(1000, max(1, sum(e.kind == "memory.recorded" for e in history))),
+        limit=min(1000, max(1, owned_count)),
     )
     by_id = {str(item.event.event_id): item for item in ranked}
     views = []
     for event in history:
-        if event.kind != "memory.recorded":
+        if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
             continue
         item = by_id.get(str(event.event_id))
         if item is None:

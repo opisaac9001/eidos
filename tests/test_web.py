@@ -74,6 +74,7 @@ class WebTests(unittest.TestCase):
             if path == "/app.js":
                 self.assertIn(b"function renderPlans()", body)
                 self.assertIn(b"person.plan_scheduled_for", body)
+                self.assertIn(b"state.scenes", body)
             if path == "/api/export":
                 exported = json.loads(body)
                 self.assertEqual(exported["schema"], 2)

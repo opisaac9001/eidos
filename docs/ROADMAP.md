@@ -231,8 +231,8 @@ boundaries and must not rely on emotional coercion.
    index from the beginning.
 2. Broaden NPC goal formation beyond the first community-perception trigger and three
    authored feasible activity profiles while preserving private knowledge boundaries.
-3. Add bounded multi-turn NPC scenes with interruption, exits, topic state, and
-   observer-specific memories.
+3. Expand the new bounded scene lifecycle beyond its first integrated two-turn
+   exchange into model-proposed dialogue and richer interruption/resume policies.
 4. Broaden paced world events, recurring activities, seasons, resource dependencies,
    and project variety without forcing drama.
 5. Add explicit long-run memory archive/retention maintenance and longer soak evidence.

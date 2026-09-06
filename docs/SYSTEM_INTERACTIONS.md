@@ -207,6 +207,12 @@ matching activity must occur on or after its scheduled time to complete it; othe
 the deadline expires. Plan cooldowns bound repetition. These private plans appear only
 in the operator lens and are never inserted into Pathos's context automatically.
 
+Social scenes now have an explicit start, alternating typed turns, mutable topic,
+one-to-six-turn budget, voluntary exit, sourced interruption, and terminal status.
+Private turns create memories only for their audience; public turns also reach
+co-present observers. The first two-turn bench exchange is an authored acceptance
+fixture, while generative multi-turn dialogue remains future work.
+
 ## 8. Dream and reflection feedback loop
 
 1. During waking, track perceived experiences, unfinished concerns and affect.

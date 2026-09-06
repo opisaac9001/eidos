@@ -38,6 +38,7 @@ from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
+from eidos.application.scene_story import bounded_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import authored_community_schedule, due_world_observations
@@ -50,6 +51,7 @@ from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
+from eidos.domain.scenes import project_scenes
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
 from eidos.domain.transfers import project_transfers
@@ -171,6 +173,7 @@ class Life:
         dream_seeds: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
         catch_up_summaries = []
+        npc_memories = []
         concerns = {}
         for event in history:
             payload: dict[str, Any] = {
@@ -229,6 +232,8 @@ class Life:
                 recalls.append(item)
             if event.kind == "memory.consolidated":
                 consolidations.append(item)
+            if event.kind == "memory.recorded" and payload.get("owner", "pathos") != "pathos":
+                npc_memories.append(item)
             if event.kind == "dream.recorded":
                 dreams.append(item)
             if event.kind == "dream.seed_linked":
@@ -318,6 +323,7 @@ class Life:
         memories = memory_view(history, state.simulated_at)
         planning = project_planning(history)
         social = project_social(history)
+        scenes = project_scenes(history)
         beliefs = project_beliefs(history)
         followups = project_followups(history)
         development = project_development(history)
@@ -356,6 +362,7 @@ class Life:
             "locations": LOCATIONS,
             "people": population,
             "npc_states": [vars_for(person) for person in npc_state.people.values()],
+            "npc_memories": npc_memories[-100:],
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
             "goals": [vars_for(goal) for goal in planning.goals.values()],
@@ -366,6 +373,7 @@ class Life:
             "renegotiations": [vars_for(item) for item in renegotiations.offers.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
+            "scenes": [vars_for(item) for item in scenes.scenes.values()],
             "beliefs": [
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id == "pathos"
             ],
@@ -641,6 +649,14 @@ class Life:
             pending.extend(npc_belief_events(history + pending, at))
             pending.extend(
                 relational_arc_events(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    current,
+                    len(history) + len(pending),
+                )
+            )
+            pending.extend(
+                bounded_scene_events(
                     history + pending,
                     {"pathos": state.location_id, **npc_locations},
                     current,

@@ -141,6 +141,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   project; the planner checks
   consent, custody, terms, resources, schedules, open hours, travel buffers,
   abandonment, and renegotiation. General autonomous planning remains future work.
+- A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
+  a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
+  memories. One authored two-turn scene exercises it; generated scene dialogue remains
+  future work.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.

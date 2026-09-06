@@ -40,6 +40,16 @@ class SevenDayAcceptanceTests(unittest.TestCase):
             self.assertTrue(any(item["owner_id"] == "rowan" for item in snapshot["npc_beliefs"]))
             rowan = next(item for item in snapshot["npc_states"] if item["actor_id"] == "rowan")
             self.assertEqual(rowan["plan_status"], "completed")
+            scene = next(
+                item
+                for item in snapshot["scenes"]
+                if item["scene_id"] == "rowan-weathered-bench-scene"
+            )
+            self.assertEqual(
+                (scene["status"], scene["turn_count"], scene["end_reason"]),
+                ("ended", 2, "turn_budget"),
+            )
+            self.assertTrue(any(item["owner"] == "rowan" for item in snapshot["npc_memories"]))
 
             by_id = {str(event.event_id): event for event in history}
             chronicler_links = [event for event in history if event.kind == "summary.source_linked"]

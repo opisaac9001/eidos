@@ -517,6 +517,15 @@ function render(next) {
       },
     )
     .join("");
+  $("npc-states").insertAdjacentHTML(
+    "beforeend",
+    (state.scenes || [])
+      .map(
+        (scene) =>
+          `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`,
+      )
+      .join(""),
+  );
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>
