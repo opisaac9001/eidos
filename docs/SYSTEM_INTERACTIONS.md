@@ -341,9 +341,13 @@ change Mara's trust, or supply a repair skill he has not acquired.
 
 Moira supplies candidate circumstances without choosing from a closed event list.
 The initial contract accepts any concise event type and asks for a specific cause,
-known place, start delay, duration, theme and opportunity. A strict parser, recent
-novelty check and world-event rules decide whether the candidate can become scheduled
-fiction. Generated prose never makes the event occur by itself. The deterministic
+known place, start delay, duration, theme, opportunity, concrete participation, stakes,
+and one known physical resource. The resource must currently be usable and non-depleted
+at that same place. A strict parser, cross-field recent-novelty score and world-event
+rules decide whether the candidate can become scheduled fiction. Accepted metadata and
+its novelty score are source-linked to the schedule. If the resource later moves,
+breaks, or depletes, occurrence is cancelled. Generated prose never makes the event
+occur by itself. The deterministic
 sixteen-event neighborhood pack remains an offline fixture and minimum texture, not
 the production generator's creative boundary.
 

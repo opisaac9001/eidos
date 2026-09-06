@@ -1219,6 +1219,11 @@ class Life:
                         place.place_id: place.name
                         for place in self._world_catalog(history + pending).places.values()
                     },
+                    known_resources={
+                        item.object_id: item.location_id
+                        for item in self._planning(history + pending).objects.values()
+                        if item.condition in {"good", "usable", "repaired"} and item.quantity != 0
+                    },
                 )
             )
             npc_locations = {

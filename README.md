@@ -181,6 +181,12 @@ network authorization; the server remains loopback-only until authenticated depl
   physical community resource at the right place and is cancelled if it becomes
   unavailable. Existing four-resource worlds receive only the twelve missing objects
   during the version-two upgrade.
+- Moira also proposes open-ended event types every few days rather than selecting from
+  that pack. Each proposal must name a currently usable, non-depleted object at the same
+  known place and supply cause, lead time, duration, participation, stakes, theme, and
+  opportunity metadata. Cross-field novelty is scored against recent events. Passing
+  proposals enter the ordinary scheduled-event lifecycle; invalid output produces a
+  visible quiet interval, and later resource loss cancels rather than invents the event.
 - The seed cast and map are no longer hard ceilings. Rare Moira expansion proposals
   can register a new person, useful object, or connected place after strict identity,
   collision, location, route, hours, and layout checks. Existing databases project

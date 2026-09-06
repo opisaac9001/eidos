@@ -234,7 +234,12 @@ def authored_community_schedule(
     if any(item.payload.get("proposal_id") == proposal_id for item in history):
         return []
     resource = project_planning(list(history)).objects.get(resource_id)
-    if resource is None or resource.location_id != location_id or resource.condition != "good":
+    if (
+        resource is None
+        or resource.location_id != location_id
+        or resource.condition not in {"good", "usable", "repaired"}
+        or resource.quantity == 0
+    ):
         return [
             DomainEvent(
                 "world_event.skipped",
@@ -326,6 +331,9 @@ def due_world_observations(
                 "cause",
                 "duration_hours",
                 "generated_fiction",
+                "participation",
+                "stakes",
+                "novelty_score",
             )
             if key in event.payload
         }
@@ -345,7 +353,10 @@ def due_world_observations(
         resource_id = resource_links.get(proposal_id)
         resource = objects.get(resource_id) if resource_id else None
         if resource_id and (
-            resource is None or resource.location_id != location_id or resource.condition != "good"
+            resource is None
+            or resource.location_id != location_id
+            or resource.condition not in {"good", "usable", "repaired"}
+            or resource.quantity == 0
         ):
             output.append(
                 DomainEvent(

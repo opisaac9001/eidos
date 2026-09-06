@@ -157,6 +157,11 @@ class StandInGateway(ModelGateway):
                 ),
             )
             item = palette[choice % len(palette)]
+            resource_id = next(
+                object_id
+                for object_id, resource_location in context["known_resources"].items()
+                if resource_location == item[2]
+            )
             return ModelResponse(
                 content=json.dumps(
                     {
@@ -166,6 +171,9 @@ class StandInGateway(ModelGateway):
                         "cause": item[3],
                         "theme": item[4],
                         "opportunity": item[5],
+                        "participation": f"A present neighbor may {item[5]} without a guaranteed outcome.",
+                        "stakes": "The event may change an ordinary plan or relationship, but need not.",
+                        "resource_id": resource_id,
                         "starts_in_hours": item[6],
                         "intensity": item[7],
                         "duration_hours": item[8],

@@ -106,6 +106,7 @@ class GatewayTests(unittest.TestCase):
                             "season": "winter",
                             "weather": "Clear",
                             "known_locations": ["park"],
+                            "known_resources": {"community-sketch-basket": "park"},
                             "recent_events": [],
                             "permission": "invent fiction",
                             "private_state": "must not pass",

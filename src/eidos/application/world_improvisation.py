@@ -29,6 +29,7 @@ async def improvised_world_events(
     season: str,
     weather: str,
     known_locations: Mapping[str, str] | None = None,
+    known_resources: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Ask Moira periodically; rejection or failure means an ordinary quiet interval."""
     if simulated_at.utcoffset() is None:
@@ -53,12 +54,24 @@ async def improvised_world_events(
             "park": "Willow Square",
         }
     )
+    resources = dict(
+        {
+            "seed-swap-table": "park",
+            "community-repair-kit": "workshop",
+            "shared-tea-service": "cafe",
+            "community-sketch-basket": "park",
+        }
+        if known_resources is None
+        else known_resources
+    )
+    if not resources:
+        return []
     request = ModelRequest(
         capability="moira_event",
-        task_version="1",
+        task_version="2",
         temperature=0.85,
         max_output_tokens=300,
-        output_schema=ambient_output_schema(tuple(locations)),
+        output_schema=ambient_output_schema(tuple(locations), tuple(resources)),
         messages=(
             ModelMessage(
                 "user",
@@ -68,6 +81,7 @@ async def improvised_world_events(
                         "season": season,
                         "weather": weather,
                         "known_locations": locations,
+                        "known_resources": resources,
                         "recent_events": recent,
                         "permission": "Invent new fictional material; do not claim it already happened.",
                     }
@@ -95,9 +109,10 @@ async def improvised_world_events(
         if response.finish_reason != "stop":
             raise ProposalRejected("incomplete", "Moira's proposal was incomplete")
         candidate = parse_ambient_candidate(response.content)
-        validate_ambient_candidate(
+        novelty_score = validate_ambient_candidate(
             candidate,
             known_locations=set(locations),
+            known_resources=resources,
             history=history,
         )
     except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
@@ -190,6 +205,19 @@ async def improvised_world_events(
         )
         output.append(
             DomainEvent(
+                "world_event.resource_linked",
+                "pathos",
+                {
+                    "proposal_id": proposal_id,
+                    "resource_id": candidate.resource_id,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=scheduled.event_id,
+                correlation_id=proposal_id,
+            )
+        )
+        output.append(
+            DomainEvent(
                 "world_event.theme_linked",
                 "pathos",
                 {
@@ -197,8 +225,11 @@ async def improvised_world_events(
                     "event_type": candidate.event_type,
                     "theme": candidate.theme,
                     "opportunity": candidate.opportunity,
+                    "participation": candidate.participation,
+                    "stakes": candidate.stakes,
                     "cause": candidate.cause,
                     "duration_hours": candidate.duration_hours,
+                    "novelty_score": novelty_score,
                     "generated_fiction": True,
                     "simulated_at": simulated_at.isoformat(),
                 },

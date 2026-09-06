@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.world_improvisation import improvised_world_events
 from eidos.application.world_perception import due_world_observations
+from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
 
 
@@ -27,6 +28,20 @@ class FixedGateway:
 class WorldImprovisationTests(unittest.TestCase):
     now = datetime(2026, 1, 7, 18, tzinfo=timezone.utc)
 
+    def resource(self):
+        return DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "shared-tea-service",
+                "name": "Shared tea service",
+                "owner_id": "mara",
+                "custodian_id": "mara",
+                "location_id": "cafe",
+                "condition": "good",
+            },
+        )
+
     def proposal(
         self, description="A visiting mapmaker displays a hand-drawn river atlas in the cafe."
     ):
@@ -38,6 +53,9 @@ class WorldImprovisationTests(unittest.TestCase):
                 "cause": "a missed train leaves an open evening",
                 "theme": "curiosity",
                 "opportunity": "ask about the maps",
+                "participation": "Visitors may ask questions or help annotate a local route.",
+                "stakes": "The mapmaker may leave with gaps in the neighborhood record.",
+                "resource_id": "shared-tea-service",
                 "starts_in_hours": 2,
                 "intensity": 0.3,
                 "duration_hours": 4,
@@ -60,12 +78,17 @@ class WorldImprovisationTests(unittest.TestCase):
         events = self.generate_events(FixedGateway(self.proposal()))
         scheduled = next(event for event in events if event.kind == "world_event.scheduled")
         link = next(event for event in events if event.kind == "world_event.theme_linked")
+        resource = next(event for event in events if event.kind == "world_event.resource_linked")
         self.assertEqual(scheduled.payload["event_kind"], "ambient")
         self.assertEqual(scheduled.payload["source"], "model-fiction-proposal")
         self.assertEqual(link.payload["event_type"], "visiting_mapmaker")
         self.assertTrue(link.payload["generated_fiction"])
+        self.assertGreater(link.payload["novelty_score"], 0.3)
+        self.assertEqual(resource.payload["resource_id"], "shared-tea-service")
         self.assertFalse(any(event.kind == "world_event.occurred" for event in events))
-        due = due_world_observations(events, {"pathos": "cafe"}, self.now + timedelta(hours=2))
+        due = due_world_observations(
+            [self.resource(), *events], {"pathos": "cafe"}, self.now + timedelta(hours=2)
+        )
         occurred = next(event for event in due if event.kind == "world_event.occurred")
         self.assertEqual(occurred.payload["cause"], "a missed train leaves an open evening")
         memory = next(event for event in due if event.kind == "memory.recorded")
@@ -82,6 +105,14 @@ class WorldImprovisationTests(unittest.TestCase):
         events = self.generate_events(StandInGateway())
         self.assertTrue(any(event.kind == "world_event.accepted" for event in events))
         self.assertTrue(any(event.kind == "world_event.theme_linked" for event in events))
+
+    def test_unknown_or_wrong_place_resource_is_rejected_before_world_scheduling(self):
+        proposal = json.loads(self.proposal())
+        proposal["resource_id"] = "missing-resource"
+        events = self.generate_events(FixedGateway(json.dumps(proposal)))
+        failure = next(event for event in events if event.kind == "role.failed")
+        self.assertEqual(failure.payload["error_code"], "unknown_resource")
+        self.assertFalse(any(event.kind == "world_event.scheduled" for event in events))
 
 
 if __name__ == "__main__":

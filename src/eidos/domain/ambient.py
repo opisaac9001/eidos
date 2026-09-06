@@ -17,6 +17,9 @@ AMBIENT_FIELDS = {
     "cause",
     "theme",
     "opportunity",
+    "participation",
+    "stakes",
+    "resource_id",
     "starts_in_hours",
     "intensity",
     "duration_hours",
@@ -32,6 +35,9 @@ class AmbientCandidate:
     cause: str
     theme: str
     opportunity: str
+    participation: str
+    stakes: str
+    resource_id: str
     starts_in_hours: int
     intensity: float
     duration_hours: int
@@ -52,6 +58,9 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
         "cause": 140,
         "theme": 40,
         "opportunity": 40,
+        "participation": 100,
+        "stakes": 100,
+        "resource_id": 80,
     }.items():
         value = raw[field]
         if not isinstance(value, str) or not value.strip() or len(value) > maximum:
@@ -82,14 +91,22 @@ def validate_ambient_candidate(
     candidate: AmbientCandidate,
     *,
     known_locations: set[str],
+    known_resources: Mapping[str, str],
     history: Sequence[DomainEvent],
-) -> None:
+) -> float:
     if candidate.location_id not in known_locations:
         raise ProposalRejected("unknown_location", "Ambient event names an unknown place")
+    if candidate.resource_id not in known_resources:
+        raise ProposalRejected("unknown_resource", "Ambient event names an unknown resource")
+    if known_resources[candidate.resource_id] != candidate.location_id:
+        raise ProposalRejected(
+            "resource_location_mismatch", "Ambient resource is not at the proposed place"
+        )
     description_terms = _terms(candidate.description)
     if len(description_terms) < 3:
         raise ProposalRejected("thin_description", "Ambient event is too vague to ground")
     compared = 0
+    maximum_similarity = 0.0
     for event in reversed(history):
         if event.kind != "world_event.accepted" or event.payload.get("event_kind") != "ambient":
             continue
@@ -98,12 +115,44 @@ def validate_ambient_candidate(
         overlap = len(description_terms & prior) / max(1, len(description_terms | prior))
         if overlap >= 0.65:
             raise ProposalRejected("repetitive_event", "Ambient event repeats recent material")
+        metadata = next(
+            (
+                item
+                for item in reversed(history)
+                if item.kind == "world_event.theme_linked"
+                and item.payload.get("proposal_id") == event.payload.get("proposal_id")
+            ),
+            None,
+        )
+        if metadata is not None:
+            type_match = float(metadata.payload.get("event_type") == candidate.event_type)
+            theme_overlap = _overlap(candidate.theme, str(metadata.payload.get("theme", "")))
+            opportunity_overlap = _overlap(
+                candidate.opportunity, str(metadata.payload.get("opportunity", ""))
+            )
+            maximum_similarity = max(
+                maximum_similarity,
+                0.55 * overlap
+                + 0.15 * type_match
+                + 0.15 * theme_overlap
+                + 0.15 * opportunity_overlap,
+            )
         if compared >= 24:
             break
+    novelty = round(1 - maximum_similarity, 4)
+    if novelty < 0.35:
+        raise ProposalRejected("low_novelty", "Ambient event is too similar across its metadata")
+    return novelty
 
 
 def ambient_output_schema(
     known_location_ids: Sequence[str] = ("home", "cafe", "workshop", "park"),
+    known_resource_ids: Sequence[str] = (
+        "seed-swap-table",
+        "community-repair-kit",
+        "shared-tea-service",
+        "community-sketch-basket",
+    ),
 ) -> Mapping[str, object]:
     return {
         "type": "object",
@@ -114,6 +163,9 @@ def ambient_output_schema(
             "cause": {"type": "string", "minLength": 1, "maxLength": 140},
             "theme": {"type": "string", "minLength": 1, "maxLength": 40},
             "opportunity": {"type": "string", "minLength": 1, "maxLength": 40},
+            "participation": {"type": "string", "minLength": 1, "maxLength": 100},
+            "stakes": {"type": "string", "minLength": 1, "maxLength": 100},
+            "resource_id": {"type": "string", "enum": list(known_resource_ids)},
             "starts_in_hours": {"type": "integer", "minimum": 1, "maximum": 12},
             "intensity": {"type": "number", "minimum": 0.05, "maximum": 1.0},
             "duration_hours": {"type": "integer", "minimum": 1, "maximum": 72},
@@ -125,3 +177,8 @@ def ambient_output_schema(
 
 def _terms(text: str) -> set[str]:
     return {word for word in WORDS.findall(text.lower()) if len(word) > 2}
+
+
+def _overlap(left: str, right: str) -> float:
+    left_terms, right_terms = _terms(left), _terms(right)
+    return len(left_terms & right_terms) / max(1, len(left_terms | right_terms))
