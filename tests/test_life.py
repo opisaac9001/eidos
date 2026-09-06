@@ -225,6 +225,11 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(len(sessions), 2)
         self.assertTrue(all(item["status"] == "completed" for item in sessions))
         self.assertEqual(skill["practice_count"], 2)
+        awl = next(item for item in snapshot["objects"] if item["object_id"] == "bookbinding-awl")
+        self.assertEqual((awl["owner_id"], awl["custodian_id"]), ("ellis", "ellis"))
+        self.assertEqual(
+            [item["status"] for item in snapshot["transfers"]], ["accepted", "accepted"]
+        )
 
     def test_unresolved_concern_seeds_dream_and_bounded_waking_recall(self):
         self.life.advance(24)

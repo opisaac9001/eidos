@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from eidos.application.personal_project import GOAL_ID, personal_project_events
+from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 
 
@@ -12,6 +13,24 @@ class PersonalProjectTests(unittest.TestCase):
         self.assertEqual(planning.goals[GOAL_ID].progress, 0)
         self.assertEqual(len(planning.calendar), 2)
         self.assertEqual(len(planning.intentions), 2)
+        missing = personal_project_events(
+            datetime(2026, 1, 3, 16, tzinfo=timezone.utc), history, "workshop"
+        )
+        self.assertEqual(missing[-1].payload["code"], "missing_resource")
+        history.append(
+            DomainEvent(
+                "object.registered",
+                "bookbinding-awl",
+                {
+                    "object_id": "bookbinding-awl",
+                    "name": "Awl",
+                    "owner_id": "ellis",
+                    "custodian_id": "pathos",
+                    "location_id": "workshop",
+                    "condition": "usable",
+                },
+            )
+        )
 
         first = personal_project_events(
             datetime(2026, 1, 3, 16, tzinfo=timezone.utc), history, "workshop"

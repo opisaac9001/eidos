@@ -274,6 +274,14 @@ def resolve_action(
             return reject("schedule_mismatch", "The target does not match the schedule")
         if schedule.location_id != actor_location_id:
             return reject("wrong_location", "The actor must be at the activity location")
+        if schedule.resource_id is not None:
+            resource = state.objects.get(schedule.resource_id)
+            if resource is None:
+                return reject("missing_resource", "The scheduled resource does not exist")
+            if resource.custodian_id != proposal.actor_id:
+                return reject("resource_unavailable", "The actor does not hold the resource")
+            if resource.location_id != actor_location_id or resource.condition == "broken":
+                return reject("resource_unavailable", "The resource is not usable at this place")
         starts_at = datetime.fromisoformat(schedule.starts_at)
         ends_at = datetime.fromisoformat(schedule.ends_at) if schedule.ends_at else starts_at
         if simulated_at < starts_at:

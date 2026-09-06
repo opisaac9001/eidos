@@ -47,7 +47,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: motivated goals + project progress/completion/audited abandonment | P3 |
-| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments across talk/repair/work/learn/attend | P3 |
+| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments + validated project resource | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/travel buffers/open hours | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption/reschedule, negotiation + atomic project cancellation | P3 |
@@ -60,7 +60,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed routes/open hours | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
-| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
+| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair + consent-based co-present lend/give/return with distinct custody | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans + completed bookbinding project | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted movement/needs/activity + perception-grounded private belief/plan | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather pacing/causes | P5 |

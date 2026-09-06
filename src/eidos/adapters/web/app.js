@@ -54,6 +54,13 @@ const labels = {
   "skill.practiced": "SKILL PRACTICE",
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",
+  "transfer.offered": "OBJECT OFFERED",
+  "transfer.accepted": "OBJECT TRANSFER ACCEPTED",
+  "transfer.declined": "OBJECT TRANSFER DECLINED",
+  "transfer.offer_rejected": "OBJECT OFFER BLOCKED",
+  "transfer.response_rejected": "OBJECT TRANSFER BLOCKED",
+  "object.custody_changed": "OBJECT HANDED OVER",
+  "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -187,8 +194,9 @@ function renderPlace() {
   const people = state.people.filter(
     (p) => p.location_id === place.id && place.id !== "home",
   );
+  const objects = state.objects.filter((item) => item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${!pathosHere && !people.length ? "<p>No one is here at the moment.</p>" : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${!pathosHere && !people.length ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {
@@ -301,7 +309,7 @@ function renderPlans() {
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
         .map(
           (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.resource_id ? ` · needs ${esc(state.objects.find((object) => object.object_id === item.resource_id)?.name || item.resource_id)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
         )
         .join("")
     : empty("The calendar is open.");

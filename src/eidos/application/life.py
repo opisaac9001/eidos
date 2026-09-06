@@ -27,6 +27,7 @@ from eidos.application.inner_life import (
 )
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.npc_cognition import npc_belief_events
+from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.planner import overdue_plan_events
@@ -44,6 +45,7 @@ from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
+from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
@@ -219,6 +221,13 @@ class Life:
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
+                "transfer.offered",
+                "transfer.accepted",
+                "transfer.declined",
+                "transfer.offer_rejected",
+                "transfer.response_rejected",
+                "object.custody_changed",
+                "object.ownership_changed",
             }:
                 feed.append(item)
         npc_state = project_npcs(history, state.simulated_at)
@@ -236,6 +245,7 @@ class Life:
         beliefs = project_beliefs(history)
         followups = project_followups(history)
         development = project_development(history)
+        transfers = project_transfers(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -273,6 +283,7 @@ class Life:
             "commitments": [vars_for(item) for item in planning.commitments.values()],
             "calendar": [vars_for(item) for item in planning.calendar.values()],
             "objects": [vars_for(item) for item in planning.objects.values()],
+            "transfers": [vars_for(item) for item in transfers.offers.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
             "beliefs": [
@@ -486,6 +497,10 @@ class Life:
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
+            object_story = object_story_events(current, history + pending, state.location_id)
+            if object_story:
+                project_planning(history + pending + object_story)
+                pending.extend(object_story)
             personal_project = personal_project_events(
                 current, history + pending, state.location_id
             )

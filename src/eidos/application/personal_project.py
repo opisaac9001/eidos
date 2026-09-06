@@ -118,6 +118,7 @@ def _start_project(
                     "action": ActionKind.LEARN.value,
                     "target_id": TARGET_ID,
                     "goal_id": GOAL_ID,
+                    "resource_id": "bookbinding-awl",
                     "simulated_at": current.isoformat(),
                 },
                 correlation_id=correlation,

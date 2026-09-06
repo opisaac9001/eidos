@@ -45,6 +45,7 @@ class CalendarEntry:
     target_id: str | None = None
     commitment_id: str | None = None
     goal_id: str | None = None
+    resource_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +196,7 @@ class PlanningState:
                     target_id=_optional(payload, "target_id"),
                     commitment_id=_optional(payload, "commitment_id"),
                     goal_id=_optional(payload, "goal_id"),
+                    resource_id=_optional(payload, "resource_id"),
                 )
             case "schedule.interrupted":
                 entry = _existing(calendar, payload, "schedule_id")
@@ -247,6 +249,18 @@ class PlanningState:
             case "object.condition_changed":
                 item = _existing(objects, payload, "object_id")
                 objects[item.object_id] = replace(item, condition=_required(payload, "condition"))
+            case "object.custody_changed":
+                item = _existing(objects, payload, "object_id")
+                if item.custodian_id != _required(payload, "from_custodian_id"):
+                    raise ValueError("Object custody source does not match current state")
+                objects[item.object_id] = replace(
+                    item, custodian_id=_required(payload, "to_custodian_id")
+                )
+            case "object.ownership_changed":
+                item = _existing(objects, payload, "object_id")
+                if item.owner_id != _required(payload, "from_owner_id"):
+                    raise ValueError("Object ownership source does not match current state")
+                objects[item.object_id] = replace(item, owner_id=_required(payload, "to_owner_id"))
             case "intention.adopted":
                 intention_id = _required(payload, "intention_id")
                 if intention_id in intentions:
