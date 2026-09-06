@@ -27,6 +27,7 @@ def relationship_belief_events(
             not isinstance(subject_id, str)
             or isinstance(trust_delta, bool)
             or not isinstance(trust_delta, (int, float))
+            or trust_delta == 0
         ):
             continue
         combined = [*history, *output]

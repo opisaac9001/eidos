@@ -199,6 +199,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   visitors, deliveries, urgency and remembered follow-up. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
+- Ordinary NPC conversations now recur from actual non-home co-presence rather than
+  one authored date. They use only Pathos-observable topics, advance two turns per
+  simulated hour, shift topics, scale their 2/4/6-turn budget with familiarity, end
+  when someone leaves, and permit an early NPC exit under sustained tension.
 - Opt-in in-app outreach, quiet hours, rate limits and an off switch. No guilt,
   pressure or punishment for user absence.
 
@@ -264,8 +268,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Generalize the now-integrated four-turn interruption/resume scene into recurring
-   dialogue policies with topic selection, voluntary exits, and relationship pacing.
+1. Extend recurring dialogue with invitations, visitors, remembered follow-up, and
+   interruption-specific resumptions beyond the completed calls and co-present scenes.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected

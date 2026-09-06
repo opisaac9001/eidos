@@ -51,6 +51,20 @@ class BeliefReviewTests(unittest.TestCase):
         )
         self.assertEqual(relationship_belief_events([legacy], "now"), [])
 
+    def test_neutral_trust_change_is_not_evidence_of_unreliability(self):
+        neutral = DomainEvent(
+            "relationship.changed",
+            "pathos",
+            {
+                "person_id": "rowan",
+                "evidence_actor_id": "pathos",
+                "trust_delta": 0.0,
+                "familiarity_delta": 0.02,
+                "simulated_at": "2026-01-02T13:00:00+00:00",
+            },
+        )
+        self.assertEqual(relationship_belief_events([neutral], "now"), [])
+
     def test_heard_claim_is_discounted_then_direct_evidence_strengthens_it(self):
         perceived = DomainEvent(
             "perception.recorded",

@@ -40,6 +40,7 @@ from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
+from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
@@ -1181,6 +1182,20 @@ class Life:
                 await continuing_scene_events(
                     history + pending,
                     {"pathos": state.location_id, **npc_locations},
+                    current,
+                    len(history) + len(pending),
+                    self.gateway,
+                )
+            )
+            pending.extend(
+                await recurring_dialogue_events(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    {
+                        person.person_id: person.name
+                        for person in self._world_catalog(history + pending).people.values()
+                    },
+                    self._relationships(history + pending).relationships,
                     current,
                     len(history) + len(pending),
                     self.gateway,

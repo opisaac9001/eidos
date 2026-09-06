@@ -282,13 +282,15 @@ class LifeTests(unittest.TestCase):
         self.assertLess(kinds.index("intention.adopted"), kinds.index("action.accepted"))
         self.assertLess(kinds.index("schedule.interrupted"), kinds.index("schedule.completed"))
         self.assertLess(kinds.index("speech.delivered"), kinds.index("schedule.rescheduled"))
-        perceived = next(
-            event for event in self.life.history() if event.kind == "perception.recorded"
-        )
         reported_memory = next(
             event
             for event in self.life.history()
             if event.kind == "memory.recorded" and event.payload.get("source") == "perceived-speech"
+        )
+        perceived = next(
+            event
+            for event in self.life.history()
+            if str(event.event_id) == reported_memory.payload["source_event_id"]
         )
         self.assertEqual(reported_memory.payload["source_event_id"], str(perceived.event_id))
         self.assertEqual(perceived.payload["owner"], "pathos")

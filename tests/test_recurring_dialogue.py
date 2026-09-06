@@ -1,0 +1,83 @@
+import unittest
+from datetime import datetime, timedelta, timezone
+
+from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.recurring_dialogue import recurring_dialogue_events
+from eidos.domain.events import DomainEvent
+from eidos.domain.relationships import Relationship
+from eidos.domain.scenes import project_scenes
+
+
+class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
+    now = datetime(2026, 1, 12, 13, tzinfo=timezone.utc)
+    locations = {"pathos": "park", "rowan": "park", "mara": "cafe"}
+    names = {"rowan": "Rowan", "mara": "Mara"}
+
+    async def test_new_acquaintance_has_a_short_complete_grounded_conversation(self):
+        events = await recurring_dialogue_events(
+            [],
+            self.locations,
+            self.names,
+            {"rowan": Relationship("rowan")},
+            self.now,
+            0,
+            StandInGateway(),
+        )
+        scene = next(iter(project_scenes(events).scenes.values()))
+        self.assertEqual(
+            (scene.turn_count, scene.status, scene.end_reason), (2, "ended", "turn_budget")
+        )
+        self.assertTrue(any(event.kind == "relationship.changed" for event in events))
+        memories = [event for event in events if event.kind == "memory.recorded"]
+        self.assertEqual({event.payload["owner"] for event in memories}, {"pathos", "rowan"})
+
+    async def test_familiar_conversation_continues_across_hours_and_changes_topic(self):
+        perceptions = [
+            DomainEvent(
+                "perception.recorded",
+                "pathos",
+                {
+                    "owner": "pathos",
+                    "location_id": "park",
+                    "topic_id": topic,
+                },
+            )
+            for topic in ("winter-trees", "missing-sign")
+        ]
+        relationship = {"rowan": Relationship("rowan", encounters=20, familiarity=0.9)}
+        history = list(perceptions)
+        for offset in range(3):
+            events = await recurring_dialogue_events(
+                history,
+                self.locations,
+                self.names,
+                relationship,
+                self.now + timedelta(hours=offset),
+                len(history),
+                StandInGateway(),
+            )
+            history.extend(events)
+        scene = next(iter(project_scenes(history).scenes.values()))
+        self.assertEqual((scene.turn_count, scene.status), (6, "ended"))
+        topics = {
+            event.payload["topic_id"] for event in history if event.kind == "scene.turn_taken"
+        }
+        self.assertEqual(topics, {"winter-trees", "missing-sign"})
+
+    async def test_tension_allows_the_other_person_to_leave_before_the_budget(self):
+        events = await recurring_dialogue_events(
+            [],
+            self.locations,
+            self.names,
+            {"rowan": Relationship("rowan", encounters=20, familiarity=0.9, tension=0.8)},
+            self.now,
+            0,
+            StandInGateway(),
+        )
+        scene = next(iter(project_scenes(events).scenes.values()))
+        self.assertEqual((scene.turn_count, scene.status, scene.end_reason), (2, "ended", "left"))
+        self.assertFalse(any(event.kind == "relationship.changed" for event in events))
+
+
+if __name__ == "__main__":
+    unittest.main()

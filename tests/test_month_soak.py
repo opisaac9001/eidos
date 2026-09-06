@@ -126,6 +126,31 @@ class MonthSoakTests(unittest.TestCase):
                 ),
                 ("ended", 4, "turn_budget"),
             )
+            ordinary_scenes = [
+                event
+                for event in events
+                if event.kind == "scene.started"
+                and str(event.payload.get("scene_id", "")).startswith("ordinary-")
+            ]
+            ordinary_turns = [
+                event
+                for event in events
+                if event.kind == "scene.turn_taken"
+                and str(event.payload.get("scene_id", "")).startswith("ordinary-")
+            ]
+            ordinary_ends = [
+                event
+                for event in events
+                if event.kind == "scene.ended"
+                and str(event.payload.get("scene_id", "")).startswith("ordinary-")
+            ]
+            self.assertGreaterEqual(len(ordinary_scenes), 20)
+            self.assertEqual(
+                {event.payload["partner_id"] for event in ordinary_scenes},
+                {"mara", "ellis", "rowan", "nina-vale"},
+            )
+            self.assertGreaterEqual(len({event.payload["topic_id"] for event in ordinary_turns}), 6)
+            self.assertEqual(len(ordinary_ends), len(ordinary_scenes))
             interrupted = next(event for event in events if event.kind == "scene.interrupted")
             resumed = next(event for event in events if event.kind == "scene.resumed")
             self.assertLess(events.index(interrupted), events.index(resumed))
