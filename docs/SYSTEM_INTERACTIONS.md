@@ -390,6 +390,22 @@ memory. Ordinary routines cannot move Eidos away halfway through scheduled work.
 rule is additive, so historical objects without a maintenance event preserve their
 projected condition.
 
+A retirement decision or failed repair may produce one recovery decision. Compatible
+substitutes must share the object's practical kind, remain usable and non-depleted, and
+be physically co-present with both Eidos and their NPC owner. Eidos first decides to
+seek the loan; the owner then independently accepts or declines from their own capacity.
+Acceptance still goes through the normal lend offer and Pathos response, so neither
+custody nor consent is implied. The loan records a due time, and return uses the same
+transfer resolver only after borrower, owner, and object meet again; until then custody
+truthfully remains with Eidos.
+
+Without a viable loan, reliability and stable inclination choose replacement or living
+without the object. Replacement ordering does not change the old object. A delayed
+handoff succeeds only at the object's place, retries once after absence, and then cancels.
+Receipt registers a new object ID with `replacement_for` provenance while the original
+condition stays broken or retired. Thus continuity queries can distinguish two physical
+objects even when one functionally succeeds the other.
+
 Consumability is explicit object state, never inferred for every object. Qualifying
 delivered supplies register a non-negative quantity, reorder point, and unit; legacy
 objects retain null stock fields. When awake at the object's location, Pathos makes one

@@ -196,6 +196,11 @@ network authorization; the server remains loopback-only until authenticated depl
   and maintenance choice. Eidos may retire it rather than silently committing to repair.
   If he tries, he must remain at the site through the repair interval, and the attempt
   can still fail against his present mastery; only success makes the object usable again.
+  After retirement or failed repair, he may live without it, seek a compatible loan,
+  or order a replacement. Loans require owner/object/Pathos co-presence, independent
+  owner consent, Pathos's acceptance, custody tracking, and eventual co-present return.
+  Replacements have two fallible handoffs and arrive under a new identity while the
+  original remains broken or retired.
 - Delivered seeds, repair materials, drawing paper, and tea are finite stocks rather
   than decorative names. Pathos may use or save one when awake and co-located with it.
   Low stock produces an explicit order-or-go-without choice; an order has a delayed

@@ -40,6 +40,7 @@ from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_eve
 from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_maintenance import object_maintenance_events
 from eidos.application.object_opportunities import object_opportunity_events
+from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
@@ -631,6 +632,16 @@ class Life:
                 "object.maintenance_decided",
                 "object.repair_attempted",
                 "object.repair_failed",
+                "object.recovery_decided",
+                "object.loan_requested",
+                "object.loan_request_accepted",
+                "object.loan_request_declined",
+                "object.recovery_loaned",
+                "object.recovery_loan_returned",
+                "object.replacement_ordered",
+                "object.replacement_missed",
+                "object.replacement_received",
+                "object.replacement_cancelled",
                 "object.consumption_decided",
                 "object.consumed",
                 "object.stock_changed",
@@ -1650,6 +1661,26 @@ class Life:
             if supply:
                 self._planning(history + pending + supply)
                 pending.extend(supply)
+            recovery_people = project_npcs(history + pending, current).people
+            recovery = object_recovery_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                self._planning(history + pending),
+                pathos_awake=state.awake,
+                actor_locations={
+                    "pathos": state.location_id,
+                    **{
+                        person_id: person.location_id
+                        for person_id, person in recovery_people.items()
+                    },
+                },
+                npc_people=recovery_people,
+                values=project_identity(history + pending).values,
+            )
+            if recovery:
+                self._planning(history + pending + recovery)
+                pending.extend(recovery)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),

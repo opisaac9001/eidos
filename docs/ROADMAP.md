@@ -55,6 +55,12 @@ that does not justify the time and effort. A chosen repair can fail against pres
 mastery, leaving the condition broken and resolving its schedule, intention, goal, and
 setback memory honestly. This creates a reusable causal loop from discovery through
 use, social consequence, wear, judgment, and imperfect care.
+Retirement or repair failure now opens a separate recovery choice: live without the
+object, seek a compatible substitute, or order a replacement. A substitute loan needs
+the owner, Eidos, and the object co-present; the owner independently accepts or declines,
+Eidos explicitly accepts custody, and return waits for later co-presence. A replacement
+has delayed fallible handoffs and registers as a distinct object, preserving the old
+object and its history instead of laundering condition through an identity swap.
 Selected delivered supplies now carry an explicit quantity, unit, and low-stock point.
 Ordinary co-located use decrements stock; Pathos can instead save it. Low stock creates
 an order-or-go-without decision, and ordered stock arrives after a delay with one retry
@@ -308,8 +314,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Let a retired or unsuccessfully repaired object motivate a grounded borrow-or-replace
-   choice, with consent, acquisition delay, and no identity-swapping shortcuts.
+1. Let replacement objects and borrowed substitutes enter later projects, with explicit
+   utility matching, loan-duration pressure, and consequences for overdue returns.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
