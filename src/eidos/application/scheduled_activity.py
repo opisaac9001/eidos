@@ -222,6 +222,7 @@ def scheduled_activity_events(
                     {
                         "schedule_id": entry.schedule_id,
                         "activity_type": entry.activity_type,
+                        "action": action.value,
                         "title": entry.title,
                         "companion_id": entry.companion_id,
                         "location_id": entry.location_id,

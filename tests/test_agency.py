@@ -153,6 +153,7 @@ class AgencyTests(unittest.TestCase):
                 needs={"rest": 0.7, "connection": 0.4, "curiosity": 0.8},
                 emotion={"label": "quiet", "valence": 0.1},
                 values={"curiosity": 0.8},
+                preferences=("quiet mornings",),
                 memories=["I noticed rain collecting on the old bench."],
             )
         )

@@ -19,9 +19,9 @@ ROLE_PROMPTS = {
     "chronicler": "Summarize only the supplied memories in two sentences. Do not invent events, people, places, or causality.",
     "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Choose one supplied physical resource at that same location, and describe concrete participation, stakes, and an opportunity without claiming consequences or completed actions. External signals, when supplied, are attributed creative inspiration rather than facts about the fictional town. This is a proposal, not a fact.",
     "moira_expansion": "Act as a restrained but imaginative world builder. Propose one genuinely new person, useful object, or reachable neighborhood place that could support many future stories. Avoid duplicates and generic fantasy spectacle. Return a proposal only; registration rules decide whether it exists.",
-    "pathos_agency": "Propose one specific ordinary activity Pathos might freely choose from his needs, emotion, values, memories, known places, usable objects, people, and calendar. Prefer fresh combinations over a fixed routine. The open-vocabulary activity_type describes its meaning; action is only the safe execution mechanism. Do not claim it happened, guarantee a companion, spend money, or create facts or possessions.",
+    "pathos_agency": "Propose one specific ordinary activity Pathos might freely choose from his needs, emotion, values, slowly learned preferences, memories, known places, usable objects, people, and calendar. Preferences are influences rather than commands; prefer fresh combinations over a fixed routine. The open-vocabulary activity_type describes its meaning; action is only the safe execution mechanism. Do not claim it happened, guarantee a companion, spend money, or create facts or possessions.",
     "npc_agency": "Propose one specific ordinary private plan for the supplied resident, grounded only in that resident's identity, needs, and private context plus public known places. Use open-vocabulary activity and action slugs. Do not borrow Pathos's memories, claim success, spend money, create property, or control another person.",
-    "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, memories, known places, usable objects, and calendar. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
+    "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, slowly learned preferences, memories, known places, usable objects, and calendar. Preferences are influences rather than commands. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
 }
 
 ROLE_FIELDS = {
@@ -68,6 +68,7 @@ ROLE_FIELDS = {
         "needs",
         "emotion",
         "values",
+        "preferences",
         "recent_memories",
         "known_places",
         "usable_resources",
@@ -89,6 +90,7 @@ ROLE_FIELDS = {
         "needs",
         "emotion",
         "values",
+        "preferences",
         "recent_memories",
         "known_places",
         "usable_resources",

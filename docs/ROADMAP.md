@@ -88,7 +88,13 @@ narrow class of value/capacity-aware social choices; NPCs have persistent offscr
 locations, needs, private beliefs, activities, and perception- or need-driven private
 goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
 Need-driven choices now record all three competing levels and their selected priority;
-critical exhaustion can interrupt and causally replace a lower-priority private plan
+repeated successfully realized voluntary activities also create evidence-backed learned
+preferences only after three choices span at least seven days. At most one preference
+changes in fourteen days, only five learned preferences may coexist, and 120 days of
+behavioral disuse retires one without altering the character-pack identity. Active
+preferences are visible and feed subsequent activity and project proposals as soft
+influences rather than scripts.
+Critical exhaustion can interrupt and causally replace a lower-priority private plan
 without making ordinary fluctuations rewrite the day. Shared familiarity can make a
 connection need more attractive, but Pathos's one-sided trust is never treated as
 proof of an NPC's hidden reciprocal feeling. The authored opening uses person-specific,
@@ -283,8 +289,8 @@ Beautiful prose with contradictory consequences does not pass.
 
 Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 
-- Tune saturation, retrieval bias, emotional feedback, trait drift, relationship
-  recovery, skills, habits, recurring events and ongoing projects.
+- Tune saturation, retrieval bias, emotional feedback, remaining trait drift,
+  relationship recovery, skills, habits, recurring events and ongoing projects.
 - Versioned world/character packs with validated seeds; controlled content expansion.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.

@@ -494,6 +494,23 @@ commitment deadlines, sleep, resource accounting and causal order. If the budget
 is exhausted, stop at a coherent checkpoint and report the remaining interval.
 Cancellation keeps completed batches and prevents later unapproved catch-up work.
 
+### Preferences emerge from a life rather than prose
+
+Character-pack values and initial preferences remain stable identity. A learned
+preference can arise only from authoritative `agency.activity_realized` events: at
+least three distinct self-chosen activities must support the same broad action or
+place affinity across seven simulated days. Free-form thoughts, conversations,
+reflections, dreams, and model claims are never preference evidence.
+
+An evening review may make at most one change per fourteen simulated days, with no
+more than five learned preferences active. The emergence event cites every sampled
+source event and replay checks that each source actually supports the exact label.
+Active preferences return to later activity and multi-day-project performers as soft
+context; feasibility, commitments, needs, emotion, novelty, and consent still decide
+what can happen. If no supporting voluntary behavior recurs for 120 days, a sourced
+retirement removes only that learned preference. The default character pack is never
+silently edited. Both changes remain in the event history and are shown in the feed.
+
 ## 10. Failure, safety and inference boundaries
 
 - Queue jobs only from committed state, or use an atomic outbox. Input snapshots

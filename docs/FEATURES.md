@@ -35,12 +35,12 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: persisted sourced values/preferences + bounded context | P2 |
+| SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: persisted sourced values + default and evidence-developed preferences in bounded context | P2 |
 | SELF-02 | Multidimensional affect, named emotion, duration, appraisal, episodes and baseline mood | Partial: replayable emotion samples, prolonged-low tracking, source-linked valence/arousal episodes + recovery | P2 |
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
 | SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows | P3 |
-| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair/bookbinding skills + morning habit | P6 |
+| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair/bookbinding skills, morning habit, and capped week-spanning behavioral preference emergence/retirement | P6 |
 
 ## Planning and time — Chronos / Pathos
 

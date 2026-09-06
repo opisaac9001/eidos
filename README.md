@@ -43,6 +43,10 @@ project, and resident agency can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
+Repeated voluntary choices can now form a small number of learned preferences only
+after evidence spans at least a simulated week. Those preferences influence later
+activity and project proposals, appear in the Observatory, and fade only after long
+behavioral disuse; generated prose cannot rewrite personality directly.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the

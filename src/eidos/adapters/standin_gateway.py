@@ -513,7 +513,9 @@ class StandInGateway(ModelGateway):
                     "location_id": step[3] if step[3] in known_places else "home",
                     "resource_id": "none",
                     "day_offset": step[4],
-                    "scheduled_hour": 14,
+                    # Morning keeps this integration fixture clear of the afternoon
+                    # follow-ups and other emergent plans already in a mature calendar.
+                    "scheduled_hour": 8,
                     "duration_hours": 2,
                 }
                 for step in project[3]

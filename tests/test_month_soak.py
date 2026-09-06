@@ -130,6 +130,9 @@ class MonthSoakTests(unittest.TestCase):
                 {str(event.payload["proposal_id"]) for event in terminal_projects},
                 project_ids,
             )
+            emerged_preferences = [event for event in events if event.kind == "preference.emerged"]
+            self.assertTrue(emerged_preferences)
+            self.assertGreater(len(snapshot["identity"]["preferences"]), 3)
             priorities = [event for event in events if event.kind == "npc.priority_evaluated"]
             self.assertEqual(
                 {event.payload["actor_id"] for event in priorities},

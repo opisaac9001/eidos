@@ -183,6 +183,7 @@ class SelfProjectTests(unittest.TestCase):
                 needs={"curiosity": 0.8, "mastery": 0.5},
                 emotion={"label": "quiet"},
                 values={"curiosity": 0.8},
+                preferences=("quiet mornings",),
                 memories=["The workshop sounded different in the rain."],
             )
         )

@@ -53,6 +53,7 @@ from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
+from eidos.application.preference_development import preference_development_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
@@ -648,6 +649,8 @@ class Life:
                 "follow_up.completed",
                 "skill.practiced",
                 "habit.reinforced",
+                "preference.emerged",
+                "preference.retired",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -1075,6 +1078,7 @@ class Life:
             pending.extend(recovery)
             project_history = history + pending
             project_feeling = project_emotion(project_history)
+            project_identity_state = project_identity(project_history)
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1095,7 +1099,8 @@ class Life:
                     "arousal": project_feeling.arousal,
                     "sustained_low_hours": project_feeling.sustained_low_hours,
                 },
-                values=project_identity(project_history).values,
+                values=project_identity_state.values,
+                preferences=project_identity_state.preferences,
                 memories=[
                     str(event.payload["text"])
                     for event in project_history
@@ -1108,6 +1113,7 @@ class Life:
                 pending.extend(project_events)
             agency_history = history + pending
             current_emotion = project_emotion(agency_history)
+            agency_identity = project_identity(agency_history)
             agency = await autonomous_activity_events(
                 agency_history,
                 current,
@@ -1128,7 +1134,8 @@ class Life:
                     "arousal": current_emotion.arousal,
                     "sustained_low_hours": current_emotion.sustained_low_hours,
                 },
-                values=project_identity(agency_history).values,
+                values=agency_identity.values,
+                preferences=agency_identity.preferences,
                 memories=[
                     str(event.payload["text"])
                     for event in agency_history
@@ -1526,6 +1533,7 @@ class Life:
                 )
             )
             pending.extend(development_events(history + pending, at))
+            pending.extend(preference_development_events(history + pending, current))
             overdue = overdue_plan_events(self._planning(history + pending), current)
             if overdue:
                 self._planning(history + pending + overdue)

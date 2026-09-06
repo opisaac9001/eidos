@@ -32,6 +32,7 @@ async def autonomous_activity_events(
     needs: Mapping[str, float],
     emotion: Mapping[str, object],
     values: Mapping[str, float],
+    preferences: Sequence[str],
     memories: Sequence[str],
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""
@@ -71,6 +72,7 @@ async def autonomous_activity_events(
         "needs": dict(needs),
         "emotion": dict(emotion),
         "values": dict(values),
+        "preferences": list(preferences),
         "recent_memories": list(memories[-8:]),
         "known_places": places,
         "usable_resources": resources,

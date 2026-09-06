@@ -209,6 +209,7 @@ async def _agency_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
         "needs": {"rest": 0.65, "connection": 0.42, "curiosity": 0.78, "mastery": 0.51},
         "emotion": {"label": ("quiet", "contentment", "melancholy")[run % 3]},
         "values": {"curiosity": 0.8, "care": 0.7},
+        "preferences": ["quiet mornings"],
         "recent_memories": [
             "I noticed rain collecting on the old bench.",
             "Ellis showed me a carefully repaired wooden joint.",
@@ -319,6 +320,7 @@ async def _self_project_sample(gateway: ModelGateway, run: int) -> dict[str, obj
         needs={"curiosity": 0.78, "mastery": 0.52, "connection": 0.48},
         emotion={"label": ("quiet", "contentment", "melancholy")[run % 3]},
         values={"curiosity": 0.8, "care": 0.7},
+        preferences=("quiet mornings",),
         memories=["The workshop sounded different in the rain."],
     )
     trace = next(
