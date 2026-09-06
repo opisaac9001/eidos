@@ -33,7 +33,7 @@ from eidos.application.inner_life import (
 )
 from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
-from eidos.application.npc_cognition import npc_belief_events
+from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
@@ -748,6 +748,7 @@ class Life:
                 )
             )
             pending.extend(npc_belief_events(history + pending, at))
+            pending.extend(npc_need_plan_events(history + pending, at))
             pending.extend(
                 relational_arc_events(
                     history + pending,

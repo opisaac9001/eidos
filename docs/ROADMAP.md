@@ -44,9 +44,10 @@ and a bounded source-linked factual recap. Lexical recall includes importance,
 simulated-time fading and capped rehearsal. Normal CLI and browser model calls use
 supervised durable workers and reuse completed work after restart. Pathos makes a
 narrow class of value/capacity-aware social choices; NPCs have persistent offscreen
-locations, needs, private beliefs, activities, and actor-specific private plans with
-cooldowns, deadlines, and activity-validated outcomes rather than general autonomous
-planning. Term, entity, goal, relationship, and rehearsal recall indexes now persist
+locations, needs, private beliefs, activities, and perception- or need-driven private
+goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
+Their option vocabulary remains bounded rather than generally autonomous. Term,
+entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Other
 projections, including beliefs and consolidation, still rebuild from event history.
 
@@ -234,8 +235,8 @@ boundaries and must not rely on emotional coercion.
 
 1. Extend materialization beyond the completed incremental memory index into the
    remaining high-cost belief, planning, relationship, and consolidation projections.
-2. Broaden NPC goal formation beyond the first community-perception trigger and three
-   authored feasible activity profiles while preserving private knowledge boundaries.
+2. Expand the completed perception- and need-driven NPC goal loop with more personal
+   projects, competing priorities, interruption, and relationship-motivated choices.
 3. Expand the new bounded scene lifecycle beyond its first integrated two-turn
    performer-driven exchange into richer dialogue policies and interruption/resume.
 4. Expand the new seasonal, resource-backed neighborhood rhythm into a broad palette

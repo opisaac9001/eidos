@@ -176,6 +176,44 @@ class OffscreenWorldTests(unittest.TestCase):
         on_time = npc_world_events([plan, *early], tomorrow)
         self.assertTrue(any(event.kind == "npc.plan_completed" for event in on_time))
 
+    def test_need_goal_resolves_only_after_its_plan_activity(self):
+        goal = DomainEvent(
+            "npc.goal_formed",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "goal_id": "rowan-rest-goal",
+                "title": "Rest",
+                "motivation": "low energy",
+                "owner": "rowan",
+                "visibility": "private",
+            },
+        )
+        plan = DomainEvent(
+            "npc.plan_created",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "plan_id": "rowan-rest-plan",
+                "goal_id": "rowan-rest-goal",
+                "title": "Rest",
+                "action": "rest",
+                "location_id": "home",
+                "owner": "rowan",
+                "visibility": "private",
+            },
+            causation_id=goal.event_id,
+        )
+        midnight = self.now.replace(hour=0) + timedelta(days=1)
+        events = npc_world_events([goal, plan], midnight)
+        completed = next(event for event in events if event.kind == "npc.plan_completed")
+        achieved = next(event for event in events if event.kind == "npc.goal_achieved")
+        self.assertEqual(achieved.causation_id, completed.event_id)
+        self.assertEqual(
+            project_npcs([goal, plan, *events], midnight).people["rowan"].goal_status,
+            "achieved",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

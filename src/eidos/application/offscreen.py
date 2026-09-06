@@ -62,6 +62,23 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             )
             output.append(expired)
             state = state.apply(expired)
+            if current.plan_goal_id is not None:
+                abandoned = DomainEvent(
+                    "npc.goal_abandoned",
+                    "pathos",
+                    {
+                        "actor_id": actor_id,
+                        "goal_id": current.plan_goal_id,
+                        "reason": "the supporting plan expired",
+                        "owner": actor_id,
+                        "visibility": "private",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=expired.event_id,
+                    correlation_id=expired.correlation_id,
+                )
+                output.append(abandoned)
+                state = state.apply(abandoned)
             current = state.people[actor_id]
         if simulated_at.hour not in {0, 6, 12, 18}:
             continue
@@ -121,6 +138,22 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             )
             output.append(completed)
             state = state.apply(completed)
+            if current.plan_goal_id is not None:
+                achieved = DomainEvent(
+                    "npc.goal_achieved",
+                    "pathos",
+                    {
+                        "actor_id": actor_id,
+                        "goal_id": current.plan_goal_id,
+                        "owner": actor_id,
+                        "visibility": "private",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=completed.event_id,
+                    correlation_id=completed.correlation_id,
+                )
+                output.append(achieved)
+                state = state.apply(achieved)
     return output
 
 

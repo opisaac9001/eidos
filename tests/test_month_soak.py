@@ -56,6 +56,25 @@ class MonthSoakTests(unittest.TestCase):
                 {"mara", "ellis", "rowan"},
             )
             self.assertEqual(
+                {
+                    event.payload["actor_id"]
+                    for event in events
+                    if event.kind == "npc.plan_created"
+                    and event.payload.get("motivation_need") is not None
+                },
+                {"mara", "ellis", "rowan"},
+            )
+            self.assertEqual(
+                {event.payload["actor_id"] for event in events if event.kind == "npc.goal_formed"},
+                {"mara", "ellis", "rowan"},
+            )
+            self.assertTrue(
+                all(
+                    person["goal_status"] in {"active", "achieved", "abandoned"}
+                    for person in snapshot["npc_states"]
+                )
+            )
+            self.assertEqual(
                 {item["owner_id"] for item in snapshot["npc_beliefs"]},
                 {"mara", "ellis", "rowan"},
             )

@@ -135,9 +135,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - Offline chat uses templates; model mode uses the configured HTTP endpoint and
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
-- NPC movement, needs, private activity, a causal promise/repair story, public-event
-  perception, private beliefs, three actor-specific bounded plan profiles, and
-  relationship metrics persist by replay. Pathos completes a resource-backed personal
+- NPC movement, needs, private activity, public-event perception, private beliefs,
+  relationship metrics, and private goals formed from each neighbor's own perceived
+  events or changing needs persist by replay. Pathos completes a causal promise/repair
+  story and a resource-backed personal
   project; the planner checks
   consent, custody, terms, resources, schedules, open hours, travel buffers,
   abandonment, and renegotiation. General autonomous planning remains future work.

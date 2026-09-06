@@ -62,7 +62,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers + finite community-event resources | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans + completed bookbinding project | P3 |
-| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted state + three owned evidence-linked scheduled plan profiles | P3 |
+| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted state + perception- and need-driven private goals with causal scheduled plans | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather + resource-backed weekly events with lead time/cooldowns | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
 | WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons + weekday/weekend activity palette + four-event weekly neighborhood rhythm | P6 |

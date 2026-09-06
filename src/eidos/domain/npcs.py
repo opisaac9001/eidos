@@ -19,8 +19,14 @@ class NPCState:
     connection: float = 0.5
     purpose: float = 0.5
     private_activity: str = "unrecorded"
+    goal_id: str | None = None
+    goal_title: str | None = None
+    goal_motivation: str | None = None
+    goal_status: str | None = None
     plan_id: str | None = None
     plan_title: str | None = None
+    plan_motivation: str | None = None
+    plan_goal_id: str | None = None
     plan_action: str | None = None
     plan_location_id: str | None = None
     plan_scheduled_for: datetime | None = None
@@ -53,6 +59,21 @@ class NPCWorldState:
                 connection=_bounded(event, "connection"),
                 purpose=_bounded(event, "purpose"),
             )
+        elif event.kind == "npc.goal_formed":
+            if person.goal_status == "active":
+                raise ValueError("NPC already has an active goal")
+            if (
+                event.payload.get("owner") != actor_id
+                or event.payload.get("visibility") != "private"
+            ):
+                raise ValueError("NPC goals must remain private to their owner")
+            people[actor_id] = replace(
+                person,
+                goal_id=_required(event, "goal_id"),
+                goal_title=_required(event, "title"),
+                goal_motivation=_required(event, "motivation"),
+                goal_status="active",
+            )
         elif event.kind == "npc.plan_created":
             if person.plan_status == "active":
                 raise ValueError("NPC already has an active plan")
@@ -69,6 +90,10 @@ class NPCWorldState:
                 person,
                 plan_id=_required(event, "plan_id"),
                 plan_title=_required(event, "title"),
+                plan_motivation=str(
+                    event.payload.get("motivation", "response to privately owned evidence")
+                ),
+                plan_goal_id=_optional(event, "goal_id"),
                 plan_action=_required(event, "action"),
                 plan_location_id=_required(event, "location_id"),
                 plan_scheduled_for=scheduled_for,
@@ -83,6 +108,13 @@ class NPCWorldState:
             if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
                 raise ValueError("Only the active NPC plan can expire")
             people[actor_id] = replace(person, plan_status="expired")
+        elif event.kind in {"npc.goal_achieved", "npc.goal_abandoned"}:
+            if person.goal_status != "active" or person.goal_id != _required(event, "goal_id"):
+                raise ValueError("Only the active NPC goal can be resolved")
+            people[actor_id] = replace(
+                person,
+                goal_status="achieved" if event.kind == "npc.goal_achieved" else "abandoned",
+            )
         return NPCWorldState(people)
 
 
@@ -108,6 +140,15 @@ def _required(event: DomainEvent, key: str) -> str:
     value = event.payload.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} is required")
+    return value
+
+
+def _optional(event: DomainEvent, key: str) -> str | None:
+    value = event.payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{key} must be a non-empty string")
     return value
 
 
