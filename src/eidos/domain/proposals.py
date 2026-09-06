@@ -28,6 +28,8 @@ def validate_proposal(role: str, content: str, context: Mapping[str, object]) ->
     if role == "firmament":
         if len(re.findall(r"\w+", text)) < 5 or text.rstrip().endswith(":"):
             raise ProposalRejected("empty_scene", "Encounter was an unfinished fragment")
+        if context.get("scene_mode") is True:
+            return text
         person_value = context.get("person")
         person = person_value if isinstance(person_value, str) else None
         if person and not re.search(r"\b" + re.escape(person) + r"\b", text, re.IGNORECASE):

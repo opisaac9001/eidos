@@ -211,7 +211,9 @@ Social scenes now have an explicit start, alternating typed turns, mutable topic
 one-to-six-turn budget, voluntary exit, sourced interruption, and terminal status.
 Private turns create memories only for their audience; public turns also reach
 co-present observers. The first two-turn bench exchange is an authored acceptance
-fixture, while generative multi-turn dialogue remains future work.
+fixture whose individual lines are performer proposals. Invalid or unavailable model
+output records a failure and uses a labeled authored fallback without bypassing the
+scene resolver. Broader dialogue and interruption policies remain future work.
 
 ## 8. Dream and reflection feedback loop
 

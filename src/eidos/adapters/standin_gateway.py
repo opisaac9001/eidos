@@ -37,13 +37,20 @@ class StandInGateway(ModelGateway):
                 "Some days are held together by very small things.",
             )[choice % 4]
         elif role == "firmament":
-            person = context["person"]
-            lines = {
-                "Mara": "Mara asks whether the little lamp at the workshop is working yet.",
-                "Ellis": "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
-                "Rowan": "Rowan shares a sketch of the square and points out a detail Pathos missed.",
-            }
-            text = lines[person]
+            if context.get("scene_mode") is True:
+                text = (
+                    "The weathering is part of why the old bench belongs here."
+                    if context.get("scene_speaker") == "rowan"
+                    else "I can see why replacing it outright would feel like losing something."
+                )
+            else:
+                person = context["person"]
+                lines = {
+                    "Mara": "Mara asks whether the little lamp at the workshop is working yet.",
+                    "Ellis": "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
+                    "Rowan": "Rowan shares a sketch of the square and points out a detail Pathos missed.",
+                }
+                text = lines[person]
         elif role == "reflection":
             text = f"Looking back, this is the moment that stays with me: {last_memory}"
         elif role == "oneiros":

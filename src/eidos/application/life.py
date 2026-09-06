@@ -656,11 +656,12 @@ class Life:
                 )
             )
             pending.extend(
-                bounded_scene_events(
+                await bounded_scene_events(
                     history + pending,
                     {"pathos": state.location_id, **npc_locations},
                     current,
                     len(history) + len(pending),
+                    self.gateway,
                 )
             )
             pending.extend(follow_up_events(history + pending, current))

@@ -143,8 +143,8 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   abandonment, and renegotiation. General autonomous planning remains future work.
 - A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
   a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
-  memories. One authored two-turn scene exercises it; generated scene dialogue remains
-  future work.
+  memories. The integrated two-turn scene requests performer-generated dialogue and
+  uses explicit audited authored fallbacks when generation fails.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.
