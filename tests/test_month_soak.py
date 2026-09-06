@@ -50,6 +50,10 @@ class MonthSoakTests(unittest.TestCase):
                 item for item in snapshot["npc_states"] if item["actor_id"] == "rowan"
             )
             self.assertEqual(rowan_state["plan_status"], "completed")
+            self.assertTrue(all(0 <= item["level"] <= 1 for item in snapshot["skills"]))
+            self.assertTrue(all(0 <= item["strength"] <= 1 for item in snapshot["habits"]))
+            self.assertEqual(snapshot["skills"][0]["practice_count"], 1)
+            self.assertGreater(snapshot["habits"][0]["repetitions"], 20)
             thoughts = {
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }

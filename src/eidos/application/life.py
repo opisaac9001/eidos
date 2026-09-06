@@ -16,6 +16,7 @@ from eidos.application.belief_review import relationship_belief_events, testimon
 from eidos.application.catchup import CatchUpPreview, active_catch_up, preview_catch_up
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import consolidation_events
+from eidos.application.development import development_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.inner_life import (
@@ -33,6 +34,7 @@ from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
+from eidos.domain.development import project_development
 from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.npcs import project_npcs
@@ -203,6 +205,8 @@ class Life:
                 "boundary.stated",
                 "apology.offered",
                 "follow_up.ready",
+                "skill.practiced",
+                "habit.reinforced",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -222,6 +226,7 @@ class Life:
         social = project_social(history)
         beliefs = project_beliefs(history)
         followups = project_followups(history)
+        development = project_development(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -268,6 +273,8 @@ class Life:
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id != "pathos"
             ],
             "followups": [vars_for(item) for item in followups.values()],
+            "skills": [vars_for(item) for item in development.skills.values()],
+            "habits": [vars_for(item) for item in development.habits.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
@@ -494,6 +501,7 @@ class Life:
                 )
             )
             pending.extend(follow_up_events(history + pending, current))
+            pending.extend(development_events(history + pending, at))
             overdue = overdue_plan_events(project_planning(history + pending), current)
             if overdue:
                 project_planning(history + pending + overdue)
@@ -533,6 +541,7 @@ class Life:
             )
             memories = [item.recalled_text for item in selected_context]
             identity_now = project_identity(history + pending)
+            development_now = project_development(history + pending)
             context = {
                 "location": location_name(state.location_id),
                 "time": at,
@@ -540,6 +549,14 @@ class Life:
                 "identity": {
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
+                },
+                "development": {
+                    "skills": {
+                        skill.skill_id: skill.level for skill in development_now.skills.values()
+                    },
+                    "habits": {
+                        habit.habit_id: habit.strength for habit in development_now.habits.values()
+                    },
                 },
             }
             if concerns_now:
