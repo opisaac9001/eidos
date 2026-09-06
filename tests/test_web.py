@@ -66,6 +66,11 @@ class WebTests(unittest.TestCase):
             status, body = self.request("GET", path)
             self.assertEqual(status, 200, path)
             self.assertTrue(body)
+            if path == "/":
+                self.assertIn(b'data-view="plans"', body)
+                self.assertIn(b'id="calendar-list"', body)
+            if path == "/app.js":
+                self.assertIn(b"function renderPlans()", body)
             if path == "/api/export":
                 exported = json.loads(body)
                 self.assertEqual(exported["schema"], 2)

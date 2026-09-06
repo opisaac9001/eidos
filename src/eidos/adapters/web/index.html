@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#111512" />
     <title>Eidos · A life unfolding</title>
     <link rel="stylesheet" href="/style.css" />
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=20260905-2" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -29,8 +29,11 @@
         <button class="nav" data-view="memories">
           <span>▤</span> Memory archive <span class="nav-index">04</span>
         </button>
+        <button class="nav" data-view="plans">
+          <span>⌁</span> Plans & time <span class="nav-index">05</span>
+        </button>
         <button class="nav" data-view="engine">
-          <span>⏣</span> The ensemble <span class="nav-index">05</span>
+          <span>⏣</span> The ensemble <span class="nav-index">06</span>
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -265,6 +268,27 @@
           <summary>Why memories surfaced</summary>
           <div id="recall-traces" aria-label="Memory recall explanations"></div>
         </details>
+      </section>
+
+      <section id="view-plans" class="view" hidden>
+        <div class="overview-grid">
+          <article class="panel">
+            <div class="panel-kicker">PROJECTS <span>PATHOS</span></div>
+            <div id="goal-list" class="memory-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-kicker">PROMISES <span>CONSENT-BASED</span></div>
+            <div id="commitment-list" class="memory-list"></div>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-kicker">CALENDAR <span>CHRONOS</span></div>
+          <div id="calendar-list" class="memory-list"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-kicker">CHANGES & CONFLICTS <span>AUDIT TRAIL</span></div>
+          <div id="plan-change-list" class="feed expanded"></div>
+        </article>
       </section>
 
       <section id="view-engine" class="view" hidden>

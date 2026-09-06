@@ -105,7 +105,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | UX-02 | Conversation: recall context, availability, uncertainty, stream/cancel/retry | Partial: chat/sidebar | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export | P2–P5 |
-| UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Planned | P3 |
+| UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |
 | UX-06 | Ensemble: traces, recovery, queue, budgets, context/causal inspector | Partial: latest 100 traces | P1 onward |
 | UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Partial: motif/seed journal and waking effects | P4 |
 | UX-08 | Keyboard/mobile/accessibility, reduced motion, onboarding, error/recovery states | Partial: five-view prototype | Every phase |

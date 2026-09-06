@@ -50,6 +50,7 @@ const views = {
     "CONVERSATION",
   ],
   memories: ["THE THINGS THAT STAY", "A life, remembered.", "MEMORY ARCHIVE"],
+  plans: ["INTENTIONS, PROMISES & TIME", "A future with consequences.", "PLANS & TIME"],
   engine: ["BEHIND THE EXPERIENCE", "An ensemble of minds.", "THE ENSEMBLE"],
 };
 let state = null,
@@ -199,7 +200,7 @@ function renderArchive() {
         .slice(0, 6)
         .map(
           (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(item.motif.replaceAll("_", " "))}</span><span>${item.seed_count} bounded seed${item.seed_count === 1 ? "" : "s"}</span></div><p>${esc(item.text)}</p><div class="memory-source">NOT WORLD FACT · ${item.seeds.length} source link${item.seeds.length === 1 ? "" : "s"} retained</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc((item.motif || "legacy dream").replaceAll("_", " "))}</span><span>${item.seed_count ?? 0} bounded seed${item.seed_count === 1 ? "" : "s"}</span></div><p>${esc(item.text)}</p><div class="memory-source">NOT WORLD FACT · ${(item.seeds || []).length} source link${(item.seeds || []).length === 1 ? "" : "s"} retained</div></article>`,
         )
         .join("")}`
     : "";
@@ -240,6 +241,45 @@ function renderEngineFeed() {
     state.feed.filter((item) => filter === "all" || item.kind === filter),
     true,
   );
+}
+
+function renderPlans() {
+  const empty = (text) => `<p class="muted">${esc(text)}</p>`;
+  $("goal-list").innerHTML = state.goals.length
+    ? state.goals
+        .map(
+          (goal) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(goal.status.toUpperCase())}</span><span>${Math.round(goal.progress * 100)}%</span></div><p>${esc(goal.title)}</p><div class="meter"><span style="width:${goal.progress * 100}%"></span></div><div class="memory-source">Goal ${esc(goal.goal_id)}</div></article>`,
+        )
+        .join("")
+    : empty("No owned projects yet.");
+  $("commitment-list").innerHTML = state.commitments.length
+    ? state.commitments
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.status.toUpperCase())}</span><span>due ${esc(date(item.due_at))} ${esc(time(item.due_at))}</span></div><p>${esc(item.title)}</p><div class="memory-source">Pathos → ${esc(item.creditor_id)} · linked goal ${esc(item.goal_id || "none")}</div></article>`,
+        )
+        .join("")
+    : empty("No promises have been accepted.");
+  $("calendar-list").innerHTML = state.calendar.length
+    ? [...state.calendar]
+        .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
+        )
+        .join("")
+    : empty("The calendar is open.");
+  const changes = state.feed.filter((item) =>
+    [
+      "planning.rejected",
+      "schedule.interrupted",
+      "commitment.missed",
+      "commitment.fulfilled",
+      "intention.completed",
+    ].includes(item.kind),
+  );
+  $("plan-change-list").innerHTML = feedMarkup(changes, true);
 }
 
 function renderMessages() {
@@ -368,6 +408,7 @@ function render(next) {
     .join("");
   renderMessages();
   renderArchive();
+  renderPlans();
   renderEngineFeed();
   $("diagnostics").innerHTML =
     (state.diagnostics || [])
