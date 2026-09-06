@@ -13,8 +13,10 @@ from eidos.domain.events import DomainEvent
 class Goal:
     goal_id: str
     title: str
+    motivation: str | None = None
     status: str = "active"
     progress: float = 0.0
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +87,11 @@ class PlanningState:
                 goal_id = _required(payload, "goal_id")
                 if goal_id in goals:
                     raise ValueError("Goal already exists")
-                goals[goal_id] = Goal(goal_id, _required(payload, "title"))
+                goals[goal_id] = Goal(
+                    goal_id,
+                    _required(payload, "title"),
+                    motivation=_optional(payload, "motivation"),
+                )
             case "goal.achieved":
                 goal = _existing(goals, payload, "goal_id")
                 linked_commitments = [
@@ -111,6 +117,28 @@ class PlanningState:
                 ):
                     raise ValueError("Goal progress must be greater than zero and at most 0.5")
                 goals[goal.goal_id] = replace(goal, progress=min(1.0, goal.progress + float(delta)))
+            case "goal.abandoned":
+                goal = _existing(goals, payload, "goal_id")
+                if goal.status not in {"active", "blocked"}:
+                    raise ValueError("Only unfinished goals can be abandoned")
+                if any(
+                    item.goal_id == goal.goal_id and item.status == "active"
+                    for item in commitments.values()
+                ):
+                    raise ValueError("An active external commitment cannot be abandoned")
+                if any(
+                    item.goal_id == goal.goal_id and item.status in {"scheduled", "interrupted"}
+                    for item in calendar.values()
+                ):
+                    raise ValueError("Goal schedules must be resolved before abandonment")
+                if any(
+                    item.goal_id == goal.goal_id and item.status == "active"
+                    for item in intentions.values()
+                ):
+                    raise ValueError("Goal intentions must be resolved before abandonment")
+                goals[goal.goal_id] = replace(
+                    goal, status="abandoned", reason=_required(payload, "reason")
+                )
             case "goal.blocked":
                 goal = _existing(goals, payload, "goal_id")
                 if goal.status != "active":
@@ -196,6 +224,13 @@ class PlanningState:
                     raise ValueError("Only unfinished scheduled work can fail")
                 calendar[entry.schedule_id] = replace(
                     entry, status="failed", reason=_required(payload, "reason")
+                )
+            case "schedule.cancelled":
+                entry = _existing(calendar, payload, "schedule_id")
+                if entry.status not in {"scheduled", "interrupted"}:
+                    raise ValueError("Only unfinished scheduled work can be cancelled")
+                calendar[entry.schedule_id] = replace(
+                    entry, status="cancelled", reason=_required(payload, "reason")
                 )
             case "object.registered":
                 object_id = _required(payload, "object_id")
