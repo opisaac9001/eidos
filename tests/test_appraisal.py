@@ -44,6 +44,17 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual([event.kind for event in events], ["appraisal.recorded"])
         self.assertEqual(updated, state)
 
+    def test_completed_learning_satisfies_mastery_from_action_evidence(self):
+        source = DomainEvent(
+            "activity.completed",
+            "pathos",
+            {"activity": "learn", "schedule_id": "lesson"},
+        )
+        state = PathosState(mastery=0.4)
+        events, updated = appraisal_events([source], state, self.now)
+        self.assertGreater(updated.mastery, state.mastery)
+        self.assertEqual(events[0].causation_id, source.event_id)
+
     def test_sleep_recovers_rest_while_waking_hours_create_need_pressure(self):
         sleeping = PathosState(rest=0.4)
         night_events, rested = sleep_and_need_events(

@@ -284,7 +284,7 @@ function renderPlans() {
     ? state.goals
         .map(
           (goal) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(goal.status.toUpperCase())}</span><span>${Math.round(goal.progress * 100)}%</span></div><p>${esc(goal.title)}</p><div class="meter"><span style="width:${goal.progress * 100}%"></span></div><div class="memory-source">Goal ${esc(goal.goal_id)}</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(goal.status.toUpperCase())}</span><span>${Math.round(goal.progress * 100)}%</span></div><p>${esc(goal.title)}</p>${goal.motivation ? `<p class="context-note">${esc(goal.motivation)}</p>` : ""}<div class="meter"><span style="width:${goal.progress * 100}%"></span></div><div class="memory-source">Goal ${esc(goal.goal_id)}${goal.reason ? ` · ${esc(goal.reason)}` : ""}</div></article>`,
         )
         .join("")
     : empty("No owned projects yet.");
@@ -309,9 +309,13 @@ function renderPlans() {
     [
       "planning.rejected",
       "schedule.interrupted",
+      "schedule.cancelled",
       "commitment.missed",
       "commitment.fulfilled",
       "intention.completed",
+      "goal.progressed",
+      "goal.achieved",
+      "goal.abandoned",
     ].includes(item.kind),
   );
   $("plan-change-list").innerHTML = feedMarkup(changes, true);

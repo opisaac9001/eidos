@@ -69,7 +69,12 @@ def plan_accepted_work(
             return reject(
                 "resource_unavailable", "The object is not available at the work location"
             )
-    elif action is not ActionKind.TALK:
+    elif action not in {
+        ActionKind.TALK,
+        ActionKind.WORK,
+        ActionKind.LEARN,
+        ActionKind.ATTEND,
+    }:
         return reject("unsupported_action", "No deterministic planner exists for this action yet")
     earliest = datetime.fromisoformat(request.earliest_start)
     due = datetime.fromisoformat(request.due_at)

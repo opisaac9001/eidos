@@ -198,6 +198,11 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", 0.05, 0.4, 0.45, 0.6)
     if event.kind == "social.activity_completed":
         return ("connection", 0.06, 0.55, 0.35, 0.8)
+    if event.kind == "activity.completed":
+        if event.payload.get("activity") == "attend":
+            return ("connection", 0.05, 0.45, 0.3, 0.75)
+        if event.payload.get("activity") in {"learn", "work"}:
+            return ("mastery", 0.06, 0.6, 0.3, 0.85)
     if event.kind == "schedule.interrupted":
         return ("mastery", -0.04, -0.35, 0.5, 0.4)
     if event.kind == "action.accepted" and event.payload.get("action") == "repair":

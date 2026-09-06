@@ -85,6 +85,27 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(planning.calendar["coffee-schedule"].action, "talk")
         self.assertEqual(planning.intentions["coffee-intention"].target_id, "mara")
 
+    def test_accepted_work_learning_and_attendance_become_linked_plans(self):
+        for action in ("work", "learn", "attend"):
+            with self.subTest(action=action):
+                request = self.request(
+                    request_id=action,
+                    action=action,
+                    target_id=f"{action}-subject",
+                    title=action.title(),
+                )
+                result = plan_accepted_work(
+                    request,
+                    state=self.state(),
+                    actual_revision=1,
+                    simulated_at=self.now,
+                    preferred_start=self.now + timedelta(days=1),
+                )
+                self.assertTrue(result.accepted)
+                planning = self.state(result.events)
+                self.assertEqual(planning.calendar[f"{action}-schedule"].action, action)
+                self.assertEqual(planning.intentions[f"{action}-intention"].action, action)
+
     def test_unaccepted_infeasible_and_conflicting_requests_do_not_create_plans(self):
         unaccepted = plan_accepted_work(
             self.request(status="pending"),

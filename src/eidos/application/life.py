@@ -31,6 +31,7 @@ from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
+from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.associations import AssociationProposal, resolve_association
@@ -719,6 +720,15 @@ class Life:
             if social_activity:
                 project_planning(history + pending + social_activity)
                 pending.extend(social_activity)
+            scheduled_activity = scheduled_activity_events(
+                project_planning(history + pending),
+                actor_location_id=state.location_id,
+                simulated_at=current,
+                actual_revision=len(history) + len(pending),
+            )
+            if scheduled_activity:
+                project_planning(history + pending + scheduled_activity)
+                pending.extend(scheduled_activity)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),
