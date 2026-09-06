@@ -320,8 +320,8 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Capture the Dell inventory, then benchmark and pin its private inference stack.
-2. Expand real-model corpus evaluation beyond the deterministic semantic warnings for
-   contradictions, perspective leaks, repeated prose, and low-quality schema-valid output.
+2. Expand the new multi-context real-model benchmark with a reviewed long-run corpus,
+   contradiction pairs, and calibrated per-role Dell acceptance thresholds.
 
 Completed: the opt-in British-town adapter now records attributed, expiring
 Open-Meteo weather/daylight and optional RSS headlines. Moira can cite them only as

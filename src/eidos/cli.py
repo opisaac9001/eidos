@@ -45,6 +45,10 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="Inspect current state")
     commands.add_parser("probe-model", help="Test every performer against the configured model")
+    benchmark = commands.add_parser(
+        "benchmark-model", help="Run a repeatable synthetic quality corpus"
+    )
+    benchmark.add_argument("--runs", type=int, default=2)
     advance = commands.add_parser("advance", help="Advance an authored simulated routine")
     advance.add_argument("--hours", type=float, default=24)
     catch_up = commands.add_parser("catch-up", help="Explicitly catch up at most seven days")
@@ -108,7 +112,6 @@ def main() -> None:
             )
             return
         gateway: ModelGateway = StandInGateway()
-        town_signal_source = _town_source_from_env()
         mode = "stand-in"
         if args.base_url or args.model:
             if not args.base_url or not args.model:
@@ -129,6 +132,17 @@ def main() -> None:
             if not result["passed"]:
                 raise SystemExit(1)
             return
+        if args.command == "benchmark-model":
+            if mode == "stand-in":
+                raise ValueError("benchmark-model requires a model endpoint and model name")
+            from eidos.application.model_benchmark import benchmark_model
+
+            result = asyncio.run(benchmark_model(gateway, args.runs))
+            print(json.dumps(result, indent=2))
+            if float(str(result["contract_pass_rate"])) < 1:
+                raise SystemExit(1)
+            return
+        town_signal_source = _town_source_from_env()
         if args.command == "serve":
             from eidos.adapters.web_server import serve
 

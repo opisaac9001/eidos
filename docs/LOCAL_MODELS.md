@@ -20,6 +20,7 @@ Then, from this repository:
 export EIDOS_MODEL_BASE_URL=http://127.0.0.1:11435/v1
 export EIDOS_MODEL_NAME=qwen2.5:1.5b
 PYTHONPATH=src .venv/bin/python -m eidos probe-model
+PYTHONPATH=src .venv/bin/python -m eidos benchmark-model --runs 3
 EIDOS_DATABASE=data/lab.sqlite3 ./run.command --port 8766
 ```
 
@@ -38,6 +39,10 @@ separately exposes `semantic_passed` and per-role `semantic_findings` for fragme
 output, lost first-person voice, prompt/AI-role leakage, time-of-day contradictions,
 forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
+`benchmark-model` repeats a three-context synthetic corpus one to five times and reports
+per-role contract/finding counts, retained samples, median/max latency, tokens, and a
+minimum three-sample screening floor. Passing that floor only nominates a role/model
+pair for human review; it never changes production routing automatically.
 Roles receive only their relevant context fields. Responses must finish, parse
 as exactly one text field, and meet role-specific rules. Weather is enumerated;
 factual memory must reproduce its source experience exactly. Outputs are bounded
@@ -85,6 +90,13 @@ voice, and Chronicler nearly duplicating another role. Calls took roughly 0.3–
 seconds. This keeps the tiny model classified as a transport/failure fixture, not a
 candidate for autonomous life simulation. Qwen remains a better development bridge,
 but neither model is approved for unattended world state.
+
+A subsequent two-run Qwen corpus produced 10 accepted contracts from 16 calls
+(62.5%) and a 43.75% semantic-clean rate when failures count as unclean. Mnemosyne,
+Moira, and Chronicler completed both samples; Murmur, Firmament, and Oneiros completed
+neither. Murmur and Oneiros each consumed roughly 22 seconds before failure. This run
+is below the three-sample screening minimum but demonstrates that the benchmark exposes
+role-specific reliability and cost rather than hiding them inside one aggregate result.
 
 The connected integration run bootstrapped a new world, advanced 24 hours,
 exchanged a chat message, and reconstructed state from SQLite. It reached day 2
