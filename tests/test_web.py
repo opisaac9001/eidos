@@ -174,6 +174,21 @@ class WebTests(unittest.TestCase):
         self.assertEqual(snapshot["pathos"]["location_id"], "cafe")
         self.assertEqual(len(snapshot["conversations"]), 2)
 
+    def test_live_visit_and_immediate_exchange_work_through_http(self):
+        status, body = self.request("POST", "/api/visit", {"request_id": "http-visit-1"})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["communication"]["live_scene_id"])
+        status, body = self.request(
+            "POST", "/api/chat", {"text": "Can we talk?", "request_id": "http-live-1"}
+        )
+        snapshot = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(snapshot["communication"]["live_turn_count"], 2)
+        self.assertEqual(snapshot["conversations"][-1]["speaker"], "pathos")
+        status, body = self.request("POST", "/api/visit/end", {"request_id": "http-leave-1"})
+        self.assertEqual(status, 200)
+        self.assertIsNone(json.loads(body)["communication"]["live_scene_id"])
+
     def test_catch_up_requires_explicit_preview_and_request(self):
         before = self.runtime.snapshot()["time"]
         status, body = self.request("GET", "/api/catch-up/preview?hours=2")

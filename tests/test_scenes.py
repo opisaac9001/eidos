@@ -129,6 +129,10 @@ class SceneTests(unittest.TestCase):
         )
         self.assertEqual(rejected.code, "closed_scene")
 
+    def test_a_live_visit_can_have_a_long_but_still_finite_turn_budget(self):
+        self.assertTrue(self.start(40).accepted)
+        self.assertEqual(self.start(41).code, "invalid_budget")
+
     def test_exit_is_voluntary_and_interruption_requires_evidence(self):
         started = self.start()
         left = resolve_scene_end(

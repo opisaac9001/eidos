@@ -59,8 +59,8 @@ class SceneState:
             initiator = _required(payload, "initiator_id")
             partner = _required(payload, "partner_id")
             maximum = payload.get("max_turns")
-            if isinstance(maximum, bool) or not isinstance(maximum, int) or not 1 <= maximum <= 6:
-                raise ValueError("Scene turn budget must be between one and six")
+            if isinstance(maximum, bool) or not isinstance(maximum, int) or not 1 <= maximum <= 40:
+                raise ValueError("Scene turn budget must be between one and 40")
             scenes[scene_id] = Scene(
                 scene_id,
                 initiator,
@@ -219,9 +219,9 @@ def resolve_scene_start(
     if (
         isinstance(proposal.max_turns, bool)
         or not isinstance(proposal.max_turns, int)
-        or not 1 <= proposal.max_turns <= 6
+        or not 1 <= proposal.max_turns <= 40
     ):
-        return _reject(proposed, "invalid_budget", "Scene turn budget must be one to six")
+        return _reject(proposed, "invalid_budget", "Scene turn budget must be one to 40")
     started = DomainEvent(
         "scene.started",
         "pathos",

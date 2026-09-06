@@ -135,6 +135,44 @@ class LifeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.life.chat("Different content", "visit-1")
 
+    def test_available_user_can_begin_end_and_talk_inside_a_live_visit(self):
+        self.life.bootstrap()
+        self.life.request_visit("sit-down-1")
+        started = self.life.snapshot()
+        self.assertEqual(started["communication"]["status"], "in_conversation")
+        self.assertTrue(started["communication"]["live_scene_id"])
+        self.life.chat("Tell me what this morning felt like.", "live-turn-1")
+        during = self.life.snapshot()
+        self.assertEqual(
+            [item["speaker"] for item in during["conversations"][-2:]], ["you", "pathos"]
+        )
+        self.assertEqual(during["communication"]["live_turn_count"], 2)
+        self.assertEqual(during["conversations"][-1]["channel"], "live_visit")
+        self.life.end_visit("leave-1")
+        ended = self.life.snapshot()
+        self.assertIsNone(ended["communication"]["live_scene_id"])
+        self.assertTrue(any(event.kind == "visit.ended" for event in self.life.history()))
+
+    def test_sleeping_pathos_can_decline_a_live_visit_without_starting_a_scene(self):
+        self.life.request_visit("too-late")
+        self.assertTrue(any(event.kind == "visit.declined" for event in self.life.history()))
+        self.assertFalse(self.life.snapshot()["communication"]["can_visit"])
+        self.assertIsNone(self.life.snapshot()["communication"]["live_scene_id"])
+
+    def test_a_scheduled_departure_can_end_a_user_visit(self):
+        self.life.bootstrap()
+        self.life.request_visit("before-cafe")
+        self.life.advance(1)
+        snapshot = self.life.snapshot()
+        self.assertIsNone(snapshot["communication"]["live_scene_id"])
+        ended = next(
+            event for event in reversed(self.life.history()) if event.kind == "visit.ended"
+        )
+        self.assertEqual(ended.payload["reason"], "scheduled_departure")
+        self.assertTrue(
+            any(event.kind == "visit.interruption_arose" for event in self.life.history())
+        )
+
     def test_bad_model_output_is_quarantined_without_breaking_time(self):
         class BadGateway:
             async def generate(self, request):

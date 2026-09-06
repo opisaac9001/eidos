@@ -164,7 +164,7 @@ async function request(path, body) {
 
 function setBusy(value) {
   busy = value;
-  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send"].forEach((id) => {
+  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send", "visit", "end-visit"].forEach((id) => {
     $(id).disabled = value || !state;
   });
 }
@@ -360,7 +360,7 @@ function renderMessages() {
     ? state.conversations
         .map(
           (item) =>
-            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "SYSTEM" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
+            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "SYSTEM" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
         )
         .join("")
     : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
@@ -502,13 +502,21 @@ function render(next) {
     `${state.pathos.location} · ${time(state.time)}`;
   const communication = state.communication || {};
   $("chat-availability").textContent =
-    communication.status === "available"
+    communication.status === "in_conversation"
+      ? "TOGETHER NOW"
+      : communication.status === "available"
       ? "AVAILABLE"
       : communication.status === "hurried"
         ? "FREE BRIEFLY"
         : (communication.status || "UNAVAILABLE").toUpperCase();
   $("chat-context-availability").textContent = communication.reason || "";
-  $("delivery-note").textContent = communication.waiting_count
+  $("visit").hidden = Boolean(communication.live_scene_id);
+  $("visit").disabled = !communication.can_visit;
+  $("end-visit").hidden = !communication.live_scene_id;
+  $("send").textContent = communication.live_scene_id ? "Speak ↗" : "Send ↗";
+  $("delivery-note").textContent = communication.live_scene_id
+    ? "You are speaking together in real time."
+    : communication.waiting_count
     ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
     : "Messages are delivered; replies may take time.";
   $("chat-memories").innerHTML = state.memories
@@ -636,7 +644,21 @@ $("chat-form").addEventListener("submit", async (event) => {
     pendingChat = null;
     $("message").focus();
   }
-  $("send").textContent = "Send ↗";
+  $("send").textContent = state?.communication?.live_scene_id ? "Speak ↗" : "Send ↗";
+});
+$("visit").addEventListener("click", async () => {
+  if (busy) return;
+  if (await mutate("/api/visit", { request_id: crypto.randomUUID() }))
+    toast(
+      state.communication.live_scene_id
+        ? "Pathos made room for a conversation."
+        : state.communication.reason,
+    );
+});
+$("end-visit").addEventListener("click", async () => {
+  if (busy) return;
+  if (await mutate("/api/visit/end", { request_id: crypto.randomUUID() }))
+    toast("The conversation ended here.");
 });
 $("message").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {

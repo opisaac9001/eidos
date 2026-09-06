@@ -172,10 +172,11 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
 - Integrate daily life, conversation, world, memories, calendar, relationships,
   dreams and diagnostics. Add full-history pagination/search and while-away summaries.
 - Ordinary user messages now enter an asynchronous inbox with replay-stable,
-  state-derived response timing and visible delivered/answered state. Add optional
-  co-present visits as interruptible scenes: Pathos may
-  be unavailable, hurried, decline, leave, answer or defer a call, and genuinely
-  follow up later. Keep simulation controls in a distinct operator surface so the
+  state-derived response timing and visible delivered/answered state. Optional
+  co-present visits now require availability and use an alternating, bounded live
+  scene that either party can leave; a scheduled departure already ends the visit.
+  Extend this so Pathos may answer or defer a call, pause/resume when appropriate,
+  and genuinely follow up later. Keep simulation controls in a distinct operator surface so the
   life-facing UI changes the world only through communication.
 - Opt-in in-app outreach, quiet hours, rate limits and an off switch. No guilt,
   pressure or punishment for user absence.

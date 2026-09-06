@@ -60,7 +60,17 @@ from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between, emotionally_adjusted_beat
-from eidos.domain.scenes import project_scenes
+from eidos.domain.scenes import (
+    SceneEndProposal,
+    SceneEndReason,
+    ScenePrivacy,
+    SceneStartProposal,
+    SceneTurnProposal,
+    project_scenes,
+    resolve_scene_end,
+    resolve_scene_start,
+    resolve_scene_turn,
+)
 from eidos.domain.seasons import project_season, season_change_events, season_for
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
@@ -304,7 +314,10 @@ class Life:
                 recalls.append(item)
             if event.kind == "memory.consolidated":
                 consolidations.append(item)
-            if event.kind == "memory.recorded" and payload.get("owner", "pathos") != "pathos":
+            if event.kind == "memory.recorded" and payload.get("owner", "pathos") not in {
+                "pathos",
+                "user",
+            }:
                 npc_memories.append(item)
             if event.kind == "dream.recorded":
                 dreams.append(item)
@@ -421,6 +434,15 @@ class Life:
             if item.get("speaker") == "you"
             and str(item.get("request_id")) not in answered_request_ids
         ]
+        user_scene = next(
+            (
+                item
+                for item in scenes.scenes.values()
+                if item.status == "active"
+                and {item.initiator_id, item.partner_id} == {"pathos", "user"}
+            ),
+            None,
+        )
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -515,6 +537,8 @@ class Life:
                 "next_reply_due_at": min(
                     (str(item["reply_due_at"]) for item in waiting_messages), default=None
                 ),
+                "live_scene_id": user_scene.scene_id if user_scene else None,
+                "live_turn_count": user_scene.turn_count if user_scene else 0,
             },
             "mode": self.mode,
             "model": getattr(self.gateway, "model", "authored-stand-in-v1"),
@@ -695,6 +719,76 @@ class Life:
                 )
                 arrival = None
                 if state.location_id != beat.location_id:
+                    user_scene = next(
+                        (
+                            scene
+                            for scene in project_scenes(history + pending).scenes.values()
+                            if scene.status == "active"
+                            and {scene.initiator_id, scene.partner_id} == {"pathos", "user"}
+                        ),
+                        None,
+                    )
+                    if user_scene is not None:
+                        interruption = DomainEvent(
+                            "visit.interruption_arose",
+                            "pathos",
+                            {
+                                "scene_id": user_scene.scene_id,
+                                "reason": "Pathos needs to leave for his next activity.",
+                                "activity": beat.activity,
+                                "destination_id": beat.location_id,
+                                "simulated_at": at,
+                            },
+                            correlation_id=user_scene.scene_id,
+                        )
+                        pending.append(interruption)
+                        ended = resolve_scene_end(
+                            SceneEndProposal(
+                                f"depart-{user_scene.scene_id}-{at}",
+                                user_scene.scene_id,
+                                "pathos",
+                                SceneEndReason.INTERRUPTED,
+                                len(history) + len(pending),
+                                interruption.event_id,
+                            ),
+                            state=project_scenes(history + pending),
+                            history=history + pending,
+                            actual_revision=len(history) + len(pending),
+                            simulated_at=at,
+                        )
+                        pending.extend(ended.events)
+                        if ended.accepted:
+                            visit_ended = DomainEvent(
+                                "visit.ended",
+                                "pathos",
+                                {
+                                    "request_id": f"departure-{at}",
+                                    "scene_id": user_scene.scene_id,
+                                    "reason": "scheduled_departure",
+                                    "simulated_at": at,
+                                },
+                                causation_id=ended.events[-1].event_id,
+                                correlation_id=user_scene.scene_id,
+                            )
+                            pending.extend(
+                                (
+                                    visit_ended,
+                                    DomainEvent(
+                                        "conversation.message",
+                                        "pathos",
+                                        {
+                                            "request_id": f"departure-{at}",
+                                            "speaker": "system",
+                                            "text": f"Pathos had to leave for {beat.description.lower()}",
+                                            "channel": "live_visit",
+                                            "scene_id": user_scene.scene_id,
+                                            "simulated_at": at,
+                                        },
+                                        causation_id=visit_ended.event_id,
+                                        correlation_id=user_scene.scene_id,
+                                    ),
+                                )
+                            )
                     duration = route_duration(state.location_id, beat.location_id)
                     travel = resolve_travel(
                         TravelProposal(
@@ -1179,6 +1273,127 @@ class Life:
             len(history),
         )
 
+    def request_visit(self, request_id: str) -> None:
+        if not isinstance(request_id, str) or not 1 <= len(request_id) <= 100:
+            raise ValueError("A request ID is required")
+        history = self.history()
+        if any(
+            event.kind == "visit.requested" and event.payload.get("request_id") == request_id
+            for event in history
+        ):
+            return
+        state = self._project_state(history)
+        at = state.simulated_at.isoformat()
+        requested = DomainEvent(
+            "visit.requested",
+            "pathos",
+            {"request_id": request_id, "simulated_at": at},
+            correlation_id=request_id,
+        )
+        availability = communication_availability(history, state)
+        if not availability.can_visit or availability.status == "in_conversation":
+            declined = DomainEvent(
+                "visit.declined",
+                "pathos",
+                {
+                    "request_id": request_id,
+                    "reason": availability.reason,
+                    "simulated_at": at,
+                },
+                causation_id=requested.event_id,
+                correlation_id=request_id,
+            )
+            self.store.append("pathos", [requested, declined], len(history))
+            return
+        scene_id = f"user-visit-{request_id}"
+        actor_locations = {"pathos": state.location_id, "user": state.location_id}
+        start = resolve_scene_start(
+            SceneStartProposal(
+                f"start-{scene_id}",
+                scene_id,
+                "pathos",
+                "user",
+                "open-conversation",
+                40,
+                len(history) + 1,
+            ),
+            state=project_scenes([*history, requested]),
+            actor_locations=actor_locations,
+            known_actor_ids=set(actor_locations),
+            actual_revision=len(history) + 1,
+            simulated_at=at,
+        )
+        output = [requested, *start.events]
+        if start.accepted:
+            output.append(
+                DomainEvent(
+                    "visit.accepted",
+                    "pathos",
+                    {
+                        "request_id": request_id,
+                        "scene_id": scene_id,
+                        "location_id": state.location_id,
+                        "hurried": availability.hurried,
+                        "simulated_at": at,
+                    },
+                    causation_id=start.events[-1].event_id,
+                    correlation_id=scene_id,
+                )
+            )
+        self.store.append("pathos", output, len(history))
+
+    def end_visit(self, request_id: str) -> None:
+        if not isinstance(request_id, str) or not 1 <= len(request_id) <= 100:
+            raise ValueError("A request ID is required")
+        history = self.history()
+        if any(
+            event.kind == "visit.ended" and event.payload.get("request_id") == request_id
+            for event in history
+        ):
+            return
+        scene = next(
+            (
+                item
+                for item in project_scenes(history).scenes.values()
+                if item.status == "active"
+                and {item.initiator_id, item.partner_id} == {"pathos", "user"}
+            ),
+            None,
+        )
+        if scene is None:
+            raise ValueError("There is no live visit to end")
+        state = self._project_state(history)
+        ended = resolve_scene_end(
+            SceneEndProposal(
+                f"end-{scene.scene_id}-{request_id}",
+                scene.scene_id,
+                "user",
+                SceneEndReason.LEFT,
+                len(history),
+            ),
+            state=project_scenes(history),
+            history=history,
+            actual_revision=len(history),
+            simulated_at=state.simulated_at.isoformat(),
+        )
+        output = list(ended.events)
+        if ended.accepted:
+            output.append(
+                DomainEvent(
+                    "visit.ended",
+                    "pathos",
+                    {
+                        "request_id": request_id,
+                        "scene_id": scene.scene_id,
+                        "reason": "user_left",
+                        "simulated_at": state.simulated_at.isoformat(),
+                    },
+                    causation_id=ended.events[-1].event_id,
+                    correlation_id=scene.scene_id,
+                )
+            )
+        self.store.append("pathos", output, len(history))
+
     def chat(self, text: str, request_id: str) -> None:
         if not isinstance(text, str) or not 1 <= len(text.strip()) <= 2000:
             raise ValueError("Messages must contain 1–2000 characters")
@@ -1199,6 +1414,20 @@ class Life:
             if previous.payload["text"] != text.strip():
                 raise ValueError("Request ID was already used for a different message")
             return
+        user_scene = next(
+            (
+                scene
+                for scene in project_scenes(history).scenes.values()
+                if scene.status == "active"
+                and {scene.initiator_id, scene.partner_id} == {"pathos", "user"}
+            ),
+            None,
+        )
+        if user_scene is not None:
+            if user_scene.next_actor_id != "user":
+                raise ValueError("Pathos is still responding")
+            asyncio.run(self._live_exchange(user_scene.scene_id, text.strip(), request_id))
+            return
         state = self._project_state(history)
         at = state.simulated_at.isoformat()
         due_at = reply_due_at(history, state, request_id)
@@ -1216,6 +1445,81 @@ class Life:
             correlation_id=request_id,
         )
         self.store.append("pathos", [incoming], len(history))
+
+    async def _live_exchange(self, scene_id: str, text: str, request_id: str) -> None:
+        history = self.history()
+        state = self._project_state(history)
+        actor_locations = {"pathos": state.location_id, "user": state.location_id}
+        user_turn = resolve_scene_turn(
+            SceneTurnProposal(
+                f"{scene_id}-{request_id}-user",
+                scene_id,
+                "user",
+                text,
+                "converse",
+                "open-conversation",
+                ScenePrivacy.PRIVATE,
+                len(history),
+            ),
+            state=project_scenes(history),
+            history=history,
+            actor_locations=actor_locations,
+            actual_revision=len(history),
+            simulated_at=state.simulated_at.isoformat(),
+        )
+        if not user_turn.accepted:
+            raise ValueError(user_turn.events[-1].payload.get("reason", "The turn was rejected"))
+        incoming = DomainEvent(
+            "conversation.message",
+            "pathos",
+            {
+                "text": text,
+                "speaker": "you",
+                "simulated_at": state.simulated_at.isoformat(),
+                "request_id": request_id,
+                "delivery_status": "heard",
+                "channel": "live_visit",
+                "scene_id": scene_id,
+            },
+            causation_id=next(
+                event.event_id for event in user_turn.events if event.kind == "scene.turn_taken"
+            ),
+            correlation_id=scene_id,
+        )
+        self.store.append("pathos", [*user_turn.events, incoming], len(history))
+        await self._respond_to_message(incoming)
+        history = self.history()
+        reply = next(
+            (
+                event
+                for event in reversed(history)
+                if event.kind == "conversation.message"
+                and event.payload.get("request_id") == request_id
+                and event.payload.get("speaker") == "pathos"
+            ),
+            None,
+        )
+        if reply is None:
+            return
+        state = self._project_state(history)
+        pathos_turn = resolve_scene_turn(
+            SceneTurnProposal(
+                f"{scene_id}-{request_id}-pathos",
+                scene_id,
+                "pathos",
+                str(reply.payload["text"]),
+                "respond",
+                "open-conversation",
+                ScenePrivacy.PRIVATE,
+                len(history),
+            ),
+            state=project_scenes(history),
+            history=history,
+            actor_locations={"pathos": state.location_id, "user": state.location_id},
+            actual_revision=len(history),
+            simulated_at=state.simulated_at.isoformat(),
+        )
+        self.store.append("pathos", list(pathos_turn.events), len(history))
 
     async def _respond_to_due_messages(self) -> None:
         while True:
@@ -1374,26 +1678,33 @@ class Life:
                         "simulated_at": at,
                         "request_id": request_id,
                         "source": self.mode,
+                        "channel": incoming.payload.get("channel", "inbox"),
+                        "scene_id": incoming.payload.get("scene_id"),
                     },
+                    causation_id=incoming.event_id,
+                    correlation_id=incoming.correlation_id or request_id,
                 )
             )
-            pending.append(
-                DomainEvent(
-                    "memory.recorded",
-                    "pathos",
-                    {
-                        "text": f"You sent a message: {text.strip()}",
-                        "simulated_at": at,
-                        "source": "user-conversation",
-                        "source_event_id": str(incoming.event_id),
-                        "category": "conversation",
-                        "location_id": state.location_id,
-                        "owner": "pathos",
-                        "importance": 0.7,
-                        "confidence": 1.0,
-                    },
+            if incoming.payload.get("channel") != "live_visit":
+                pending.append(
+                    DomainEvent(
+                        "memory.recorded",
+                        "pathos",
+                        {
+                            "text": f"You sent a message: {text.strip()}",
+                            "simulated_at": at,
+                            "source": "user-conversation",
+                            "source_event_id": str(incoming.event_id),
+                            "category": "conversation",
+                            "location_id": state.location_id,
+                            "owner": "pathos",
+                            "importance": 0.7,
+                            "confidence": 1.0,
+                        },
+                        causation_id=incoming.event_id,
+                        correlation_id=incoming.correlation_id or request_id,
+                    )
                 )
-            )
         else:
             pending.append(
                 DomainEvent(

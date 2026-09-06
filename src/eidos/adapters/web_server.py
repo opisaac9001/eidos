@@ -266,6 +266,16 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         if not isinstance(text_value, str) or not isinstance(request_id, str):
                             raise ValueError("Chat text and request ID must be strings")
                         runtime.life.chat(text_value, request_id)
+                    elif self.path == "/api/visit":
+                        request_id = body.get("request_id")
+                        if not isinstance(request_id, str):
+                            raise ValueError("Visit request ID must be a string")
+                        runtime.life.request_visit(request_id)
+                    elif self.path == "/api/visit/end":
+                        request_id = body.get("request_id")
+                        if not isinstance(request_id, str):
+                            raise ValueError("Visit request ID must be a string")
+                        runtime.life.end_visit(request_id)
                     else:
                         self.respond(404, {"error": "Not found"})
                         return

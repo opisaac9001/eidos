@@ -137,7 +137,9 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   source-archive recovery and stand-in states are visible.
 - The browser is functional. Messages now enter a persistent inbox and show as
   delivered until a replay-stable, availability-aware response time arrives; sleep
-  and existing scenes can defer a reply. Interruptible co-present user visit scenes
+  and existing scenes can defer a reply. When Pathos is available, the user can begin
+  a private live visit with immediate alternating replies, leave voluntarily, or be
+  interrupted when his next scheduled departure arrives. Richer interruption choices
   remain future work, and simulation controls are still operator-facing.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived

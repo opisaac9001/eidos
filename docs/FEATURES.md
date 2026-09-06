@@ -71,8 +71,8 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox replies with state-derived availability; co-present user visits remain | P2–P3 |
-| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: typed lifecycle + two performer-driven exchanges, including sourced interruption/resume and audited fallback | P3 |
+| SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox plus availability-gated live user visits | P2–P3 |
+| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: typed lifecycle, up-to-40-turn user visits, voluntary exit, scheduled-departure interruption, and NPC exchanges with interruption/resume | P3 |
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: bounded favors and scheduled invitations with explicit consent | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology with unresolved-rupture rule | P3 |
@@ -102,7 +102,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard | P5 |
-| UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: functioning delayed inbox with delivered/answered and availability states; user visit scenes remain | P2–P3 |
+| UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: delayed inbox plus start/leave controls for availability-gated live visits | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export + revision-cursor event API | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |

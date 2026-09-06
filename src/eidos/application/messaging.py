@@ -28,6 +28,13 @@ def communication_availability(
         return CommunicationAvailability("asleep", "He is asleep.", False, False)
     scenes = project_scenes(history).scenes.values()
     if any(
+        scene.status == "active" and {scene.initiator_id, scene.partner_id} == {"pathos", "user"}
+        for scene in scenes
+    ):
+        return CommunicationAvailability(
+            "in_conversation", "You are spending time together now.", True, False
+        )
+    if any(
         scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
         for scene in scenes
     ):
