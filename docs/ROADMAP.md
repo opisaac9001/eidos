@@ -225,8 +225,9 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add bounded materialized checkpoints/index maintenance so years of history do not
-   require rebuilding every projection and recall index from the beginning.
+1. Extend the new disposable core-state checkpoint into bounded materialized index
+   maintenance so years of history do not rebuild every remaining projection and recall
+   index from the beginning.
 2. Generalize NPC goals and feasible planning beyond the single perception-grounded
    Rowan sketch fixture while preserving private knowledge boundaries.
 3. Add bounded multi-turn NPC scenes with interruption, exits, topic state, and

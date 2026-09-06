@@ -56,7 +56,7 @@ from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
-from eidos.ports.event_store import EventStore
+from eidos.ports.event_store import EventStore, StateCheckpoint, StateCheckpointStore
 from eidos.ports.model_gateway import DeferredModelGateway, ModelGateway, ModelRequest
 
 
@@ -79,6 +79,59 @@ class Life:
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
 
+    def _project_state(self, history: list[DomainEvent]) -> PathosState:
+        state = PathosState()
+        start = 0
+        if isinstance(self.store, StateCheckpointStore):
+            checkpoint = self.store.load_checkpoint("pathos", len(history))
+            if checkpoint is not None:
+                try:
+                    raw = checkpoint.state
+                    state = PathosState(
+                        pathos_id=str(raw["pathos_id"]),
+                        simulated_at=datetime.fromisoformat(str(raw["simulated_at"])),
+                        location_id=str(raw["location_id"]),
+                        energy=float(raw["energy"]),
+                        valence=float(raw["valence"]),
+                        arousal=float(raw["arousal"]),
+                        rest=float(raw["rest"]),
+                        connection=float(raw["connection"]),
+                        curiosity=float(raw["curiosity"]),
+                        mastery=float(raw["mastery"]),
+                        awake=raw["awake"],
+                    )
+                    start = checkpoint.revision
+                except (KeyError, TypeError, ValueError):
+                    state = PathosState()
+                    start = 0
+        for event in history[start:]:
+            state = state.apply(event)
+        return state
+
+    def _save_state_checkpoint(self, history: list[DomainEvent], state: PathosState) -> None:
+        if not history or not isinstance(self.store, StateCheckpointStore):
+            return
+        self.store.save_checkpoint(
+            StateCheckpoint(
+                "pathos",
+                len(history),
+                str(history[-1].event_id),
+                {
+                    "pathos_id": state.pathos_id,
+                    "simulated_at": state.simulated_at.isoformat(),
+                    "location_id": state.location_id,
+                    "energy": state.energy,
+                    "valence": state.valence,
+                    "arousal": state.arousal,
+                    "rest": state.rest,
+                    "connection": state.connection,
+                    "curiosity": state.curiosity,
+                    "mastery": state.mastery,
+                    "awake": state.awake,
+                },
+            )
+        )
+
     @staticmethod
     def project(history: list[DomainEvent]) -> PathosState:
         state = PathosState()
@@ -93,7 +146,7 @@ class Life:
 
     def snapshot(self) -> dict[str, Any]:
         history = self.history()
-        state = self.project(history)
+        state = self._project_state(history)
         identity = project_identity(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
@@ -358,13 +411,13 @@ class Life:
 
     def preview_catch_up(self, hours: float) -> CatchUpPreview:
         history = self.history()
-        return preview_catch_up(history, self.project(history).simulated_at, hours)
+        return preview_catch_up(history, self._project_state(history).simulated_at, hours)
 
     def catch_up(self, hours: float) -> None:
         history = self.history()
         if active_catch_up(history) is not None:
             raise ValueError("A catch-up session is already active; resume it instead")
-        preview = preview_catch_up(history, self.project(history).simulated_at, hours)
+        preview = preview_catch_up(history, self._project_state(history).simulated_at, hours)
         catch_up_id = str(uuid4())
         started = DomainEvent(
             "catch_up.started",
@@ -399,7 +452,7 @@ class Life:
         session = active_catch_up(history)
         if session is None:
             raise ValueError("There is no active catch-up session")
-        now = self.project(history).simulated_at
+        now = self._project_state(history).simulated_at
         self.store.append(
             "pathos",
             [
@@ -421,13 +474,13 @@ class Life:
     def _resume_catch_up(self, catch_up_id: str, target: datetime, cause: UUID) -> None:
         while True:
             history = self.history()
-            current = self.project(history).simulated_at
+            current = self._project_state(history).simulated_at
             if current >= target:
                 break
             hours = min(24.0, (target - current).total_seconds() / 3600)
             self.advance(hours)
             after = self.history()
-            through = self.project(after).simulated_at
+            through = self._project_state(after).simulated_at
             self.store.append(
                 "pathos",
                 [
@@ -475,7 +528,7 @@ class Life:
 
     async def _advance(self, hours: float) -> None:
         history = self.history()
-        state = self.project(history)
+        state = self._project_state(history)
         target = state.simulated_at + timedelta(hours=hours)
         if target <= state.simulated_at:
             raise ValueError("Advance is smaller than clock precision")
@@ -903,8 +956,11 @@ class Life:
             pending.extend(episodes)
             if current.hour == 0:
                 pending.extend(consolidation_events(history + pending, current))
-        pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
+        final_time = DomainEvent("time.advanced", "pathos", {"simulated_at": target})
+        pending.append(final_time)
+        state = state.apply(final_time)
         self.store.append("pathos", pending, expected_revision=len(history))
+        self._save_state_checkpoint([*history, *pending], state)
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
                 self.gateway.submit_deferred(request)
@@ -949,7 +1005,7 @@ class Life:
             if previous.payload["text"] != text.strip():
                 raise ValueError("Request ID was already used for a different message")
             return
-        state = self.project(history)
+        state = self._project_state(history)
         at = state.simulated_at.isoformat()
         pending = [
             DomainEvent(

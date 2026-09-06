@@ -22,6 +22,19 @@ class PathosState:
     mastery: float = 0.45
     awake: bool = False
 
+    def __post_init__(self) -> None:
+        if not self.pathos_id.strip() or not self.location_id.strip():
+            raise ValueError("Pathos state requires actor and location identifiers")
+        if self.simulated_at.utcoffset() is None:
+            raise ValueError("Pathos state time must be timezone-aware")
+        _bounded_dimension(self.energy, "energy", 0, 1)
+        _bounded_dimension(self.valence, "valence", -1, 1)
+        _bounded_dimension(self.arousal, "arousal", 0, 1)
+        for name in ("rest", "connection", "curiosity", "mastery"):
+            _bounded_dimension(getattr(self, name), name, 0, 1)
+        if type(self.awake) is not bool:
+            raise ValueError("awake must be boolean")
+
     def apply(self, event: DomainEvent) -> PathosState:
         if event.aggregate_id != self.pathos_id:
             return self

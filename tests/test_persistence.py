@@ -13,7 +13,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.domain.events import DomainEvent
-from eidos.ports.event_store import RevisionConflict
+from eidos.ports.event_store import RevisionConflict, StateCheckpoint
 
 
 class PersistenceTests(unittest.TestCase):
@@ -60,7 +60,59 @@ class PersistenceTests(unittest.TestCase):
         migrated = SQLiteEventStore(legacy_path)
         self.assertEqual(migrated.read("pathos"), [event])
         with sqlite3.connect(legacy_path) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+
+    def test_checkpoint_is_anchored_rebuildable_and_corruption_falls_back(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(8)
+        history = life.history()
+        checkpoint = self.store.load_checkpoint("pathos", len(history))
+        self.assertIsNotNone(checkpoint)
+        assert checkpoint is not None
+        self.assertEqual(checkpoint.last_event_id, str(history[-1].event_id))
+        self.assertEqual(life._project_state(history), Life.project(history))
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "UPDATE state_checkpoints SET state_json = ? WHERE aggregate_id = ?",
+                ('{"energy": 999}', "pathos"),
+            )
+        self.assertIsNone(self.store.load_checkpoint("pathos", len(history)))
+        self.assertEqual(life._project_state(history), Life.project(history))
+
+    def test_checkpoint_refuses_an_unmatched_or_backward_anchor(self) -> None:
+        events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]
+        self.store.append("pathos", events, 0)
+        with self.assertRaises(ValueError):
+            self.store.save_checkpoint(StateCheckpoint("pathos", 2, "wrong", {}))
+        self.store.save_checkpoint(StateCheckpoint("pathos", 2, str(events[1].event_id), {}))
+        with self.assertRaises(ValueError):
+            self.store.save_checkpoint(StateCheckpoint("pathos", 1, str(events[0].event_id), {}))
+
+    def test_semantically_invalid_checkpoint_falls_back_to_full_replay(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(8)
+        history = life.history()
+        self.store.save_checkpoint(
+            StateCheckpoint(
+                "pathos",
+                len(history),
+                str(history[-1].event_id),
+                {
+                    "pathos_id": "pathos",
+                    "location_id": "home",
+                    "simulated_at": history[-1].payload["simulated_at"].isoformat(),
+                    "energy": 99,
+                    "valence": 0,
+                    "arousal": 0.5,
+                    "rest": 0.5,
+                    "connection": 0.5,
+                    "curiosity": 0.5,
+                    "mastery": 0.5,
+                    "awake": True,
+                },
+            )
+        )
+        self.assertEqual(life._project_state(history), Life.project(history))
 
     def test_day_survives_restart_without_repeating_memories(self) -> None:
         first = Life(self.store, StandInGateway())

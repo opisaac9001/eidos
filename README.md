@@ -146,9 +146,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay passes restart-spanning seven-day acceptance and thirty-day
-  offline soak gates. Event history has stable revision pagination; longer deployments
-  still need materialized checkpoints and archive maintenance. Verified online backups
-  and supervised durable model workers are implemented.
+  offline soak gates. Event history has stable revision pagination and a checksummed,
+  event-anchored core-state checkpoint; longer deployments still need broader
+  materialized indexes and archive maintenance. Verified online backups and supervised
+  durable model workers are implemented.
 - Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the

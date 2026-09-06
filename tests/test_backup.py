@@ -17,7 +17,7 @@ class BackupTests(unittest.TestCase):
             life.advance(24)
             report = create_backup(source, destination)
             self.assertEqual(report.integrity, "ok")
-            self.assertEqual(report.schema_version, 2)
+            self.assertEqual(report.schema_version, 3)
             self.assertEqual(report.event_count, len(life.history()))
             restored = Life(SQLiteEventStore(destination), StandInGateway())
             self.assertEqual(restored.snapshot(), life.snapshot())

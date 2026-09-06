@@ -1,7 +1,7 @@
 """Persistence boundary. Append is atomic and checks the caller's revision."""
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
 
 from eidos.domain.events import DomainEvent
 
@@ -20,6 +20,21 @@ class EventRecord:
 class EventPage:
     records: tuple[EventRecord, ...]
     next_before_revision: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class StateCheckpoint:
+    aggregate_id: str
+    revision: int
+    last_event_id: str
+    state: Mapping[str, Any]
+
+
+@runtime_checkable
+class StateCheckpointStore(Protocol):
+    def load_checkpoint(self, aggregate_id: str, max_revision: int) -> StateCheckpoint | None: ...
+
+    def save_checkpoint(self, checkpoint: StateCheckpoint) -> None: ...
 
 
 class EventStore(Protocol):

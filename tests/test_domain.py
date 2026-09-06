@@ -73,6 +73,14 @@ class PathosStateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             state.apply(DomainEvent("affect.changed", "pathos", {"arousal": -0.1}))
 
+    def test_initial_and_checkpoint_state_dimensions_are_validated(self) -> None:
+        with self.assertRaises(ValueError):
+            PathosState(energy=2)
+        with self.assertRaises(ValueError):
+            PathosState(simulated_at=datetime(2026, 1, 1))
+        with self.assertRaises(ValueError):
+            PathosState(awake=1)  # type: ignore[arg-type]
+
 
 if __name__ == "__main__":
     unittest.main()
