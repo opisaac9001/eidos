@@ -66,6 +66,7 @@ class DurableModelGateway(ModelGateway):
                 job_id=UUID(str(request.correlation_id)),
                 created_at=now,
                 available_at=now,
+                deadline_at=now + timedelta(seconds=60 if request.capability == "pathos" else 120),
             )
         )
         if self.supervisor is not None:
@@ -89,6 +90,9 @@ class DurableModelGateway(ModelGateway):
         try:
             response = await self.inner.generate(request)
             text = validate_proposal(request.capability, response.content, context)
+            if job.deadline_at is not None and datetime.now(timezone.utc) >= job.deadline_at:
+                self.jobs.expire_deadlines(datetime.now(timezone.utc))
+                raise TimeoutError("Inference result arrived after its deadline")
             if self.revision_for(aggregate_id) != claimed.expected_revision:
                 self.jobs.fail(job.job_id, self.worker_id, "stale_context")
                 raise OSError("World changed during inference")
@@ -112,6 +116,7 @@ class DurableModelGateway(ModelGateway):
 
     async def _await_result(self, job_id: UUID) -> ModelResponse:
         while True:
+            self.jobs.expire_deadlines(datetime.now(timezone.utc))
             job = self.jobs.get_job(job_id)
             if job is None:
                 raise OSError("Durable job disappeared")

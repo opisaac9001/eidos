@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -17,7 +18,7 @@ class JobStoreTests(unittest.TestCase):
         self.store = SQLiteJobStore(self.path)
         self.now = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    def job(self, key="job-1", priority=50, attempts=2):
+    def job(self, key="job-1", priority=50, attempts=2, deadline=None):
         return CognitionJob(
             capability="murmur",
             aggregate_id="pathos",
@@ -29,6 +30,7 @@ class JobStoreTests(unittest.TestCase):
             idempotency_key=key,
             created_at=self.now,
             available_at=self.now,
+            deadline_at=deadline,
         )
 
     def test_jobs_survive_restart_and_enqueue_is_idempotent(self):
@@ -120,6 +122,58 @@ class JobStoreTests(unittest.TestCase):
         )
         self.assertEqual(claimed.attempts, 1)
         self.assertEqual(failed.status, "failed")
+
+    def test_capacity_is_bounded_but_idempotent_reuse_is_always_available(self):
+        limited = SQLiteJobStore(Path(self.directory.name) / "limited.sqlite3", max_pending=2)
+        first = limited.enqueue(self.job("first"))
+        limited.enqueue(self.job("second"))
+        self.assertEqual(limited.enqueue(self.job("first")).job_id, first.job_id)
+        with self.assertRaisesRegex(JobConflict, "capacity"):
+            limited.enqueue(self.job("third"))
+        limited.cancel(first.job_id)
+        self.assertEqual(limited.enqueue(self.job("third")).status, "queued")
+
+    def test_deadlines_expire_queued_and_running_work_and_bound_retries(self):
+        deadline = self.now + timedelta(seconds=10)
+        queued = self.store.enqueue(self.job("queued-deadline", deadline=deadline))
+        self.assertIsNone(self.store.claim_next("worker", deadline))
+        self.assertEqual(self.store.get_job(queued.job_id).error_code, "deadline_expired")
+
+        running = self.store.enqueue(self.job("running-deadline", deadline=deadline))
+        claimed = self.store.claim_next("worker", self.now, timedelta(seconds=60))
+        self.assertEqual(claimed.lease_until, deadline)
+        self.assertEqual(self.store.expire_deadlines(deadline), 1)
+        with self.assertRaises(JobConflict):
+            self.store.complete(running.job_id, "worker", "late")
+
+        retrying = self.store.enqueue(self.job("retry-deadline", deadline=deadline))
+        self.store.claim_next("worker", self.now)
+        failed = self.store.fail(
+            retrying.job_id, "worker", "endpoint_unavailable", deadline + timedelta(seconds=1)
+        )
+        self.assertEqual(failed.status, "failed")
+
+    def test_legacy_queue_schema_adds_nullable_deadlines_without_losing_rows(self):
+        legacy_path = Path(self.directory.name) / "legacy.sqlite3"
+        with sqlite3.connect(legacy_path) as connection:
+            connection.execute("""
+                CREATE TABLE cognition_jobs (
+                    job_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+                    capability TEXT NOT NULL, aggregate_id TEXT NOT NULL,
+                    context_json TEXT NOT NULL, expected_revision INTEGER NOT NULL,
+                    simulated_at TEXT NOT NULL, priority INTEGER NOT NULL,
+                    max_attempts INTEGER NOT NULL, attempts INTEGER NOT NULL,
+                    status TEXT NOT NULL, created_at TEXT NOT NULL,
+                    available_at TEXT NOT NULL, lease_until TEXT, worker_id TEXT,
+                    result TEXT, error_code TEXT
+                )
+            """)
+        migrated = SQLiteJobStore(legacy_path)
+        job = migrated.enqueue(self.job("after-migration"))
+        self.assertIsNone(migrated.get_job(job.job_id).deadline_at)
+        with sqlite3.connect(legacy_path) as connection:
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(cognition_jobs)")}
+        self.assertIn("deadline_at", columns)
 
 
 if __name__ == "__main__":

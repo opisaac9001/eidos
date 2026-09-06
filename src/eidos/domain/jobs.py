@@ -26,6 +26,7 @@ class CognitionJob:
     attempts: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     available_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    deadline_at: datetime | None = None
     lease_until: datetime | None = None
     worker_id: str | None = None
     result: str | None = None
@@ -44,6 +45,8 @@ class CognitionJob:
             raise ValueError("Job timestamps must be timezone-aware")
         if self.lease_until is not None and self.lease_until.utcoffset() is None:
             raise ValueError("Job lease must be timezone-aware")
+        if self.deadline_at is not None and self.deadline_at.utcoffset() is None:
+            raise ValueError("Job deadline must be timezone-aware")
         if not self.idempotency_key:
             object.__setattr__(self, "idempotency_key", str(self.job_id))
         object.__setattr__(self, "context", MappingProxyType(dict(self.context)))
@@ -51,6 +54,8 @@ class CognitionJob:
     def claimed(self, worker_id: str, lease_until: datetime) -> CognitionJob:
         if self.status != "queued" or not worker_id.strip():
             raise ValueError("Only queued jobs can be claimed")
+        if self.deadline_at is not None and lease_until > self.deadline_at:
+            lease_until = self.deadline_at
         return replace(
             self,
             status="running",

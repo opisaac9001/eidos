@@ -42,6 +42,7 @@ class CognitionSupervisor:
         with self._lock:
             if self._started:
                 return
+            self.jobs.expire_deadlines(datetime.now(timezone.utc))
             self.jobs.recover_expired(datetime.now(timezone.utc))
             self._started = True
             for index in range(self.worker_count):
@@ -62,6 +63,7 @@ class CognitionSupervisor:
                 result = runner.run_once()
                 if result is None:
                     if time.monotonic() >= next_recovery:
+                        self.jobs.expire_deadlines(datetime.now(timezone.utc))
                         self.jobs.recover_expired(datetime.now(timezone.utc))
                         next_recovery = time.monotonic() + 1
                     self.stop_event.wait(self.poll_interval)

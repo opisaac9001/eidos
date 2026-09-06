@@ -42,7 +42,7 @@ class RunnerTests(unittest.TestCase):
         self.now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         self.revision = 7
 
-    def enqueue(self, attempts=2):
+    def enqueue(self, attempts=2, deadline=None):
         return self.jobs.enqueue(
             CognitionJob(
                 capability="murmur",
@@ -54,6 +54,7 @@ class RunnerTests(unittest.TestCase):
                 idempotency_key=f"runner-{len(self.jobs.list_jobs())}",
                 created_at=self.now,
                 available_at=self.now,
+                deadline_at=deadline,
             )
         )
 
@@ -116,6 +117,19 @@ class RunnerTests(unittest.TestCase):
         result = self.runner(Gateway(json.dumps({"wrong": "shape"}))).run_once()
         self.assertEqual(result.status, "failed")
         self.assertEqual(self.jobs.get_job(invalid.job_id).error_code, "invalid_completion")
+
+    def test_completion_after_deadline_is_discarded(self):
+        job = self.enqueue(deadline=self.now + timedelta(seconds=5))
+        gateway = BlockingGateway()
+        result = []
+        thread = threading.Thread(target=lambda: result.append(self.runner(gateway).run_once()))
+        thread.start()
+        self.assertTrue(gateway.entered.wait(1))
+        self.now += timedelta(seconds=6)
+        gateway.release.set()
+        thread.join()
+        self.assertEqual(result[0].status, "failed")
+        self.assertEqual(self.jobs.get_job(job.job_id).error_code, "deadline_expired")
 
 
 if __name__ == "__main__":

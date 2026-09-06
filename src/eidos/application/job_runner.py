@@ -34,6 +34,9 @@ class CognitionJobRunner:
             return None
         if self.revision_for(claimed.aggregate_id) != claimed.expected_revision:
             return self.jobs.fail(claimed.job_id, self.worker_id, "stale_context")
+        if claimed.deadline_at is not None and self.now() >= claimed.deadline_at:
+            self.jobs.expire_deadlines(self.now())
+            return self.jobs.get_job(claimed.job_id)
         try:
             response = asyncio.run(
                 self.gateway.generate(
@@ -52,6 +55,9 @@ class CognitionJobRunner:
                 )
             )
             text = validate_proposal(claimed.capability, response.content, dict(claimed.context))
+            if claimed.deadline_at is not None and self.now() >= claimed.deadline_at:
+                self.jobs.expire_deadlines(self.now())
+                return self.jobs.get_job(claimed.job_id)
             if self.revision_for(claimed.aggregate_id) != claimed.expected_revision:
                 return self.jobs.fail(claimed.job_id, self.worker_id, "stale_context")
             return self.jobs.complete(claimed.job_id, self.worker_id, text)

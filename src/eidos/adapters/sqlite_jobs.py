@@ -13,8 +13,11 @@ from eidos.ports.job_store import JobConflict
 
 
 class SQLiteJobStore:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, max_pending: int = 256) -> None:
+        if not 1 <= max_pending <= 10000:
+            raise ValueError("Pending job limit must be between 1 and 10000")
         self.path = path
+        self.max_pending = max_pending
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute("""
@@ -32,12 +35,18 @@ class SQLiteJobStore:
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     available_at TEXT NOT NULL,
+                    deadline_at TEXT,
                     lease_until TEXT,
                     worker_id TEXT,
                     result TEXT,
                     error_code TEXT
                 )
             """)
+            columns = {
+                str(row[1]) for row in connection.execute("PRAGMA table_info(cognition_jobs)")
+            }
+            if "deadline_at" not in columns:
+                connection.execute("ALTER TABLE cognition_jobs ADD COLUMN deadline_at TEXT")
             connection.execute("""
                 CREATE INDEX IF NOT EXISTS cognition_jobs_ready
                 ON cognition_jobs(status, available_at, priority DESC, created_at)
@@ -64,6 +73,7 @@ class SQLiteJobStore:
             attempts=row["attempts"],
             created_at=datetime.fromisoformat(row["created_at"]),
             available_at=datetime.fromisoformat(row["available_at"]),
+            deadline_at=datetime.fromisoformat(row["deadline_at"]) if row["deadline_at"] else None,
             lease_until=datetime.fromisoformat(row["lease_until"]) if row["lease_until"] else None,
             worker_id=row["worker_id"],
             result=row["result"],
@@ -72,44 +82,53 @@ class SQLiteJobStore:
 
     def enqueue(self, job: CognitionJob) -> CognitionJob:
         encoded = json.dumps(dict(job.context), allow_nan=False, sort_keys=True)
-        try:
-            with self._connect() as connection:
-                connection.execute(
-                    "INSERT INTO cognition_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (
-                        str(job.job_id),
-                        job.idempotency_key,
-                        job.capability,
-                        job.aggregate_id,
-                        encoded,
-                        job.expected_revision,
-                        job.simulated_at,
-                        job.priority,
-                        job.max_attempts,
-                        job.attempts,
-                        job.status,
-                        job.created_at.isoformat(),
-                        job.available_at.isoformat(),
-                        None,
-                        None,
-                        None,
-                        None,
-                    ),
-                )
-            return job
-        except sqlite3.IntegrityError:
-            with self._connect() as connection:
-                row = connection.execute(
-                    "SELECT * FROM cognition_jobs WHERE idempotency_key = ?", (job.idempotency_key,)
-                ).fetchone()
-            if row is None:
-                raise
-            existing = self._from_row(row)
-            comparable = (existing.capability, existing.aggregate_id, dict(existing.context))
-            proposed = (job.capability, job.aggregate_id, dict(job.context))
-            if comparable != proposed:
-                raise JobConflict("Idempotency key was already used for different work") from None
-            return existing
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM cognition_jobs WHERE idempotency_key = ?", (job.idempotency_key,)
+            ).fetchone()
+            if row is not None:
+                existing = self._from_row(row)
+                comparable = (existing.capability, existing.aggregate_id, dict(existing.context))
+                proposed = (job.capability, job.aggregate_id, dict(job.context))
+                if comparable != proposed:
+                    raise JobConflict(
+                        "Idempotency key was already used for different work"
+                    ) from None
+                return existing
+            pending = connection.execute(
+                "SELECT COUNT(*) FROM cognition_jobs WHERE status IN ('queued','running')"
+            ).fetchone()[0]
+            if pending >= self.max_pending:
+                raise JobConflict("Cognition queue is at capacity")
+            connection.execute(
+                "INSERT INTO cognition_jobs "
+                "(job_id,idempotency_key,capability,aggregate_id,context_json,"
+                "expected_revision,simulated_at,priority,max_attempts,attempts,status,"
+                "created_at,available_at,deadline_at,lease_until,worker_id,result,error_code) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    str(job.job_id),
+                    job.idempotency_key,
+                    job.capability,
+                    job.aggregate_id,
+                    encoded,
+                    job.expected_revision,
+                    job.simulated_at,
+                    job.priority,
+                    job.max_attempts,
+                    job.attempts,
+                    job.status,
+                    job.created_at.isoformat(),
+                    job.available_at.isoformat(),
+                    job.deadline_at.isoformat() if job.deadline_at else None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            )
+        return job
 
     def get_job(self, job_id: UUID) -> CognitionJob | None:
         with self._connect() as connection:
@@ -132,12 +151,14 @@ class SQLiteJobStore:
     ) -> CognitionJob | None:
         if not worker_id.strip() or now.utcoffset() is None or lease.total_seconds() <= 0:
             raise ValueError("Worker, aware timestamp, and positive lease are required")
+        self.expire_deadlines(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT * FROM cognition_jobs WHERE status='queued' AND available_at <= ? "
+                "AND (deadline_at IS NULL OR deadline_at > ?) "
                 "ORDER BY priority DESC, created_at, job_id LIMIT 1",
-                (now.isoformat(),),
+                (now.isoformat(), now.isoformat()),
             ).fetchone()
             if row is None:
                 return None
@@ -159,6 +180,7 @@ class SQLiteJobStore:
     ) -> CognitionJob:
         if not worker_id.strip() or now.utcoffset() is None or lease.total_seconds() <= 0:
             raise ValueError("Worker, aware timestamp, and positive lease are required")
+        self.expire_deadlines(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
@@ -209,7 +231,11 @@ class SQLiteJobStore:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             job = self._owned_running(connection, job_id, worker_id)
-            retry = retry_at is not None and job.attempts < job.max_attempts
+            retry = (
+                retry_at is not None
+                and job.attempts < job.max_attempts
+                and (job.deadline_at is None or retry_at < job.deadline_at)
+            )
             connection.execute(
                 "UPDATE cognition_jobs SET status=?, available_at=?, worker_id=NULL, "
                 "lease_until=NULL, error_code=? WHERE job_id=?",
@@ -259,3 +285,14 @@ class SQLiteJobStore:
                 (now.isoformat(), now.isoformat()),
             ).rowcount
         return failed + queued
+
+    def expire_deadlines(self, now: datetime) -> int:
+        if now.utcoffset() is None:
+            raise ValueError("Deadline time must be timezone-aware")
+        with self._connect() as connection:
+            return connection.execute(
+                "UPDATE cognition_jobs SET status='failed', worker_id=NULL, lease_until=NULL, "
+                "error_code='deadline_expired' WHERE status IN ('queued','running') "
+                "AND deadline_at IS NOT NULL AND deadline_at <= ?",
+                (now.isoformat(),),
+            ).rowcount

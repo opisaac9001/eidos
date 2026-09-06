@@ -221,7 +221,7 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Extend the shipped typed v1 envelopes to speech and memory associations.
-2. Add job deadlines/backpressure and detach optional result application from callers.
+2. Detach optional cognition result application from simulation callers.
 3. Persist the in-memory entity/goal memory indexes and add relationship/diversity indexes.
 4. Expand the reusable accepted-work planner beyond repair with travel/resources.
 5. Extend bounded social scenes from work requests to invitations and follow-ups.

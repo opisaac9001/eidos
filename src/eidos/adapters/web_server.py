@@ -111,6 +111,7 @@ class Runtime:
                         "status": job.status,
                         "attempts": job.attempts,
                         "error_code": job.error_code,
+                        "deadline_at": job.deadline_at.isoformat() if job.deadline_at else None,
                     }
                     for job in jobs[:20]
                 ],
