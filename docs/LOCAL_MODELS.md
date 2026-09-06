@@ -1,6 +1,6 @@
 # Local model testing
 
-Eidos can run eight narrative performers and four structured proposal roles through
+Eidos can run eight narrative performers and five structured proposal roles through
 an OpenAI-compatible chat completion endpoint supporting JSON-schema responses. They
 are logical roles in one application, not separately deployed services. The continuity
 critic remains deterministic code. Offline stand-ins are still the default.
@@ -91,8 +91,8 @@ output, lost first-person voice, prompt/AI-role leakage, time-of-day contradicti
 explicit evidence contradictions, forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
 `benchmark-model` repeats a three-context synthetic corpus one to five times for the
-eight narrative performers plus varied structured agency cases for Pathos and one
-independent resident. It reports
+eight narrative performers plus varied structured cases for Pathos activities,
+multi-step projects, and one independent resident. It reports
 per-role contract/finding counts, retained samples, median/max latency, tokens, and a
 minimum three-sample screening floor. Pathos agency must also parse and pass the real
 place/time/travel/resource planner; resident agency must preserve private ownership and

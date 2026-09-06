@@ -416,6 +416,122 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "pathos_project":
+            projects = (
+                (
+                    "neighborhood_sound_atlas",
+                    "Make a small atlas of neighborhood sounds",
+                    "Follow curiosity across several places and notice how their rhythms differ.",
+                    (
+                        (
+                            "listening_walk",
+                            "Collect sound notes in Willow Square",
+                            "attend",
+                            "park",
+                            1,
+                        ),
+                        (
+                            "workshop_rhythm_notes",
+                            "Compare the workshop's working rhythms",
+                            "learn",
+                            "workshop",
+                            3,
+                        ),
+                        (
+                            "sound_atlas_draft",
+                            "Draft the neighborhood sound atlas",
+                            "work",
+                            "home",
+                            5,
+                        ),
+                    ),
+                ),
+                (
+                    "ordinary_object_study",
+                    "Trace the lives of three ordinary objects",
+                    "Practice patient observation while keeping imagination distinct from fact.",
+                    (
+                        (
+                            "cafe_object_notes",
+                            "Observe the wear on objects at the café",
+                            "attend",
+                            "cafe",
+                            1,
+                        ),
+                        (
+                            "repair_construction_study",
+                            "Study how repaired objects were constructed",
+                            "learn",
+                            "workshop",
+                            3,
+                        ),
+                        (
+                            "object_history_draft",
+                            "Write three evidence-based object sketches",
+                            "work",
+                            "home",
+                            5,
+                        ),
+                    ),
+                ),
+                (
+                    "seasonal_light_journal",
+                    "Build a short journal of changing seasonal light",
+                    "Give sustained attention to a subtle change that cannot be understood at once.",
+                    (
+                        (
+                            "morning_light_notes",
+                            "Record morning light in the square",
+                            "attend",
+                            "park",
+                            1,
+                        ),
+                        (
+                            "indoor_light_comparison",
+                            "Compare afternoon light at the café",
+                            "attend",
+                            "cafe",
+                            3,
+                        ),
+                        (
+                            "light_journal_assembly",
+                            "Assemble the seasonal light journal",
+                            "work",
+                            "home",
+                            5,
+                        ),
+                    ),
+                ),
+            )
+            project = projects[choice % len(projects)]
+            known_places = context["known_places"]
+            steps = [
+                {
+                    "activity_type": step[0],
+                    "title": step[1],
+                    "action": step[2],
+                    "location_id": step[3] if step[3] in known_places else "home",
+                    "resource_id": "none",
+                    "day_offset": step[4],
+                    "scheduled_hour": 14,
+                    "duration_hours": 2,
+                }
+                for step in project[3]
+            ]
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "project_type": project[0],
+                        "title": project[1],
+                        "motivation": project[2],
+                        "priority": 0.56,
+                        "steps": steps,
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         else:
             raise ValueError(f"Unknown stand-in capability: {role}")
         return ModelResponse(

@@ -9,6 +9,7 @@ STRUCTURED_CAPABILITIES = {
     "moira_expansion",
     "npc_agency",
     "pathos_agency",
+    "pathos_project",
 }
 
 

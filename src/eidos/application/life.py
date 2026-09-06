@@ -57,6 +57,7 @@ from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
+from eidos.application.self_projects import autonomous_project_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.urgent_incidents import (
@@ -613,6 +614,12 @@ class Life:
                 "agency.activity_rejected",
                 "agency.activity_realized",
                 "agency.activity_missed",
+                "self_project.proposed",
+                "self_project.accepted",
+                "self_project.rejected",
+                "self_project.completed",
+                "self_project.failed",
+                "self_project.step_failed",
                 "goal.activated",
                 "goal.progressed",
                 "goal.achieved",
@@ -1066,6 +1073,39 @@ class Life:
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
+            project_history = history + pending
+            project_feeling = project_emotion(project_history)
+            project_events = await autonomous_project_events(
+                project_history,
+                current,
+                len(project_history),
+                self.gateway,
+                planning=self._planning(project_history),
+                catalog=self._world_catalog(project_history),
+                needs={
+                    "rest": state.rest,
+                    "connection": state.connection,
+                    "curiosity": state.curiosity,
+                    "mastery": state.mastery,
+                    "energy": state.energy,
+                },
+                emotion={
+                    "label": project_feeling.label,
+                    "valence": project_feeling.valence,
+                    "arousal": project_feeling.arousal,
+                    "sustained_low_hours": project_feeling.sustained_low_hours,
+                },
+                values=project_identity(project_history).values,
+                memories=[
+                    str(event.payload["text"])
+                    for event in project_history
+                    if event.kind == "memory.recorded"
+                    and isinstance(event.payload.get("text"), str)
+                ],
+            )
+            if project_events:
+                self._planning(project_history + project_events)
+                pending.extend(project_events)
             agency_history = history + pending
             current_emotion = project_emotion(agency_history)
             agency = await autonomous_activity_events(

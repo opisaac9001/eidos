@@ -23,6 +23,7 @@ CAPABILITIES = {
     "moira_expansion",
     "pathos_agency",
     "npc_agency",
+    "pathos_project",
 }
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

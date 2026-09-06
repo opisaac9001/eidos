@@ -178,8 +178,10 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   Support refusal, interruption, postponement, renegotiation, failure and abandonment.
 - Open-ended personal agency proposals grounded in needs, emotions, values, memories,
   relationships, places and possessions. Activity meaning may be novel, while execution
-  still uses typed actions and deterministic feasibility. This first slice is complete;
-  multi-step decomposition and general NPC proposal vocabularies remain later work.
+  still uses typed actions and deterministic feasibility. Pathos can also propose a
+  two-to-four-step project with atomic schedule/travel/resource admission, incremental
+  action-backed progress, and whole-project cleanup on a failed required step. Residents
+  independently propose owner-private open-vocabulary plans after the authored opening.
 - Persistent objects and validated actions: move, meet, borrow, give, repair,
   learn, rest, work and attend. Narration alone cannot perform an action.
 - NPC-private knowledge, needs, plans and directed relationships. Bounded multi-turn

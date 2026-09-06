@@ -8,10 +8,10 @@ from eidos.application.model_benchmark import benchmark_contexts, benchmark_mode
 class ModelBenchmarkTests(unittest.TestCase):
     def test_varied_corpus_reports_separate_contract_quality_and_latency(self):
         report = asyncio.run(benchmark_model(StandInGateway(), runs=3))
-        self.assertEqual(report["calls"], 30)
+        self.assertEqual(report["calls"], 33)
         self.assertEqual(report["contract_pass_rate"], 1.0)
         self.assertEqual(report["semantic_clean_rate"], 1.0)
-        self.assertEqual(len(report["roles"]), 10)
+        self.assertEqual(len(report["roles"]), 11)
         self.assertTrue(all(role["calls"] == 3 for role in report["roles"]))
         self.assertTrue(all("error_counts" in role for role in report["roles"]))
         self.assertTrue(all("finding_counts" in role for role in report["roles"]))
@@ -24,6 +24,9 @@ class ModelBenchmarkTests(unittest.TestCase):
         npc_agency = next(role for role in report["roles"] if role["role"] == "npc_agency")
         self.assertEqual(npc_agency["contracts_passed"], 3)
         self.assertEqual(npc_agency["semantic_clean"], 3)
+        project = next(role for role in report["roles"] if role["role"] == "pathos_project")
+        self.assertEqual(project["contracts_passed"], 3)
+        self.assertEqual(project["semantic_clean"], 3)
 
     def test_corpus_contains_hidden_knowledge_and_role_pressure_cases(self):
         contexts = benchmark_contexts()

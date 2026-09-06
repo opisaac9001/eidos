@@ -110,6 +110,7 @@ def resolve_action(
     actor_location_id: str,
     actual_revision: int,
     simulated_at: datetime,
+    goal_progress_delta: float = 0.5,
 ) -> ActionResolution:
     """Validate a proposal against current state and return its only legal effects."""
 
@@ -140,6 +141,12 @@ def resolve_action(
 
     if proposal.expected_revision != actual_revision:
         return reject("stale_revision", "The world changed after this action was proposed")
+    if (
+        isinstance(goal_progress_delta, bool)
+        or not isinstance(goal_progress_delta, (int, float))
+        or not 0 < goal_progress_delta <= 0.5
+    ):
+        return reject("invalid_progress", "Goal progress must be greater than zero and at most 0.5")
     if proposal.intention_id is not None:
         intention = state.intentions.get(proposal.intention_id)
         if intention is None:
@@ -323,13 +330,13 @@ def resolve_action(
                 "goal.progressed",
                 {
                     "goal_id": goal.goal_id,
-                    "progress_delta": 0.5,
+                    "progress_delta": goal_progress_delta,
                     "simulated_at": simulated_at,
                 },
                 activity_completed.event_id,
             )
             effects.append(progressed)
-            if goal.progress + 0.5 >= 1:
+            if goal.progress + goal_progress_delta >= 1:
                 effects.append(
                     effect(
                         "goal.achieved",

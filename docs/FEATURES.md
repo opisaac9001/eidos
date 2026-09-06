@@ -46,8 +46,8 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: motivated goals + project progress/completion/audited abandonment + ordered materialized replay | P3 |
-| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments + validated project resource | P3 |
+| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: motivated goals + model-originated multi-step project progress/completion/audited whole-project failure + ordered materialized replay | P3 |
+| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments + distinct linked intentions for every generated project step | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/multi-hop travel buffers/replayed place hours + model-originated personal plans | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules + absent-companion failure | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption, two-party promise retiming + atomic project cancellation | P3 |
@@ -61,7 +61,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite supplies, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
-| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended self-chosen activities, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
+| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended one-off and multi-day self-chosen projects, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people originate schema-checked open-vocabulary private plans from owner-only context, then move/act or fail; audited priorities and critical-energy replanning remain deterministic | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, source-attributed expiring real-town inspiration, schema-valid open-ended resource-backed events with novelty scores, plus witnessed urgent incidents with independent response | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |

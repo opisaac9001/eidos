@@ -38,7 +38,8 @@ The local prototype has six connected views: Observatory, World, Conversation,
 Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
 NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
 scheduled activities, and a factual daybook. All eight narrative performers plus
-Moira's two structured world proposers plus structured Pathos and resident agency can use
+Moira's two structured world proposers plus structured Pathos activity, multi-step
+project, and resident agency can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
@@ -193,6 +194,9 @@ network authorization; the server remains loopback-only until authenticated depl
   consent, custody, terms, resources, schedules, open hours, travel buffers,
   abandonment, and renegotiation. Accepted ideas remain intentions and calendar entries
   until the normal action path completes them; unavailable companions can make them fail.
+  He can also originate a two-to-four-step project spanning several days. Every step is
+  scheduled atomically, advances one bounded share of the goal only after real execution,
+  and a blocked required step explicitly fails and closes the remaining project plan.
 - A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
   a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
   memories. Integrated two- and four-turn scenes request performer-generated dialogue;

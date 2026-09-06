@@ -117,6 +117,19 @@ class MonthSoakTests(unittest.TestCase):
                     for event in events
                 )
             )
+            projects = [event for event in events if event.kind == "self_project.accepted"]
+            self.assertTrue(projects)
+            project_ids = {str(projects[0].payload["proposal_id"])}
+            terminal_projects = [
+                event
+                for event in events
+                if event.kind in {"self_project.completed", "self_project.failed"}
+                and event.payload.get("proposal_id") in project_ids
+            ]
+            self.assertEqual(
+                {str(event.payload["proposal_id"]) for event in terminal_projects},
+                project_ids,
+            )
             priorities = [event for event in events if event.kind == "npc.priority_evaluated"]
             self.assertEqual(
                 {event.payload["actor_id"] for event in priorities},

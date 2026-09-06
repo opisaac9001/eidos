@@ -203,6 +203,14 @@ intention. Completion later passes through the ordinary action resolver. If a na
 companion is elsewhere when the activity is due, the schedule fails and the intention
 is abandoned rather than silently fabricating attendance.
 
+Longer self-directed projects use a separate structured proposal containing two to four
+chronological steps. The rules layer admits all steps atomically: every interval, route,
+place hour, usable object, intention, and fractional progress share must be valid before
+the goal exists. Each later action contributes only its configured bounded share. The
+last successful step produces project completion. A missed or resource-blocked required
+step fails its schedule and intention, cancels unfinished sibling steps, abandons their
+intentions and the goal, and records the project failure without erasing completed work.
+
 ## 7. Social scenes and independent NPCs
 
 Scene lifecycle: establish location/participants → assemble each actor's own

@@ -51,6 +51,7 @@ class CalendarEntry:
     activity_type: str | None = None
     source_proposal_id: str | None = None
     intention_id: str | None = None
+    goal_progress_delta: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +121,7 @@ class PlanningState:
                     "activity_type": None,
                     "source_proposal_id": None,
                     "intention_id": None,
+                    "goal_progress_delta": None,
                     **value,
                 }
                 if isinstance(value, dict)
@@ -276,6 +278,7 @@ class PlanningState:
                     activity_type=_optional(payload, "activity_type"),
                     source_proposal_id=_optional(payload, "source_proposal_id"),
                     intention_id=_optional(payload, "intention_id"),
+                    goal_progress_delta=_optional_bounded_float(payload, "goal_progress_delta"),
                 )
             case "schedule.interrupted":
                 entry = _existing(calendar, payload, "schedule_id")
@@ -562,6 +565,15 @@ def _optional(payload: Mapping[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be null or a non-empty string")
     return value
+
+
+def _optional_bounded_float(payload: Mapping[str, Any], key: str) -> float | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 0.5:
+        raise ValueError(f"{key} must be greater than zero and at most 0.5")
+    return float(value)
 
 
 def _optional_nonnegative_int(payload: Mapping[str, Any], key: str) -> int | None:

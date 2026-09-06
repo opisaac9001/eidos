@@ -58,7 +58,8 @@ def scheduled_activity_events(
             action is ActionKind.ATTEND and simulated_at > ends_at
         ):
             if entry.activity_type is not None and simulated_at > ends_at:
-                missed_events = _missed_agency_events(
+                missed_events = _failed_open_plan_events(
+                    projected,
                     entry,
                     intention.intention_id,
                     "Pathos was not able to be at the planned place in time.",
@@ -71,7 +72,8 @@ def scheduled_activity_events(
         if entry.companion_id is not None and (
             actor_locations is None or actor_locations.get(entry.companion_id) != entry.location_id
         ):
-            companion_consequences = _missed_agency_events(
+            companion_consequences = _failed_open_plan_events(
+                projected,
                 entry,
                 intention.intention_id,
                 "The hoped-for companion was not present when the activity was due.",
@@ -186,11 +188,23 @@ def scheduled_activity_events(
             actor_location_id=actor_location_id,
             actual_revision=actual_revision + len(output),
             simulated_at=simulated_at,
+            goal_progress_delta=entry.goal_progress_delta or 0.5,
         )
         output.extend(resolution.events)
         for event in resolution.events:
             projected = projected.apply(event)
         if not resolution.accepted:
+            if entry.source_proposal_id is not None and entry.activity_type is not None:
+                failed_events = _failed_open_plan_events(
+                    projected,
+                    entry,
+                    intention.intention_id,
+                    resolution.explanation,
+                    simulated_at,
+                )
+                output.extend(failed_events)
+                for event in failed_events:
+                    projected = projected.apply(event)
             continue
         completion = next(
             event
@@ -215,6 +229,26 @@ def scheduled_activity_events(
                     },
                     causation_id=completion.event_id,
                     correlation_id=entry.source_proposal_id or correlation,
+                )
+            )
+        achieved = next(
+            (event for event in resolution.events if event.kind == "goal.achieved"), None
+        )
+        if achieved is not None and entry.source_proposal_id is not None:
+            output.append(
+                DomainEvent(
+                    "self_project.completed",
+                    "pathos",
+                    {
+                        "proposal_id": entry.source_proposal_id,
+                        "goal_id": entry.goal_id,
+                        "title": projected.goals[entry.goal_id].title
+                        if entry.goal_id
+                        else entry.title,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=achieved.event_id,
+                    correlation_id=entry.source_proposal_id,
                 )
             )
 
@@ -296,26 +330,30 @@ def scheduled_activity_events(
     return output
 
 
-def _missed_agency_events(
+def _failed_open_plan_events(
+    state: PlanningState,
     entry: CalendarEntry,
     intention_id: str,
     reason: str,
     simulated_at: datetime,
-) -> tuple[DomainEvent, DomainEvent, DomainEvent]:
+) -> list[DomainEvent]:
     correlation = entry.source_proposal_id or entry.schedule_id
+    project_step = entry.goal_id is not None and entry.source_proposal_id is not None
     missed = DomainEvent(
-        "agency.activity_missed",
+        "self_project.step_failed" if project_step else "agency.activity_missed",
         "pathos",
         {
             "schedule_id": entry.schedule_id,
             "activity_type": entry.activity_type,
             "companion_id": entry.companion_id,
+            "proposal_id": entry.source_proposal_id,
+            "goal_id": entry.goal_id,
             "reason": reason,
             "simulated_at": simulated_at.isoformat(),
         },
         correlation_id=correlation,
     )
-    return (
+    events = [
         missed,
         DomainEvent(
             "schedule.failed",
@@ -339,7 +377,75 @@ def _missed_agency_events(
             causation_id=missed.event_id,
             correlation_id=correlation,
         ),
+    ]
+    if entry.goal_id is None or entry.source_proposal_id is None:
+        return events
+    project_failed = DomainEvent(
+        "self_project.failed",
+        "pathos",
+        {
+            "proposal_id": entry.source_proposal_id,
+            "goal_id": entry.goal_id,
+            "failed_schedule_id": entry.schedule_id,
+            "reason": reason,
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=missed.event_id,
+        correlation_id=correlation,
     )
+    events.append(project_failed)
+    for other in state.calendar.values():
+        if (
+            other.goal_id == entry.goal_id
+            and other.schedule_id != entry.schedule_id
+            and other.status in {"scheduled", "interrupted"}
+        ):
+            events.append(
+                DomainEvent(
+                    "schedule.cancelled",
+                    "pathos",
+                    {
+                        "schedule_id": other.schedule_id,
+                        "reason": "Another required project step failed.",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=project_failed.event_id,
+                    correlation_id=correlation,
+                )
+            )
+    for other_intention in state.intentions.values():
+        if (
+            other_intention.goal_id == entry.goal_id
+            and other_intention.intention_id != intention_id
+            and other_intention.status == "active"
+        ):
+            events.append(
+                DomainEvent(
+                    "intention.abandoned",
+                    "pathos",
+                    {
+                        "intention_id": other_intention.intention_id,
+                        "reason": "Another required project step failed.",
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=project_failed.event_id,
+                    correlation_id=correlation,
+                )
+            )
+    events.append(
+        DomainEvent(
+            "goal.abandoned",
+            "pathos",
+            {
+                "goal_id": entry.goal_id,
+                "reason": reason,
+                "simulated_at": simulated_at.isoformat(),
+            },
+            causation_id=project_failed.event_id,
+            correlation_id=correlation,
+        )
+    )
+    return events
 
 
 def _sample(key: str) -> float:

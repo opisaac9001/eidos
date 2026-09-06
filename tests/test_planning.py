@@ -110,6 +110,7 @@ class PlanningTests(unittest.TestCase):
                         "activity_type",
                         "source_proposal_id",
                         "intention_id",
+                        "goal_progress_delta",
                     }
                 }
             ],

@@ -129,6 +129,33 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["external_signals"], {"signal-1": "Attributed weather report"})
         self.assertNotIn("private_state", context)
 
+    def test_multi_step_project_gets_bounded_larger_envelope_and_filtered_context(self):
+        request = ModelRequest(
+            capability="pathos_project",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps(
+                        {
+                            "time": "2026-01-16T09:00:00+00:00",
+                            "needs": {"curiosity": 0.8},
+                            "known_places": {"home": {"name": "Home"}},
+                            "calendar": [],
+                            "private_operator_field": "must not pass",
+                        }
+                    ),
+                ),
+            ),
+            temperature=0.9,
+            max_output_tokens=900,
+            output_schema={"type": "object", "properties": {}},
+        )
+        asyncio.run(self.gateway.generate(request))
+        self.assertEqual(self.payload["max_tokens"], 640)
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["needs"], {"curiosity": 0.8})
+        self.assertNotIn("private_operator_field", context)
+
     def test_incomplete_and_invalid_envelopes_rejected(self):
         self.envelope["choices"][0]["finish_reason"] = "length"
         with self.assertRaises(ValueError):

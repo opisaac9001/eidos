@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from statistics import median
 from time import perf_counter
 
 from eidos.application.cognition import perform
 from eidos.application.npc_agency import autonomous_npc_plan_events
+from eidos.application.self_projects import autonomous_project_events
 from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.domain.agency import (
     agency_output_schema,
@@ -90,6 +91,7 @@ async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, obj
     roles = [str(role["id"]) for role in ROLES if role["id"] != "critic"] + [
         "pathos_agency",
         "npc_agency",
+        "pathos_project",
     ]
     contexts = benchmark_contexts()
     samples: list[dict[str, object]] = []
@@ -102,6 +104,9 @@ async def benchmark_model(gateway: ModelGateway, runs: int = 2) -> dict[str, obj
                 continue
             if role == "npc_agency":
                 samples.append(await _npc_agency_sample(gateway, run))
+                continue
+            if role == "pathos_project":
+                samples.append(await _self_project_sample(gateway, run))
                 continue
             events: list[DomainEvent] = []
             text = await perform(gateway, role, context, str(context["time"]), events)
@@ -293,6 +298,44 @@ async def _npc_agency_sample(gateway: ModelGateway, run: int) -> dict[str, objec
         "contract_passed": plan is not None,
         "semantic_findings": findings,
         "text": plan.payload.get("title") if plan is not None else None,
+        "latency_ms": trace.payload.get("latency_ms", 0.0),
+        "prompt_tokens": trace.payload.get("prompt_tokens"),
+        "output_tokens": trace.payload.get("output_tokens"),
+        "error_code": trace.payload.get("error_code"),
+        "model": trace.payload.get("model", getattr(gateway, "model", "unknown")),
+        "backend": trace.payload.get("backend", "unknown"),
+    }
+
+
+async def _self_project_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
+    at = datetime(2026, 1, 16, 9, tzinfo=timezone.utc) + timedelta(days=run * 14)
+    events = await autonomous_project_events(
+        [],
+        at,
+        0,
+        gateway,
+        planning=PlanningState(),
+        catalog=project_world_catalog([]),
+        needs={"curiosity": 0.78, "mastery": 0.52, "connection": 0.48},
+        emotion={"label": ("quiet", "contentment", "melancholy")[run % 3]},
+        values={"curiosity": 0.8, "care": 0.7},
+        memories=["The workshop sounded different in the rain."],
+    )
+    trace = next(
+        event
+        for event in events
+        if event.kind == "role.completed" and event.payload.get("role") == "pathos_project"
+    )
+    accepted = next((event for event in events if event.kind == "self_project.accepted"), None)
+    rejected = next((event for event in events if event.kind == "self_project.rejected"), None)
+    findings = [str(rejected.payload["code"])] if rejected is not None else []
+    return {
+        "run": run + 1,
+        "case_id": f"multi-step-project-{run + 1}",
+        "role": "pathos_project",
+        "contract_passed": accepted is not None,
+        "semantic_findings": findings,
+        "text": accepted.payload.get("title") if accepted is not None else None,
         "latency_ms": trace.payload.get("latency_ms", 0.0),
         "prompt_tokens": trace.payload.get("prompt_tokens"),
         "output_tokens": trace.payload.get("output_tokens"),
