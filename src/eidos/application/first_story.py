@@ -2,10 +2,14 @@
 
 from datetime import datetime, timedelta
 
+from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
+from eidos.domain.planning import project_planning
 
 
-def story_events(current: datetime, existing: list[DomainEvent]) -> list[DomainEvent]:
+def story_events(
+    current: datetime, existing: list[DomainEvent], actor_location_id: str
+) -> list[DomainEvent]:
     day = (current.date() - datetime(2026, 1, 1).date()).days + 1
     kinds = {event.kind for event in existing}
     at = current.isoformat()
@@ -131,17 +135,26 @@ def story_events(current: datetime, existing: list[DomainEvent]) -> list[DomainE
             ),
         ]
     if day == 2 and current.hour == 14 and "commitment.fulfilled" not in kinds:
+        proposal = ActionProposal(
+            proposal_id="repair-mara-lamp-at-rescheduled-time",
+            actor_id="pathos",
+            action=ActionKind.REPAIR,
+            expected_revision=len(existing),
+            target_id="mara-lamp",
+            schedule_id="repair-mara-lamp-slot",
+            intention_id="repair-mara-lamp",
+        )
+        resolution = resolve_action(
+            proposal,
+            state=project_planning(existing),
+            actor_location_id=actor_location_id,
+            actual_revision=len(existing),
+            simulated_at=current,
+        )
+        if not resolution.accepted:
+            return list(resolution.events)
         return [
-            DomainEvent(
-                "object.condition_changed",
-                "pathos",
-                {"object_id": "mara-lamp", "condition": "repaired", "simulated_at": at},
-            ),
-            DomainEvent(
-                "schedule.completed",
-                "pathos",
-                {"schedule_id": "repair-mara-lamp-slot", "simulated_at": at},
-            ),
+            *resolution.events,
             DomainEvent(
                 "commitment.fulfilled",
                 "pathos",

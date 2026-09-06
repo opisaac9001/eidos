@@ -219,7 +219,7 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Finish typed action/intention/world-event envelopes and migrations.
+1. Extend the shipped action-v1 envelope to intentions/world events and add migrations.
 2. Move inline durable execution to supervised background workers and expose cancellation.
 3. Add entity/relationship/goal indexes and richer retrieval explanations.
 4. Generalize planning beyond the authored lamp story.

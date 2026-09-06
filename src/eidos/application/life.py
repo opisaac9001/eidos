@@ -218,7 +218,7 @@ class Life:
                         },
                     )
                 )
-            story = story_events(current, history + pending)
+            story = story_events(current, history + pending, state.location_id)
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
