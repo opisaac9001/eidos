@@ -189,7 +189,9 @@ network authorization; the server remains loopback-only until authenticated depl
   curiosity, capability, and values. If it does, he schedules two feasible visits,
   must physically reach the shared object while it remains usable, and learns through
   ordinary validated actions; he may also decline, or explicitly abandon the project
-  when access fails.
+  when access fails. A neighbor who is genuinely co-present may independently join or
+  decline that practical activity. Joining creates shared relationship evidence and a
+  later follow-up; merely being named in narration does not.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

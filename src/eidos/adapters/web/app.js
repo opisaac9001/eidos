@@ -97,6 +97,8 @@ const labels = {
   "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
   "object.opportunity_evaluated": "A USEFUL OBJECT CONSIDERED",
   "object.used": "AN OBJECT USED",
+  "object.collaboration_decided": "A NEIGHBOR DECIDED WHETHER TO JOIN",
+  "object.shared_use": "A SHARED PRACTICAL MOMENT",
   "catch_up.summarized": "WHILE YOU WERE AWAY",
   "catch_up.cancelled": "CATCH-UP CANCELLED",
   "commitment.renegotiation_offered": "NEW PROMISE TERMS OFFERED",

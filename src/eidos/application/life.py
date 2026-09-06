@@ -37,6 +37,7 @@ from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
+from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_opportunities import object_opportunity_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
@@ -622,6 +623,8 @@ class Life:
                 "object.ownership_changed",
                 "object.opportunity_evaluated",
                 "object.used",
+                "object.collaboration_decided",
+                "object.shared_use",
                 "catch_up.summarized",
                 "catch_up.cancelled",
             }:
@@ -1600,6 +1603,14 @@ class Life:
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)
                 pending.extend(scheduled_activity)
+            pending.extend(
+                object_collaboration_events(
+                    history + pending,
+                    current,
+                    npc_people=project_npcs(history + pending, current).people,
+                    relationships=self._relationships(history + pending).relationships,
+                )
+            )
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),

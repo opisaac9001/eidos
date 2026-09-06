@@ -366,6 +366,13 @@ action resolver, which permits a community-held object only for co-located atten
 and rejects missing or unusable resources. Successful use is an explicit sourced event
 and memory; two completed sessions achieve the goal. Expired inaccessible sessions and
 their intentions fail before the goal is abandoned, preserving a complete causal trail.
+Immediately after real use, a neighbor at that same projected location may choose to
+join or decline according to their own energy, purpose, connection need, familiarity,
+and replay-stable inclination. Absence produces no decision and later proximity cannot
+rewrite the earlier moment. Joined use creates a separate sourced fact, directed
+relationship evidence, and a shared memory; declined use creates none of those. The
+shared fact enters the ordinary follow-up system and can later motivate a mutually
+accepted invitation through the existing availability and feasibility rules.
 
 Examples include a neighborhood gathering, workshop delay, weather disruption,
 request for help, or opportunity related to an existing goal.

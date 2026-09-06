@@ -63,6 +63,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             "phone.call_completed",
             "phone.callback_completed",
             "incident.shared_aftermath",
+            "object.shared_use",
         } and not (
             source.kind == "scene.ended"
             and str(source.payload.get("scene_id", "")).startswith("ordinary-")
@@ -176,6 +177,8 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
     elif event.kind == "invitation.made":
         value = event.payload.get("invitee_id") or event.payload.get("person_id")
     elif event.kind == "incident.shared_aftermath":
+        value = event.payload.get("person_id")
+    elif event.kind == "object.shared_use":
         value = event.payload.get("person_id")
     elif event.kind == "scene.ended" and str(event.payload.get("scene_id", "")).startswith(
         "ordinary-"

@@ -44,6 +44,9 @@ the ordinary action resolver. Introduced useful objects can likewise become opti
 two-session projects according to Pathos's current curiosity, mastery, and stable
 values. Their sessions require the real shared object at its projected location and
 end in completion, refusal, or explicit access failure rather than narrated success.
+A genuinely co-present neighbor can independently join or decline one of those sessions.
+Only joined use creates shared relationship evidence, memory, and a later follow-up
+that can enter the existing invitation lifecycle.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,
@@ -292,15 +295,16 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Propagate useful-object consequences into invitations, shared activities, and
-   maintenance or consumption lifecycles instead of ending after individual use.
+1. Add maintenance, wear, repair, replenishment, and consumption lifecycles so useful
+   objects change through repeated individual and shared use.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
    feasibility. Pathos and introduced NPCs now form bounded goals that select new
    places, and Pathos can accept or decline a resource-backed project around an
-   introduced object; next, let additions create broader shared consequences.
+   introduced object, with co-present neighbors able to join or decline and seed later
+   invitations; next, let additions create broader durable world consequences.
 3. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
