@@ -27,6 +27,7 @@ class NPCState:
     plan_id: str | None = None
     plan_title: str | None = None
     plan_motivation: str | None = None
+    plan_need: str | None = None
     plan_goal_id: str | None = None
     plan_action: str | None = None
     plan_location_id: str | None = None
@@ -104,6 +105,7 @@ class NPCWorldState:
                 plan_motivation=str(
                     event.payload.get("motivation", "response to privately owned evidence")
                 ),
+                plan_need=_optional(event, "motivation_need"),
                 plan_goal_id=_optional(event, "goal_id"),
                 plan_action=_required(event, "action"),
                 plan_location_id=_required(event, "location_id"),
@@ -111,6 +113,10 @@ class NPCWorldState:
                 plan_due_at=due_at,
                 plan_status="active",
             )
+        elif event.kind == "npc.plan_interrupted":
+            if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
+                raise ValueError("Only the active NPC plan can be interrupted")
+            people[actor_id] = replace(person, plan_status="interrupted")
         elif event.kind == "npc.plan_completed":
             if person.plan_status != "active" or person.plan_id != _required(event, "plan_id"):
                 raise ValueError("Only the active NPC plan can complete")

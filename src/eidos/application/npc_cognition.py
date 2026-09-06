@@ -127,8 +127,6 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
     latest_plan_at = _latest_plan_times(history)
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
-        if person.plan_status == "active" or _in_plan_cooldown(latest_plan_at.get(actor_id), now):
-            continue
         evidence = next(
             (
                 event
@@ -141,6 +139,53 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
             None,
         )
         if evidence is None:
+            continue
+        replaced = False
+        if (
+            person.plan_status == "active"
+            and person.plan_need not in {None, "energy"}
+            and person.energy <= 0.25
+            and person.plan_id is not None
+        ):
+            interrupted = DomainEvent(
+                "npc.plan_interrupted",
+                "pathos",
+                {
+                    "actor_id": actor_id,
+                    "plan_id": person.plan_id,
+                    "reason": "critical energy displaced a lower-priority plan",
+                    "evidence_need_event_id": str(evidence.event_id),
+                    "owner": actor_id,
+                    "visibility": "private",
+                    "simulated_at": simulated_at,
+                },
+                causation_id=evidence.event_id,
+                correlation_id=person.plan_id,
+            )
+            output.append(interrupted)
+            state = state.apply(interrupted)
+            if person.plan_goal_id is not None:
+                abandoned = DomainEvent(
+                    "npc.goal_abandoned",
+                    "pathos",
+                    {
+                        "actor_id": actor_id,
+                        "goal_id": person.plan_goal_id,
+                        "reason": "critical energy required an immediate replan",
+                        "owner": actor_id,
+                        "visibility": "private",
+                        "simulated_at": simulated_at,
+                    },
+                    causation_id=interrupted.event_id,
+                    correlation_id=interrupted.correlation_id,
+                )
+                output.append(abandoned)
+                state = state.apply(abandoned)
+            person = state.people[actor_id]
+            replaced = True
+        if person.plan_status == "active" or (
+            not replaced and _in_plan_cooldown(latest_plan_at.get(actor_id), now)
+        ):
             continue
         needs = {
             "energy": person.energy,
@@ -155,6 +200,25 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
         )
         goal_id = f"{actor_id}-{need}-goal-{evidence.event_id}"
         motivation = f"restore {need} from {level:.2f}"
+        priority = DomainEvent(
+            "npc.priority_evaluated",
+            "pathos",
+            {
+                "actor_id": actor_id,
+                "energy_level": needs["energy"],
+                "connection_level": needs["connection"],
+                "purpose_level": needs["purpose"],
+                "selected_need": need,
+                "selected_level": level,
+                "replacement": replaced,
+                "evidence_need_event_id": str(evidence.event_id),
+                "owner": actor_id,
+                "visibility": "private",
+                "simulated_at": simulated_at,
+            },
+            causation_id=evidence.event_id,
+            correlation_id=f"npc-need-{actor_id}-{evidence.event_id}",
+        )
         goal = DomainEvent(
             "npc.goal_formed",
             "pathos",
@@ -169,7 +233,7 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
                 "visibility": "private",
                 "simulated_at": simulated_at,
             },
-            causation_id=evidence.event_id,
+            causation_id=priority.event_id,
             correlation_id=f"npc-need-{actor_id}-{evidence.event_id}",
         )
         plan = DomainEvent(
@@ -194,7 +258,7 @@ def npc_need_plan_events(history: Sequence[DomainEvent], simulated_at: str) -> l
             causation_id=goal.event_id,
             correlation_id=f"npc-need-{actor_id}-{evidence.event_id}",
         )
-        output.extend((goal, plan))
+        output.extend((priority, goal, plan))
         state = state.apply(goal).apply(plan)
         latest_plan_at[actor_id] = now
         used_evidence.add(str(evidence.event_id))

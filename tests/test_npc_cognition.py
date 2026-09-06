@@ -130,15 +130,67 @@ class NPCCognitionTests(unittest.TestCase):
             },
         )
         events = npc_need_plan_events([evidence], "2026-01-10T19:00:00+00:00")
-        self.assertEqual(len(events), 2)
-        goal, plan = events
+        self.assertEqual(len(events), 3)
+        priority, goal, plan = events
+        self.assertEqual(priority.kind, "npc.priority_evaluated")
+        self.assertEqual(priority.payload["selected_need"], "energy")
         self.assertEqual(goal.kind, "npc.goal_formed")
-        self.assertEqual(goal.causation_id, evidence.event_id)
+        self.assertEqual(goal.causation_id, priority.event_id)
         self.assertEqual((plan.payload["action"], plan.payload["location_id"]), ("rest", "home"))
         self.assertEqual(plan.payload["motivation_need"], "energy")
         self.assertEqual(plan.payload["evidence_need_event_id"], str(evidence.event_id))
         self.assertEqual(plan.causation_id, goal.event_id)
         self.assertEqual((plan.payload["owner"], plan.payload["visibility"]), ("rowan", "private"))
+
+    def test_critical_energy_interrupts_a_lower_priority_private_plan(self):
+        first_need = DomainEvent(
+            "npc.needs_changed",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "energy": 0.7,
+                "connection": 0.2,
+                "purpose": 0.6,
+                "owner": "rowan",
+                "visibility": "private",
+            },
+        )
+        first = npc_need_plan_events([first_need], "2026-01-10T19:00:00+00:00")
+        first_plan = next(event for event in first if event.kind == "npc.plan_created")
+        exhausted = DomainEvent(
+            "npc.needs_changed",
+            "pathos",
+            {
+                "actor_id": "rowan",
+                "energy": 0.1,
+                "connection": 0.2,
+                "purpose": 0.6,
+                "owner": "rowan",
+                "visibility": "private",
+            },
+        )
+        replacement = npc_need_plan_events(
+            [first_need, *first, exhausted], "2026-01-11T19:00:00+00:00"
+        )
+        kinds = [event.kind for event in replacement]
+        self.assertEqual(
+            kinds,
+            [
+                "npc.plan_interrupted",
+                "npc.goal_abandoned",
+                "npc.priority_evaluated",
+                "npc.goal_formed",
+                "npc.plan_created",
+            ],
+        )
+        interrupted, abandoned, priority, _, plan = replacement
+        self.assertEqual(interrupted.payload["plan_id"], first_plan.payload["plan_id"])
+        self.assertEqual(interrupted.causation_id, exhausted.event_id)
+        self.assertEqual(abandoned.causation_id, interrupted.event_id)
+        self.assertTrue(priority.payload["replacement"])
+        self.assertEqual(
+            (plan.payload["motivation_need"], plan.payload["action"]), ("energy", "rest")
+        )
 
     def test_satisfied_needs_do_not_force_a_goal(self):
         evidence = DomainEvent(

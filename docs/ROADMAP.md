@@ -57,7 +57,10 @@ supervised durable workers and reuse completed work after restart. Pathos makes 
 narrow class of value/capacity-aware social choices; NPCs have persistent offscreen
 locations, needs, private beliefs, activities, and perception- or need-driven private
 goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
-Their option vocabulary remains bounded rather than generally autonomous. Term,
+Need-driven choices now record all three competing levels and their selected priority;
+critical exhaustion can interrupt and causally replace a lower-priority private plan
+without making ordinary fluctuations rewrite the day. Their option vocabulary remains
+bounded rather than generally autonomous. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
 as a versioned disposable projection and increment from the event tail. Planning and
 actor-owned beliefs and directed relationships now do the same with ordered,
@@ -258,7 +261,8 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Expand the completed perception- and need-driven NPC goal loop with more personal
-   projects, competing priorities, interruption, and relationship-motivated choices.
+   projects and relationship-motivated choices; competing priorities and critical
+   energy interruption now have a causal replacement path.
 2. Generalize the now-integrated four-turn interruption/resume scene into recurring
    dialogue policies with topic selection, voluntary exits, and relationship pacing.
 3. Let Moira propose additions to the completed sixteen-event, resource-backed
