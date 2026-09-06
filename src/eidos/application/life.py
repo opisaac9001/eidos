@@ -32,6 +32,7 @@ from eidos.application.inner_life import (
     waking_dream_events,
 )
 from eidos.application.memory import memory_view, recall, terms
+from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.npc_cognition import npc_belief_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
@@ -52,6 +53,7 @@ from eidos.domain.commitments import project_renegotiations
 from eidos.domain.development import project_development
 from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
+from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
@@ -329,6 +331,7 @@ class Life:
         planning = project_planning(history)
         social = project_social(history)
         scenes = project_scenes(history)
+        mind = project_mind(history)
         season = project_season(history)
         beliefs = project_beliefs(history)
         followups = project_followups(history)
@@ -370,6 +373,10 @@ class Life:
             "people": population,
             "npc_states": [vars_for(person) for person in npc_state.people.values()],
             "npc_memories": npc_memories[-100:],
+            "mind": {
+                "layers": [vars_for(item) for item in mind.latest.values()],
+                "pulse_counts": dict(mind.pulse_counts),
+            },
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
             "goals": [vars_for(goal) for goal in planning.goals.values()],
@@ -648,6 +655,7 @@ class Life:
                 actor_id: person.location_id
                 for actor_id, person in project_npcs(history + pending, current).people.items()
             }
+            pending.extend(mental_layer_events(history + pending, state, current, npc_locations))
             pending.extend(
                 due_world_observations(
                     history + pending,
@@ -741,6 +749,7 @@ class Life:
                     }
                     for item in inspirations_now
                 ],
+                "mind_layers": mind_context(history + pending),
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]

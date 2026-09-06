@@ -32,6 +32,8 @@ eight deployed services. A deterministic critic checks contracts. The offline su
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
+Somatic, attention, and associative layers pulse every simulated hour; deliberative,
+social, reflective, and dream layers activate by waking state, context, and cadence.
 The connected week exercises a promise, interruption, repair, personal bookbinding
 project, explicitly accepted tool loan/return, scheduled learning, skill growth,
 concern, dream residue, temporary non-authoritative inspiration, and directed trust.

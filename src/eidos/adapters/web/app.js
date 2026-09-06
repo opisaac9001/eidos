@@ -445,7 +445,8 @@ function render(next) {
     .slice(0, 2)
     .map(([name]) => name[0].toUpperCase() + name.slice(1))
     .join(" · ");
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}`;
+  const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);
   $("recent-feed").innerHTML = feedMarkup(state.feed.slice(0, 7));

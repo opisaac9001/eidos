@@ -90,8 +90,8 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: sourced private/surfaced associations | P4 |
-| INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: source-linked scheduled interpretation | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/attention/association pulses + sourced associations | P4 |
+| INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs and complete lineage | P4 |
 | INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: recall/capped affect + expiring non-authoritative possibility | P4 |

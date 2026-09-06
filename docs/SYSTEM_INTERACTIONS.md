@@ -228,6 +228,12 @@ scene resolver. Broader dialogue and interruption policies remain future work.
 
 ## 8. Dream and reflection feedback loop
 
+Pathos's mind is modeled as concurrent replayable layers rather than one prompt.
+Somatic pressure, attention, and association advance every simulated hour. Deliberation,
+social awareness, reflection, and dream processing activate under distinct conditions.
+A layer pulse selects focus and activation but is neither a memory nor permission to
+act; it becomes bounded context for the performers and downstream appraisal systems.
+
 1. During waking, track perceived experiences, unfinished concerns and affect.
 2. Sleep begins when the chosen schedule/needs allow it, not merely because a
    cron hour arrives. Protect sleep-state transitions against duplicate jobs.

@@ -153,6 +153,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   unavailable.
 - The simulation calendar records season transitions as replayable world facts and
   exposes the current season beside weather; it does not depend on generated prose.
+- Every simulated hour advances somatic awareness, attention, and association. Awake
+  conditions also activate deliberative and social layers; evening reflection and
+  sleeping dream layers have distinct cadences. These replayable pulses guide model
+  context but have no authority to become memories or actions by themselves.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.
