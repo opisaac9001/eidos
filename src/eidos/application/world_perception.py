@@ -13,29 +13,192 @@ from eidos.domain.world_events import (
     resolve_world_event,
 )
 
-COMMUNITY_RESOURCES = (
+COMMUNITY_RESOURCES_V1 = (
     ("seed-swap-table", "Seed swap table", "rowan", "park"),
     ("community-repair-kit", "Community repair kit", "ellis", "workshop"),
     ("shared-tea-service", "Shared tea service", "mara", "cafe"),
     ("community-sketch-basket", "Community sketch basket", "rowan", "park"),
 )
 
+COMMUNITY_RESOURCES_V2 = (
+    ("little-library-crate", "Little library crate", "mara", "cafe"),
+    ("bird-count-binoculars", "Bird-count binoculars", "rowan", "park"),
+    ("community-mending-basket", "Community mending basket", "ellis", "workshop"),
+    ("recipe-card-box", "Neighborhood recipe-card box", "mara", "cafe"),
+    ("park-litter-grabbers", "Park litter grabbers", "rowan", "park"),
+    ("tool-sharpening-stone", "Shared tool-sharpening stone", "ellis", "workshop"),
+    ("reading-hour-books", "Reading-hour book stack", "mara", "cafe"),
+    ("leaf-print-press", "Leaf-print press", "rowan", "park"),
+    ("community-bicycle-pump", "Community bicycle pump", "ellis", "workshop"),
+    ("neighborhood-puzzle-box", "Neighborhood puzzle box", "mara", "cafe"),
+    ("park-chalk-box", "Park chalk box", "rowan", "park"),
+    ("household-swap-shelf", "Household swap shelf", "ellis", "workshop"),
+)
+
+COMMUNITY_RESOURCES = (*COMMUNITY_RESOURCES_V1, *COMMUNITY_RESOURCES_V2)
+
+COMMUNITY_EVENT_PALETTE = (
+    (
+        "seed-swap",
+        "Neighbors set out a small table for swapping seeds and cuttings.",
+        "park",
+        0.25,
+        "seed-swap-table",
+        "growing",
+        "garden",
+    ),
+    (
+        "repair-clinic",
+        "The workshop opens a quiet table for neighbors to mend small household things.",
+        "workshop",
+        0.30,
+        "community-repair-kit",
+        "repair",
+        "craft",
+    ),
+    (
+        "shared-tea",
+        "The cafe sets aside a shared pot of tea for an informal neighborhood hour.",
+        "cafe",
+        0.20,
+        "shared-tea-service",
+        "hospitality",
+        "conversation",
+    ),
+    (
+        "sketch-walk",
+        "A small group meets in the square to sketch overlooked corners of the neighborhood.",
+        "park",
+        0.25,
+        "community-sketch-basket",
+        "observation",
+        "art",
+    ),
+    (
+        "book-exchange",
+        "A crate of well-read books appears at the cafe for an unhurried exchange.",
+        "cafe",
+        0.18,
+        "little-library-crate",
+        "reading",
+        "learning",
+    ),
+    (
+        "bird-count",
+        "Neighbors spend an hour noting the ordinary birds that visit Willow Square.",
+        "park",
+        0.22,
+        "bird-count-binoculars",
+        "nature",
+        "observation",
+    ),
+    (
+        "mending-circle",
+        "The workshop lays out thread and needles for a small clothes-mending circle.",
+        "workshop",
+        0.24,
+        "community-mending-basket",
+        "mending",
+        "craft",
+    ),
+    (
+        "recipe-swap",
+        "People add handwritten recipes to a box on the cafe counter and trade favorites.",
+        "cafe",
+        0.19,
+        "recipe-card-box",
+        "cooking",
+        "sharing",
+    ),
+    (
+        "square-care-walk",
+        "A few neighbors make a slow circuit of the square collecting windblown litter.",
+        "park",
+        0.23,
+        "park-litter-grabbers",
+        "care",
+        "neighborhood",
+    ),
+    (
+        "tool-care-hour",
+        "The workshop hosts a practical hour for cleaning and sharpening shared tools.",
+        "workshop",
+        0.27,
+        "tool-sharpening-stone",
+        "maintenance",
+        "craft",
+    ),
+    (
+        "quiet-reading",
+        "The cafe keeps one table quiet for neighbors who want to read in company.",
+        "cafe",
+        0.16,
+        "reading-hour-books",
+        "reading",
+        "quiet-company",
+    ),
+    (
+        "leaf-printing",
+        "A small press is set out in the square for making prints from fallen leaves.",
+        "park",
+        0.21,
+        "leaf-print-press",
+        "season",
+        "art",
+    ),
+    (
+        "bicycle-check",
+        "The workshop offers a brief check of tires, brakes, and loose bicycle fittings.",
+        "workshop",
+        0.28,
+        "community-bicycle-pump",
+        "repair",
+        "mobility",
+    ),
+    (
+        "puzzle-table",
+        "A half-finished neighborhood puzzle occupies the cafe's shared table for an hour.",
+        "cafe",
+        0.17,
+        "neighborhood-puzzle-box",
+        "play",
+        "cooperation",
+    ),
+    (
+        "chalk-map",
+        "Neighbors draw a temporary chalk map of remembered local details in the square.",
+        "park",
+        0.20,
+        "park-chalk-box",
+        "place",
+        "storytelling",
+    ),
+    (
+        "household-swap",
+        "The workshop opens a shelf for useful household things that need a new home.",
+        "workshop",
+        0.23,
+        "household-swap-shelf",
+        "reuse",
+        "sharing",
+    ),
+)
+
 
 def community_resource_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
     """Register the finite physical resources used by the neighborhood rhythm."""
-    if any(event.kind == "world.community_resources_seeded" for event in history):
+    existing = project_planning(list(history)).objects
+    missing = [resource for resource in COMMUNITY_RESOURCES if resource[0] not in existing]
+    if not missing:
         return []
     seeded = DomainEvent(
         "world.community_resources_seeded",
         "pathos",
-        {"simulated_at": at.isoformat(), "schema_version": 1},
-        correlation_id="community-resources-v1",
+        {"simulated_at": at.isoformat(), "schema_version": 2},
+        correlation_id="community-resources-v2",
     )
-    existing = project_planning(list(history)).objects
     output = [seeded]
-    for object_id, name, owner_id, location_id in COMMUNITY_RESOURCES:
-        if object_id in existing:
-            continue
+    for object_id, name, owner_id, location_id in missing:
         output.append(
             DomainEvent(
                 "object.registered",
@@ -48,7 +211,7 @@ def community_resource_events(history: Sequence[DomainEvent], at: datetime) -> l
                     "location_id": location_id,
                     "condition": "good",
                     "simulated_at": at.isoformat(),
-                    "source": "authored-neighborhood-rhythm-v1",
+                    "source": "authored-neighborhood-rhythm-v2",
                 },
                 causation_id=seeded.event_id,
                 correlation_id=seeded.correlation_id,
@@ -65,37 +228,8 @@ def authored_community_schedule(
     if day < 2 or (day - 2) % 7 != 0 or simulated_at.hour != 8:
         return []
     occurrence = (day - 2) // 7
-    event = (
-        (
-            "seed-swap",
-            "Neighbors set out a small table for swapping seeds and cuttings.",
-            "park",
-            0.25,
-            "seed-swap-table",
-        ),
-        (
-            "repair-clinic",
-            "The workshop opens a quiet table for neighbors to mend small household things.",
-            "workshop",
-            0.3,
-            "community-repair-kit",
-        ),
-        (
-            "shared-tea",
-            "The cafe sets aside a shared pot of tea for an informal neighborhood hour.",
-            "cafe",
-            0.2,
-            "shared-tea-service",
-        ),
-        (
-            "sketch-walk",
-            "A small group meets in the square to sketch overlooked corners of the neighborhood.",
-            "park",
-            0.25,
-            "community-sketch-basket",
-        ),
-    )[occurrence % 4]
-    event_id, description, location_id, intensity, resource_id = event
+    event = COMMUNITY_EVENT_PALETTE[occurrence % len(COMMUNITY_EVENT_PALETTE)]
+    event_id, description, location_id, intensity, resource_id, theme, opportunity = event
     proposal_id = f"neighborhood-rhythm-{occurrence + 1}-{event_id}"
     if any(item.payload.get("proposal_id") == proposal_id for item in history):
         return []
@@ -124,7 +258,7 @@ def authored_community_schedule(
             starts_at=simulated_at + timedelta(hours=5),
             intensity=intensity,
             expected_revision=actual_revision,
-            source="authored-neighborhood-rhythm-v1",
+            source="authored-neighborhood-rhythm-v2",
         ),
         history=history,
         known_location_ids={"home", "cafe", "workshop", "park"},
@@ -149,6 +283,20 @@ def authored_community_schedule(
                 correlation_id=proposal_id,
             )
         )
+        output.append(
+            DomainEvent(
+                "world_event.theme_linked",
+                "pathos",
+                {
+                    "proposal_id": proposal_id,
+                    "theme": theme,
+                    "opportunity": opportunity,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=scheduled.event_id,
+                correlation_id=proposal_id,
+            )
+        )
     return output
 
 
@@ -167,6 +315,14 @@ def due_world_observations(
         str(event.payload["proposal_id"]): str(event.payload["resource_id"])
         for event in history
         if event.kind == "world_event.resource_linked"
+    }
+    themes = {
+        str(event.payload["proposal_id"]): (
+            str(event.payload["theme"]),
+            str(event.payload["opportunity"]),
+        )
+        for event in history
+        if event.kind == "world_event.theme_linked"
     }
     objects = project_planning(list(history)).objects
     output: list[DomainEvent] = []
@@ -207,6 +363,8 @@ def due_world_observations(
                 "simulated_at": simulated_at.isoformat(),
                 "source_event_id": str(scheduled.event_id),
                 "resource_id": resource_id,
+                "theme": themes.get(proposal_id, (None, None))[0],
+                "opportunity": themes.get(proposal_id, (None, None))[1],
             },
             causation_id=scheduled.event_id,
             correlation_id=scheduled.correlation_id,
@@ -226,6 +384,8 @@ def due_world_observations(
                     "privacy": "public",
                     "location_id": location_id,
                     "reported": False,
+                    "theme": themes.get(proposal_id, (None, None))[0],
+                    "opportunity": themes.get(proposal_id, (None, None))[1],
                     "simulated_at": simulated_at.isoformat(),
                 },
                 causation_id=occurred.event_id,
@@ -244,6 +404,8 @@ def due_world_observations(
                             "source": "direct-perception",
                             "source_event_id": str(perception.event_id),
                             "location_id": location_id,
+                            "theme": themes.get(proposal_id, (None, None))[0],
+                            "opportunity": themes.get(proposal_id, (None, None))[1],
                             "importance": float(scheduled.payload.get("intensity", 0.5)),
                             "confidence": 1.0,
                             "simulated_at": simulated_at.isoformat(),

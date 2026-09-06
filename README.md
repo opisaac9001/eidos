@@ -148,12 +148,14 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   the longer exchange pauses for a sourced world incident and resumes a day later with
   its topic and turn order intact. Both use explicit audited authored fallbacks when
   generation fails.
-- A calm four-week neighborhood rhythm plans seed swaps, repair tables, shared tea,
-  and sketch walks with explicit lead time and cooldowns. Only co-present residents
+- A calm sixteen-week neighborhood pack rotates seed swaps, repair tables, shared tea,
+  sketch walks, reading, nature, mending, cooking, play, reuse, and neighborhood care
+  with explicit lead time and cooldowns. Only co-present residents
   perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for
   their own private plans during the month soak. Each event requires a persistent
   physical community resource at the right place and is cancelled if it becomes
-  unavailable.
+  unavailable. Existing four-resource worlds receive only the twelve missing objects
+  during the version-two upgrade.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

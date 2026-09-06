@@ -65,7 +65,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted state + perception- and need-driven private goals with causal scheduled plans | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather + resource-backed weekly events with lead time/cooldowns | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
-| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons + weekday/weekend activity palette + four-event weekly neighborhood rhythm | P6 |
+| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons + daily texture + upgradeable sixteen-event resource-backed neighborhood pack | P6 |
 
 ## Interaction catalog — Pathos and NPC performers
 

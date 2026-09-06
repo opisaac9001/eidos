@@ -239,8 +239,8 @@ boundaries and must not rely on emotional coercion.
    projects, competing priorities, interruption, and relationship-motivated choices.
 3. Generalize the now-integrated four-turn interruption/resume scene into recurring
    dialogue policies with topic selection, voluntary exits, and relationship pacing.
-4. Expand the new seasonal, resource-backed neighborhood rhythm into a broad palette
-   of ordinary generated events and project opportunities without forcing drama.
+4. Let Moira propose additions to the completed sixteen-event, resource-backed
+   neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
 5. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
