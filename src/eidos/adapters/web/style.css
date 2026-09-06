@@ -1257,6 +1257,19 @@ hr {
 .mobile-mode {
   display: none;
 }
+.call-inspector {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.call-inspector summary {
+  cursor: pointer;
+  color: var(--amber);
+}
+#diagnostics {
+  max-height: 480px;
+  overflow: auto;
+  margin-top: 20px;
+}
 @media (max-width: 950px) {
   .mobile-mode {
     display: block;

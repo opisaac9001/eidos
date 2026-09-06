@@ -71,3 +71,22 @@ response. Replay preserved the revision. This validates failure containment as
 well as the happy path, but confirms that this model is not reliable enough for
 unattended memory formation. The automated suite has 29 passing tests, including
 real HTTP contract tests against a controlled fake endpoint.
+
+## Reliability follow-up
+
+The engine now preserves every accepted encounter even if Mnemosyne fails:
+an explicit `source-archive` recovery stores the source verbatim and keeps the
+failure trace. No rejected model output is saved as a memory. New conservative
+critic checks reject empty encounter fragments, omitted scheduled neighbors,
+and dreams lacking an explicit label. They do not detect arbitrary inventions.
+
+In a fresh live run through 10:00, one empty encounter was rejected. Both
+accepted encounters had exact source-linked memories; one used archive recovery
+after a source mismatch and the other passed through the model normally.
+The suite now has 33 passing tests. Browser verification confirmed the Ensemble
+call inspector shows model/backend, latency, token usage, and correlated traces.
+
+The SSH forward and preview are foreground processes, not installed services;
+they may need restarting between sessions. Connection failure is reported as
+`endpoint_unavailable`, not a successful model test. Durable local service
+installation is separate from the prototype launch commands above.

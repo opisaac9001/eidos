@@ -18,7 +18,7 @@ services and whose next implementation steps are unambiguous.
 - Chronos clock, pause, resume, and restart behavior (implemented)
 - Firmament locations, actors, and scheduled activities (implemented)
 - Ethos episodic memory with provenance (implemented)
-- Pathos dialogue through a model port (stand-in implemented; real inference pending)
+- Pathos dialogue through a model port (stand-in and real HTTP inference implemented)
 - Operator API, health view, and five-view browser interface (implemented)
 
 Exit condition: Pathos completes and remembers a small deterministic day across
@@ -40,6 +40,12 @@ chat idempotency, proposal rejection, HTTP validation, and background pause/resu
 Stand-in implementations now cover basic affect, encounter counts, conversations,
 memory formation, and evening reflection. Nuanced relationships, semantic
 retrieval, character evolution, and autonomous outreach remain open.
+
+Real inference now exercises all eight roles. The critic rejects malformed
+proposals, altered source memories, empty/missing-actor scenes, and unmarked
+dreams. This is conservative contract validation, not semantic contradiction
+detection. Accepted encounters survive memory-model failure through explicit
+verbatim source archiving. The Ensemble includes recent call diagnostics.
 
 ## Milestone 3: Inner life
 

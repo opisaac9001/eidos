@@ -50,6 +50,7 @@ class Life:
         relationships = {person["id"]: 0 for person in PEOPLE}
         roles = {role["id"]: {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES}
         memories, feed, conversations = [], [], []
+        diagnostics = []
         for event in history:
             payload = dict(event.payload)
             item = {**payload, "id": str(event.event_id), "kind": event.kind}
@@ -69,6 +70,12 @@ class Life:
                         latency_ms=payload["latency_ms"],
                     )
                     role["calls"] += 1
+                    role["failures"] = role.get("failures", 0) + (
+                        payload["status"] in {"failed", "rejected"}
+                    )
+                    role["model"] = payload.get("model", "unknown")
+                    role["error_code"] = payload.get("error_code")
+                diagnostics.append(item)
             if event.kind == "memory.recorded":
                 memories.append(item)
             if event.kind == "conversation.message":
@@ -82,6 +89,7 @@ class Life:
                 "day.summarized",
                 "memory.recorded",
                 "role.failed",
+                "memory.recovered",
             }:
                 feed.append(item)
         population = [
@@ -109,6 +117,7 @@ class Life:
             "locations": LOCATIONS,
             "people": population,
             "roles": list(roles.values()),
+            "diagnostics": list(reversed(diagnostics[-100:])),
             "memories": list(reversed(memories[-300:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
@@ -235,6 +244,21 @@ class Life:
                         memory = await perform(
                             self.gateway, "mnemosyne", {**context, "experience": text}, at, pending
                         )
+                        recovered = memory is None
+                        if recovered:
+                            memory = text
+                            pending.append(
+                                DomainEvent(
+                                    "memory.recovered",
+                                    "pathos",
+                                    {
+                                        "text": "Archived the accepted encounter verbatim after the memory performer failed.",
+                                        "simulated_at": at,
+                                        "source_event_id": str(encounter.event_id),
+                                        "source": "source-archive",
+                                    },
+                                )
+                            )
                         if memory:
                             pending.append(
                                 DomainEvent(
@@ -244,10 +268,10 @@ class Life:
                                         "text": memory,
                                         "simulated_at": at,
                                         "category": "encounter",
-                                        "source": self.mode,
+                                        "source": "source-archive" if recovered else self.mode,
                                         "source_event_id": str(encounter.event_id),
                                         "location_id": state.location_id,
-                                        "role": "mnemosyne",
+                                        "role": "source-archive" if recovered else "mnemosyne",
                                     },
                                 )
                             )

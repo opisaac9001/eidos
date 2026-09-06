@@ -21,7 +21,11 @@ The daybook uses the latest seven recorded experiences, so it is a brief extract
 rather than a complete daily archive. The archive itself retains the full log.
 NPC movement outside encounters is a projection of the authored schedule, not
 independent model reasoning. The continuity critic checks proposal shape and
-allowed weather vocabulary; it does not evaluate arbitrary prose for truth.
+allowed weather vocabulary, source-memory identity, scene fragments/missing
+scheduled actors, and explicit dream labels; it does not evaluate arbitrary prose
+for truth. Rejected calls carry stable reason codes and correlated critic traces.
+The Ensemble's expandable call inspector shows the latest 100 traces, model,
+backend, latency, token count when available, and outcome.
 
 ## Persistence and failures
 
@@ -30,6 +34,12 @@ supports the earlier foundation events as well as the new scene events. Request
 IDs prevent duplicate chat submissions; an ID cannot be reused for another
 message. World writes use optimistic concurrency. An unexpected worker failure
 pauses the world and shows an error; restart the server after resolving it.
+
+If the memory performer cannot copy an accepted encounter exactly, the engine
+archives the source text itself. This is labeled `source-archive`, links to the
+encounter event, and emits `memory.recovered`. The model failure is retained;
+recovery is never presented as a successful AI call. A rejected encounter has no
+such recovery: only already accepted scenes can be archived.
 
 The browser shows the latest 160 feed items, 300 memories, and 100 conversation
 messages. Export includes every event. Search applies to the loaded memory
@@ -46,8 +56,8 @@ browser assets so installation works outside an editable checkout.
 
 ## Next connection
 
-Add an HTTP model adapter after the Dell inventory and inference benchmark.
-Before making role calls expensive, introduce bounded durable jobs and caching
-so a model timeout does not hold the operator lock. Keep the stand-in adapter
-as a fast test backend. No model is granted world-editing authority by the
-transport itself.
+The HTTP adapter is implemented and tested against the small lab server; see
+[local models](LOCAL_MODELS.md). State reads use a cached committed snapshot
+during generation, while writes remain serialized. Durable jobs, cancellation,
+and per-role model selection remain follow-ups. Keep the stand-in adapter as a
+fast test backend. No model is granted world-editing authority by the transport.

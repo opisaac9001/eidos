@@ -83,6 +83,38 @@ class LifeTests(unittest.TestCase):
         self.life.bootstrap()
         self.assertEqual(len(self.life.history()), revision)
 
+    def test_failed_memory_is_archived_from_source_with_visible_recovery(self):
+        class AlteredMemory(StandInGateway):
+            async def generate(self, request):
+                if request.capability == "mnemosyne":
+                    return ModelResponse(
+                        '{"text":"An invented memory"}', "bad-memory", "test", "stop"
+                    )
+                return await super().generate(request)
+
+        life = Life(SQLiteEventStore(self.path), AlteredMemory())
+        life.advance(10)
+        events = life.history()
+        sources = {
+            str(e.event_id): e.payload["text"] for e in events if e.kind == "npc.encountered"
+        }
+        memories = [m for m in life.snapshot()["memories"] if m["source"] == "source-archive"]
+        self.assertEqual(len(memories), len(sources))
+        self.assertGreater(len(memories), 0)
+        for memory in memories:
+            self.assertEqual(memory["text"], sources[memory["source_event_id"]])
+        self.assertTrue(any(e.kind == "memory.recovered" for e in events))
+        self.assertTrue(
+            any(
+                d.get("error_code") == "source_mismatch" and d["role"] == "critic"
+                for d in life.snapshot()["diagnostics"]
+            )
+        )
+        self.assertEqual(
+            Life(SQLiteEventStore(self.path), AlteredMemory()).snapshot()["memories"],
+            life.snapshot()["memories"],
+        )
+
     def test_controls_reject_invalid_values(self):
         for running, speed in (("yes", 15), (True, True), (False, 100)):
             with self.assertRaises(ValueError):

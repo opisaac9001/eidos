@@ -6,6 +6,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.proposals import ProposalRejected, validate_proposal
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 
@@ -14,6 +15,7 @@ async def perform(
 ) -> str | None:
     started = perf_counter()
     trace = str(uuid4())
+    response = None
     try:
         response = await asyncio.wait_for(
             gateway.generate(
@@ -39,16 +41,7 @@ async def perform(
             ),
             timeout=50,
         )
-        proposal = json.loads(response.content)
-        if not isinstance(proposal, dict) or set(proposal) != {"text"}:
-            raise ValueError("Expected a text-only proposal")
-        text = proposal["text"]
-        if not isinstance(text, str) or not text.strip() or len(text) > 8000:
-            raise ValueError("Proposal text must contain 1–8000 characters")
-        if role == "moira" and text not in {"Clear", "Cloudy", "Light rain", "Breezy"}:
-            raise ValueError("Weather is outside the world's vocabulary")
-        if role == "mnemosyne" and text != context.get("experience"):
-            raise ValueError("A factual memory must preserve its source experience")
+        text = validate_proposal(role, response.content, context)
         pending.append(
             DomainEvent(
                 "role.completed",
@@ -84,13 +77,34 @@ async def perform(
         )
         return text
     except (ValueError, TypeError, KeyError, TimeoutError, OSError) as error:
+        code = (
+            error.code
+            if isinstance(error, ProposalRejected)
+            else (
+                "timeout"
+                if isinstance(error, TimeoutError)
+                else "endpoint_unavailable"
+                if isinstance(error, OSError)
+                else "invalid_completion"
+            )
+        )
+        explanation = (
+            str(error)
+            if isinstance(error, ProposalRejected)
+            else {
+                "timeout": "Model request timed out",
+                "endpoint_unavailable": "Model endpoint could not complete the request",
+                "invalid_completion": "Endpoint returned an incomplete or invalid response",
+            }[code]
+        )
         pending.append(
             DomainEvent(
                 "role.failed",
                 "pathos",
                 {
                     "role": role,
-                    "text": f"{role} did not produce a valid proposal ({type(error).__name__}).",
+                    "text": f"{role}: {explanation}.",
+                    "error_code": code,
                     "simulated_at": at,
                     "trace_id": trace,
                 },
@@ -104,9 +118,31 @@ async def perform(
                     "role": role,
                     "simulated_at": at,
                     "status": "failed",
+                    "error_code": code,
+                    "model": response.resolved_model
+                    if response
+                    else getattr(gateway, "model", "unknown"),
+                    "backend": response.backend if response else "unknown",
                     "trace_id": trace,
                     "latency_ms": round((perf_counter() - started) * 1000, 2),
                 },
             )
         )
+        if response is not None:
+            pending.append(
+                DomainEvent(
+                    "role.completed",
+                    "pathos",
+                    {
+                        "role": "critic",
+                        "simulated_at": at,
+                        "status": "rejected",
+                        "trace_id": trace,
+                        "latency_ms": 0,
+                        "error_code": code,
+                        "model": "schema-rules-v1",
+                        "backend": "rules",
+                    },
+                )
+            )
         return None

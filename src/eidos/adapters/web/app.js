@@ -17,6 +17,7 @@ const labels = {
   "day.summarized": "THE DAYBOOK",
   "memory.recorded": "A MEMORY FORMED",
   "role.failed": "PERFORMER ERROR",
+  "memory.recovered": "SOURCE ARCHIVE RECOVERY",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -304,6 +305,13 @@ function render(next) {
   renderMessages();
   renderArchive();
   renderEngineFeed();
+  $("diagnostics").innerHTML =
+    (state.diagnostics || [])
+      .map(
+        (call) =>
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(call.role)} · ${esc(call.status)}</span><span>${Math.round(call.latency_ms || 0)} ms</span></div><p>${esc(call.error_code || "Contract accepted — semantic quality not certified")}</p><div class="memory-source">${esc(call.model || "unknown")} · ${esc(call.backend || "unknown")} · ${call.output_tokens ?? "—"} output tokens<br>Trace ${esc(call.trace_id || "legacy")}</div></article>`,
+      )
+      .join("") || "<p>No calls recorded yet.</p>";
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>
