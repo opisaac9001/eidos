@@ -492,6 +492,11 @@ proposal creates no fallback biography and may retry only once per simulated day
 with three total attempts. Successful facts then use the identical witnessed
 disclosure path as pack-authored facts.
 
+The resident's own agency performer may use those facts as owner-visible context when
+proposing a private plan. Biography can therefore influence a choice without making
+the choice inevitable: the plan must still satisfy ordinary need, place, schedule,
+and action rules. No other resident's biography is included.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows

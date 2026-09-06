@@ -299,7 +299,7 @@ def _owned_context(history: Sequence[DomainEvent], actor_id: str) -> list[dict[s
         }
         for event in history
         if event.payload.get("owner") == actor_id
-        and event.kind in {"perception.recorded", "npc.activity_recorded"}
+        and event.kind in {"perception.recorded", "npc.activity_recorded", "npc.biography_seeded"}
     ][-8:]
 
 

@@ -145,10 +145,38 @@ class NPCAgencyTests(unittest.TestCase):
                 "simulated_at": self.now.isoformat(),
             },
         )
+        rowan_history = DomainEvent(
+            "npc.biography_seeded",
+            "pathos",
+            {
+                "fact_id": "rowan-old-maps",
+                "person_id": "rowan",
+                "topic": "old maps",
+                "text": "I used to name every shortcut on my childhood walks.",
+                "reveal_after_familiarity": 0.5,
+                "owner": "rowan",
+                "visibility": "private",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        mara_history = DomainEvent(
+            "npc.biography_seeded",
+            "pathos",
+            {
+                "fact_id": "mara-unheard-song",
+                "person_id": "mara",
+                "topic": "unheard song",
+                "text": "I've never played the song I wrote as a teenager.",
+                "reveal_after_familiarity": 0.7,
+                "owner": "mara",
+                "visibility": "private",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
         gateway = CapturingStandIn()
         asyncio.run(
             autonomous_npc_plan_events(
-                [mara_secret, rowan_memory, rowan],
+                [mara_secret, mara_history, rowan_memory, rowan_history, rowan],
                 self.now,
                 gateway,
                 project_world_catalog([]),
@@ -156,7 +184,9 @@ class NPCAgencyTests(unittest.TestCase):
         )
         serialized = json.dumps(gateway.contexts)
         self.assertIn("long shadows", serialized)
+        self.assertIn("name every shortcut", serialized)
         self.assertNotIn("unopened letter", serialized)
+        self.assertNotIn("song I wrote", serialized)
 
 
 if __name__ == "__main__":
