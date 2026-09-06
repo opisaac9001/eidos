@@ -42,6 +42,7 @@ from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
+from eidos.domain.commitments import project_renegotiations
 from eidos.domain.development import project_development
 from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
@@ -215,6 +216,13 @@ class Life:
                 "schedule.cancelled",
                 "commitment.fulfilled",
                 "commitment.missed",
+                "commitment.renegotiation_offered",
+                "commitment.renegotiation_accepted",
+                "commitment.renegotiation_declined",
+                "commitment.renegotiation_rejected",
+                "commitment.renegotiation_response_rejected",
+                "commitment.renegotiated",
+                "schedule.retimed",
                 "planning.rejected",
                 "belief.formed",
                 "belief.contested",
@@ -256,6 +264,7 @@ class Life:
         followups = project_followups(history)
         development = project_development(history)
         transfers = project_transfers(history)
+        renegotiations = project_renegotiations(history)
         catch_up = active_catch_up(history)
         return {
             "revision": len(history),
@@ -295,6 +304,7 @@ class Life:
             "calendar": [vars_for(item) for item in planning.calendar.values()],
             "objects": [vars_for(item) for item in planning.objects.values()],
             "transfers": [vars_for(item) for item in transfers.offers.values()],
+            "renegotiations": [vars_for(item) for item in renegotiations.offers.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
             "beliefs": [

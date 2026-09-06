@@ -29,6 +29,7 @@ class Commitment:
     status: str = "active"
     request_id: str | None = None
     goal_id: str | None = None
+    terms_version: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +182,23 @@ class PlanningState:
                 if missed_at <= datetime.fromisoformat(commitment.due_at):
                     raise ValueError("A commitment cannot be missed before its deadline")
                 commitments[commitment.commitment_id] = replace(commitment, status="missed")
+            case "commitment.renegotiated":
+                commitment = _existing(commitments, payload, "commitment_id")
+                if commitment.status != "active":
+                    raise ValueError("Only active commitments can be renegotiated")
+                if _required(payload, "actor_id") != commitment.creditor_id:
+                    raise ValueError("Only the creditor can accept changed commitment terms")
+                if _required(payload, "from_due_at") != commitment.due_at:
+                    raise ValueError("Renegotiation does not match the current deadline")
+                version = payload.get("terms_version")
+                if version != commitment.terms_version + 1:
+                    raise ValueError("Commitment terms version must advance exactly once")
+                due_at = _required(payload, "due_at")
+                if datetime.fromisoformat(due_at).utcoffset() is None:
+                    raise ValueError("Commitment deadline needs a timezone")
+                commitments[commitment.commitment_id] = replace(
+                    commitment, due_at=due_at, terms_version=int(version)
+                )
             case "schedule.created":
                 schedule_id = _required(payload, "schedule_id")
                 if schedule_id in calendar:
@@ -214,6 +232,24 @@ class PlanningState:
                     status="scheduled",
                     starts_at=_required(payload, "starts_at"),
                     ends_at=_optional(payload, "ends_at") or entry.ends_at,
+                )
+            case "schedule.retimed":
+                entry = _existing(calendar, payload, "schedule_id")
+                if entry.status not in {"scheduled", "interrupted"}:
+                    raise ValueError("Only unfinished work can be retimed")
+                if _required(payload, "from_starts_at") != entry.starts_at:
+                    raise ValueError("Retiming does not match the current schedule")
+                starts_at = _required(payload, "starts_at")
+                ends_at = _required(payload, "ends_at")
+                start, end = datetime.fromisoformat(starts_at), datetime.fromisoformat(ends_at)
+                if start.utcoffset() is None or end.utcoffset() is None or end <= start:
+                    raise ValueError("Retimed work needs a valid aware interval")
+                calendar[entry.schedule_id] = replace(
+                    entry,
+                    status="scheduled",
+                    reason=_required(payload, "reason"),
+                    starts_at=starts_at,
+                    ends_at=ends_at,
                 )
             case "schedule.completed":
                 entry = _existing(calendar, payload, "schedule_id")

@@ -50,7 +50,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments + validated project resource | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/travel buffers/open hours | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
-| PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption/reschedule, negotiation + atomic project cancellation | P3 |
+| PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption, two-party promise retiming + atomic project cancellation | P3 |
 | PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: proposed/accepted/rejected action audit | P3 |
 | PLAN-07 | Bounded catch-up, meaningful decisions, interval summaries | Partial: preview/chunks/restart/cancel + bounded sourced factual recap | P5 |
 

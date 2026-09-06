@@ -63,6 +63,11 @@ const labels = {
   "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
   "catch_up.summarized": "WHILE YOU WERE AWAY",
   "catch_up.cancelled": "CATCH-UP CANCELLED",
+  "commitment.renegotiation_offered": "NEW PROMISE TERMS OFFERED",
+  "commitment.renegotiation_accepted": "NEW PROMISE TERMS ACCEPTED",
+  "commitment.renegotiation_declined": "NEW PROMISE TERMS DECLINED",
+  "commitment.renegotiated": "PROMISE RETIMED",
+  "schedule.retimed": "PLAN RETIMED",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -302,7 +307,7 @@ function renderPlans() {
     ? state.commitments
         .map(
           (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.status.toUpperCase())}</span><span>due ${esc(date(item.due_at))} ${esc(time(item.due_at))}</span></div><p>${esc(item.title)}</p><div class="memory-source">Pathos → ${esc(item.creditor_id)} · linked goal ${esc(item.goal_id || "none")}</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.status.toUpperCase())} · TERMS ${item.terms_version}</span><span>due ${esc(date(item.due_at))} ${esc(time(item.due_at))}</span></div><p>${esc(item.title)}</p><div class="memory-source">Pathos → ${esc(item.creditor_id)} · linked goal ${esc(item.goal_id || "none")}</div></article>`,
         )
         .join("")
     : empty("No promises have been accepted.");
@@ -322,6 +327,8 @@ function renderPlans() {
       "schedule.cancelled",
       "commitment.missed",
       "commitment.fulfilled",
+      "commitment.renegotiated",
+      "commitment.renegotiation_declined",
       "intention.completed",
       "goal.progressed",
       "goal.achieved",
