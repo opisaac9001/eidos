@@ -7,7 +7,10 @@ from hashlib import sha256
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.planning import PlanningState
 from eidos.domain.state import PathosState
+
+PROVISIONS_ID = "household-provisions"
 
 _MEAL_WINDOWS = {
     "breakfast": range(7, 10),
@@ -38,6 +41,7 @@ def nourishment_events(
     history: Sequence[DomainEvent],
     state: PathosState,
     at: datetime,
+    planning: PlanningState,
     *,
     pathos_busy: bool,
 ) -> list[DomainEvent]:
@@ -63,6 +67,14 @@ def nourishment_events(
     }
     if meal_id in completed:
         return []
+    unavailable_here = any(
+        event.kind == "meal.unavailable"
+        and event.payload.get("meal_id") == meal_id
+        and event.payload.get("location_id") == state.location_id
+        for event in history
+    )
+    if unavailable_here:
+        return []
     if meal_kind == "snack":
         recent = [
             datetime.fromisoformat(str(event.payload["simulated_at"]))
@@ -79,25 +91,87 @@ def nourishment_events(
     options = _DESCRIPTIONS[place]
     sample = sha256(f"{meal_id}:{state.location_id}".encode()).digest()[0]
     description = options[sample % len(options)]
+    provisions = planning.objects.get(PROVISIONS_ID)
+    uses_household_stock = state.location_id != "cafe"
+    if uses_household_stock and (provisions is None or not provisions.quantity):
+        return [
+            DomainEvent(
+                "meal.unavailable",
+                "pathos",
+                {
+                    "meal_id": meal_id,
+                    "meal_kind": meal_kind,
+                    "location_id": state.location_id,
+                    "reason": "There were no household provisions available here.",
+                    "simulated_at": at.isoformat(),
+                },
+                correlation_id=meal_id,
+            )
+        ]
+    meal = DomainEvent(
+        "meal.eaten",
+        "pathos",
+        {
+            "meal_id": meal_id,
+            "meal_kind": meal_kind,
+            "text": description,
+            "location_id": state.location_id,
+            "hunger_before": state.hunger,
+            "hunger_after": hunger_after,
+            "energy_after": energy_after,
+            "provision_source": "household_stock" if uses_household_stock else "cafe_service",
+            "provision_object_id": PROVISIONS_ID if uses_household_stock else None,
+            "reason": (
+                "hunger became difficult to ignore"
+                if urgent
+                else "hunger and a free moment aligned"
+            ),
+            "simulated_at": at.isoformat(),
+        },
+        correlation_id=meal_id,
+    )
+    if not uses_household_stock or provisions is None or provisions.quantity is None:
+        return [meal]
+    stock = DomainEvent(
+        "object.stock_changed",
+        "pathos",
+        {
+            "object_id": PROVISIONS_ID,
+            "from_quantity": provisions.quantity,
+            "quantity": provisions.quantity - 1,
+            "reason": "One meal portion was actually eaten.",
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=meal.event_id,
+        correlation_id=meal_id,
+    )
+    return [meal, stock]
+
+
+def provision_foundation_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
+    """Add owned starting provisions once without rewriting established worlds."""
+    if any(
+        event.kind == "object.registered" and event.payload.get("object_id") == PROVISIONS_ID
+        for event in history
+    ):
+        return []
     return [
         DomainEvent(
-            "meal.eaten",
+            "object.registered",
             "pathos",
             {
-                "meal_id": meal_id,
-                "meal_kind": meal_kind,
-                "text": description,
-                "location_id": state.location_id,
-                "hunger_before": state.hunger,
-                "hunger_after": hunger_after,
-                "energy_after": energy_after,
-                "reason": (
-                    "hunger became difficult to ignore"
-                    if urgent
-                    else "hunger and a free moment aligned"
-                ),
+                "object_id": PROVISIONS_ID,
+                "name": "Household provisions",
+                "owner_id": "pathos",
+                "custodian_id": "pathos",
+                "location_id": "home",
+                "condition": "usable",
+                "quantity": 12,
+                "reorder_at": 3,
+                "unit": "meal portions",
                 "simulated_at": at.isoformat(),
+                "source": "starting-household-state-v1",
             },
-            correlation_id=meal_id,
+            correlation_id="household-provisions",
         )
     ]

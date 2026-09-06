@@ -122,6 +122,7 @@ const labels = {
   "emotion.mixed_state_recognized": "TWO FEELINGS REMAINED AT ONCE",
   "emotion.mixed_state_resolved": "A MIXED FEELING EASED",
   "meal.eaten": "A MEAL",
+  "meal.unavailable": "A MEAL COULD NOT HAPPEN",
   "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",

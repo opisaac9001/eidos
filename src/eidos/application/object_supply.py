@@ -68,6 +68,7 @@ def _consumption_choice(
             and value.location_id == location_id
             and value.quantity is not None
             and value.quantity > 0
+            and value.unit != "meal portions"
             and (value.object_id, simulated_at.date().isoformat()) not in handled
         ),
         None,
@@ -197,6 +198,9 @@ def _replenishment_choice(
         )
         if not order:
             return [decision]
+        due_at = simulated_at + timedelta(days=1)
+        if item.unit == "meal portions":
+            due_at = due_at.replace(hour=18, minute=0, second=0, microsecond=0)
         ordered = DomainEvent(
             "object.replenishment_ordered",
             "pathos",
@@ -204,7 +208,7 @@ def _replenishment_choice(
                 "order_id": order_id,
                 "object_id": object_id,
                 "attempt": 1,
-                "due_at": (simulated_at + timedelta(days=1)).isoformat(),
+                "due_at": due_at.isoformat(),
                 "restock_quantity": max(item.quantity + 1, item.reorder_at * 3),
                 "simulated_at": simulated_at.isoformat(),
             },

@@ -153,7 +153,10 @@ Hunger now accumulates as bodily pressure across waking and sleep. Breakfast, lu
 an evening meal, or an occasional urgent snack happens only while Pathos is awake and
 unoccupied; conversations and incidents can delay eating within a flexible window.
 Meals reduce hunger, restore bounded energy, inform somatic attention and leave
-replayable evidence rather than relying on routine narration alone.
+replayable evidence rather than relying on routine narration alone. Meals away from
+the café consume an owned, finite household provision; low stock enters the existing
+replenishment and missed-delivery lifecycle. Café service is identified explicitly,
+but prices and a household money ledger remain future work.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or

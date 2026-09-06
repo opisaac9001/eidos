@@ -53,6 +53,9 @@ actual meal leaves validated bodily evidence before it can become a memory. Sour
 appraisals update the other needs from routines,
 encounters, interruptions, completed actions and missed commitments. The work
 request policy combines energy, rest and mastery with schedule feasibility.
+Non-café meals consume owned household provisions. Low stock uses the established
+order, handoff, retry and cancellation lifecycle instead of silently refilling; café
+meals identify their external source, while money accounting is not yet simulated.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe

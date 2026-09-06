@@ -80,6 +80,10 @@ class LifeTests(unittest.TestCase):
                 for event in self.life.history()
             )
         )
+        provisions = next(
+            item for item in snapshot["objects"] if item["object_id"] == "household-provisions"
+        )
+        self.assertEqual(provisions["quantity"], 9)
         self.assertEqual(snapshot["indexes"]["memory_revision"], len(self.life.history()))
         self.assertGreater(snapshot["indexes"]["memory_count"], 0)
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)

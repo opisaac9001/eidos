@@ -240,6 +240,8 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", 0.025, 0.3, 0.35, 0.75)
     if event.kind == "meal.eaten":
         return ("affect", 0.0, 0.25, 0.1, 0.9)
+    if event.kind == "meal.unavailable":
+        return ("affect", 0.0, -0.2, 0.2, 0.65)
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)

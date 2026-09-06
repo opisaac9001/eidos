@@ -40,7 +40,7 @@ from eidos.application.memory import MemoryIndex, memory_archive_page, memory_vi
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
-from eidos.application.nourishment import nourishment_events
+from eidos.application.nourishment import nourishment_events, provision_foundation_events
 from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_collaboration import object_collaboration_events
@@ -786,6 +786,7 @@ class Life:
                 "object.replenishment_received",
                 "object.replenishment_cancelled",
                 "meal.eaten",
+                "meal.unavailable",
                 "catch_up.summarized",
                 "catch_up.cancelled",
                 "sleep.window_selected",
@@ -1155,6 +1156,10 @@ class Life:
             at = current.isoformat()
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            provisions = provision_foundation_events(history + pending, current)
+            if provisions:
+                self._planning(history + pending + provisions)
+                pending.extend(provisions)
             pending.extend(
                 await asyncio.to_thread(
                     town_signal_events,
@@ -1461,21 +1466,26 @@ class Life:
                     history + pending,
                     state,
                     current,
+                    self._planning(history + pending),
                     pathos_busy=meal_busy,
                 )
                 meal_checked = True
                 pending.extend(meals)
                 for meal in meals:
                     state = state.apply(meal)
+                meal_event = next((event for event in meals if event.kind == "meal.eaten"), None)
+                unavailable = any(event.kind == "meal.unavailable" for event in meals)
                 meal_claim = any(
                     word in beat.description.lower()
                     for word in ("breakfast", "porridge", "toast", "lunch", "soup", "dinner", "ate")
                 )
-                remembered_description = (
-                    "The usual meal was delayed while the hour remained occupied."
-                    if meal_claim and not meals
-                    else beat.description
-                )
+                remembered_description = beat.description
+                if meal_claim and meal_event is None:
+                    remembered_description = (
+                        "The usual meal could not happen because there was no food available."
+                        if unavailable
+                        else "The usual meal was delayed while the hour remained occupied."
+                    )
                 pending.append(
                     DomainEvent(
                         "memory.recorded",
@@ -1485,8 +1495,10 @@ class Life:
                             "simulated_at": at,
                             "source": "authored-routine",
                             "category": "experience",
-                            "activity": "meal_delayed"
-                            if meal_claim and not meals
+                            "activity": "meal_unavailable"
+                            if meal_claim and unavailable
+                            else "meal_delayed"
+                            if meal_claim and meal_event is None
                             else beat.activity,
                             "emotional_decision_reason": emotional_reason,
                             "location_id": beat.location_id,
@@ -1494,14 +1506,14 @@ class Life:
                             "importance": 0.45,
                             "confidence": 1.0,
                         },
-                        causation_id=meals[-1].event_id
-                        if meals
+                        causation_id=meal_event.event_id
+                        if meal_event is not None
                         else arrival.event_id
                         if arrival
                         else None,
                         correlation_id=(
-                            meals[-1].correlation_id
-                            if meals
+                            meal_event.correlation_id
+                            if meal_event is not None
                             else arrival.correlation_id
                             if arrival
                             else None
@@ -1518,6 +1530,7 @@ class Life:
                     history + pending,
                     state,
                     current,
+                    self._planning(history + pending),
                     pathos_busy=meal_busy,
                 )
                 pending.extend(meals)

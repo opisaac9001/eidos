@@ -97,6 +97,8 @@ class PathosStateTests(unittest.TestCase):
                 "hunger_before": 0.7,
                 "hunger_after": 0.24,
                 "energy_after": 0.47,
+                "provision_source": "household_stock",
+                "provision_object_id": "household-provisions",
             },
         )
         after = state.apply(meal)
