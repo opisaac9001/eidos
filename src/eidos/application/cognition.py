@@ -3,6 +3,7 @@
 import asyncio
 import json
 from time import perf_counter
+from typing import Mapping
 from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
@@ -11,7 +12,11 @@ from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 
 async def perform(
-    gateway: ModelGateway, role: str, context: dict, at: str, pending: list
+    gateway: ModelGateway,
+    role: str,
+    context: Mapping[str, object],
+    at: str,
+    pending: list[DomainEvent],
 ) -> str | None:
     started = perf_counter()
     trace = str(uuid4())

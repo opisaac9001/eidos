@@ -20,8 +20,10 @@ a cached committed snapshot while inference holds the serialized mutation lock.
 Source archiving recovers accepted encounters when memory-model copying fails.
 The critic has conservative contract checks, not general semantic understanding.
 
-The rest of this document describes the target architecture. Durable job
-scheduling, vector retrieval, and real-world tools are not implemented.
+The durable SQLite job store and isolated runner are implemented and tested for
+priority, concurrent claims, leases, bounded retry, cancellation and stale
+results before/after inference. They are not yet the main life loop's path.
+Explainable lexical recall is implemented; vector retrieval and tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
 [system interactions](SYSTEM_INTERACTIONS.md) define the delivery sequence and
 behavioral contracts. Their richer event fields require explicit schema evolution.
@@ -142,7 +144,8 @@ State and the journal are rebuilt from those events. The planned schema will com
 
 The current port requires atomic appends and revision conflicts, independent of
 database engine. A PostgreSQL adapter must satisfy the same persistence tests.
-Materialized projections, scheduled jobs, and vectors are not implemented yet.
+Materialized projections and vectors are not implemented yet. Durable cognition
+jobs exist but still need atomic scene consumption and main-loop wiring.
 Role traces currently record status, model/backend, latency, and a trace ID.
 
 ## Model contract

@@ -3,9 +3,14 @@
 import asyncio
 import math
 from datetime import timedelta
+from typing import Any
 
 from eidos.application.cognition import perform
+from eidos.application.first_story import story_events
+from eidos.application.inner_life import active_concerns, waking_dream_events
+from eidos.application.memory import memory_view, recall
 from eidos.domain.events import DomainEvent
+from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.state import PathosState
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name, npc_location
@@ -42,15 +47,21 @@ class Life:
             return
         self.advance(8)
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         history = self.history()
         state = self.project(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
-        relationships = {person["id"]: 0 for person in PEOPLE}
-        roles = {role["id"]: {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES}
+        relationships: dict[str, dict[str, Any]] = {
+            person["id"]: {"encounters": 0, "trust": 0.3, "familiarity": 0.2, "tension": 0.0}
+            for person in PEOPLE
+        }
+        roles: dict[str, dict[str, Any]] = {
+            str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
+        }
         memories, feed, conversations = [], [], []
         diagnostics = []
+        concerns = {}
         for event in history:
             payload = dict(event.payload)
             item = {**payload, "id": str(event.event_id), "kind": event.kind}
@@ -60,7 +71,21 @@ class Life:
                 weather = payload["text"]
             elif event.kind == "npc.encountered":
                 person_id = payload["person_id"]
-                relationships[person_id] = relationships.get(person_id, 0) + 1
+                relationships[person_id]["encounters"] += 1
+                relationships[person_id]["familiarity"] = min(
+                    1.0, relationships[person_id]["familiarity"] + 0.01
+                )
+            elif event.kind == "relationship.changed":
+                relation = relationships[payload["person_id"]]
+                for dimension in ("trust", "familiarity", "tension"):
+                    relation[dimension] = max(
+                        0.0,
+                        min(1.0, relation[dimension] + float(payload.get(f"{dimension}_delta", 0))),
+                    )
+            elif event.kind == "concern.opened":
+                concerns[payload["concern_id"]] = {**item, "status": "active"}
+            elif event.kind == "concern.resolved" and payload["concern_id"] in concerns:
+                concerns[payload["concern_id"]]["status"] = "resolved"
             elif event.kind == "role.completed":
                 role = roles.get(payload["role"])
                 if role:
@@ -86,7 +111,12 @@ class Life:
                 "world.weather",
                 "reflection.recorded",
                 "dream.recorded",
+                "dream.recalled",
                 "day.summarized",
+                "request.made",
+                "schedule.interrupted",
+                "commitment.fulfilled",
+                "relationship.changed",
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
@@ -96,10 +126,12 @@ class Life:
             {
                 **person,
                 "location_id": npc_location(person["id"], state.simulated_at.hour),
-                "encounters": relationships[person["id"]],
+                **relationships[person["id"]],
             }
             for person in PEOPLE
         ]
+        memories = memory_view(history, state.simulated_at)
+        planning = project_planning(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -118,6 +150,11 @@ class Life:
             "people": population,
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
+            "goals": [vars_for(goal) for goal in planning.goals.values()],
+            "commitments": [vars_for(item) for item in planning.commitments.values()],
+            "calendar": [vars_for(item) for item in planning.calendar.values()],
+            "objects": [vars_for(item) for item in planning.objects.values()],
+            "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
@@ -175,9 +212,21 @@ class Life:
                             "source": "authored-routine",
                             "category": "experience",
                             "location_id": beat.location_id,
+                            "owner": "pathos",
+                            "importance": 0.45,
+                            "confidence": 1.0,
                         },
                     )
                 )
+            story = story_events(current, history + pending)
+            if story:
+                project_planning(history + pending + story)
+                pending.extend(story)
+            if current.hour == 7:
+                waking = waking_dream_events(history + pending, state, at)
+                for event in waking:
+                    pending.append(event)
+                    state = state.apply(event)
             memories = [
                 e.payload["text"] for e in history + pending if e.kind == "memory.recorded"
             ][-7:]
@@ -186,6 +235,9 @@ class Life:
                 "time": at,
                 "memories": memories,
             }
+            concerns_now = active_concerns(history + pending)
+            if concerns_now:
+                context["concern"] = concerns_now[-1].payload["text"]
             if current.hour in (6, 12, 18):
                 text = await perform(self.gateway, "moira", context, at, pending)
                 if text:
@@ -272,6 +324,9 @@ class Life:
                                         "source_event_id": str(encounter.event_id),
                                         "location_id": state.location_id,
                                         "role": "source-archive" if recovered else "mnemosyne",
+                                        "owner": "pathos",
+                                        "importance": 0.75,
+                                        "confidence": 1.0,
                                     },
                                 )
                             )
@@ -293,18 +348,35 @@ class Life:
                 if current.hour == scheduled_hour:
                     text = await perform(self.gateway, role, context, at, pending)
                     if text:
-                        pending.append(
-                            DomainEvent(
-                                kind,
-                                "pathos",
-                                {
-                                    "text": text,
-                                    "simulated_at": at,
-                                    "source": self.mode,
-                                    "role": role,
-                                },
-                            )
+                        event = DomainEvent(
+                            kind,
+                            "pathos",
+                            {
+                                "text": text,
+                                "simulated_at": at,
+                                "source": self.mode,
+                                "role": role,
+                                **(
+                                    {"seed_concern_id": concerns_now[-1].payload["concern_id"]}
+                                    if role == "oneiros" and concerns_now
+                                    else {}
+                                ),
+                            },
                         )
+                        pending.append(event)
+                        if role == "oneiros" and concerns_now:
+                            pending.append(
+                                DomainEvent(
+                                    "dream.effect_scheduled",
+                                    "pathos",
+                                    {
+                                        "source_dream_id": str(event.event_id),
+                                        "simulated_at": at,
+                                        "valence_delta": -0.05,
+                                        "reason": "unresolved concern carried into sleep",
+                                    },
+                                )
+                            )
         pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
         self.store.append("pathos", pending, expected_revision=len(history))
 
@@ -362,13 +434,28 @@ class Life:
                 },
             )
         ]
+        selected = recall(history, text.strip(), state.simulated_at, 7)
         context = {
             "message": text.strip(),
             "time": at,
             "location": location_name(state.location_id),
             "mood": mood_name(state.energy, state.valence),
-            "memories": [e.payload["text"] for e in history if e.kind == "memory.recorded"][-7:],
+            "memories": [item.event.payload["text"] for item in selected],
         }
+        pending.extend(
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {
+                    "memory_id": str(item.event.event_id),
+                    "simulated_at": at,
+                    "reason": item.reason,
+                    "score": item.score,
+                    "query_source": "user-conversation",
+                },
+            )
+            for item in selected
+        )
         reply = asyncio.run(perform(self.gateway, "pathos", context, at, pending))
         if reply:
             pending.append(
@@ -395,6 +482,9 @@ class Life:
                         "source_event_id": str(pending[0].event_id),
                         "category": "conversation",
                         "location_id": state.location_id,
+                        "owner": "pathos",
+                        "importance": 0.7,
+                        "confidence": 1.0,
                     },
                 )
             )
@@ -413,3 +503,7 @@ class Life:
                 )
             )
         self.store.append("pathos", pending, len(history))
+
+
+def vars_for(value: Any) -> dict[str, Any]:
+    return {name: getattr(value, name) for name in value.__dataclass_fields__}

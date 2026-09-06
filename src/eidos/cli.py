@@ -10,6 +10,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.ports.event_store import RevisionConflict
+from eidos.ports.model_gateway import ModelGateway
 
 
 def main() -> None:
@@ -27,7 +28,7 @@ def main() -> None:
     web.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     try:
-        gateway = StandInGateway()
+        gateway: ModelGateway = StandInGateway()
         mode = "stand-in"
         if args.base_url or args.model:
             if not args.base_url or not args.model:

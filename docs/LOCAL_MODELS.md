@@ -83,7 +83,7 @@ and dreams lacking an explicit label. They do not detect arbitrary inventions.
 In a fresh live run through 10:00, one empty encounter was rejected. Both
 accepted encounters had exact source-linked memories; one used archive recovery
 after a source mismatch and the other passed through the model normally.
-The suite now has 33 passing tests. Browser verification confirmed the Ensemble
+The suite at that point had 33 passing tests. Browser verification confirmed the Ensemble
 call inspector shows model/backend, latency, token usage, and correlated traces.
 
 The SSH forward and preview are foreground processes, not installed services;

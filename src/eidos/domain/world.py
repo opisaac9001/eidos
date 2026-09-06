@@ -81,4 +81,4 @@ def npc_location(person_id: str, hour: int) -> str:
 
 
 def location_name(location_id: str) -> str:
-    return next(place["name"] for place in LOCATIONS if place["id"] == location_id)
+    return str(next(place["name"] for place in LOCATIONS if place["id"] == location_id))

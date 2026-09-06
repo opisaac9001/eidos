@@ -18,6 +18,11 @@ const labels = {
   "memory.recorded": "A MEMORY FORMED",
   "role.failed": "PERFORMER ERROR",
   "memory.recovered": "SOURCE ARCHIVE RECOVERY",
+  "request.made": "A REQUEST",
+  "schedule.interrupted": "PLAN INTERRUPTED",
+  "commitment.fulfilled": "PROMISE KEPT",
+  "relationship.changed": "RELATIONSHIP CHANGED",
+  "dream.recalled": "A DREAM REMEMBERED",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
@@ -160,7 +165,7 @@ function feedMarkup(items, full = false) {
   return items
     .map(
       (item) =>
-        `<div class="feed-row"><span class="feed-time">${full ? `${esc(date(item.simulated_at))}<br>` : ""}${esc(time(item.simulated_at))}</span><div><div class="feed-type">${esc(labels[item.kind] || item.kind)}</div><div class="feed-text">${esc(item.text)}</div></div></div>`,
+        `<div class="feed-row"><span class="feed-time">${full ? `${esc(date(item.simulated_at))}<br>` : ""}${esc(time(item.simulated_at))}</span><div><div class="feed-type">${esc(labels[item.kind] || item.kind)}</div><div class="feed-text">${esc(item.text || item.reason || item.title || "Recorded consequence")}</div></div></div>`,
     )
     .join("");
 }
@@ -180,7 +185,7 @@ function renderArchive() {
     ? items
         .map(
           (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${esc((item.category || "experience").toUpperCase())}</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(item.source || "authored-routine")}${item.source_event_id ? ` · linked to event ${esc(item.source_event_id.slice(0, 8))}` : ""}</div></article>`,
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${esc((item.category || "experience").toUpperCase())} · ${Math.round((item.accessibility ?? 1) * 100)}% ACCESSIBLE</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(item.source || "authored-routine")}${item.source_event_id ? ` · linked to event ${esc(item.source_event_id.slice(0, 8))}` : ""}</div></article>`,
         )
         .join("")
     : '<div class="empty">No memories match that search.</div>';
@@ -282,6 +287,12 @@ function render(next) {
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);
   $("recent-feed").innerHTML = feedMarkup(state.feed.slice(0, 7));
+  const commitment = state.commitments[0];
+  const appointment = state.calendar[0];
+  const object = state.objects[0];
+  $("life-threads").innerHTML = commitment
+    ? `<div><span class="eyebrow">COMMITMENT</span><strong>${esc(commitment.title)}</strong><small>${esc(commitment.status)} · due ${esc(date(commitment.due_at))} ${esc(time(commitment.due_at))}</small></div><div><span class="eyebrow">NEXT ACTION</span><strong>${esc(appointment.title)}</strong><small>${esc(appointment.status)} · ${esc(date(appointment.starts_at))} ${esc(time(appointment.starts_at))}</small></div><div><span class="eyebrow">OBJECT STATE</span><strong>${esc(object.name)}</strong><small>${esc(object.condition)} · at ${esc(state.locations.find((place) => place.id === object.location_id)?.name || object.location_id)}</small></div>`
+    : '<p class="muted">No active commitments yet.</p>';
   $("neighborhood-status").textContent =
     `${state.people.length} neighbors · ${state.locations.length} places`;
   $("event-count").textContent = state.counts.events.toLocaleString();
@@ -292,7 +303,7 @@ function render(next) {
   $("people").innerHTML = state.people
     .map(
       (person) =>
-        `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p><div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters</span></div></article>`,
+        `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p><div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`,
     )
     .join("");
   $("chat-context-mood").textContent = state.pathos.mood;

@@ -1257,6 +1257,31 @@ hr {
 .mobile-mode {
   display: none;
 }
+.life-threads {
+  padding: 24px;
+  margin: 24px 0;
+}
+.thread-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 18px;
+}
+.thread-grid > div {
+  border-left: 1px solid var(--line);
+  padding-left: 16px;
+}
+.thread-grid strong,
+.thread-grid small {
+  display: block;
+}
+.thread-grid strong {
+  margin: 7px 0;
+  font-family: Georgia, serif;
+}
+.thread-grid small {
+  color: var(--muted);
+}
 .call-inspector {
   padding: 24px;
   margin-bottom: 24px;
@@ -1271,6 +1296,9 @@ hr {
   margin-top: 20px;
 }
 @media (max-width: 950px) {
+  .thread-grid {
+    grid-template-columns: 1fr;
+  }
   .mobile-mode {
     display: block;
     font-size: 12px;

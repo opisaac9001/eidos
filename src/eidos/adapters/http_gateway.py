@@ -26,7 +26,7 @@ ROLE_FIELDS = {
     "moira": ("time", "location"),
     "mnemosyne": ("experience",),
     "reflection": ("memories",),
-    "oneiros": ("location", "memories"),
+    "oneiros": ("location", "memories", "concern"),
     "chronicler": ("memories",),
 }
 

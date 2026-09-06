@@ -122,3 +122,34 @@ class LifeTests(unittest.TestCase):
         for hours in (float("nan"), 0, -1, 25, True, "1"):
             with self.assertRaises(ValueError):
                 self.life.advance(hours)
+
+    def test_first_story_persists_a_causal_plan_across_days(self):
+        self.life.advance(24)
+        active = self.life.snapshot()
+        self.assertEqual(active["commitments"][0]["status"], "active")
+        self.assertEqual(active["objects"][0]["condition"], "broken")
+        self.life.advance(14)
+        finished = self.life.snapshot()
+        self.assertEqual(finished["goals"][0]["status"], "achieved")
+        self.assertEqual(finished["commitments"][0]["status"], "fulfilled")
+        self.assertEqual(finished["calendar"][0]["status"], "completed")
+        self.assertEqual(finished["objects"][0]["condition"], "repaired")
+        self.assertGreater(finished["people"][0]["trust"], active["people"][0]["trust"])
+        kinds = [event.kind for event in self.life.history()]
+        self.assertLess(kinds.index("schedule.interrupted"), kinds.index("schedule.completed"))
+        replayed = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        self.assertEqual(replayed["commitments"], finished["commitments"])
+
+    def test_unresolved_concern_seeds_dream_and_bounded_waking_recall(self):
+        self.life.advance(24)
+        before_waking = self.life.snapshot()
+        dream = next(e for e in self.life.history() if e.kind == "dream.recorded")
+        self.assertEqual(dream.payload["seed_concern_id"], "finish-mara-lamp")
+        self.life.advance(7)
+        after_waking = self.life.snapshot()
+        recalled = [memory for memory in after_waking["memories"] if memory["category"] == "dream"]
+        self.assertEqual(len(recalled), 1)
+        self.assertEqual(recalled[0]["source_event_id"], str(dream.event_id))
+        self.assertLess(after_waking["pathos"]["valence"], before_waking["pathos"]["valence"])
+        applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
+        self.assertEqual(len(applied), 1)

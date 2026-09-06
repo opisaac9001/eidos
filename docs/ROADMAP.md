@@ -27,12 +27,16 @@ Implemented: SQLite event history, atomic writes/replay, fixed daily routines,
 pause/resume, four places, three scheduled neighbors, basic energy/emotional
 tone, source-linked memories, conversations, and five UX views. Eight logical AI
 roles use stand-ins or real HTTP inference; they are not eight deployed services.
-A deterministic critic checks contracts. The latest suite has 33 passing tests.
+A deterministic critic checks contracts. The latest suite has 54 passing tests
+and the complete source tree passes strict static typing.
 
 Hourly associations, reflection, dreams and a daybook run at fixed times.
-**Dreams do not yet affect next-day state; memories do not fade; Pathos does not
-choose plans; NPCs do not have independent minds.** Context mostly uses seven
-recent memories. Encounter counts are not nuanced relationships.
+The first authored story now exercises a promise, object, calendar, interruption,
+repair, fulfillment, concern and directed trust. Concern-seeded dreams can create
+one capped waking effect and explicit dream recollection. Lexical recall includes
+importance, simulated-time fading and capped rehearsal. **Pathos does not yet
+choose plans, the life loop has not moved onto the durable job queue, and NPCs
+do not have independent minds.** Entity indexes, beliefs and consolidation remain.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -214,13 +218,13 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Typed proposal envelopes and event migration fixtures (CORE-02).
-2. Durable jobs and stale-result-safe commits (CORE-03, OPS-02).
-3. Memory metadata and explainable cue-based retrieval (MEM-01–03).
-4. Accessibility decay and rehearsal with simulated-time tests (MEM-04).
-5. Goal/commitment/calendar state machines (PLAN-01–03).
-6. One persistent object and a multi-turn favor scene (WORLD-03, SOCIAL-02/03).
-7. Emotional residue, unresolved concerns and dream carryover (INNER-01–06).
+1. Wire the tested durable job store/runner into atomic life-loop consumption.
+2. Finish typed action/intention/world-event envelopes and migrations.
+3. Add entity/relationship/goal indexes and richer retrieval explanations.
+4. Generalize planning beyond the authored lamp story.
+5. Make the lamp request a bounded accept/decline/negotiate scene.
+6. Add appraisal, needs and choice policy around dream residue.
+7. Add consolidation and owned beliefs, then adversarial perspective tests.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,
 operator visibility, known limitations and migration notes. Real-model probes

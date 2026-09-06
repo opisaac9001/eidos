@@ -10,7 +10,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: text only | P1 |
-| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Planned | P1 |
+| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: tested queue/runner; loop wiring pending | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
 
@@ -18,10 +18,10 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: links/categories | P2 |
+| MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: owner/source/confidence/importance | P2 |
 | MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: recent seven | P2 |
-| MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Planned | P2 |
-| MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Planned | P2 |
+| MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: explainable lexical cues | P2 |
+| MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: daybook prose | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Planned | P2 |
 | MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Planned | P2 |
@@ -46,9 +46,9 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Planned | P3 |
-| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Planned | P3 |
-| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: fixed routine | P3 |
+| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: state and first story | P3 |
+| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: commitment state/first story | P3 |
+| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: schedule transitions/routine | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Planned | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Planned | P3 |
 | PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Planned | P3 |
@@ -60,7 +60,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Planned | P3 |
-| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Planned | P3 |
+| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: lamp custody/condition | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: authored routine | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: schedules | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: weather only | P5 |
@@ -76,7 +76,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Planned | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Planned | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Planned | P3 |
-| SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: encounter counts | P3 |
+| SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Planned | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Planned | P5 |
 
@@ -89,12 +89,12 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| INNER-01 | Structured unresolved concerns and emotional residue | Planned | P4 |
+| INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
 | INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly thought | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: scheduled prose | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: recent-context dream | P4 |
-| INNER-06 | Partial dream recall, waking affect, inspiration, fading | Planned | P4 |
+| INNER-06 | Partial dream recall, waking affect, inspiration, fading | Partial: explicit recall/capped effect | P4 |
 | INNER-07 | Source-linked subjective/objective journals and interval summaries | Partial: daybook/events | P4–P5 |
 
 ## UX

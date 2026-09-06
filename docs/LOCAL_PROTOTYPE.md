@@ -3,9 +3,10 @@
 ## Surfaces
 
 - Observatory: present state, inner monologue, clock, map, and recent events.
-- World: four locations, three neighbors, their schedules, and encounter counts.
+- World: four locations, three neighbors, directed relationship metrics, one
+  causal lamp-repair story, persistent plans and object condition.
 - Conversation: persisted messages, context-based stand-in replies, retry IDs.
-- Memory archive: category and text filters, provenance, complete JSON export.
+- Memory archive: category/text filters, provenance, accessibility and JSON export.
 - Ensemble: role execution counts, last-run times, errors, and filtered history.
 
 ## Daily loop
@@ -26,6 +27,17 @@ scheduled actors, and explicit dream labels; it does not evaluate arbitrary pros
 for truth. Rejected calls carry stable reason codes and correlated critic traces.
 The Ensemble's expandable call inspector shows the latest 100 traces, model,
 backend, latency, token count when available, and outcome.
+
+Conversation context now uses explainable cue-based recall with importance,
+confidence, simulated-time accessibility decay and capped rehearsal. This is
+lexical retrieval, not semantic understanding; the audit history never fades.
+The authored lamp fixture exercises a goal, promise, schedule, interruption,
+reschedule, object repair, fulfillment and causal trust update. It is not yet
+general autonomous planning.
+
+The unresolved lamp concern seeds the first night's dream. Waking records it
+explicitly as a dream and applies one capped emotional residue. Duplicate
+application is prevented. General sleep, appraisal and choice remain pending.
 
 ## Persistence and failures
 
@@ -53,6 +65,11 @@ chat retries, API input boundaries, the live worker, and pause behavior. Browser
 checks exercise navigation, hour stepping, contextual replies, archive search,
 and desktop/mobile presentation. A built Python wheel must include all three
 browser assets so installation works outside an editable checkout.
+
+The suite has 54 tests and strict static typing passes. A separate durable queue
+and runner cover restart, concurrent claims, ownership, priority, leases, bounded
+retry, cancellation, invalid output and stale revisions before/after inference.
+The main simulation has not switched to that queue yet.
 
 ## Next connection
 

@@ -2,6 +2,7 @@
 
 import json
 import re
+from typing import Mapping
 
 
 class ProposalRejected(ValueError):
@@ -10,7 +11,7 @@ class ProposalRejected(ValueError):
         self.code = code
 
 
-def validate_proposal(role: str, content: str, context: dict) -> str:
+def validate_proposal(role: str, content: str, context: Mapping[str, object]) -> str:
     try:
         proposal = json.loads(content)
     except (ValueError, TypeError):
@@ -27,7 +28,8 @@ def validate_proposal(role: str, content: str, context: dict) -> str:
     if role == "firmament":
         if len(re.findall(r"\w+", text)) < 5 or text.rstrip().endswith(":"):
             raise ProposalRejected("empty_scene", "Encounter was an unfinished fragment")
-        person = context.get("person")
+        person_value = context.get("person")
+        person = person_value if isinstance(person_value, str) else None
         if person and not re.search(r"\b" + re.escape(person) + r"\b", text, re.IGNORECASE):
             raise ProposalRejected("missing_actor", "Encounter omitted its scheduled neighbor")
     if role == "oneiros" and not text.lower().startswith("in a dream"):

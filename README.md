@@ -113,13 +113,15 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - Offline chat uses templates; model mode uses the configured HTTP endpoint and
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
-- NPC schedules and encounter counts persist by replaying deterministic rules
-  and events; autonomous NPC planning and nuanced relationships are future work.
-- Memories use text search and provenance links; semantic retrieval is pending.
+- NPC schedules, a first causal promise/repair story and relationship metrics
+  persist by replay; autonomous NPC planning remains future work.
+- Memories have provenance, importance, cue-based recall, accessibility fading
+  and capped rehearsal. Entity/semantic retrieval and consolidation are pending.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay is appropriate for short prototype runs. Longer runs need
-  snapshots, pagination, backups, and a durable job queue before sustained operation.
+  snapshots, pagination and backups. A durable job queue/runner is tested but not
+  yet wired into the main life loop.
 - Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the

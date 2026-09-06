@@ -7,6 +7,7 @@ import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -28,7 +29,7 @@ class Runtime:
         self.error: str | None = None
         self.ticks = 0
         self.thread: threading.Thread | None = None
-        self.cached: dict | None = None
+        self.cached: dict[str, Any] | None = None
         self.working = False
 
     def start(self) -> None:
@@ -71,7 +72,7 @@ class Runtime:
             self.thread.join(timeout=30)
 
     @contextmanager
-    def mutation(self):
+    def mutation(self) -> Iterator[None]:
         with self.lock:
             self.working = True
             try:
@@ -80,7 +81,7 @@ class Runtime:
                 self.working = False
                 self.cached = self.life.snapshot()
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         if self.lock.acquire(blocking=False):
             try:
                 self.cached = self.life.snapshot()
@@ -100,17 +101,15 @@ class Runtime:
         }
 
 
-def make_handler(runtime: Runtime):
+def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, format, *args) -> None:
+        def log_message(self, format: str, *args: Any) -> None:
             logger.debug(format, *args)
 
         def local_request(self) -> bool:
             host = self.headers.get("Host", "")
-            allowed = {
-                f"127.0.0.1:{self.server.server_port}",
-                f"localhost:{self.server.server_port}",
-            }
+            port = int(getattr(self.server, "server_port"))
+            allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
             if host not in allowed:
                 self.respond(403, {"error": "This server accepts local requests only"})
                 return False
@@ -120,7 +119,7 @@ def make_handler(runtime: Runtime):
                 return False
             return True
 
-        def respond(self, status: int, value, content_type: str = "application/json") -> None:
+        def respond(self, status: int, value: Any, content_type: str = "application/json") -> None:
             body = (
                 json.dumps(value, allow_nan=False).encode()
                 if content_type == "application/json"
@@ -195,7 +194,11 @@ def make_handler(runtime: Runtime):
                     elif self.path == "/api/step":
                         runtime.life.advance(body.get("hours", 1))
                     elif self.path == "/api/chat":
-                        runtime.life.chat(body.get("text"), body.get("request_id"))
+                        text_value = body.get("text")
+                        request_id = body.get("request_id")
+                        if not isinstance(text_value, str) or not isinstance(request_id, str):
+                            raise ValueError("Chat text and request ID must be strings")
+                        runtime.life.chat(text_value, request_id)
                     else:
                         self.respond(404, {"error": "Not found"})
                         return
