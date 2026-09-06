@@ -111,6 +111,9 @@ const labels = {
   "follow_up.completed": "FOLLOW-UP COMPLETED",
   "relationship.milestone_recorded": "A SHARED DATE WAS KEPT",
   "relationship.anniversary_remembered": "A RELATIONSHIP DATE RETURNED",
+  "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
+  "social.preference_revised": "A PREFERENCE CHANGED",
+  "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
   "skill.practiced": "SKILL PRACTICE",
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",
@@ -612,7 +615,11 @@ function render(next) {
         const belief = state.beliefs?.find(
           (item) => item.owner_id === "pathos" && item.subject_id === person.id,
         );
-        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
+        const preferences = (state.social_preferences || []).filter((item) => item.person_id === person.id);
+        const preferenceText = preferences.length
+          ? `<p class="context-note">Pathos remembers: ${preferences.map((item) => `${item.status === "uncertain" ? "possibly " : ""}${esc(item.stance)} ${esc(item.topic)}`).join(" · ")}</p>`
+          : "";
+        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
       },
     )
     .join("");
@@ -655,6 +662,12 @@ function render(next) {
         })
         .join("")
     : '<p class="context-note">No shared date has formed yet.</p>';
+  const userPreferences = (state.social_preferences || []).filter((item) => item.person_id === "user");
+  $("user-preferences").innerHTML = userPreferences.length
+    ? userPreferences
+        .map((item) => `<div class="context-memory">Pathos ${item.status === "uncertain" ? "is less sure you " : "remembers that you "}${esc(item.stance)} ${esc(item.topic)}.</div>`)
+        .join("")
+    : '<p class="context-note">You have not told him a clear preference yet.</p>';
   renderMessages();
   renderArchive();
   renderPlans();

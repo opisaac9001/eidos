@@ -20,6 +20,7 @@ from eidos.domain.scenes import (
     resolve_scene_start,
     resolve_scene_turn,
 )
+from eidos.domain.social_preferences import project_social_preferences
 from eidos.ports.model_gateway import ModelGateway
 
 
@@ -267,6 +268,10 @@ def _observable_topics(
     history: Sequence[DomainEvent], location_id: str, partner_id: str
 ) -> list[str]:
     topics: list[str] = []
+    for item in project_social_preferences(history).values():
+        if item.person_id == partner_id and item.status == "held":
+            topics.append(f"remembered-{item.stance}-{item.topic}")
+            break
     if any(
         item.status == "ready" and item.person_id == partner_id
         for item in project_followups(history).values()

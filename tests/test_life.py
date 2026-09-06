@@ -201,6 +201,25 @@ class LifeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.life.chat("Different content", "visit-1")
 
+    def test_explicit_user_preference_is_persisted_with_the_reply(self):
+        self.life.bootstrap()
+        self.life.chat("I love jasmine tea.", "preference-1")
+        self.life.advance(1)
+        snapshot = self.life.snapshot()
+        preference = next(
+            item for item in snapshot["social_preferences"] if item["person_id"] == "user"
+        )
+        self.assertEqual((preference["topic"], preference["stance"]), ("jasmine tea", "likes"))
+        source = next(
+            event
+            for event in self.life.history()
+            if event.kind == "conversation.message" and event.payload.get("speaker") == "you"
+        )
+        remembered = next(
+            event for event in self.life.history() if event.kind == "social.preference_remembered"
+        )
+        self.assertEqual(remembered.causation_id, source.event_id)
+
     def test_available_user_can_begin_end_and_talk_inside_a_live_visit(self):
         self.life.bootstrap()
         self.life.request_visit("sit-down-1")

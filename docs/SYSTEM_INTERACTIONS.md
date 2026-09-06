@@ -356,6 +356,16 @@ and one factual memory. An NPC anniversary can use the normal follow-up and invi
 machinery, where availability and NPC consent still apply. A date involving the user
 is visible only as local context and cannot itself send a message or notification.
 
+Remembered social preferences have a narrower evidence rule than general beliefs. An
+explicit first-person user message (for example, a direct like, preference, or
+avoidance) can establish a user preference. An NPC preference requires a structured
+self-report perceived by Pathos: third-party gossip is insufficient. A later direct
+statement about the same normalized topic creates a revision and preserves the earlier
+evidence in history. If no direct evidence refreshes a held preference for 180
+simulated days, it becomes uncertain rather than being deleted. Only held place
+preferences influence the location of an invitation; the ordinary feasibility and
+independent NPC-consent checks remain authoritative.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

@@ -281,6 +281,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   per relationship. At 08:00 on its annual recurrence, Pathos records a factual memory;
   an NPC date can enter the ordinary follow-up and invitation path, while a user date
   remains in-app context and cannot bypass outreach consent or create an external alert.
+- Explicit first-person user statements and structured NPC self-reports create private
+  remembered likes or avoidances. Later direct statements revise rather than erase the
+  record; unsupported knowledge becomes uncertain after 180 simulated days. A held
+  place preference can shape an invitation, but gossip and ambiguous language cannot.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
   one authored date. They use only Pathos-observable topics, advance two turns per
   simulated hour, shift topics, scale their 2/4/6-turn budget with familiarity, end

@@ -18,6 +18,7 @@ from eidos.domain.social import (
     project_social,
     resolve_social_move,
 )
+from eidos.domain.social_preferences import project_social_preferences
 from eidos.domain.world_catalog import WorldCatalog
 
 
@@ -60,7 +61,9 @@ def follow_up_invitation_events(
     if follow_up is None:
         return []
     person = npc_people[follow_up.person_id]
-    location_id = person.usual_location_id
+    location_id = _preferred_location(
+        history, follow_up.person_id, person.usual_location_id, catalog
+    )
     if location_id == "home" or location_id not in catalog.places:
         location_id = "park" if "park" in catalog.places else next(iter(catalog.places))
     request = _feasible_request(
@@ -216,3 +219,38 @@ def _feasible_request(
 
 def _sample(key: str) -> float:
     return int(sha256(key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+
+
+def _preferred_location(
+    history: Sequence[DomainEvent], person_id: str, fallback: str, catalog: WorldCatalog
+) -> str:
+    preferences = [
+        item
+        for item in project_social_preferences(history).values()
+        if item.person_id == person_id and item.status == "held" and item.confidence >= 0.6
+    ]
+    matching: dict[str, str] = {}
+    for place_id, place in catalog.places.items():
+        matching[place_id.casefold()] = place_id
+        matching[place.name.casefold()] = place_id
+    liked = next(
+        (
+            matching[item.topic]
+            for item in preferences
+            if item.stance == "likes" and item.topic in matching
+        ),
+        None,
+    )
+    avoided = {
+        matching[item.topic]
+        for item in preferences
+        if item.stance == "avoids" and item.topic in matching
+    }
+    if liked is not None and liked not in avoided:
+        return liked
+    if fallback not in avoided:
+        return fallback
+    return next(
+        (place_id for place_id in catalog.places if place_id != "home" and place_id not in avoided),
+        fallback,
+    )

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.invitations import follow_up_invitation_events
+from eidos.application.social_preferences import social_preference_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import NPCState
 from eidos.domain.planning import PlanningState, project_planning
@@ -117,6 +118,27 @@ class InvitationTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_invitation_uses_a_held_self_reported_place_preference(self):
+        history = self.ready_follow_up("preferred-place")
+        evidence = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "pathos",
+                "speaker_id": "mara",
+                "claim_subject_id": "mara",
+                "claim_predicate": "prefers",
+                "claim_value": "Willow Square",
+                "claim_confidence": 0.9,
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        history.append(evidence)
+        history.extend(social_preference_events(history, self.now))
+        person = NPCState("mara", usual_location_id="cafe", energy=1.0, connection=1.0, purpose=1.0)
+        invitation = self.invite(history, person)[0]
+        self.assertEqual(invitation.payload["location_id"], "park")
 
     def _find_outcome(
         self, kind: str, person: NPCState

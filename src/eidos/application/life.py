@@ -62,6 +62,7 @@ from eidos.application.scene_story import bounded_scene_events, continuing_scene
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.social_preferences import social_preference_events
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.trait_development import trait_development_events
 from eidos.application.urgent_incidents import (
@@ -105,6 +106,7 @@ from eidos.domain.scenes import (
 )
 from eidos.domain.seasons import project_season, season_change_events, season_for
 from eidos.domain.social import project_social
+from eidos.domain.social_preferences import project_social_preferences
 from eidos.domain.state import PathosState
 from eidos.domain.traits import project_traits
 from eidos.domain.transfers import project_transfers
@@ -474,6 +476,7 @@ class Life:
         traits = project_traits(history)
         world_threads = project_world_threads(history)
         relationship_dates = project_relationship_dates(history)
+        social_preferences = project_social_preferences(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         outreach_config = project_outreach_config(history)
@@ -665,6 +668,9 @@ class Life:
                 "follow_up.completed",
                 "relationship.milestone_recorded",
                 "relationship.anniversary_remembered",
+                "social.preference_remembered",
+                "social.preference_revised",
+                "social.preference_faded",
                 "skill.practiced",
                 "habit.reinforced",
                 "preference.emerged",
@@ -804,6 +810,7 @@ class Life:
                 vars_for(thread) for thread in reversed(list(world_threads.values())[-30:])
             ],
             "relationship_dates": [vars_for(item) for item in relationship_dates.values()],
+            "social_preferences": [vars_for(item) for item in social_preferences.values()],
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
             "outreach": {
@@ -1553,6 +1560,7 @@ class Life:
                 )
             )
             pending.extend(relationship_date_events(history + pending, current))
+            pending.extend(social_preference_events(history + pending, current))
             pending.extend(follow_up_events(history + pending, current))
             invitation_emotion = project_emotion(history + pending)
             invitation_bias = emotional_planning_bias(
@@ -2344,6 +2352,7 @@ class Life:
         if not identity.established:
             pending.append(identity_established_event(at))
             identity = project_identity(history + pending)
+        pending.extend(social_preference_events(history + pending, state.simulated_at))
         query_terms = terms(text)
         planning = self._planning(history)
         catalog = self._world_catalog(history)
@@ -2402,6 +2411,11 @@ class Life:
                 }
                 for belief in self._beliefs(history).beliefs.values()
                 if belief.owner_id == "pathos"
+            ],
+            "remembered_preferences": [
+                vars_for(item)
+                for item in project_social_preferences(history + pending).values()
+                if item.person_id == "user"
             ],
             "dream_inspirations": [
                 {

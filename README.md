@@ -68,6 +68,9 @@ The first completed meaningful interaction with each person also establishes a
 source-linked private date. Its annual return becomes a factual memory and may make
 room for an ordinary, consent-respecting NPC follow-up; dates involving the user never
 create external contact.
+Pathos also retains explicit first-person likes and dislikes from the user and
+structured NPC self-reports. Corrections remain in the event history, stale preferences
+become visibly uncertain, and held place preferences can shape later invitations.
 SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
