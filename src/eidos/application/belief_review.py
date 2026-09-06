@@ -61,11 +61,18 @@ def testimony_belief_events(
     simulated_at: str,
     belief_state: BeliefState | None = None,
 ) -> list[DomainEvent]:
-    """Review structured heard claims and later direct confirmations as distinct evidence."""
+    """Review actor-owned heard claims and Pathos's direct confirmations."""
     considered = {
         str(event.payload["evidence_event_id"])
         for event in history
-        if event.kind in {"belief.formed", "belief.revised", "belief.corrected", "belief.contested"}
+        if event.kind
+        in {
+            "belief.formed",
+            "belief.revised",
+            "belief.corrected",
+            "belief.contested",
+            "belief.rejected",
+        }
     }
     output: list[DomainEvent] = []
     state = belief_state if belief_state is not None else project_beliefs(history)
@@ -74,7 +81,8 @@ def testimony_belief_events(
         if evidence_id in considered:
             continue
         if evidence.kind == "perception.recorded":
-            if evidence.payload.get("owner") != "pathos":
+            owner_id = evidence.payload.get("owner")
+            if not isinstance(owner_id, str):
                 continue
             subject_id = evidence.payload.get("claim_subject_id")
             predicate = evidence.payload.get("claim_predicate")
@@ -88,8 +96,9 @@ def testimony_belief_events(
             assert isinstance(claim_confidence, (int, float)) and not isinstance(
                 claim_confidence, bool
             )
-            confidence = float(claim_confidence) * _speaker_reliability(state, speaker_id)
+            confidence = float(claim_confidence) * _speaker_reliability(state, owner_id, speaker_id)
         elif evidence.kind == "resource.confirmed":
+            owner_id = "pathos"
             subject_id = evidence.payload.get("subject_id")
             predicate = evidence.payload.get("predicate")
             object_value = evidence.payload.get("object_value")
@@ -108,8 +117,8 @@ def testimony_belief_events(
         combined = [*history, *output]
         proposal = BeliefProposal(
             proposal_id=f"review-claim-{evidence.event_id}",
-            belief_id=f"pathos-{subject_id}-{predicate}",
-            owner_id="pathos",
+            belief_id=f"{owner_id}-{subject_id}-{predicate}",
+            owner_id=owner_id,
             subject_id=subject_id,
             predicate=predicate,
             object_value=object_value,
@@ -145,8 +154,8 @@ def _claim_shape(
     )
 
 
-def _speaker_reliability(state: BeliefState, speaker_id: str) -> float:
-    belief = state.beliefs.get(f"pathos-{speaker_id}-testimony_reliability")
+def _speaker_reliability(state: BeliefState, owner_id: str, speaker_id: str) -> float:
+    belief = state.beliefs.get(f"{owner_id}-{speaker_id}-testimony_reliability")
     if belief is None or belief.status == "contested":
         return 0.6
     if belief.object_value == "reliable":

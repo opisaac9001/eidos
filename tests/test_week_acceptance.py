@@ -55,6 +55,35 @@ class SevenDayAcceptanceTests(unittest.TestCase):
             self.assertTrue(snapshot["dreams"])
             self.assertTrue(any(item["category"] == "dream" for item in snapshot["memories"]))
             self.assertTrue(any(item["owner_id"] == "rowan" for item in snapshot["npc_beliefs"]))
+            testimony = next(
+                event
+                for event in history
+                if event.kind == "scene.turn_taken"
+                and event.payload.get("actor_id") == "rowan"
+                and event.payload.get("audience_id") == "mara"
+                and event.payload.get("claim_subject_id") is not None
+            )
+            mara_belief = next(
+                item
+                for item in snapshot["npc_beliefs"]
+                if item["owner_id"] == "mara"
+                and item["subject_id"] == testimony.payload["claim_subject_id"]
+            )
+            rowan_belief = next(
+                item
+                for item in snapshot["npc_beliefs"]
+                if item["owner_id"] == "rowan"
+                and item["subject_id"] == testimony.payload["claim_subject_id"]
+            )
+            self.assertLess(mara_belief["confidence"], rowan_belief["confidence"])
+            self.assertFalse(
+                any(
+                    event.kind == "perception.recorded"
+                    and event.payload.get("owner") == "pathos"
+                    and event.payload.get("source_event_id") == str(testimony.event_id)
+                    for event in history
+                )
+            )
             rowan = next(item for item in snapshot["npc_states"] if item["actor_id"] == "rowan")
             self.assertEqual(rowan["plan_status"], "completed")
             scene = next(

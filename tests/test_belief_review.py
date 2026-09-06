@@ -99,7 +99,7 @@ class BeliefReviewTests(unittest.TestCase):
         self.assertAlmostEqual(final.confidence, 0.98)
         self.assertEqual(testimony_belief_events(history, "again"), [])
 
-    def test_private_or_unstructured_perception_does_not_create_a_claim(self):
+    def test_private_testimony_forms_only_the_listeners_owned_discounted_belief(self):
         private = DomainEvent(
             "perception.recorded",
             "pathos",
@@ -112,12 +112,70 @@ class BeliefReviewTests(unittest.TestCase):
                 "claim_confidence": 0.8,
             },
         )
+        history = [private]
+        history.extend(testimony_belief_events(history, "now"))
+        belief = project_beliefs(history).beliefs["mara-lamp-switch"]
+        self.assertEqual((belief.owner_id, belief.object_value), ("mara", "available"))
+        self.assertAlmostEqual(belief.confidence, 0.48)
+        self.assertNotIn("pathos-lamp-switch", project_beliefs(history).beliefs)
+
+    def test_unstructured_perception_does_not_create_a_claim(self):
         unstructured = DomainEvent(
             "perception.recorded",
             "pathos",
             {"owner": "pathos", "speaker_id": "ellis", "text": "Maybe."},
         )
-        self.assertEqual(testimony_belief_events([private, unstructured], "now"), [])
+        self.assertEqual(testimony_belief_events([unstructured], "now"), [])
+
+    def test_testimony_loses_confidence_at_each_listener_and_conflict_contests_it(self):
+        rowan_to_mara = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "mara",
+                "speaker_id": "rowan",
+                "claim_subject_id": "glasshouse",
+                "claim_predicate": "opening_status",
+                "claim_value": "open",
+                "claim_confidence": 0.8,
+            },
+        )
+        history = [rowan_to_mara]
+        history.extend(testimony_belief_events(history, "first"))
+        mara = project_beliefs(history).beliefs["mara-glasshouse-opening_status"]
+        self.assertAlmostEqual(mara.confidence, 0.48)
+        mara_to_ellis = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "ellis",
+                "speaker_id": "mara",
+                "claim_subject_id": "glasshouse",
+                "claim_predicate": "opening_status",
+                "claim_value": "open",
+                "claim_confidence": mara.confidence,
+            },
+        )
+        history.append(mara_to_ellis)
+        history.extend(testimony_belief_events(history, "second"))
+        ellis = project_beliefs(history).beliefs["ellis-glasshouse-opening_status"]
+        self.assertAlmostEqual(ellis.confidence, 0.288)
+        contradiction = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "ellis",
+                "speaker_id": "rowan",
+                "claim_subject_id": "glasshouse",
+                "claim_predicate": "opening_status",
+                "claim_value": "closed",
+                "claim_confidence": 0.9,
+            },
+        )
+        history.append(contradiction)
+        history.extend(testimony_belief_events(history, "third"))
+        contested = project_beliefs(history).beliefs["ellis-glasshouse-opening_status"]
+        self.assertEqual((contested.status, contested.alternative_value), ("contested", "closed"))
 
 
 if __name__ == "__main__":

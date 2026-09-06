@@ -142,6 +142,10 @@ class SceneTurnProposal:
     topic_id: str
     privacy: ScenePrivacy
     expected_revision: int
+    claim_subject_id: str | None = None
+    claim_predicate: str | None = None
+    claim_value: str | None = None
+    claim_confidence: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +284,38 @@ def resolve_scene_turn(
         or not proposal.intent.strip()
     ):
         return _reject(proposed, "invalid_turn", "A scene turn needs bounded text and intent")
+    claim_values = (
+        proposal.claim_subject_id,
+        proposal.claim_predicate,
+        proposal.claim_value,
+        proposal.claim_confidence,
+    )
+    if any(value is not None for value in claim_values):
+        if not all(value is not None for value in claim_values):
+            return _reject(proposed, "partial_claim", "A spoken claim needs every claim field")
+        if (
+            not isinstance(proposal.claim_subject_id, str)
+            or not proposal.claim_subject_id.strip()
+            or len(proposal.claim_subject_id) > 80
+            or not isinstance(proposal.claim_predicate, str)
+            or not proposal.claim_predicate.strip()
+            or len(proposal.claim_predicate) > 80
+            or not isinstance(proposal.claim_value, str)
+            or not proposal.claim_value.strip()
+            or len(proposal.claim_value) > 240
+            or isinstance(proposal.claim_confidence, bool)
+            or not isinstance(proposal.claim_confidence, (int, float))
+            or not 0 <= proposal.claim_confidence <= 1
+        ):
+            return _reject(proposed, "invalid_claim", "Spoken claim fields are invalid")
+    claim_payload: dict[str, object] = {}
+    if proposal.claim_subject_id is not None:
+        claim_payload = {
+            "claim_subject_id": proposal.claim_subject_id,
+            "claim_predicate": proposal.claim_predicate,
+            "claim_value": proposal.claim_value,
+            "claim_confidence": proposal.claim_confidence,
+        }
     turn = DomainEvent(
         "scene.turn_taken",
         "pathos",
@@ -295,6 +331,7 @@ def resolve_scene_turn(
             "location_id": scene.location_id,
             "turn_number": scene.turn_count + 1,
             "simulated_at": simulated_at,
+            **claim_payload,
         },
         causation_id=proposed.event_id,
         correlation_id=scene.scene_id,
@@ -323,6 +360,7 @@ def resolve_scene_turn(
                 "privacy": proposal.privacy.value,
                 "location_id": scene.location_id,
                 "simulated_at": simulated_at,
+                **claim_payload,
             },
             causation_id=turn.event_id,
             correlation_id=scene.scene_id,

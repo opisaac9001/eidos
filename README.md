@@ -142,6 +142,9 @@ resident's actual conversation turn; only the spoken turn becomes Pathos's memor
 People invented by Moira receive the same kind of three-stage private history from a
 separate schema-checked model proposal. Invalid history remains an audited quiet gap,
 with at most three daily attempts, rather than becoming an improvised fact.
+Residents can also pass an owned belief through an actual scene turn. The listener
+stores discounted testimony rather than world truth; private speech reaches only its
+audience, while public speech reaches only actors projected at that place.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or

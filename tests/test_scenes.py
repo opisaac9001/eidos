@@ -89,6 +89,52 @@ class SceneTests(unittest.TestCase):
         self.assertEqual(owners, {"pathos", "mara"})
         self.assertNotIn("ellis", owners)
 
+    def test_structured_claim_reaches_only_the_actual_turn_observers(self):
+        started = self.start()
+        turn = resolve_scene_turn(
+            SceneTurnProposal(
+                "claim-turn",
+                "bench",
+                "rowan",
+                "I may be wrong, but the lamp switch seems available.",
+                "testify",
+                "lamp-switch",
+                ScenePrivacy.PRIVATE,
+                len(started.events),
+                claim_subject_id="lamp",
+                claim_predicate="switch",
+                claim_value="available",
+                claim_confidence=0.8,
+            ),
+            state=project_scenes(started.events),
+            history=started.events,
+            actor_locations=self.locations,
+            actual_revision=len(started.events),
+            simulated_at=self.at,
+        )
+        perceptions = [event for event in turn.events if event.kind == "perception.recorded"]
+        self.assertEqual([event.payload["owner"] for event in perceptions], ["pathos"])
+        self.assertEqual(perceptions[0].payload["claim_subject_id"], "lamp")
+        partial = resolve_scene_turn(
+            SceneTurnProposal(
+                "partial-claim",
+                "bench",
+                "rowan",
+                "Something uncertain.",
+                "testify",
+                "lamp-switch",
+                ScenePrivacy.PRIVATE,
+                len(started.events),
+                claim_subject_id="lamp",
+            ),
+            state=project_scenes(started.events),
+            history=started.events,
+            actor_locations=self.locations,
+            actual_revision=len(started.events),
+            simulated_at=self.at,
+        )
+        self.assertEqual(partial.code, "partial_claim")
+
     def test_turn_budget_ends_scene_and_rejects_later_speech(self):
         started = self.start(1)
         turn = resolve_scene_turn(

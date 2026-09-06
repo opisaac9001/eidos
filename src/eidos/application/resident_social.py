@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from itertools import combinations
 
 from eidos.application.cognition import perform
+from eidos.domain.beliefs import Belief, project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
 from eidos.domain.resident_relationships import project_resident_relationships
@@ -158,27 +159,36 @@ async def _advance(
             break
         speaker_id = scene.next_actor_id
         audience_id = scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
-        text = await perform(
-            gateway,
-            "firmament",
-            {
-                "time": simulated_at.isoformat(),
-                "location": scene.location_id,
-                "person": actor_names.get(speaker_id, speaker_id.replace("-", " ").title()),
-                "scene_mode": True,
-                "scene_speaker": speaker_id,
-                "scene_audience": audience_id,
-                "scene_topic": scene.topic_id.replace("-", " "),
-                "prior_turns": [
-                    str(event.payload["text"])
-                    for event in combined
-                    if event.kind == "scene.turn_taken"
-                    and event.payload.get("scene_id") == scene_id
-                ][-4:],
-            },
-            simulated_at.isoformat(),
-            output,
-        )
+        claim = _shareable_belief(combined, scene_id, speaker_id, audience_id)
+        text: str | None
+        if claim is not None:
+            text = (
+                "I could be mistaken, but I think "
+                f"{claim.subject_id.replace('-', ' ')} "
+                f"{claim.predicate.replace('_', ' ')}: {claim.object_value}."
+            )
+        else:
+            text = await perform(
+                gateway,
+                "firmament",
+                {
+                    "time": simulated_at.isoformat(),
+                    "location": scene.location_id,
+                    "person": actor_names.get(speaker_id, speaker_id.replace("-", " ").title()),
+                    "scene_mode": True,
+                    "scene_speaker": speaker_id,
+                    "scene_audience": audience_id,
+                    "scene_topic": scene.topic_id.replace("-", " "),
+                    "prior_turns": [
+                        str(event.payload["text"])
+                        for event in combined
+                        if event.kind == "scene.turn_taken"
+                        and event.payload.get("scene_id") == scene_id
+                    ][-4:],
+                },
+                simulated_at.isoformat(),
+                output,
+            )
         if text is None:
             name = actor_names.get(speaker_id, speaker_id.replace("-", " ").title())
             text = f"{name} shared a small observation about {scene.topic_id.replace('-', ' ')}."
@@ -205,6 +215,10 @@ async def _advance(
                 scene.topic_id,
                 privacy,
                 actual_revision + len(output),
+                claim_subject_id=claim.subject_id if claim is not None else None,
+                claim_predicate=claim.predicate if claim is not None else None,
+                claim_value=claim.object_value if claim is not None else None,
+                claim_confidence=min(0.9, claim.confidence) if claim is not None else None,
             ),
             state=project_scenes([*history, *output]),
             history=[*history, *output],
@@ -284,6 +298,34 @@ def _cooldown_complete(
         if isinstance(raw, str):
             return now - datetime.fromisoformat(raw) >= timedelta(days=5)
     return True
+
+
+def _shareable_belief(
+    history: Sequence[DomainEvent], scene_id: str, speaker_id: str, audience_id: str
+) -> Belief | None:
+    if any(
+        event.kind == "scene.turn_taken"
+        and event.payload.get("scene_id") == scene_id
+        and event.payload.get("claim_subject_id") is not None
+        for event in history
+    ):
+        return None
+    events_by_id = {str(event.event_id): event for event in history}
+    beliefs = project_beliefs(history)
+    return next(
+        (
+            belief
+            for belief in beliefs.beliefs.values()
+            if belief.owner_id == speaker_id
+            and belief.status == "held"
+            and not (
+                (source := events_by_id.get(belief.last_evidence_id)) is not None
+                and source.kind == "perception.recorded"
+                and source.payload.get("speaker_id") == audience_id
+            )
+        ),
+        None,
+    )
 
 
 def _topic(history: Sequence[DomainEvent], location_id: str) -> str:

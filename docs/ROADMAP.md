@@ -240,7 +240,8 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
 - Co-present residents now hold cooldown-paced conversations without requiring Pathos.
   Turns produce audience-owned memories, completed scenes update two separate directed
   relationships and connection needs, and only public speech heard at Pathos's actual
-  location enters his memory. Broader resident testimony and gossip remain future work.
+  location enters his memory. Evidence-backed beliefs can now travel through those
+  turns as discounted, listener-owned testimony without becoming universal truth.
 - Opt-in bounded catch-up with preview, cancellation and interval summaries.
   Important decisions retain full fidelity. Keep today's explicit resume default
   until catch-up behavior is deliberately enabled.

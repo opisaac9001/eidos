@@ -506,6 +506,16 @@ A completed exchange independently increases each resident's directed familiarit
 and satisfies some connection need. Those effects cite the final spoken turn, cannot
 be created by narration alone, and remain visible in the private operator lens.
 
+If a speaker holds an evidence-backed belief, one ordinary scene turn may carry it as
+explicit testimony. The claim metadata is attached to the spoken turn and copied only
+into the perceptions of its real audience and any co-present public observers. Each
+listener forms or revises a separately owned belief; default speaker reliability
+discounts confidence, so a claim loses strength as it travels. A resident will not
+immediately echo testimony back to the person who supplied their latest evidence.
+Conflicting later testimony contests the belief rather than rewriting world truth.
+Pathos receives none of this from a private offscreen exchange, although the operator
+can inspect resident beliefs and their evidence counts.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows

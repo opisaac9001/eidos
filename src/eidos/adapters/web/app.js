@@ -801,6 +801,15 @@ function render(next) {
   );
   $("npc-states").insertAdjacentHTML(
     "beforeend",
+    (state.npc_beliefs || [])
+      .map(
+        (item) =>
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(item.owner_id)} believes · ${esc(item.status.toUpperCase())}</span><span>PRIVATE BELIEF</span></div><p>${esc(item.subject_id)} · ${esc(item.predicate.replaceAll("_", " "))} → ${esc(item.object_value)}${item.alternative_value ? ` / alternative: ${esc(item.alternative_value)}` : ""}</p><div class="memory-source">confidence ${Math.round(item.confidence * 100)}% · ${item.evidence_count} evidence source${item.evidence_count === 1 ? "" : "s"} · never passed to Pathos without a witnessed public turn</div></article>`,
+      )
+      .join(""),
+  );
+  $("npc-states").insertAdjacentHTML(
+    "beforeend",
     (state.scenes || [])
       .map((scene) => {
         const clock = (state.conversation_clocks || []).find((item) => item.scene_id === scene.scene_id);
