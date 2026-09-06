@@ -145,6 +145,8 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(finished["calendar"][0]["status"], "completed")
         self.assertEqual(finished["objects"][0]["condition"], "repaired")
         self.assertEqual(finished["intentions"][0]["status"], "completed")
+        self.assertEqual(finished["beliefs"][0]["owner_id"], "pathos")
+        self.assertEqual(finished["beliefs"][0]["object_value"], "reliable")
         self.assertGreater(finished["people"][0]["trust"], active["people"][0]["trust"])
         kinds = [event.kind for event in self.life.history()]
         self.assertLess(kinds.index("social.request_negotiated"), kinds.index("commitment.created"))

@@ -100,8 +100,10 @@ class MemoryIndex:
             goal_id = event.payload.get("goal_id")
             if isinstance(goal_id, str):
                 goals_map.setdefault(goal_id, set()).add(event.event_id)
+
         def freeze(values: dict[str, set[UUID]]) -> Mapping[str, frozenset[UUID]]:
             return MappingProxyType({key: frozenset(ids) for key, ids in values.items()})
+
         return cls(
             memories,
             MappingProxyType(term_sets),

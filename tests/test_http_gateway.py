@@ -62,6 +62,38 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(result.output_tokens, 5)
         self.assertEqual(result.backend, "openai-compatible")
 
+    def test_pathos_receives_owned_beliefs_as_uncertain_context(self):
+        request = ModelRequest(
+            capability="pathos",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps(
+                        {
+                            "message": "Can Mara be trusted?",
+                            "location": "Workshop",
+                            "beliefs": [
+                                {
+                                    "subject": "mara",
+                                    "predicate": "reliability",
+                                    "value": "reliable",
+                                    "confidence": 0.68,
+                                    "status": "contested",
+                                    "alternative": "unreliable",
+                                }
+                            ],
+                            "private_operator_field": "must not pass",
+                        }
+                    ),
+                ),
+            ),
+            output_schema={"type": "object"},
+        )
+        asyncio.run(self.gateway.generate(request))
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["beliefs"][0]["status"], "contested")
+        self.assertNotIn("private_operator_field", context)
+
     def test_incomplete_and_invalid_envelopes_rejected(self):
         self.envelope["choices"][0]["finish_reason"] = "length"
         with self.assertRaises(ValueError):

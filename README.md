@@ -63,7 +63,7 @@ Python 3.12 or newer is required. With mise installed:
 mise trust
 mise exec -- python -m venv .venv
 .venv/bin/python -m pip install -e .
-.venv/bin/eidos serve
+PYTHONPATH=src .venv/bin/eidos serve
 ```
 
 Open **http://127.0.0.1:8765**. A new browser world starts at 08:00 on its first
@@ -83,22 +83,22 @@ set `EIDOS_DATABASE` to select another file. Override the port with
 The command line and browser share one application engine:
 
 ```bash
-.venv/bin/eidos status
-.venv/bin/eidos advance --hours 24
-.venv/bin/eidos journal
+PYTHONPATH=src .venv/bin/eidos status
+PYTHONPATH=src .venv/bin/eidos advance --hours 24
+PYTHONPATH=src .venv/bin/eidos journal
 ```
 
 Commands default to `data/eidos.sqlite3`. Use `eidos --database PATH ...` to
 create independent worlds. Manual advances are bounded to 24 hours. The seed
 calendar begins January 1, 2026, UTC. The preview built during development uses
 `data/observatory.sqlite3`; run it again with
-`.venv/bin/eidos --database data/observatory.sqlite3 serve`.
+`PYTHONPATH=src .venv/bin/eidos --database data/observatory.sqlite3 serve`.
 
 ## Verify
 
 ```bash
 .venv/bin/python -m pip install -e '.[dev]'
-.venv/bin/python -m unittest discover -s tests -v
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/ruff check src tests
 .venv/bin/ruff format --check src tests
 ```

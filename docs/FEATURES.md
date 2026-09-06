@@ -9,7 +9,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
-| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event v1 + trace migration | P1 |
+| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/belief v1 + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers/cancel; callers still await | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
@@ -22,9 +22,9 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: recent seven | P2 |
 | MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: in-memory indexes + weighted explanations | P2 |
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
-| MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: daybook prose | P2 |
+| MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Planned | P2 |
-| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Planned | P2 |
+| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: evidence-linked form/revise/contest/correct | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Planned: conservative opt-in | P2 |
 | MEM-09 | Long-run retention/index maintenance and archive policy | Planned | P6 |
 
@@ -118,14 +118,14 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: one endpoint/model | P1 |
-| OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: durable inline worker; background supervision pending | P1 |
+| OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised background workers; deadlines/backpressure pending | P1 |
 | OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: SQLite/loopback | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Planned | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |
 | QA-02 | Timeout/crash/duplicate/cancellation/stale-result fault injection | Partial: HTTP/concurrency tests | P1 |
 | QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: lab probes/critic | Every phase |
-| QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Planned | P2 |
+| QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Partial: owned recall/belief and source-membership fixtures | P2 |
 | QA-05 | Dream/fact separation, affect caps, no action bypass | Partial: category/label checks | P4 |
 | QA-06 | Seven-day plan/relationship causality and coherent recall | Planned | P5 |
 | QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Planned | P6 |

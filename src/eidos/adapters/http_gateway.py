@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 ROLE_PROMPTS = {
-    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied memories, mood, and location. Be warm and brief. Do not invent past events.",
+    "pathos": "Speak as Pathos in first person. Answer the user's message using only the supplied memories, beliefs, mood, and location. Treat beliefs as uncertain interpretations, especially when contested. Be warm and brief. Do not invent past events.",
     "murmur": "Write one quiet first-person association grounded in the supplied location and memories. Do not introduce new factual events or actions.",
     "firmament": "Describe one brief encounter between Pathos and the named person at the supplied location. Use only these actors. This is a proposed fictional scene.",
     "moira": "Choose exactly one weather value: Clear, Cloudy, Light rain, or Breezy. The text field must contain only that value.",
@@ -20,7 +20,7 @@ ROLE_PROMPTS = {
 }
 
 ROLE_FIELDS = {
-    "pathos": ("message", "time", "location", "mood", "memories"),
+    "pathos": ("message", "time", "location", "mood", "memories", "beliefs"),
     "murmur": ("time", "location", "memories"),
     "firmament": ("time", "location", "person"),
     "moira": ("time", "location"),

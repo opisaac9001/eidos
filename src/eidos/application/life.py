@@ -6,11 +6,14 @@ from datetime import timedelta
 from typing import Any
 
 from eidos.application.appraisal import appraisal_events, sleep_and_need_events
+from eidos.application.belief_review import relationship_belief_events
 from eidos.application.cognition import perform
+from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
 from eidos.application.inner_life import active_concerns, waking_dream_events
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.planner import overdue_plan_events
+from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
@@ -63,7 +66,7 @@ class Life:
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
         }
-        memories, feed, conversations, recalls = [], [], [], []
+        memories, feed, conversations, recalls, consolidations = [], [], [], [], []
         diagnostics = []
         concerns = {}
         for event in history:
@@ -118,6 +121,8 @@ class Life:
                 conversations.append(item)
             if event.kind == "memory.accessed":
                 recalls.append(item)
+            if event.kind == "memory.consolidated":
+                consolidations.append(item)
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -139,6 +144,9 @@ class Life:
                 "commitment.fulfilled",
                 "commitment.missed",
                 "planning.rejected",
+                "belief.formed",
+                "belief.contested",
+                "belief.corrected",
                 "relationship.changed",
                 "memory.recorded",
                 "role.failed",
@@ -156,6 +164,7 @@ class Life:
         memories = memory_view(history, state.simulated_at)
         planning = project_planning(history)
         social = project_social(history)
+        beliefs = project_beliefs(history)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -187,9 +196,11 @@ class Life:
             "objects": [vars_for(item) for item in planning.objects.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
+            "beliefs": [vars_for(item) for item in beliefs.beliefs.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
             "recalls": list(reversed(recalls[-100:])),
+            "consolidations": list(reversed(consolidations[-100:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
             "mode": self.mode,
@@ -269,6 +280,7 @@ class Life:
             if overdue:
                 project_planning(history + pending + overdue)
                 pending.extend(overdue)
+            pending.extend(relationship_belief_events(history + pending, at))
             if current.hour == 7:
                 waking = waking_dream_events(history + pending, state, at)
                 for event in waking:
@@ -451,6 +463,8 @@ class Life:
                             )
             appraisals, state = appraisal_events(history + pending, state, current)
             pending.extend(appraisals)
+            if current.hour == 0:
+                pending.extend(consolidation_events(history + pending, current))
         pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
         self.store.append("pathos", pending, expected_revision=len(history))
 
@@ -539,6 +553,18 @@ class Life:
             "location": location_name(state.location_id),
             "mood": mood_name(state.energy, state.valence),
             "memories": [item.event.payload["text"] for item in selected],
+            "beliefs": [
+                {
+                    "subject": belief.subject_id,
+                    "predicate": belief.predicate,
+                    "value": belief.object_value,
+                    "confidence": belief.confidence,
+                    "status": belief.status,
+                    "alternative": belief.alternative_value,
+                }
+                for belief in project_beliefs(history).beliefs.values()
+                if belief.owner_id == "pathos"
+            ],
         }
         pending.extend(
             DomainEvent(

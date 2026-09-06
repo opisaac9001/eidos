@@ -37,7 +37,8 @@ one capped waking effect and explicit dream recollection. Lexical recall include
 importance, simulated-time fading and capped rehearsal. Normal CLI and browser
 model calls now use the durable queue and reuse completed work after restart.
 **Pathos does not yet choose plans and NPCs do not have independent minds.**
-Entity indexes, beliefs and consolidation remain.
+Entity and goal indexes, owned beliefs and daily source-linked consolidation are
+implemented in memory; durable relationship/diversity indexes remain.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -219,13 +220,13 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend the shipped action/intention/world-event v1 envelopes to speech and beliefs.
+1. Extend the shipped typed v1 envelopes to speech and memory associations.
 2. Add job deadlines/backpressure and detach optional result application from callers.
 3. Persist the in-memory entity/goal memory indexes and add relationship/diversity indexes.
 4. Expand the reusable accepted-work planner beyond repair with travel/resources.
 5. Extend bounded social scenes from work requests to invitations and follow-ups.
 6. Add baseline mood recovery, episodes and broader value-based choice.
-7. Add consolidation and owned beliefs, then adversarial perspective tests.
+7. Add testimony reliability, correction UX and broader adversarial perspective fixtures.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,
 operator visibility, known limitations and migration notes. Real-model probes

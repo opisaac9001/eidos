@@ -31,6 +31,9 @@ const labels = {
   "commitment.fulfilled": "PROMISE KEPT",
   "commitment.missed": "COMMITMENT MISSED",
   "planning.rejected": "NO FEASIBLE PLAN",
+  "belief.formed": "A BELIEF FORMED",
+  "belief.contested": "A BELIEF QUESTIONED",
+  "belief.corrected": "A BELIEF CORRECTED",
   "relationship.changed": "RELATIONSHIP CHANGED",
   "dream.recalled": "A DREAM REMEMBERED",
 };
@@ -191,6 +194,15 @@ function renderArchive() {
   );
   $("archive-count").textContent =
     `${items.length} matching memories · ${state.counts.memories} recorded in total${state.counts.memories > 300 ? " · browsing the latest 300" : ""}`;
+  $("consolidations").innerHTML = (state.consolidations || []).length
+    ? `<div class="eyebrow">SOURCE-LINKED THEMES</div>${state.consolidations
+        .slice(0, 6)
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.theme_type)} · ${esc(item.theme_id)}</span><span>${item.source_count} sources</span></div><p>${esc(item.text)}</p><div class="memory-source">${item.dream_only ? "DREAM-ONLY THEME · NOT FACT" : "DERIVED SUMMARY · NOT INDEPENDENT EVIDENCE"} · confidence ${Math.round(item.confidence * 100)}%</div></article>`,
+        )
+        .join("")}`
+    : "";
   $("memory-list").innerHTML = items.length
     ? items
         .map(
@@ -330,8 +342,12 @@ function render(next) {
   renderPlace();
   $("people").innerHTML = state.people
     .map(
-      (person) =>
-        `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p><div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`,
+      (person) => {
+        const belief = state.beliefs?.find(
+          (item) => item.owner_id === "pathos" && item.subject_id === person.id,
+        );
+        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
+      },
     )
     .join("");
   $("chat-context-mood").textContent = state.pathos.mood;
