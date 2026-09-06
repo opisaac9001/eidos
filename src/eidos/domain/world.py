@@ -1,5 +1,7 @@
 """Authored world facts and deterministic schedules shared by every role."""
 
+from datetime import datetime, time
+
 LOCATIONS = (
     {
         "id": "home",
@@ -70,6 +72,30 @@ ROLES = (
     {"id": "chronicler", "name": "The Chronicler", "purpose": "A factual daybook"},
     {"id": "critic", "name": "Continuity critic", "purpose": "Proposal validation"},
 )
+
+# Simulation-local opening windows. The end is exclusive for arrival and inclusive
+# for an activity ending exactly at closing time.
+OPEN_HOURS = {
+    "home": (time(0), time(23, 59, 59, 999999)),
+    "cafe": (time(7), time(18)),
+    "workshop": (time(8), time(20)),
+    "park": (time(6), time(22)),
+}
+
+
+def location_allows_interval(location_id: str, starts_at: datetime, ends_at: datetime) -> bool:
+    """Return whether one same-day activity fits within a known place's hours."""
+    hours = OPEN_HOURS.get(location_id)
+    if hours is None or starts_at.tzinfo is None or ends_at.tzinfo is None:
+        return False
+    if ends_at <= starts_at:
+        return False
+    if location_id == "home":
+        return True
+    if starts_at.date() != ends_at.date():
+        return False
+    opens_at, closes_at = hours
+    return starts_at.time() >= opens_at and ends_at.time() <= closes_at
 
 
 def npc_location(person_id: str, hour: int) -> str:

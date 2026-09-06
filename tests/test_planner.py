@@ -123,6 +123,44 @@ class PlannerTests(unittest.TestCase):
         )
         self.assertEqual(conflicted.code, "schedule_conflict")
 
+    def test_plans_respect_open_hours_and_travel_between_calendar_entries(self):
+        closed = plan_accepted_work(
+            self.request(),
+            state=self.state(),
+            actual_revision=1,
+            simulated_at=self.now,
+            preferred_start=(self.now + timedelta(days=1)).replace(hour=19),
+        )
+        self.assertEqual(closed.code, "location_closed")
+        earlier = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "coffee",
+                "title": "Coffee first",
+                "starts_at": (self.now + timedelta(days=1)).replace(hour=8).isoformat(),
+                "ends_at": (self.now + timedelta(days=1)).replace(hour=9).isoformat(),
+                "location_id": "cafe",
+                "actor_id": "pathos",
+            },
+        )
+        no_transition = plan_accepted_work(
+            self.request(),
+            state=self.state((earlier,)),
+            actual_revision=2,
+            simulated_at=self.now,
+            preferred_start=self.now + timedelta(days=1),
+        )
+        self.assertEqual(no_transition.code, "travel_conflict")
+        enough_transition = plan_accepted_work(
+            self.request(),
+            state=self.state((earlier,)),
+            actual_revision=2,
+            simulated_at=self.now,
+            preferred_start=self.now + timedelta(days=1, minutes=15),
+        )
+        self.assertTrue(enough_transition.accepted)
+
     def test_overdue_commitment_has_linked_failure_and_social_consequences_once(self):
         planned = plan_accepted_work(
             self.request(),

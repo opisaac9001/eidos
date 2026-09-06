@@ -48,7 +48,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: linked accepted-work goals | P3 |
 | PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments | P3 |
-| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/transitions | P3 |
+| PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/travel buffers/open hours | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption/reschedule and social deadline negotiation | P3 |
 | PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: proposed/accepted/rejected action audit | P3 |
@@ -58,7 +58,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed minimum-duration routes | P3 |
+| WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed routes/open hours | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Planned | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: authored routine | P3 |

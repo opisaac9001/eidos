@@ -10,6 +10,8 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.intentions import IntentionProposal, resolve_intention
 from eidos.domain.planning import PlanningState
 from eidos.domain.social import SocialRequest
+from eidos.domain.travel import route_duration
+from eidos.domain.world import location_allows_interval
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +77,8 @@ def plan_accepted_work(
     end = start + timedelta(hours=request.duration_hours)
     if end > due:
         return reject("deadline_infeasible", "The accepted deadline has no feasible work window")
+    if not location_allows_interval(request.location_id, start, end):
+        return reject("location_closed", "The activity falls outside the location's open hours")
     for entry in state.calendar.values():
         if entry.status != "scheduled" or entry.actor_id not in {None, request.responder_id}:
             continue
@@ -86,6 +90,20 @@ def plan_accepted_work(
         )
         if start < other_end and other_start < end:
             return reject("schedule_conflict", f"The work overlaps {entry.title}")
+        try:
+            if other_end <= start:
+                transition = route_duration(entry.location_id, request.location_id)
+                transition_fits = other_end + transition <= start
+            else:
+                transition = route_duration(request.location_id, entry.location_id)
+                transition_fits = end + transition <= other_start
+        except ValueError:
+            transition_fits = False
+        if not transition_fits:
+            return reject(
+                "travel_conflict",
+                f"There is not enough travel time between this work and {entry.title}",
+            )
     goal_id = f"{request.request_id}-goal"
     commitment_id = f"{request.request_id}-commitment"
     schedule_id = f"{request.request_id}-schedule"
