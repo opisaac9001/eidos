@@ -381,6 +381,7 @@ def resolve_scene_turn(
                 "importance": 0.6,
                 "confidence": 1.0,
                 "simulated_at": simulated_at,
+                **claim_payload,
             },
             causation_id=perceived.event_id,
             correlation_id=scene.scene_id,

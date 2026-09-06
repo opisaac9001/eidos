@@ -189,7 +189,9 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   trace of how Pathos felt while remembering. Two similar hazy memories actually
   accessed together can blend, with both source links retained and no change to either
   source. Later thought begins from that version while immutable evidence remains
-  separate; future work adds evidence-driven correction.
+  separate. A newer direct structured confirmation that contradicts a remembered claim
+  can restore clarity and confidence while retaining the source, drift, and correction
+  trail; testimony and evidence that predates the drift cannot do so.
 - Consolidate repeated episodes into source-linked summaries and associations.
   Maintain uncertainty and correction history; summaries are not new events.
 - Stable values/preferences/traits plus separately changing needs, emotional

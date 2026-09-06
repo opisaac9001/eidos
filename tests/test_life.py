@@ -7,7 +7,9 @@ from pathlib import Path
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.application.memory import recall
 from eidos.application.messaging import reply_due_at
+from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.relationship_repairs import relationship_repair_events
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
@@ -264,6 +266,71 @@ class LifeTests(unittest.TestCase):
         )
         self.assertNotEqual(changed.payload["recalled_text"], old_memory.payload["text"])
         self.assertEqual(changed.payload["epistemic_status"], "subjective_recollection")
+
+    def test_new_direct_evidence_corrects_a_drifted_memory_in_the_life_loop(self):
+        self.life.bootstrap()
+        history = self.life.history()
+        now = datetime.fromisoformat(self.life.snapshot()["time"])
+        memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "Rowan told me the lamp switch was available.",
+                "simulated_at": (now - timedelta(days=120)).isoformat(),
+                "owner": "pathos",
+                "source": "direct-perception",
+                "importance": 0.35,
+                "confidence": 0.8,
+                "claim_subject_id": "lamp",
+                "claim_predicate": "switch",
+                "claim_value": "available",
+                "claim_confidence": 0.8,
+            },
+        )
+        recalled = recall([memory], "lamp switch", now)
+        access = DomainEvent(
+            "memory.accessed",
+            "pathos",
+            {"memory_id": str(memory.event_id), "simulated_at": now.isoformat()},
+        )
+        drift = reconsolidation_events([*history, memory, access], recalled, now)
+        evidence = DomainEvent(
+            "resource.confirmed",
+            "pathos",
+            {
+                "subject_id": "lamp",
+                "predicate": "switch",
+                "object_value": "unavailable",
+                "confidence": 0.95,
+                "simulated_at": now.isoformat(),
+            },
+        )
+        self.life.store.append(
+            "pathos", [memory, access, *drift, evidence], expected_revision=len(history)
+        )
+
+        self.life.advance(1)
+
+        events = self.life.history()
+        corrected = next(
+            event
+            for event in events
+            if event.kind == "memory.recollection_corrected"
+            and event.payload["memory_id"] == str(memory.event_id)
+        )
+        self.assertEqual(corrected.causation_id, evidence.event_id)
+        visible = next(
+            item for item in self.life.snapshot()["memories"] if item["id"] == str(memory.event_id)
+        )
+        self.assertIn("unavailable", visible["recalled_text"])
+        self.assertEqual(visible["text"], memory.payload["text"])
+        self.assertEqual(visible["correction_evidence_id"], str(evidence.event_id))
+        self.assertTrue(
+            any(
+                item["kind"] == "memory.recollection_corrected"
+                for item in self.life.snapshot()["feed"]
+            )
+        )
 
     def test_explicit_user_preference_is_persisted_with_the_reply(self):
         self.life.bootstrap()

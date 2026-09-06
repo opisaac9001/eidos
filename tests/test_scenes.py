@@ -115,6 +115,15 @@ class SceneTests(unittest.TestCase):
         perceptions = [event for event in turn.events if event.kind == "perception.recorded"]
         self.assertEqual([event.payload["owner"] for event in perceptions], ["pathos"])
         self.assertEqual(perceptions[0].payload["claim_subject_id"], "lamp")
+        memory = next(event for event in turn.events if event.kind == "memory.recorded")
+        self.assertEqual(
+            (
+                memory.payload["claim_subject_id"],
+                memory.payload["claim_predicate"],
+                memory.payload["claim_value"],
+            ),
+            ("lamp", "switch", "available"),
+        )
         partial = resolve_scene_turn(
             SceneTurnProposal(
                 "partial-claim",

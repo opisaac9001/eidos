@@ -19,6 +19,7 @@ class Recollection:
     detail_level: str
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
+    correction_evidence_id: str | None
     changed_at: datetime
 
 
@@ -31,13 +32,14 @@ class RecollectionState:
 
 
 def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
-    sources: dict[str, float] = {}
+    sources: dict[str, DomainEvent] = {}
     accesses: dict[str, tuple[str, str | None]] = {}
     used_accesses: set[str] = set()
+    evidence: dict[str, DomainEvent] = {}
     latest: dict[str, Recollection] = {}
     for event in events:
         if event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos":
-            sources[str(event.event_id)] = _source_confidence(event)
+            sources[str(event.event_id)] = event
         elif event.kind == "memory.accessed":
             memory_id = event.payload.get("memory_id")
             if isinstance(memory_id, str):
@@ -61,7 +63,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
             if revision != (prior.revision + 1 if prior else 1):
                 raise ValueError("Recollection revision must be sequential")
             confidence = _level(event, "confidence")
-            if prior is None and confidence > sources[memory_id]:
+            if prior is None and confidence > _source_confidence(sources[memory_id]):
                 raise ValueError("Reconsolidation cannot exceed source confidence")
             if prior is not None and confidence > prior.confidence:
                 raise ValueError("Uncorrected reconsolidation cannot increase confidence")
@@ -99,11 +101,62 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 detail_level,
                 affective_bias,
                 blended_memory_ids,
+                None,
                 changed_at,
             )
             used_accesses.add(cause)
             if isinstance(blend_access, str):
                 used_accesses.add(blend_access)
+        elif event.kind == "memory.recollection_corrected":
+            memory_id = _required(event, "memory_id")
+            source = sources.get(memory_id)
+            prior = latest.get(memory_id)
+            if source is None or prior is None:
+                raise ValueError("Correction requires an existing drifted Pathos memory")
+            cause = str(event.causation_id) if event.causation_id is not None else ""
+            direct = evidence.get(cause)
+            if direct is None or direct.kind != "resource.confirmed":
+                raise ValueError("Correction requires prior direct confirmation")
+            if event.payload.get("evidence_event_id") != cause:
+                raise ValueError("Correction must preserve its evidence link")
+            subject = _required(source, "claim_subject_id")
+            predicate = _required(source, "claim_predicate")
+            old_value = _required(source, "claim_value")
+            new_value = _required(direct, "object_value")
+            if (
+                direct.payload.get("subject_id") != subject
+                or direct.payload.get("predicate") != predicate
+                or new_value == old_value
+                or event.payload.get("corrected_value") != new_value
+            ):
+                raise ValueError("Correction evidence must contradict the source claim")
+            revision = _integer(event, "revision")
+            if revision != prior.revision + 1:
+                raise ValueError("Recollection correction revision must be sequential")
+            confidence = _level(event, "confidence")
+            evidence_confidence = _source_confidence(direct)
+            if confidence > evidence_confidence:
+                raise ValueError("Correction confidence cannot exceed direct evidence")
+            detail_level = _required(event, "detail_level")
+            if detail_level not in {"clear", "partial"}:
+                raise ValueError("Correction detail must reflect direct evidence")
+            if event.payload.get("epistemic_status") != "subjective_recollection":
+                raise ValueError("Corrected recollection must remain subjective")
+            changed_at = _aware(event, "simulated_at")
+            if changed_at < prior.changed_at:
+                raise ValueError("Recollection correction time cannot move backwards")
+            latest[memory_id] = Recollection(
+                memory_id,
+                revision,
+                _required(event, "corrected_text"),
+                confidence,
+                detail_level,
+                0.0,
+                (),
+                cause,
+                changed_at,
+            )
+        evidence[str(event.event_id)] = event
     return RecollectionState(latest)
 
 

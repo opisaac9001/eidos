@@ -105,6 +105,7 @@ Representative contracts:
 | Appointment is agreed | `schedule.created` | Chronos, availability, participants | Conflicts, travel, location and recurrence checks |
 | A deadline is missed | `commitment.missed` | Appraisal, relationships, replanning | Still active, not fulfilled/cancelled, exactly once |
 | Memory is recalled | `memory.accessed`, optionally `memory.reconsolidated` | Retrieval reinforcement, attention, mood-congruent selection, selective drift or similarity blend | Actor can access every cited source; one bounded update per meaningful access, with immutable evidence kept separate |
+| Direct evidence contradicts a drifted claim | `memory.recollection_corrected` | Later recall, operator memory view, feed | Newer `resource.confirmed` evidence matches subject/predicate, differs in value, and never rewrites source history |
 | Belief is revised | `belief.revised` | Context, decisions | Owned belief, cited evidence, confidence and prior version |
 | Dream completes | `dream.recorded` | Dream journal, sleep processing | Seed lineage, fiction category, intensity/length limits |
 | Waking effect is accepted | `affect.changed` / `attention.cued` | Hexus, recall and later decisions | Caps, decay, source dream ID; no direct factual update |

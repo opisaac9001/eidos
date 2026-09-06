@@ -25,7 +25,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership and prefix-verified incremental grouping | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
 | MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: Pathos and residents form actor-owned discounted testimony, direct confirmation can strengthen or contest it, and revision ledgers/materialization remain checked | P2 |
-| MEM-08 | Intentional imperfect recall distinct from world truth | Partial: accessibility-driven omission, bounded mood-congruent retrieval, and confidence-losing subjective reconsolidation with mood coloring plus source-linked blending of two similar hazy memories actually recalled together; evidence-driven correction remains | P2 |
+| MEM-08 | Intentional imperfect recall distinct from world truth | Implemented: accessibility-driven omission, bounded mood-congruent retrieval, confidence-losing mood-colored reconsolidation, source-linked similarity blending, and newer direct structured evidence correcting the subjective version without changing its source | P2 |
 | MEM-09 | Long-run retention/index maintenance and archive policy | Partial: incremental event-anchored index plus monthly bounded cold archive with direct-cue resurfacing; physical compaction remains separate | P6 |
 
 Accepted encounter evidence already has explicit deterministic archive recovery.

@@ -369,9 +369,12 @@ network authorization; the server remains loopback-only until authenticated depl
   context but have no authority to become memories or actions by themselves.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
-  consolidation. The recall maps are maintained as a versioned, checksummed,
-  event-anchored projection that can be discarded and rebuilt safely. Existing
-  databases migrate in place without rewriting events. Vector retrieval remains
+  consolidation. Mood-congruent recall, bounded subjective drift, and source-linked
+  blending make recollection intentionally fallible without editing historical facts.
+  Newer direct structured evidence can correct a drifted claim while preserving both
+  the mistaken version and its correction trail. The recall maps are maintained as a
+  versioned, checksummed, event-anchored projection that can be discarded and rebuilt
+  safely. Existing databases migrate in place without rewriting events. Vector retrieval remains
   optional and unimplemented. A monthly bounded retention review moves cold ordinary
   memories out of background context after 180 simulated days while preserving every
   source event; important/recently accessed memories stay active, direct cues can

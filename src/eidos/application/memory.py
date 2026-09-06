@@ -69,6 +69,7 @@ class RecalledMemory:
     detail_level: str
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
+    correction_evidence_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,7 +342,11 @@ def recall(
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
         rehearsals = min(5, index.access_counts.get(event.event_id, 0))
-        accessibility = min(1.0, base_access + rehearsals * 0.04)
+        reactivation = 0.0
+        if subjective is not None:
+            subjective_age = max(0.0, (now - subjective.changed_at).total_seconds() / 86400)
+            reactivation = 0.55 * (0.5 ** (subjective_age / 14.0))
+        accessibility = min(1.0, base_access + rehearsals * 0.04 + reactivation)
         matched_terms = tuple(sorted(query_terms & index.terms_by_memory[event.event_id]))
         matched_entities = tuple(
             sorted(
@@ -417,6 +422,7 @@ def recall(
                 *_render_recollection(event, accessibility, importance, subjective),
                 subjective.affective_bias if subjective is not None else 0.0,
                 subjective.blended_memory_ids if subjective is not None else (),
+                subjective.correction_evidence_id if subjective is not None else None,
             )
         )
     ranked.sort(
@@ -439,11 +445,23 @@ def _render_recollection(
     category = str(event.payload.get("category", "experience"))
     if category == "dream":
         return f"I remember this as a dream: {text}", "dream"
-    if subjective is not None:
-        return text, subjective.detail_level
-    if accessibility >= 0.55 or importance >= 0.75:
+    accessible_detail = (
+        "clear"
+        if accessibility >= 0.55 or importance >= 0.75
+        else "partial"
+        if accessibility >= 0.2
+        else "vague"
+    )
+    detail_level = (
+        max((subjective.detail_level, accessible_detail), key=_detail_rank)
+        if subjective is not None
+        else accessible_detail
+    )
+    if subjective is not None and detail_level == subjective.detail_level:
+        return text, detail_level
+    if detail_level == "clear":
         return text, "clear"
-    if accessibility >= 0.2:
+    if detail_level == "partial":
         first_detail = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
         return f"I remember {first_detail.lower()}, though some details are hazy.", "partial"
     links = [
@@ -453,6 +471,10 @@ def _render_recollection(
     ]
     cue = ", ".join(links[:2]) or category
     return f"I have a faint {category} memory connected to {cue}; the details are unclear.", "vague"
+
+
+def _detail_rank(detail_level: str) -> int:
+    return {"clear": 0, "partial": 1, "vague": 2}.get(detail_level, 2)
 
 
 def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]:
@@ -522,6 +544,7 @@ def memory_view(
                 "detail_level": item.detail_level,
                 "affective_bias": item.affective_bias,
                 "blended_memory_ids": list(item.blended_memory_ids),
+                "correction_evidence_id": item.correction_evidence_id,
                 "archived": str(event.event_id) in archived,
             }
         )

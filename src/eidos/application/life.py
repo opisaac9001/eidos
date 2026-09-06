@@ -70,6 +70,7 @@ from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
+from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
@@ -826,6 +827,7 @@ class Life:
                 "memory.recorded",
                 "role.failed",
                 "memory.recovered",
+                "memory.recollection_corrected",
                 "memory.retention_reviewed",
                 "memory.archived",
                 "transfer.offered",
@@ -2514,6 +2516,7 @@ class Life:
                 current,
             )
             pending.extend(regulation_events)
+            pending.extend(recollection_correction_events(history + pending, current))
             pending.extend(memory_retention_events(history + pending, current))
             if current.hour == 0:
                 pending.extend(
