@@ -46,10 +46,18 @@ class MonthSoakTests(unittest.TestCase):
             self.assertLess(rowan["tension"], 0.08)
             self.assertTrue(snapshot["followups"])
             self.assertTrue(all(item["status"] == "ready" for item in snapshot["followups"]))
-            rowan_state = next(
-                item for item in snapshot["npc_states"] if item["actor_id"] == "rowan"
+            self.assertEqual(
+                {
+                    item["actor_id"]
+                    for item in snapshot["npc_states"]
+                    if item["plan_status"] == "completed"
+                },
+                {"mara", "ellis", "rowan"},
             )
-            self.assertEqual(rowan_state["plan_status"], "completed")
+            self.assertEqual(
+                {item["owner_id"] for item in snapshot["npc_beliefs"]},
+                {"mara", "ellis", "rowan"},
+            )
             self.assertTrue(all(0 <= item["level"] <= 1 for item in snapshot["skills"]))
             self.assertTrue(all(0 <= item["strength"] <= 1 for item in snapshot["habits"]))
             self.assertEqual(snapshot["skills"][0]["practice_count"], 1)

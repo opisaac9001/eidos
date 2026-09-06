@@ -201,6 +201,11 @@ NPCs act offscreen through inexpensive schedules/decisions. Important consequenc
 are committed even if Pathos is absent. He learns them later through observation
 or testimony, not because the summarizer read the world database.
 
+The initial world rhythm schedules one low-stakes neighborhood occurrence each week,
+rotating among seed sharing, repair, tea, and sketching. Each is announced five
+simulated hours before it begins, has a unique occurrence ID, obeys the community-event
+cooldown, and becomes knowledge only for actors present at its location.
+
 The current deterministic baseline lets each resident turn owned public-event
 perception into a private, evidence-linked plan suited to their routine. A structured
 matching activity must occur on or after its scheduled time to complete it; otherwise

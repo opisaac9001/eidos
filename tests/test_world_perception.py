@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.world_perception import due_world_observations
+from eidos.application.world_perception import authored_community_schedule, due_world_observations
 from eidos.domain.events import DomainEvent
 
 
@@ -44,6 +44,27 @@ class WorldPerceptionTests(unittest.TestCase):
         self.assertFalse(any(event.kind == "memory.recorded" for event in events))
         perception = next(event for event in events if event.kind == "perception.recorded")
         self.assertEqual(perception.payload["owner"], "rowan")
+
+    def test_weekly_rhythm_rotates_places_and_never_duplicates_occurrences(self):
+        history = []
+        scheduled = []
+        for day in (2, 9, 16, 23):
+            now = datetime(2026, 1, day, 8, tzinfo=timezone.utc)
+            events = authored_community_schedule(history, now, len(history))
+            self.assertEqual([event.kind for event in events][-1], "world_event.scheduled")
+            history.extend(events)
+            scheduled.append(events[-1])
+            self.assertEqual(authored_community_schedule(history, now, len(history)), [])
+        self.assertEqual(
+            [event.payload["location_id"] for event in scheduled],
+            ["park", "workshop", "cafe", "park"],
+        )
+        self.assertEqual(len({event.payload["proposal_id"] for event in scheduled}), 4)
+        self.assertTrue(
+            all(
+                datetime.fromisoformat(event.payload["starts_at"]).hour == 13 for event in scheduled
+            )
+        )
 
 
 if __name__ == "__main__":

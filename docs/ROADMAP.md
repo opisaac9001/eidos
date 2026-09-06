@@ -233,8 +233,8 @@ boundaries and must not rely on emotional coercion.
    authored feasible activity profiles while preserving private knowledge boundaries.
 3. Expand the new bounded scene lifecycle beyond its first integrated two-turn
    performer-driven exchange into richer dialogue policies and interruption/resume.
-4. Broaden paced world events, recurring activities, seasons, resource dependencies,
-   and project variety without forcing drama.
+4. Extend the new rotating weekly neighborhood rhythm with seasons, resource
+   dependencies, and project variety without forcing drama.
 5. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
 6. Capture the Dell inventory, then benchmark and pin its private inference stack.
 7. Expand semantic and adversarial evaluations for contradictions, perspective leaks,

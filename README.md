@@ -145,6 +145,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
   memories. The integrated two-turn scene requests performer-generated dialogue and
   uses explicit audited authored fallbacks when generation fails.
+- A calm four-week neighborhood rhythm plans seed swaps, repair tables, shared tea,
+  and sketch walks with explicit lead time and cooldowns. Only co-present residents
+  perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for
+  their own private plans during the month soak.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
   recall, accessibility/detail fading, capped rehearsal, and source-linked
   consolidation. Vector retrieval remains optional and unimplemented.
