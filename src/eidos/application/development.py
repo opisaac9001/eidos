@@ -59,7 +59,10 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
         for event in history
         if event.kind == "memory.recorded"
         and event.payload.get("source") == "authored-routine"
-        and event.payload.get("text") == "Visited the cafe before work."
+        and (
+            event.payload.get("activity") == "morning_cafe"
+            or event.payload.get("text") == "Visited the cafe before work."
+        )
     ]
     if len(cafe_visits) >= 3:
         source = cafe_visits[-1]

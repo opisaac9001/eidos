@@ -57,7 +57,7 @@ from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
-from eidos.domain.routine import beats_between
+from eidos.domain.routine import beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import project_scenes
 from eidos.domain.seasons import project_season, season_change_events, season_for
 from eidos.domain.social import project_social
@@ -590,6 +590,18 @@ class Life:
             pending.extend(recovery)
             beat = beats.get(current)
             if beat:
+                emotion_before_beat = project_emotion(history + pending)
+                bias = emotional_planning_bias(
+                    emotion_before_beat.valence,
+                    emotion_before_beat.arousal,
+                    emotion_before_beat.sustained_low_hours,
+                )
+                beat, emotional_reason = emotionally_adjusted_beat(
+                    beat,
+                    initiative=bias.initiative,
+                    social_openness=bias.social_openness,
+                    sustained_low_hours=emotion_before_beat.sustained_low_hours,
+                )
                 arrival = None
                 if state.location_id != beat.location_id:
                     duration = route_duration(state.location_id, beat.location_id)
@@ -627,6 +639,8 @@ class Life:
                             "simulated_at": at,
                             "source": "authored-routine",
                             "category": "experience",
+                            "activity": beat.activity,
+                            "emotional_decision_reason": emotional_reason,
                             "location_id": beat.location_id,
                             "owner": "pathos",
                             "importance": 0.45,

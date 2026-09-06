@@ -24,15 +24,16 @@ remain recognizably different rather than a repeated short loop.
 
 ## Current baseline
 
-Implemented: SQLite event history, atomic writes/replay, verified backups, daily
-routines, typed travel, open hours, four places, three persistent neighbors,
+Implemented: SQLite event history, atomic writes/replay, verified backups, replayable
+weekday/weekend daily texture, typed travel, open hours, four places, three persistent neighbors,
 multidimensional affect and needs, source-linked memories, conversations, and five
 UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
-Somatic, attention, and associative layers pulse every simulated hour; deliberative,
+Named emotional state and duration are sampled hourly. Somatic, affective, attention,
+and associative layers pulse every simulated hour; deliberative,
 social, reflective, and dream layers activate by waking state, context, and cadence.
 The connected week exercises a promise, interruption, repair, personal bookbinding
 project, explicitly accepted tool loan/return, scheduled learning, skill growth,

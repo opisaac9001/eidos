@@ -151,6 +151,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   their own private plans during the month soak. Each event requires a persistent
   physical community resource at the right place and is cancelled if it becomes
   unavailable.
+- After the authored six-day acceptance story, replay-stable weekday and weekend
+  palettes combine dozens of ordinary activities instead of repeating one daily
+  script. Emotional initiative and social openness can bend optional outings toward
+  restorative solitude or company while leaving obligations intact.
 - The simulation calendar records season transitions as replayable world facts and
   exposes the current season beside weather; it does not depend on generated prose.
 - Every simulated hour samples a named, persistent emotional state and advances
