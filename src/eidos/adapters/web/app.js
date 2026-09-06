@@ -248,7 +248,7 @@ function renderArchive() {
           const memory = state.memories.find(
             (item) => item.id === trace.memory_id,
           );
-          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(trace.simulated_at))} · ${esc(trace.query_source || "context")}</span><span>SCORE ${Number(trace.score || 0).toFixed(3)}</span></div><p>${esc(memory?.text || `Memory ${trace.memory_id.slice(0, 8)}`)}</p><div class="memory-source">${esc(trace.reason)}<br>lexical ${Number(trace.lexical_score || 0).toFixed(3)} · entities ${Number(trace.entity_score || 0).toFixed(3)} · goals ${Number(trace.goal_score || 0).toFixed(3)} · access ${Number(trace.accessibility_score || 0).toFixed(3)} · importance ${Number(trace.importance_score || 0).toFixed(3)} · confidence ${Number(trace.confidence_score || 0).toFixed(3)}</div></article>`;
+          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(trace.simulated_at))} · ${esc(trace.query_source || "context")}</span><span>SCORE ${Number(trace.score || 0).toFixed(3)}</span></div><p>${esc(memory?.text || `Memory ${trace.memory_id.slice(0, 8)}`)}</p><div class="memory-source">${esc(trace.reason)}<br>lexical ${Number(trace.lexical_score || 0).toFixed(3)} · entities ${Number(trace.entity_score || 0).toFixed(3)} · goals ${Number(trace.goal_score || 0).toFixed(3)} · relationship ${Number(trace.relationship_score || 0).toFixed(3)} · access ${Number(trace.accessibility_score || 0).toFixed(3)} · importance ${Number(trace.importance_score || 0).toFixed(3)} · confidence ${Number(trace.confidence_score || 0).toFixed(3)}</div></article>`;
         })
         .join("")
     : "<p>No explicit recall decisions recorded yet.</p>";

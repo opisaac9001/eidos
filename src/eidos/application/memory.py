@@ -61,6 +61,7 @@ class RecalledMemory:
     matched_terms: tuple[str, ...]
     matched_entities: tuple[str, ...]
     matched_goals: tuple[str, ...]
+    matched_relationships: tuple[str, ...]
     components: Mapping[str, float]
 
 
@@ -73,6 +74,7 @@ class MemoryIndex:
     by_term: Mapping[str, frozenset[UUID]]
     by_entity: Mapping[str, frozenset[UUID]]
     by_goal: Mapping[str, frozenset[UUID]]
+    by_relationship: Mapping[str, frozenset[UUID]]
 
     @classmethod
     def build(cls, history: list[DomainEvent]) -> MemoryIndex:
@@ -85,6 +87,7 @@ class MemoryIndex:
         terms_map: dict[str, set[UUID]] = {}
         entities_map: dict[str, set[UUID]] = {}
         goals_map: dict[str, set[UUID]] = {}
+        relationships_map: dict[str, set[UUID]] = {}
         for event in memories:
             memory_terms = frozenset(terms(str(event.payload["text"])))
             term_sets[event.event_id] = memory_terms
@@ -100,6 +103,9 @@ class MemoryIndex:
             goal_id = event.payload.get("goal_id")
             if isinstance(goal_id, str):
                 goals_map.setdefault(goal_id, set()).add(event.event_id)
+            person_id = event.payload.get("person_id")
+            if isinstance(person_id, str):
+                relationships_map.setdefault(person_id, set()).add(event.event_id)
 
         def freeze(values: dict[str, set[UUID]]) -> Mapping[str, frozenset[UUID]]:
             return MappingProxyType({key: frozenset(ids) for key, ids in values.items()})
@@ -110,6 +116,7 @@ class MemoryIndex:
             freeze(terms_map),
             freeze(entities_map),
             freeze(goals_map),
+            freeze(relationships_map),
         )
 
 
@@ -136,6 +143,8 @@ def recall(
     *,
     entity_ids: set[str] | None = None,
     goal_ids: set[str] | None = None,
+    relationship_ids: set[str] | None = None,
+    diverse: bool = False,
 ) -> list[RecalledMemory]:
     """Rank accessible Pathos memories without treating similarity as proof."""
     if now.utcoffset() is None or not 1 <= limit <= 1000:
@@ -143,6 +152,7 @@ def recall(
     query_terms = terms(query)
     entity_ids = entity_ids or set()
     goal_ids = goal_ids or set()
+    relationship_ids = relationship_ids or set()
     index = MemoryIndex.build(history)
     accesses: dict[str, int] = {}
     for event in history:
@@ -166,16 +176,27 @@ def recall(
         matched_goals = tuple(
             sorted(goal for goal in goal_ids if event.event_id in index.by_goal.get(goal, ()))
         )
+        matched_relationships = tuple(
+            sorted(
+                person
+                for person in relationship_ids
+                if event.event_id in index.by_relationship.get(person, ())
+            )
+        )
         relevance = len(matched_terms) / max(1, len(query_terms))
         entity_relevance = min(1.0, len(matched_entities) / max(1, len(entity_ids)))
         goal_relevance = min(1.0, len(matched_goals) / max(1, len(goal_ids)))
+        relationship_relevance = min(
+            1.0, len(matched_relationships) / max(1, len(relationship_ids))
+        )
         components = {
-            "lexical": 0.32 * relevance,
-            "entity": 0.18 * entity_relevance,
+            "lexical": 0.27 * relevance,
+            "entity": 0.14 * entity_relevance,
             "goal": 0.15 * goal_relevance,
+            "relationship": 0.1 * relationship_relevance,
             "accessibility": 0.17 * accessibility,
             "importance": 0.12 * importance,
-            "confidence": 0.06 * confidence,
+            "confidence": 0.05 * confidence,
         }
         score = sum(components.values())
         reasons = []
@@ -185,6 +206,8 @@ def recall(
             reasons.append("entity link: " + ", ".join(matched_entities))
         if matched_goals:
             reasons.append("active goal: " + ", ".join(matched_goals))
+        if matched_relationships:
+            reasons.append("relationship: " + ", ".join(matched_relationships))
         if importance >= 0.7:
             reasons.append("important")
         if age_days < 1:
@@ -201,6 +224,7 @@ def recall(
                 matched_terms,
                 matched_entities,
                 matched_goals,
+                matched_relationships,
                 MappingProxyType({key: round(value, 4) for key, value in components.items()}),
             )
         )
@@ -208,7 +232,39 @@ def recall(
         key=lambda item: (item.score, _simulated_time(item.event), str(item.event.event_id)),
         reverse=True,
     )
-    return ranked[:limit]
+    if not diverse:
+        return ranked[:limit]
+    return _diversify(ranked, limit)
+
+
+def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]:
+    """Prevent one repeated phrase or category from monopolizing working context."""
+    selected: list[RecalledMemory] = []
+    texts: set[str] = set()
+    categories: dict[str, int] = {}
+    deferred: list[RecalledMemory] = []
+    for item in ranked:
+        fingerprint = " ".join(sorted(terms(str(item.event.payload["text"]))))
+        if fingerprint in texts:
+            continue
+        category = str(item.event.payload.get("category", "experience"))
+        if categories.get(category, 0) >= 2:
+            deferred.append(item)
+            continue
+        selected.append(item)
+        texts.add(fingerprint)
+        categories[category] = categories.get(category, 0) + 1
+        if len(selected) == limit:
+            return selected
+    for item in deferred:
+        fingerprint = " ".join(sorted(terms(str(item.event.payload["text"]))))
+        if fingerprint in texts:
+            continue
+        selected.append(item)
+        texts.add(fingerprint)
+        if len(selected) == limit:
+            break
+    return selected
 
 
 def memory_view(history: list[DomainEvent], now: datetime) -> list[dict[str, Any]]:

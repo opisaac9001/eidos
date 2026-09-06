@@ -356,6 +356,12 @@ class Life:
                 7,
                 entity_ids={state.location_id},
                 goal_ids=active_goal_ids,
+                relationship_ids={
+                    str(person["id"])
+                    for person in PEOPLE
+                    if terms(str(person["name"])) & terms(recall_query)
+                },
+                diverse=True,
             )
             memories = [item.event.payload["text"] for item in selected_context]
             context = {
@@ -630,6 +636,9 @@ class Life:
             for item in planning.objects.values()
             if terms(item.name) & query_terms or item.object_id in query_terms
         )
+        relationship_ids = {
+            str(person["id"]) for person in PEOPLE if str(person["id"]) in entity_ids
+        }
         goal_ids = {
             goal.goal_id
             for goal in planning.goals.values()
@@ -642,6 +651,8 @@ class Life:
             7,
             entity_ids=entity_ids,
             goal_ids=goal_ids,
+            relationship_ids=relationship_ids,
+            diverse=True,
         )
         context = {
             "message": text.strip(),
@@ -674,11 +685,13 @@ class Life:
                     "lexical_score": item.components["lexical"],
                     "entity_score": item.components["entity"],
                     "goal_score": item.components["goal"],
+                    "relationship_score": item.components["relationship"],
                     "accessibility_score": item.components["accessibility"],
                     "importance_score": item.components["importance"],
                     "confidence_score": item.components["confidence"],
                     "matched_entity_count": len(item.matched_entities),
                     "matched_goal_count": len(item.matched_goals),
+                    "matched_relationship_count": len(item.matched_relationships),
                     "query_source": "user-conversation",
                 },
             )

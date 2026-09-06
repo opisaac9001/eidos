@@ -88,12 +88,55 @@ class MemoryTests(unittest.TestCase):
             self.now,
             entity_ids={"mara", "lamp"},
             goal_ids={"repair-lamp"},
+            relationship_ids={"mara"},
         )
         self.assertEqual(results[0].event.event_id, linked.event_id)
         self.assertEqual(results[0].matched_entities, ("lamp", "mara"))
         self.assertEqual(results[0].matched_goals, ("repair-lamp",))
+        self.assertEqual(results[0].matched_relationships, ("mara",))
         self.assertIn("entity link", results[0].reason)
+        self.assertIn("relationship", results[0].reason)
         self.assertAlmostEqual(sum(results[0].components.values()), results[0].score, places=3)
+
+    def test_working_recall_suppresses_duplicate_phrasing_and_diversifies_categories(self):
+        history = [
+            self.memory(
+                "Visited the cafe before work.",
+                self.now - timedelta(days=day),
+                0.45,
+                category="experience",
+            )
+            for day in range(5)
+        ]
+        history.extend(
+            (
+                self.memory(
+                    "Mara remembered my usual tea.",
+                    self.now - timedelta(hours=2),
+                    0.7,
+                    category="encounter",
+                    person_id="mara",
+                ),
+                self.memory(
+                    "I promised to return tomorrow.",
+                    self.now - timedelta(hours=3),
+                    0.8,
+                    category="commitment",
+                    person_id="mara",
+                ),
+            )
+        )
+        results = recall(
+            history,
+            "cafe Mara tomorrow",
+            self.now,
+            limit=5,
+            relationship_ids={"mara"},
+            diverse=True,
+        )
+        texts = [str(item.event.payload["text"]) for item in results]
+        self.assertEqual(texts.count("Visited the cafe before work."), 1)
+        self.assertGreaterEqual(len({item.event.payload.get("category") for item in results}), 3)
 
 
 if __name__ == "__main__":
