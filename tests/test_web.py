@@ -4,13 +4,18 @@ import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
+from eidos.adapters.sqlite_jobs import SQLiteJobStore
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.adapters.web_server import Runtime, make_handler
 from eidos.application.life import Life
+from eidos.domain.jobs import CognitionJob
 
 
 class WebTests(unittest.TestCase):
@@ -74,6 +79,31 @@ class WebTests(unittest.TestCase):
             {"Content-Type": "application/json", "Origin": "https://example.org"},
         )
         self.assertEqual(status, 403)
+
+    def test_queued_job_can_be_cancelled_without_waiting_for_world_lock(self):
+        jobs = SQLiteJobStore(Path(self.directory.name) / "queue.db")
+        job = jobs.enqueue(
+            CognitionJob(
+                capability="murmur",
+                aggregate_id="pathos",
+                context={},
+                expected_revision=0,
+                simulated_at="2026-01-01T00:00:00+00:00",
+                idempotency_key="cancel-from-ui",
+                job_id=uuid4(),
+                created_at=datetime.now(timezone.utc),
+                available_at=datetime.now(timezone.utc),
+            )
+        )
+        original = self.runtime.life.gateway
+        self.runtime.life.gateway = SimpleNamespace(jobs=jobs, model="fixture")
+        try:
+            status, body = self.request("POST", f"/api/jobs/{job.job_id}/cancel", {})
+        finally:
+            self.runtime.life.gateway = original
+        self.assertEqual(status, 200)
+        self.assertEqual(jobs.get_job(job.job_id).status, "cancelled")
+        self.assertEqual(json.loads(body)["jobs"]["counts"]["cancelled"], 1)
 
         status, _ = self.request("POST", "/api/step", {"hours": 999})
         self.assertEqual(status, 400)

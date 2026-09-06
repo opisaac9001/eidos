@@ -56,12 +56,17 @@ def main() -> None:
             return
         from eidos.adapters.durable_gateway import DurableModelGateway
         from eidos.adapters.sqlite_jobs import SQLiteJobStore
+        from eidos.application.cognition_supervisor import CognitionSupervisor
 
         store = SQLiteEventStore(args.database)
-        gateway = DurableModelGateway(
-            gateway, SQLiteJobStore(args.database), lambda aggregate: len(store.read(aggregate))
-        )
-        simulation = Life(store, gateway, mode=mode)
+        jobs = SQLiteJobStore(args.database)
+
+        def revision_for(aggregate: str) -> int:
+            return len(store.read(aggregate))
+
+        supervisor = CognitionSupervisor(jobs, gateway, revision_for)
+        durable = DurableModelGateway(gateway, jobs, revision_for, supervisor=supervisor)
+        simulation = Life(store, durable, mode=mode)
         if args.command == "journal":
             print(
                 json.dumps(
@@ -69,6 +74,7 @@ def main() -> None:
                     indent=2,
                 )
             )
+            durable.close()
             return
         if args.command == "advance":
             simulation.advance(args.hours)
@@ -86,6 +92,7 @@ def main() -> None:
                 indent=2,
             )
         )
+        durable.close()
     except (ValueError, RevisionConflict) as error:
         parser.exit(2, f"eidos: {error}\n")
 

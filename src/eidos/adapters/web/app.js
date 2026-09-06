@@ -331,6 +331,13 @@ function render(next) {
           `<article class="memory-card"><div class="memory-meta"><span>${esc(call.role)} · ${esc(call.status)}</span><span>${Math.round(call.latency_ms || 0)} ms</span></div><p>${esc(call.error_code || "Contract accepted — semantic quality not certified")}</p><div class="memory-source">${esc(call.model || "unknown")} · ${esc(call.backend || "unknown")} · ${call.output_tokens ?? "—"} output tokens<br>Trace ${esc(call.trace_id || "legacy")}</div></article>`,
       )
       .join("") || "<p>No calls recorded yet.</p>";
+  $("jobs").innerHTML =
+    (state.jobs?.recent || [])
+      .map(
+        (job) =>
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">Job ${esc(job.id)}</div>${["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
+      )
+      .join("") || "<p>No durable jobs recorded yet.</p>";
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>
@@ -354,6 +361,8 @@ document.addEventListener("click", (event) => {
     $("message").value = suggestion.dataset.suggestion;
     $("message").focus();
   }
+  const cancel = event.target.closest("[data-cancel-job]");
+  if (cancel) mutate(`/api/jobs/${cancel.dataset.cancelJob}/cancel`, {});
 });
 window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
 $("play").addEventListener(

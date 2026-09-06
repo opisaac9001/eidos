@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from eidos.application.cognition_supervisor import CognitionSupervisor
 from eidos.domain.jobs import CognitionJob
 from eidos.domain.proposals import validate_proposal
 from eidos.ports.job_store import JobConflict, JobStore
@@ -21,11 +23,13 @@ class DurableModelGateway(ModelGateway):
         jobs: JobStore,
         revision_for: Callable[[str], int],
         worker_id: str = "eidos-inline-worker",
+        supervisor: CognitionSupervisor | None = None,
     ) -> None:
         self.inner = inner
         self.jobs = jobs
         self.revision_for = revision_for
         self.worker_id = worker_id
+        self.supervisor = supervisor
         self.model = getattr(inner, "model", "authored-stand-in-v1")
 
     @staticmethod
@@ -64,6 +68,8 @@ class DurableModelGateway(ModelGateway):
                 available_at=now,
             )
         )
+        if self.supervisor is not None:
+            self.supervisor.start()
         if job.status == "completed" and job.result is not None:
             return ModelResponse(
                 json.dumps({"text": job.result}), self.model, "durable-cache", "stop"
@@ -71,7 +77,11 @@ class DurableModelGateway(ModelGateway):
         if job.status in {"cancelled", "failed"}:
             raise OSError(f"Durable job is {job.status}: {job.error_code or 'no result'}")
         if job.status == "running":
-            raise OSError("Durable job is already running")
+            if self.supervisor is None:
+                raise OSError("Durable job is already running")
+            return await self._await_result(job.job_id)
+        if self.supervisor is not None:
+            return await self._await_result(job.job_id)
         claimed = self.jobs.claim_job(job.job_id, self.worker_id, now, timedelta(seconds=60))
         if self.revision_for(aggregate_id) != claimed.expected_revision:
             self.jobs.fail(job.job_id, self.worker_id, "stale_context")
@@ -99,3 +109,20 @@ class DurableModelGateway(ModelGateway):
             if latest and latest.status == "running":
                 self.jobs.fail(job.job_id, self.worker_id, "invalid_completion")
             raise
+
+    async def _await_result(self, job_id: UUID) -> ModelResponse:
+        while True:
+            job = self.jobs.get_job(job_id)
+            if job is None:
+                raise OSError("Durable job disappeared")
+            if job.status == "completed" and job.result is not None:
+                return ModelResponse(
+                    json.dumps({"text": job.result}), self.model, "durable-worker", "stop"
+                )
+            if job.status in {"failed", "cancelled"}:
+                raise OSError(f"Durable job is {job.status}: {job.error_code or 'no result'}")
+            await asyncio.sleep(0.01)
+
+    def close(self) -> None:
+        if self.supervisor is not None:
+            self.supervisor.close()

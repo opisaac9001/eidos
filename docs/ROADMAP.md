@@ -220,7 +220,7 @@ boundaries and must not rely on emotional coercion.
 ## Immediate implementation queue
 
 1. Extend the shipped action/intention/world-event v1 envelopes to speech and beliefs.
-2. Move inline durable execution to supervised background workers and expose cancellation.
+2. Add job deadlines/backpressure and detach optional result application from callers.
 3. Add entity/relationship/goal indexes and richer retrieval explanations.
 4. Generalize planning beyond the authored lamp story.
 5. Make the lamp request a bounded accept/decline/negotiate scene.

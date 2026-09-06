@@ -14,6 +14,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.ports.event_store import RevisionConflict
+from eidos.ports.job_store import JobConflict
 from eidos.ports.model_gateway import ModelGateway
 
 STATIC = Path(__file__).parent / "web"
@@ -70,6 +71,9 @@ class Runtime:
         self.stop.set()
         if self.thread:
             self.thread.join(timeout=30)
+        close_gateway = getattr(self.life.gateway, "close", None)
+        if callable(close_gateway):
+            close_gateway()
 
     @contextmanager
     def mutation(self) -> Iterator[None]:
@@ -90,6 +94,7 @@ class Runtime:
         if self.cached is None:
             raise RuntimeError("Runtime has not initialized")
         job_store = getattr(self.life.gateway, "jobs", None)
+        supervisor = getattr(self.life.gateway, "supervisor", None)
         jobs = job_store.list_jobs(100) if job_store else []
         job_counts = {
             status: sum(job.status == status for job in jobs)
@@ -109,6 +114,7 @@ class Runtime:
                     }
                     for job in jobs[:20]
                 ],
+                "supervisor": supervisor.snapshot() if supervisor else None,
             },
             "runtime": {
                 "ticks": self.ticks,
@@ -206,6 +212,17 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 body = json.loads(self.rfile.read(size))
                 if not isinstance(body, dict):
                     raise ValueError("Expected a JSON object")
+                path = urlsplit(self.path).path
+                if path.startswith("/api/jobs/") and path.endswith("/cancel"):
+                    job_store = getattr(runtime.life.gateway, "jobs", None)
+                    if job_store is None:
+                        raise ValueError("This runtime has no durable cognition queue")
+                    job_id = path.removeprefix("/api/jobs/").removesuffix("/cancel").strip("/")
+                    from uuid import UUID
+
+                    job_store.cancel(UUID(job_id))
+                    self.respond(200, runtime.snapshot())
+                    return
                 with runtime.mutation():
                     if self.path == "/api/control":
                         if body.get("running") and runtime.stop.is_set():
@@ -225,7 +242,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         self.respond(404, {"error": "Not found"})
                         return
                 self.respond(200, runtime.snapshot())
-            except (ValueError, KeyError, TypeError, TimeoutError) as error:
+            except (ValueError, KeyError, TypeError, TimeoutError, JobConflict) as error:
                 self.respond(400, {"error": str(error)})
             except RevisionConflict:
                 self.respond(409, {"error": "The world changed in another process. Try again."})
@@ -245,12 +262,21 @@ def serve(
         raise ValueError("Port must be between 1 and 65535")
     from eidos.adapters.durable_gateway import DurableModelGateway
     from eidos.adapters.sqlite_jobs import SQLiteJobStore
+    from eidos.application.cognition_supervisor import CognitionSupervisor
 
     store = SQLiteEventStore(database)
+    jobs = SQLiteJobStore(database)
+
+    def revision_for(aggregate: str) -> int:
+        return len(store.read(aggregate))
+
+    inner = gateway or StandInGateway()
+    supervisor = CognitionSupervisor(jobs, inner, revision_for)
     durable = DurableModelGateway(
-        gateway or StandInGateway(),
-        SQLiteJobStore(database),
-        lambda aggregate: len(store.read(aggregate)),
+        inner,
+        jobs,
+        revision_for,
+        supervisor=supervisor,
     )
     life = Life(store, durable, mode=mode)
     runtime = Runtime(life)

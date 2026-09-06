@@ -10,7 +10,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event v1 + trace migration | P1 |
-| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: normal paths wired; background supervision pending | P1 |
+| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers/cancel; callers still await | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
 

@@ -50,6 +50,11 @@ IDs prevent duplicate chat submissions; an ID cannot be reused for another
 message. World writes use optimistic concurrency. An unexpected worker failure
 pauses the world and shows an error; restart the server after resolving it.
 
+Normal CLI and browser inference runs on supervised background cognition workers.
+The durable queue recovers expired leases, retries bounded endpoint failures, and
+supports cancellation from the Ensemble inspector. Simulation callers still await
+required results; detached optional thoughts and explicit job deadlines remain.
+
 If the memory performer cannot copy an accepted encounter exactly, the engine
 archives the source text itself. This is labeled `source-archive`, links to the
 encounter event, and emits `memory.recovered`. The model failure is retained;
