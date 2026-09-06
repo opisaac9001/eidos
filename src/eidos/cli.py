@@ -65,6 +65,21 @@ def main() -> None:
     backup.add_argument("--output", type=Path, required=True)
     verify = commands.add_parser("verify-backup", help="Verify a SQLite backup without changing it")
     verify.add_argument("--input", type=Path, required=True)
+    experiment_create = commands.add_parser(
+        "experiment-create", help="Fork a verified, independent life experiment"
+    )
+    experiment_create.add_argument("--output", type=Path, required=True)
+    experiment_create.add_argument("--name", required=True)
+    experiment_create.add_argument("--purpose", required=True)
+    experiment_create.add_argument("--profile")
+    experiment_inspect = commands.add_parser(
+        "experiment-inspect", help="Verify an experiment and its fork anchor"
+    )
+    experiment_inspect.add_argument("--input", type=Path, required=True)
+    experiment_compare = commands.add_parser(
+        "experiment-compare", help="Compare an experiment with its canonical life"
+    )
+    experiment_compare.add_argument("--input", type=Path, required=True)
     inventory = commands.add_parser(
         "inventory-server", help="Read hardware and firmware inventory from iDRAC"
     )
@@ -115,6 +130,34 @@ def main() -> None:
                     indent=2,
                 )
             )
+            return
+        if args.command in {
+            "experiment-create",
+            "experiment-inspect",
+            "experiment-compare",
+        }:
+            from eidos.adapters.sqlite_experiments import (
+                ExperimentComparison,
+                ExperimentReport,
+                compare_experiment,
+                create_experiment,
+                inspect_experiment,
+            )
+
+            experiment_result: ExperimentReport | ExperimentComparison
+            if args.command == "experiment-create":
+                experiment_result = create_experiment(
+                    args.database,
+                    args.output,
+                    name=args.name,
+                    purpose=args.purpose,
+                    model_profile=args.profile,
+                )
+            elif args.command == "experiment-inspect":
+                experiment_result = inspect_experiment(args.input)
+            else:
+                experiment_result = compare_experiment(args.database, args.input)
+            print(json.dumps(asdict(experiment_result), indent=2, default=str))
             return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"

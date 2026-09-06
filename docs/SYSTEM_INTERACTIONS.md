@@ -184,6 +184,15 @@ Alternative branches require recorded reasons. A completed plan needs action
 evidence, not a model saying "done." Renegotiation creates a new agreed version;
 it does not erase a previously missed deadline or assume the other party agreed.
 
+Operational experiment branches are separate from Pathos's alternative plans. An
+operator may fork the persistent database at a verified event-history anchor to
+compare a model, route or prompt. The fork preserves accepted history and derived
+projections but discards queued and cached cognition jobs, preventing work authored
+for one model configuration from leaking into another. Canonical and experimental
+events may then diverge independently. Inspection proves the original shared prefix;
+comparison is read-only and offers no automatic merge because two lived histories
+cannot be silently reconciled.
+
 Chronos orders due work deterministically, breaks ties explicitly and handles
 time zones only at presentation/external scheduling boundaries. Recurring entries
 create distinct occurrences with IDs. Use simulated deadlines inside Firmament;

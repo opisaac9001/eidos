@@ -324,8 +324,10 @@ Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 - Versioned world/character packs with validated seeds; controlled content expansion.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.
-- Add checkpoints/experiment branches for comparing model and prompt versions
-  without rewriting the canonical life.
+- Verified experiment branches now copy an exact life, discard inherited cognition
+  work, anchor their shared event prefix and compare later event-kind divergence
+  without merging or rewriting the canonical life. Add governed promotion/rollback
+  decisions only after real-model comparison evidence exists.
 
 Exit: a report covering thirty simulated days, causal invariant violations,
 continuity review, repeated motifs, budgets, storage and restore. Use deterministic

@@ -106,6 +106,21 @@ Backup creation refuses to overwrite an existing file. A verified backup can be
 opened directly with `--database` to prove that the event history replays before
 it is promoted during a recovery.
 
+Fork a named experiment before changing a model route or prompt, run that database
+independently, and compare both lives from their shared history anchor:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 experiment-create --output experiments/warmer-reflection.sqlite3 --name "Warmer reflection" --purpose "Compare relationship continuity" --profile reflection-v2
+PYTHONPATH=src .venv/bin/python -m eidos experiment-inspect --input experiments/warmer-reflection.sqlite3
+PYTHONPATH=src .venv/bin/python -m eidos --database experiments/warmer-reflection.sqlite3 advance --hours 24
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 experiment-compare --input experiments/warmer-reflection.sqlite3
+```
+
+An experiment carries the complete accepted life and its disposable projections,
+but starts with an empty cognition queue so it cannot inherit unfinished or cached
+model work. Provenance includes a checksummed fork anchor. Comparison reports what
+each life added; it never merges or rewrites the canonical database.
+
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or
 cancel it at its last committed checkpoint:
