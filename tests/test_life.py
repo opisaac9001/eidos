@@ -244,6 +244,9 @@ class LifeTests(unittest.TestCase):
                 for memory in events
             )
         )
+        snapshot = self.life.snapshot()
+        self.assertFalse(any(item["owner_id"] != "pathos" for item in snapshot["beliefs"]))
+        self.assertTrue(any(item["owner_id"] == "rowan" for item in snapshot["npc_beliefs"]))
 
     def test_accepted_invitation_requires_co_presence_and_becomes_shared_history(self):
         for hours in (24, 24, 24, 9):

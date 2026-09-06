@@ -24,6 +24,7 @@ from eidos.application.inner_life import (
     waking_dream_events,
 )
 from eidos.application.memory import memory_view, recall, terms
+from eidos.application.npc_cognition import npc_belief_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
@@ -259,7 +260,12 @@ class Life:
             "objects": [vars_for(item) for item in planning.objects.values()],
             "intentions": [vars_for(item) for item in planning.intentions.values()],
             "requests": [vars_for(item) for item in social.requests.values()],
-            "beliefs": [vars_for(item) for item in beliefs.beliefs.values()],
+            "beliefs": [
+                vars_for(item) for item in beliefs.beliefs.values() if item.owner_id == "pathos"
+            ],
+            "npc_beliefs": [
+                vars_for(item) for item in beliefs.beliefs.values() if item.owner_id != "pathos"
+            ],
             "followups": [vars_for(item) for item in followups.values()],
             "concerns": list(concerns.values()),
             "memories": list(reversed(memories[-300:])),
@@ -394,6 +400,7 @@ class Life:
                     current,
                 )
             )
+            pending.extend(npc_belief_events(history + pending, at))
             pending.extend(
                 relational_arc_events(
                     history + pending,
