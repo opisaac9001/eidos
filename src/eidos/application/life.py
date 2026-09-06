@@ -33,6 +33,7 @@ from eidos.application.inner_life import (
 )
 from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
+from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
@@ -408,6 +409,18 @@ class Life:
         renegotiations = project_renegotiations(history)
         catch_up = active_catch_up(history)
         inspirations = active_dream_inspirations(history, state.simulated_at)
+        availability = communication_availability(history, state)
+        answered_request_ids = {
+            str(item["request_id"])
+            for item in conversations
+            if item.get("speaker") in {"pathos", "system"}
+        }
+        waiting_messages = [
+            item
+            for item in conversations
+            if item.get("speaker") == "you"
+            and str(item.get("request_id")) not in answered_request_ids
+        ]
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -496,6 +509,13 @@ class Life:
             "catch_up": vars_for(catch_up) if catch_up is not None else None,
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
+            "communication": {
+                **vars_for(availability),
+                "waiting_count": len(waiting_messages),
+                "next_reply_due_at": min(
+                    (str(item["reply_due_at"]) for item in waiting_messages), default=None
+                ),
+            },
             "mode": self.mode,
             "model": getattr(self.gateway, "model", "authored-stand-in-v1"),
             "counts": {
@@ -1134,6 +1154,7 @@ class Life:
         committed = [*history, *pending]
         self._save_state_checkpoint(committed, state)
         self._save_memory_index(committed)
+        await self._respond_to_due_messages()
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
                 self.gateway.submit_deferred(request)
@@ -1180,18 +1201,63 @@ class Life:
             return
         state = self._project_state(history)
         at = state.simulated_at.isoformat()
-        pending = [
-            DomainEvent(
-                "conversation.message",
-                "pathos",
-                {
-                    "text": text.strip(),
-                    "speaker": "you",
-                    "simulated_at": at,
-                    "request_id": request_id,
-                },
+        due_at = reply_due_at(history, state, request_id)
+        incoming = DomainEvent(
+            "conversation.message",
+            "pathos",
+            {
+                "text": text.strip(),
+                "speaker": "you",
+                "simulated_at": at,
+                "request_id": request_id,
+                "delivery_status": "delivered",
+                "reply_due_at": due_at.isoformat(),
+            },
+            correlation_id=request_id,
+        )
+        self.store.append("pathos", [incoming], len(history))
+
+    async def _respond_to_due_messages(self) -> None:
+        while True:
+            history = self.history()
+            state = self._project_state(history)
+            replied = {
+                str(event.payload["request_id"])
+                for event in history
+                if event.kind == "conversation.message"
+                and event.payload.get("speaker") in {"pathos", "system"}
+            }
+            incoming = next(
+                (
+                    event
+                    for event in history
+                    if event.kind == "conversation.message"
+                    and event.payload.get("speaker") == "you"
+                    and str(event.payload.get("request_id")) not in replied
+                    and "reply_due_at" in event.payload
+                    and datetime.fromisoformat(str(event.payload["reply_due_at"]))
+                    <= state.simulated_at
+                ),
+                None,
             )
-        ]
+            if incoming is None:
+                return
+            await self._respond_to_message(incoming)
+
+    async def _respond_to_message(self, incoming: DomainEvent) -> None:
+        history = self.history()
+        request_id = str(incoming.payload["request_id"])
+        if any(
+            event.kind == "conversation.message"
+            and event.payload.get("request_id") == request_id
+            and event.payload.get("speaker") in {"pathos", "system"}
+            for event in history
+        ):
+            return
+        text = str(incoming.payload["text"])
+        state = self._project_state(history)
+        at = state.simulated_at.isoformat()
+        pending: list[DomainEvent] = []
         identity = project_identity(history)
         if not identity.established:
             pending.append(identity_established_event(at))
@@ -1296,7 +1362,7 @@ class Life:
             )
             for item in selected
         )
-        reply = asyncio.run(perform(self.gateway, "pathos", context, at, pending))
+        reply = await perform(self.gateway, "pathos", context, at, pending)
         if reply:
             pending.append(
                 DomainEvent(
@@ -1316,10 +1382,10 @@ class Life:
                     "memory.recorded",
                     "pathos",
                     {
-                        "text": f"You visited and said: {text.strip()}",
+                        "text": f"You sent a message: {text.strip()}",
                         "simulated_at": at,
                         "source": "user-conversation",
-                        "source_event_id": str(pending[0].event_id),
+                        "source_event_id": str(incoming.event_id),
                         "category": "conversation",
                         "location_id": state.location_id,
                         "owner": "pathos",

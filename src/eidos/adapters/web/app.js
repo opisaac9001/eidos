@@ -351,11 +351,16 @@ function renderMessages() {
       $("messages").scrollTop -
       $("messages").clientHeight <
     90;
+  const answered = new Set(
+    state.conversations
+      .filter((item) => ["pathos", "system"].includes(item.speaker))
+      .map((item) => item.request_id),
+  );
   $("messages").innerHTML = state.conversations.length
     ? state.conversations
         .map(
           (item) =>
-            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "SYSTEM" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
+            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "SYSTEM" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
         )
         .join("")
     : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
@@ -382,7 +387,7 @@ function render(next) {
   document.querySelector(".context-note").textContent = liveModel
     ? "This experimental voice uses recorded context. It can still misinterpret or invent details. Conversations persist."
     : "This voice uses templates and recorded context. Conversations and memories persist.";
-  document.querySelectorAll(".small-tag").forEach((tag) => {
+  document.querySelectorAll(".small-tag:not(#chat-availability)").forEach((tag) => {
     tag.textContent = liveModel ? "MODEL OUTPUT" : "STAND-IN";
   });
   $("connection").textContent = state.runtime.error
@@ -495,6 +500,17 @@ function render(next) {
   $("chat-context-mood").textContent = state.emotion?.label || state.pathos.mood;
   $("chat-context-location").textContent =
     `${state.pathos.location} · ${time(state.time)}`;
+  const communication = state.communication || {};
+  $("chat-availability").textContent =
+    communication.status === "available"
+      ? "AVAILABLE"
+      : communication.status === "hurried"
+        ? "FREE BRIEFLY"
+        : (communication.status || "UNAVAILABLE").toUpperCase();
+  $("chat-context-availability").textContent = communication.reason || "";
+  $("delivery-note").textContent = communication.waiting_count
+    ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
+    : "Messages are delivered; replies may take time.";
   $("chat-memories").innerHTML = state.memories
     .slice(0, 3)
     .map((item) => `<div class="context-memory">${esc(item.text)}</div>`)
@@ -614,7 +630,7 @@ $("chat-form").addEventListener("submit", async (event) => {
   if (!text) return;
   if (!pendingChat || pendingChat.text !== text)
     pendingChat = { text, request_id: crypto.randomUUID() };
-  $("send").textContent = "Thinking…";
+  $("send").textContent = "Sending…";
   if (await mutate("/api/chat", pendingChat)) {
     $("message").value = "";
     pendingChat = null;

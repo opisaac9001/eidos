@@ -135,10 +135,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - Offline chat uses templates; model mode uses the configured HTTP endpoint and
   recent memories. The lab model's semantic reliability is limited. Failure,
   source-archive recovery and stand-in states are visible.
-- The browser is functional, but its current chat replies immediately and its
-  simulation controls are still operator-facing. Asynchronous inbox delivery,
-  availability-aware replies, and interruptible user visit scenes are specified next;
-  they should not be mistaken for already implemented behavior.
+- The browser is functional. Messages now enter a persistent inbox and show as
+  delivered until a replay-stable, availability-aware response time arrives; sleep
+  and existing scenes can defer a reply. Interruptible co-present user visit scenes
+  remain future work, and simulation controls are still operator-facing.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair

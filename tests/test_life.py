@@ -120,8 +120,14 @@ class LifeTests(unittest.TestCase):
         revision = len(self.life.history())
         self.life.chat("How has your day been?", "visit-1")
         self.assertEqual(len(self.life.history()), revision)
+        delivered = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        self.assertEqual([m["speaker"] for m in delivered["conversations"]], ["you"])
+        self.assertEqual(delivered["communication"]["waiting_count"], 1)
+        self.assertTrue(delivered["communication"]["next_reply_due_at"])
+        self.life.advance(1)
         snapshot = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
         self.assertEqual([m["speaker"] for m in snapshot["conversations"]], ["you", "pathos"])
+        self.assertEqual(snapshot["communication"]["waiting_count"], 0)
         self.assertIn("breakfast", snapshot["conversations"][-1]["text"])
         self.assertGreater(len(snapshot["recalls"]), 0)
         self.assertIn("lexical_score", snapshot["recalls"][0])
@@ -146,6 +152,7 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(any(e["kind"] == "role.failed" for e in snapshot["feed"]))
         self.assertEqual(snapshot["time"], "2026-01-01T08:00:00+00:00")
         life.chat("Hello", "failed-reply")
+        life.advance(1)
         self.assertEqual(life.snapshot()["conversations"][-1]["speaker"], "system")
 
     def test_bootstrap_does_not_advance_existing_world(self):

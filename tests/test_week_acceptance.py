@@ -65,6 +65,7 @@ class SevenDayAcceptanceTests(unittest.TestCase):
                     self.assertIn(str(event.causation_id), by_id)
 
             life.chat("What do you remember about the notebook and the dream?", "week-return")
+            life.advance(1)
             reply = life.snapshot()["conversations"][-1]["text"]
             self.assertTrue(reply)
             replay = Life(SQLiteEventStore(path), StandInGateway()).snapshot()

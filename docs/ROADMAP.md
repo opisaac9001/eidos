@@ -26,7 +26,7 @@ remain recognizably different rather than a repeated short loop.
 
 Implemented: SQLite event history, atomic writes/replay, verified backups, replayable
 weekday/weekend daily texture, typed travel, open hours, four places, three persistent neighbors,
-multidimensional affect and needs, source-linked memories, conversations, and five
+multidimensional affect and needs, source-linked memories, delayed inbox conversations, and five
 UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
@@ -171,8 +171,9 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   until catch-up behavior is deliberately enabled.
 - Integrate daily life, conversation, world, memories, calendar, relationships,
   dreams and diagnostics. Add full-history pagination/search and while-away summaries.
-- Treat ordinary user messages as asynchronous inbox deliveries with state-derived
-  response timing. Add optional co-present visits as interruptible scenes: Pathos may
+- Ordinary user messages now enter an asynchronous inbox with replay-stable,
+  state-derived response timing and visible delivered/answered state. Add optional
+  co-present visits as interruptible scenes: Pathos may
   be unavailable, hurried, decline, leave, answer or defer a call, and genuinely
   follow up later. Keep simulation controls in a distinct operator surface so the
   life-facing UI changes the world only through communication.
