@@ -36,10 +36,10 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: character/prompts | P2 |
-| SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: energy/valence | P2 |
-| SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Planned | P2–P4 |
-| SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Planned | P2–P4 |
-| SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: request capacity/window policy | P3 |
+| SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: source-linked appraisal + energy/valence | P2 |
+| SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
+| SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
+| SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: energy/rest/mastery and window policy | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Planned | P6 |
 
 ## Planning and time — Chronos / Pathos

@@ -22,6 +22,10 @@ class LifeTests(unittest.TestCase):
         for role in snapshot["roles"]:
             self.assertGreater(role["calls"], 0) if role["id"] != "pathos" else None
         self.assertEqual(snapshot["time"], "2026-01-02T00:00:00+00:00")
+        self.assertGreater(snapshot["pathos"]["needs"]["connection"], 0.5)
+        self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)
+        self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
+        self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))
         dreams = [e for e in self.life.history() if e.kind == "dream.recorded"]
         self.assertEqual(len(dreams), 1)
         self.assertFalse(any(e["text"] == dreams[0].payload["text"] for e in snapshot["memories"]))

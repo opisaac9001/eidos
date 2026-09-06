@@ -294,7 +294,7 @@ function render(next) {
   setBusy(busy);
   if (!changed) return;
   $("presence-mood").textContent = state.pathos.mood;
-  $("presence-location").textContent = `At ${state.pathos.location}`;
+  $("presence-location").textContent = `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}`;
   const thought = state.feed.find((item) => item.kind === "thought.recorded");
   $("latest-thought").textContent = thought
     ? `“${thought.text}”`
@@ -308,6 +308,8 @@ function render(next) {
         ? "Low"
         : "Balanced";
   $("valence-meter").style.width = `${(state.pathos.valence + 1) * 50}%`;
+  const needs = state.pathos.needs;
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%`;
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);
   $("recent-feed").innerHTML = feedMarkup(state.feed.slice(0, 7));

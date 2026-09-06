@@ -263,20 +263,23 @@ def choose_request_response(
     actor_id: str,
     energy: float,
     expected_revision: int,
+    rest: float = 0.5,
+    mastery: float = 0.5,
 ) -> SocialMoveProposal:
     """A deterministic baseline policy; models may later propose the same envelope."""
     if actor_id != request.awaiting_actor_id:
         raise ValueError("Only the awaited actor can choose a response")
-    if not 0 <= energy <= 1:
-        raise ValueError("Energy must be between zero and one")
+    if any(not 0 <= value <= 1 for value in (energy, rest, mastery)):
+        raise ValueError("Choice dimensions must be between zero and one")
     proposal_id = f"respond-{request.request_id}-r{request.rounds}-{actor_id}"
-    if energy < 0.25:
+    capacity = 0.5 * energy + 0.3 * rest + 0.2 * mastery
+    if capacity < 0.35:
         return SocialMoveProposal(
             proposal_id,
             request.request_id,
             actor_id,
             SocialMove.DECLINE,
-            "I do not have the capacity to promise this work.",
+            "My energy, rest, and confidence do not support this promise.",
             expected_revision,
         )
     earliest = datetime.fromisoformat(request.earliest_start)

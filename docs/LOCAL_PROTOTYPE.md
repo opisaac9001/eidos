@@ -43,7 +43,16 @@ failure, memory and relationship consequences. Other action families remain.
 
 The unresolved lamp concern seeds the first night's dream. Waking records it
 explicitly as a dream and applies one capped emotional residue. Duplicate
-application is prevented. General sleep, appraisal and choice remain pending.
+application is prevented. General sleep architecture and richer choice remain pending.
+
+Pathos now has replayed, bounded rest, connection, curiosity and mastery
+satisfaction. Source-linked appraisals update those needs from routines,
+encounters, interruptions, completed actions and missed commitments. The work
+request policy combines energy, rest and mastery with schedule feasibility.
+Dream residue receives an appraisal but cannot directly change a need, belief,
+intention or action. An explicit 23:00–07:00 sleep state recovers rest while
+waking hours create modest need pressure; a seven-day calibration keeps these
+signals away from permanent floors and ceilings. Richer values remain future work.
 
 ## Persistence and failures
 

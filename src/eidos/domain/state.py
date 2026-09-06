@@ -15,6 +15,11 @@ class PathosState:
     simulated_at: datetime = datetime(2026, 1, 1, tzinfo=timezone.utc)
     energy: float = 1.0
     valence: float = 0.0
+    rest: float = 0.75
+    connection: float = 0.5
+    curiosity: float = 0.5
+    mastery: float = 0.45
+    awake: bool = False
 
     def apply(self, event: DomainEvent) -> PathosState:
         if event.aggregate_id != self.pathos_id:
@@ -41,6 +46,28 @@ class PathosState:
                     event.payload.get("valence", self.valence), "valence", -1, 1
                 )
                 return replace(self, energy=energy, valence=valence)
+            case "needs.changed":
+                return replace(
+                    self,
+                    rest=_bounded_dimension(event.payload.get("rest", self.rest), "rest", 0, 1),
+                    connection=_bounded_dimension(
+                        event.payload.get("connection", self.connection), "connection", 0, 1
+                    ),
+                    curiosity=_bounded_dimension(
+                        event.payload.get("curiosity", self.curiosity), "curiosity", 0, 1
+                    ),
+                    mastery=_bounded_dimension(
+                        event.payload.get("mastery", self.mastery), "mastery", 0, 1
+                    ),
+                )
+            case "sleep.started":
+                if not self.awake:
+                    raise ValueError("Pathos is already asleep")
+                return replace(self, awake=False)
+            case "sleep.ended":
+                if self.awake:
+                    raise ValueError("Pathos is already awake")
+                return replace(self, awake=True)
             case _:
                 return self
 

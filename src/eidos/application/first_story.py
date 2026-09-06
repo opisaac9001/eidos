@@ -20,6 +20,8 @@ def story_events(
     existing: list[DomainEvent],
     actor_location_id: str,
     actor_energy: float,
+    actor_rest: float = 0.5,
+    actor_mastery: float = 0.5,
 ) -> list[DomainEvent]:
     day = (current.date() - datetime(2026, 1, 1).date()).days + 1
     kinds = {event.kind for event in existing}
@@ -76,6 +78,8 @@ def story_events(
             actor_id="pathos",
             energy=actor_energy,
             expected_revision=len(existing) + len(foundation),
+            rest=actor_rest,
+            mastery=actor_mastery,
         )
         response = resolve_social_move(
             choice,

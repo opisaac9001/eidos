@@ -5,6 +5,7 @@ import math
 from datetime import timedelta
 from typing import Any
 
+from eidos.application.appraisal import appraisal_events, sleep_and_need_events
 from eidos.application.cognition import perform
 from eidos.application.first_story import story_events
 from eidos.application.inner_life import active_concerns, waking_dream_events
@@ -165,6 +166,13 @@ class Life:
                 "location": location_name(state.location_id),
                 "energy": state.energy,
                 "valence": state.valence,
+                "needs": {
+                    "rest": state.rest,
+                    "connection": state.connection,
+                    "curiosity": state.curiosity,
+                    "mastery": state.mastery,
+                },
+                "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence),
             },
             "weather": weather,
@@ -220,6 +228,8 @@ class Life:
             at = current.isoformat()
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            need_events, state = sleep_and_need_events(state, current)
+            pending.extend(need_events)
             beat = beats.get(current)
             if beat:
                 for event in (
@@ -244,7 +254,14 @@ class Life:
                         },
                     )
                 )
-            story = story_events(current, history + pending, state.location_id, state.energy)
+            story = story_events(
+                current,
+                history + pending,
+                state.location_id,
+                state.energy,
+                state.rest,
+                state.mastery,
+            )
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
@@ -432,6 +449,8 @@ class Life:
                                     },
                                 )
                             )
+            appraisals, state = appraisal_events(history + pending, state, current)
+            pending.extend(appraisals)
         pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": target}))
         self.store.append("pathos", pending, expected_revision=len(history))
 

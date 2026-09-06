@@ -132,6 +132,17 @@ class SocialTests(unittest.TestCase):
             choose_request_response(roomy, actor_id="pathos", energy=0.8, expected_revision=1).move,
             SocialMove.ACCEPT,
         )
+        self.assertEqual(
+            choose_request_response(
+                roomy,
+                actor_id="pathos",
+                energy=0.4,
+                rest=0.1,
+                mastery=0.1,
+                expected_revision=1,
+            ).move,
+            SocialMove.DECLINE,
+        )
 
 
 if __name__ == "__main__":
