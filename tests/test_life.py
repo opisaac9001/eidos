@@ -236,6 +236,35 @@ class LifeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.life.chat("Different content", "visit-1")
 
+    def test_using_an_old_memory_persists_subjective_reconsolidation(self):
+        self.life.bootstrap()
+        history = self.life.history()
+        old_memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I saw a blue cup beside Mara before lunch.",
+                "simulated_at": "2025-08-01T12:00:00+00:00",
+                "owner": "pathos",
+                "importance": 0.3,
+                "confidence": 1.0,
+                "person_id": "mara",
+                "location_id": "cafe",
+            },
+        )
+        self.life.store.append("pathos", [old_memory], expected_revision=len(history))
+        self.life.chat("Do you remember Mara and the blue cup?", "old-memory")
+        self.life.advance(1)
+        events = self.life.history()
+        changed = next(
+            event
+            for event in events
+            if event.kind == "memory.reconsolidated"
+            and event.payload["memory_id"] == str(old_memory.event_id)
+        )
+        self.assertNotEqual(changed.payload["recalled_text"], old_memory.payload["text"])
+        self.assertEqual(changed.payload["epistemic_status"], "subjective_recollection")
+
     def test_explicit_user_preference_is_persisted_with_the_reply(self):
         self.life.bootstrap()
         self.life.chat("I love jasmine tea.", "preference-1")

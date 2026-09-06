@@ -70,6 +70,7 @@ from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
+from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
@@ -3055,7 +3056,7 @@ class Life:
             },
             "mind_layers": mind_context(history),
         }
-        pending.extend(
+        access_events = [
             DomainEvent(
                 "memory.accessed",
                 "pathos",
@@ -3080,7 +3081,9 @@ class Life:
                 },
             )
             for item in selected
-        )
+        ]
+        pending.extend(access_events)
+        pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))
         reply = await perform(self.gateway, "pathos", context, at, pending)
         if reply:
             pending.append(

@@ -11,6 +11,7 @@ from uuid import UUID
 
 from eidos.application.memory_retention import archived_memory_ids
 from eidos.domain.events import DomainEvent
+from eidos.domain.recollections import Recollection, project_recollections
 
 WORDS = re.compile(r"[a-z0-9]+")
 STOP_WORDS = {
@@ -327,8 +328,12 @@ def recall(
         raise ValueError("Memory index revision does not match supplied history")
     ranked = []
     archived = archived_memory_ids(history)
+    recollections = project_recollections(history).latest
     for event in index.memories:
         importance, confidence = _metadata(event)
+        subjective = recollections.get(str(event.event_id))
+        if subjective is not None:
+            confidence = min(confidence, subjective.confidence)
         age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
@@ -399,7 +404,7 @@ def recall(
                 matched_goals,
                 matched_relationships,
                 MappingProxyType({key: round(value, 4) for key, value in components.items()}),
-                *_render_recollection(event, accessibility, importance),
+                *_render_recollection(event, accessibility, importance, subjective),
             )
         )
     ranked.sort(
@@ -412,13 +417,18 @@ def recall(
 
 
 def _render_recollection(
-    event: DomainEvent, accessibility: float, importance: float
+    event: DomainEvent,
+    accessibility: float,
+    importance: float,
+    subjective: Recollection | None,
 ) -> tuple[str, str]:
-    """Blur low-access detail by omission only; never synthesize a replacement fact."""
-    text = str(event.payload["text"])
+    """Render the current subjective recollection without changing source evidence."""
+    text = subjective.text if subjective is not None else str(event.payload["text"])
     category = str(event.payload.get("category", "experience"))
     if category == "dream":
         return f"I remember this as a dream: {text}", "dream"
+    if subjective is not None:
+        return text, subjective.detail_level
     if accessibility >= 0.55 or importance >= 0.75:
         return text, "clear"
     if accessibility >= 0.2:
