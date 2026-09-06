@@ -195,6 +195,11 @@ network authorization; the server remains loopback-only until authenticated depl
   physical wear, make the object temporarily unusable, and create a feasible inspection
   and repair project. Eidos must remain at the site through the repair interval before
   the shared object becomes usable again.
+- Delivered seeds, repair materials, drawing paper, and tea are finite stocks rather
+  than decorative names. Pathos may use or save one when awake and co-located with it.
+  Low stock produces an explicit order-or-go-without choice; an order has a delayed
+  physical handoff, one retry, and can be received or cancelled after two misses. The
+  observatory shows remaining quantities, and depleted resources cannot satisfy plans.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

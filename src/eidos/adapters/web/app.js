@@ -100,6 +100,14 @@ const labels = {
   "object.collaboration_decided": "A NEIGHBOR DECIDED WHETHER TO JOIN",
   "object.shared_use": "A SHARED PRACTICAL MOMENT",
   "object.maintenance_required": "AN OBJECT NEEDS MAINTENANCE",
+  "object.consumption_decided": "A FINITE SUPPLY CONSIDERED",
+  "object.consumed": "A FINITE SUPPLY USED",
+  "object.stock_changed": "OBJECT STOCK CHANGED",
+  "object.replenishment_decided": "REPLENISHMENT CONSIDERED",
+  "object.replenishment_ordered": "REPLENISHMENT ORDERED",
+  "object.replenishment_missed": "REPLENISHMENT MISSED",
+  "object.replenishment_received": "REPLENISHMENT RECEIVED",
+  "object.replenishment_cancelled": "REPLENISHMENT CANCELLED",
   "catch_up.summarized": "WHILE YOU WERE AWAY",
   "catch_up.cancelled": "CATCH-UP CANCELLED",
   "commitment.renegotiation_offered": "NEW PROMISE TERMS OFFERED",
@@ -250,7 +258,7 @@ function renderPlace() {
   );
   const objects = state.objects.filter((item) => item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${!pathosHere && !people.length ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${!pathosHere && !people.length ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {

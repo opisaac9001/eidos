@@ -277,6 +277,7 @@ def _complete_handoff(
         causation_id=arrived.event_id,
         correlation_id=delivery_id,
     )
+    stock = _stock_profile(str(arrived.payload["item_name"]))
     registered = DomainEvent(
         "object.registered",
         "pathos",
@@ -287,6 +288,7 @@ def _complete_handoff(
             "custodian_id": "pathos",
             "location_id": "home",
             "condition": "good",
+            **stock,
             "source": "received-neighborhood-delivery",
             "simulated_at": simulated_at.isoformat(),
         },
@@ -344,6 +346,20 @@ def _item_name(source: DomainEvent) -> str:
         (name for terms, name in choices if any(term in cue for term in terms)),
         "a neighborhood circular and keepsake",
     )
+
+
+def _stock_profile(item_name: str) -> dict[str, object]:
+    name = item_name.casefold()
+    profiles = (
+        ("seeds", 6, 2, "portions"),
+        ("repair materials", 4, 1, "pieces"),
+        ("drawing paper", 12, 3, "sheets"),
+        ("tea", 8, 2, "servings"),
+    )
+    for term, quantity, reorder_at, unit in profiles:
+        if term in name:
+            return {"quantity": quantity, "reorder_at": reorder_at, "unit": unit}
+    return {}
 
 
 def _sample(key: str) -> float:

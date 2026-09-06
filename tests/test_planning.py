@@ -98,6 +98,58 @@ class PlanningTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PlanningState.from_materialized_state(corrupted)
 
+        legacy = {
+            **materialized,
+            "objects": [
+                {
+                    key: value
+                    for key, value in materialized["objects"][0].items()
+                    if key not in {"quantity", "reorder_at", "unit"}
+                }
+            ],
+        }
+        self.assertEqual(PlanningState.from_materialized_state(legacy), state)
+
+    def test_quantified_stock_requires_complete_metadata_and_ordered_changes(self):
+        with self.assertRaises(ValueError):
+            project_planning(
+                [
+                    self.event(
+                        "object.registered",
+                        object_id="tea",
+                        name="Tea",
+                        owner_id="pathos",
+                        custodian_id="pathos",
+                        location_id="home",
+                        condition="good",
+                        quantity=3,
+                    )
+                ]
+            )
+        registered = self.event(
+            "object.registered",
+            object_id="tea",
+            name="Tea",
+            owner_id="pathos",
+            custodian_id="pathos",
+            location_id="home",
+            condition="good",
+            quantity=3,
+            reorder_at=1,
+            unit="servings",
+        )
+        changed = self.event("object.stock_changed", object_id="tea", from_quantity=3, quantity=2)
+        self.assertEqual(project_planning([registered, changed]).objects["tea"].quantity, 2)
+        with self.assertRaises(ValueError):
+            project_planning(
+                [
+                    registered,
+                    self.event(
+                        "object.stock_changed", object_id="tea", from_quantity=2, quantity=1
+                    ),
+                ]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

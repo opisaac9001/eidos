@@ -52,6 +52,11 @@ becomes unavailable. Eidos schedules an inspection followed by repair around ope
 hours, conflicts, and travel, remains at the site for the work interval, and restores
 the object only through the ordinary repair resolver. This creates a reusable causal
 loop from discovery through use, social consequence, wear, and care.
+Selected delivered supplies now carry an explicit quantity, unit, and low-stock point.
+Ordinary co-located use decrements stock; Pathos can instead save it. Low stock creates
+an order-or-go-without decision, and ordered stock arrives after a delay with one retry
+rather than appearing automatically. Depleted resources fail feasibility. Legacy
+materialized object records upgrade with no invented quantities.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,
@@ -300,8 +305,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add quantities, consumption, replenishment, failed maintenance, and choices about
-   whether scarce useful objects are worth repairing or replacing.
+1. Add failed-maintenance outcomes and choices about whether scarce useful objects are
+   worth repairing, borrowing a substitute for, or replacing.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected

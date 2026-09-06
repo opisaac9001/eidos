@@ -41,6 +41,7 @@ from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_maintenance import object_maintenance_events
 from eidos.application.object_opportunities import object_opportunity_events
 from eidos.application.object_story import object_story_events
+from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
@@ -627,6 +628,14 @@ class Life:
                 "object.collaboration_decided",
                 "object.shared_use",
                 "object.maintenance_required",
+                "object.consumption_decided",
+                "object.consumed",
+                "object.stock_changed",
+                "object.replenishment_decided",
+                "object.replenishment_ordered",
+                "object.replenishment_missed",
+                "object.replenishment_received",
+                "object.replenishment_cancelled",
                 "catch_up.summarized",
                 "catch_up.cancelled",
             }:
@@ -1622,6 +1631,19 @@ class Life:
             if maintenance:
                 self._planning(history + pending + maintenance)
                 pending.extend(maintenance)
+            supply = object_supply_events(
+                history + pending,
+                current,
+                self._planning(history + pending),
+                pathos_awake=state.awake,
+                pathos_location_id=state.location_id,
+                pathos_energy=state.energy,
+                curiosity=state.curiosity,
+                values=project_identity(history + pending).values,
+            )
+            if supply:
+                self._planning(history + pending + supply)
+                pending.extend(supply)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),

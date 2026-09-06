@@ -292,6 +292,8 @@ def resolve_action(
                 "repaired",
             }:
                 return reject("resource_unavailable", "The resource is not usable at this place")
+            if resource.quantity is not None and resource.quantity == 0:
+                return reject("resource_depleted", "The scheduled resource has no stock remaining")
         starts_at = datetime.fromisoformat(schedule.starts_at)
         ends_at = datetime.fromisoformat(schedule.ends_at) if schedule.ends_at else starts_at
         if simulated_at < starts_at:

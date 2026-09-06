@@ -318,6 +318,54 @@ class ActionTests(unittest.TestCase):
         )
         self.assertEqual(early.code, "activity_incomplete")
 
+    def test_depleted_finite_resource_cannot_support_a_scheduled_activity(self):
+        registered = DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "paper",
+                "name": "Drawing paper",
+                "owner_id": "pathos",
+                "custodian_id": "pathos",
+                "location_id": "workshop",
+                "condition": "good",
+                "quantity": 0,
+                "reorder_at": 2,
+                "unit": "sheets",
+            },
+        )
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "draw",
+                "title": "Draw",
+                "starts_at": self.now.isoformat(),
+                "ends_at": self.now.isoformat(),
+                "location_id": "workshop",
+                "actor_id": "pathos",
+                "action": "attend",
+                "target_id": "paper",
+                "resource_id": "paper",
+            },
+        )
+        state = project_planning([registered, schedule])
+        result = resolve_action(
+            ActionProposal(
+                "use-paper",
+                "pathos",
+                ActionKind.ATTEND,
+                2,
+                target_id="paper",
+                schedule_id="draw",
+            ),
+            state=state,
+            actor_location_id="workshop",
+            actual_revision=2,
+            simulated_at=self.now,
+        )
+        self.assertEqual(result.code, "resource_depleted")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -384,6 +384,17 @@ goal progress, completion, skill evidence, and memory. Ordinary routines cannot 
 Eidos away halfway through scheduled work. This rule is additive, so historical objects
 without a maintenance event preserve their projected condition.
 
+Consumability is explicit object state, never inferred for every object. Qualifying
+delivered supplies register a non-negative quantity, reorder point, and unit; legacy
+objects retain null stock fields. When awake at the object's location, Pathos makes one
+replayable use-or-save decision per day. Use creates a sourced consumption fact before
+an ordered stock transition and low-importance ordinary memory. At or below the reorder
+point, a separate reliability-weighted order-or-go-without decision occurs. Ordering
+creates a next-day handoff rather than stock: presence receives it, absence schedules
+one retry, and a second miss cancels it. Every stock event states its prior quantity so
+reordered, duplicated, or stale transitions fail projection. Quantity zero makes a
+resource unavailable to the action resolver. The observatory displays remaining units.
+
 Examples include a neighborhood gathering, workshop delay, weather disruption,
 request for help, or opportunity related to an existing goal.
 Each needs cause, prerequisites, lead time, affected entities, likely duration,

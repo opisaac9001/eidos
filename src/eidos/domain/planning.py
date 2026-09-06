@@ -57,6 +57,9 @@ class WorldObject:
     custodian_id: str
     location_id: str
     condition: str
+    quantity: int | None = None
+    reorder_at: int | None = None
+    unit: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,11 +98,21 @@ class PlanningState:
         expected = {"goals", "commitments", "calendar", "objects", "intentions"}
         if set(raw) != expected:
             raise ValueError("Materialized planning fields do not match schema v1")
+        object_records = raw["objects"]
+        if isinstance(object_records, list):
+            object_records = [
+                {**value, "quantity": None, "reorder_at": None, "unit": None}
+                if isinstance(value, dict)
+                and set(value)
+                == {"object_id", "name", "owner_id", "custodian_id", "location_id", "condition"}
+                else value
+                for value in object_records
+            ]
         state = cls(
             goals=_restore_records(raw["goals"], Goal, "goal_id"),
             commitments=_restore_records(raw["commitments"], Commitment, "commitment_id"),
             calendar=_restore_records(raw["calendar"], CalendarEntry, "schedule_id"),
-            objects=_restore_records(raw["objects"], WorldObject, "object_id"),
+            objects=_restore_records(object_records, WorldObject, "object_id"),
             intentions=_restore_records(raw["intentions"], Intention, "intention_id"),
         )
         _validate_materialized_planning(state)
@@ -300,17 +313,33 @@ class PlanningState:
                 object_id = _required(payload, "object_id")
                 if object_id in objects:
                     raise ValueError("Object already exists")
-                objects[object_id] = WorldObject(
+                item = WorldObject(
                     object_id,
                     _required(payload, "name"),
                     _required(payload, "owner_id"),
                     _required(payload, "custodian_id"),
                     _required(payload, "location_id"),
                     _required(payload, "condition"),
+                    _optional_nonnegative_int(payload, "quantity"),
+                    _optional_nonnegative_int(payload, "reorder_at"),
+                    _optional(payload, "unit"),
                 )
+                _validate_object_stock(item)
+                objects[object_id] = item
             case "object.condition_changed":
                 item = _existing(objects, payload, "object_id")
                 objects[item.object_id] = replace(item, condition=_required(payload, "condition"))
+            case "object.stock_changed":
+                item = _existing(objects, payload, "object_id")
+                if item.quantity is None:
+                    raise ValueError("Only quantified objects can change stock")
+                previous = payload.get("from_quantity")
+                quantity = payload.get("quantity")
+                if previous != item.quantity:
+                    raise ValueError("Stock change does not match current quantity")
+                if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0:
+                    raise ValueError("Object stock must be a non-negative integer")
+                objects[item.object_id] = replace(item, quantity=quantity)
             case "object.custody_changed":
                 item = _existing(objects, payload, "object_id")
                 if item.custodian_id != _required(payload, "from_custodian_id"):
@@ -464,6 +493,7 @@ def _validate_materialized_planning(state: PlanningState) -> None:
             )
         ):
             raise ValueError("Materialized object is invalid")
+        _validate_object_stock(item)
     for intention in state.intentions.values():
         if (
             not all(
@@ -510,6 +540,28 @@ def _optional(payload: Mapping[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be null or a non-empty string")
     return value
+
+
+def _optional_nonnegative_int(payload: Mapping[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{key} must be null or a non-negative integer")
+    return value
+
+
+def _validate_object_stock(item: WorldObject) -> None:
+    fields = (item.quantity, item.reorder_at, item.unit)
+    if all(value is None for value in fields):
+        return
+    if (
+        item.quantity is None
+        or item.reorder_at is None
+        or not isinstance(item.unit, str)
+        or not item.unit.strip()
+    ):
+        raise ValueError("Quantified objects need quantity, reorder threshold, and unit")
 
 
 def _existing(collection: dict[str, T], payload: Mapping[str, Any], key: str) -> T:

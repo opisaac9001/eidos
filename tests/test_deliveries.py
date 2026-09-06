@@ -145,6 +145,7 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(
             (item.owner_id, item.custodian_id, item.location_id), ("pathos", "pathos", "home")
         )
+        self.assertEqual((item.quantity, item.reorder_at, item.unit), (6, 2, "portions"))
         memory = next(event for event in completion if event.kind == "memory.recorded")
         received = next(event for event in completion if event.kind == "delivery.received")
         self.assertEqual(memory.payload["source_event_id"], str(received.event_id))
