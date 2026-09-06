@@ -43,14 +43,11 @@ class CognitionJobRunner:
                     ModelRequest(
                         capability=claimed.capability,
                         messages=(ModelMessage("user", json.dumps(dict(claimed.context))),),
-                        task_version="2",
+                        task_version=claimed.task_version,
+                        max_output_tokens=claimed.max_output_tokens,
+                        temperature=claimed.temperature,
                         correlation_id=claimed.job_id,
-                        output_schema={
-                            "type": "object",
-                            "properties": {"text": {"type": "string"}},
-                            "required": ["text"],
-                            "additionalProperties": False,
-                        },
+                        output_schema=claimed.output_schema,
                     )
                 )
             )

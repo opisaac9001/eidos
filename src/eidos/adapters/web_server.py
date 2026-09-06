@@ -112,6 +112,9 @@ class Runtime:
                         "capability": job.capability,
                         "status": job.status,
                         "attempts": job.attempts,
+                        "task_version": job.task_version,
+                        "max_output_tokens": job.max_output_tokens,
+                        "temperature": job.temperature,
                         "error_code": job.error_code,
                         "deadline_at": job.deadline_at.isoformat() if job.deadline_at else None,
                     }

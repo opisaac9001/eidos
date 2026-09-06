@@ -10,11 +10,29 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected, validate_proposal
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
+ROLE_MODEL_PROFILES = {
+    "pathos": ("3", 160, 0.55),
+    "murmur": ("3", 100, 0.65),
+    "firmament": ("3", 140, 0.7),
+    "moira": ("3", 16, 0.2),
+    "mnemosyne": ("3", 384, 0.0),
+    "reflection": ("3", 140, 0.55),
+    "oneiros": ("3", 220, 0.8),
+    "chronicler": ("3", 180, 0.2),
+}
+
 
 def request_for(role: str, context: Mapping[str, object]) -> ModelRequest:
+    try:
+        task_version, max_output_tokens, temperature = ROLE_MODEL_PROFILES[role]
+    except KeyError:
+        raise ValueError(f"Unknown cognition role: {role}") from None
     return ModelRequest(
         capability=role,
         messages=(ModelMessage("user", json.dumps(context)),),
+        task_version=task_version,
+        max_output_tokens=max_output_tokens,
+        temperature=temperature,
         output_schema={
             "type": "object",
             "properties": {

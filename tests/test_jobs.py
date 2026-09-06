@@ -2,6 +2,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -52,6 +53,35 @@ class JobStoreTests(unittest.TestCase):
                     available_at=self.now,
                 )
             )
+
+    def test_request_profile_survives_restart_and_participates_in_idempotency(self):
+        profiled = self.job("profiled")
+        profiled = replace(
+            profiled,
+            task_version="7",
+            max_output_tokens=123,
+            temperature=0.25,
+            output_schema={"type": "object", "required": ["text"]},
+        )
+        stored = self.store.enqueue(profiled)
+        restarted = SQLiteJobStore(self.path).get_job(stored.job_id)
+        self.assertEqual(restarted.task_version, "7")
+        self.assertEqual(restarted.max_output_tokens, 123)
+        self.assertEqual(restarted.temperature, 0.25)
+        self.assertEqual(dict(restarted.output_schema), {"type": "object", "required": ["text"]})
+        changed = replace(profiled, max_output_tokens=124)
+        with self.assertRaises(JobConflict):
+            self.store.enqueue(changed)
+
+    def test_invalid_request_profiles_are_rejected(self):
+        for changes in (
+            {"task_version": ""},
+            {"max_output_tokens": 0},
+            {"temperature": True},
+            {"output_schema": "not-a-schema"},
+        ):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                replace(self.job(), **changes)
 
     def test_priority_claim_completion_and_worker_ownership(self):
         low = self.store.enqueue(self.job("low", 10))
@@ -174,6 +204,9 @@ class JobStoreTests(unittest.TestCase):
         with sqlite3.connect(legacy_path) as connection:
             columns = {row[1] for row in connection.execute("PRAGMA table_info(cognition_jobs)")}
         self.assertIn("deadline_at", columns)
+        self.assertTrue(
+            {"task_version", "max_output_tokens", "temperature", "output_schema_json"} <= columns
+        )
 
 
 if __name__ == "__main__":

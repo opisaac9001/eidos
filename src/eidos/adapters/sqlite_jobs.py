@@ -29,6 +29,10 @@ class SQLiteJobStore:
                     context_json TEXT NOT NULL,
                     expected_revision INTEGER NOT NULL,
                     simulated_at TEXT NOT NULL,
+                    task_version TEXT NOT NULL DEFAULT '1',
+                    max_output_tokens INTEGER NOT NULL DEFAULT 512,
+                    temperature REAL NOT NULL DEFAULT 0.7,
+                    output_schema_json TEXT,
                     priority INTEGER NOT NULL,
                     max_attempts INTEGER NOT NULL,
                     attempts INTEGER NOT NULL,
@@ -47,6 +51,20 @@ class SQLiteJobStore:
             }
             if "deadline_at" not in columns:
                 connection.execute("ALTER TABLE cognition_jobs ADD COLUMN deadline_at TEXT")
+            if "task_version" not in columns:
+                connection.execute(
+                    "ALTER TABLE cognition_jobs ADD COLUMN task_version TEXT NOT NULL DEFAULT '1'"
+                )
+            if "max_output_tokens" not in columns:
+                connection.execute(
+                    "ALTER TABLE cognition_jobs ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 512"
+                )
+            if "temperature" not in columns:
+                connection.execute(
+                    "ALTER TABLE cognition_jobs ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7"
+                )
+            if "output_schema_json" not in columns:
+                connection.execute("ALTER TABLE cognition_jobs ADD COLUMN output_schema_json TEXT")
             connection.execute("""
                 CREATE INDEX IF NOT EXISTS cognition_jobs_ready
                 ON cognition_jobs(status, available_at, priority DESC, created_at)
@@ -65,6 +83,12 @@ class SQLiteJobStore:
             context=json.loads(row["context_json"]),
             expected_revision=row["expected_revision"],
             simulated_at=row["simulated_at"],
+            task_version=row["task_version"],
+            max_output_tokens=row["max_output_tokens"],
+            temperature=row["temperature"],
+            output_schema=(
+                json.loads(row["output_schema_json"]) if row["output_schema_json"] else None
+            ),
             priority=row["priority"],
             max_attempts=row["max_attempts"],
             idempotency_key=row["idempotency_key"],
@@ -89,8 +113,24 @@ class SQLiteJobStore:
             ).fetchone()
             if row is not None:
                 existing = self._from_row(row)
-                comparable = (existing.capability, existing.aggregate_id, dict(existing.context))
-                proposed = (job.capability, job.aggregate_id, dict(job.context))
+                comparable = (
+                    existing.capability,
+                    existing.aggregate_id,
+                    dict(existing.context),
+                    existing.task_version,
+                    existing.max_output_tokens,
+                    existing.temperature,
+                    dict(existing.output_schema) if existing.output_schema else None,
+                )
+                proposed = (
+                    job.capability,
+                    job.aggregate_id,
+                    dict(job.context),
+                    job.task_version,
+                    job.max_output_tokens,
+                    job.temperature,
+                    dict(job.output_schema) if job.output_schema else None,
+                )
                 if comparable != proposed:
                     raise JobConflict(
                         "Idempotency key was already used for different work"
@@ -104,9 +144,10 @@ class SQLiteJobStore:
             connection.execute(
                 "INSERT INTO cognition_jobs "
                 "(job_id,idempotency_key,capability,aggregate_id,context_json,"
-                "expected_revision,simulated_at,priority,max_attempts,attempts,status,"
+                "expected_revision,simulated_at,task_version,max_output_tokens,temperature,"
+                "output_schema_json,priority,max_attempts,attempts,status,"
                 "created_at,available_at,deadline_at,lease_until,worker_id,result,error_code) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     str(job.job_id),
                     job.idempotency_key,
@@ -115,6 +156,12 @@ class SQLiteJobStore:
                     encoded,
                     job.expected_revision,
                     job.simulated_at,
+                    job.task_version,
+                    job.max_output_tokens,
+                    job.temperature,
+                    json.dumps(dict(job.output_schema), sort_keys=True)
+                    if job.output_schema
+                    else None,
                     job.priority,
                     job.max_attempts,
                     job.attempts,

@@ -62,6 +62,13 @@ must explicitly cover all ten generated capabilities, including Moira's event an
 world-expansion proposals. Routing selects a performer; it does not bypass that
 performer's schema, semantic warnings, world rules, timeouts, or provenance.
 
+Each text performer also has an explicit versioned request profile. Token ceilings
+range from 16 for enumerated weather to 384 for exact memory copying; temperatures
+range from deterministic copying to 0.8 for dreams. The durable queue persists the
+task version, schema, ceiling, and temperature as real columns and restores them after
+a worker restart. Existing queue tables migrate in place with legacy defaults. The
+operator job inspector shows the effective version and budgets for each recent job.
+
 ## What is checked
 
 The probe invokes Pathos, Murmur, Firmament, Moira, Mnemosyne, Reflection,

@@ -19,9 +19,11 @@ class ThreadRecordingGateway:
 
     def __init__(self):
         self.thread_names = []
+        self.requests = []
 
     async def generate(self, request):
         self.thread_names.append(threading.current_thread().name)
+        self.requests.append(request)
         return ModelResponse('{"text":"background thought"}', "fixture", "test", "stop")
 
 
@@ -35,6 +37,14 @@ class SupervisorTests(unittest.TestCase):
         return ModelRequest(
             capability="murmur",
             messages=(ModelMessage("user", json.dumps({"location": "home", "memories": []})),),
+            task_version="9",
+            max_output_tokens=73,
+            temperature=0.31,
+            output_schema={
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
         )
 
     def test_gateway_work_runs_on_supervised_background_thread(self):
@@ -48,6 +58,10 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(json.loads(response.content)["text"], "background thought")
         self.assertEqual(response.backend, "durable-worker")
         self.assertTrue(all(name.startswith("eidos-cognition-") for name in inner.thread_names))
+        self.assertEqual(inner.requests[0].task_version, self.request().task_version)
+        self.assertEqual(inner.requests[0].max_output_tokens, self.request().max_output_tokens)
+        self.assertEqual(inner.requests[0].temperature, self.request().temperature)
+        self.assertEqual(inner.requests[0].output_schema, self.request().output_schema)
         self.assertEqual(supervisor.alive_workers, 2)
         self.assertEqual(supervisor.snapshot()["completed_runs"], 1)
 
