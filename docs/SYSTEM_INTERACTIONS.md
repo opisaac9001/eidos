@@ -245,6 +245,15 @@ declines. Answering pauses the visit until the call completes; declining schedul
 callback that waits until he is awake and no longer in an active scene. These events
 are auditable and cannot be asserted into existence by the dialogue performer.
 
+The same private connection goal can instead reserve a replay-stable next-day visit.
+At arrival time the world checks that Pathos is awake and home, then weighs energy,
+social openness, familiarity, trust, tension, and stable personal variability. A
+missed or deferred visit remains an explicit consequence. An admitted visitor moves
+to the apartment in the projected world, forms a source-linked encounter memory,
+blocks other live-visit requests, and can pause the user's conversation at the door.
+The visitor departs on a later world tick, changes the relationship through the time
+actually shared, and only then resumes a still-paused user scene.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

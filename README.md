@@ -144,10 +144,14 @@ network authorization; the server remains loopback-only until authenticated depl
   delivered until a replay-stable, availability-aware response time arrives; sleep
   and existing scenes can defer a reply. When Pathos is available, the user can begin
   a private live visit with immediate alternating replies, leave voluntarily, or be
-  interrupted when his next scheduled departure or an answered phone call arrives.
+  interrupted when his next scheduled departure, an answered phone call, or a visitor
+  at the door arrives.
   Connection-goal-sourced calls can be answered or declined; declined calls create a
-  durable callback that waits for a free waking interval. Richer interruptions remain
-  future work, and simulation controls are still operator-facing.
+  durable callback that waits for a free waking interval. Connection goals can also
+  produce next-day visits: Pathos may miss, defer, or admit the visitor based on his
+  location, energy, emotion, and relationship with them. An admitted visitor is
+  physically present, blocks new visits, and leaves before a paused user conversation
+  resumes. Simulation controls remain operator-facing.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair

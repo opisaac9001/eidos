@@ -40,7 +40,8 @@ def phone_call_events(
     called_goal_ids = {
         str(event.payload["source_goal_id"])
         for event in history
-        if event.kind == "phone.call_received" and "source_goal_id" in event.payload
+        if event.kind in {"phone.call_received", "visitor.planned"}
+        and "source_goal_id" in event.payload
     }
     goal = next(
         (

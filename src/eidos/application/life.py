@@ -45,6 +45,7 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import exploration_plan_events, planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
@@ -546,6 +547,11 @@ class Life:
                 "phone.call_completed",
                 "phone.callback_scheduled",
                 "phone.callback_completed",
+                "visitor.arrived",
+                "visitor.admitted",
+                "visitor.deferred",
+                "visitor.missed",
+                "visitor.departed",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",
@@ -595,6 +601,7 @@ class Life:
             }:
                 feed.append(item)
         npc_state = project_npcs(history, state.simulated_at)
+        active_visitor_locations = visitor_locations(history)
         population = [
             {
                 "id": person.person_id,
@@ -603,7 +610,9 @@ class Life:
                 "color": person.color,
                 "description": person.description,
                 "introduced": person.introduced,
-                "location_id": npc_state.people[person.person_id].location_id,
+                "location_id": active_visitor_locations.get(
+                    person.person_id, npc_state.people[person.person_id].location_id
+                ),
                 "encounters": relationship_state.for_person(person.person_id).encounters,
                 "trust": relationship_state.for_person(person.person_id).trust,
                 "familiarity": relationship_state.for_person(person.person_id).familiarity,
@@ -1145,6 +1154,23 @@ class Life:
                 phone_emotion.arousal,
                 phone_emotion.sustained_low_hours,
             )
+            pending.extend(
+                visitor_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    actor_locations={
+                        "pathos": state.location_id,
+                        "user": state.location_id,
+                        **npc_locations,
+                    },
+                    pathos_awake=state.awake,
+                    pathos_energy=state.energy,
+                    social_openness=phone_bias.social_openness,
+                    relationships=self._relationships(history + pending).relationships,
+                )
+            )
+            npc_locations.update(visitor_locations(history + pending))
             pending.extend(
                 phone_call_events(
                     history + pending,

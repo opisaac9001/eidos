@@ -46,6 +46,16 @@ def communication_availability(
         for scene in scenes
     ):
         return CommunicationAvailability("occupied", "He is already with someone.", False, False)
+    departed_visits = {
+        str(event.payload["visit_id"]) for event in history if event.kind == "visitor.departed"
+    }
+    if any(
+        event.kind == "visitor.admitted" and str(event.payload["visit_id"]) not in departed_visits
+        for event in history
+    ):
+        return CommunicationAvailability(
+            "occupied", "He has someone visiting at home.", False, False
+        )
     planning = project_planning(list(history))
     now = state.simulated_at
     if any(
