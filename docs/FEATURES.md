@@ -102,7 +102,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard | P5 |
+| UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard with communication-only ordinary surface and separate local operator view | P5 |
 | UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: delayed inbox plus start/leave controls for availability-gated live visits | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: map/neighbors | P3 |
 | UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: latest 300 search/export + revision-cursor event API | P2–P5 |

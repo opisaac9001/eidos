@@ -128,6 +128,11 @@ PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 No Node runtime is needed to serve the UI. The browser assets ship in the Python
 wheel and use no CDN, external fonts, or frontend build pipeline.
 
+The ordinary observatory at `/` is read-only except for messages and live-visit
+requests. Local maintenance controls, private NPC state, model traces, and durable-job
+cancellation are rendered only at `/operator`. This is a presentation boundary, not
+network authorization; the server remains loopback-only until authenticated deployment.
+
 ## Prototype boundaries
 
 - The application runs locally; real inference has been tested on the small lab

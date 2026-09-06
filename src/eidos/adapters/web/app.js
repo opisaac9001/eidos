@@ -1,5 +1,6 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
+const operatorMode = window.location.pathname === "/operator";
 const esc = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -105,6 +106,9 @@ let lastMessageSignature = "",
   pendingChat = null,
   toastTimer,
   disconnected = false;
+document.querySelectorAll("[data-operator-only]").forEach((element) => {
+  element.hidden = !operatorMode;
+});
 const time = (value) =>
   new Date(value).toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -551,7 +555,7 @@ function render(next) {
     (state.jobs?.recent || [])
       .map(
         (job) =>
-          `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">Job ${esc(job.id)}${job.deadline_at ? ` · deadline ${esc(time(job.deadline_at))}` : ""}</div>${["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">Job ${esc(job.id)}${job.deadline_at ? ` · deadline ${esc(time(job.deadline_at))}` : ""}</div>${operatorMode && ["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
       )
       .join("") || "<p>No durable jobs recorded yet.</p>";
   $("npc-states").innerHTML = (state.npc_states || [])

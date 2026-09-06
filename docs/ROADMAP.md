@@ -177,8 +177,9 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   scene that either party can leave; a scheduled departure already ends the visit.
   Connection-goal-sourced phone calls now support answer/decline, visit pause/resume,
   and callbacks that wait for a free waking interval. Extend the same mechanism to
-  visitors, deliveries, urgency and remembered follow-up. Keep simulation controls in a distinct operator surface so the
-  life-facing UI changes the world only through communication.
+  visitors, deliveries, urgency and remembered follow-up. Simulation controls and
+  private diagnostics now render only on the explicit local `/operator` surface, so
+  the ordinary life-facing UI changes the world only through communication.
 - Opt-in in-app outreach, quiet hours, rate limits and an off switch. No guilt,
   pressure or punishment for user absence.
 

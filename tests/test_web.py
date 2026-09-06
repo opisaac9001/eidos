@@ -63,7 +63,7 @@ class WebTests(unittest.TestCase):
         self.runtime.stop.wait(0.08)
         self.assertEqual(self.runtime.snapshot()["time"], paused_time)
         self.assertEqual(self.runtime.snapshot()["jobs"]["counts"]["queued"], 0)
-        for path in ("/", "/app.js", "/style.css", "/health", "/api/export"):
+        for path in ("/", "/operator", "/app.js", "/style.css", "/health", "/api/export"):
             status, body = self.request("GET", path)
             self.assertEqual(status, 200, path)
             self.assertTrue(body)
@@ -73,11 +73,15 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'id="catch-up"', body)
                 self.assertIn(b'id="dream-inspiration"', body)
                 self.assertIn(b'id="index-status"', body)
+                self.assertIn(b'class="controls" data-operator-only hidden', body)
+            if path == "/operator":
+                self.assertIn(b"data-operator-only hidden", body)
             if path == "/app.js":
                 self.assertIn(b"function renderPlans()", body)
                 self.assertIn(b"person.plan_scheduled_for", body)
                 self.assertIn(b"state.scenes", body)
                 self.assertIn(b"state.emotion", body)
+                self.assertIn(b'window.location.pathname === "/operator"', body)
             if path == "/api/export":
                 exported = json.loads(body)
                 self.assertEqual(exported["schema"], 2)

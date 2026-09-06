@@ -211,8 +211,8 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 with runtime.lock:
                     events = [event_json(event) for event in runtime.life.history()]
                 self.respond(200, {"schema": 2, "events": events})
-            elif path in ("/", "/app.js", "/style.css"):
-                asset = STATIC / ("index.html" if path == "/" else path[1:])
+            elif path in ("/", "/operator", "/app.js", "/style.css"):
+                asset = STATIC / ("index.html" if path in {"/", "/operator"} else path[1:])
                 self.respond(
                     200, asset.read_bytes(), mimetypes.guess_type(asset)[0] or "text/plain"
                 )

@@ -65,7 +65,7 @@
           <h1 id="page-title">A life in motion.</h1>
           <p class="mobile-mode">Stand-in performers · saved locally</p>
         </div>
-        <div class="controls">
+        <div class="controls" data-operator-only hidden>
           <label class="sr-only" for="speed">Simulation speed</label
           ><select id="speed">
             <option value="5">5 min / tick</option>
@@ -275,7 +275,7 @@
         <div id="dream-journal" class="memory-list"></div>
         <div id="consolidations" class="memory-list"></div>
         <div id="memory-list" class="memory-list"></div>
-        <details class="panel call-inspector">
+        <details class="panel call-inspector" data-operator-only hidden>
           <summary>Why memories surfaced</summary>
           <div id="recall-traces" aria-label="Memory recall explanations"></div>
         </details>
@@ -318,11 +318,11 @@
           </div>
         </div>
         <div id="roles" class="role-grid"></div>
-        <details class="panel call-inspector">
+        <details class="panel call-inspector" data-operator-only hidden>
           <summary>Inspect operator-only offscreen lives</summary>
           <div id="npc-states" aria-label="Private NPC simulation state"></div>
         </details>
-        <details class="panel call-inspector">
+        <details class="panel call-inspector" data-operator-only hidden>
           <summary>Inspect recent model calls</summary>
           <div id="diagnostics" aria-label="Model call diagnostics"></div>
         </details>
