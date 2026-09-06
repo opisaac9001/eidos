@@ -1,0 +1,101 @@
+"""Model gateway decorator backed by restart-safe, idempotent cognition jobs."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+from eidos.domain.jobs import CognitionJob
+from eidos.domain.proposals import validate_proposal
+from eidos.ports.job_store import JobConflict, JobStore
+from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
+
+
+class DurableModelGateway(ModelGateway):
+    def __init__(
+        self,
+        inner: ModelGateway,
+        jobs: JobStore,
+        revision_for: Callable[[str], int],
+        worker_id: str = "eidos-inline-worker",
+    ) -> None:
+        self.inner = inner
+        self.jobs = jobs
+        self.revision_for = revision_for
+        self.worker_id = worker_id
+        self.model = getattr(inner, "model", "authored-stand-in-v1")
+
+    @staticmethod
+    def _key(request: ModelRequest, context: dict[str, object]) -> str:
+        canonical = json.dumps(
+            {
+                "capability": request.capability,
+                "task_version": request.task_version,
+                "context": context,
+                "schema": request.output_schema,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return "model:" + hashlib.sha256(canonical.encode()).hexdigest()
+
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        context_value = json.loads(request.messages[-1].content)
+        if not isinstance(context_value, dict):
+            raise ValueError("Durable model context must be an object")
+        context: dict[str, object] = context_value
+        aggregate_id = "pathos"
+        revision = self.revision_for(aggregate_id)
+        now = datetime.now(timezone.utc)
+        job = self.jobs.enqueue(
+            CognitionJob(
+                capability=request.capability,
+                aggregate_id=aggregate_id,
+                context=context,
+                expected_revision=revision,
+                simulated_at=str(context.get("time", "unknown")),
+                priority=90 if request.capability == "pathos" else 50,
+                idempotency_key=self._key(request, context),
+                job_id=UUID(str(request.correlation_id)),
+                created_at=now,
+                available_at=now,
+            )
+        )
+        if job.status == "completed" and job.result is not None:
+            return ModelResponse(
+                json.dumps({"text": job.result}), self.model, "durable-cache", "stop"
+            )
+        if job.status in {"cancelled", "failed"}:
+            raise OSError(f"Durable job is {job.status}: {job.error_code or 'no result'}")
+        if job.status == "running":
+            raise OSError("Durable job is already running")
+        claimed = self.jobs.claim_job(job.job_id, self.worker_id, now, timedelta(seconds=60))
+        if self.revision_for(aggregate_id) != claimed.expected_revision:
+            self.jobs.fail(job.job_id, self.worker_id, "stale_context")
+            raise OSError("World changed before inference")
+        try:
+            response = await self.inner.generate(request)
+            text = validate_proposal(request.capability, response.content, context)
+            if self.revision_for(aggregate_id) != claimed.expected_revision:
+                self.jobs.fail(job.job_id, self.worker_id, "stale_context")
+                raise OSError("World changed during inference")
+            self.jobs.complete(job.job_id, self.worker_id, text)
+            return response
+        except JobConflict:
+            latest = self.jobs.get_job(job.job_id)
+            if latest and latest.status == "cancelled":
+                raise OSError("Durable job was cancelled") from None
+            raise
+        except (OSError, TimeoutError):
+            latest = self.jobs.get_job(job.job_id)
+            if latest and latest.status == "running":
+                self.jobs.fail(job.job_id, self.worker_id, "endpoint_unavailable")
+            raise
+        except (ValueError, TypeError, KeyError):
+            latest = self.jobs.get_job(job.job_id)
+            if latest and latest.status == "running":
+                self.jobs.fail(job.job_id, self.worker_id, "invalid_completion")
+            raise

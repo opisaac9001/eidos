@@ -10,7 +10,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: text only | P1 |
-| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: tested queue/runner; loop wiring pending | P1 |
+| CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: normal paths wired; background supervision pending | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
 
@@ -118,7 +118,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: one endpoint/model | P1 |
-| OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: in-process worker | P1 |
+| OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: durable inline worker; background supervision pending | P1 |
 | OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: SQLite/loopback | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Planned | P6 |

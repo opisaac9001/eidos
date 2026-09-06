@@ -34,9 +34,10 @@ Hourly associations, reflection, dreams and a daybook run at fixed times.
 The first authored story now exercises a promise, object, calendar, interruption,
 repair, fulfillment, concern and directed trust. Concern-seeded dreams can create
 one capped waking effect and explicit dream recollection. Lexical recall includes
-importance, simulated-time fading and capped rehearsal. **Pathos does not yet
-choose plans, the life loop has not moved onto the durable job queue, and NPCs
-do not have independent minds.** Entity indexes, beliefs and consolidation remain.
+importance, simulated-time fading and capped rehearsal. Normal CLI and browser
+model calls now use the durable queue and reuse completed work after restart.
+**Pathos does not yet choose plans and NPCs do not have independent minds.**
+Entity indexes, beliefs and consolidation remain.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -218,8 +219,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Wire the tested durable job store/runner into atomic life-loop consumption.
-2. Finish typed action/intention/world-event envelopes and migrations.
+1. Finish typed action/intention/world-event envelopes and migrations.
+2. Move inline durable execution to supervised background workers and expose cancellation.
 3. Add entity/relationship/goal indexes and richer retrieval explanations.
 4. Generalize planning beyond the authored lamp story.
 5. Make the lamp request a bounded accept/decline/negotiate scene.

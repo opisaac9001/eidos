@@ -56,6 +56,7 @@ class WebTests(unittest.TestCase):
         paused_time = json.loads(body)["time"]
         self.runtime.stop.wait(0.08)
         self.assertEqual(self.runtime.snapshot()["time"], paused_time)
+        self.assertEqual(self.runtime.snapshot()["jobs"]["counts"]["queued"], 0)
         for path in ("/", "/app.js", "/style.css", "/health", "/api/export"):
             status, body = self.request("GET", path)
             self.assertEqual(status, 200, path)

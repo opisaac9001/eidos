@@ -150,6 +150,34 @@ class SQLiteJobStore:
             )
         return claimed
 
+    def claim_job(
+        self,
+        job_id: UUID,
+        worker_id: str,
+        now: datetime,
+        lease: timedelta = timedelta(seconds=60),
+    ) -> CognitionJob:
+        if not worker_id.strip() or now.utcoffset() is None or lease.total_seconds() <= 0:
+            raise ValueError("Worker, aware timestamp, and positive lease are required")
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM cognition_jobs WHERE job_id=?", (str(job_id),)
+            ).fetchone()
+            if row is None:
+                raise KeyError(str(job_id))
+            job = self._from_row(row)
+            if job.status != "queued" or job.available_at > now:
+                raise JobConflict("Job is not available to claim")
+            claimed = job.claimed(worker_id, now + lease)
+            assert claimed.lease_until is not None
+            connection.execute(
+                "UPDATE cognition_jobs SET status='running', attempts=?, worker_id=?, lease_until=? "
+                "WHERE job_id=? AND status='queued'",
+                (claimed.attempts, worker_id, claimed.lease_until.isoformat(), str(job_id)),
+            )
+        return claimed
+
     def _owned_running(
         self, connection: sqlite3.Connection, job_id: UUID, worker_id: str
     ) -> CognitionJob:

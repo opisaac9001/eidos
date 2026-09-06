@@ -266,6 +266,9 @@ function render(next) {
       : "Chronos worker online"
     : "Worker stopped";
   $("tick-count").textContent = `${state.runtime.ticks} ticks this session`;
+  const jobCounts = state.jobs?.counts || {};
+  $("job-count").textContent =
+    `${jobCounts.queued || 0} queued · ${jobCounts.running || 0} running · ${jobCounts.failed || 0} failed`;
   if (state.runtime.error) showError(state.runtime.error);
   setBusy(busy);
   if (!changed) return;

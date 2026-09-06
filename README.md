@@ -120,8 +120,8 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - The server is loopback-only. Authentication and hardened LAN deployment belong
   to the server installation phase.
 - Full-history replay is appropriate for short prototype runs. Longer runs need
-  snapshots, pagination and backups. A durable job queue/runner is tested but not
-  yet wired into the main life loop.
+  snapshots, pagination and backups. Normal model calls use a durable queue;
+  separate background-worker supervision is still pending.
 - Export history downloads the entire event log, including conversations.
 
 Original code: `git show main:eidos/README.md`. The rebuild does not import the

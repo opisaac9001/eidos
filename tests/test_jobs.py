@@ -63,6 +63,13 @@ class JobStoreTests(unittest.TestCase):
         self.assertEqual(completed.status, "completed")
         self.assertEqual(self.store.claim_next("worker-a", self.now).job_id, low.job_id)
 
+    def test_specific_claim_obeys_ownership_and_availability(self):
+        job = self.store.enqueue(self.job())
+        claimed = self.store.claim_job(job.job_id, "worker-a", self.now)
+        self.assertEqual(claimed.worker_id, "worker-a")
+        with self.assertRaises(JobConflict):
+            self.store.claim_job(job.job_id, "worker-b", self.now)
+
     def test_two_workers_cannot_claim_the_same_job(self):
         queued = self.store.enqueue(self.job())
         claimed = []

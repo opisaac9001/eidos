@@ -54,7 +54,14 @@ def main() -> None:
 
             serve(args.database, args.port, gateway=gateway, mode=mode)
             return
-        simulation = Life(SQLiteEventStore(args.database), gateway, mode=mode)
+        from eidos.adapters.durable_gateway import DurableModelGateway
+        from eidos.adapters.sqlite_jobs import SQLiteJobStore
+
+        store = SQLiteEventStore(args.database)
+        gateway = DurableModelGateway(
+            gateway, SQLiteJobStore(args.database), lambda aggregate: len(store.read(aggregate))
+        )
+        simulation = Life(store, gateway, mode=mode)
         if args.command == "journal":
             print(
                 json.dumps(

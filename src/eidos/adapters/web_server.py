@@ -89,8 +89,27 @@ class Runtime:
                 self.lock.release()
         if self.cached is None:
             raise RuntimeError("Runtime has not initialized")
+        job_store = getattr(self.life.gateway, "jobs", None)
+        jobs = job_store.list_jobs(100) if job_store else []
+        job_counts = {
+            status: sum(job.status == status for job in jobs)
+            for status in ("queued", "running", "completed", "failed", "cancelled")
+        }
         return {
             **self.cached,
+            "jobs": {
+                "counts": job_counts,
+                "recent": [
+                    {
+                        "id": str(job.job_id),
+                        "capability": job.capability,
+                        "status": job.status,
+                        "attempts": job.attempts,
+                        "error_code": job.error_code,
+                    }
+                    for job in jobs[:20]
+                ],
+            },
             "runtime": {
                 "ticks": self.ticks,
                 "interval_seconds": self.interval,
@@ -221,7 +240,16 @@ def serve(
 ) -> None:
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
-    life = Life(SQLiteEventStore(database), gateway or StandInGateway(), mode=mode)
+    from eidos.adapters.durable_gateway import DurableModelGateway
+    from eidos.adapters.sqlite_jobs import SQLiteJobStore
+
+    store = SQLiteEventStore(database)
+    durable = DurableModelGateway(
+        gateway or StandInGateway(),
+        SQLiteJobStore(database),
+        lambda aggregate: len(store.read(aggregate)),
+    )
+    life = Life(store, durable, mode=mode)
     runtime = Runtime(life)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()

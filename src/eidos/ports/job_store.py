@@ -22,6 +22,14 @@ class JobStore(Protocol):
         self, worker_id: str, now: datetime, lease: timedelta = timedelta(seconds=60)
     ) -> CognitionJob | None: ...
 
+    def claim_job(
+        self,
+        job_id: UUID,
+        worker_id: str,
+        now: datetime,
+        lease: timedelta = timedelta(seconds=60),
+    ) -> CognitionJob: ...
+
     def complete(self, job_id: UUID, worker_id: str, result: str) -> CognitionJob: ...
 
     def fail(

@@ -22,7 +22,8 @@ The critic has conservative contract checks, not general semantic understanding.
 
 The durable SQLite job store and isolated runner are implemented and tested for
 priority, concurrent claims, leases, bounded retry, cancellation and stale
-results before/after inference. They are not yet the main life loop's path.
+results before/after inference. Normal CLI and browser model paths use the queue
+through a durable gateway decorator; background supervision remains pending.
 Explainable lexical recall is implemented; vector retrieval and tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
 [system interactions](SYSTEM_INTERACTIONS.md) define the delivery sequence and
@@ -145,7 +146,7 @@ State and the journal are rebuilt from those events. The planned schema will com
 The current port requires atomic appends and revision conflicts, independent of
 database engine. A PostgreSQL adapter must satisfy the same persistence tests.
 Materialized projections and vectors are not implemented yet. Durable cognition
-jobs exist but still need atomic scene consumption and main-loop wiring.
+jobs run inline today; separate supervised workers and cancellation UX remain.
 Role traces currently record status, model/backend, latency, and a trace ID.
 
 ## Model contract
