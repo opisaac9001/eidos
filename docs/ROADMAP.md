@@ -330,6 +330,10 @@ Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
   person and project-capable object. Its second release adds private character-history
   facts with familiarity thresholds. They stay out of model context and Pathos memory
   until the resident speaks one in a validated co-present scene.
+- Residents accepted through Moira's open-world expansion now receive a bounded
+  three-stage private history generated from public identity alone. Invalid output
+  never becomes biography, retries are daily and capped, and the facts remain unknown
+  to Pathos until the same witnessed disclosure boundary is crossed.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.
 - Verified experiment branches now copy an exact life, discard inherited cognition

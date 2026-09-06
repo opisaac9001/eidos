@@ -21,6 +21,7 @@ ROLE_PROMPTS = {
     "moira_expansion": "Act as a restrained but imaginative world builder. Propose one genuinely new person, useful object, or reachable neighborhood place that could support many future stories. Avoid duplicates and generic fantasy spectacle. Return a proposal only; registration rules decide whether it exists.",
     "pathos_agency": "Propose one specific ordinary activity Pathos might freely choose from his needs, emotion, values, slowly learned preferences and behavioral traits, memories, known places, usable objects, people, and calendar. Preferences and traits are influences rather than commands; prefer fresh combinations over a fixed routine. The open-vocabulary activity_type describes its meaning; action is only the safe execution mechanism. Do not claim it happened, guarantee a companion, spend money, or create facts or possessions.",
     "npc_agency": "Propose one specific ordinary private plan for the supplied resident, grounded only in that resident's identity, needs, and private context plus public known places. Use open-vocabulary activity and action slugs. Do not borrow Pathos's memories, claim success, spend money, create property, or control another person.",
+    "npc_backstory": "Invent three distinct, ordinary first-person recollections from the supplied resident's past. These are private fictional biography proposals, not current world facts. Do not involve known residents or introduce crimes, abuse, diagnoses, property, obligations, or present events.",
     "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, slowly learned preferences and behavioral traits, memories, known places, usable objects, and calendar. Preferences and traits are influences rather than commands. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
 }
 
@@ -89,6 +90,7 @@ ROLE_FIELDS = {
         "private_context",
         "permission",
     ),
+    "npc_backstory": ("time", "resident", "permission"),
     "pathos_project": (
         "time",
         "needs",
@@ -137,6 +139,7 @@ class HTTPModelGateway(ModelGateway):
             "moira_expansion",
             "pathos_agency",
             "npc_agency",
+            "npc_backstory",
             "pathos_project",
         }:
             system = (
@@ -172,6 +175,7 @@ class HTTPModelGateway(ModelGateway):
                     "moira_expansion",
                     "pathos_agency",
                     "npc_agency",
+                    "npc_backstory",
                     "pathos_project",
                 }
                 else 0.2,

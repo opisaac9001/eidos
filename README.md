@@ -39,7 +39,7 @@ Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
 NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
 scheduled activities, and a factual daybook. All eight narrative performers plus
 Moira's two structured world proposers plus structured Pathos activity, multi-step
-project, and resident agency can use
+project, resident agency, and private resident-history generation can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
@@ -139,6 +139,9 @@ unchanged release is safe, while rewriting or skipping a published version is re
 Schema-v2 releases may also add resident-private biography. These facts remain visible
 only in the local operator lens until familiarity makes one eligible during the
 resident's actual conversation turn; only the spoken turn becomes Pathos's memory.
+People invented by Moira receive the same kind of three-stage private history from a
+separate schema-checked model proposal. Invalid history remains an audited quiet gap,
+with at most three daily attempts, rather than becoming an improvised fact.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or
@@ -229,7 +232,7 @@ network authorization; the server remains loopback-only until authenticated depl
   source-archive recovery and stand-in states are visible.
 - Local inference can use one endpoint/model or an untracked strict routing file that
   assigns Pathos, Murmur, Firmament, weather, memory, reflection, dreams, daybook,
-  Pathos's activity agency, and Moira's two world-building capabilities independently. Inline secrets and incomplete
+  Pathos's activity agency, private resident plans and histories, and Moira's two world-building capabilities independently. Inline secrets and incomplete
   no-default route maps are rejected; routing never bypasses validation or provenance.
 - The browser is functional. Messages now enter a persistent inbox and show as
   delivered until a replay-stable, availability-aware response time arrives; sleep

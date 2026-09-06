@@ -8,6 +8,7 @@ STRUCTURED_CAPABILITIES = {
     "moira_event",
     "moira_expansion",
     "npc_agency",
+    "npc_backstory",
     "pathos_agency",
     "pathos_project",
 }

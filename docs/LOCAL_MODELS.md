@@ -58,7 +58,7 @@ roles while measured overrides handle demanding work:
 
 Inline credentials and unknown roles are rejected. `api_key_env` names an environment
 variable without copying its value into the file. A configuration without a default
-must explicitly cover all ten generated capabilities, including Moira's event and
+must explicitly cover all generated capabilities, including Moira's event and
 world-expansion proposals. Routing selects a performer; it does not bypass that
 performer's schema, semantic warnings, world rules, timeouts, or provenance.
 
@@ -71,7 +71,8 @@ operator job inspector shows the effective version and budgets for each recent j
 Completed work also retains its resolved underlying model, backend, and prompt/output
 token counts. Cached and restarted results report the original model rather than the
 generic router name, while their durable-cache/worker transport remains visible.
-Moira's structured event and world-expansion JSON now uses the same durable queue.
+Moira's structured event, world-expansion, and private resident-history JSON now use
+the same durable queue.
 The worker preserves raw JSON only after a complete object envelope; the ordinary
 ambient/entity domain parsers still decide whether it is valid enough to schedule or
 register. A worker restart therefore cannot turn partial prose into world state, and a

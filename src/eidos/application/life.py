@@ -20,6 +20,7 @@ from eidos.application.catchup import (
     catch_up_summary_events,
     preview_catch_up,
 )
+from eidos.application.character_generation import generated_character_history_events
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
@@ -1135,6 +1136,13 @@ class Life:
                     history + pending,
                     current,
                     len(history) + len(pending),
+                    self.gateway,
+                )
+            )
+            pending.extend(
+                await generated_character_history_events(
+                    history + pending,
+                    current,
                     self.gateway,
                 )
             )

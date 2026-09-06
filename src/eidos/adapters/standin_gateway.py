@@ -420,6 +420,49 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "npc_backstory":
+            histories = (
+                (
+                    "early influence",
+                    "I learned to notice small changes in a room while helping an elderly neighbor sort old postcards.",
+                    "private ritual",
+                    "I've kept a folded list of unfamiliar words since my first job, even though I rarely show it to anyone.",
+                    "turning point",
+                    "I once left a course I had worked hard to enter because the life around it felt borrowed rather than mine.",
+                ),
+                (
+                    "childhood habit",
+                    "I used to map every shortcut near my childhood home and give each one a private name.",
+                    "unfinished ambition",
+                    "I've quietly wanted to make one useful thing that lasts longer than the story of who made it.",
+                    "difficult choice",
+                    "I turned down a secure opportunity years ago because I was afraid it would make every week feel identical.",
+                ),
+                (
+                    "formative summer",
+                    "I spent one summer waking before dawn to help at a market, and I still associate morning air with possibility.",
+                    "kept memento",
+                    "I've carried the same blank railway ticket between notebooks for years without deciding why it matters.",
+                    "old regret",
+                    "I once let a close friendship fade by waiting too long to say that I wanted it to continue.",
+                ),
+            )
+            backstory_item = histories[choice % len(histories)]
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "fact_1_topic": backstory_item[0],
+                        "fact_1_text": backstory_item[1],
+                        "fact_2_topic": backstory_item[2],
+                        "fact_2_text": backstory_item[3],
+                        "fact_3_topic": backstory_item[4],
+                        "fact_3_text": backstory_item[5],
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_project":
             projects = (
                 (

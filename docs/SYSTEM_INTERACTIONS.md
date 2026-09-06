@@ -482,6 +482,16 @@ then creates Pathos's direct perception and memory, after which a disclosure eve
 marks that fact shared. A prompt mentioning a private fact, a narrator summary, or an
 operator view never counts as disclosure.
 
+A person accepted through Moira's sparse expansion boundary receives a separate
+resident-history proposal. Its prompt contains only that person's public catalog
+entry—not Pathos's memories, another resident's private state, or operator data. The
+model proposes three first-person past facts; deterministic policy assigns early,
+middle, and high familiarity thresholds. Exact shape, length, distinct topics, and
+known-person references are checked before any private fact is appended. A failed
+proposal creates no fallback biography and may retry only once per simulated day,
+with three total attempts. Successful facts then use the identical witnessed
+disclosure path as pack-authored facts.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows
