@@ -20,7 +20,7 @@ class CountingGateway:
 
     async def generate(self, request):
         self.calls += 1
-        return ModelResponse(self.content, self.model, "fixture", "stop")
+        return ModelResponse(self.content, self.model, "fixture", "stop", 17, 4)
 
 
 class DurableGatewayTests(unittest.TestCase):
@@ -57,6 +57,8 @@ class DurableGatewayTests(unittest.TestCase):
         self.assertEqual(json.loads(first.content)["text"], "remembered result")
         self.assertEqual(json.loads(second.content)["text"], "remembered result")
         self.assertEqual(second.backend, "durable-cache")
+        self.assertEqual(second.resolved_model, "fixture")
+        self.assertEqual((second.prompt_tokens, second.output_tokens), (17, 4))
         self.assertEqual(inner.calls, 1)
         self.assertEqual(len(self.jobs.list_jobs()), 1)
 

@@ -68,6 +68,9 @@ range from deterministic copying to 0.8 for dreams. The durable queue persists t
 task version, schema, ceiling, and temperature as real columns and restores them after
 a worker restart. Existing queue tables migrate in place with legacy defaults. The
 operator job inspector shows the effective version and budgets for each recent job.
+Completed work also retains its resolved underlying model, backend, and prompt/output
+token counts. Cached and restarted results report the original model rather than the
+generic router name, while their durable-cache/worker transport remains visible.
 
 ## What is checked
 

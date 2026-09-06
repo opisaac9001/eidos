@@ -24,7 +24,7 @@ class ThreadRecordingGateway:
     async def generate(self, request):
         self.thread_names.append(threading.current_thread().name)
         self.requests.append(request)
-        return ModelResponse('{"text":"background thought"}', "fixture", "test", "stop")
+        return ModelResponse('{"text":"background thought"}', "fixture", "test", "stop", 19, 5)
 
 
 class SupervisorTests(unittest.TestCase):
@@ -57,6 +57,8 @@ class SupervisorTests(unittest.TestCase):
 
         self.assertEqual(json.loads(response.content)["text"], "background thought")
         self.assertEqual(response.backend, "durable-worker")
+        self.assertEqual(response.resolved_model, "fixture")
+        self.assertEqual((response.prompt_tokens, response.output_tokens), (19, 5))
         self.assertTrue(all(name.startswith("eidos-cognition-") for name in inner.thread_names))
         self.assertEqual(inner.requests[0].task_version, self.request().task_version)
         self.assertEqual(inner.requests[0].max_output_tokens, self.request().max_output_tokens)

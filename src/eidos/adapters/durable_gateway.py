@@ -58,7 +58,12 @@ class DurableModelGateway(ModelGateway):
             self.supervisor.start()
         if job.status == "completed" and job.result is not None:
             return ModelResponse(
-                json.dumps({"text": job.result}), self.model, "durable-cache", "stop"
+                json.dumps({"text": job.result}),
+                job.resolved_model or self.model,
+                "durable-cache",
+                "stop",
+                job.prompt_tokens,
+                job.output_tokens,
             )
         if job.status in {"cancelled", "failed"}:
             raise OSError(f"Durable job is {job.status}: {job.error_code or 'no result'}")
@@ -113,7 +118,15 @@ class DurableModelGateway(ModelGateway):
             if self.revision_for(job.aggregate_id) != claimed.expected_revision:
                 self.jobs.fail(job.job_id, self.worker_id, "stale_context")
                 raise OSError("World changed during inference")
-            self.jobs.complete(job.job_id, self.worker_id, text)
+            self.jobs.complete(
+                job.job_id,
+                self.worker_id,
+                text,
+                resolved_model=response.resolved_model,
+                backend=response.backend,
+                prompt_tokens=response.prompt_tokens,
+                output_tokens=response.output_tokens,
+            )
             return response
         except JobConflict:
             latest = self.jobs.get_job(job.job_id)
@@ -163,7 +176,12 @@ class DurableModelGateway(ModelGateway):
                 raise OSError("Durable job disappeared")
             if job.status == "completed" and job.result is not None:
                 return ModelResponse(
-                    json.dumps({"text": job.result}), self.model, "durable-worker", "stop"
+                    json.dumps({"text": job.result}),
+                    job.resolved_model or self.model,
+                    "durable-worker",
+                    "stop",
+                    job.prompt_tokens,
+                    job.output_tokens,
                 )
             if job.status in {"failed", "cancelled"}:
                 raise OSError(f"Durable job is {job.status}: {job.error_code or 'no result'}")

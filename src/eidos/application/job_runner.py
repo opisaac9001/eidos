@@ -57,7 +57,15 @@ class CognitionJobRunner:
                 return self.jobs.get_job(claimed.job_id)
             if self.revision_for(claimed.aggregate_id) != claimed.expected_revision:
                 return self.jobs.fail(claimed.job_id, self.worker_id, "stale_context")
-            return self.jobs.complete(claimed.job_id, self.worker_id, text)
+            return self.jobs.complete(
+                claimed.job_id,
+                self.worker_id,
+                text,
+                resolved_model=response.resolved_model,
+                backend=response.backend,
+                prompt_tokens=response.prompt_tokens,
+                output_tokens=response.output_tokens,
+            )
         except JobConflict:
             return self.jobs.get_job(claimed.job_id)
         except (OSError, TimeoutError):

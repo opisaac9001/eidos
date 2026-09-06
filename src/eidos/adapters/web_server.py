@@ -115,6 +115,10 @@ class Runtime:
                         "task_version": job.task_version,
                         "max_output_tokens": job.max_output_tokens,
                         "temperature": job.temperature,
+                        "resolved_model": job.resolved_model,
+                        "backend": job.backend,
+                        "prompt_tokens": job.prompt_tokens,
+                        "output_tokens": job.output_tokens,
                         "error_code": job.error_code,
                         "deadline_at": job.deadline_at.isoformat() if job.deadline_at else None,
                     }

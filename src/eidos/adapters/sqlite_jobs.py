@@ -43,7 +43,11 @@ class SQLiteJobStore:
                     lease_until TEXT,
                     worker_id TEXT,
                     result TEXT,
-                    error_code TEXT
+                    error_code TEXT,
+                    resolved_model TEXT,
+                    backend TEXT,
+                    prompt_tokens INTEGER,
+                    output_tokens INTEGER
                 )
             """)
             columns = {
@@ -65,6 +69,14 @@ class SQLiteJobStore:
                 )
             if "output_schema_json" not in columns:
                 connection.execute("ALTER TABLE cognition_jobs ADD COLUMN output_schema_json TEXT")
+            for name, sql_type in (
+                ("resolved_model", "TEXT"),
+                ("backend", "TEXT"),
+                ("prompt_tokens", "INTEGER"),
+                ("output_tokens", "INTEGER"),
+            ):
+                if name not in columns:
+                    connection.execute(f"ALTER TABLE cognition_jobs ADD COLUMN {name} {sql_type}")
             connection.execute("""
                 CREATE INDEX IF NOT EXISTS cognition_jobs_ready
                 ON cognition_jobs(status, available_at, priority DESC, created_at)
@@ -102,6 +114,10 @@ class SQLiteJobStore:
             worker_id=row["worker_id"],
             result=row["result"],
             error_code=row["error_code"],
+            resolved_model=row["resolved_model"],
+            backend=row["backend"],
+            prompt_tokens=row["prompt_tokens"],
+            output_tokens=row["output_tokens"],
         )
 
     def enqueue(self, job: CognitionJob) -> CognitionJob:
@@ -260,13 +276,42 @@ class SQLiteJobStore:
             raise JobConflict("Job is not owned by this worker")
         return job
 
-    def complete(self, job_id: UUID, worker_id: str, result: str) -> CognitionJob:
+    def complete(
+        self,
+        job_id: UUID,
+        worker_id: str,
+        result: str,
+        *,
+        resolved_model: str | None = None,
+        backend: str | None = None,
+        prompt_tokens: int | None = None,
+        output_tokens: int | None = None,
+    ) -> CognitionJob:
+        if any(
+            value is not None and (not isinstance(value, str) or not value.strip())
+            for value in (resolved_model, backend)
+        ):
+            raise ValueError("Model provenance strings must be non-empty")
+        if any(
+            value is not None
+            and (isinstance(value, bool) or not isinstance(value, int) or value < 0)
+            for value in (prompt_tokens, output_tokens)
+        ):
+            raise ValueError("Token counts must be non-negative")
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._owned_running(connection, job_id, worker_id)
             connection.execute(
-                "UPDATE cognition_jobs SET status='completed', result=?, lease_until=NULL WHERE job_id=?",
-                (result, str(job_id)),
+                "UPDATE cognition_jobs SET status='completed', result=?, lease_until=NULL, "
+                "resolved_model=?, backend=?, prompt_tokens=?, output_tokens=? WHERE job_id=?",
+                (
+                    result,
+                    resolved_model,
+                    backend,
+                    prompt_tokens,
+                    output_tokens,
+                    str(job_id),
+                ),
             )
         return self.get_job(job_id)  # type: ignore[return-value]
 

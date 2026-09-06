@@ -30,7 +30,17 @@ class JobStore(Protocol):
         lease: timedelta = timedelta(seconds=60),
     ) -> CognitionJob: ...
 
-    def complete(self, job_id: UUID, worker_id: str, result: str) -> CognitionJob: ...
+    def complete(
+        self,
+        job_id: UUID,
+        worker_id: str,
+        result: str,
+        *,
+        resolved_model: str | None = None,
+        backend: str | None = None,
+        prompt_tokens: int | None = None,
+        output_tokens: int | None = None,
+    ) -> CognitionJob: ...
 
     def fail(
         self, job_id: UUID, worker_id: str, error_code: str, retry_at: datetime | None = None

@@ -622,7 +622,7 @@ function render(next) {
     (state.jobs?.recent || [])
       .map(
         (job) =>
-          `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">Profile v${esc(job.task_version)} · ${job.max_output_tokens} token ceiling · temperature ${esc(job.temperature)}<br>Job ${esc(job.id)}${job.deadline_at ? ` · deadline ${esc(time(job.deadline_at))}` : ""}</div>${operatorMode && ["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">${job.resolved_model ? `${esc(job.resolved_model)} · ${esc(job.backend || "unknown backend")} · ${job.prompt_tokens ?? "—"}/${job.output_tokens ?? "—"} prompt/output tokens<br>` : ""}Profile v${esc(job.task_version)} · ${job.max_output_tokens} token ceiling · temperature ${esc(job.temperature)}<br>Job ${esc(job.id)}${job.deadline_at ? ` · deadline ${esc(time(job.deadline_at))}` : ""}</div>${operatorMode && ["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
       )
       .join("") || "<p>No durable jobs recorded yet.</p>";
   $("npc-states").innerHTML = (state.npc_states || [])

@@ -36,6 +36,10 @@ class CognitionJob:
     worker_id: str | None = None
     result: str | None = None
     error_code: str | None = None
+    resolved_model: str | None = None
+    backend: str | None = None
+    prompt_tokens: int | None = None
+    output_tokens: int | None = None
 
     def __post_init__(self) -> None:
         if not self.capability.strip() or not self.aggregate_id.strip():
@@ -55,6 +59,17 @@ class CognitionJob:
             raise ValueError("Job temperature must be between zero and two")
         if self.output_schema is not None and not isinstance(self.output_schema, Mapping):
             raise ValueError("Job output schema must be a mapping")
+        if any(
+            value is not None and (not isinstance(value, str) or not value.strip())
+            for value in (self.resolved_model, self.backend)
+        ):
+            raise ValueError("Job model provenance strings must be non-empty")
+        if any(
+            value is not None
+            and (isinstance(value, bool) or not isinstance(value, int) or value < 0)
+            for value in (self.prompt_tokens, self.output_tokens)
+        ):
+            raise ValueError("Job token counts must be non-negative integers")
         if not 1 <= self.max_attempts <= 10 or not 0 <= self.attempts <= self.max_attempts:
             raise ValueError("Invalid job attempt limits")
         if self.status not in {"queued", "running", *TERMINAL_JOB_STATUSES}:

@@ -91,8 +91,23 @@ class JobStoreTests(unittest.TestCase):
         self.assertEqual(claimed.attempts, 1)
         with self.assertRaises(JobConflict):
             self.store.complete(high.job_id, "worker-b", "no")
-        completed = self.store.complete(high.job_id, "worker-a", '{"text":"done"}')
+        completed = self.store.complete(
+            high.job_id,
+            "worker-a",
+            '{"text":"done"}',
+            resolved_model="memory-model",
+            backend="fixture",
+            prompt_tokens=11,
+            output_tokens=4,
+        )
         self.assertEqual(completed.status, "completed")
+        self.assertEqual(completed.resolved_model, "memory-model")
+        self.assertEqual(completed.backend, "fixture")
+        self.assertEqual((completed.prompt_tokens, completed.output_tokens), (11, 4))
+        invalid = self.store.enqueue(self.job("invalid-metadata"))
+        self.store.claim_job(invalid.job_id, "worker-a", self.now)
+        with self.assertRaises(ValueError):
+            self.store.complete(invalid.job_id, "worker-a", "result", prompt_tokens=True)
         self.assertEqual(self.store.claim_next("worker-a", self.now).job_id, low.job_id)
 
     def test_specific_claim_obeys_ownership_and_availability(self):
@@ -205,7 +220,17 @@ class JobStoreTests(unittest.TestCase):
             columns = {row[1] for row in connection.execute("PRAGMA table_info(cognition_jobs)")}
         self.assertIn("deadline_at", columns)
         self.assertTrue(
-            {"task_version", "max_output_tokens", "temperature", "output_schema_json"} <= columns
+            {
+                "task_version",
+                "max_output_tokens",
+                "temperature",
+                "output_schema_json",
+                "resolved_model",
+                "backend",
+                "prompt_tokens",
+                "output_tokens",
+            }
+            <= columns
         )
 
 

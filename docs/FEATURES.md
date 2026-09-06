@@ -118,7 +118,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: strict per-capability local endpoint/model routing plus one-model mode | P1 |
+| OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: strict routing plus durable version/budget/schema/model/token provenance | P1 |
 | OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised bounded queue with deadlines | P1 |
 | OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/memory/planning/belief/relationship/consolidation projections | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
