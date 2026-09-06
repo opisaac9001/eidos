@@ -2,12 +2,14 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.appraisal import appraisal_events
+from eidos.application.followups import follow_up_events
 from eidos.application.messaging import communication_availability
 from eidos.application.urgent_incidents import (
     active_incident_location,
     urgent_incident_events,
 )
 from eidos.domain.events import DomainEvent
+from eidos.domain.relationships import project_relationships
 from eidos.domain.scenes import project_scenes
 from eidos.domain.state import PathosState
 
@@ -138,6 +140,63 @@ class UrgentIncidentTests(unittest.TestCase):
             "perception.recorded", "pathos", {**dict(source.payload), "owner": "mara"}
         )
         self.assertEqual(self.decide([private]), [])
+
+    def test_shared_response_uses_present_resource_and_changes_real_relationship(self):
+        resource = DomainEvent(
+            "object.registered",
+            "pathos",
+            {
+                "object_id": "hall-repair-kit",
+                "name": "Hallway repair kit",
+                "owner_id": "community",
+                "custodian_id": "community",
+                "location_id": "home",
+                "condition": "good",
+            },
+        )
+        for index in range(300):
+            pathos_perception = self.perception(f"shared-{index}")
+            mara_perception = DomainEvent(
+                "perception.recorded",
+                "pathos",
+                {**dict(pathos_perception.payload), "owner": "mara"},
+            )
+            history = [resource, pathos_perception, mara_perception]
+            started_events = urgent_incident_events(
+                history,
+                self.now,
+                len(history),
+                actor_locations={**self.locations, "mara": "home"},
+                pathos_energy=0.9,
+                values={"care": 1.0},
+            )
+            if any(event.kind == "incident.response_started" for event in started_events):
+                break
+        else:
+            self.fail("No deterministic fixture produced a shared incident response")
+        started = next(
+            event for event in started_events if event.kind == "incident.response_started"
+        )
+        self.assertEqual(started.payload["participant_ids"], "mara")
+        self.assertEqual(started.payload["resource_id"], "hall-repair-kit")
+        active = [*history, *started_events]
+        due = datetime.fromisoformat(str(started.payload["responds_until"]))
+        completed = urgent_incident_events(
+            active,
+            due,
+            len(active),
+            actor_locations={**self.locations, "mara": "home"},
+            pathos_energy=0.7,
+            values={"care": 1.0},
+        )
+        self.assertTrue(any(event.kind == "incident.resource_used" for event in completed))
+        shared = next(event for event in completed if event.kind == "incident.shared_aftermath")
+        relationship = project_relationships([*active, *completed]).for_person("mara")
+        self.assertGreater(relationship.trust, 0.3)
+        followups = follow_up_events([*active, *completed], due)
+        scheduled = next(event for event in followups if event.kind == "follow_up.scheduled")
+        self.assertEqual(scheduled.payload["person_id"], "mara")
+        self.assertEqual(scheduled.causation_id, shared.event_id)
 
     def _find_outcome(
         self,

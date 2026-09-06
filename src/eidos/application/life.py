@@ -572,6 +572,8 @@ class Life:
                 "incident.response_declined",
                 "incident.response_completed",
                 "incident.response_abandoned",
+                "incident.resource_used",
+                "incident.shared_aftermath",
                 "speech.delivered",
                 "travel.completed",
                 "intention.adopted",

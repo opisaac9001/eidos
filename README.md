@@ -157,7 +157,9 @@ network authorization; the server remains loopback-only until authenticated depl
   controls remain operator-facing. Higher-intensity or plainly hazardous public
   incidents that Pathos directly witnesses can demand a separate respond/decline
   choice, displace routine and appointments for a bounded interval, interrupt a live
-  visit, and leave a source-linked memory and emotional aftermath.
+  visit, and leave a source-linked memory and emotional aftermath. Co-present people
+  share that aftermath, which can change the relationship and create a later follow-up;
+  a suitable undamaged object is used only when it already exists at the incident site.
 - NPC movement, needs, private activity, public-event perception, private beliefs,
   relationship metrics, and private goals formed from each neighbor's own perceived
   events or changing needs persist by replay. Pathos completes a causal promise/repair

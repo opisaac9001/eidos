@@ -392,6 +392,7 @@ def due_world_observations(
                     "location_id": location_id,
                     "reported": False,
                     "intensity": scheduled.payload.get("intensity", 0.2),
+                    "resource_id": resource_id,
                     **event_metadata.get(proposal_id, {}),
                     "simulated_at": simulated_at.isoformat(),
                 },

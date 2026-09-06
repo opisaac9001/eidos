@@ -57,6 +57,8 @@ const labels = {
   "incident.response_declined": "RESPONSE DECLINED",
   "incident.response_completed": "RESPONSE COMPLETED",
   "incident.response_abandoned": "RESPONSE LEFT UNFINISHED",
+  "incident.resource_used": "A RESOURCE WAS USED",
+  "incident.shared_aftermath": "A SHARED AFTERMATH",
   "speech.delivered": "SOMETHING SAID",
   "travel.completed": "ARRIVED",
   "intention.adopted": "AN INTENTION FORMED",

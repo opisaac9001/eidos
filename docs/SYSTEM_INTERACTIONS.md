@@ -296,6 +296,11 @@ physical location for a bounded one-to-two-hour interval, even when that displac
 routine or appointment. Completion or abandonment creates source-linked memory and an
 appraised emotional consequence before the normal resume-or-end choice. Declining also
 has an emotional aftermath but cannot claim that Pathos performed the response.
+Co-present NPC observers are captured at decision time. A completed shared response
+creates per-person aftermath evidence, directed relationship change, and a later
+follow-up; leaving it unfinished may instead add tension. Resource use is separately
+typed and allowed only for a suitable, undamaged object whose projected location already
+matches the response site. The response never creates or teleports a convenient tool.
 
 ## 8. Dream and reflection feedback loop
 

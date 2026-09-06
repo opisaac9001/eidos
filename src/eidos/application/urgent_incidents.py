@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
+from eidos.domain.planning import project_planning
 from eidos.domain.scenes import (
     SceneInterruptProposal,
     project_scenes,
@@ -77,6 +78,21 @@ def urgent_incident_events(
         0.05, min(0.95, 0.2 + 0.32 * care + 0.23 * pathos_energy + 0.3 * intensity)
     )
     incident_id = f"urgent-{perception.event_id}"
+    location_id = str(perception.payload["location_id"])
+    source_world_event_id = str(perception.payload.get("source_event_id", ""))
+    participant_ids = sorted(
+        {
+            str(event.payload["owner"])
+            for event in history
+            if event.kind == "perception.recorded"
+            and event.payload.get("source_event_id") == source_world_event_id
+            and event.payload.get("owner") not in {"pathos", "user"}
+            and isinstance(event.payload.get("owner"), str)
+            and actor_locations.get(str(event.payload["owner"])) == location_id
+        }
+    )
+    participant_ids_value = ",".join(participant_ids)
+    resource_id = _matching_resource(history, perception, location_id)
     responds = _sample(incident_id) < response_score
     decision = DomainEvent(
         "incident.attention_decided",
@@ -88,6 +104,8 @@ def urgent_incident_events(
             "decision_energy": pathos_energy,
             "decision_care": care,
             "intensity": intensity,
+            "participant_ids": participant_ids_value,
+            "resource_id": resource_id,
             "reason": (
                 "Pathos judged that the situation needed his attention."
                 if responds
@@ -108,6 +126,7 @@ def urgent_incident_events(
                     "incident_id": incident_id,
                     "source_perception_id": str(perception.event_id),
                     "reason": str(decision.payload["reason"]),
+                    "participant_ids": participant_ids_value,
                     "simulated_at": simulated_at.isoformat(),
                 },
                 causation_id=decision.event_id,
@@ -131,8 +150,10 @@ def urgent_incident_events(
             "incident_id": incident_id,
             "source_perception_id": str(perception.event_id),
             "description": str(perception.payload.get("text", "A nearby incident")),
-            "location_id": str(perception.payload["location_id"]),
+            "location_id": location_id,
             "scene_id": user_scene.scene_id if user_scene else None,
+            "participant_ids": participant_ids_value,
+            "resource_id": resource_id,
             "responds_until": (simulated_at + timedelta(hours=duration)).isoformat(),
             "text": "Pathos stopped what he was doing to respond to something nearby.",
             "simulated_at": simulated_at.isoformat(),
@@ -235,7 +256,68 @@ def _complete_response(
         causation_id=outcome.event_id,
         correlation_id=incident_id,
     )
-    output = [outcome, memory]
+    output = [outcome]
+    resource_id = started.payload.get("resource_id")
+    if still_there and isinstance(resource_id, str):
+        output.append(
+            DomainEvent(
+                "incident.resource_used",
+                "pathos",
+                {
+                    "incident_id": incident_id,
+                    "resource_id": resource_id,
+                    "location_id": str(started.payload["location_id"]),
+                    "reason": "A suitable resource was physically available at the response site.",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=outcome.event_id,
+                correlation_id=incident_id,
+            )
+        )
+    participant_ids = started.payload.get("participant_ids", "")
+    if isinstance(participant_ids, str):
+        for participant_id in filter(None, participant_ids.split(",")):
+            shared = DomainEvent(
+                "incident.shared_aftermath",
+                "pathos",
+                {
+                    "incident_id": incident_id,
+                    "person_id": participant_id,
+                    "outcome": "completed" if still_there else "abandoned",
+                    "text": (
+                        f"Pathos and {participant_id.replace('-', ' ').title()} shared "
+                        "the aftermath of the nearby incident."
+                    ),
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=outcome.event_id,
+                correlation_id=incident_id,
+            )
+            output.extend(
+                (
+                    shared,
+                    DomainEvent(
+                        "relationship.changed",
+                        "pathos",
+                        {
+                            "person_id": participant_id,
+                            "evidence_actor_id": "pathos",
+                            "familiarity_delta": 0.03,
+                            "trust_delta": 0.02 if still_there else 0.0,
+                            "tension_delta": 0.0 if still_there else 0.02,
+                            "reason": (
+                                "They shared a completed response to a nearby incident."
+                                if still_there
+                                else "They shared an incident that Pathos left unfinished."
+                            ),
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        causation_id=shared.event_id,
+                        correlation_id=incident_id,
+                    ),
+                )
+            )
+    output.append(memory)
     scene_id = started.payload.get("scene_id")
     if isinstance(scene_id, str):
         output.extend(
@@ -277,6 +359,31 @@ def _is_urgent(perception: DomainEvent) -> bool:
         for key in ("event_type", "cause", "opportunity", "text")
     ).casefold()
     return intensity >= 0.4 or any(term in text for term in _URGENT_TERMS)
+
+
+def _matching_resource(
+    history: Sequence[DomainEvent], perception: DomainEvent, location_id: str
+) -> str | None:
+    cue = " ".join(
+        str(perception.payload.get(key, ""))
+        for key in ("event_type", "cause", "opportunity", "text")
+    ).casefold()
+    cue_terms = {word for word in cue.replace("_", " ").split() if len(word) > 3}
+    candidates = []
+    for item in project_planning(list(history)).objects.values():
+        if item.location_id != location_id or item.condition != "good":
+            continue
+        name_terms = {
+            word for word in item.name.casefold().replace("-", " ").split() if len(word) > 3
+        }
+        overlap = len(cue_terms & name_terms)
+        practical = int(
+            any(term in cue for term in ("fault", "broken", "repair", "unsafe"))
+            and any(term in item.name.casefold() for term in ("repair", "tool", "kit"))
+        )
+        if overlap or practical:
+            candidates.append((overlap + practical, item.object_id))
+    return max(candidates, default=(0, None))[1]
 
 
 def _bounded(value: object) -> float:

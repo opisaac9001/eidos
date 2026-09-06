@@ -214,7 +214,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   plainly hazardous public incidents Pathos directly perceives now create a bounded
   respond/decline decision. A response holds him at the scene, can displace routine or
   commitments, interrupts a user visit, and leaves factual and emotional aftermath;
-  refusal never pretends that he acted. Simulation controls and
+  refusal never pretends that he acted. Co-present witnesses now become explicit shared
+  aftermath, relationship evidence, and follow-up sources. If an undamaged relevant
+  object already exists at that location, the response records its use; narration cannot
+  conjure one. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
@@ -286,8 +289,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Let urgent-incident outcomes produce contextual social follow-ups, relationship
-   consequences, and resource choices beyond their completed memory/affect lifecycle.
+1. Let useful-object choices and shared social consequences spread beyond the completed
+   urgent-incident lifecycle into general projects, invitations, and ordinary events.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
