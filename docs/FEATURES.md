@@ -9,7 +9,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
-| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action v1 + event trace migration | P1 |
+| CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention v1 + event trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: normal paths wired; background supervision pending | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role field filtering | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits | P1 |
@@ -47,7 +47,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: state and first story | P3 |
-| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: commitment state/first story | P3 |
+| PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: owned intentions + commitment state | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: schedule transitions/routine | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair feasibility/stale checks | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Planned | P3 |

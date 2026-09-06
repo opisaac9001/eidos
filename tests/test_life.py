@@ -134,8 +134,10 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(finished["commitments"][0]["status"], "fulfilled")
         self.assertEqual(finished["calendar"][0]["status"], "completed")
         self.assertEqual(finished["objects"][0]["condition"], "repaired")
+        self.assertEqual(finished["intentions"][0]["status"], "completed")
         self.assertGreater(finished["people"][0]["trust"], active["people"][0]["trust"])
         kinds = [event.kind for event in self.life.history()]
+        self.assertLess(kinds.index("intention.adopted"), kinds.index("action.accepted"))
         self.assertLess(kinds.index("schedule.interrupted"), kinds.index("schedule.completed"))
         replayed = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
         self.assertEqual(replayed["commitments"], finished["commitments"])

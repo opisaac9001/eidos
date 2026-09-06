@@ -127,6 +127,28 @@ class ActionTests(unittest.TestCase):
                     [event.kind for event in result.events], ["action.proposed", "action.rejected"]
                 )
 
+    def test_action_must_match_an_explicit_intention_when_one_is_claimed(self):
+        intention = DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "other-work",
+                "actor_id": "pathos",
+                "action": "rest",
+                "motivation": "Recover",
+                "priority": 0.5,
+            },
+        )
+        result = resolve_action(
+            self.proposal(intention_id="other-work"),
+            state=self.state().apply(intention),
+            actor_location_id="workshop",
+            actual_revision=2,
+            simulated_at=self.now,
+        )
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.code, "intention_mismatch")
+
     def test_action_json_contract_is_exact_and_versioned(self):
         raw = {
             "schema_version": 1,

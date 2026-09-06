@@ -19,6 +19,10 @@ const labels = {
   "role.failed": "PERFORMER ERROR",
   "memory.recovered": "SOURCE ARCHIVE RECOVERY",
   "request.made": "A REQUEST",
+  "intention.adopted": "AN INTENTION FORMED",
+  "intention.completed": "AN INTENTION COMPLETED",
+  "action.accepted": "ACTION VALIDATED",
+  "action.rejected": "ACTION COULD NOT HAPPEN",
   "schedule.interrupted": "PLAN INTERRUPTED",
   "commitment.fulfilled": "PROMISE KEPT",
   "relationship.changed": "RELATIONSHIP CHANGED",
@@ -293,8 +297,9 @@ function render(next) {
   const commitment = state.commitments[0];
   const appointment = state.calendar[0];
   const object = state.objects[0];
+  const intention = state.intentions?.[0];
   $("life-threads").innerHTML = commitment
-    ? `<div><span class="eyebrow">COMMITMENT</span><strong>${esc(commitment.title)}</strong><small>${esc(commitment.status)} · due ${esc(date(commitment.due_at))} ${esc(time(commitment.due_at))}</small></div><div><span class="eyebrow">NEXT ACTION</span><strong>${esc(appointment.title)}</strong><small>${esc(appointment.status)} · ${esc(date(appointment.starts_at))} ${esc(time(appointment.starts_at))}</small></div><div><span class="eyebrow">OBJECT STATE</span><strong>${esc(object.name)}</strong><small>${esc(object.condition)} · at ${esc(state.locations.find((place) => place.id === object.location_id)?.name || object.location_id)}</small></div>`
+    ? `<div><span class="eyebrow">COMMITMENT</span><strong>${esc(commitment.title)}</strong><small>${esc(commitment.status)} · due ${esc(date(commitment.due_at))} ${esc(time(commitment.due_at))}</small></div><div><span class="eyebrow">OWNED INTENTION</span><strong>${esc(intention ? `${intention.action} ${object.name}` : appointment.title)}</strong><small>${esc(intention?.status || appointment.status)} · ${esc(intention?.motivation || "scheduled")} · ${esc(date(appointment.starts_at))} ${esc(time(appointment.starts_at))}</small></div><div><span class="eyebrow">OBJECT STATE</span><strong>${esc(object.name)}</strong><small>${esc(object.condition)} · at ${esc(state.locations.find((place) => place.id === object.location_id)?.name || object.location_id)}</small></div>`
     : '<p class="muted">No active commitments yet.</p>';
   $("neighborhood-status").textContent =
     `${state.people.length} neighbors · ${state.locations.length} places`;

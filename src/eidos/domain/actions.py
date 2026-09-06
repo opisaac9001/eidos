@@ -134,6 +134,16 @@ def resolve_action(
 
     if proposal.expected_revision != actual_revision:
         return reject("stale_revision", "The world changed after this action was proposed")
+    if proposal.intention_id is not None:
+        intention = state.intentions.get(proposal.intention_id)
+        if intention is None:
+            return reject("unknown_intention", "The action refers to an unknown intention")
+        if intention.status != "active":
+            return reject("inactive_intention", "The action's intention is not active")
+        if intention.actor_id != proposal.actor_id or intention.action != proposal.action.value:
+            return reject("intention_mismatch", "The action does not match its owned intention")
+        if intention.target_id is not None and intention.target_id != proposal.target_id:
+            return reject("intention_mismatch", "The action target does not match its intention")
 
     effects: list[DomainEvent] = []
     if proposal.action is ActionKind.REPAIR:
@@ -208,6 +218,13 @@ def resolve_action(
         )
 
     accepted = effect("action.accepted", common)
+    if proposal.intention_id is not None:
+        effects.append(
+            effect(
+                "intention.completed",
+                {"intention_id": proposal.intention_id, "simulated_at": simulated_at},
+            )
+        )
     return ActionResolution(
         True, "accepted", "Action passed deterministic rules", (proposed, accepted, *effects)
     )

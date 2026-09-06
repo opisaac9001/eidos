@@ -31,9 +31,10 @@ backend, latency, token count when available, and outcome.
 Conversation context now uses explainable cue-based recall with importance,
 confidence, simulated-time accessibility decay and capped rehearsal. This is
 lexical retrieval, not semantic understanding; the audit history never fades.
-The authored lamp fixture exercises a goal, promise, schedule, interruption,
-reschedule, object repair, fulfillment and causal trust update. It is not yet
-general autonomous planning.
+The authored lamp fixture exercises a goal, promise, owned intention, schedule,
+interruption and reschedule. The repair must then pass deterministic intention,
+custody, location, condition and time checks before fulfillment and its causal
+trust update. It is not yet general autonomous planning.
 
 The unresolved lamp concern seeds the first night's dream. Waking records it
 explicitly as a dream and applies one capped emotional residue. Duplicate

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
+from eidos.domain.intentions import IntentionProposal, resolve_intention
 from eidos.domain.planning import project_planning
 
 
@@ -25,7 +26,7 @@ def story_events(
                 "simulated_at": at,
             },
         )
-        return [
+        foundation = [
             request,
             DomainEvent(
                 "object.registered",
@@ -98,6 +99,23 @@ def story_events(
                 },
             ),
         ]
+        intention = resolve_intention(
+            IntentionProposal(
+                proposal_id="choose-repair-mara-lamp",
+                intention_id="repair-mara-lamp-next",
+                actor_id="pathos",
+                action=ActionKind.REPAIR,
+                motivation="Keep my promise to Mara and restore something she values.",
+                priority=0.9,
+                expected_revision=len(existing) + len(foundation),
+                goal_id="repair-mara-lamp",
+                target_id="mara-lamp",
+            ),
+            state=project_planning(existing + foundation),
+            actual_revision=len(existing) + len(foundation),
+            simulated_at=current,
+        )
+        return [*foundation, *intention.events]
     if day == 2 and current.hour == 10 and "schedule.interrupted" not in kinds:
         return [
             DomainEvent(
@@ -142,7 +160,7 @@ def story_events(
             expected_revision=len(existing),
             target_id="mara-lamp",
             schedule_id="repair-mara-lamp-slot",
-            intention_id="repair-mara-lamp",
+            intention_id="repair-mara-lamp-next",
         )
         resolution = resolve_action(
             proposal,

@@ -47,16 +47,30 @@ class WorldObject:
 
 
 @dataclass(frozen=True, slots=True)
+class Intention:
+    intention_id: str
+    actor_id: str
+    action: str
+    motivation: str
+    priority: float
+    goal_id: str | None = None
+    target_id: str | None = None
+    status: str = "active"
+
+
+@dataclass(frozen=True, slots=True)
 class PlanningState:
     goals: dict[str, Goal] = field(default_factory=dict)
     commitments: dict[str, Commitment] = field(default_factory=dict)
     calendar: dict[str, CalendarEntry] = field(default_factory=dict)
     objects: dict[str, WorldObject] = field(default_factory=dict)
+    intentions: dict[str, Intention] = field(default_factory=dict)
 
     def apply(self, event: DomainEvent) -> PlanningState:
         payload = event.payload
         goals, commitments = dict(self.goals), dict(self.commitments)
         calendar, objects = dict(self.calendar), dict(self.objects)
+        intentions = dict(self.intentions)
         match event.kind:
             case "goal.activated":
                 goal_id = _required(payload, "goal_id")
@@ -130,7 +144,33 @@ class PlanningState:
             case "object.condition_changed":
                 item = _existing(objects, payload, "object_id")
                 objects[item.object_id] = replace(item, condition=_required(payload, "condition"))
-        return PlanningState(goals, commitments, calendar, objects)
+            case "intention.adopted":
+                intention_id = _required(payload, "intention_id")
+                if intention_id in intentions:
+                    raise ValueError("Intention already exists")
+                priority = payload.get("priority")
+                if not isinstance(priority, (int, float)) or isinstance(priority, bool):
+                    raise ValueError("priority is required")
+                intentions[intention_id] = Intention(
+                    intention_id=intention_id,
+                    actor_id=_required(payload, "actor_id"),
+                    action=_required(payload, "action"),
+                    motivation=_required(payload, "motivation"),
+                    priority=float(priority),
+                    goal_id=_optional(payload, "goal_id"),
+                    target_id=_optional(payload, "target_id"),
+                )
+            case "intention.completed":
+                intention = _existing(intentions, payload, "intention_id")
+                if intention.status != "active":
+                    raise ValueError("Only active intentions can complete")
+                intentions[intention.intention_id] = replace(intention, status="completed")
+            case "intention.abandoned":
+                intention = _existing(intentions, payload, "intention_id")
+                if intention.status != "active":
+                    raise ValueError("Only active intentions can be abandoned")
+                intentions[intention.intention_id] = replace(intention, status="abandoned")
+        return PlanningState(goals, commitments, calendar, objects, intentions)
 
 
 def project_planning(events: list[DomainEvent]) -> PlanningState:
@@ -147,6 +187,15 @@ def _required(payload: Mapping[str, Any], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} is required")
+    return value
+
+
+def _optional(payload: Mapping[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{key} must be null or a non-empty string")
     return value
 
 
