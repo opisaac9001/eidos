@@ -397,7 +397,12 @@ function render(next) {
     ? `Latest episode: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
     : "No affect episode recorded yet.";
   const needs = state.pathos.needs;
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%`;
+  const values = Object.entries(state.identity?.values || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([name]) => name[0].toUpperCase() + name.slice(1))
+    .join(" · ");
+  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${values ? ` · Values: ${values}` : ""}`;
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);
   $("recent-feed").innerHTML = feedMarkup(state.feed.slice(0, 7));

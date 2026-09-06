@@ -28,6 +28,7 @@ from eidos.application.social_activity import scheduled_social_events
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
+from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
@@ -74,6 +75,7 @@ class Life:
     def snapshot(self) -> dict[str, Any]:
         history = self.history()
         state = self.project(history)
+        identity = project_identity(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
         relationships: dict[str, dict[str, Any]] = {
@@ -228,6 +230,12 @@ class Life:
                 "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence, state.arousal),
             },
+            "identity": {
+                "name": identity.name,
+                "values": dict(identity.values),
+                "preferences": list(identity.preferences),
+                "established": identity.established,
+            },
             "weather": weather,
             "config": config,
             "locations": LOCATIONS,
@@ -283,6 +291,8 @@ class Life:
         if target <= state.simulated_at:
             raise ValueError("Advance is smaller than clock precision")
         pending = []
+        if not project_identity(history).established:
+            pending.append(identity_established_event(state.simulated_at.isoformat()))
         beats = dict(beats_between(state.simulated_at, target))
         hour = state.simulated_at.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         times = []
@@ -395,10 +405,15 @@ class Life:
                 diverse=True,
             )
             memories = [item.event.payload["text"] for item in selected_context]
+            identity_now = project_identity(history + pending)
             context = {
                 "location": location_name(state.location_id),
                 "time": at,
                 "memories": memories,
+                "identity": {
+                    "values": dict(identity_now.values),
+                    "preferences": list(identity_now.preferences),
+                },
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
@@ -656,6 +671,10 @@ class Life:
                 },
             )
         ]
+        identity = project_identity(history)
+        if not identity.established:
+            pending.append(identity_established_event(at))
+            identity = project_identity(history + pending)
         query_terms = terms(text)
         planning = project_planning(history)
         entity_ids = {
@@ -691,6 +710,10 @@ class Life:
             "time": at,
             "location": location_name(state.location_id),
             "mood": mood_name(state.energy, state.valence, state.arousal),
+            "identity": {
+                "values": dict(identity.values),
+                "preferences": list(identity.preferences),
+            },
             "memories": [item.event.payload["text"] for item in selected],
             "beliefs": [
                 {

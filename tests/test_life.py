@@ -19,6 +19,11 @@ class LifeTests(unittest.TestCase):
     def test_whole_day_exercises_every_role_and_keeps_dreams_out_of_facts(self):
         self.life.advance(24)
         snapshot = self.life.snapshot()
+        self.assertTrue(snapshot["identity"]["established"])
+        self.assertGreater(snapshot["identity"]["values"]["curiosity"], 0.8)
+        self.assertEqual(
+            sum(event.kind == "identity.established" for event in self.life.history()), 1
+        )
         for role in snapshot["roles"]:
             self.assertGreater(role["calls"], 0) if role["id"] != "pathos" else None
         self.assertEqual(snapshot["time"], "2026-01-02T00:00:00+00:00")
