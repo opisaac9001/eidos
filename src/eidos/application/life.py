@@ -28,6 +28,7 @@ from eidos.application.inner_life import (
 from eidos.application.memory import memory_view, recall, terms
 from eidos.application.npc_cognition import npc_belief_events
 from eidos.application.offscreen import npc_world_events
+from eidos.application.personal_project import personal_project_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.social_activity import scheduled_social_events
@@ -193,6 +194,10 @@ class Life:
                 "intention.completed",
                 "action.accepted",
                 "action.rejected",
+                "activity.completed",
+                "goal.activated",
+                "goal.progressed",
+                "goal.achieved",
                 "schedule.interrupted",
                 "commitment.fulfilled",
                 "commitment.missed",
@@ -477,6 +482,12 @@ class Life:
             if story:
                 project_planning(history + pending + story)
                 pending.extend(story)
+            personal_project = personal_project_events(
+                current, history + pending, state.location_id
+            )
+            if personal_project:
+                project_planning(history + pending + personal_project)
+                pending.extend(personal_project)
             pending.extend(
                 authored_community_schedule(history + pending, current, len(history) + len(pending))
             )

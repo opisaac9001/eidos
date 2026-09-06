@@ -33,6 +33,27 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
                 )
             )
             processed.add(source_id)
+        elif (
+            source.kind == "activity.completed"
+            and source.payload.get("activity") == "learn"
+            and source.payload.get("target_id") == "bookbinding-basics"
+        ):
+            output.append(
+                DomainEvent(
+                    "skill.practiced",
+                    "pathos",
+                    {
+                        "skill_id": "bookbinding",
+                        "delta": 0.05,
+                        "source_event_id": source_id,
+                        "owner": "pathos",
+                        "simulated_at": simulated_at,
+                    },
+                    causation_id=source.event_id,
+                    correlation_id=source.correlation_id,
+                )
+            )
+            processed.add(source_id)
     cafe_visits = [
         event
         for event in history

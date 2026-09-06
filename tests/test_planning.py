@@ -70,6 +70,23 @@ class PlanningTests(unittest.TestCase):
                 events + [self.event("schedule.rescheduled", schedule_id="slot", starts_at="later")]
             )
 
+    def test_self_directed_goal_requires_bounded_completed_progress(self):
+        events = [self.event("goal.activated", goal_id="learn", title="Learn bookbinding")]
+        with self.assertRaises(ValueError):
+            project_planning(
+                events + [self.event("goal.progressed", goal_id="learn", progress_delta=1)]
+            )
+        events.extend(
+            [
+                self.event("goal.progressed", goal_id="learn", progress_delta=0.5),
+                self.event("goal.progressed", goal_id="learn", progress_delta=0.5),
+                self.event("goal.achieved", goal_id="learn"),
+            ]
+        )
+        goal = project_planning(events).goals["learn"]
+        self.assertEqual(goal.progress, 1)
+        self.assertEqual(goal.status, "achieved")
+
 
 if __name__ == "__main__":
     unittest.main()

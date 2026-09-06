@@ -32,6 +32,10 @@ const labels = {
   "intention.completed": "AN INTENTION COMPLETED",
   "action.accepted": "ACTION VALIDATED",
   "action.rejected": "ACTION COULD NOT HAPPEN",
+  "activity.completed": "PRACTICE COMPLETED",
+  "goal.activated": "A PERSONAL GOAL",
+  "goal.progressed": "GOAL PROGRESS",
+  "goal.achieved": "GOAL ACHIEVED",
   "schedule.interrupted": "PLAN INTERRUPTED",
   "commitment.fulfilled": "PROMISE KEPT",
   "commitment.missed": "COMMITMENT MISSED",
@@ -414,9 +418,17 @@ function render(next) {
   $("large-map").innerHTML = mapMarkup(true);
   $("recent-feed").innerHTML = feedMarkup(state.feed.slice(0, 7));
   const commitment = state.commitments[0];
-  const appointment = state.calendar[0];
-  const object = state.objects[0];
-  const intention = state.intentions?.[0];
+  const appointment =
+    state.calendar.find(
+      (item) => commitment && item.commitment_id === commitment.commitment_id,
+    ) || state.calendar[0];
+  const object =
+    state.objects.find((item) => item.object_id === appointment?.target_id) ||
+    state.objects[0];
+  const intention =
+    state.intentions?.find(
+      (item) => commitment && item.goal_id === commitment.goal_id,
+    ) || state.intentions?.[0];
   const socialRequest = state.requests?.[0];
   $("life-threads").innerHTML = commitment
     ? `<div><span class="eyebrow">AGREED COMMITMENT</span><strong>${esc(commitment.title)}</strong><small>${esc(commitment.status)} · ${socialRequest ? `${socialRequest.rounds} negotiation round${socialRequest.rounds === 1 ? "" : "s"} · ` : ""}due ${esc(date(commitment.due_at))} ${esc(time(commitment.due_at))}</small></div><div><span class="eyebrow">OWNED INTENTION</span><strong>${esc(intention ? `${intention.action} ${object.name}` : appointment.title)}</strong><small>${esc(intention?.status || appointment.status)} · ${esc(intention?.motivation || "scheduled")} · ${esc(date(appointment.starts_at))} ${esc(time(appointment.starts_at))}</small></div><div><span class="eyebrow">OBJECT STATE</span><strong>${esc(object.name)}</strong><small>${esc(object.condition)} · at ${esc(state.locations.find((place) => place.id === object.location_id)?.name || object.location_id)}</small></div>`

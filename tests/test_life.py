@@ -169,11 +169,18 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(active["requests"][0]["due_at"], active["commitments"][0]["due_at"])
         self.life.advance(17)
         finished = self.life.snapshot()
-        self.assertEqual(finished["goals"][0]["status"], "achieved")
+        repair_goal = next(
+            item for item in finished["goals"] if item["goal_id"] == "repair-mara-lamp-goal"
+        )
+        repair_schedule = next(item for item in finished["calendar"] if item["action"] == "repair")
+        repair_intention = next(
+            item for item in finished["intentions"] if item["action"] == "repair"
+        )
+        self.assertEqual(repair_goal["status"], "achieved")
         self.assertEqual(finished["commitments"][0]["status"], "fulfilled")
-        self.assertEqual(finished["calendar"][0]["status"], "completed")
+        self.assertEqual(repair_schedule["status"], "completed")
         self.assertEqual(finished["objects"][0]["condition"], "repaired")
-        self.assertEqual(finished["intentions"][0]["status"], "completed")
+        self.assertEqual(repair_intention["status"], "completed")
         self_belief = next(
             belief for belief in finished["beliefs"] if belief["subject_id"] == "pathos"
         )
@@ -203,6 +210,21 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(perceived.payload["owner"], "pathos")
         replayed = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
         self.assertEqual(replayed["commitments"], finished["commitments"])
+
+    def test_self_chosen_project_advances_only_through_completed_practice(self):
+        for _ in range(5):
+            self.life.advance(24)
+        snapshot = self.life.snapshot()
+        goal = next(item for item in snapshot["goals"] if item["goal_id"] == "bind-pocket-notebook")
+        sessions = [
+            item for item in snapshot["calendar"] if item["goal_id"] == "bind-pocket-notebook"
+        ]
+        skill = next(item for item in snapshot["skills"] if item["skill_id"] == "bookbinding")
+        self.assertEqual(goal["status"], "achieved")
+        self.assertEqual(goal["progress"], 1)
+        self.assertEqual(len(sessions), 2)
+        self.assertTrue(all(item["status"] == "completed" for item in sessions))
+        self.assertEqual(skill["practice_count"], 2)
 
     def test_unresolved_concern_seeds_dream_and_bounded_waking_recall(self):
         self.life.advance(24)

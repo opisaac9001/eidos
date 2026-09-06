@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Mapping
+from uuid import UUID
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
@@ -122,12 +123,14 @@ def resolve_action(
         "action.proposed", proposal.actor_id, common, correlation_id=proposal.proposal_id
     )
 
-    def effect(kind: str, payload: Mapping[str, Any]) -> DomainEvent:
+    def effect(
+        kind: str, payload: Mapping[str, Any], causation_id: UUID = proposed.event_id
+    ) -> DomainEvent:
         return DomainEvent(
             kind,
             proposal.actor_id,
             payload,
-            causation_id=proposed.event_id,
+            causation_id=causation_id,
             correlation_id=proposal.proposal_id,
         )
 
@@ -147,8 +150,17 @@ def resolve_action(
             return reject("intention_mismatch", "The action does not match its owned intention")
         if intention.target_id is not None and intention.target_id != proposal.target_id:
             return reject("intention_mismatch", "The action target does not match its intention")
+        if intention.goal_id is not None:
+            goal = state.goals.get(intention.goal_id)
+            if goal is None:
+                return reject("unknown_goal", "The action's intention refers to an unknown goal")
+            if goal.status != "active":
+                return reject("inactive_goal", "The action's intention belongs to an inactive goal")
 
     effects: list[DomainEvent] = []
+    intention = (
+        state.intentions.get(proposal.intention_id) if proposal.intention_id is not None else None
+    )
     if proposal.action is ActionKind.REPAIR:
         missing = _missing(proposal, "target_id", "schedule_id")
         if missing:
@@ -270,24 +282,41 @@ def resolve_action(
             return reject("activity_incomplete", "The scheduled activity duration has not elapsed")
         if proposal.action is ActionKind.ATTEND and simulated_at > ends_at:
             return reject("activity_missed", "The attendance window has passed")
-        effects.extend(
-            (
-                effect(
-                    "schedule.completed",
-                    {"schedule_id": schedule.schedule_id, "simulated_at": simulated_at},
-                ),
-                effect(
-                    "activity.completed",
-                    {
-                        "activity": proposal.action.value,
-                        "schedule_id": schedule.schedule_id,
-                        "target_id": proposal.target_id,
-                        "location_id": actor_location_id,
-                        "simulated_at": simulated_at,
-                    },
-                ),
-            )
+        schedule_completed = effect(
+            "schedule.completed",
+            {"schedule_id": schedule.schedule_id, "simulated_at": simulated_at},
         )
+        activity_completed = effect(
+            "activity.completed",
+            {
+                "activity": proposal.action.value,
+                "schedule_id": schedule.schedule_id,
+                "target_id": proposal.target_id,
+                "location_id": actor_location_id,
+                "simulated_at": simulated_at,
+            },
+        )
+        effects.extend((schedule_completed, activity_completed))
+        if intention is not None and intention.goal_id is not None:
+            goal = state.goals[intention.goal_id]
+            progressed = effect(
+                "goal.progressed",
+                {
+                    "goal_id": goal.goal_id,
+                    "progress_delta": 0.5,
+                    "simulated_at": simulated_at,
+                },
+                activity_completed.event_id,
+            )
+            effects.append(progressed)
+            if goal.progress + 0.5 >= 1:
+                effects.append(
+                    effect(
+                        "goal.achieved",
+                        {"goal_id": goal.goal_id, "simulated_at": simulated_at},
+                        progressed.event_id,
+                    )
+                )
 
     accepted = effect("action.accepted", common)
     if proposal.intention_id is not None:

@@ -149,6 +149,38 @@ class ActionTests(unittest.TestCase):
         self.assertFalse(result.accepted)
         self.assertEqual(result.code, "intention_mismatch")
 
+    def test_action_rejects_a_dangling_goal_on_an_untrusted_intention_event(self):
+        intention = DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "learn",
+                "actor_id": "pathos",
+                "action": "learn",
+                "target_id": "lesson",
+                "goal_id": "missing",
+                "motivation": "Learn",
+                "priority": 0.5,
+            },
+        )
+        result = resolve_action(
+            ActionProposal(
+                "learn",
+                "pathos",
+                ActionKind.LEARN,
+                3,
+                target_id="lesson",
+                schedule_id="slot",
+                intention_id="learn",
+            ),
+            state=self.state().apply(intention),
+            actor_location_id="workshop",
+            actual_revision=3,
+            simulated_at=self.now,
+        )
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.code, "unknown_goal")
+
     def test_planned_conversation_requires_its_time_and_place(self):
         schedule = DomainEvent(
             "schedule.created",

@@ -40,13 +40,13 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
 | SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: sourced values + energy/rest/mastery/window policy | P3 |
-| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair skill/morning habit | P6 |
+| SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair/bookbinding skills + morning habit | P6 |
 
 ## Planning and time — Chronos / Pathos
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: linked accepted-work goals | P3 |
+| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: accepted-work goals + two-session self-directed learning project | P3 |
 | PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/travel buffers/open hours | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
@@ -61,7 +61,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed routes/open hours | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
-| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: scheduled work/learn/attend + authored routine/repair skill | P3 |
+| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: validated scheduled activities + completed bookbinding project | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted movement/needs/activity + perception-grounded private belief/plan | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather pacing/causes | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |

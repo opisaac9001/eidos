@@ -94,9 +94,23 @@ class PlanningState:
                 commitment_evidence = linked_commitments or [
                     item for item in commitments.values() if item.goal_id is None
                 ]
-                if not any(item.status == "fulfilled" for item in commitment_evidence):
-                    raise ValueError("Goal needs an accomplished commitment")
+                if goal.progress < 1 and not any(
+                    item.status == "fulfilled" for item in commitment_evidence
+                ):
+                    raise ValueError("Goal needs completed progress or an accomplished commitment")
                 goals[goal.goal_id] = replace(goal, status="achieved", progress=1.0)
+            case "goal.progressed":
+                goal = _existing(goals, payload, "goal_id")
+                if goal.status != "active":
+                    raise ValueError("Only active goals can progress")
+                delta = payload.get("progress_delta")
+                if (
+                    isinstance(delta, bool)
+                    or not isinstance(delta, (int, float))
+                    or not 0 < delta <= 0.5
+                ):
+                    raise ValueError("Goal progress must be greater than zero and at most 0.5")
+                goals[goal.goal_id] = replace(goal, progress=min(1.0, goal.progress + float(delta)))
             case "goal.blocked":
                 goal = _existing(goals, payload, "goal_id")
                 if goal.status != "active":
