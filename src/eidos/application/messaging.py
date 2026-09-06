@@ -14,6 +14,7 @@ from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.scenes import project_scenes
 from eidos.domain.state import PathosState
+from eidos.domain.wellbeing import project_wellbeing
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +100,23 @@ def communication_availability(
         return CommunicationAvailability(
             "occupied", "He is in the middle of something he planned.", False, False
         )
+    physical = project_wellbeing(history).active
+    if physical is not None and physical.severity >= 0.45:
+        return CommunicationAvailability(
+            "unwell",
+            f"He is awake but resting with {physical.kind.replace('_', ' ')}.",
+            False,
+            hurried,
+            *timing_fields,
+        )
+    if physical is not None and physical.severity >= 0.3:
+        return CommunicationAvailability(
+            "recovering",
+            f"He is taking things slowly with {physical.kind.replace('_', ' ')}.",
+            True,
+            True,
+            *timing_fields,
+        )
     if state.energy < 0.25:
         return CommunicationAvailability(
             "tired", "He is awake, but does not have much energy for company.", False, hurried
@@ -144,8 +162,8 @@ def reply_due_at(history: Sequence[DomainEvent], state: PathosState, request_id:
     choices = (5, 15, 30, 60)
     seed = f"{request_id}:{state.simulated_at.date().isoformat()}"
     minutes = choices[int(sha256(seed.encode()).hexdigest()[:8], 16) % len(choices)]
-    if availability.status == "occupied":
+    if availability.status in {"occupied", "unwell"}:
         minutes = max(minutes, 60)
-    elif availability.status in {"tired", "hurried"}:
+    elif availability.status in {"recovering", "tired", "hurried"}:
         minutes = max(minutes, 30)
     return state.simulated_at + timedelta(minutes=minutes)

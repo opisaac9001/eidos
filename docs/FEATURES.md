@@ -42,6 +42,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + primary/mixed emotional planning bias + open-vocabulary activity proposals checked against energy/rest/mastery/windows | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded skills/habit, capped week-spanning preference lifecycle, and one-point month-spanning behavioral trait drift | P6 |
 | SELF-07 | Household income, costs, affordability, obligations and missed-payment consequences | Partial: source-linked GBP ledger for workshop shifts, café meals, provision orders/refunds and weekly housing without overdrafts | P3–P6 |
+| SELF-08 | Physical comfort, minor illness, recovery and capacity effects | Partial: rare replayable non-clinical one-to-three-day episodes with monotonic recovery and bounded effects on attention, mood, plans and availability | P3–P6 |
 
 ## Planning and time — Chronos / Pathos
 

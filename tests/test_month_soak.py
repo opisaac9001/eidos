@@ -52,6 +52,27 @@ class MonthSoakTests(unittest.TestCase):
                 )
             )
             self.assertLess(path.stat().st_size, 10_000_000)
+            physical_starts = [
+                event for event in events if event.kind == "wellbeing.episode_started"
+            ]
+            physical_ends = [
+                event for event in events if event.kind == "wellbeing.episode_resolved"
+            ]
+            self.assertEqual(len(physical_starts), 1)
+            self.assertEqual(len(physical_ends), 1)
+            self.assertFalse(physical_starts[0].payload["clinical_diagnosis"])
+            self.assertEqual(
+                physical_ends[0].payload["episode_id"],
+                physical_starts[0].payload["episode_id"],
+            )
+            self.assertIsNone(snapshot["wellbeing"]["active"])
+            self.assertTrue(
+                any(
+                    event.kind == "memory.recorded"
+                    and event.payload.get("physical_decision_reason")
+                    for event in events
+                )
+            )
             disagreement = next(event for event in events if event.kind == "disagreement.expressed")
             apology = next(event for event in events if event.kind == "apology.offered")
             self.assertLess(events.index(disagreement), events.index(apology))

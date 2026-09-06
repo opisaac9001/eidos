@@ -11,6 +11,7 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import project_planning
 from eidos.domain.state import PathosState
+from eidos.domain.wellbeing import project_wellbeing
 
 
 def mental_layer_events(
@@ -40,6 +41,10 @@ def mental_layer_events(
         "nourishment": 1 - state.hunger,
     }
     need_name, need_value = min(needs.items(), key=lambda item: (item[1], item[0]))
+    physical = project_wellbeing(history).active
+    if physical is not None and physical.severity > 1 - need_value:
+        need_name = physical.kind
+        need_value = 1 - physical.severity
     focus_type = "concern" if concerns else "goal" if active_goals else "place"
     focus_id = (
         str(concerns[-1].payload["concern_id"])

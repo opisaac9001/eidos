@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.domain.events import DomainEvent
@@ -60,6 +60,40 @@ class MentalLayerTests(unittest.TestCase):
         somatic = next(event for event in events if event.payload["layer"] == "somatic")
         self.assertEqual(somatic.payload["focus_id"], "nourishment")
         self.assertGreater(somatic.payload["activation"], 0.9)
+
+    def test_physical_discomfort_can_hold_somatic_attention(self):
+        at = datetime(2026, 1, 2, 11, tzinfo=timezone.utc)
+        condition = DomainEvent(
+            "wellbeing.episode_started",
+            "pathos",
+            {
+                "episode_id": "condition",
+                "condition_kind": "headache",
+                "severity": 0.45,
+                "expected_end_at": (at + timedelta(days=1)).isoformat(),
+                "reason": "Ordinary temporary symptoms.",
+                "simulated_at": at.isoformat(),
+                "clinical_diagnosis": False,
+            },
+        )
+        events = mental_layer_events(
+            [condition],
+            PathosState(
+                simulated_at=at,
+                awake=True,
+                hunger=0.2,
+                energy=0.8,
+                rest=0.8,
+                connection=0.8,
+                curiosity=0.8,
+                mastery=0.8,
+            ),
+            at,
+            {},
+        )
+        somatic = next(event for event in events if event.payload["layer"] == "somatic")
+        self.assertEqual(somatic.payload["focus_id"], "headache")
+        self.assertGreaterEqual(somatic.payload["activation"], 0.7)
 
     def test_invalid_layer_activation_is_rejected_on_replay(self):
         bad = DomainEvent(

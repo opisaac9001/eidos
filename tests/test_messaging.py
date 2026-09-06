@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.domain.events import DomainEvent
@@ -45,6 +45,38 @@ class MessagingTests(unittest.TestCase):
         self.assertEqual(first, reply_due_at([], state, "same-id"))
         self.assertGreater(first, state.simulated_at)
         self.assertLessEqual((first - state.simulated_at).total_seconds(), 3600)
+
+    def test_physical_condition_changes_visit_and_text_availability(self):
+        now = datetime(2026, 1, 1, 10, tzinfo=timezone.utc)
+        state = PathosState(simulated_at=now, awake=True)
+
+        def condition(severity: float) -> DomainEvent:
+            return DomainEvent(
+                "wellbeing.episode_started",
+                "pathos",
+                {
+                    "episode_id": f"condition-{severity}",
+                    "condition_kind": "under_the_weather",
+                    "severity": severity,
+                    "expected_end_at": (now + timedelta(days=1)).isoformat(),
+                    "reason": "Ordinary temporary symptoms.",
+                    "simulated_at": now.isoformat(),
+                    "clinical_diagnosis": False,
+                },
+            )
+
+        recovering = communication_availability([condition(0.35)], state)
+        self.assertEqual(recovering.status, "recovering")
+        self.assertTrue(recovering.can_visit)
+        self.assertTrue(recovering.hurried)
+        unwell_history = [condition(0.55)]
+        unwell = communication_availability(unwell_history, state)
+        self.assertEqual(unwell.status, "unwell")
+        self.assertFalse(unwell.can_visit)
+        self.assertGreaterEqual(
+            (reply_due_at(unwell_history, state, "unwell-message") - now).total_seconds(),
+            3600,
+        )
 
     def test_live_conversation_reports_real_upcoming_time_pressure(self):
         now = datetime(2026, 1, 1, 8, 45, tzinfo=timezone.utc)

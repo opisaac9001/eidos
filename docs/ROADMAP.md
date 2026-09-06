@@ -31,6 +31,9 @@ delayed inbox conversations, and five
 UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
+Rare non-clinical physical discomfort now forms a replayable one-to-three-day arc:
+onset, monotonic recovery and resolution can alter somatic attention, mood, effective
+capacity, routine choices, plans, visit availability and queued response timing.
 Moira can also submit open-vocabulary fictional incidents with explicit cause, place,
 lead time, duration, theme and opportunity; rejected or failed generations produce a
 quiet interval instead of falling back to a scripted event.
@@ -203,6 +206,9 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   charges café meals and provision orders, refunds failed deliveries, and resolves
   weekly housing costs as paid or explicitly missed. Affordability constrains food
   choices and enters agency context; balances cannot silently become negative.
+- Rare physical discomfort is explicitly non-clinical and time-bounded. Its severity
+  can defer optional activity or interrupt a plan, but does not bypass emergencies,
+  travel, schedule consequences, communication availability or ordinary recovery.
 - NPC-private knowledge, needs, plans and directed relationships. Bounded multi-turn
   scenes with intent, response, observation and validated consequences.
 - Invitations, favors, promises, cooperation, disagreement, misunderstandings,
@@ -338,7 +344,8 @@ Beautiful prose with contradictory consequences does not pass.
 Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 
 - Tune saturation, retrieval bias, emotional feedback, remaining trait drift,
-  relationship recovery, skills, habits, recurring events and ongoing projects.
+  relationship recovery, skills, habits, recurring events, physical episode pacing
+  and ongoing projects.
 - An apology now opens a source-linked repair attempt whose other-party response stays
   unknown. At most three later direct contacts can gently reduce Pathos's own tension
   and add familiarity without restoring trust or claiming forgiveness; thirty days

@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from eidos.application.appraisal import (
     affect_episode_events,
@@ -43,6 +43,10 @@ class AppraisalTests(unittest.TestCase):
         events, updated = appraisal_events([dream_effect], state, self.now)
         self.assertEqual([event.kind for event in events], ["appraisal.recorded"])
         self.assertEqual(updated, state)
+        affect, unchanged = affect_episode_events([dream_effect, *events], state, self.now)
+        self.assertTrue(affect[0].payload["already_applied"])
+        self.assertEqual(affect[0].payload["valence_delta"], 0.0)
+        self.assertEqual(unchanged.valence, state.valence)
 
     def test_completed_learning_satisfies_mastery_from_action_evidence(self):
         source = DomainEvent(
@@ -116,6 +120,29 @@ class AppraisalTests(unittest.TestCase):
         repeated, same = affect_episode_events([source, *appraisals, *events], affected, self.now)
         self.assertEqual(repeated, [])
         self.assertEqual(same, affected)
+
+    def test_physical_discomfort_and_recovery_have_bounded_emotional_residue(self):
+        condition = DomainEvent(
+            "wellbeing.episode_started",
+            "pathos",
+            {
+                "episode_id": "condition",
+                "condition_kind": "headache",
+                "severity": 0.45,
+                "expected_end_at": (self.now + timedelta(days=1)).isoformat(),
+                "reason": "Ordinary temporary symptoms.",
+                "simulated_at": self.now.isoformat(),
+                "clinical_diagnosis": False,
+            },
+        )
+        appraisals, state = appraisal_events([condition], PathosState(), self.now)
+        self.assertEqual([event.kind for event in appraisals], ["appraisal.recorded"])
+        self.assertLess(float(appraisals[0].payload["desirability"]), 0)
+        affect, changed = affect_episode_events([condition, *appraisals], state, self.now)
+        self.assertEqual(
+            [event.kind for event in affect], ["affect.episode_started", "affect.changed"]
+        )
+        self.assertLess(changed.valence, state.valence)
 
     def test_transient_affect_recovers_toward_baseline_without_overshoot(self):
         state = PathosState(valence=0.5, arousal=0.8, awake=True)

@@ -61,6 +61,13 @@ workshop evidence earns income; café meals and accepted provision orders cost m
 failed deliveries refund only an earlier charge; and weekly housing costs are either
 paid or explicitly missed without overdrawing the account. Older experiences before
 the ledger was introduced are not retroactively charged or paid.
+Rare, explicitly non-clinical physical episodes can now emerge from ordinary chance,
+with elevated likelihood when rest or nourishment is poor. They last one to three
+days, recover monotonically, reduce effective capacity, and can turn optional or
+severely constrained planned time into rest. The same condition reaches somatic
+attention, emotional appraisal, model context, visit availability, delayed texting,
+routine memory and the Observatory. The simulator does not invent a diagnosis or
+silently make a temporary symptom permanent.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe

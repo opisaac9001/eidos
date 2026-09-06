@@ -43,6 +43,10 @@ project, resident agency, and private resident-history generation can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
+Pathos can experience rare, bounded bouts of ordinary physical discomfort. These are
+explicitly non-clinical, recover within one to three simulated days, and can change
+his attention, mood, pace, plans, willingness to host a visit and response time. The
+Observatory shows the active condition and reduced physical capacity when present.
 Live visits now consume five to fifteen simulated minutes per accepted exchange.
 Approaching routines or appointments appear as visible time pressure; crossing their
 time can make Pathos leave or expose the conversation to the same calls, visitors,

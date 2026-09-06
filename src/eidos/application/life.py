@@ -77,6 +77,7 @@ from eidos.application.urgent_incidents import (
     urgent_incident_events,
 )
 from eidos.application.visitors import visitor_events, visitor_locations
+from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import exploration_plan_events, planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
@@ -125,6 +126,7 @@ from eidos.domain.state import PathosState
 from eidos.domain.traits import project_traits
 from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
+from eidos.domain.wellbeing import WellbeingState, project_wellbeing
 from eidos.domain.world import ROLES
 from eidos.domain.world_catalog import WorldCatalog, project_world_catalog
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
@@ -180,6 +182,7 @@ class Life:
         self._relationship_cache: tuple[int, str, RelationshipState] | None = None
         self._consolidation_cache: tuple[int, str, ConsolidationIndex] | None = None
         self._finance_cache: tuple[int, str, FinancialState] | None = None
+        self._wellbeing_cache: tuple[int, str, WellbeingState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -299,6 +302,22 @@ class Life:
         anchor = str(history[-1].event_id) if history else ""
         self._finance_cache = (len(history), anchor, finances)
         return finances
+
+    def _wellbeing(self, history: list[DomainEvent]) -> WellbeingState:
+        if self._wellbeing_cache is not None:
+            revision, anchor, wellbeing = self._wellbeing_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    wellbeing = wellbeing.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._wellbeing_cache = (len(history), anchor, wellbeing)
+                return wellbeing
+        wellbeing = project_wellbeing(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._wellbeing_cache = (len(history), anchor, wellbeing)
+        return wellbeing
 
     def _planning(self, history: list[DomainEvent]) -> PlanningState:
         if self._planning_cache is not None:
@@ -536,6 +555,7 @@ class Life:
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
         finances = self._finances(history)
+        wellbeing = self._wellbeing(history)
         catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         outreach_config = project_outreach_config(history)
@@ -809,6 +829,9 @@ class Life:
                 "meal.unavailable",
                 "finance.transaction_recorded",
                 "finance.payment_missed",
+                "wellbeing.episode_started",
+                "wellbeing.episode_progressed",
+                "wellbeing.episode_resolved",
                 "catch_up.summarized",
                 "catch_up.cancelled",
                 "sleep.window_selected",
@@ -973,6 +996,10 @@ class Life:
                     vars_for(item) for item in list(finances.transactions.values())[-50:]
                 ],
                 "missed_payments": [vars_for(item) for item in finances.missed_payments.values()],
+            },
+            "wellbeing": {
+                "active": vars_for(wellbeing.active) if wellbeing.active is not None else None,
+                "episodes": [vars_for(item) for item in wellbeing.episodes.values()],
             },
             "sleep_windows": [
                 vars_for(item)
@@ -1277,6 +1304,13 @@ class Life:
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
+            physical_events = wellbeing_events(history + pending, state, current)
+            if physical_events:
+                self._wellbeing(history + pending + physical_events)
+                pending.extend(physical_events)
+            active_wellbeing = self._wellbeing(history + pending).active
+            physical_capacity = 1.0 if active_wellbeing is None else 1 - active_wellbeing.severity
+            effective_energy = min(state.energy, physical_capacity)
             project_history = history + pending
             project_feeling = project_emotion(project_history)
             project_identity_state = project_identity(project_history)
@@ -1293,11 +1327,12 @@ class Life:
                     "connection": state.connection,
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
-                    "energy": state.energy,
+                    "energy": effective_energy,
                     "hunger": state.hunger,
                     "financial_margin": min(
                         1.0, self._finances(project_history).balance_pence / 20_000
                     ),
+                    "physical_capacity": physical_capacity,
                 },
                 emotion={
                     "label": project_feeling.label,
@@ -1336,11 +1371,12 @@ class Life:
                     "connection": state.connection,
                     "curiosity": state.curiosity,
                     "mastery": state.mastery,
-                    "energy": state.energy,
+                    "energy": effective_energy,
                     "hunger": state.hunger,
                     "financial_margin": min(
                         1.0, self._finances(agency_history).balance_pence / 20_000
                     ),
+                    "physical_capacity": physical_capacity,
                 },
                 emotion={
                     "label": current_emotion.label,
@@ -1375,14 +1411,19 @@ class Life:
                 if incident_location is not None
                 else None
             )
-            beat = (
-                incident_beat
-                or planned_activity_beat(self._planning(history + pending), current, state.energy)
-                or beats.get(current)
+            planned_beat = planned_activity_beat(
+                self._planning(history + pending), current, effective_energy
             )
+            beat = incident_beat or planned_beat or beats.get(current)
             meals: list[DomainEvent] = []
             meal_checked = False
             if beat:
+                beat, physical_reason = physically_adjusted_beat(
+                    beat,
+                    active_wellbeing,
+                    planned=incident_beat is None and planned_beat is not None,
+                    protected=incident_beat is not None,
+                )
                 emotion_before_beat = project_emotion(history + pending)
                 bias = emotional_planning_bias(
                     emotion_before_beat.valence,
@@ -1543,6 +1584,7 @@ class Life:
                             if meal_claim and meal_event is None
                             else beat.activity,
                             "emotional_decision_reason": emotional_reason,
+                            "physical_decision_reason": physical_reason,
                             "location_id": beat.location_id,
                             "owner": "pathos",
                             "importance": 0.45,
@@ -1587,11 +1629,12 @@ class Life:
             if money:
                 self._finances(history + pending + money)
                 pending.extend(money)
+            effective_energy = min(state.energy, physical_capacity)
             story = story_events(
                 current,
                 history + pending,
                 state.location_id,
-                state.energy,
+                effective_energy,
                 state.rest,
                 state.mastery,
                 state.valence,
@@ -1662,7 +1705,7 @@ class Life:
                     "user": state.location_id,
                     **npc_locations,
                 },
-                pathos_energy=state.energy,
+                pathos_energy=effective_energy,
                 values=project_identity(history + pending).values,
             )
             pending.extend(incident_output)
@@ -1711,7 +1754,7 @@ class Life:
                         **npc_locations,
                     },
                     pathos_awake=state.awake,
-                    pathos_energy=state.energy,
+                    pathos_energy=effective_energy,
                     social_openness=phone_bias.social_openness,
                     relationships=self._relationships(history + pending).relationships,
                 )
@@ -1731,7 +1774,7 @@ class Life:
                         **npc_locations,
                     },
                     pathos_awake=state.awake,
-                    pathos_energy=state.energy,
+                    pathos_energy=effective_energy,
                 )
             )
             pending.extend(delivery_output)
@@ -1763,7 +1806,7 @@ class Life:
                             **npc_locations,
                         },
                         pathos_awake=state.awake,
-                        pathos_energy=state.energy,
+                        pathos_energy=effective_energy,
                         social_openness=phone_bias.social_openness,
                         relationships=self._relationships(history + pending).relationships,
                     )
@@ -1839,7 +1882,7 @@ class Life:
                     current,
                     len(history) + len(pending),
                     pathos_awake=state.awake,
-                    pathos_energy=state.energy,
+                    pathos_energy=effective_energy,
                     social_openness=invitation_bias.social_openness,
                     npc_people=project_npcs(history + pending, current).people,
                     planning=self._planning(history + pending),
@@ -2128,7 +2171,7 @@ class Life:
                 self._planning(history + pending),
                 pathos_awake=state.awake,
                 pathos_location_id=state.location_id,
-                pathos_energy=state.energy,
+                pathos_energy=effective_energy,
                 curiosity=state.curiosity,
                 values=project_identity(history + pending).values,
                 available_pence=self._finances(history + pending).balance_pence,

@@ -50,7 +50,7 @@ def affect_episode_events(
             continue
         desirability = float(appraisal.payload["desirability"])
         novelty = float(appraisal.payload["novelty"])
-        already_applied = appraisal.payload.get("need") == "affect"
+        already_applied = appraisal.payload.get("source_kind") == "dream.effect_applied"
         valence_delta = 0.0 if already_applied else max(-0.08, min(0.08, desirability * 0.06))
         arousal_delta = max(-0.04, min(0.06, (novelty - 0.25) * 0.08))
         episode = DomainEvent(
@@ -249,6 +249,13 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         and event.payload.get("category") == "work_income"
     ):
         return ("affect", 0.0, 0.2, 0.15, 0.75)
+    if event.kind == "wellbeing.episode_started":
+        severity = float(event.payload.get("severity", 0.3))
+        return ("affect", 0.0, -severity, 0.3, 0.35)
+    if event.kind == "wellbeing.episode_progressed":
+        return ("affect", 0.0, 0.12, 0.1, 0.45)
+    if event.kind == "wellbeing.episode_resolved":
+        return ("affect", 0.0, 0.22, 0.15, 0.8)
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)
