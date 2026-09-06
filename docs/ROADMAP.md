@@ -237,6 +237,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   cooldowns and pacing budgets. Quiet days are valid; forced drama is not.
 - Low-detail offscreen NPC activity preserves consequential state and knowledge
   boundaries. Meaningful scenes receive higher-detail simulation.
+- Co-present residents now hold cooldown-paced conversations without requiring Pathos.
+  Turns produce audience-owned memories, completed scenes update two separate directed
+  relationships and connection needs, and only public speech heard at Pathos's actual
+  location enters his memory. Broader resident testimony and gossip remain future work.
 - Opt-in bounded catch-up with preview, cancellation and interval summaries.
   Important decisions retain full fidelity. Keep today's explicit resume default
   until catch-up behavior is deliberately enabled.

@@ -36,7 +36,7 @@ tests/               Executable architecture and domain expectations
 
 The local prototype has six connected views: Observatory, World, Conversation,
 Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
-NPC encounters, thoughts, weather, memory formation, reflection, dreams, projects,
+Pathos encounters, resident-to-resident conversations, thoughts, weather, memory formation, reflection, dreams, projects,
 scheduled activities, and a factual daybook. All eight narrative performers plus
 Moira's two structured world proposers plus structured Pathos activity, multi-step
 project, resident agency, and private resident-history generation can use

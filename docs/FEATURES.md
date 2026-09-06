@@ -59,12 +59,12 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
-| WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
+| WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception, owner-specific scene memory, and public resident conversation overhearing; broader testimony propagation remains | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite supplies, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended one-off and multi-day self-chosen projects, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people originate schema-checked open-vocabulary private plans from owner-only context, including their own private biography, then move/act or fail; model-invented residents gain bounded private histories from public context; audited priorities and critical-energy replanning remain deterministic | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, attributed inspiration, open-ended resource-backed events, witnessed urgent responses, and multi-stage aftermath | P5 |
-| WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
+| WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement, six-hour activity, and cooldown-paced resident-to-resident scenes with need consequences | P5 |
 | WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons/daily texture, open-ended Moira events that become bounded evolving world threads, rare schema-checked entities entering goals, and atomic additive entity/character-pack releases | P6 |
 
 ## Interaction catalog — Pathos and NPC performers
@@ -72,11 +72,11 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox that waits through occupied periods plus time-bearing availability-gated live user visits | P2–P3 |
-| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: time-bearing up-to-40-turn user visits with natural endings plus recurring observable-topic NPC scenes with relationship pacing, hourly continuation, and voluntary exits | P3 |
+| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: time-bearing up-to-40-turn user visits with natural endings plus recurring Pathos/NPC and NPC/NPC scenes with relationship pacing, hourly continuation, and voluntary exits | P3 |
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: authored inbound requests plus follow-up-driven outbound invitations with independent NPC consent and feasible shared plans | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology plus durable post-apology repair attempts that progress only through later direct contact and never imply forgiveness | P3 |
-| SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: materialized directed metrics affect choices; shared incident aftermath and capped repair contact create evidence-linked changes and follow-ups without automatic trust restoration | P3 |
+| SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: Pathos and resident-to-resident directed metrics derive from witnessed contact; shared incident aftermath and capped repair contact create evidence-linked changes and follow-ups without automatic trust restoration | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims, confidence-weighted review, and pack- or model-originated familiarity-gated resident biography learned only through witnessed disclosure | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked reminders and annual dates, explicit evidence-bound preferences with correction/fading and invitation influence, plus consented memory-grounded in-app outreach with quiet hours and anti-pressure rejection | P5 |
 | SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, incidents, pause/resume current company | Partial: calls, visits, deliveries, and witnessed urgent incidents share the advancing live-conversation clock, with choices, pacing, presence checks, and post-interruption resume/end decisions | P3–P5 |

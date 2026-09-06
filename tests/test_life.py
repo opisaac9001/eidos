@@ -73,6 +73,13 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))
         self.assertTrue(any(event.kind == "npc.activity_recorded" for event in self.life.history()))
+        self.assertTrue(
+            any(event.kind == "npc.relationship_changed" for event in self.life.history())
+        )
+        self.assertEqual(
+            {(item["owner_id"], item["person_id"]) for item in snapshot["resident_relationships"]},
+            {("mara", "rowan"), ("rowan", "mara")},
+        )
         self.assertTrue(all("private_activity" not in person for person in snapshot["people"]))
 
         self.assertTrue(all("private_activity" in person for person in snapshot["npc_states"]))

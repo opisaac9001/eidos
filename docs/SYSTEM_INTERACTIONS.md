@@ -497,6 +497,15 @@ proposing a private plan. Biography can therefore influence a choice without mak
 the choice inevitable: the plan must still satisfy ordinary need, place, schedule,
 and action rules. No other resident's biography is included.
 
+Residents can also enter cooldown-paced ordinary scenes with one another when they
+are genuinely co-present and neither is already in a scene. Each turn passes through
+the shared scene resolver and creates perception and memory only for its audience.
+Most of these low-detail exchanges are private; a replay-stable minority are public,
+and Pathos remembers one only if his projected location makes him an actual observer.
+A completed exchange independently increases each resident's directed familiarity
+and satisfies some connection need. Those effects cite the final spoken turn, cannot
+be created by narration alone, and remain visible in the private operator lens.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows

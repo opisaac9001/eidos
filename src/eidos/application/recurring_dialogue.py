@@ -90,11 +90,18 @@ async def recurring_dialogue_events(
     ready_people = {
         item.person_id for item in project_followups(history).values() if item.status == "ready"
     }
+    busy_actors = {
+        actor_id
+        for scene in state.scenes.values()
+        if scene.status in {"active", "paused"}
+        for actor_id in (scene.initiator_id, scene.partner_id)
+    }
     candidates = sorted(
         (
             actor_id
             for actor_id, location in actor_locations.items()
             if actor_id not in {"pathos", "user"}
+            and actor_id not in busy_actors
             and location == location_id
             and actor_id in actor_names
             and _cooldown_complete(history, actor_id, simulated_at, relationships)

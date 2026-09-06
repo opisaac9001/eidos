@@ -60,6 +60,7 @@ from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
 from eidos.application.relationship_repairs import relationship_repair_events
+from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
@@ -97,6 +98,7 @@ from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.relationship_dates import project_relationship_dates
 from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import RelationshipState, project_relationships
+from eidos.domain.resident_relationships import project_resident_relationships
 from eidos.domain.routine import RoutineBeat, beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import (
     SceneEndProposal,
@@ -502,6 +504,7 @@ class Life:
         world_threads = project_world_threads(history)
         relationship_dates = project_relationship_dates(history)
         relationship_repairs = project_relationship_repairs(history)
+        resident_relationships = project_resident_relationships(history)
         character_history = project_character_history(history)
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
@@ -864,6 +867,9 @@ class Life:
             ],
             "relationship_dates": [vars_for(item) for item in relationship_dates.values()],
             "relationship_repairs": [vars_for(item) for item in relationship_repairs.values()],
+            "resident_relationships": [
+                vars_for(item) for item in resident_relationships.relationships.values()
+            ],
             "character_histories": [vars_for(item) for item in character_history.facts.values()],
             "social_preferences": [vars_for(item) for item in social_preferences.values()],
             "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
@@ -1622,6 +1628,19 @@ class Life:
                         for person in self._world_catalog(history + pending).people.values()
                     },
                     self._relationships(history + pending).relationships,
+                    current,
+                    len(history) + len(pending),
+                    self.gateway,
+                )
+            )
+            pending.extend(
+                await resident_social_events(
+                    history + pending,
+                    {"pathos": state.location_id, **npc_locations},
+                    {
+                        person.person_id: person.name
+                        for person in self._world_catalog(history + pending).people.values()
+                    },
                     current,
                     len(history) + len(pending),
                     self.gateway,

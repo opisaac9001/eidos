@@ -105,6 +105,7 @@ const labels = {
   "belief.contested": "A BELIEF QUESTIONED",
   "belief.corrected": "A BELIEF CORRECTED",
   "relationship.changed": "RELATIONSHIP CHANGED",
+  "npc.relationship_changed": "TWO RESIDENTS GREW MORE FAMILIAR",
   "disagreement.expressed": "A DISAGREEMENT",
   "boundary.stated": "A BOUNDARY",
   "apology.offered": "AN APOLOGY",
@@ -786,6 +787,16 @@ function render(next) {
         (fact) =>
           `<article class="memory-card"><div class="memory-meta"><span>${esc(fact.person_id)} · ${esc(fact.status.toUpperCase())}</span><span>PRIVATE BIOGRAPHY</span></div><p>${esc(fact.text)}</p><div class="memory-source">Topic ${esc(fact.topic)} · reveal after ${Math.round(fact.reveal_after_familiarity * 100)}% familiarity${fact.scene_id ? ` · shared in ${esc(fact.scene_id)}` : " · never passed to Pathos"}</div></article>`,
       )
+      .join(""),
+  );
+  $("npc-states").insertAdjacentHTML(
+    "beforeend",
+    (state.resident_relationships || [])
+      .map((item) => {
+        const owner = state.people.find((person) => person.id === item.owner_id)?.name || item.owner_id;
+        const person = state.people.find((candidate) => candidate.id === item.person_id)?.name || item.person_id;
+        return `<article class="memory-card"><div class="memory-meta"><span>${esc(owner)} → ${esc(person)}</span><span>PRIVATE RELATIONSHIP</span></div><p>${item.encounters} completed encounter${item.encounters === 1 ? "" : "s"}</p><div class="memory-source">familiarity ${Math.round(item.familiarity * 100)}% · trust ${Math.round(item.trust * 100)}% · tension ${Math.round(item.tension * 100)}% · last shared scene ${esc(item.last_scene_id || "none")}</div></article>`;
+      })
       .join(""),
   );
   $("npc-states").insertAdjacentHTML(
