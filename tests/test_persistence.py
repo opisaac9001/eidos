@@ -122,6 +122,50 @@ class PersistenceTests(unittest.TestCase):
         self.assertIsNone(self.store.load_checkpoint("pathos", len(history)))
         self.assertEqual(life._project_state(history), Life.project(history))
 
+    def test_life_materializes_planning_and_semantic_corruption_falls_back(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(24)
+        history = life.history()
+        projection = self.store.load_projection("pathos", "planning", 1, len(history))
+        self.assertIsNotNone(projection)
+        assert projection is not None
+        expected = life._planning(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "planning",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                {
+                    **projection.state,
+                    "goals": [
+                        {**value, "progress": "invalid"} for value in projection.state["goals"]
+                    ],
+                },
+            )
+        )
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        self.assertEqual(restarted._planning(history), expected)
+
+    def test_materialized_planning_applies_the_event_tail_after_its_anchor(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(8)
+        history = life.history()
+        tail = DomainEvent(
+            "goal.activated",
+            "pathos",
+            {
+                "goal_id": "tail-goal",
+                "title": "A goal added after the checkpoint",
+                "motivation": "Prove incremental replay",
+            },
+        )
+        self.store.append("pathos", [tail], len(history))
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        projected = restarted._planning(restarted.history())
+        self.assertIn("tail-goal", projected.goals)
+
     def test_checkpoint_refuses_an_unmatched_or_backward_anchor(self) -> None:
         events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]
         self.store.append("pathos", events, 0)

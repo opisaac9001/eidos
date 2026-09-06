@@ -16,10 +16,13 @@ from eidos.domain.world_catalog import WorldCatalog
 
 
 def exploration_plan_events(
-    history: Sequence[DomainEvent], simulated_at: datetime, catalog: WorldCatalog
+    history: Sequence[DomainEvent],
+    simulated_at: datetime,
+    catalog: WorldCatalog,
+    planning: PlanningState | None = None,
 ) -> list[DomainEvent]:
     """Plan two visits to one unconsidered introduced place when time permits."""
-    planning = project_planning(list(history))
+    planning = planning if planning is not None else project_planning(list(history))
     planned_sources = {
         str(event.payload["source_registration_id"])
         for event in history

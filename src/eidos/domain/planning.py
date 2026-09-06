@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from typing import Any, Mapping, TypeVar
 
@@ -78,6 +78,32 @@ class PlanningState:
     calendar: dict[str, CalendarEntry] = field(default_factory=dict)
     objects: dict[str, WorldObject] = field(default_factory=dict)
     intentions: dict[str, Intention] = field(default_factory=dict)
+
+    def materialized_state(self) -> Mapping[str, Any]:
+        """Return a disposable JSON-safe snapshot of this replay projection."""
+        return {
+            "goals": [asdict(value) for value in self.goals.values()],
+            "commitments": [asdict(value) for value in self.commitments.values()],
+            "calendar": [asdict(value) for value in self.calendar.values()],
+            "objects": [asdict(value) for value in self.objects.values()],
+            "intentions": [asdict(value) for value in self.intentions.values()],
+        }
+
+    @classmethod
+    def from_materialized_state(cls, raw: Mapping[str, Any]) -> PlanningState:
+        """Restore a checked disposable snapshot; event history remains authoritative."""
+        expected = {"goals", "commitments", "calendar", "objects", "intentions"}
+        if set(raw) != expected:
+            raise ValueError("Materialized planning fields do not match schema v1")
+        state = cls(
+            goals=_restore_records(raw["goals"], Goal, "goal_id"),
+            commitments=_restore_records(raw["commitments"], Commitment, "commitment_id"),
+            calendar=_restore_records(raw["calendar"], CalendarEntry, "schedule_id"),
+            objects=_restore_records(raw["objects"], WorldObject, "object_id"),
+            intentions=_restore_records(raw["intentions"], Intention, "intention_id"),
+        )
+        _validate_materialized_planning(state)
+        return state
 
     def apply(self, event: DomainEvent) -> PlanningState:
         payload = event.payload
@@ -334,6 +360,140 @@ def project_planning(events: list[DomainEvent]) -> PlanningState:
 
 
 T = TypeVar("T")
+
+
+def _restore_records(raw: Any, record_type: type[T], id_field: str) -> dict[str, T]:
+    if not isinstance(raw, list):
+        raise ValueError("Materialized planning collection must be an ordered list")
+    expected_fields = set(getattr(record_type, "__dataclass_fields__"))
+    restored: dict[str, T] = {}
+    for value in raw:
+        key = value.get(id_field) if isinstance(value, dict) else None
+        if (
+            not isinstance(key, str)
+            or not key.strip()
+            or not isinstance(value, dict)
+            or set(value) != expected_fields
+            or key in restored
+        ):
+            raise ValueError("Materialized planning record does not match schema v1")
+        try:
+            restored[key] = record_type(**value)
+        except TypeError:
+            raise ValueError("Materialized planning record is invalid") from None
+    return restored
+
+
+def _validate_materialized_planning(state: PlanningState) -> None:
+    def text(value: object, *, optional: bool = False) -> bool:
+        return (optional and value is None) or isinstance(value, str) and bool(value.strip())
+
+    for goal in state.goals.values():
+        if (
+            not all(text(value) for value in (goal.goal_id, goal.title, goal.status))
+            or not text(goal.motivation, optional=True)
+            or not text(goal.reason, optional=True)
+            or isinstance(goal.progress, bool)
+            or not isinstance(goal.progress, (int, float))
+            or not 0 <= goal.progress <= 1
+            or goal.status not in {"active", "blocked", "achieved", "abandoned"}
+        ):
+            raise ValueError("Materialized goal is invalid")
+    for commitment in state.commitments.values():
+        if (
+            not all(
+                text(value)
+                for value in (
+                    commitment.commitment_id,
+                    commitment.title,
+                    commitment.debtor_id,
+                    commitment.creditor_id,
+                    commitment.due_at,
+                    commitment.status,
+                )
+            )
+            or not all(
+                text(value, optional=True) for value in (commitment.request_id, commitment.goal_id)
+            )
+            or commitment.status not in {"active", "fulfilled", "missed"}
+            or isinstance(commitment.terms_version, bool)
+            or not isinstance(commitment.terms_version, int)
+            or commitment.terms_version < 1
+        ):
+            raise ValueError("Materialized commitment is invalid")
+        _aware(commitment.due_at)
+    for entry in state.calendar.values():
+        if not all(
+            text(value)
+            for value in (entry.schedule_id, entry.title, entry.starts_at, entry.location_id)
+        ) or not all(
+            text(value, optional=True)
+            for value in (
+                entry.reason,
+                entry.ends_at,
+                entry.actor_id,
+                entry.action,
+                entry.target_id,
+                entry.commitment_id,
+                entry.goal_id,
+                entry.resource_id,
+            )
+        ):
+            raise ValueError("Materialized calendar entry is invalid")
+        if entry.status not in {
+            "scheduled",
+            "interrupted",
+            "completed",
+            "failed",
+            "cancelled",
+        }:
+            raise ValueError("Materialized calendar status is invalid")
+        _aware(entry.starts_at)
+        if entry.ends_at is not None:
+            _aware(entry.ends_at)
+    for item in state.objects.values():
+        if not all(
+            text(value)
+            for value in (
+                item.object_id,
+                item.name,
+                item.owner_id,
+                item.custodian_id,
+                item.location_id,
+                item.condition,
+            )
+        ):
+            raise ValueError("Materialized object is invalid")
+    for intention in state.intentions.values():
+        if (
+            not all(
+                text(value)
+                for value in (
+                    intention.intention_id,
+                    intention.actor_id,
+                    intention.action,
+                    intention.motivation,
+                    intention.status,
+                )
+            )
+            or not all(
+                text(value, optional=True) for value in (intention.goal_id, intention.target_id)
+            )
+            or isinstance(intention.priority, bool)
+            or not isinstance(intention.priority, (int, float))
+            or not 0 <= intention.priority <= 1
+            or intention.status not in {"active", "completed", "abandoned"}
+        ):
+            raise ValueError("Materialized intention is invalid")
+
+
+def _aware(value: str) -> None:
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError("Materialized planning time is invalid") from None
+    if parsed.utcoffset() is None:
+        raise ValueError("Materialized planning time must be timezone-aware")
 
 
 def _required(payload: Mapping[str, Any], key: str) -> str:

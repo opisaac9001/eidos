@@ -46,7 +46,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: motivated goals + project progress/completion/audited abandonment | P3 |
+| PLAN-01 | Goals, projects, motivations, progress, completion/abandonment | Partial: motivated goals + project progress/completion/audited abandonment + ordered materialized replay | P3 |
 | PLAN-02 | Intentions, promises, deadlines, dependencies, responsible actors | Partial: consent-linked intentions/commitments + validated project resource | P3 |
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/multi-hop travel buffers/replayed place hours | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules | P3 |
@@ -120,7 +120,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | --- | --- | --- | --- |
 | OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: one endpoint/model | P1 |
 | OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised bounded queue with deadlines | P1 |
-| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/index projections | P1 |
+| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/memory/planning projections | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Planned | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |

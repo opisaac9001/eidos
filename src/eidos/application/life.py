@@ -61,7 +61,7 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
-from eidos.domain.planning import project_planning
+from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.routine import beats_between, emotionally_adjusted_beat
 from eidos.domain.scenes import (
     SceneEndProposal,
@@ -120,6 +120,7 @@ class Life:
         self.mode = mode
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
+        self._planning_cache: tuple[int, str, PlanningState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -222,6 +223,34 @@ class Life:
         self._world_catalog_cache = (len(history), anchor, catalog)
         return catalog
 
+    def _planning(self, history: list[DomainEvent]) -> PlanningState:
+        if self._planning_cache is not None:
+            revision, anchor, planning = self._planning_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    planning = planning.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._planning_cache = (len(history), anchor, planning)
+                return planning
+        if isinstance(self.store, MaterializedProjectionStore):
+            projection = self.store.load_projection("pathos", "planning", 1, len(history))
+            if projection is not None:
+                try:
+                    planning = PlanningState.from_materialized_state(projection.state)
+                    for event in history[projection.revision :]:
+                        planning = planning.apply(event)
+                    anchor = str(history[-1].event_id) if history else ""
+                    self._planning_cache = (len(history), anchor, planning)
+                    return planning
+                except (KeyError, TypeError, ValueError):
+                    pass
+        planning = project_planning(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._planning_cache = (len(history), anchor, planning)
+        return planning
+
     def _save_memory_index(self, history: list[DomainEvent]) -> None:
         if not history or not isinstance(self.store, MaterializedProjectionStore):
             return
@@ -234,6 +263,21 @@ class Life:
                 len(history),
                 str(history[-1].event_id),
                 index.materialized_state(),
+            )
+        )
+
+    def _save_planning(self, history: list[DomainEvent]) -> None:
+        if not history or not isinstance(self.store, MaterializedProjectionStore):
+            return
+        planning = self._planning(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "planning",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                planning.materialized_state(),
             )
         )
 
@@ -450,7 +494,7 @@ class Life:
         ]
         memory_index = self._memory_index(history)
         memories = memory_view(history, state.simulated_at, index=memory_index)
-        planning = project_planning(history)
+        planning = self._planning(history)
         social = project_social(history)
         scenes = project_scenes(history)
         mind = project_mind(history)
@@ -761,14 +805,21 @@ class Life:
                 )
             )
             expansion_catalog = self._world_catalog(history + pending)
-            pending.extend(exploration_plan_events(history + pending, current, expansion_catalog))
+            pending.extend(
+                exploration_plan_events(
+                    history + pending,
+                    current,
+                    expansion_catalog,
+                    self._planning(history + pending),
+                )
+            )
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
             beat = planned_activity_beat(
-                project_planning(history + pending), current, state.energy
+                self._planning(history + pending), current, state.energy
             ) or beats.get(current)
             if beat:
                 emotion_before_beat = project_emotion(history + pending)
@@ -918,17 +969,17 @@ class Life:
                 project_identity(history + pending).values,
             )
             if story:
-                project_planning(history + pending + story)
+                self._planning(history + pending + story)
                 pending.extend(story)
             object_story = object_story_events(current, history + pending, state.location_id)
             if object_story:
-                project_planning(history + pending + object_story)
+                self._planning(history + pending + object_story)
                 pending.extend(object_story)
             personal_project = personal_project_events(
                 current, history + pending, state.location_id
             )
             if personal_project:
-                project_planning(history + pending + personal_project)
+                self._planning(history + pending + personal_project)
                 pending.extend(personal_project)
             pending.extend(
                 authored_community_schedule(history + pending, current, len(history) + len(pending))
@@ -1010,9 +1061,9 @@ class Life:
             )
             pending.extend(follow_up_events(history + pending, current))
             pending.extend(development_events(history + pending, at))
-            overdue = overdue_plan_events(project_planning(history + pending), current)
+            overdue = overdue_plan_events(self._planning(history + pending), current)
             if overdue:
-                project_planning(history + pending + overdue)
+                self._planning(history + pending + overdue)
                 pending.extend(overdue)
             pending.extend(relationship_belief_events(history + pending, at))
             pending.extend(testimony_belief_events(history + pending, at))
@@ -1021,7 +1072,7 @@ class Life:
                 for event in waking:
                     pending.append(event)
                     state = state.apply(event)
-            planning_now = project_planning(history + pending)
+            planning_now = self._planning(history + pending)
             catalog_now = self._world_catalog(history + pending)
             inspirations_now = active_dream_inspirations(history + pending, current)
             active_goal_ids = {
@@ -1231,7 +1282,7 @@ class Life:
                                 )
                             )
             social_activity = scheduled_social_events(
-                project_planning(history + pending),
+                self._planning(history + pending),
                 actor_location_id=state.location_id,
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
@@ -1241,16 +1292,16 @@ class Life:
                 },
             )
             if social_activity:
-                project_planning(history + pending + social_activity)
+                self._planning(history + pending + social_activity)
                 pending.extend(social_activity)
             scheduled_activity = scheduled_activity_events(
-                project_planning(history + pending),
+                self._planning(history + pending),
                 actor_location_id=state.location_id,
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
             )
             if scheduled_activity:
-                project_planning(history + pending + scheduled_activity)
+                self._planning(history + pending + scheduled_activity)
                 pending.extend(scheduled_activity)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
@@ -1348,6 +1399,7 @@ class Life:
         committed = [*history, *pending]
         self._save_state_checkpoint(committed, state)
         self._save_memory_index(committed)
+        self._save_planning(committed)
         await self._respond_to_due_messages()
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
@@ -1669,7 +1721,7 @@ class Life:
             pending.append(identity_established_event(at))
             identity = project_identity(history + pending)
         query_terms = terms(text)
-        planning = project_planning(history)
+        planning = self._planning(history)
         catalog = self._world_catalog(history)
         entity_ids = {
             person.person_id
@@ -1827,7 +1879,9 @@ class Life:
                 )
             )
         self.store.append("pathos", pending, len(history))
-        self._save_memory_index([*history, *pending])
+        committed = [*history, *pending]
+        self._save_memory_index(committed)
+        self._save_planning(committed)
 
 
 def vars_for(value: Any) -> dict[str, Any]:

@@ -1,7 +1,7 @@
 import unittest
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import project_planning
+from eidos.domain.planning import PlanningState, project_planning
 
 
 class PlanningTests(unittest.TestCase):
@@ -86,6 +86,17 @@ class PlanningTests(unittest.TestCase):
         goal = project_planning(events).goals["learn"]
         self.assertEqual(goal.progress, 1)
         self.assertEqual(goal.status, "achieved")
+
+    def test_materialized_state_roundtrips_and_rejects_semantic_corruption(self):
+        state = project_planning(self.valid_history())
+        materialized = state.materialized_state()
+        self.assertEqual(PlanningState.from_materialized_state(materialized), state)
+        corrupted = {
+            **materialized,
+            "goals": [{**materialized["goals"][0], "progress": "a lot"}],
+        }
+        with self.assertRaises(ValueError):
+            PlanningState.from_materialized_state(corrupted)
 
 
 if __name__ == "__main__":
