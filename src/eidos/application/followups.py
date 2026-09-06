@@ -172,6 +172,8 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
         value = event.payload.get("visitor_id")
     elif event.kind in {"phone.call_completed", "phone.callback_completed"}:
         value = event.payload.get("caller_id")
+    elif event.kind == "invitation.made":
+        value = event.payload.get("invitee_id") or event.payload.get("person_id")
     elif event.kind == "scene.ended" and str(event.payload.get("scene_id", "")).startswith(
         "ordinary-"
     ):

@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -23,7 +24,23 @@ class SevenDayAcceptanceTests(unittest.TestCase):
             goals = {item["goal_id"]: item for item in snapshot["goals"]}
             self.assertEqual(goals["bind-pocket-notebook"]["status"], "achieved")
             self.assertEqual(goals["repair-mara-lamp-goal"]["status"], "achieved")
-            self.assertTrue(all(item["status"] != "active" for item in snapshot["commitments"]))
+            now = datetime.fromisoformat(snapshot["time"])
+            active_commitments = [
+                item for item in snapshot["commitments"] if item["status"] == "active"
+            ]
+            self.assertTrue(
+                all(datetime.fromisoformat(item["due_at"]) > now for item in active_commitments)
+            )
+            self.assertTrue(
+                all(
+                    any(
+                        entry["commitment_id"] == item["commitment_id"]
+                        and entry["status"] == "scheduled"
+                        for entry in snapshot["calendar"]
+                    )
+                    for item in active_commitments
+                )
+            )
             self.assertEqual([item["status"] for item in snapshot["transfers"]], ["accepted"] * 2)
             awl = next(
                 item for item in snapshot["objects"] if item["object_id"] == "bookbinding-awl"

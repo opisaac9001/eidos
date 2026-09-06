@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -34,8 +35,21 @@ class MonthSoakTests(unittest.TestCase):
                     for value in (person["connection"], person["purpose"])
                 )
             )
+            now = datetime.fromisoformat(snapshot["time"])
             self.assertTrue(
-                all(item["status"] in {"fulfilled", "missed"} for item in snapshot["commitments"])
+                all(
+                    item["status"] in {"fulfilled", "missed"}
+                    or (
+                        item["status"] == "active"
+                        and datetime.fromisoformat(item["due_at"]) > now
+                        and any(
+                            entry["commitment_id"] == item["commitment_id"]
+                            and entry["status"] == "scheduled"
+                            for entry in snapshot["calendar"]
+                        )
+                    )
+                    for item in snapshot["commitments"]
+                )
             )
             self.assertLess(path.stat().st_size, 10_000_000)
             disagreement = next(event for event in events if event.kind == "disagreement.expressed")

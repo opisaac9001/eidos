@@ -58,7 +58,12 @@ def plan_accepted_work(
 
     if request.status != "accepted":
         return reject("request_not_accepted", "Planning cannot imply consent")
-    if request.responder_id != "pathos":
+    responsible_actor = request.responder_id
+    counterparty = request.requester_id
+    if request.action == ActionKind.TALK.value and request.requester_id == "pathos":
+        responsible_actor = "pathos"
+        counterparty = request.responder_id
+    if responsible_actor != "pathos":
         return reject("wrong_responsible_actor", "This planner only owns Pathos's commitments")
     try:
         action = ActionKind(request.action)
@@ -88,7 +93,7 @@ def plan_accepted_work(
     if not location_allows_interval(request.location_id, start, end, opening_hours):
         return reject("location_closed", "The activity falls outside the location's open hours")
     for entry in state.calendar.values():
-        if entry.status != "scheduled" or entry.actor_id not in {None, request.responder_id}:
+        if entry.status != "scheduled" or entry.actor_id not in {None, responsible_actor}:
             continue
         other_start = datetime.fromisoformat(entry.starts_at)
         other_end = (
@@ -131,8 +136,8 @@ def plan_accepted_work(
                 **common,
                 "commitment_id": commitment_id,
                 "title": f"{request.title} by the agreed deadline",
-                "debtor_id": request.responder_id,
-                "creditor_id": request.requester_id,
+                "debtor_id": responsible_actor,
+                "creditor_id": counterparty,
                 "due_at": request.due_at,
                 "goal_id": goal_id,
             },
@@ -148,7 +153,7 @@ def plan_accepted_work(
                 "starts_at": start.isoformat(),
                 "ends_at": end.isoformat(),
                 "location_id": request.location_id,
-                "actor_id": request.responder_id,
+                "actor_id": responsible_actor,
                 "action": request.action,
                 "target_id": request.target_id,
                 "commitment_id": commitment_id,
@@ -164,9 +169,9 @@ def plan_accepted_work(
         IntentionProposal(
             proposal_id=f"intend-{request.request_id}",
             intention_id=intention_id,
-            actor_id=request.responder_id,
+            actor_id=responsible_actor,
             action=action,
-            motivation=f"Honor the explicitly accepted request from {request.requester_id}.",
+            motivation=f"Honor the mutually accepted time with {counterparty}.",
             priority=0.9,
             expected_revision=actual_revision + len(base),
             goal_id=goal_id,

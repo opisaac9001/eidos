@@ -28,6 +28,8 @@ const labels = {
   "social.request_accepted": "TERMS ACCEPTED",
   "social.request_declined": "REQUEST DECLINED",
   "invitation.made": "AN INVITATION",
+  "invitation.accepted": "INVITATION ACCEPTED",
+  "invitation.declined": "INVITATION DECLINED",
   "social.activity_completed": "TIME TOGETHER",
   "scene.interrupted": "CONVERSATION PAUSED",
   "scene.resumed": "CONVERSATION RESUMED",

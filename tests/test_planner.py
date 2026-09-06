@@ -86,6 +86,30 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(planning.calendar["coffee-schedule"].action, "talk")
         self.assertEqual(planning.intentions["coffee-intention"].target_id, "mara")
 
+    def test_pathos_can_plan_a_mutually_accepted_invitation_he_initiated(self):
+        invitation = self.request(
+            request_id="pathos-invites-mara",
+            requester_id="pathos",
+            responder_id="mara",
+            action="talk",
+            target_id="mara",
+            title="Catch up with Mara",
+            location_id="cafe",
+            duration_hours=1,
+        )
+        result = plan_accepted_work(
+            invitation,
+            state=self.state(),
+            actual_revision=1,
+            simulated_at=self.now,
+            preferred_start=self.now + timedelta(days=1),
+        )
+        self.assertTrue(result.accepted)
+        planning = self.state(result.events)
+        commitment = planning.commitments["pathos-invites-mara-commitment"]
+        self.assertEqual((commitment.debtor_id, commitment.creditor_id), ("pathos", "mara"))
+        self.assertEqual(planning.calendar["pathos-invites-mara-schedule"].actor_id, "pathos")
+
     def test_accepted_work_learning_and_attendance_become_linked_plans(self):
         for action in ("work", "learn", "attend"):
             with self.subTest(action=action):

@@ -262,6 +262,15 @@ prose: a later typed contact event for the same person must causally complete it
 new contact may schedule a future reminder, allowing relationships to recur without a
 fixed daily script.
 
+A ready follow-up can instead prompt Pathos to make an outbound invitation while he is
+awake and has emotional and physical capacity. The other person decides independently
+from their own energy, connection need, purpose, and replay-stable variability; Pathos's
+directed trust is not borrowed as proof of their feelings. A decline remains a durable
+social outcome without a calendar entry. Acceptance is passed through the same opening
+hours, schedule-conflict, and travel-feasibility planner as other commitments. The shared
+appointment then moves Pathos through the ordinary routine override and only completes
+if both people are actually co-present.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

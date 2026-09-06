@@ -31,6 +31,7 @@ from eidos.application.inner_life import (
     record_dream_events,
     waking_dream_events,
 )
+from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.memory import MemoryIndex, memory_view, recall, terms
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
@@ -537,6 +538,8 @@ class Life:
                 "social.request_accepted",
                 "social.request_declined",
                 "invitation.made",
+                "invitation.accepted",
+                "invitation.declined",
                 "social.activity_completed",
                 "scene.interrupted",
                 "scene.resumed",
@@ -1229,6 +1232,26 @@ class Life:
                 )
             )
             pending.extend(follow_up_events(history + pending, current))
+            invitation_emotion = project_emotion(history + pending)
+            invitation_bias = emotional_planning_bias(
+                invitation_emotion.valence,
+                invitation_emotion.arousal,
+                invitation_emotion.sustained_low_hours,
+            )
+            invitation_catalog = self._world_catalog(history + pending)
+            pending.extend(
+                follow_up_invitation_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    pathos_awake=state.awake,
+                    pathos_energy=state.energy,
+                    social_openness=invitation_bias.social_openness,
+                    npc_people=project_npcs(history + pending, current).people,
+                    planning=self._planning(history + pending),
+                    catalog=invitation_catalog,
+                )
+            )
             pending.extend(development_events(history + pending, at))
             overdue = overdue_plan_events(self._planning(history + pending), current)
             if overdue:
