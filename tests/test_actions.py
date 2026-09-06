@@ -229,6 +229,63 @@ class ActionTests(unittest.TestCase):
             with self.assertRaises(ProposalRejected):
                 parse_action_proposal(json.dumps(mutation))
 
+    def test_work_learning_and_attendance_require_matching_schedules(self):
+        for action in (ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND):
+            with self.subTest(action=action):
+                schedule = DomainEvent(
+                    "schedule.created",
+                    "pathos",
+                    {
+                        "schedule_id": action.value,
+                        "title": action.value.title(),
+                        "starts_at": self.now.replace(hour=12).isoformat(),
+                        "ends_at": self.now.replace(hour=14).isoformat(),
+                        "location_id": "workshop",
+                        "actor_id": "pathos",
+                        "action": action.value,
+                        "target_id": "lesson" if action is ActionKind.LEARN else None,
+                    },
+                )
+                state = self.state().apply(schedule)
+                proposal = ActionProposal(
+                    f"do-{action.value}",
+                    "pathos",
+                    action,
+                    3,
+                    target_id="lesson" if action is ActionKind.LEARN else None,
+                    schedule_id=action.value,
+                )
+                result = resolve_action(
+                    proposal,
+                    state=state,
+                    actor_location_id="workshop",
+                    actual_revision=3,
+                    simulated_at=self.now,
+                )
+                self.assertTrue(result.accepted)
+                self.assertIn("activity.completed", [event.kind for event in result.events])
+        early = resolve_action(
+            ActionProposal("early", "pathos", ActionKind.WORK, 3, schedule_id="work"),
+            state=self.state().apply(
+                DomainEvent(
+                    "schedule.created",
+                    "pathos",
+                    {
+                        "schedule_id": "work",
+                        "title": "Work",
+                        "starts_at": self.now.isoformat(),
+                        "ends_at": self.now.replace(hour=15).isoformat(),
+                        "location_id": "workshop",
+                        "action": "work",
+                    },
+                )
+            ),
+            actor_location_id="workshop",
+            actual_revision=3,
+            simulated_at=self.now,
+        )
+        self.assertEqual(early.code, "activity_incomplete")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,6 +23,9 @@ class ActionKind(StrEnum):
     REPAIR = "repair"
     REST = "rest"
     TALK = "talk"
+    WORK = "work"
+    LEARN = "learn"
+    ATTEND = "attend"
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,6 +242,50 @@ def resolve_action(
             effect(
                 "conversation.requested",
                 {"person_id": proposal.target_id, "simulated_at": simulated_at},
+            )
+        )
+    elif proposal.action in {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND}:
+        if proposal.schedule_id is None:
+            return reject(
+                "missing_argument", f"{proposal.action.value.title()} requires schedule_id"
+            )
+        schedule = state.calendar.get(proposal.schedule_id)
+        if schedule is None:
+            return reject("unknown_schedule", "The scheduled activity does not exist")
+        if schedule.status != "scheduled":
+            return reject("inactive_schedule", "The activity is not currently scheduled")
+        if schedule.actor_id not in {None, proposal.actor_id}:
+            return reject("wrong_actor", "The schedule belongs to another actor")
+        if schedule.action not in {None, proposal.action.value}:
+            return reject("schedule_mismatch", "The action does not match the schedule")
+        if schedule.target_id is not None and schedule.target_id != proposal.target_id:
+            return reject("schedule_mismatch", "The target does not match the schedule")
+        if schedule.location_id != actor_location_id:
+            return reject("wrong_location", "The actor must be at the activity location")
+        starts_at = datetime.fromisoformat(schedule.starts_at)
+        ends_at = datetime.fromisoformat(schedule.ends_at) if schedule.ends_at else starts_at
+        if simulated_at < starts_at:
+            return reject("too_early", "The scheduled activity has not started")
+        if proposal.action in {ActionKind.WORK, ActionKind.LEARN} and simulated_at < ends_at:
+            return reject("activity_incomplete", "The scheduled activity duration has not elapsed")
+        if proposal.action is ActionKind.ATTEND and simulated_at > ends_at:
+            return reject("activity_missed", "The attendance window has passed")
+        effects.extend(
+            (
+                effect(
+                    "schedule.completed",
+                    {"schedule_id": schedule.schedule_id, "simulated_at": simulated_at},
+                ),
+                effect(
+                    "activity.completed",
+                    {
+                        "activity": proposal.action.value,
+                        "schedule_id": schedule.schedule_id,
+                        "target_id": proposal.target_id,
+                        "location_id": actor_location_id,
+                        "simulated_at": simulated_at,
+                    },
+                ),
             )
         )
 
