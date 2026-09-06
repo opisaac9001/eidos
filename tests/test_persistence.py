@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -27,9 +28,39 @@ class PersistenceTests(unittest.TestCase):
             "test",
             "pathos",
             {"at": datetime.now(timezone.utc), "number": 0.25, "enabled": True, "empty": None},
+            schema_version=2,
+            causation_id=uuid4(),
+            correlation_id="proposal-17",
         )
         self.store.append("pathos", [event], 0)
         self.assertEqual(self.store.read("pathos"), [event])
+
+    def test_v1_database_migrates_without_rewriting_events(self) -> None:
+        legacy_path = Path(self.directory.name) / "legacy.sqlite3"
+        event = DomainEvent("legacy", "pathos", {"value": "kept"})
+        with sqlite3.connect(legacy_path) as connection:
+            connection.execute(
+                "CREATE TABLE events (aggregate_id TEXT NOT NULL, revision INTEGER NOT NULL, "
+                "event_id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, occurred_at TEXT NOT NULL, "
+                "payload TEXT NOT NULL, PRIMARY KEY (aggregate_id, revision))"
+            )
+            connection.execute(
+                "INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "pathos",
+                    1,
+                    str(event.event_id),
+                    event.kind,
+                    event.occurred_at.isoformat(),
+                    '{"value": "kept"}',
+                ),
+            )
+            connection.execute("PRAGMA user_version = 1")
+
+        migrated = SQLiteEventStore(legacy_path)
+        self.assertEqual(migrated.read("pathos"), [event])
+        with sqlite3.connect(legacy_path) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
 
     def test_day_survives_restart_without_repeating_memories(self) -> None:
         first = Life(self.store, StandInGateway())

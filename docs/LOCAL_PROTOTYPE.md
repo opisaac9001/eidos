@@ -41,7 +41,9 @@ application is prevented. General sleep, appraisal and choice remain pending.
 
 ## Persistence and failures
 
-The SQLite event stream is the only durable source of state. Schema version 1
+The SQLite event stream is the only durable source of state. Schema version 2
+adds event schema, causation, and correlation columns; version 1 databases are
+migrated in place without rewriting their event payloads. The stream
 supports the earlier foundation events as well as the new scene events. Request
 IDs prevent duplicate chat submissions; an ID cannot be reused for another
 message. World writes use optimistic concurrency. An unexpected worker failure

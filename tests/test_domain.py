@@ -30,6 +30,13 @@ class DomainEventTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DomainEvent("pathos.moved", "pathos", occurred_at=datetime(2026, 1, 1))
 
+    def test_event_trace_metadata_is_validated(self) -> None:
+        for version in (0, 1.5, True):
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                DomainEvent("test", "pathos", schema_version=version)  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            DomainEvent("test", "pathos", correlation_id="")
+
 
 class PathosStateTests(unittest.TestCase):
     def test_events_replay_deterministically(self) -> None:

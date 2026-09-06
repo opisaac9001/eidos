@@ -115,14 +115,21 @@ def resolve_action(
         "schema_version": proposal.schema_version,
         "simulated_at": simulated_at.isoformat(),
     }
-    proposed = DomainEvent("action.proposed", proposal.actor_id, common)
+    proposed = DomainEvent(
+        "action.proposed", proposal.actor_id, common, correlation_id=proposal.proposal_id
+    )
+
+    def effect(kind: str, payload: Mapping[str, Any]) -> DomainEvent:
+        return DomainEvent(
+            kind,
+            proposal.actor_id,
+            payload,
+            causation_id=proposed.event_id,
+            correlation_id=proposal.proposal_id,
+        )
 
     def reject(code: str, explanation: str) -> ActionResolution:
-        rejected = DomainEvent(
-            "action.rejected",
-            proposal.actor_id,
-            {**common, "code": code, "explanation": explanation},
-        )
+        rejected = effect("action.rejected", {**common, "code": code, "explanation": explanation})
         return ActionResolution(False, code, explanation, (proposed, rejected))
 
     if proposal.expected_revision != actual_revision:
@@ -158,18 +165,16 @@ def resolve_action(
             return reject("too_early", "The scheduled work has not started")
         effects.extend(
             (
-                DomainEvent(
+                effect(
                     "object.condition_changed",
-                    proposal.actor_id,
                     {
                         "object_id": item.object_id,
                         "condition": "repaired",
                         "simulated_at": simulated_at,
                     },
                 ),
-                DomainEvent(
+                effect(
                     "schedule.completed",
-                    proposal.actor_id,
                     {"schedule_id": schedule.schedule_id, "simulated_at": simulated_at},
                 ),
             )
@@ -180,17 +185,15 @@ def resolve_action(
         if proposal.location_id == actor_location_id:
             return reject("already_there", "The actor is already at that location")
         effects.append(
-            DomainEvent(
+            effect(
                 "pathos.moved",
-                proposal.actor_id,
                 {"location_id": proposal.location_id, "simulated_at": simulated_at},
             )
         )
     elif proposal.action is ActionKind.REST:
         effects.append(
-            DomainEvent(
+            effect(
                 "action.rested",
-                proposal.actor_id,
                 {"location_id": actor_location_id, "simulated_at": simulated_at},
             )
         )
@@ -198,14 +201,13 @@ def resolve_action(
         if proposal.target_id is None:
             return reject("missing_argument", "Talk requires target_id")
         effects.append(
-            DomainEvent(
+            effect(
                 "conversation.requested",
-                proposal.actor_id,
                 {"person_id": proposal.target_id, "simulated_at": simulated_at},
             )
         )
 
-    accepted = DomainEvent("action.accepted", proposal.actor_id, common)
+    accepted = effect("action.accepted", common)
     return ActionResolution(
         True, "accepted", "Action passed deterministic rules", (proposed, accepted, *effects)
     )

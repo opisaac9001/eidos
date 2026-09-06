@@ -18,7 +18,7 @@ class SQLiteEventStore:
         self.path = path
         with self._connect() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise ValueError(f"Unsupported database schema version: {version}")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS events (
@@ -28,10 +28,19 @@ class SQLiteEventStore:
                     kind TEXT NOT NULL,
                     occurred_at TEXT NOT NULL,
                     payload TEXT NOT NULL,
+                    schema_version INTEGER NOT NULL DEFAULT 1,
+                    causation_id TEXT,
+                    correlation_id TEXT,
                     PRIMARY KEY (aggregate_id, revision)
                 )
             """)
-            connection.execute("PRAGMA user_version = 1")
+            if version == 1:
+                connection.execute(
+                    "ALTER TABLE events ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1"
+                )
+                connection.execute("ALTER TABLE events ADD COLUMN causation_id TEXT")
+                connection.execute("ALTER TABLE events ADD COLUMN correlation_id TEXT")
+            connection.execute("PRAGMA user_version = 2")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -45,12 +54,21 @@ class SQLiteEventStore:
     def read(self, aggregate_id: str) -> list[DomainEvent]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT kind, payload, occurred_at, event_id FROM events "
+                "SELECT kind, payload, occurred_at, event_id, schema_version, "
+                "causation_id, correlation_id FROM events "
                 "WHERE aggregate_id = ? ORDER BY revision",
                 (aggregate_id,),
             ).fetchall()
         result = []
-        for kind, encoded, occurred_at, event_id in rows:
+        for (
+            kind,
+            encoded,
+            occurred_at,
+            event_id,
+            schema_version,
+            causation_id,
+            correlation_id,
+        ) in rows:
             payload = json.loads(encoded)
             payload = {
                 key: datetime.fromisoformat(value["$datetime"])
@@ -62,7 +80,14 @@ class SQLiteEventStore:
                 payload["simulated_at"] = datetime.fromisoformat(payload["simulated_at"])
             result.append(
                 DomainEvent(
-                    kind, aggregate_id, payload, datetime.fromisoformat(occurred_at), UUID(event_id)
+                    kind,
+                    aggregate_id,
+                    payload,
+                    datetime.fromisoformat(occurred_at),
+                    UUID(event_id),
+                    schema_version,
+                    UUID(causation_id) if causation_id else None,
+                    correlation_id,
                 )
             )
         return result
@@ -86,6 +111,9 @@ class SQLiteEventStore:
                     event.kind,
                     event.occurred_at.isoformat(),
                     json.dumps(payload, allow_nan=False),
+                    event.schema_version,
+                    str(event.causation_id) if event.causation_id else None,
+                    event.correlation_id,
                 )
             )
         with self._connect() as connection:
@@ -96,4 +124,9 @@ class SQLiteEventStore:
             ).fetchone()[0]
             if revision != expected_revision:
                 raise RevisionConflict(f"Expected revision {expected_revision}, found {revision}")
-            connection.executemany("INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)", rows)
+            connection.executemany(
+                "INSERT INTO events "
+                "(aggregate_id, revision, event_id, kind, occurred_at, payload, schema_version, "
+                "causation_id, correlation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )

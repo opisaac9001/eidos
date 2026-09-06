@@ -20,6 +20,9 @@ class DomainEvent:
     payload: Mapping[str, Any] = field(default_factory=dict)
     occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_id: UUID = field(default_factory=uuid4)
+    schema_version: int = 1
+    causation_id: UUID | None = None
+    correlation_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.kind.strip():
@@ -28,6 +31,14 @@ class DomainEvent:
             raise ValueError("aggregate_id must not be empty")
         if self.occurred_at.tzinfo is None:
             raise ValueError("occurred_at must be timezone-aware")
+        if (
+            isinstance(self.schema_version, bool)
+            or not isinstance(self.schema_version, int)
+            or self.schema_version < 1
+        ):
+            raise ValueError("schema_version must be a positive integer")
+        if self.correlation_id is not None and not self.correlation_id.strip():
+            raise ValueError("correlation_id must not be empty")
         for key, value in self.payload.items():
             if not isinstance(key, str):
                 raise ValueError("event payload keys must be strings")
