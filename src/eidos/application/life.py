@@ -33,6 +33,7 @@ from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
+from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.event_store import EventStore
@@ -176,6 +177,7 @@ class Life:
                 "invitation.made",
                 "social.activity_completed",
                 "speech.delivered",
+                "travel.completed",
                 "intention.adopted",
                 "intention.completed",
                 "action.accepted",
@@ -298,12 +300,34 @@ class Life:
             pending.extend(recovery)
             beat = beats.get(current)
             if beat:
-                for event in (
-                    DomainEvent("pathos.moved", "pathos", {"location_id": beat.location_id}),
-                    DomainEvent("affect.changed", "pathos", {"energy": beat.energy}),
-                ):
-                    pending.append(event)
-                    state = state.apply(event)
+                arrival = None
+                if state.location_id != beat.location_id:
+                    duration = route_duration(state.location_id, beat.location_id)
+                    travel = resolve_travel(
+                        TravelProposal(
+                            proposal_id=f"routine-travel-{at}",
+                            actor_id="pathos",
+                            origin_id=state.location_id,
+                            destination_id=beat.location_id,
+                            depart_at=current - duration,
+                            arrive_at=current,
+                            expected_revision=len(history) + len(pending),
+                        ),
+                        history=history + pending,
+                        actor_location_id=state.location_id,
+                        known_location_ids={str(place["id"]) for place in LOCATIONS},
+                        actual_revision=len(history) + len(pending),
+                        simulated_at=current,
+                    )
+                    pending.extend(travel.events)
+                    if not travel.accepted:
+                        continue
+                    for event in travel.events:
+                        state = state.apply(event)
+                    arrival = travel.events[-1]
+                energy = DomainEvent("affect.changed", "pathos", {"energy": beat.energy})
+                pending.append(energy)
+                state = state.apply(energy)
                 pending.append(
                     DomainEvent(
                         "memory.recorded",
@@ -318,6 +342,8 @@ class Life:
                             "importance": 0.45,
                             "confidence": 1.0,
                         },
+                        causation_id=arrival.event_id if arrival else None,
+                        correlation_id=arrival.correlation_id if arrival else None,
                     )
                 )
             story = story_events(

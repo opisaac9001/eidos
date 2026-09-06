@@ -56,6 +56,12 @@ class LifeTests(unittest.TestCase):
                     for memory in snapshot["memories"]
                 )
             )
+        events = self.life.history()
+        completed_trips = {e.event_id for e in events if e.kind == "travel.completed"}
+        moves = [e for e in events if e.kind == "pathos.moved"]
+        self.assertGreater(len(moves), 0)
+        self.assertTrue(all(move.causation_id in completed_trips for move in moves))
+        self.assertTrue(all(move.correlation_id for move in moves))
 
     def test_fractional_steps_and_restart_do_not_duplicate_scenes(self):
         self.life.advance(8.5)

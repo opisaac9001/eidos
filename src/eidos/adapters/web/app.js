@@ -26,6 +26,7 @@ const labels = {
   "invitation.made": "AN INVITATION",
   "social.activity_completed": "TIME TOGETHER",
   "speech.delivered": "SOMETHING SAID",
+  "travel.completed": "ARRIVED",
   "intention.adopted": "AN INTENTION FORMED",
   "intention.completed": "AN INTENTION COMPLETED",
   "action.accepted": "ACTION VALIDATED",
