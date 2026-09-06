@@ -116,6 +116,11 @@ const labels = {
   "relationship.repair_opened": "A REPAIR ATTEMPT OPENED",
   "relationship.repair_contacted": "CONTACT AFTER AN APOLOGY",
   "relationship.repair_became_dormant": "A REPAIR ATTEMPT WENT QUIET",
+  "emotion.regulation_selected": "A RESPONSE TO FEELING WAS CHOSEN",
+  "emotion.regulation_practiced": "AN EMOTIONAL RESPONSE WAS PRACTICED",
+  "emotion.regulation_completed": "A REST INTENTION WAS FOLLOWED THROUGH",
+  "emotion.mixed_state_recognized": "TWO FEELINGS REMAINED AT ONCE",
+  "emotion.mixed_state_resolved": "A MIXED FEELING EASED",
   "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
@@ -585,7 +590,9 @@ function render(next) {
   if (state.runtime.error) showError(state.runtime.error);
   setBusy(busy);
   if (!changed) return;
-  $("presence-mood").textContent = state.emotion?.label || state.pathos.mood;
+  $("presence-mood").textContent = state.emotion?.secondary_label
+    ? `${state.emotion.label} with ${state.emotion.secondary_label}`
+    : state.emotion?.label || state.pathos.mood;
   $("presence-location").textContent = `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}`;
   const thought = state.feed.find((item) => item.kind === "thought.recorded");
   $("latest-thought").textContent = thought
@@ -610,7 +617,7 @@ function render(next) {
   const episode = state.affect_episodes?.[0];
   const emotion = state.emotion;
   const emotionalPattern = emotion
-    ? `${emotion.pattern} ${emotion.label}${emotion.sustained_low_hours ? ` · ${emotion.sustained_low_hours} low hours` : ""}`
+    ? `${emotion.pattern} ${emotion.label}${emotion.secondary_label ? ` with ${emotion.secondary_label} · ${Math.round(emotion.complexity * 100)}% mixed` : ""}${emotion.sustained_low_hours ? ` · ${emotion.sustained_low_hours} low hours` : ""}`
     : "No emotional sample yet";
   $("affect-source").textContent = episode
     ? `${emotionalPattern}. Latest influence: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
@@ -705,7 +712,9 @@ function render(next) {
       },
     )
     .join("");
-  $("chat-context-mood").textContent = state.emotion?.label || state.pathos.mood;
+  $("chat-context-mood").textContent = state.emotion?.secondary_label
+    ? `${state.emotion.label} with ${state.emotion.secondary_label}`
+    : state.emotion?.label || state.pathos.mood;
   $("chat-context-location").textContent =
     `${state.pathos.location} · ${time(state.time)}`;
   const communication = state.communication || {};

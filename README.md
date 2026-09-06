@@ -145,6 +145,10 @@ with at most three daily attempts, rather than becoming an improvised fact.
 Residents can also pass an owned belief through an actual scene turn. The listener
 stores discounted testimony rather than world truth; private speech reaches only its
 audience, while public speech reaches only actors projected at that place.
+Emotion samples can retain opposed recent appraisals as a source-linked secondary
+feeling instead of collapsing everything to one label. Mixed feeling slows initiative
+and risk slightly. Bounded coping attempts may lower arousal or protect sleep, but do
+not manufacture happiness or erase sadness.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or

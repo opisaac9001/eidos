@@ -54,6 +54,20 @@ class SevenDayAcceptanceTests(unittest.TestCase):
             )
             self.assertTrue(snapshot["dreams"])
             self.assertTrue(any(item["category"] == "dream" for item in snapshot["memories"]))
+            mixed_emotions = [
+                event for event in history if event.kind == "emotion.mixed_state_recognized"
+            ]
+            self.assertTrue(mixed_emotions)
+            event_ids = {str(event.event_id): event for event in history}
+            self.assertTrue(
+                all(
+                    event_ids[str(sample.payload["positive_source_event_id"])].kind
+                    == "appraisal.recorded"
+                    and event_ids[str(sample.payload["negative_source_event_id"])].kind
+                    == "appraisal.recorded"
+                    for sample in mixed_emotions
+                )
+            )
             self.assertTrue(any(item["owner_id"] == "rowan" for item in snapshot["npc_beliefs"]))
             testimony = next(
                 event

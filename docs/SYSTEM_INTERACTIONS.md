@@ -405,6 +405,18 @@ Hourly emotion samples interpret replayed valence, arousal and duration into sta
 such as joy, contentment, sadness, anxiety or prolonged low mood. Their bounded bias
 changes initiative, social openness, risk tolerance and pace; feasibility and consent
 still decide what can happen. A prolonged pattern is not a clinical diagnosis.
+Opposed positive and negative appraisals from the prior twelve hours may remain as a
+source-linked secondary feeling with bounded complexity. This makes initiative, pace,
+and risk slightly more cautious without pretending one scalar can cancel the other.
+
+At most once per seventy-two hours, an awake Pathos may select an explicit regulation
+response to high arousal, low feeling, or strongly mixed emotion. Grounding, making
+space for a feeling, and naming mixed feeling can move arousal only a small step toward
+baseline; they never directly improve valence. When low feeling coincides with poor
+rest, Pathos can instead choose to protect sleep. That attempt remains pending until a
+real `sleep.started` event completes it. Selection cites the exact emotion sample,
+practice cites the selection, and completion cites actual sleep, so a narrated coping
+claim cannot manufacture recovery.
 
 1. During waking, track perceived experiences, unfinished concerns and affect.
 2. Sleep begins when the chosen schedule/needs allow it, not merely because a

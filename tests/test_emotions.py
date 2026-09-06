@@ -7,6 +7,7 @@ from eidos.domain.emotions import (
     emotional_planning_bias,
     project_emotion,
 )
+from eidos.domain.events import DomainEvent
 from eidos.domain.state import PathosState
 
 
@@ -50,6 +51,72 @@ class EmotionTests(unittest.TestCase):
                 )
             )
         )
+
+    def test_opposed_recent_appraisals_preserve_a_mixed_emotional_state(self):
+        at = datetime(2026, 1, 2, 18, tzinfo=timezone.utc)
+        welcome = DomainEvent(
+            "appraisal.recorded",
+            "pathos",
+            {
+                "desirability": 0.6,
+                "simulated_at": (at - timedelta(hours=2)).isoformat(),
+            },
+        )
+        disappointment = DomainEvent(
+            "appraisal.recorded",
+            "pathos",
+            {
+                "desirability": -0.7,
+                "simulated_at": (at - timedelta(hours=1)).isoformat(),
+            },
+        )
+        state = PathosState(simulated_at=at, valence=0.2, arousal=0.5, awake=True)
+        events = emotion_sample_events([welcome, disappointment], state, at)
+        emotion = project_emotion([welcome, disappointment, *events])
+        self.assertEqual(emotion.secondary_label, "sadness")
+        self.assertAlmostEqual(emotion.complexity, 0.65)
+        self.assertEqual(emotion.positive_source_event_id, str(welcome.event_id))
+        self.assertEqual(emotion.negative_source_event_id, str(disappointment.event_id))
+        simple = emotional_planning_bias(0.2, 0.5)
+        mixed = emotional_planning_bias(0.2, 0.5, complexity=emotion.complexity)
+        self.assertLess(mixed.initiative, simple.initiative)
+        self.assertLess(mixed.risk_tolerance, simple.risk_tolerance)
+        history = [welcome, disappointment, *events]
+        one_hour_later = at + timedelta(hours=1)
+        continuation = emotion_sample_events(
+            history,
+            PathosState(simulated_at=one_hour_later, valence=0.15, arousal=0.45, awake=True),
+            one_hour_later,
+        )
+        self.assertEqual([event.kind for event in continuation], ["emotion.sampled"])
+        self.assertEqual(
+            project_emotion([*history, *continuation]).secondary_label,
+            "sadness",
+        )
+        after_window = at + timedelta(hours=13)
+        resolved = emotion_sample_events(
+            [*history, *continuation],
+            PathosState(simulated_at=after_window, awake=True),
+            after_window,
+        )
+        self.assertEqual(
+            [event.kind for event in resolved],
+            ["emotion.sampled", "emotion.mixed_state_resolved"],
+        )
+        self.assertIsNone(project_emotion([*history, *continuation, *resolved]).secondary_label)
+
+    def test_one_sided_appraisal_does_not_create_a_half_mixed_state(self):
+        at = datetime(2026, 1, 2, 18, tzinfo=timezone.utc)
+        appraisal = DomainEvent(
+            "appraisal.recorded",
+            "pathos",
+            {"desirability": 0.6, "simulated_at": at.isoformat()},
+        )
+        sample = emotion_sample_events([appraisal], PathosState(simulated_at=at, awake=True), at)
+        emotion = project_emotion(sample)
+        self.assertIsNone(emotion.secondary_label)
+        self.assertIsNone(emotion.positive_source_event_id)
+        self.assertEqual(emotion.complexity, 0.0)
 
 
 if __name__ == "__main__":

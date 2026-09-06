@@ -25,6 +25,7 @@ from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import development_events
+from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.inner_life import (
@@ -88,6 +89,7 @@ from eidos.domain.character_history import project_character_history
 from eidos.domain.commitments import project_renegotiations
 from eidos.domain.conversation_time import exchange_minutes, project_conversation_clocks
 from eidos.domain.development import project_development
+from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
@@ -506,6 +508,7 @@ class Life:
         relationship_repairs = project_relationship_repairs(history)
         resident_relationships = project_resident_relationships(history)
         character_history = project_character_history(history)
+        regulation = project_regulation(history)
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
         catalog = self._world_catalog(history)
@@ -721,6 +724,11 @@ class Life:
                 "relationship.repair_opened",
                 "relationship.repair_contacted",
                 "relationship.repair_became_dormant",
+                "emotion.regulation_selected",
+                "emotion.regulation_practiced",
+                "emotion.regulation_completed",
+                "emotion.mixed_state_recognized",
+                "emotion.mixed_state_resolved",
                 "npc.biography_disclosed",
                 "social.preference_remembered",
                 "social.preference_revised",
@@ -871,6 +879,7 @@ class Life:
                 vars_for(item) for item in resident_relationships.relationships.values()
             ],
             "character_histories": [vars_for(item) for item in character_history.facts.values()],
+            "emotional_regulation": [vars_for(item) for item in regulation.attempts.values()],
             "social_preferences": [vars_for(item) for item in social_preferences.values()],
             "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
             "season": season.name if season is not None else season_for(state.simulated_at),
@@ -906,7 +915,10 @@ class Life:
                 **vars_for(emotion),
                 "planning_bias": vars_for(
                     emotional_planning_bias(
-                        emotion.valence, emotion.arousal, emotion.sustained_low_hours
+                        emotion.valence,
+                        emotion.arousal,
+                        emotion.sustained_low_hours,
+                        emotion.complexity,
                     )
                 ),
             },
@@ -1210,6 +1222,8 @@ class Life:
                     "valence": project_feeling.valence,
                     "arousal": project_feeling.arousal,
                     "sustained_low_hours": project_feeling.sustained_low_hours,
+                    "secondary_label": project_feeling.secondary_label,
+                    "complexity": project_feeling.complexity,
                 },
                 values=project_identity_state.values,
                 preferences=project_identity_state.preferences,
@@ -1247,6 +1261,8 @@ class Life:
                     "valence": current_emotion.valence,
                     "arousal": current_emotion.arousal,
                     "sustained_low_hours": current_emotion.sustained_low_hours,
+                    "secondary_label": current_emotion.secondary_label,
+                    "complexity": current_emotion.complexity,
                 },
                 values=agency_identity.values,
                 preferences=agency_identity.preferences,
@@ -1284,6 +1300,7 @@ class Life:
                     emotion_before_beat.valence,
                     emotion_before_beat.arousal,
                     emotion_before_beat.sustained_low_hours,
+                    emotion_before_beat.complexity,
                 )
                 beat, emotional_reason = emotionally_adjusted_beat(
                     beat,
@@ -1518,6 +1535,7 @@ class Life:
                 phone_emotion.valence,
                 phone_emotion.arousal,
                 phone_emotion.sustained_low_hours,
+                phone_emotion.complexity,
             )
             incident_busy = active_incident_location(history + pending, current) is not None or any(
                 event.kind in {"incident.response_completed", "incident.response_abandoned"}
@@ -1655,6 +1673,7 @@ class Life:
                 invitation_emotion.valence,
                 invitation_emotion.arousal,
                 invitation_emotion.sustained_low_hours,
+                invitation_emotion.complexity,
             )
             invitation_catalog = self._world_catalog(history + pending)
             pending.extend(
@@ -1761,6 +1780,7 @@ class Life:
                         emotion_now.valence,
                         emotion_now.arousal,
                         emotion_now.sustained_low_hours,
+                        emotion_now.complexity,
                     )
                 ),
             }
@@ -2074,6 +2094,13 @@ class Life:
             episodes, state = affect_episode_events(history + pending, state, current)
             pending.extend(episodes)
             pending.extend(emotion_sample_events(history + pending, state, current))
+            regulation_events, state = emotional_regulation_events(
+                history + pending,
+                state,
+                project_emotion(history + pending),
+                current,
+            )
+            pending.extend(regulation_events)
             pending.extend(memory_retention_events(history + pending, current))
             if current.hour == 0:
                 pending.extend(
@@ -2606,6 +2633,7 @@ class Life:
                         state.valence,
                         state.arousal,
                         project_emotion(history).sustained_low_hours,
+                        project_emotion(history).complexity,
                     )
                 ),
             },

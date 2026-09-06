@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
@@ -19,6 +19,10 @@ class EmotionState:
     sustained_low_hours: int = 0
     pattern: str = "transient"
     simulated_at: str | None = None
+    secondary_label: str | None = None
+    complexity: float = 0.0
+    positive_source_event_id: str | None = None
+    negative_source_event_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,18 +59,29 @@ def classify_emotion(valence: float, arousal: float, sustained_low_hours: int = 
 
 
 def emotional_planning_bias(
-    valence: float, arousal: float, sustained_low_hours: int = 0
+    valence: float,
+    arousal: float,
+    sustained_low_hours: int = 0,
+    complexity: float = 0.0,
 ) -> EmotionalPlanningBias:
     _dimensions(valence, arousal)
+    if not 0 <= complexity <= 1:
+        raise ValueError("Emotional complexity must be between zero and one")
     positive = max(0.0, valence)
     negative = max(0.0, -valence)
     strain = max(0.0, arousal - 0.6)
     persistence = min(0.3, sustained_low_hours / 240)
     return EmotionalPlanningBias(
-        initiative=_clamp(0.55 + 0.25 * positive - 0.3 * negative - persistence),
+        initiative=_clamp(
+            0.55 + 0.25 * positive - 0.3 * negative - persistence - 0.08 * complexity
+        ),
         social_openness=_clamp(0.55 + 0.3 * positive - 0.25 * negative - 0.2 * strain),
-        risk_tolerance=_clamp(0.5 + 0.15 * positive - 0.25 * negative - 0.35 * strain),
-        pace=_clamp(0.6 + 0.2 * positive - 0.2 * negative - 0.25 * strain - persistence),
+        risk_tolerance=_clamp(
+            0.5 + 0.15 * positive - 0.25 * negative - 0.35 * strain - 0.12 * complexity
+        ),
+        pace=_clamp(
+            0.6 + 0.2 * positive - 0.2 * negative - 0.25 * strain - persistence - 0.05 * complexity
+        ),
     )
 
 
@@ -86,6 +101,18 @@ def emotion_sample_events(
     label = classify_emotion(state.valence, state.arousal, low_hours)
     intensity = _clamp(max(abs(state.valence), abs(state.arousal - 0.35) * 1.25))
     pattern = "prolonged" if low_hours >= 72 else "sustained" if low_hours >= 24 else "transient"
+    positive, negative = _recent_opposed_appraisals(history, at, previous)
+    secondary_label = None
+    complexity = 0.0
+    if positive is not None and negative is not None:
+        positive_weight = float(positive.payload["desirability"])
+        negative_weight = abs(float(negative.payload["desirability"]))
+        complexity = _clamp((positive_weight + negative_weight) / 2)
+        secondary_label = (
+            ("sadness" if negative_weight >= 0.5 else "unease")
+            if state.valence >= 0
+            else ("hope" if positive_weight >= 0.5 else "warmth")
+        )
     source = next(
         (
             event
@@ -94,32 +121,118 @@ def emotion_sample_events(
         ),
         None,
     )
-    return [
-        DomainEvent(
-            "emotion.sampled",
-            "pathos",
-            {
-                "sample_id": sample_id,
-                "label": label,
-                "intensity": intensity,
-                "valence": state.valence,
-                "arousal": state.arousal,
-                "sustained_low_hours": low_hours,
-                "pattern": pattern,
-                "source_event_id": str(source.event_id) if source else None,
-                "simulated_at": at.isoformat(),
-                "clinical_diagnosis": False,
-            },
-            causation_id=source.event_id if source else None,
-            correlation_id=f"affect-{at.date().isoformat()}",
+    sampled = DomainEvent(
+        "emotion.sampled",
+        "pathos",
+        {
+            "sample_id": sample_id,
+            "label": label,
+            "intensity": intensity,
+            "valence": state.valence,
+            "arousal": state.arousal,
+            "sustained_low_hours": low_hours,
+            "pattern": pattern,
+            "source_event_id": str(source.event_id) if source else None,
+            "simulated_at": at.isoformat(),
+            "clinical_diagnosis": False,
+        },
+        causation_id=source.event_id if source else None,
+        correlation_id=f"affect-{at.date().isoformat()}",
+    )
+    output = [sampled]
+    if positive is not None and negative is not None and secondary_label is not None:
+        positive_id = str(positive.event_id)
+        negative_id = str(negative.event_id)
+        changed = (
+            previous.positive_source_event_id != positive_id
+            or previous.negative_source_event_id != negative_id
+            or previous.secondary_label != secondary_label
         )
-    ]
+        if changed:
+            output.append(
+                DomainEvent(
+                    "emotion.mixed_state_recognized",
+                    "pathos",
+                    {
+                        "mixed_state_id": f"mixed:{sample_id}",
+                        "secondary_label": secondary_label,
+                        "complexity": complexity,
+                        "positive_source_event_id": positive_id,
+                        "negative_source_event_id": negative_id,
+                        "reason": f"{label} remained alongside {secondary_label}",
+                        "simulated_at": at.isoformat(),
+                    },
+                    causation_id=negative.event_id,
+                    correlation_id=f"affect-{at.date().isoformat()}",
+                )
+            )
+    elif previous.secondary_label is not None:
+        output.append(
+            DomainEvent(
+                "emotion.mixed_state_resolved",
+                "pathos",
+                {
+                    "positive_source_event_id": previous.positive_source_event_id,
+                    "negative_source_event_id": previous.negative_source_event_id,
+                    "reason": "The opposed appraisal pair moved outside the active window.",
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=sampled.event_id,
+                correlation_id=f"affect-{at.date().isoformat()}",
+            )
+        )
+    return output
 
 
 def project_emotion(events: Sequence[DomainEvent]) -> EmotionState:
     state = EmotionState()
+    prior: dict[str, DomainEvent] = {}
     for event in events:
+        if event.kind == "emotion.mixed_state_recognized":
+            secondary = event.payload.get("secondary_label")
+            positive_source = event.payload.get("positive_source_event_id")
+            negative_source = event.payload.get("negative_source_event_id")
+            complexity = _number(event.payload.get("complexity"), "complexity")
+            positive = prior.get(str(positive_source))
+            negative = prior.get(str(negative_source))
+            if (
+                not isinstance(secondary, str)
+                or not secondary.strip()
+                or not 0 < complexity <= 1
+                or positive is None
+                or negative is None
+                or positive.kind != "appraisal.recorded"
+                or negative.kind != "appraisal.recorded"
+                or float(positive.payload.get("desirability", 0)) < 0.3
+                or float(negative.payload.get("desirability", 0)) > -0.3
+                or event.causation_id != negative.event_id
+            ):
+                raise ValueError("Mixed emotion requires opposed appraisal evidence")
+            state = replace(
+                state,
+                secondary_label=secondary.strip(),
+                complexity=complexity,
+                positive_source_event_id=str(positive_source),
+                negative_source_event_id=str(negative_source),
+            )
+            prior[str(event.event_id)] = event
+            continue
+        if event.kind == "emotion.mixed_state_resolved":
+            if state.secondary_label is None or event.causation_id not in {
+                item.event_id for item in prior.values() if item.kind == "emotion.sampled"
+            }:
+                raise ValueError("Only a sampled mixed emotion can resolve")
+            state = replace(
+                state,
+                secondary_label=None,
+                complexity=0.0,
+                positive_source_event_id=None,
+                negative_source_event_id=None,
+            )
+            prior[str(event.event_id)] = event
+            continue
         if event.kind != "emotion.sampled":
+            prior[str(event.event_id)] = event
             continue
         payload = event.payload
         label = payload.get("label")
@@ -145,14 +258,85 @@ def project_emotion(events: Sequence[DomainEvent]) -> EmotionState:
         ):
             raise ValueError("Emotion intensity or duration is invalid")
         state = EmotionState(
-            str(label), intensity, valence, arousal, low_hours, str(pattern), simulated_at
+            label=str(label),
+            intensity=intensity,
+            valence=valence,
+            arousal=arousal,
+            sustained_low_hours=low_hours,
+            pattern=str(pattern),
+            simulated_at=simulated_at,
+            secondary_label=state.secondary_label,
+            complexity=state.complexity,
+            positive_source_event_id=state.positive_source_event_id,
+            negative_source_event_id=state.negative_source_event_id,
         )
+        prior[str(event.event_id)] = event
     return state
 
 
 def _dimensions(valence: float, arousal: float) -> None:
     if not -1 <= valence <= 1 or not 0 <= arousal <= 1:
         raise ValueError("Emotion dimensions are outside their bounds")
+
+
+def _recent_opposed_appraisals(
+    events: Sequence[DomainEvent], at: datetime, previous: EmotionState
+) -> tuple[DomainEvent | None, DomainEvent | None]:
+    positive = None
+    negative = None
+    cutoff = at - timedelta(hours=12)
+    by_id = {str(event.event_id): event for event in events}
+    carried_positive = by_id.get(previous.positive_source_event_id or "")
+    carried_negative = by_id.get(previous.negative_source_event_id or "")
+    if _eligible_appraisal(carried_positive, cutoff, at, positive=True) and _eligible_appraisal(
+        carried_negative, cutoff, at, positive=False
+    ):
+        return carried_positive, carried_negative
+    for event in reversed(events):
+        if event.kind != "appraisal.recorded":
+            continue
+        raw_time = event.payload.get("simulated_at")
+        desirability = event.payload.get("desirability")
+        if (
+            not isinstance(raw_time, str)
+            or isinstance(desirability, bool)
+            or not isinstance(desirability, (int, float))
+        ):
+            continue
+        try:
+            event_time = datetime.fromisoformat(raw_time)
+        except ValueError:
+            continue
+        if event_time.utcoffset() is None or event_time < cutoff or event_time > at:
+            continue
+        if positive is None and desirability >= 0.3:
+            positive = event
+        elif negative is None and desirability <= -0.3:
+            negative = event
+        if positive is not None and negative is not None:
+            break
+    return positive, negative
+
+
+def _eligible_appraisal(
+    event: DomainEvent | None, cutoff: datetime, at: datetime, *, positive: bool
+) -> bool:
+    if event is None or event.kind != "appraisal.recorded":
+        return False
+    raw_time = event.payload.get("simulated_at")
+    desirability = event.payload.get("desirability")
+    if (
+        not isinstance(raw_time, str)
+        or isinstance(desirability, bool)
+        or not isinstance(desirability, (int, float))
+    ):
+        return False
+    try:
+        event_time = datetime.fromisoformat(raw_time)
+    except ValueError:
+        return False
+    threshold_met = desirability >= 0.3 if positive else desirability <= -0.3
+    return event_time.utcoffset() is not None and cutoff <= event_time <= at and threshold_met
 
 
 def _clamp(value: float) -> float:

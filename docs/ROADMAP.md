@@ -223,6 +223,11 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
 - Permit mundane dreams, nightmares and no recalled dream. Avoid forced profoundness.
 - Waking carries limited, decaying affect and partially recalled fragments. Dream
   inspiration must pass through ordinary planning before it changes behavior.
+- Opposed recent appraisals now survive as source-linked mixed emotion rather than
+  cancelling into a deceptively neutral label. Complexity modestly slows initiative,
+  pace and risk. Rate-limited regulation can lower arousal or protect a sleep intention,
+  but never directly turns sadness into happiness; protected rest completes only when
+  sleep actually begins.
 - Dream journal with recalled content; operator-only seed/effect provenance.
 
 Exit: concern → dream seed → bounded waking effect → later consideration works;
