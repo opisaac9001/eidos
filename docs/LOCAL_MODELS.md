@@ -66,6 +66,26 @@ Dreams and thoughts are separate event categories, not factual autobiographical
 memories. Stronger continuity evaluation and better performers remain necessary.
 All inference here is sequential to avoid saturating the shared small server.
 
+## Semantic probe recheck — September 6, 2026
+
+The lab endpoint remained reachable and was probed read-only with synthetic context
+after semantic warnings were added. Qwen completed seven of eight contracts on the
+tightened run; Oneiros exceeded the bounded completion, while accepted Murmur and
+Reflection responses were independently flagged for excessive length and context
+drift. Calls took roughly 0.7–21.4 seconds. An immediately preceding Qwen run completed
+all contracts but produced invented appointments and an identity-confused dream,
+which directly informed the added commitment, identity, length, and internal-repetition
+checks. The variation between two runs is itself evidence that a single green probe is
+not a quality certificate.
+
+The `smollm2:135m` comparison completed only five of eight contracts. Pathos and
+Oneiros returned incomplete envelopes and Firmament omitted Rowan. Among accepted
+outputs, the evaluator flagged overlong Murmur prose, Reflection losing first-person
+voice, and Chronicler nearly duplicating another role. Calls took roughly 0.3–8.2
+seconds. This keeps the tiny model classified as a transport/failure fixture, not a
+candidate for autonomous life simulation. Qwen remains a better development bridge,
+but neither model is approved for unattended world state.
+
 The connected integration run bootstrapped a new world, advanced 24 hours,
 exchanged a chat message, and reconstructed state from SQLite. It reached day 2
 at 08:00 with 10 memories and two conversation messages. Of 36 performer calls,

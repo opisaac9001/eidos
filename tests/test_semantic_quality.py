@@ -42,6 +42,23 @@ class SemanticQualityTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_detects_unauthorized_plan_identity_confusion_and_verbose_repetition(self):
+        context = {
+            "time": "2026-01-01T13:00:00+00:00",
+            "forbidden_identity_claims": ["Mara"],
+        }
+        self.assertIn(
+            "unauthorized_commitment",
+            semantic_quality_findings(
+                "murmur", "I'm meeting Mara at the library for a project this afternoon.", context
+            ),
+        )
+        dream = "In a dream, I was Mara. " + "The square and cafe circled through the dream. " * 20
+        findings = semantic_quality_findings("oneiros", dream, context)
+        self.assertIn("identity_confusion", findings)
+        self.assertIn("excessive_length", findings)
+        self.assertIn("internally_repetitive", findings)
+
 
 if __name__ == "__main__":
     unittest.main()

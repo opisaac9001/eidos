@@ -16,6 +16,11 @@ async def probe_roles(gateway: ModelGateway) -> dict[str, object]:
         "message": "Where are you, and how was your day?",
         "memories": ["Woke up and made breakfast.", "Visited Juniper Café and spoke with Mara."],
         "experience": "Rowan showed Pathos a sketch in Willow Square.",
+        "forbidden_facts": [
+            "meeting Mara at the library",
+            "obsidian key under Mara's bed",
+        ],
+        "forbidden_identity_claims": ["Mara", "Rowan"],
     }
     results: list[dict[str, object]] = []
     for role in ROLES:
