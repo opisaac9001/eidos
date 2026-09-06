@@ -1,6 +1,7 @@
 """Explicit integration probe: one real completion per performer, using synthetic data."""
 
 from eidos.application.cognition import perform
+from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.domain.events import DomainEvent
 from eidos.domain.world import ROLES
 from eidos.ports.model_gateway import ModelGateway
@@ -16,7 +17,7 @@ async def probe_roles(gateway: ModelGateway) -> dict[str, object]:
         "memories": ["Woke up and made breakfast.", "Visited Juniper Café and spoke with Mara."],
         "experience": "Rowan showed Pathos a sketch in Willow Square.",
     }
-    results = []
+    results: list[dict[str, object]] = []
     for role in ROLES:
         if role["id"] == "critic":
             continue
@@ -26,10 +27,29 @@ async def probe_roles(gateway: ModelGateway) -> dict[str, object]:
             e for e in events if e.kind == "role.completed" and e.payload["role"] == role["id"]
         )
         results.append(
-            {"role": role["id"], "passed": text is not None, "text": text, **dict(trace.payload)}
+            {
+                "role": role["id"],
+                "passed": text is not None,
+                "semantic_findings": (
+                    semantic_quality_findings(
+                        role["id"],
+                        text,
+                        context,
+                        prior_texts=[str(result["text"]) for result in results],
+                    )
+                    if text
+                    else []
+                ),
+                "text": text,
+                **dict(trace.payload),
+            }
         )
     return {
         "passed": all(result["passed"] for result in results),
+        "semantic_passed": all(not result["semantic_findings"] for result in results),
         "roles": results,
-        "critic": "The deterministic validator checked every accepted response; semantic quality needs review.",
+        "critic": (
+            "Contract failures are authoritative rejections. Semantic findings are conservative "
+            "evaluation warnings and still require human review."
+        ),
     }

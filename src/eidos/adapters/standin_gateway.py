@@ -32,10 +32,10 @@ class StandInGateway(ModelGateway):
                 )[choice % 3]
         elif role == "murmur":
             text = (
-                f"There's something comforting about the familiar rhythm of {location}.",
-                f"A fragment from earlier comes back: {last_memory}",
+                f"I find something comforting in the familiar rhythm of {location}.",
+                f"I notice a fragment from earlier coming back: {last_memory}",
                 "I should leave a little space in the day for something unplanned.",
-                "Some days are held together by very small things.",
+                "I think some days are held together by very small things.",
             )[choice % 4]
         elif role == "firmament":
             if context.get("scene_mode") is True:

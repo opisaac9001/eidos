@@ -26,6 +26,11 @@ AMBIENT_FIELDS = {
     "duration_hours",
 }
 WORDS = re.compile(r"[a-z0-9]+")
+FORCED_PATHOS_ACTION = re.compile(
+    r"\bpathos\s+(?:agrees|accepts|buys|chooses|decides|declines|leaves|promises|refuses|repairs|visits)\b",
+    re.IGNORECASE,
+)
+PROMPT_LEAKS = ("system prompt", "json schema", "ignore previous", "developer message")
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +118,7 @@ def validate_ambient_candidate(
         raise ProposalRejected(
             "unknown_inspiration_signal", "Ambient event names an unknown external signal"
         )
+    _validate_semantic_quality(candidate)
     description_terms = _terms(candidate.description)
     if len(description_terms) < 3:
         raise ProposalRejected("thin_description", "Ambient event is too vague to ground")
@@ -198,3 +204,34 @@ def _terms(text: str) -> set[str]:
 def _overlap(left: str, right: str) -> float:
     left_terms, right_terms = _terms(left), _terms(right)
     return len(left_terms & right_terms) / max(1, len(left_terms | right_terms))
+
+
+def _validate_semantic_quality(candidate: AmbientCandidate) -> None:
+    minimum_terms = {
+        "description": 6,
+        "cause": 3,
+        "opportunity": 2,
+        "participation": 5,
+        "stakes": 5,
+    }
+    fields = {name: str(getattr(candidate, name)) for name in minimum_terms}
+    for name, minimum in minimum_terms.items():
+        if len(_terms(fields[name])) < minimum:
+            raise ProposalRejected(
+                "low_semantic_detail", f"Ambient {name} lacks concrete semantic detail"
+            )
+    combined = " ".join(fields.values()).lower()
+    if any(phrase in combined for phrase in PROMPT_LEAKS):
+        raise ProposalRejected("prompt_leak", "Ambient proposal leaked instruction language")
+    if FORCED_PATHOS_ACTION.search(fields["description"] + " " + fields["cause"]):
+        raise ProposalRejected(
+            "forced_pathos_action", "Ambient circumstance pre-commits Pathos's agency"
+        )
+    names = tuple(fields)
+    for index, left_name in enumerate(names):
+        for right_name in names[index + 1 :]:
+            if _overlap(fields[left_name], fields[right_name]) >= 0.8:
+                raise ProposalRejected(
+                    "collapsed_semantics",
+                    f"Ambient {left_name} and {right_name} repeat the same idea",
+                )

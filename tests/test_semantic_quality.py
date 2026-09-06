@@ -1,0 +1,47 @@
+import unittest
+
+from eidos.application.semantic_quality import semantic_quality_findings
+
+
+class SemanticQualityTests(unittest.TestCase):
+    def test_detects_known_lab_failure_and_identity_leak(self):
+        context = {"time": "2026-01-01T13:00:00+00:00"}
+        self.assertIn(
+            "time_of_day_contradiction",
+            semantic_quality_findings("pathos", "Good morning, I'm doing well today.", context),
+        )
+        self.assertIn(
+            "role_or_prompt_leak",
+            semantic_quality_findings(
+                "pathos", "As an AI language model, I cannot remember that.", context
+            ),
+        )
+
+    def test_detects_forbidden_perspective_and_repeated_prose(self):
+        context = {
+            "time": "2026-01-01T14:00:00+00:00",
+            "forbidden_facts": ["obsidian key under Mara's bed"],
+        }
+        text = "I know about the obsidian key under Mara's bed, although she never told me."
+        findings = semantic_quality_findings(
+            "pathos",
+            text,
+            context,
+            prior_texts=[
+                "I know about the obsidian key under Mara's bed, though she never told me."
+            ],
+        )
+        self.assertIn("forbidden_knowledge_leak", findings)
+        self.assertIn("near_duplicate_prose", findings)
+
+    def test_clean_first_person_output_has_no_warning(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            "I'm at Willow Square, thinking about the sketch Rowan showed me.",
+            {"time": "2026-01-01T14:00:00+00:00"},
+        )
+        self.assertEqual(findings, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
