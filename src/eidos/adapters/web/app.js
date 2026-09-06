@@ -13,6 +13,8 @@ const labels = {
   "npc.encountered": "AN ENCOUNTER",
   "world.weather": "THE WORLD OUTSIDE",
   "world_event.occurred": "IN THE NEIGHBORHOOD",
+  "world.expansion_accepted": "THE WORLD GREW",
+  "world.expansion_rejected": "WORLD ADDITION DECLINED",
   "reflection.recorded": "EVENING REFLECTION",
   "dream.recorded": "A DREAM · NOT WORLD HISTORY",
   "day.summarized": "THE DAYBOOK",
@@ -203,7 +205,7 @@ function mapMarkup(large) {
       const occupants = state.people.filter(
         (person) => person.location_id === place.id && place.id !== "home",
       );
-      return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id]}</span><span class="place-label">${esc(place.label)}</span><span class="here">${here ? "● PATHOS" : occupants.length ? `${occupants.length} NEIGHBOR${occupants.length > 1 ? "S" : ""}` : " "}</span></button>`;
+      return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${here ? "● PATHOS" : occupants.length ? `${occupants.length} NEIGHBOR${occupants.length > 1 ? "S" : ""}` : " "}</span></button>`;
     })
     .join("");
 }

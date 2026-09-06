@@ -10,15 +10,9 @@ from uuid import UUID
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected
+from eidos.domain.world_catalog import SEED_ROUTE_MINUTES
 
-ROUTE_MINUTES: Mapping[frozenset[str], int] = {
-    frozenset(("home", "cafe")): 20,
-    frozenset(("cafe", "workshop")): 15,
-    frozenset(("workshop", "park")): 20,
-    frozenset(("park", "home")): 15,
-    frozenset(("home", "workshop")): 30,
-    frozenset(("cafe", "park")): 25,
-}
+ROUTE_MINUTES = SEED_ROUTE_MINUTES
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,10 +46,14 @@ _FIELDS = {
 }
 
 
-def route_duration(origin_id: str, destination_id: str) -> timedelta:
+def route_duration(
+    origin_id: str,
+    destination_id: str,
+    route_minutes: Mapping[frozenset[str], int] = ROUTE_MINUTES,
+) -> timedelta:
     if origin_id == destination_id:
         return timedelta(0)
-    minutes = ROUTE_MINUTES.get(frozenset((origin_id, destination_id)))
+    minutes = route_minutes.get(frozenset((origin_id, destination_id)))
     if minutes is None:
         raise ValueError("No route connects those locations")
     return timedelta(minutes=minutes)
@@ -104,6 +102,7 @@ def resolve_travel(
     known_location_ids: set[str],
     actual_revision: int,
     simulated_at: datetime,
+    route_minutes: Mapping[frozenset[str], int] = ROUTE_MINUTES,
 ) -> TravelResolution:
     common: dict[str, object] = {
         "proposal_id": proposal.proposal_id,
@@ -148,7 +147,7 @@ def resolve_travel(
     if proposal.arrive_at != simulated_at or proposal.depart_at >= proposal.arrive_at:
         return reject("invalid_window", "Arrival must match current time and follow departure")
     try:
-        minimum = route_duration(proposal.origin_id, proposal.destination_id)
+        minimum = route_duration(proposal.origin_id, proposal.destination_id, route_minutes)
     except ValueError:
         return reject("no_route", "No route connects those locations")
     if proposal.arrive_at - proposal.depart_at < minimum:

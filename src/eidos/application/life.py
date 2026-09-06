@@ -44,6 +44,7 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_improvisation import improvised_world_events
 from eidos.application.world_perception import (
     authored_community_schedule,
@@ -77,7 +78,8 @@ from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
 from eidos.domain.transfers import project_transfers
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
-from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
+from eidos.domain.world import ROLES
+from eidos.domain.world_catalog import WorldCatalog, project_world_catalog
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.event_store import (
     EventStore,
@@ -116,6 +118,7 @@ class Life:
         self.gateway = gateway
         self.mode = mode
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
+        self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -202,6 +205,22 @@ class Life:
             self._memory_cache = (len(history), str(history[-1].event_id), index)
         return index
 
+    def _world_catalog(self, history: list[DomainEvent]) -> WorldCatalog:
+        if self._world_catalog_cache is not None:
+            revision, anchor, catalog = self._world_catalog_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    catalog = catalog.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._world_catalog_cache = (len(history), anchor, catalog)
+                return catalog
+        catalog = project_world_catalog(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._world_catalog_cache = (len(history), anchor, catalog)
+        return catalog
+
     def _save_memory_index(self, history: list[DomainEvent]) -> None:
         if not history or not isinstance(self.store, MaterializedProjectionStore):
             return
@@ -233,11 +252,17 @@ class Life:
         history = self.history()
         state = self._project_state(history)
         identity = project_identity(history)
+        catalog = self._world_catalog(history)
         config = {"running": False, "minutes_per_tick": 15}
         weather = "Clear"
         relationships: dict[str, dict[str, Any]] = {
-            person["id"]: {"encounters": 0, "trust": 0.3, "familiarity": 0.2, "tension": 0.0}
-            for person in PEOPLE
+            person.person_id: {
+                "encounters": 0,
+                "trust": 0.3,
+                "familiarity": 0.2,
+                "tension": 0.0,
+            }
+            for person in catalog.people.values()
         }
         roles: dict[str, dict[str, Any]] = {
             str(role["id"]): {**role, "calls": 0, "last": None, "status": "idle"} for role in ROLES
@@ -337,6 +362,8 @@ class Life:
                 "npc.encountered",
                 "world.weather",
                 "world_event.occurred",
+                "world.expansion_accepted",
+                "world.expansion_rejected",
                 "reflection.recorded",
                 "dream.recorded",
                 "dream.recalled",
@@ -409,11 +436,16 @@ class Life:
         npc_state = project_npcs(history, state.simulated_at)
         population = [
             {
-                **person,
-                "location_id": npc_state.people[str(person["id"])].location_id,
-                **relationships[person["id"]],
+                "id": person.person_id,
+                "name": person.name,
+                "occupation": person.occupation,
+                "color": person.color,
+                "description": person.description,
+                "introduced": person.introduced,
+                "location_id": npc_state.people[person.person_id].location_id,
+                **relationships[person.person_id],
             }
-            for person in PEOPLE
+            for person in catalog.people.values()
         ]
         memory_index = self._memory_index(history)
         memories = memory_view(history, state.simulated_at, index=memory_index)
@@ -458,7 +490,7 @@ class Life:
             "pathos": {
                 "name": "Pathos",
                 "location_id": state.location_id,
-                "location": location_name(state.location_id),
+                "location": catalog.location_name(state.location_id),
                 "energy": state.energy,
                 "valence": state.valence,
                 "arousal": state.arousal,
@@ -480,7 +512,20 @@ class Life:
             "weather": weather,
             "season": season.name if season is not None else season_for(state.simulated_at),
             "config": config,
-            "locations": LOCATIONS,
+            "locations": [
+                {
+                    "id": place.place_id,
+                    "name": place.name,
+                    "label": place.label,
+                    "x": place.x,
+                    "y": place.y,
+                    "description": place.description,
+                    "introduced": place.introduced,
+                    "opens_hour": place.opens_hour,
+                    "closes_hour": place.closes_hour,
+                }
+                for place in catalog.places.values()
+            ],
             "people": population,
             "npc_states": [vars_for(person) for person in npc_state.people.values()],
             "npc_memories": npc_memories[-100:],
@@ -706,6 +751,14 @@ class Life:
             state = state.apply(pending[-1])
             pending.extend(season_change_events(history + pending, current))
             pending.extend(community_resource_events(history + pending, current))
+            pending.extend(
+                await expanding_world_events(
+                    history + pending,
+                    current,
+                    len(history) + len(pending),
+                    self.gateway,
+                )
+            )
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)
@@ -797,7 +850,10 @@ class Life:
                                     ),
                                 )
                             )
-                    duration = route_duration(state.location_id, beat.location_id)
+                    travel_catalog = self._world_catalog(history + pending)
+                    duration = route_duration(
+                        state.location_id, beat.location_id, travel_catalog.route_minutes
+                    )
                     travel = resolve_travel(
                         TravelProposal(
                             proposal_id=f"routine-travel-{at}",
@@ -810,9 +866,10 @@ class Life:
                         ),
                         history=history + pending,
                         actor_location_id=state.location_id,
-                        known_location_ids={str(place["id"]) for place in LOCATIONS},
+                        known_location_ids=set(travel_catalog.places),
                         actual_revision=len(history) + len(pending),
                         simulated_at=current,
+                        route_minutes=travel_catalog.route_minutes,
                     )
                     pending.extend(travel.events)
                     if not travel.accepted:
@@ -879,6 +936,10 @@ class Life:
                     self.gateway,
                     season=season_for(current),
                     weather=_latest_weather(history + pending),
+                    known_locations={
+                        place.place_id: place.name
+                        for place in self._world_catalog(history + pending).places.values()
+                    },
                 )
             )
             npc_locations = {
@@ -956,6 +1017,7 @@ class Life:
                     pending.append(event)
                     state = state.apply(event)
             planning_now = project_planning(history + pending)
+            catalog_now = self._world_catalog(history + pending)
             inspirations_now = active_dream_inspirations(history + pending, current)
             active_goal_ids = {
                 goal.goal_id for goal in planning_now.goals.values() if goal.status == "active"
@@ -963,7 +1025,7 @@ class Life:
             concerns_now = active_concerns(history + pending)
             recall_query = " ".join(
                 [
-                    location_name(state.location_id),
+                    catalog_now.location_name(state.location_id),
                     *(str(concern.payload["text"]) for concern in concerns_now[-2:]),
                     *(planning_now.goals[goal_id].title for goal_id in active_goal_ids),
                 ]
@@ -976,9 +1038,9 @@ class Life:
                 entity_ids={state.location_id},
                 goal_ids=active_goal_ids,
                 relationship_ids={
-                    str(person["id"])
-                    for person in PEOPLE
-                    if terms(str(person["name"])) & terms(recall_query)
+                    person.person_id
+                    for person in catalog_now.people.values()
+                    if terms(person.name) & terms(recall_query)
                 },
                 diverse=True,
                 index=self._memory_index(history + pending),
@@ -987,7 +1049,7 @@ class Life:
             identity_now = project_identity(history + pending)
             development_now = project_development(history + pending)
             context = {
-                "location": location_name(state.location_id),
+                "location": catalog_now.location_name(state.location_id),
                 "time": at,
                 "memories": memories,
                 "identity": {
@@ -1045,7 +1107,7 @@ class Life:
                     resolution = resolve_world_event(
                         proposal,
                         history=history + pending,
-                        known_location_ids={str(place["id"]) for place in LOCATIONS},
+                        known_location_ids=set(catalog_now.places),
                         actual_revision=len(history) + len(pending),
                         simulated_at=current,
                     )
@@ -1101,13 +1163,13 @@ class Life:
                     pending.extend(association.events)
             if beat and state.location_id != "home":
                 npc_state_now = project_npcs(history + pending, current)
-                for person in PEOPLE:
-                    if npc_state_now.people[str(person["id"])].location_id != state.location_id:
+                for person in catalog_now.people.values():
+                    if npc_state_now.people[person.person_id].location_id != state.location_id:
                         continue
                     text = await perform(
                         self.gateway,
                         "firmament",
-                        {**context, "person": person["name"]},
+                        {**context, "person": person.name},
                         at,
                         pending,
                     )
@@ -1116,7 +1178,7 @@ class Life:
                             "npc.encountered",
                             "pathos",
                             {
-                                "person_id": person["id"],
+                                "person_id": person.person_id,
                                 "text": text,
                                 "simulated_at": at,
                                 "location_id": state.location_id,
@@ -1155,7 +1217,7 @@ class Life:
                                         "source": "source-archive" if recovered else self.mode,
                                         "source_event_id": str(encounter.event_id),
                                         "location_id": state.location_id,
-                                        "person_id": person["id"],
+                                        "person_id": person.person_id,
                                         "role": "source-archive" if recovered else "mnemosyne",
                                         "owner": "pathos",
                                         "importance": 0.75,
@@ -1599,10 +1661,15 @@ class Life:
             identity = project_identity(history + pending)
         query_terms = terms(text)
         planning = project_planning(history)
+        catalog = self._world_catalog(history)
         entity_ids = {
-            str(entity["id"])
-            for entity in (*PEOPLE, *LOCATIONS)
-            if terms(str(entity["name"])) & query_terms or str(entity["id"]) in query_terms
+            person.person_id
+            for person in catalog.people.values()
+            if terms(person.name) & query_terms or person.person_id in query_terms
+        } | {
+            place.place_id
+            for place in catalog.places.values()
+            if terms(place.name) & query_terms or place.place_id in query_terms
         }
         entity_ids.update(
             item.object_id
@@ -1610,7 +1677,7 @@ class Life:
             if terms(item.name) & query_terms or item.object_id in query_terms
         )
         relationship_ids = {
-            str(person["id"]) for person in PEOPLE if str(person["id"]) in entity_ids
+            person.person_id for person in catalog.people.values() if person.person_id in entity_ids
         }
         goal_ids = {
             goal.goal_id
@@ -1631,7 +1698,7 @@ class Life:
         context = {
             "message": text.strip(),
             "time": at,
-            "location": location_name(state.location_id),
+            "location": catalog.location_name(state.location_id),
             "mood": mood_name(state.energy, state.valence, state.arousal),
             "identity": {
                 "values": dict(identity.values),

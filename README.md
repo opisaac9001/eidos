@@ -164,6 +164,10 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   physical community resource at the right place and is cancelled if it becomes
   unavailable. Existing four-resource worlds receive only the twelve missing objects
   during the version-two upgrade.
+- The seed cast and map are no longer hard ceilings. Rare Moira expansion proposals
+  can register a new person, useful object, or connected place after strict identity,
+  collision, location, route, hours, and layout checks. Existing databases project
+  the original world unchanged; accepted additions are ordinary replayable events.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

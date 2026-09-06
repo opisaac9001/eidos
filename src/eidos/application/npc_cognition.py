@@ -8,7 +8,7 @@ from typing import Sequence
 from eidos.domain.beliefs import BeliefProposal, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
-from eidos.domain.world import NPC_PLAN_PROFILES
+from eidos.domain.world import npc_plan_profile
 
 
 def npc_belief_events(history: Sequence[DomainEvent], simulated_at: str) -> list[DomainEvent]:
@@ -78,7 +78,7 @@ def npc_belief_events(history: Sequence[DomainEvent], simulated_at: str) -> list
                 latest_plan_at.get(owner), now
             ):
                 continue
-            profile = NPC_PLAN_PROFILES[owner]
+            profile = npc_plan_profile(owner, location_id)
             scheduled_for = _next_noon(now)
             plan = DomainEvent(
                 "npc.plan_created",
@@ -229,7 +229,7 @@ def _need_plan(actor_id: str, need: str, now: datetime) -> tuple[str, str, str, 
     if need == "connection" and actor_id == "ellis":
         evening = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
         return "walk", "park", "Take an evening walk where neighbors may be around", evening
-    profile = NPC_PLAN_PROFILES[actor_id]
+    profile = npc_plan_profile(actor_id)
     title = (
         "Make room for people at the café"
         if actor_id == "mara" and need == "connection"

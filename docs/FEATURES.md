@@ -58,14 +58,14 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four places + typed routes/open hours | P3 |
+| WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/route validation | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers + finite community-event resources | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans + completed bookbinding project | P3 |
-| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted state + perception- and need-driven private goals with causal scheduled plans | P3 |
+| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed and newly registered people receive persisted offscreen state plus perception- and need-driven private goals | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, resource-backed events, and schema-checked open-ended Moira proposals with lead time/novelty/cooldowns | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
-| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons + daily texture + upgradeable sixteen-event resource-backed neighborhood pack | P6 |
+| WORLD-08 | Seasons, recurring events, evolving projects, world packs | Partial: replayable seasons, daily texture, sixteen-event pack, and rare schema-checked additions of people/objects/connected places | P6 |
 
 ## Interaction catalog — Pathos and NPC performers
 

@@ -62,11 +62,11 @@ class MonthSoakTests(unittest.TestCase):
                     if event.kind == "npc.plan_created"
                     and event.payload.get("motivation_need") is not None
                 },
-                {"mara", "ellis", "rowan"},
+                {"mara", "ellis", "rowan", "nina-vale"},
             )
             self.assertEqual(
                 {event.payload["actor_id"] for event in events if event.kind == "npc.goal_formed"},
-                {"mara", "ellis", "rowan"},
+                {"mara", "ellis", "rowan", "nina-vale"},
             )
             self.assertTrue(
                 all(
@@ -74,9 +74,9 @@ class MonthSoakTests(unittest.TestCase):
                     for person in snapshot["npc_states"]
                 )
             )
-            self.assertEqual(
-                {item["owner_id"] for item in snapshot["npc_beliefs"]},
-                {"mara", "ellis", "rowan"},
+            self.assertTrue(
+                {"mara", "ellis", "rowan"}
+                <= {item["owner_id"] for item in snapshot["npc_beliefs"]},
             )
             self.assertTrue(all(0 <= item["level"] <= 1 for item in snapshot["skills"]))
             self.assertTrue(all(0 <= item["strength"] <= 1 for item in snapshot["habits"]))
@@ -109,6 +109,9 @@ class MonthSoakTests(unittest.TestCase):
                     for event in events
                 )
             )
+            self.assertIn("nina-vale", {person["id"] for person in snapshot["people"]})
+            self.assertIn("old-glasshouse", {place["id"] for place in snapshot["locations"]})
+            self.assertIn("blue-handcart", {item["object_id"] for item in snapshot["objects"]})
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ ROLE_PROMPTS = {
     "oneiros": "Write a brief surreal dream inspired by the supplied memories, location, emotion, and dream-layer focus. Emotion may color the dream but does not establish facts or causes. Begin with 'In a dream'. It is explicitly fiction, never factual memory.",
     "chronicler": "Summarize only the supplied memories in two sentences. Do not invent events, people, places, or causality.",
     "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Supply an opportunity for future interaction, but do not claim consequences or completed actions. This is a proposal, not a fact.",
+    "moira_expansion": "Act as a restrained but imaginative world builder. Propose one genuinely new person, useful object, or reachable neighborhood place that could support many future stories. Avoid duplicates and generic fantasy spectacle. Return a proposal only; registration rules decide whether it exists.",
 }
 
 ROLE_FIELDS = {
@@ -56,6 +57,7 @@ ROLE_FIELDS = {
         "recent_events",
         "permission",
     ),
+    "moira_expansion": ("time", "known_places", "known_people", "instruction"),
 }
 
 
@@ -86,7 +88,7 @@ class HTTPModelGateway(ModelGateway):
     def _generate(self, request: ModelRequest) -> ModelResponse:
         if request.capability not in ROLE_PROMPTS:
             raise ValueError("Unknown model capability")
-        if request.capability == "moira_event":
+        if request.capability in {"moira_event", "moira_expansion"}:
             system = (
                 "You are one performer in Eidos, a fictional neighborhood simulation. "
                 "Return only JSON conforming exactly to the supplied schema. Do not include markdown. "
@@ -109,7 +111,8 @@ class HTTPModelGateway(ModelGateway):
             + [{"role": "user", "content": json.dumps(context)}],
             "max_tokens": min(request.max_output_tokens, 384),
             "temperature": min(
-                request.temperature, 0.95 if request.capability == "moira_event" else 0.2
+                request.temperature,
+                0.95 if request.capability in {"moira_event", "moira_expansion"} else 0.2,
             ),
             "stream": False,
         }

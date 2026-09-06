@@ -56,6 +56,11 @@ class AmbientCandidateTests(unittest.TestCase):
         self.assertEqual(set(schema["required"]), set(schema["properties"]))
         self.assertNotIn("enum", schema["properties"]["event_type"])
         self.assertFalse(schema["additionalProperties"])
+        expanded = ambient_output_schema(("park", "old-glasshouse"))
+        self.assertEqual(
+            expanded["properties"]["location_id"]["enum"],
+            ["park", "old-glasshouse"],
+        )
 
 
 if __name__ == "__main__":

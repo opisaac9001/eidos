@@ -116,19 +116,21 @@ def location_allows_interval(location_id: str, starts_at: datetime, ends_at: dat
     return starts_at.time() >= opens_at and ends_at.time() <= closes_at
 
 
-def npc_location(person_id: str, hour: int) -> str:
+def npc_location(person_id: str, hour: int, home_location_id: str = "home") -> str:
     if person_id == "mara":
         return "cafe" if 7 <= hour < 17 else "home"
     if person_id == "ellis":
         return "workshop" if 9 <= hour < 18 else "park" if 18 <= hour < 20 else "home"
-    return "park" if 11 <= hour < 16 else "cafe" if 8 <= hour < 11 else "home"
+    if person_id == "rowan":
+        return "park" if 11 <= hour < 16 else "cafe" if 8 <= hour < 11 else "home"
+    return home_location_id if 8 <= hour < 17 else "home"
 
 
 def npc_activity(person_id: str, location_id: str) -> tuple[str, str]:
     """Return the structured action and private narration for an ordinary activity."""
     if location_id == "home":
         return "rest", "resting at home"
-    return {
+    known = {
         "mara": ("host", "running the cafe"),
         "ellis": (
             ("repair", "working on repairs")
@@ -138,7 +140,19 @@ def npc_activity(person_id: str, location_id: str) -> tuple[str, str]:
         "rowan": (
             ("sketch", "sketching") if location_id == "park" else ("visit", "visiting the cafe")
         ),
-    }[person_id]
+    }
+    return known.get(person_id, ("attend", "spending time nearby"))
+
+
+def npc_plan_profile(person_id: str, location_id: str = "park") -> dict[str, str]:
+    profile = NPC_PLAN_PROFILES.get(person_id)
+    if profile is not None:
+        return profile
+    return {
+        "action": "attend",
+        "location_id": location_id,
+        "title": "Spend time among familiar people",
+    }
 
 
 def location_name(location_id: str) -> str:

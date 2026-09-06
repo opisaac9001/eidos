@@ -102,13 +102,15 @@ def validate_ambient_candidate(
             break
 
 
-def ambient_output_schema() -> Mapping[str, object]:
+def ambient_output_schema(
+    known_location_ids: Sequence[str] = ("home", "cafe", "workshop", "park"),
+) -> Mapping[str, object]:
     return {
         "type": "object",
         "properties": {
             "description": {"type": "string", "minLength": 1, "maxLength": 220},
             "event_type": {"type": "string", "minLength": 1, "maxLength": 40},
-            "location_id": {"type": "string", "enum": ["home", "cafe", "workshop", "park"]},
+            "location_id": {"type": "string", "enum": list(known_location_ids)},
             "cause": {"type": "string", "minLength": 1, "maxLength": 140},
             "theme": {"type": "string", "minLength": 1, "maxLength": 40},
             "opportunity": {"type": "string", "minLength": 1, "maxLength": 40},

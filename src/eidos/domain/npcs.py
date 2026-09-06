@@ -15,6 +15,7 @@ from eidos.domain.world import PEOPLE, npc_location
 class NPCState:
     actor_id: str
     location_id: str = "home"
+    usual_location_id: str = "home"
     energy: float = 0.7
     connection: float = 0.5
     purpose: float = 0.5
@@ -43,6 +44,16 @@ class NPCWorldState:
 
     def apply(self, event: DomainEvent) -> NPCWorldState:
         people = dict(self.people)
+        if event.kind == "world.person_registered":
+            introduced_id = _required(event, "entity_id")
+            if introduced_id in people:
+                raise ValueError("Registered world person already exists in NPC state")
+            people[introduced_id] = NPCState(
+                actor_id=introduced_id,
+                location_id="home",
+                usual_location_id=_required(event, "location_id"),
+            )
+            return NPCWorldState(people)
         actor_id = event.payload.get("actor_id")
         if not isinstance(actor_id, str) or actor_id not in people:
             return self

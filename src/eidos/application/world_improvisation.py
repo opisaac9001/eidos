@@ -6,7 +6,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 from time import perf_counter
-from typing import Sequence
+from typing import Mapping, Sequence
 from uuid import uuid4
 
 from eidos.domain.ambient import (
@@ -28,6 +28,7 @@ async def improvised_world_events(
     *,
     season: str,
     weather: str,
+    known_locations: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Ask Moira periodically; rejection or failure means an ordinary quiet interval."""
     if simulated_at.utcoffset() is None:
@@ -43,12 +44,21 @@ async def improvised_world_events(
         for event in history
         if event.kind == "world_event.accepted"
     ][-12:]
+    locations = dict(
+        known_locations
+        or {
+            "home": "The apartment",
+            "cafe": "Juniper Café",
+            "workshop": "The workshop",
+            "park": "Willow Square",
+        }
+    )
     request = ModelRequest(
         capability="moira_event",
         task_version="1",
         temperature=0.85,
         max_output_tokens=300,
-        output_schema=ambient_output_schema(),
+        output_schema=ambient_output_schema(tuple(locations)),
         messages=(
             ModelMessage(
                 "user",
@@ -57,7 +67,7 @@ async def improvised_world_events(
                         "time": simulated_at.isoformat(),
                         "season": season,
                         "weather": weather,
-                        "known_locations": ["home", "cafe", "workshop", "park"],
+                        "known_locations": locations,
                         "recent_events": recent,
                         "permission": "Invent new fictional material; do not claim it already happened.",
                     }
@@ -87,7 +97,7 @@ async def improvised_world_events(
         candidate = parse_ambient_candidate(response.content)
         validate_ambient_candidate(
             candidate,
-            known_locations={"home", "cafe", "workshop", "park"},
+            known_locations=set(locations),
             history=history,
         )
     except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
@@ -169,7 +179,7 @@ async def improvised_world_events(
             source="model-fiction-proposal",
         ),
         history=[*history, *output],
-        known_location_ids={"home", "cafe", "workshop", "park"},
+        known_location_ids=set(locations),
         actual_revision=actual_revision + len(output),
         simulated_at=simulated_at,
     )

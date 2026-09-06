@@ -7,7 +7,7 @@ from typing import Sequence
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
-from eidos.domain.world import PEOPLE, npc_activity, npc_location
+from eidos.domain.world import npc_activity, npc_location
 
 
 def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> list[DomainEvent]:
@@ -23,10 +23,9 @@ def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
                 {"simulated_at": simulated_at.isoformat(), "schema_version": 1},
             )
         )
-    for person in PEOPLE:
-        actor_id = str(person["id"])
-        current = state.people[actor_id]
-        desired = npc_location(actor_id, simulated_at.hour)
+    for current in state.people.values():
+        actor_id = current.actor_id
+        desired = npc_location(actor_id, simulated_at.hour, current.usual_location_id)
         if starting or current.location_id != desired:
             moved = DomainEvent(
                 "npc.moved",
@@ -174,7 +173,7 @@ def _next_needs(
         "cafe": (-0.04, 0.06, 0.02),
         "workshop": (-0.06, 0.02, 0.06),
         "park": (0.02, 0.01, 0.03),
-    }[location_id]
+    }.get(location_id, (-0.03, 0.02, 0.02))
     return (
         _clamp(energy + deltas[0]),
         _clamp(connection + deltas[1]),

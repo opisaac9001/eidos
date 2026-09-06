@@ -292,8 +292,14 @@ the production generator's creative boundary.
 
 Future proposal versions can introduce persistent actors, objects and places, but
 only by explicit entity-registration effects with collision, provenance and
-continuity checks. This is what lets the world expand without turning every model
-sentence into hidden state.
+continuity checks. The first version is now implemented: on a sparse weekly budget,
+Moira can propose an open-ended person, useful object, or reachable place. Stable IDs,
+duplicate names, known introduction/connection locations, map layout, opening hours,
+route duration and display metadata are checked before one registration event becomes
+fact. New people enter the same offscreen need/goal/perception projection as the seed
+cast. New objects enter ordinary ownership/condition planning. New places and their
+routes appear in the world catalog and observatory. This is what lets the world expand
+without turning every model sentence into hidden state.
 
 Examples include a neighborhood gathering, workshop delay, weather disruption,
 request for help, or opportunity related to an existing goal.

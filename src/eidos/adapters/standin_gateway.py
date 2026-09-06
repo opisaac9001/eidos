@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from datetime import datetime
 
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
@@ -50,7 +51,10 @@ class StandInGateway(ModelGateway):
                     "Ellis": "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
                     "Rowan": "Rowan shares a sketch of the square and points out a detail Pathos missed.",
                 }
-                text = lines[person]
+                text = lines.get(
+                    person,
+                    f"{person} pauses nearby and mentions a small detail from their day.",
+                )
         elif role == "reflection":
             text = f"Looking back, this is the moment that stays with me: {last_memory}"
         elif role == "oneiros":
@@ -167,6 +171,62 @@ class StandInGateway(ModelGateway):
                         "duration_hours": item[8],
                     }
                 ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "moira_expansion":
+            simulated_at = datetime.fromisoformat(context["time"])
+            occurrence = ((simulated_at.date() - datetime(2026, 1, 14).date()).days // 7) % 3
+            expansion = (
+                {
+                    "entity_kind": "person",
+                    "entity_id": "nina-vale",
+                    "name": "Nina Vale",
+                    "description": "A traveling bookbinder staying nearby while cataloguing family papers.",
+                    "location_id": "cafe",
+                    "purpose": "Independent book conservator",
+                    "color": "#a68fc2",
+                    "label": "Nina",
+                    "x": 50,
+                    "y": 50,
+                    "opens_hour": 8,
+                    "closes_hour": 18,
+                    "travel_minutes": 10,
+                },
+                {
+                    "entity_kind": "place",
+                    "entity_id": "old-glasshouse",
+                    "name": "The old glasshouse",
+                    "description": "A repaired municipal glasshouse used for seedlings, workshops, and quiet shelter.",
+                    "location_id": "park",
+                    "purpose": "Shared growing and gathering space",
+                    "color": "#91ad91",
+                    "label": "Glasshouse",
+                    "x": 39,
+                    "y": 84,
+                    "opens_hour": 8,
+                    "closes_hour": 19,
+                    "travel_minutes": 8,
+                },
+                {
+                    "entity_kind": "object",
+                    "entity_id": "blue-handcart",
+                    "name": "The blue handcart",
+                    "description": "A sturdy shared cart with one newly replaced wheel and many old paint marks.",
+                    "location_id": "workshop",
+                    "purpose": "Moving awkward repairs and neighborhood supplies",
+                    "color": "#6689a6",
+                    "label": "Handcart",
+                    "x": 50,
+                    "y": 50,
+                    "opens_hour": 8,
+                    "closes_hour": 18,
+                    "travel_minutes": 10,
+                },
+            )[occurrence]
+            return ModelResponse(
+                content=json.dumps(expansion),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",

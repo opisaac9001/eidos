@@ -49,6 +49,25 @@ class TravelTests(unittest.TestCase):
         self.assertEqual(self.resolve(location="cafe").code, "wrong_origin")
         self.assertEqual(self.resolve(revision=2).code, "stale_revision")
 
+    def test_a_registered_route_can_make_a_new_place_reachable(self):
+        proposal = self.proposal(
+            proposal_id="park-to-glasshouse",
+            origin_id="park",
+            destination_id="old-glasshouse",
+            depart_at=self.now - timedelta(minutes=8),
+        )
+        result = resolve_travel(
+            proposal,
+            history=[],
+            actor_location_id="park",
+            known_location_ids={"park", "old-glasshouse"},
+            actual_revision=3,
+            simulated_at=self.now,
+            route_minutes={frozenset(("park", "old-glasshouse")): 8},
+        )
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.events[-1].payload["location_id"], "old-glasshouse")
+
     def test_json_contract_is_exact_and_timezone_aware(self):
         proposal = self.proposal()
         raw = {
