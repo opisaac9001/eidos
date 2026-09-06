@@ -63,6 +63,8 @@ class RecalledMemory:
     matched_goals: tuple[str, ...]
     matched_relationships: tuple[str, ...]
     components: Mapping[str, float]
+    recalled_text: str
+    detail_level: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +228,7 @@ def recall(
                 matched_goals,
                 matched_relationships,
                 MappingProxyType({key: round(value, 4) for key, value in components.items()}),
+                *_render_recollection(event, accessibility, importance),
             )
         )
     ranked.sort(
@@ -235,6 +238,28 @@ def recall(
     if not diverse:
         return ranked[:limit]
     return _diversify(ranked, limit)
+
+
+def _render_recollection(
+    event: DomainEvent, accessibility: float, importance: float
+) -> tuple[str, str]:
+    """Blur low-access detail by omission only; never synthesize a replacement fact."""
+    text = str(event.payload["text"])
+    category = str(event.payload.get("category", "experience"))
+    if category == "dream":
+        return f"I remember this as a dream: {text}", "dream"
+    if accessibility >= 0.55 or importance >= 0.75:
+        return text, "clear"
+    if accessibility >= 0.2:
+        first_detail = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
+        return f"I remember {first_detail.lower()}, though some details are hazy.", "partial"
+    links = [
+        str(event.payload[key])
+        for key in ("person_id", "goal_id", "location_id")
+        if isinstance(event.payload.get(key), str)
+    ]
+    cue = ", ".join(links[:2]) or category
+    return f"I have a faint {category} memory connected to {cue}; the details are unclear.", "vague"
 
 
 def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]:
@@ -290,6 +315,8 @@ def memory_view(history: list[DomainEvent], now: datetime) -> list[dict[str, Any
                 "kind": event.kind,
                 "accessibility": item.accessibility,
                 "recall_score": item.score,
+                "recalled_text": item.recalled_text,
+                "detail_level": item.detail_level,
             }
         )
     return views

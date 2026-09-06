@@ -42,6 +42,21 @@ class MemoryTests(unittest.TestCase):
         archive = memory_view([recent, old], self.now)
         self.assertEqual(len(archive), 2)
         self.assertTrue(all("accessibility" in item for item in archive))
+        old_recall = results[old.event_id]
+        self.assertEqual(old_recall.detail_level, "vague")
+        self.assertNotEqual(old_recall.recalled_text, old.payload["text"])
+        self.assertEqual(old.payload["text"], "A mundane bus passed.")
+
+    def test_dream_recollection_is_never_presented_as_a_witnessed_fact(self):
+        dream = self.memory(
+            "The workshop floated above the park.",
+            self.now - timedelta(days=2),
+            0.9,
+            category="dream",
+        )
+        result = recall([dream], "workshop park", self.now)[0]
+        self.assertEqual(result.detail_level, "dream")
+        self.assertTrue(result.recalled_text.startswith("I remember this as a dream:"))
 
     def test_rehearsal_is_bounded_and_does_not_duplicate_evidence(self):
         memory = self.memory("Mara asked about the lamp.", self.now - timedelta(days=30), 0.5)

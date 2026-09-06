@@ -405,7 +405,7 @@ class Life:
                 },
                 diverse=True,
             )
-            memories = [item.event.payload["text"] for item in selected_context]
+            memories = [item.recalled_text for item in selected_context]
             identity_now = project_identity(history + pending)
             context = {
                 "location": location_name(state.location_id),
@@ -715,7 +715,7 @@ class Life:
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
             },
-            "memories": [item.event.payload["text"] for item in selected],
+            "memories": [item.recalled_text for item in selected],
             "beliefs": [
                 {
                     "subject": belief.subject_id,
@@ -749,6 +749,8 @@ class Life:
                     "matched_goal_count": len(item.matched_goals),
                     "matched_relationship_count": len(item.matched_relationships),
                     "query_source": "user-conversation",
+                    "detail_level": item.detail_level,
+                    "recalled_text": item.recalled_text,
                 },
             )
             for item in selected
