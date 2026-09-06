@@ -198,6 +198,14 @@ function renderArchive() {
   );
   $("archive-count").textContent =
     `${items.length} matching memories · ${state.counts.memories} recorded in total${state.counts.memories > 300 ? " · browsing the latest 300" : ""}`;
+  $("belief-list").innerHTML = (state.beliefs || []).length
+    ? `<div class="eyebrow">PATHOS'S BELIEFS · EVIDENCE IS NOT WORLD TRUTH</div>${state.beliefs
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.status.toUpperCase())}</span><span>${Math.round(item.confidence * 100)}% confidence</span></div><p>${esc(item.subject_id)} · ${esc(item.predicate.replaceAll("_", " "))} → ${esc(item.object_value)}${item.alternative_value ? ` / alternative: ${esc(item.alternative_value)}` : ""}</p><div class="memory-source">revision ${item.revision} · ${item.evidence_count} distinct evidence source${item.evidence_count === 1 ? "" : "s"} · latest ${esc(item.last_evidence_id.slice(0, 8))}</div></article>`,
+        )
+        .join("")}`
+    : "";
   $("association-list").innerHTML = (state.associations || []).length
     ? `<div class="eyebrow">SUBJECTIVE ASSOCIATIONS · NOT FACTS</div>${state.associations
         .slice(0, 8)

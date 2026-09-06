@@ -106,6 +106,20 @@ class BeliefTests(unittest.TestCase):
         )
         self.assertEqual(rejected.code, "derived_evidence")
 
+        private_perception = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {"owner": "mara", "claim_subject_id": "mara", "text": "Private"},
+        )
+        rejected = resolve_belief(
+            self.proposal(private_perception),
+            state=project_beliefs([]),
+            history=[private_perception],
+            actual_revision=1,
+            simulated_at=self.now,
+        )
+        self.assertEqual(rejected.code, "private_evidence")
+
     def test_direct_evidence_can_correct_but_identity_cannot_be_duplicated(self):
         first = self.evidence()
         formed = resolve_belief(

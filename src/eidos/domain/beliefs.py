@@ -265,7 +265,7 @@ def resolve_belief(
             "belief.revised", {"prior_revision": existing.revision, "confidence": confidence}
         )
         return BeliefResolution(True, "revised", (proposed, revised))
-    direct = evidence.kind in {"object.condition_changed", "world.weather"}
+    direct = evidence.kind in {"object.condition_changed", "resource.confirmed", "world.weather"}
     if direct and proposal.confidence >= existing.confidence:
         corrected = effect(
             "belief.corrected",
@@ -294,6 +294,8 @@ def _visible_to(owner_id: str, evidence: DomainEvent) -> bool:
     if evidence.kind == "memory.recorded":
         evidence_owner = evidence.payload.get("owner", "pathos")
         return isinstance(evidence_owner, str) and evidence_owner == owner_id
+    if evidence.kind == "perception.recorded":
+        return evidence.payload.get("owner") == owner_id
     return owner_id == "pathos"
 
 

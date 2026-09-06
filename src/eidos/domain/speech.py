@@ -25,7 +25,11 @@ class SpeechProposal:
     privacy: Privacy
     expected_revision: int
     topic_id: str | None = None
-    schema_version: int = 1
+    claim_subject_id: str | None = None
+    claim_predicate: str | None = None
+    claim_value: str | None = None
+    claim_confidence: float | None = None
+    schema_version: int = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +39,7 @@ class SpeechResolution:
     events: tuple[DomainEvent, ...]
 
 
-_FIELDS = {
+_FIELDS_V1 = {
     "schema_version",
     "proposal_id",
     "speaker_id",
@@ -45,6 +49,12 @@ _FIELDS = {
     "expected_revision",
     "topic_id",
 }
+_FIELDS_V2 = _FIELDS_V1 | {
+    "claim_subject_id",
+    "claim_predicate",
+    "claim_value",
+    "claim_confidence",
+}
 
 
 def parse_speech_proposal(content: str) -> SpeechProposal:
@@ -52,10 +62,16 @@ def parse_speech_proposal(content: str) -> SpeechProposal:
         value = json.loads(content)
     except (TypeError, ValueError):
         raise ProposalRejected("invalid_json", "Speech proposal was not valid JSON") from None
-    if not isinstance(value, dict) or set(value) != _FIELDS:
-        raise ProposalRejected("invalid_shape", "Speech fields did not match schema v1")
-    if value["schema_version"] != 1:
+    if not isinstance(value, dict):
+        raise ProposalRejected("invalid_shape", "Speech proposal must be an object")
+    version = value.get("schema_version")
+    if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2):
         raise ProposalRejected("unsupported_schema", "Speech schema is not supported")
+    fields = _FIELDS_V1 if version == 1 else _FIELDS_V2 if version == 2 else None
+    assert fields is not None
+    if set(value) != fields:
+        raise ProposalRejected("invalid_shape", f"Speech fields did not match schema v{version}")
+    schema_version = int(version)
     for field in ("proposal_id", "speaker_id", "audience_id", "text"):
         if not isinstance(value[field], str) or not value[field].strip():
             raise ProposalRejected("invalid_text", f"{field} must be non-empty")
@@ -72,6 +88,24 @@ def parse_speech_proposal(content: str) -> SpeechProposal:
         privacy = Privacy(value["privacy"])
     except (TypeError, ValueError):
         raise ProposalRejected("invalid_privacy", "privacy must be private or public") from None
+    claim_values = (
+        value.get("claim_subject_id"),
+        value.get("claim_predicate"),
+        value.get("claim_value"),
+        value.get("claim_confidence"),
+    )
+    if any(item is not None for item in claim_values):
+        if not all(item is not None for item in claim_values):
+            raise ProposalRejected("incomplete_claim", "Structured claim fields are all-or-none")
+        if any(not isinstance(item, str) or not item.strip() for item in claim_values[:3]):
+            raise ProposalRejected("invalid_claim", "Claim text fields must be non-empty")
+        confidence = claim_values[3]
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0 <= confidence <= 1
+        ):
+            raise ProposalRejected("invalid_claim", "Claim confidence must be between zero and one")
     return SpeechProposal(
         proposal_id=value["proposal_id"],
         speaker_id=value["speaker_id"],
@@ -80,6 +114,13 @@ def parse_speech_proposal(content: str) -> SpeechProposal:
         privacy=privacy,
         expected_revision=revision,
         topic_id=value["topic_id"],
+        claim_subject_id=value.get("claim_subject_id"),
+        claim_predicate=value.get("claim_predicate"),
+        claim_value=value.get("claim_value"),
+        claim_confidence=(
+            float(value["claim_confidence"]) if value.get("claim_confidence") is not None else None
+        ),
+        schema_version=schema_version,
     )
 
 
@@ -99,6 +140,10 @@ def resolve_speech(
         "text": proposal.text,
         "privacy": proposal.privacy.value,
         "topic_id": proposal.topic_id,
+        "claim_subject_id": proposal.claim_subject_id,
+        "claim_predicate": proposal.claim_predicate,
+        "claim_value": proposal.claim_value,
+        "claim_confidence": proposal.claim_confidence,
         "schema_version": proposal.schema_version,
         "simulated_at": simulated_at,
     }
@@ -150,6 +195,11 @@ def resolve_speech(
             "privacy": proposal.privacy.value,
             "location_id": speaker_location,
             "reported": True,
+            "topic_id": proposal.topic_id,
+            "claim_subject_id": proposal.claim_subject_id,
+            "claim_predicate": proposal.claim_predicate,
+            "claim_value": proposal.claim_value,
+            "claim_confidence": proposal.claim_confidence,
             "simulated_at": simulated_at,
         },
         causation_id=delivered.event_id,

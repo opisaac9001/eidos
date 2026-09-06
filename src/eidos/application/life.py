@@ -11,7 +11,7 @@ from eidos.application.appraisal import (
     baseline_affect_events,
     sleep_and_need_events,
 )
-from eidos.application.belief_review import relationship_belief_events
+from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
 from eidos.application.cognition import perform
 from eidos.application.consolidation import consolidation_events
 from eidos.application.first_story import story_events
@@ -331,6 +331,7 @@ class Life:
                 project_planning(history + pending + overdue)
                 pending.extend(overdue)
             pending.extend(relationship_belief_events(history + pending, at))
+            pending.extend(testimony_belief_events(history + pending, at))
             if current.hour == 7:
                 waking = waking_dream_events(history + pending, state, at)
                 for event in waking:

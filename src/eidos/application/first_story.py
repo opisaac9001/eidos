@@ -175,6 +175,10 @@ def story_events(
                 text="I found a replacement switch for Mara's lamp. You can use it this afternoon.",
                 privacy=Privacy.PRIVATE,
                 topic_id="mara-lamp",
+                claim_subject_id="mara-lamp",
+                claim_predicate="replacement_switch",
+                claim_value="available",
+                claim_confidence=0.8,
                 expected_revision=len(existing) + len(interrupted),
             ),
             history=existing + interrupted,
@@ -250,8 +254,24 @@ def story_events(
         )
         if not resolution.accepted:
             return list(resolution.events)
+        accepted_action = next(
+            event for event in resolution.events if event.kind == "action.accepted"
+        )
         return [
             *resolution.events,
+            DomainEvent(
+                "resource.confirmed",
+                "pathos",
+                {
+                    "subject_id": "mara-lamp",
+                    "predicate": "replacement_switch",
+                    "object_value": "available",
+                    "confidence": 0.95,
+                    "simulated_at": at,
+                },
+                causation_id=accepted_action.event_id,
+                correlation_id=accepted_action.correlation_id,
+            ),
             DomainEvent(
                 "commitment.fulfilled",
                 "pathos",

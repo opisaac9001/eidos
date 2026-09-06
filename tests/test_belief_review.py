@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from eidos.application.belief_review import relationship_belief_events
+from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
 
@@ -50,6 +50,60 @@ class BeliefReviewTests(unittest.TestCase):
             {"person_id": "mara", "trust_delta": 0.08, "simulated_at": "legacy"},
         )
         self.assertEqual(relationship_belief_events([legacy], "now"), [])
+
+    def test_heard_claim_is_discounted_then_direct_evidence_strengthens_it(self):
+        perceived = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "pathos",
+                "speaker_id": "ellis",
+                "claim_subject_id": "lamp",
+                "claim_predicate": "switch",
+                "claim_value": "available",
+                "claim_confidence": 0.8,
+            },
+        )
+        history = [perceived]
+        history.extend(testimony_belief_events(history, "heard"))
+        heard = project_beliefs(history).beliefs["pathos-lamp-switch"]
+        self.assertAlmostEqual(heard.confidence, 0.48)
+        confirmed = DomainEvent(
+            "resource.confirmed",
+            "pathos",
+            {
+                "subject_id": "lamp",
+                "predicate": "switch",
+                "object_value": "available",
+                "confidence": 0.95,
+            },
+        )
+        history.append(confirmed)
+        history.extend(testimony_belief_events(history, "confirmed"))
+        final = project_beliefs(history).beliefs["pathos-lamp-switch"]
+        self.assertEqual(final.evidence_count, 2)
+        self.assertAlmostEqual(final.confidence, 0.98)
+        self.assertEqual(testimony_belief_events(history, "again"), [])
+
+    def test_private_or_unstructured_perception_does_not_create_a_claim(self):
+        private = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "mara",
+                "speaker_id": "ellis",
+                "claim_subject_id": "lamp",
+                "claim_predicate": "switch",
+                "claim_value": "available",
+                "claim_confidence": 0.8,
+            },
+        )
+        unstructured = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {"owner": "pathos", "speaker_id": "ellis", "text": "Maybe."},
+        )
+        self.assertEqual(testimony_belief_events([private, unstructured], "now"), [])
 
 
 if __name__ == "__main__":

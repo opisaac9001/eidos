@@ -73,6 +73,17 @@ class SpeechTests(unittest.TestCase):
             "topic_id": None,
         }
         self.assertEqual(parse_speech_proposal(json.dumps(raw)).privacy, Privacy.PRIVATE)
+        claim = {
+            **raw,
+            "schema_version": 2,
+            "claim_subject_id": "mara-lamp",
+            "claim_predicate": "replacement_switch",
+            "claim_value": "available",
+            "claim_confidence": 0.8,
+        }
+        self.assertEqual(parse_speech_proposal(json.dumps(claim)).claim_subject_id, "mara-lamp")
+        with self.assertRaises(ProposalRejected):
+            parse_speech_proposal(json.dumps({**claim, "claim_value": None}))
         with self.assertRaises(ProposalRejected):
             parse_speech_proposal(json.dumps({**raw, "text": "x" * 501}))
 

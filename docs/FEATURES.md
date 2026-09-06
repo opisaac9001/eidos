@@ -24,7 +24,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
-| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: evidence-linked form/revise/contest/correct | P2 |
+| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: discounted testimony, direct confirmation and revision ledger | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Planned: conservative opt-in | P2 |
 | MEM-09 | Long-run retention/index maintenance and archive policy | Planned | P6 |
 
@@ -77,7 +77,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Planned | P3 |
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: directed metrics/causal trust | P3 |
-| SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Planned | P3 |
+| SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims and confidence-weighted review | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Planned | P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
