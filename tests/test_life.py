@@ -26,6 +26,15 @@ class LifeTests(unittest.TestCase):
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)
         self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))
+        self.assertTrue(any(event.kind == "npc.activity_recorded" for event in self.life.history()))
+        self.assertTrue(all("private_activity" not in person for person in snapshot["people"]))
+        self.assertTrue(all("private_activity" in person for person in snapshot["npc_states"]))
+        private_texts = {
+            event.payload["activity"]
+            for event in self.life.history()
+            if event.kind == "npc.activity_recorded"
+        }
+        self.assertFalse(any(memory["text"] in private_texts for memory in snapshot["memories"]))
         reflection = next(
             event for event in self.life.history() if event.kind == "reflection.recorded"
         )

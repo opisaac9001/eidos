@@ -450,6 +450,12 @@ function render(next) {
           `<article class="memory-card"><div class="memory-meta"><span>${esc(job.capability)} · ${esc(job.status)}</span><span>${job.attempts} attempt${job.attempts === 1 ? "" : "s"}</span></div><p>${esc(job.error_code || "Durable model work")}</p><div class="memory-source">Job ${esc(job.id)}${job.deadline_at ? ` · deadline ${esc(time(job.deadline_at))}` : ""}</div>${["queued", "running"].includes(job.status) ? `<button class="button quiet" data-cancel-job="${esc(job.id)}">Cancel job</button>` : ""}</article>`,
       )
       .join("") || "<p>No durable jobs recorded yet.</p>";
+  $("npc-states").innerHTML = (state.npc_states || [])
+    .map(
+      (person) =>
+        `<article class="memory-card"><div class="memory-meta"><span>${esc(person.actor_id)} · ${esc(person.location_id)}</span><span>PRIVATE OPERATOR LENS</span></div><p>${esc(person.private_activity)}</p><div class="memory-source">energy ${Math.round(person.energy * 100)}% · connection ${Math.round(person.connection * 100)}% · purpose ${Math.round(person.purpose * 100)}% · never passed to Pathos automatically</div></article>`,
+    )
+    .join("");
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>

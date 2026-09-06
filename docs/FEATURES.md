@@ -62,9 +62,9 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Planned | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: validated lamp custody/location/repair | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: authored routine | P3 |
-| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: schedules | P3 |
+| WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: persisted movement and private low-detail needs/activity | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather pacing/causes | P5 |
-| WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Planned | P5 |
+| WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
 | WORLD-08 | Seasons, recurring events, evolving projects, world packs | Planned | P6 |
 
 ## Interaction catalog — Pathos and NPC performers

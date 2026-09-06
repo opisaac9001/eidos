@@ -22,16 +22,18 @@ from eidos.application.inner_life import (
     waking_dream_events,
 )
 from eidos.application.memory import memory_view, recall, terms
+from eidos.application.offscreen import npc_world_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
+from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.social import project_social
 from eidos.domain.state import PathosState
-from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name, npc_location
+from eidos.domain.world import LOCATIONS, PEOPLE, ROLES, location_name
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.event_store import EventStore
 from eidos.ports.model_gateway import ModelGateway
@@ -191,10 +193,11 @@ class Life:
                 "memory.recovered",
             }:
                 feed.append(item)
+        npc_state = project_npcs(history, state.simulated_at)
         population = [
             {
                 **person,
-                "location_id": npc_location(person["id"], state.simulated_at.hour),
+                "location_id": npc_state.people[str(person["id"])].location_id,
                 **relationships[person["id"]],
             }
             for person in PEOPLE
@@ -227,6 +230,7 @@ class Life:
             "config": config,
             "locations": LOCATIONS,
             "people": population,
+            "npc_states": [vars_for(person) for person in npc_state.people.values()],
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
             "goals": [vars_for(goal) for goal in planning.goals.values()],
@@ -287,6 +291,7 @@ class Life:
             at = current.isoformat()
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
@@ -420,8 +425,9 @@ class Life:
                     )
                     pending.extend(association.events)
             if beat and state.location_id != "home":
+                npc_state_now = project_npcs(history + pending, current)
                 for person in PEOPLE:
-                    if npc_location(person["id"], current.hour) != state.location_id:
+                    if npc_state_now.people[str(person["id"])].location_id != state.location_id:
                         continue
                     text = await perform(
                         self.gateway,

@@ -27,6 +27,13 @@ class MonthSoakTests(unittest.TestCase):
             self.assertTrue(-1 <= snapshot["pathos"]["valence"] <= 1)
             self.assertTrue(0 <= snapshot["pathos"]["arousal"] <= 1)
             self.assertTrue(
+                all(
+                    0.2 <= value <= 0.8
+                    for person in snapshot["npc_states"]
+                    for value in (person["connection"], person["purpose"])
+                )
+            )
+            self.assertTrue(
                 all(item["status"] in {"fulfilled", "missed"} for item in snapshot["commitments"])
             )
             self.assertLess(path.stat().st_size, 10_000_000)
