@@ -22,9 +22,10 @@ def mood_name(energy: float, valence: float) -> str:
 class Life:
     """Caller serializes operations; the store also rejects stale stream revisions."""
 
-    def __init__(self, store: EventStore, gateway: ModelGateway) -> None:
+    def __init__(self, store: EventStore, gateway: ModelGateway, mode: str = "stand-in") -> None:
         self.store = store
         self.gateway = gateway
+        self.mode = mode
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -111,7 +112,8 @@ class Life:
             "memories": list(reversed(memories[-300:])),
             "feed": list(reversed(feed[-160:])),
             "conversations": conversations[-100:],
-            "mode": "stand-in",
+            "mode": self.mode,
+            "model": getattr(self.gateway, "model", "authored-stand-in-v1"),
             "counts": {
                 "events": len(history),
                 "memories": len(memories),
@@ -185,7 +187,7 @@ class Life:
                             {
                                 "text": text,
                                 "simulated_at": at,
-                                "source": "stand-in",
+                                "source": self.mode,
                                 "role": "moira",
                             },
                         )
@@ -200,7 +202,7 @@ class Life:
                             {
                                 "text": text,
                                 "simulated_at": at,
-                                "source": "stand-in",
+                                "source": self.mode,
                                 "role": "murmur",
                             },
                         )
@@ -225,7 +227,7 @@ class Life:
                                 "text": text,
                                 "simulated_at": at,
                                 "location_id": state.location_id,
-                                "source": "stand-in",
+                                "source": self.mode,
                                 "role": "firmament",
                             },
                         )
@@ -242,7 +244,7 @@ class Life:
                                         "text": memory,
                                         "simulated_at": at,
                                         "category": "encounter",
-                                        "source": "stand-in",
+                                        "source": self.mode,
                                         "source_event_id": str(encounter.event_id),
                                         "location_id": state.location_id,
                                         "role": "mnemosyne",
@@ -274,7 +276,7 @@ class Life:
                                 {
                                     "text": text,
                                     "simulated_at": at,
-                                    "source": "stand-in",
+                                    "source": self.mode,
                                     "role": role,
                                 },
                             )
@@ -354,7 +356,7 @@ class Life:
                         "speaker": "pathos",
                         "simulated_at": at,
                         "request_id": request_id,
-                        "source": "stand-in",
+                        "source": self.mode,
                     },
                 )
             )

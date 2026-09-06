@@ -220,6 +220,24 @@ function render(next) {
   if (state && next.revision < state.revision) return;
   const changed = !state || next.revision !== state.revision;
   state = next;
+  const liveModel = state.mode !== "stand-in";
+  $("backend-label").textContent = liveModel
+    ? "LOCAL MODEL PERFORMERS"
+    : "STAND-IN PERFORMERS";
+  $("backend-model").textContent = liveModel
+    ? state.model
+    : "Deterministic stand-ins";
+  document.querySelector(".mobile-mode").textContent =
+    `${liveModel ? "Local model" : "Stand-in"} performers · saved locally`;
+  document.querySelector(".disclosure").textContent = liveModel
+    ? "Model-generated fiction. Validation checks structure, not truth or consciousness."
+    : "Authored voices are running the roles. Real models can join later.";
+  document.querySelector(".context-note").textContent = liveModel
+    ? "This experimental voice uses recorded context. It can still misinterpret or invent details. Conversations persist."
+    : "This voice uses templates and recorded context. Conversations and memories persist.";
+  document.querySelectorAll(".small-tag").forEach((tag) => {
+    tag.textContent = liveModel ? "MODEL OUTPUT" : "STAND-IN";
+  });
   $("connection").textContent = state.runtime.error
     ? "Worker needs attention"
     : "Connected locally";
@@ -237,7 +255,9 @@ function render(next) {
     $("speed").value = state.config.minutes_per_tick;
   $("feed-live").textContent = state.config.running ? "● LIVE" : "PAUSED";
   $("worker-status").textContent = state.runtime.worker_alive
-    ? "Chronos worker online"
+    ? state.runtime.working
+      ? "Generating next scene…"
+      : "Chronos worker online"
     : "Worker stopped";
   $("tick-count").textContent = `${state.runtime.ticks} ticks this session`;
   if (state.runtime.error) showError(state.runtime.error);
@@ -287,7 +307,7 @@ function render(next) {
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>
-        `<article class="panel role-card"><div class="panel-kicker"><span>0${index + 1} / ${role.id === "critic" ? "RULES" : "STAND-IN"}</span><span class="role-status">${esc(role.status.toUpperCase())}</span></div><h2>${esc(role.name)}</h2><p>${esc(role.purpose)}</p><div class="role-stats"><span>${role.calls} ${role.id === "critic" ? "checks" : "calls"}</span><span>${role.last ? `${date(role.last)} · ${time(role.last)}` : "Awaiting its moment"}</span></div></article>`,
+        `<article class="panel role-card"><div class="panel-kicker"><span>0${index + 1} / ${role.id === "critic" ? "RULES" : liveModel ? "MODEL" : "STAND-IN"}</span><span class="role-status">${esc(role.status.toUpperCase())}</span></div><h2>${esc(role.name)}</h2><p>${esc(role.purpose)}</p><div class="role-stats"><span>${role.calls} ${role.id === "critic" ? "checks" : "calls"}</span><span>${role.last ? `${date(role.last)} · ${time(role.last)}` : "Awaiting its moment"}</span></div></article>`,
     )
     .join("");
 }

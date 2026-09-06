@@ -69,12 +69,35 @@ class WebTests(unittest.TestCase):
             {"Content-Type": "application/json", "Origin": "https://example.org"},
         )
         self.assertEqual(status, 403)
+
         status, _ = self.request("POST", "/api/step", {"hours": 999})
         self.assertEqual(status, 400)
         status, _ = self.request("GET", "/../../pyproject.toml")
         self.assertEqual(status, 404)
         status, _ = self.request("GET", "/api/state", headers={"Host": "evil.example"})
         self.assertEqual(status, 403)
+
+    def test_snapshot_stays_responsive_during_model_work(self):
+        entered = threading.Event()
+        release = threading.Event()
+
+        def slow_operation():
+            with self.runtime.mutation():
+                entered.set()
+                release.wait(3)
+
+        thread = threading.Thread(target=slow_operation)
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            started = time.monotonic()
+            status, body = self.request("GET", "/api/state")
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)["runtime"]["working"])
+            self.assertLess(time.monotonic() - started, 1)
+        finally:
+            release.set()
+            thread.join()
 
     def test_chat_and_step_work_through_http(self):
         status, _ = self.request(

@@ -37,9 +37,11 @@ tests/               Executable architecture and domain expectations
 The local prototype has five connected views: Observatory, World, Conversation,
 Memory Archive, and Ensemble. A background clock runs routines, NPC encounters,
 thoughts, weather, memory formation, reflection, dreams, and a daybook. All eight
-performers are deterministic stand-ins; a ninth, the continuity critic, performs
-schema validation. These are authored templates, not actual AI models or a
-general contradiction detector. SQLite stores atomic event batches and rebuilds
+performers can use deterministic stand-ins or a real compatible model endpoint;
+a ninth, the continuity critic, performs schema and factual-memory source checks,
+not general contradiction detection. Stand-ins remain the offline default.
+See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
+SQLite stores atomic event batches and rebuilds
 state on restart. See the
 [creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
 and [architecture](docs/ARCHITECTURE.md).

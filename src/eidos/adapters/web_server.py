@@ -4,6 +4,7 @@ import json
 import logging
 import mimetypes
 import threading
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -12,6 +13,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
 from eidos.ports.event_store import RevisionConflict
+from eidos.ports.model_gateway import ModelGateway
 
 STATIC = Path(__file__).parent / "web"
 logger = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ class Runtime:
         self.error: str | None = None
         self.ticks = 0
         self.thread: threading.Thread | None = None
+        self.cached: dict | None = None
+        self.working = False
 
     def start(self) -> None:
         with self.lock:
@@ -34,6 +38,7 @@ class Runtime:
             # Resume is explicit: downtime never creates an unbounded catch-up burst.
             if config["running"]:
                 self.life.configure(False, config["minutes_per_tick"])
+            self.cached = self.life.snapshot()
         self.thread = threading.Thread(target=self._loop, name="eidos-chronos", daemon=True)
         self.thread.start()
 
@@ -44,9 +49,11 @@ class Runtime:
                 try:
                     config = self.life.snapshot()["config"]
                     if config["running"]:
+                        self.working = True
                         self.life.advance(config["minutes_per_tick"] / 60)
                         self.ticks += 1
                         self.error = None
+                        self.cached = self.life.snapshot()
                 except Exception:
                     logger.exception("Simulation tick failed")
                     self.error = "The simulation paused after a tick failed. Its last committed state is safe."
@@ -55,23 +62,42 @@ class Runtime:
                     except Exception:
                         logger.exception("Could not persist pause")
                     self.stop.set()
+                finally:
+                    self.working = False
 
     def close(self) -> None:
         self.stop.set()
         if self.thread:
             self.thread.join(timeout=30)
 
-    def snapshot(self) -> dict:
+    @contextmanager
+    def mutation(self):
         with self.lock:
-            return {
-                **self.life.snapshot(),
-                "runtime": {
-                    "ticks": self.ticks,
-                    "interval_seconds": self.interval,
-                    "error": self.error,
-                    "worker_alive": bool(self.thread and self.thread.is_alive()),
-                },
-            }
+            self.working = True
+            try:
+                yield
+            finally:
+                self.working = False
+                self.cached = self.life.snapshot()
+
+    def snapshot(self) -> dict:
+        if self.lock.acquire(blocking=False):
+            try:
+                self.cached = self.life.snapshot()
+            finally:
+                self.lock.release()
+        if self.cached is None:
+            raise RuntimeError("Runtime has not initialized")
+        return {
+            **self.cached,
+            "runtime": {
+                "ticks": self.ticks,
+                "interval_seconds": self.interval,
+                "error": self.error,
+                "worker_alive": bool(self.thread and self.thread.is_alive()),
+                "working": self.working,
+            },
+        }
 
 
 def make_handler(runtime: Runtime):
@@ -142,7 +168,7 @@ def make_handler(runtime: Runtime):
                     200, asset.read_bytes(), mimetypes.guess_type(asset)[0] or "text/plain"
                 )
             elif path == "/health":
-                self.respond(200, {"status": "ok", "mode": "stand-in"})
+                self.respond(200, {"status": "ok", "mode": runtime.life.mode})
             else:
                 self.respond(404, {"error": "Not found"})
 
@@ -159,7 +185,7 @@ def make_handler(runtime: Runtime):
                 body = json.loads(self.rfile.read(size))
                 if not isinstance(body, dict):
                     raise ValueError("Expected a JSON object")
-                with runtime.lock:
+                with runtime.mutation():
                     if self.path == "/api/control":
                         if body.get("running") and runtime.stop.is_set():
                             raise ValueError(
@@ -187,14 +213,16 @@ def make_handler(runtime: Runtime):
     return Handler
 
 
-def serve(database: Path, port: int = 8765) -> None:
+def serve(
+    database: Path, port: int = 8765, gateway: ModelGateway | None = None, mode: str = "stand-in"
+) -> None:
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
-    life = Life(SQLiteEventStore(database), StandInGateway())
+    life = Life(SQLiteEventStore(database), gateway or StandInGateway(), mode=mode)
     runtime = Runtime(life)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()
-    print(f"Eidos is ready at http://127.0.0.1:{port} — stand-in mode", flush=True)
+    print(f"Eidos is ready at http://127.0.0.1:{port} — {mode} mode", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

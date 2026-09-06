@@ -1,0 +1,73 @@
+# Local model testing
+
+Eidos can run all eight performer roles through an OpenAI-compatible chat
+completion endpoint supporting JSON-schema responses. They are logical roles in
+one application, not eight separately deployed services. The continuity critic
+remains deterministic code. Offline stand-ins are still the default.
+
+## Connect
+
+Keep connection details and credentials out of Git. For a private Ollama host,
+run a loopback-only SSH forward in a separate terminal (replace USER and HOST):
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:11435:127.0.0.1:11434 USER@HOST
+```
+
+Then, from this repository:
+
+```bash
+export EIDOS_MODEL_BASE_URL=http://127.0.0.1:11435/v1
+export EIDOS_MODEL_NAME=qwen2.5:1.5b
+PYTHONPATH=src .venv/bin/python -m eidos probe-model
+EIDOS_DATABASE=data/lab.sqlite3 ./run.command --port 8766
+```
+
+The preview starts paused. Use a separate database from authored stand-in worlds.
+For an authenticated endpoint, supply `EIDOS_MODEL_API_KEY` in the environment.
+Unsetting the two model variables restores offline mode. No implicit fallback
+occurs when real inference fails: rejected proposals produce failure traces.
+Do not expose Ollama or the operator interface publicly.
+
+## What is checked
+
+The probe invokes Pathos, Murmur, Firmament, Moira, Mnemosyne, Reflection,
+Oneiros, and Chronicler independently, prints outputs and timing/token traces,
+and exits nonzero on a rejected response. It does not mutate a world.
+Roles receive only their relevant context fields. Responses must finish, parse
+as exactly one text field, and meet role-specific rules. Weather is enumerated;
+factual memory must reproduce its source experience exactly. Outputs are bounded
+to 256 tokens and requests have a 45-second network timeout. State reads show the
+last committed snapshot while inference is in flight. Mutations remain serialized.
+
+## Lab findings — September 5, 2026
+
+The existing `smollm2:135m` model also had a misleading `gpt-3.5-turbo` alias.
+It could answer HTTP requests but confused identities and role instructions.
+Installed `qwen2.5:1.5b` alongside it without replacing existing models or
+reconfiguring other lab services. This CPU-only test is a development bridge to
+the Dell, not the final inference configuration.
+
+A repeated eight-role Qwen probe completed all eight response contracts, at
+roughly 1–12 seconds per call. **This is transport/contract success, not semantic
+quality certification.** Observed defects included calling 13:00 morning,
+inventing childhood memories, an encounter containing only “Pathos:”, and ignoring
+the requested brevity. Initial dream output exceeded the earlier token budget
+and was correctly rejected. The tiny model is useful for exercising integration
+and failures, not for unattended believable lives.
+
+The exact-copy memory rule prevents the memory performer from altering its input;
+it does not make a generated scene factually consistent with earlier scenes.
+Dreams and thoughts are separate event categories, not factual autobiographical
+memories. Stronger continuity evaluation and better performers remain necessary.
+All inference here is sequential to avoid saturating the shared small server.
+
+The connected integration run bootstrapped a new world, advanced 24 hours,
+exchanged a chat message, and reconstructed state from SQLite. It reached day 2
+at 08:00 with 10 memories and two conversation messages. Of 36 performer calls,
+32 were accepted and four memory-copy attempts were rejected; the rejected
+outputs never became memories. All eight roles produced at least one accepted
+response. Replay preserved the revision. This validates failure containment as
+well as the happy path, but confirms that this model is not reliable enough for
+unattended memory formation. The automated suite has 29 passing tests, including
+real HTTP contract tests against a controlled fake endpoint.

@@ -22,13 +22,22 @@ async def perform(
                     messages=(ModelMessage("user", json.dumps(context)),),
                     output_schema={
                         "type": "object",
-                        "properties": {"text": {"type": "string"}},
+                        "properties": {
+                            "text": {
+                                "type": "string",
+                                **(
+                                    {"enum": ["Clear", "Cloudy", "Light rain", "Breezy"]}
+                                    if role == "moira"
+                                    else {}
+                                ),
+                            }
+                        },
                         "required": ["text"],
                         "additionalProperties": False,
                     },
                 )
             ),
-            timeout=20,
+            timeout=50,
         )
         proposal = json.loads(response.content)
         if not isinstance(proposal, dict) or set(proposal) != {"text"}:
@@ -38,6 +47,8 @@ async def perform(
             raise ValueError("Proposal text must contain 1–8000 characters")
         if role == "moira" and text not in {"Clear", "Cloudy", "Light rain", "Breezy"}:
             raise ValueError("Weather is outside the world's vocabulary")
+        if role == "mnemosyne" and text != context.get("experience"):
+            raise ValueError("A factual memory must preserve its source experience")
         pending.append(
             DomainEvent(
                 "role.completed",
@@ -50,6 +61,9 @@ async def perform(
                     "latency_ms": round((perf_counter() - started) * 1000, 2),
                     "model": response.resolved_model,
                     "backend": response.backend,
+                    "finish_reason": response.finish_reason,
+                    "prompt_tokens": response.prompt_tokens,
+                    "output_tokens": response.output_tokens,
                 },
             )
         )
@@ -90,7 +104,8 @@ async def perform(
                     "role": role,
                     "simulated_at": at,
                     "status": "failed",
-                    "latency_ms": 0,
+                    "trace_id": trace,
+                    "latency_ms": round((perf_counter() - started) * 1000, 2),
                 },
             )
         )
