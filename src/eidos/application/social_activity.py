@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Mapping
 
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
@@ -16,6 +17,7 @@ def scheduled_social_events(
     actor_location_id: str,
     simulated_at: datetime,
     actual_revision: int,
+    actor_locations: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Resolve due talk intentions; absence leaves them pending for later consequences."""
     output: list[DomainEvent] = []
@@ -28,12 +30,14 @@ def scheduled_social_events(
         if not start <= simulated_at <= end:
             continue
         target_id = entry.target_id
-        if (
-            entry.actor_id != "pathos"
-            or target_id is None
-            or entry.location_id != actor_location_id
-            or npc_location(target_id, simulated_at.hour) != actor_location_id
-        ):
+        if entry.actor_id != "pathos" or target_id is None:
+            continue
+        target_location = (
+            actor_locations.get(target_id)
+            if actor_locations is not None
+            else npc_location(target_id, simulated_at.hour)
+        )
+        if entry.location_id != actor_location_id or target_location != actor_location_id:
             continue
         intention = next(
             (

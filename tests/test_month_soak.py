@@ -82,6 +82,20 @@ class MonthSoakTests(unittest.TestCase):
             self.assertTrue(all(0 <= item["strength"] <= 1 for item in snapshot["habits"]))
             self.assertEqual(snapshot["skills"][0]["practice_count"], 1)
             self.assertGreaterEqual(snapshot["habits"][0]["repetitions"], 12)
+            exploration = next(
+                goal for goal in snapshot["goals"] if goal["goal_id"] == "explore-old-glasshouse"
+            )
+            self.assertEqual((exploration["status"], exploration["progress"]), ("achieved", 1.0))
+            glasshouse_visits = [
+                event
+                for event in events
+                if event.kind == "activity.completed"
+                and event.payload.get("target_id") == "old-glasshouse"
+            ]
+            self.assertEqual(len(glasshouse_visits), 2)
+            self.assertTrue(
+                all(event.payload["location_id"] == "old-glasshouse" for event in glasshouse_visits)
+            )
             thoughts = {
                 str(event.payload["text"]) for event in events if event.kind == "thought.recorded"
             }

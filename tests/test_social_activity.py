@@ -75,6 +75,25 @@ class ScheduledSocialActivityTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_replayed_location_controls_whether_a_new_person_is_present(self):
+        state, plan_events = self.planned()
+        absent = scheduled_social_events(
+            state,
+            actor_location_id="cafe",
+            simulated_at=self.now,
+            actual_revision=len(plan_events),
+            actor_locations={"mara": "home"},
+        )
+        self.assertEqual(absent, [])
+        present = scheduled_social_events(
+            state,
+            actor_location_id="cafe",
+            simulated_at=self.now,
+            actual_revision=len(plan_events),
+            actor_locations={"mara": "cafe"},
+        )
+        self.assertTrue(any(event.kind == "social.activity_completed" for event in present))
         self.assertEqual(
             scheduled_social_events(
                 state,

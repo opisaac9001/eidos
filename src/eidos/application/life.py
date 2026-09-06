@@ -45,6 +45,7 @@ from eidos.application.scene_story import bounded_scene_events, continuing_scene
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.world_expansion import expanding_world_events
+from eidos.application.world_exploration import exploration_plan_events, planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
 from eidos.application.world_perception import (
     authored_community_schedule,
@@ -759,12 +760,16 @@ class Life:
                     self.gateway,
                 )
             )
+            expansion_catalog = self._world_catalog(history + pending)
+            pending.extend(exploration_plan_events(history + pending, current, expansion_catalog))
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)
             recovery, state = baseline_affect_events(state, current)
             pending.extend(recovery)
-            beat = beats.get(current)
+            beat = planned_activity_beat(
+                project_planning(history + pending), current, state.energy
+            ) or beats.get(current)
             if beat:
                 emotion_before_beat = project_emotion(history + pending)
                 bias = emotional_planning_bias(
@@ -1230,6 +1235,10 @@ class Life:
                 actor_location_id=state.location_id,
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
+                actor_locations={
+                    person_id: person.location_id
+                    for person_id, person in project_npcs(history + pending, current).people.items()
+                },
             )
             if social_activity:
                 project_planning(history + pending + social_activity)

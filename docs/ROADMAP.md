@@ -37,7 +37,10 @@ Replayable added places now contribute their own opening hours and connected roa
 planning, travel, and promise-retiming feasibility instead of acting as display-only
 map markers. Newly introduced people also use their introduced place for generic
 need-driven goals, travel there during the day, and can complete validated activity
-there rather than being silently folded into the seed cast's routines.
+there rather than being silently folded into the seed cast's routines. Pathos now
+turns an introduced place into a source-linked, two-visit exploration goal, fits it
+around existing plans and travel, physically goes there, and completes it through
+the ordinary action resolver.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,
@@ -260,7 +263,8 @@ boundaries and must not rely on emotional coercion.
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected
    places without changing seed worlds, and place hours/routes participate in
-   feasibility. Next, let goals and consequences deliberately select those additions.
+   feasibility. Pathos and introduced NPCs now form bounded goals that select new
+   places; next, let social consequences and useful-object choices do the same.
 5. Add an optional source-attributed British-town signal adapter for weather, daylight,
    public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
 6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
