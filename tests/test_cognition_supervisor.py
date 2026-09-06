@@ -17,14 +17,15 @@ from eidos.ports.model_gateway import ModelMessage, ModelRequest, ModelResponse
 class ThreadRecordingGateway:
     model = "fixture"
 
-    def __init__(self):
+    def __init__(self, content='{"text":"background thought"}'):
         self.thread_names = []
         self.requests = []
+        self.content = content
 
     async def generate(self, request):
         self.thread_names.append(threading.current_thread().name)
         self.requests.append(request)
-        return ModelResponse('{"text":"background thought"}', "fixture", "test", "stop", 19, 5)
+        return ModelResponse(self.content, "fixture", "test", "stop", 19, 5)
 
 
 class SupervisorTests(unittest.TestCase):
@@ -94,6 +95,27 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(self.jobs.get_job(job.job_id).attempts, 2)
         supervisor.close()
         self.assertEqual(supervisor.alive_workers, 0)
+
+    def test_structured_world_work_survives_the_background_queue_unchanged(self):
+        content = '{"event_type":"unfamiliar_but_validatable"}'
+        inner = ThreadRecordingGateway(content)
+        supervisor = CognitionSupervisor(self.jobs, inner, lambda _: 0, worker_count=1)
+        self.addCleanup(supervisor.close)
+        gateway = DurableModelGateway(inner, self.jobs, lambda _: 0, supervisor=supervisor)
+        request = ModelRequest(
+            capability="moira_event",
+            messages=(ModelMessage("user", json.dumps({"time": "2026-01-07T18:00:00+00:00"})),),
+            task_version="3",
+            max_output_tokens=300,
+            temperature=0.85,
+            output_schema={"type": "object"},
+        )
+        response = asyncio.run(gateway.generate(request))
+        self.assertEqual(response.content, content)
+        self.assertEqual(response.backend, "durable-worker")
+        job = self.jobs.list_jobs()[0]
+        self.assertEqual(job.status, "completed")
+        self.assertEqual(job.result, content)
 
 
 if __name__ == "__main__":

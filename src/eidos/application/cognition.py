@@ -7,7 +7,7 @@ from typing import Mapping
 from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.proposals import ProposalRejected, validate_proposal
+from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
@@ -66,7 +66,7 @@ async def perform(
             gateway.generate(request_for(role, context)),
             timeout=50,
         )
-        text = validate_proposal(role, response.content, context)
+        text = validate_completion(role, response.content, response.finish_reason, context)
         pending.append(
             DomainEvent(
                 "role.completed",

@@ -11,7 +11,7 @@ from uuid import UUID
 
 from eidos.application.cognition_supervisor import CognitionSupervisor
 from eidos.domain.jobs import CognitionJob
-from eidos.domain.proposals import validate_proposal
+from eidos.domain.proposals import STRUCTURED_CAPABILITIES, validate_completion
 from eidos.ports.job_store import JobConflict, JobStore
 from eidos.ports.model_gateway import DeferredModelResult, ModelGateway, ModelRequest, ModelResponse
 
@@ -49,16 +49,12 @@ class DurableModelGateway(ModelGateway):
         return "model:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
-        # Durable jobs currently persist validated text, not arbitrary JSON documents.
-        # Structured world proposals remain bounded by their application validators.
-        if request.capability in {"moira_event", "moira_expansion"}:
-            return await self.inner.generate(request)
         job = self._enqueue(request)
         if self.supervisor is not None:
             self.supervisor.start()
         if job.status == "completed" and job.result is not None:
             return ModelResponse(
-                json.dumps({"text": job.result}),
+                _result_content(job.capability, job.result),
                 job.resolved_model or self.model,
                 "durable-cache",
                 "stop",
@@ -111,7 +107,12 @@ class DurableModelGateway(ModelGateway):
             raise OSError("World changed before inference")
         try:
             response = await self.inner.generate(request)
-            text = validate_proposal(request.capability, response.content, dict(job.context))
+            result = validate_completion(
+                request.capability,
+                response.content,
+                response.finish_reason,
+                dict(job.context),
+            )
             if job.deadline_at is not None and datetime.now(timezone.utc) >= job.deadline_at:
                 self.jobs.expire_deadlines(datetime.now(timezone.utc))
                 raise TimeoutError("Inference result arrived after its deadline")
@@ -121,7 +122,7 @@ class DurableModelGateway(ModelGateway):
             self.jobs.complete(
                 job.job_id,
                 self.worker_id,
-                text,
+                result,
                 resolved_model=response.resolved_model,
                 backend=response.backend,
                 prompt_tokens=response.prompt_tokens,
@@ -176,7 +177,7 @@ class DurableModelGateway(ModelGateway):
                 raise OSError("Durable job disappeared")
             if job.status == "completed" and job.result is not None:
                 return ModelResponse(
-                    json.dumps({"text": job.result}),
+                    _result_content(job.capability, job.result),
                     job.resolved_model or self.model,
                     "durable-worker",
                     "stop",
@@ -190,3 +191,7 @@ class DurableModelGateway(ModelGateway):
     def close(self) -> None:
         if self.supervisor is not None:
             self.supervisor.close()
+
+
+def _result_content(capability: str, result: str) -> str:
+    return result if capability in STRUCTURED_CAPABILITIES else json.dumps({"text": result})

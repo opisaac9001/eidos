@@ -8,7 +8,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from eidos.domain.jobs import CognitionJob
-from eidos.domain.proposals import ProposalRejected, validate_proposal
+from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.job_store import JobConflict, JobStore
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
@@ -51,7 +51,12 @@ class CognitionJobRunner:
                     )
                 )
             )
-            text = validate_proposal(claimed.capability, response.content, dict(claimed.context))
+            result = validate_completion(
+                claimed.capability,
+                response.content,
+                response.finish_reason,
+                dict(claimed.context),
+            )
             if claimed.deadline_at is not None and self.now() >= claimed.deadline_at:
                 self.jobs.expire_deadlines(self.now())
                 return self.jobs.get_job(claimed.job_id)
@@ -60,7 +65,7 @@ class CognitionJobRunner:
             return self.jobs.complete(
                 claimed.job_id,
                 self.worker_id,
-                text,
+                result,
                 resolved_model=response.resolved_model,
                 backend=response.backend,
                 prompt_tokens=response.prompt_tokens,

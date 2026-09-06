@@ -82,8 +82,27 @@ class DurableGatewayTests(unittest.TestCase):
         )
         response = asyncio.run(gateway.generate(request))
         self.assertEqual(response.content, proposal)
+        cached = asyncio.run(gateway.generate(request))
+        self.assertEqual(cached.content, proposal)
+        self.assertEqual(cached.backend, "durable-cache")
         self.assertEqual(inner.calls, 1)
-        self.assertEqual(self.jobs.list_jobs(), [])
+        self.assertEqual(len(self.jobs.list_jobs()), 1)
+
+    def test_incomplete_structured_proposal_is_never_cached_as_success(self):
+        class IncompleteGateway(CountingGateway):
+            async def generate(self, request):
+                self.calls += 1
+                return ModelResponse('{"event_type":"partial"}', self.model, "fixture", "length")
+
+        gateway = DurableModelGateway(IncompleteGateway(), self.jobs, lambda _: self.revision)
+        request = ModelRequest(
+            capability="moira_event",
+            messages=(ModelMessage("user", "{}"),),
+            output_schema={"type": "object"},
+        )
+        with self.assertRaisesRegex(ValueError, "did not finish"):
+            asyncio.run(gateway.generate(request))
+        self.assertEqual(self.jobs.list_jobs()[0].status, "failed")
 
     def test_deferred_submission_returns_before_inference_and_exposes_terminal_result(self):
         inner = CountingGateway()

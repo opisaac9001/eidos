@@ -4,11 +4,33 @@ import json
 import re
 from typing import Mapping
 
+STRUCTURED_CAPABILITIES = {"moira_event", "moira_expansion"}
+
 
 class ProposalRejected(ValueError):
     def __init__(self, code: str, explanation: str):
         super().__init__(explanation)
         self.code = code
+
+
+def validate_completion(
+    role: str,
+    content: str,
+    finish_reason: str,
+    context: Mapping[str, object],
+) -> str:
+    """Validate a transport envelope; structured domain semantics remain downstream."""
+    if finish_reason != "stop":
+        raise ProposalRejected("incomplete", "Model completion did not finish")
+    if role in STRUCTURED_CAPABILITIES:
+        try:
+            value = json.loads(content)
+        except (TypeError, ValueError):
+            raise ProposalRejected("invalid_json", "Response was not valid JSON") from None
+        if not isinstance(value, dict):
+            raise ProposalRejected("invalid_shape", "Structured proposal must be an object")
+        return content
+    return validate_proposal(role, content, context)
 
 
 def validate_proposal(role: str, content: str, context: Mapping[str, object]) -> str:
