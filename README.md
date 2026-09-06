@@ -191,7 +191,10 @@ network authorization; the server remains loopback-only until authenticated depl
   ordinary validated actions; he may also decline, or explicitly abandon the project
   when access fails. A neighbor who is genuinely co-present may independently join or
   decline that practical activity. Joining creates shared relationship evidence and a
-  later follow-up; merely being named in narration does not.
+  later follow-up; merely being named in narration does not. Two completed uses expose
+  physical wear, make the object temporarily unusable, and create a feasible inspection
+  and repair project. Eidos must remain at the site through the repair interval before
+  the shared object becomes usable again.
 - After the authored six-day acceptance story, replay-stable weekday and weekend
   palettes combine dozens of ordinary activities instead of repeating one daily
   script. Emotional initiative and social openness can bend optional outings toward

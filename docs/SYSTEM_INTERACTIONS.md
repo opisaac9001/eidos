@@ -374,6 +374,16 @@ relationship evidence, and a shared memory; declined use creates none of those. 
 shared fact enters the ordinary follow-up system and can later motivate a mutually
 accepted invitation through the existing availability and feasibility rules.
 
+Two validated uses of an introduced object cause one source-linked maintenance need.
+The condition changes to broken before new uses are allowed, and a two-stage goal fits
+inspection and repair into real opening hours, calendar gaps, and travel constraints.
+The inspection contributes bounded progress but does not alter condition. Repair accepts
+a community-held object only while Eidos and the object remain at its site, after the
+scheduled work duration has elapsed; it then records the repaired condition, remaining
+goal progress, completion, skill evidence, and memory. Ordinary routines cannot move
+Eidos away halfway through scheduled work. This rule is additive, so historical objects
+without a maintenance event preserve their projected condition.
+
 Examples include a neighborhood gathering, workshop delay, weather disruption,
 request for help, or opportunity related to an existing goal.
 Each needs cause, prerequisites, lead time, affected entities, likely duration,

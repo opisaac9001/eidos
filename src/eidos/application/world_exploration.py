@@ -124,7 +124,13 @@ def planned_activity_beat(
             for entry in planning.calendar.values()
             if entry.status == "scheduled"
             and entry.actor_id == "pathos"
-            and datetime.fromisoformat(entry.starts_at) == simulated_at
+            and datetime.fromisoformat(entry.starts_at)
+            <= simulated_at
+            <= (
+                datetime.fromisoformat(entry.ends_at)
+                if entry.ends_at is not None
+                else datetime.fromisoformat(entry.starts_at)
+            )
         ),
         key=lambda entry: (entry.commitment_id is None, entry.schedule_id),
     )

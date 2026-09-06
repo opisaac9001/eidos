@@ -8,7 +8,7 @@ from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 
-SCHEDULED_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND}
+SCHEDULED_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND, ActionKind.REPAIR}
 SCHEDULED_ACTION_VALUES = {action.value for action in SCHEDULED_ACTIONS}
 
 
@@ -67,7 +67,12 @@ def scheduled_activity_events(
             projected = projected.apply(event)
         if not resolution.accepted:
             continue
-        activity = next(event for event in resolution.events if event.kind == "activity.completed")
+        completion = next(
+            event
+            for event in resolution.events
+            if event.kind
+            == ("object.condition_changed" if action is ActionKind.REPAIR else "activity.completed")
+        )
         correlation = entry.commitment_id or entry.goal_id or entry.schedule_id
 
         def consequence(kind: str, payload: dict[str, object]) -> DomainEvent:
@@ -75,7 +80,7 @@ def scheduled_activity_events(
                 kind,
                 "pathos",
                 payload,
-                causation_id=activity.event_id,
+                causation_id=completion.event_id,
                 correlation_id=correlation,
             )
 
@@ -92,6 +97,22 @@ def scheduled_activity_events(
                     },
                 )
             )
+
+        if (
+            action is ActionKind.REPAIR
+            and entry.goal_id is not None
+            and projected.goals[entry.goal_id].status == "active"
+        ):
+            progressed = consequence(
+                "goal.progressed",
+                {
+                    "goal_id": entry.goal_id,
+                    "progress_delta": 0.5,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+            )
+            output.append(progressed)
+            projected = projected.apply(progressed)
 
         if entry.commitment_id is not None:
             fulfilled = consequence(
@@ -119,9 +140,9 @@ def scheduled_activity_events(
                 "owner": "pathos",
                 "category": "accomplishment",
                 "source": "deterministic-consequence",
-                "source_event_id": str(activity.event_id),
+                "source_event_id": str(completion.event_id),
                 "goal_id": entry.goal_id,
-                "object_id": entry.resource_id,
+                "object_id": entry.target_id if action is ActionKind.REPAIR else entry.resource_id,
                 "location_id": entry.location_id,
                 "importance": 0.7,
                 "confidence": 1.0,

@@ -172,7 +172,8 @@ def resolve_action(
         schedule = state.calendar.get(proposal.schedule_id)
         if schedule is None:
             return reject("unknown_schedule", "The scheduled work does not exist")
-        if item.custodian_id != proposal.actor_id:
+        shared_at_site = item.owner_id == "community" and item.custodian_id == "community"
+        if item.custodian_id != proposal.actor_id and not shared_at_site:
             return reject("no_custody", "The actor does not have custody of the object")
         if item.location_id != actor_location_id or schedule.location_id != actor_location_id:
             return reject(

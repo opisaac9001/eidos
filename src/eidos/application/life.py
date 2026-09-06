@@ -38,6 +38,7 @@ from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.object_collaboration import object_collaboration_events
+from eidos.application.object_maintenance import object_maintenance_events
 from eidos.application.object_opportunities import object_opportunity_events
 from eidos.application.object_story import object_story_events
 from eidos.application.offscreen import npc_world_events
@@ -625,6 +626,7 @@ class Life:
                 "object.used",
                 "object.collaboration_decided",
                 "object.shared_use",
+                "object.maintenance_required",
                 "catch_up.summarized",
                 "catch_up.cancelled",
             }:
@@ -1611,6 +1613,15 @@ class Life:
                     relationships=self._relationships(history + pending).relationships,
                 )
             )
+            maintenance = object_maintenance_events(
+                history + pending,
+                current,
+                self._planning(history + pending),
+                self._world_catalog(history + pending),
+            )
+            if maintenance:
+                self._planning(history + pending + maintenance)
+                pending.extend(maintenance)
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),

@@ -47,6 +47,11 @@ end in completion, refusal, or explicit access failure rather than narrated succ
 A genuinely co-present neighbor can independently join or decline one of those sessions.
 Only joined use creates shared relationship evidence, memory, and a later follow-up
 that can enter the existing invitation lifecycle.
+After two validated uses, an introduced shared object now develops explicit wear and
+becomes unavailable. Eidos schedules an inspection followed by repair around opening
+hours, conflicts, and travel, remains at the site for the work interval, and restores
+the object only through the ordinary repair resolver. This creates a reusable causal
+loop from discovery through use, social consequence, wear, and care.
 
 Hourly associations, reflection, dreams and a factual daybook run at fixed times.
 Named emotional state and duration are sampled hourly. Somatic, affective, attention,
@@ -295,8 +300,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Add maintenance, wear, repair, replenishment, and consumption lifecycles so useful
-   objects change through repeated individual and shared use.
+1. Add quantities, consumption, replenishment, failed maintenance, and choices about
+   whether scarce useful objects are worth repairing or replacing.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected

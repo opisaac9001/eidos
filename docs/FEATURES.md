@@ -60,8 +60,8 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
 | WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception and owned memory | P3 |
-| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers, finite community resources, delivered objects, and location-validated solo/shared use during incidents and chosen projects | P3 |
-| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend plans, completed bookbinding, feasible exploration, and optional two-session introduced-object projects with co-present participation | P3 |
+| WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: repair/transfers, finite community resources, delivered objects, location-validated use, and use-driven wear/maintenance | P3 |
+| WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: seed/new people receive varied private projects, planned movement/actions, audited priorities, and critical-energy replanning | P3 |
 | WORLD-06 | Event causes, lead time, stakes, cooldowns, participation | Partial: typed weather, resource-backed/open-ended events, plus witnessed urgent incidents with independent respond/decline and bounded participation | P5 |
 | WORLD-07 | Offscreen low-detail simulation, scene activation, pacing | Partial: bounded hourly movement and six-hour activity | P5 |
