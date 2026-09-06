@@ -24,7 +24,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay/capped rehearsal | P2 |
 | MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
-| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: discounted testimony, direct confirmation and revision ledger | P2 |
+| MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: discounted testimony, direct confirmation, revision ledger, and checked incremental materialization | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Partial: conservative detail omission in working context | P2 |
 | MEM-09 | Long-run retention/index maintenance and archive policy | Partial: incremental event-anchored memory index; retention/archive planned | P6 |
 
@@ -120,7 +120,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | --- | --- | --- | --- |
 | OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: one endpoint/model | P1 |
 | OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised bounded queue with deadlines | P1 |
-| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/memory/planning projections | P1 |
+| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: backup/replay/schema-4 migration + checksummed disposable state/memory/planning/belief projections | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Planned | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |

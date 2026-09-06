@@ -53,7 +53,7 @@ from eidos.application.world_perception import (
     due_world_observations,
 )
 from eidos.domain.associations import AssociationProposal, resolve_association
-from eidos.domain.beliefs import project_beliefs
+from eidos.domain.beliefs import BeliefState, project_beliefs
 from eidos.domain.commitments import project_renegotiations
 from eidos.domain.development import project_development
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
@@ -121,6 +121,7 @@ class Life:
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
         self._planning_cache: tuple[int, str, PlanningState] | None = None
+        self._belief_cache: tuple[int, str, BeliefState] | None = None
 
     def history(self) -> list[DomainEvent]:
         return self.store.read("pathos")
@@ -278,6 +279,49 @@ class Life:
                 len(history),
                 str(history[-1].event_id),
                 planning.materialized_state(),
+            )
+        )
+
+    def _beliefs(self, history: list[DomainEvent]) -> BeliefState:
+        if self._belief_cache is not None:
+            revision, anchor, beliefs = self._belief_cache
+            if revision <= len(history) and (
+                revision == 0 or str(history[revision - 1].event_id) == anchor
+            ):
+                for event in history[revision:]:
+                    beliefs = beliefs.apply(event)
+                anchor = str(history[-1].event_id) if history else ""
+                self._belief_cache = (len(history), anchor, beliefs)
+                return beliefs
+        if isinstance(self.store, MaterializedProjectionStore):
+            projection = self.store.load_projection("pathos", "beliefs", 1, len(history))
+            if projection is not None:
+                try:
+                    beliefs = BeliefState.from_materialized_state(projection.state)
+                    for event in history[projection.revision :]:
+                        beliefs = beliefs.apply(event)
+                    anchor = str(history[-1].event_id) if history else ""
+                    self._belief_cache = (len(history), anchor, beliefs)
+                    return beliefs
+                except (KeyError, TypeError, ValueError):
+                    pass
+        beliefs = project_beliefs(history)
+        anchor = str(history[-1].event_id) if history else ""
+        self._belief_cache = (len(history), anchor, beliefs)
+        return beliefs
+
+    def _save_beliefs(self, history: list[DomainEvent]) -> None:
+        if not history or not isinstance(self.store, MaterializedProjectionStore):
+            return
+        beliefs = self._beliefs(history)
+        self.store.save_projection(
+            MaterializedProjection(
+                "pathos",
+                "beliefs",
+                1,
+                len(history),
+                str(history[-1].event_id),
+                beliefs.materialized_state(),
             )
         )
 
@@ -500,7 +544,7 @@ class Life:
         mind = project_mind(history)
         emotion = project_emotion(history)
         season = project_season(history)
-        beliefs = project_beliefs(history)
+        beliefs = self._beliefs(history)
         followups = project_followups(history)
         development = project_development(history)
         transfers = project_transfers(history)
@@ -1010,7 +1054,9 @@ class Life:
                     current,
                 )
             )
-            pending.extend(npc_belief_events(history + pending, at))
+            pending.extend(
+                npc_belief_events(history + pending, at, self._beliefs(history + pending))
+            )
             pending.extend(npc_need_plan_events(history + pending, at))
             phone_emotion = project_emotion(history + pending)
             phone_bias = emotional_planning_bias(
@@ -1065,8 +1111,12 @@ class Life:
             if overdue:
                 self._planning(history + pending + overdue)
                 pending.extend(overdue)
-            pending.extend(relationship_belief_events(history + pending, at))
-            pending.extend(testimony_belief_events(history + pending, at))
+            pending.extend(
+                relationship_belief_events(history + pending, at, self._beliefs(history + pending))
+            )
+            pending.extend(
+                testimony_belief_events(history + pending, at, self._beliefs(history + pending))
+            )
             if current.hour == 7:
                 waking = waking_dream_events(history + pending, state, at)
                 for event in waking:
@@ -1400,6 +1450,7 @@ class Life:
         self._save_state_checkpoint(committed, state)
         self._save_memory_index(committed)
         self._save_planning(committed)
+        self._save_beliefs(committed)
         await self._respond_to_due_messages()
         if isinstance(self.gateway, DeferredModelGateway):
             for request in deferred_requests:
@@ -1775,7 +1826,7 @@ class Life:
                     "status": belief.status,
                     "alternative": belief.alternative_value,
                 }
-                for belief in project_beliefs(history).beliefs.values()
+                for belief in self._beliefs(history).beliefs.values()
                 if belief.owner_id == "pathos"
             ],
             "dream_inspirations": [
@@ -1882,6 +1933,7 @@ class Life:
         committed = [*history, *pending]
         self._save_memory_index(committed)
         self._save_planning(committed)
+        self._save_beliefs(committed)
 
 
 def vars_for(value: Any) -> dict[str, Any]:

@@ -5,19 +5,23 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from eidos.domain.beliefs import BeliefProposal, project_beliefs, resolve_belief
+from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
 from eidos.domain.world import npc_plan_profile
 
 
-def npc_belief_events(history: Sequence[DomainEvent], simulated_at: str) -> list[DomainEvent]:
+def npc_belief_events(
+    history: Sequence[DomainEvent],
+    simulated_at: str,
+    belief_state: BeliefState | None = None,
+) -> list[DomainEvent]:
     """Turn unprocessed public-event perceptions into private, owned beliefs."""
     now = datetime.fromisoformat(simulated_at)
     if now.utcoffset() is None:
         raise ValueError("NPC cognition time must be timezone-aware")
     output: list[DomainEvent] = []
-    state = project_beliefs(history)
+    state = belief_state if belief_state is not None else project_beliefs(history)
     npc_state = project_npcs(history, now)
     used_evidence = {
         str(event.payload["evidence_event_id"])

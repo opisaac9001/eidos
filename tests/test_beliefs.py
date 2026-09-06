@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from eidos.domain.beliefs import (
     BeliefProposal,
+    BeliefState,
     parse_belief_proposal,
     project_beliefs,
     resolve_belief,
@@ -223,6 +224,22 @@ class BeliefTests(unittest.TestCase):
         )
         with self.assertRaises(ProposalRejected):
             parse_belief_proposal(json.dumps({**raw, "confidence": 1.5}))
+
+    def test_materialized_beliefs_are_ordered_checked_and_replayable(self):
+        evidence = self.evidence()
+        formed = resolve_belief(
+            self.proposal(evidence),
+            state=BeliefState.empty(),
+            history=[evidence],
+            actual_revision=1,
+            simulated_at=self.now,
+        )
+        state = project_beliefs([evidence, *formed.events])
+        materialized = state.materialized_state()
+        self.assertEqual(BeliefState.from_materialized_state(materialized), state)
+        corrupted = {"beliefs": [{**materialized["beliefs"][0], "confidence": 4.0}]}
+        with self.assertRaises(ValueError):
+            BeliefState.from_materialized_state(corrupted)
 
 
 if __name__ == "__main__":

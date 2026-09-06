@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.domain.beliefs import project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.ports.event_store import MaterializedProjection, RevisionConflict, StateCheckpoint
 
@@ -165,6 +166,17 @@ class PersistenceTests(unittest.TestCase):
         restarted = Life(SQLiteEventStore(self.path), StandInGateway())
         projected = restarted._planning(restarted.history())
         self.assertIn("tail-goal", projected.goals)
+
+    def test_life_materializes_beliefs_at_the_committed_revision(self) -> None:
+        life = Life(self.store, StandInGateway())
+        life.advance(24)
+        history = life.history()
+        projection = self.store.load_projection("pathos", "beliefs", 1, len(history))
+        self.assertIsNotNone(projection)
+        assert projection is not None
+        self.assertEqual(projection.revision, len(history))
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        self.assertEqual(restarted._beliefs(history), project_beliefs(history))
 
     def test_checkpoint_refuses_an_unmatched_or_backward_anchor(self) -> None:
         events = [DomainEvent("test", "pathos"), DomainEvent("test", "pathos")]

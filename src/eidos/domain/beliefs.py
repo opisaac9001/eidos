@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from types import MappingProxyType
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
@@ -37,6 +37,59 @@ class BeliefState:
     @classmethod
     def empty(cls) -> BeliefState:
         return cls({})
+
+    def materialized_state(self) -> Mapping[str, Any]:
+        return {"beliefs": [asdict(belief) for belief in self.beliefs.values()]}
+
+    @classmethod
+    def from_materialized_state(cls, raw: Mapping[str, Any]) -> BeliefState:
+        if set(raw) != {"beliefs"} or not isinstance(raw["beliefs"], list):
+            raise ValueError("Materialized belief fields do not match schema v1")
+        beliefs: dict[str, Belief] = {}
+        expected = set(Belief.__dataclass_fields__)
+        identities: set[tuple[str, str, str]] = set()
+        for value in raw["beliefs"]:
+            if not isinstance(value, dict) or set(value) != expected:
+                raise ValueError("Materialized belief record does not match schema v1")
+            try:
+                belief = Belief(**value)
+            except TypeError:
+                raise ValueError("Materialized belief record is invalid") from None
+            identity = (belief.owner_id, belief.subject_id, belief.predicate)
+            texts = (
+                belief.belief_id,
+                *identity,
+                belief.object_value,
+                belief.status,
+                belief.last_evidence_id,
+            )
+            if (
+                not all(isinstance(item, str) and item.strip() for item in texts)
+                or belief.belief_id in beliefs
+                or identity in identities
+                or belief.status not in {"held", "contested"}
+                or isinstance(belief.confidence, bool)
+                or not isinstance(belief.confidence, (int, float))
+                or not 0 <= belief.confidence <= 1
+                or isinstance(belief.revision, bool)
+                or not isinstance(belief.revision, int)
+                or belief.revision < 1
+                or isinstance(belief.evidence_count, bool)
+                or not isinstance(belief.evidence_count, int)
+                or belief.evidence_count < 1
+                or (
+                    belief.alternative_value is not None
+                    and (
+                        not isinstance(belief.alternative_value, str)
+                        or not belief.alternative_value.strip()
+                    )
+                )
+                or (belief.status == "contested") != (belief.alternative_value is not None)
+            ):
+                raise ValueError("Materialized belief is semantically invalid")
+            beliefs[belief.belief_id] = belief
+            identities.add(identity)
+        return cls(beliefs)
 
     def apply(self, event: DomainEvent) -> BeliefState:
         beliefs = dict(self.beliefs)

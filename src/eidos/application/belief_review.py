@@ -6,13 +6,18 @@ from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, r
 from eidos.domain.events import DomainEvent
 
 
-def relationship_belief_events(history: list[DomainEvent], simulated_at: str) -> list[DomainEvent]:
+def relationship_belief_events(
+    history: list[DomainEvent],
+    simulated_at: str,
+    belief_state: BeliefState | None = None,
+) -> list[DomainEvent]:
     considered = {
         str(event.payload["evidence_event_id"])
         for event in history
         if event.kind in {"belief.formed", "belief.revised", "belief.corrected", "belief.contested"}
     }
     output: list[DomainEvent] = []
+    state = belief_state if belief_state is not None else project_beliefs(history)
     for evidence in history:
         if evidence.kind != "relationship.changed" or str(evidence.event_id) in considered:
             continue
@@ -38,17 +43,23 @@ def relationship_belief_events(history: list[DomainEvent], simulated_at: str) ->
         )
         resolution = resolve_belief(
             proposal,
-            state=project_beliefs(combined),
+            state=state,
             history=combined,
             actual_revision=len(combined),
             simulated_at=simulated_at,
         )
         output.extend(resolution.events)
+        for event in resolution.events:
+            state = state.apply(event)
         considered.add(str(evidence.event_id))
     return output
 
 
-def testimony_belief_events(history: list[DomainEvent], simulated_at: str) -> list[DomainEvent]:
+def testimony_belief_events(
+    history: list[DomainEvent],
+    simulated_at: str,
+    belief_state: BeliefState | None = None,
+) -> list[DomainEvent]:
     """Review structured heard claims and later direct confirmations as distinct evidence."""
     considered = {
         str(event.payload["evidence_event_id"])
@@ -56,6 +67,7 @@ def testimony_belief_events(history: list[DomainEvent], simulated_at: str) -> li
         if event.kind in {"belief.formed", "belief.revised", "belief.corrected", "belief.contested"}
     }
     output: list[DomainEvent] = []
+    state = belief_state if belief_state is not None else project_beliefs(history)
     for evidence in history:
         evidence_id = str(evidence.event_id)
         if evidence_id in considered:
@@ -75,9 +87,7 @@ def testimony_belief_events(history: list[DomainEvent], simulated_at: str) -> li
             assert isinstance(claim_confidence, (int, float)) and not isinstance(
                 claim_confidence, bool
             )
-            confidence = float(claim_confidence) * _speaker_reliability(
-                project_beliefs([*history, *output]), speaker_id
-            )
+            confidence = float(claim_confidence) * _speaker_reliability(state, speaker_id)
         elif evidence.kind == "resource.confirmed":
             subject_id = evidence.payload.get("subject_id")
             predicate = evidence.payload.get("predicate")
@@ -108,12 +118,14 @@ def testimony_belief_events(history: list[DomainEvent], simulated_at: str) -> li
         )
         resolution = resolve_belief(
             proposal,
-            state=project_beliefs(combined),
+            state=state,
             history=combined,
             actual_revision=len(combined),
             simulated_at=simulated_at,
         )
         output.extend(resolution.events)
+        for event in resolution.events:
+            state = state.apply(event)
         considered.add(evidence_id)
     return output
 

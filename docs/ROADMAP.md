@@ -59,10 +59,10 @@ locations, needs, private beliefs, activities, and perception- or need-driven pr
 goals with cooldowns, deadlines, causal plans, and activity-validated outcomes.
 Their option vocabulary remains bounded rather than generally autonomous. Term,
 entity, goal, relationship, and rehearsal recall indexes now persist
-as a versioned disposable projection and increment from the event tail. Planning now
-does the same with an ordered, semantically checked disposable snapshot so restarts
-preserve exact presentation order. Other projections, including beliefs,
-relationships, and consolidation, still rebuild from event history.
+as a versioned disposable projection and increment from the event tail. Planning and
+actor-owned beliefs now do the same with ordered, semantically checked disposable
+snapshots so restarts preserve exact presentation order. Relationship and
+consolidation projections still rebuild from event history.
 
 Lab tests exercised all performers. The small model still invents details and
 produces invalid proposals. Explicit source archiving preserves accepted scenes
@@ -255,8 +255,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend materialization beyond the completed incremental memory and planning
-   projections into the remaining high-cost belief, relationship, and consolidation
+1. Extend materialization beyond the completed incremental memory, planning, and
+   belief projections into the remaining high-cost relationship and consolidation
    projections.
 2. Expand the completed perception- and need-driven NPC goal loop with more personal
    projects, competing priorities, interruption, and relationship-motivated choices.
