@@ -13,6 +13,7 @@ from eidos.domain.events import DomainEvent
 
 class CognitiveLayer(StrEnum):
     SOMATIC = "somatic"
+    AFFECTIVE = "affective"
     ATTENTION = "attention"
     ASSOCIATIVE = "associative"
     DELIBERATIVE = "deliberative"

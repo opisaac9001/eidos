@@ -36,10 +36,10 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | SELF-01 | Stable identity, values, preferences, sourced backstory, knowledge limits | Partial: persisted sourced values/preferences + bounded context | P2 |
-| SELF-02 | Multidimensional affect, appraisal, episodes and baseline mood | Partial: source-linked valence/arousal episodes + recovery | P2 |
+| SELF-02 | Multidimensional affect, named emotion, duration, appraisal, episodes and baseline mood | Partial: replayable emotion samples, prolonged-low tracking, source-linked valence/arousal episodes + recovery | P2 |
 | SELF-03 | Rest, connection, curiosity, mastery; bounded satisfaction/frustration | Partial: durable needs with circadian pressure/recovery | P2–P4 |
 | SELF-04 | Emotional residue, recovery, regulation, capped dream carryover | Partial: sleep cycle + capped non-action dream appraisal | P2–P4 |
-| SELF-05 | Decisions balance values, needs, commitments and feasible options | Partial: sourced values + energy/rest/mastery/window policy | P3 |
+| SELF-05 | Decisions balance values, needs, emotion, commitments and feasible options | Partial: sourced values + emotional planning bias + energy/rest/mastery/window policy | P3 |
 | SELF-06 | Slow trait/preference change, habits, skills, evidence/drift limits | Partial: source-linked bounded repair/bookbinding skills + morning habit | P6 |
 
 ## Planning and time — Chronos / Pathos
@@ -90,7 +90,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/attention/association pulses + sourced associations | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/attention/association pulses + sourced associations | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: routine bedtime | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs and complete lineage | P4 |

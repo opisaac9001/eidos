@@ -198,6 +198,8 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", 0.05, 0.4, 0.45, 0.6)
     if event.kind == "social.activity_completed":
         return ("connection", 0.06, 0.55, 0.35, 0.8)
+    if event.kind == "scene.turn_taken":
+        return ("connection", 0.025, 0.3, 0.35, 0.75)
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)
@@ -209,6 +211,16 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("mastery", 0.08, 0.7, 0.35, 0.9)
     if event.kind == "commitment.missed":
         return ("connection", -0.08, -0.75, 0.3, 0.65)
+    if event.kind == "goal.achieved":
+        return ("mastery", 0.08, 0.8, 0.4, 0.9)
+    if event.kind == "world_event.occurred":
+        return ("curiosity", 0.03, 0.35, 0.5, 0.55)
+    if event.kind == "disagreement.expressed":
+        return ("affect", 0.0, -0.6, 0.65, 0.55)
+    if event.kind == "boundary.stated":
+        return ("affect", 0.0, -0.15, 0.5, 0.8)
+    if event.kind == "apology.offered":
+        return ("connection", 0.04, 0.55, 0.35, 0.85)
     if event.kind == "dream.effect_applied":
         return ("affect", 0.0, float(event.payload.get("valence_delta", 0)), 0.65, 0.15)
     return None

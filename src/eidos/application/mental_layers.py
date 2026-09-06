@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Mapping, Sequence
 
 from eidos.application.inner_life import active_concerns
+from eidos.domain.emotions import classify_emotion, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import project_planning
@@ -27,6 +28,7 @@ def mental_layer_events(
         if event.kind == "mind.layer_pulsed" and isinstance(event.payload.get("pulse_id"), str)
     }
     planning = project_planning(list(history))
+    previous_emotion = project_emotion(history)
     concerns = active_concerns(list(history))
     active_goals = [goal for goal in planning.goals.values() if goal.status == "active"]
     needs = {
@@ -52,6 +54,8 @@ def mental_layer_events(
         if active_goals
         else state.location_id
     )
+    sustained_low_hours = previous_emotion.sustained_low_hours if state.valence <= -0.35 else 0
+    emotion_label = classify_emotion(state.valence, state.arousal, sustained_low_hours)
     specs: list[tuple[CognitiveLayer, str, str, str, str, float]] = [
         (
             CognitiveLayer.SOMATIC,
@@ -68,6 +72,14 @@ def mental_layer_events(
             focus_id,
             focus_text,
             0.75 if concerns else 0.6,
+        ),
+        (
+            CognitiveLayer.AFFECTIVE,
+            "background",
+            "emotion",
+            emotion_label,
+            f"Feel {emotion_label}",
+            min(1.0, 0.3 + abs(state.valence) + abs(state.arousal - 0.35)),
         ),
         (
             CognitiveLayer.ASSOCIATIVE,

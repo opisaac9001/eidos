@@ -153,7 +153,11 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
   unavailable.
 - The simulation calendar records season transitions as replayable world facts and
   exposes the current season beside weather; it does not depend on generated prose.
-- Every simulated hour advances somatic awareness, attention, and association. Awake
+- Every simulated hour samples a named, persistent emotional state and advances
+  somatic awareness, affect, attention, and association. Emotional valence, arousal,
+  intensity, and duration bias social capacity and planning style without bypassing
+  feasibility or consent. Prolonged low mood is represented as a lived pattern, never
+  as an automatic clinical diagnosis. Awake
   conditions also activate deliberative and social layers; evening reflection and
   sleeping dream layers have distinct cadences. These replayable pulses guide model
   context but have no authority to become memories or actions by themselves.

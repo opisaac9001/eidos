@@ -104,7 +104,9 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
 - Consolidate repeated episodes into source-linked summaries and associations.
   Maintain uncertainty and correction history; summaries are not new events.
 - Stable values/preferences/traits plus separately changing needs, emotional
-  episodes, baseline mood and recovery. Personality cannot reset with each prompt.
+  episodes, named emotional states, duration, baseline mood and recovery. Emotional
+  planning bias changes attention and option weighting without removing feasibility,
+  consent, or agency. Personality cannot reset with each prompt.
 - Show why a memory was selected and distinguish what happened from what is recalled.
 
 Exit: an old relevant promise outranks unrelated recent chatter; ordinary details

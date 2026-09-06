@@ -47,6 +47,13 @@ intentions, emotion, and memory. Most Murmur output never becomes conscious.
 Salient fragments surface as intuitions, impulses, intrusive recollections, or
 dream seeds.
 
+Emotion is persistent state, not decorative prose. Appraised experiences alter
+valence and arousal; duration turns a passing feeling into a sustained pattern;
+recovery remains gradual. That state colors attention, inner association, speech,
+initiative, social openness, pace, and acceptable risk. It may make a plan less
+likely or prompt reconsideration, but never fabricates its own cause, overrides a
+promise, compels another person, or substitutes a psychiatric diagnosis.
+
 ### Mnemosyne
 
 The memory curator. It proposes consolidation, associations, salience changes,

@@ -31,10 +31,21 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(snapshot["mind"]["pulse_counts"]["somatic"], 24)
         self.assertEqual(snapshot["mind"]["pulse_counts"]["attention"], 24)
         self.assertEqual(snapshot["mind"]["pulse_counts"]["associative"], 24)
+        self.assertEqual(snapshot["mind"]["pulse_counts"]["affective"], 24)
         self.assertTrue(
-            {"somatic", "attention", "associative", "deliberative", "social", "reflective", "dream"}
+            {
+                "somatic",
+                "affective",
+                "attention",
+                "associative",
+                "deliberative",
+                "social",
+                "reflective",
+                "dream",
+            }
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
+        self.assertTrue(snapshot["emotion"]["label"])
         self.assertNotEqual(snapshot["pathos"]["needs"]["mastery"], 0.45)
         self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
         self.assertTrue(any(event.kind == "appraisal.recorded" for event in self.life.history()))

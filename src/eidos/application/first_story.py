@@ -24,6 +24,9 @@ def story_events(
     actor_energy: float,
     actor_rest: float = 0.5,
     actor_mastery: float = 0.5,
+    actor_valence: float = 0.0,
+    actor_arousal: float = 0.35,
+    sustained_low_hours: int = 0,
     actor_values: Mapping[str, float] | None = None,
 ) -> list[DomainEvent]:
     day = (current.date() - datetime(2026, 1, 1).date()).days + 1
@@ -84,6 +87,9 @@ def story_events(
             rest=actor_rest,
             mastery=actor_mastery,
             values=actor_values,
+            affect_valence=actor_valence,
+            affect_arousal=actor_arousal,
+            sustained_low_hours=sustained_low_hours,
         )
         response = resolve_social_move(
             choice,
@@ -359,6 +365,9 @@ def story_events(
             rest=actor_rest,
             mastery=actor_mastery,
             values=actor_values,
+            affect_valence=actor_valence,
+            affect_arousal=actor_arousal,
+            sustained_low_hours=sustained_low_hours,
             expected_revision=len(existing) + len(opened),
         )
         response = resolve_social_move(

@@ -51,6 +51,7 @@ from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.commitments import project_renegotiations
 from eidos.domain.development import project_development
+from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
@@ -332,6 +333,7 @@ class Life:
         social = project_social(history)
         scenes = project_scenes(history)
         mind = project_mind(history)
+        emotion = project_emotion(history)
         season = project_season(history)
         beliefs = project_beliefs(history)
         followups = project_followups(history)
@@ -376,6 +378,14 @@ class Life:
             "mind": {
                 "layers": [vars_for(item) for item in mind.latest.values()],
                 "pulse_counts": dict(mind.pulse_counts),
+            },
+            "emotion": {
+                **vars_for(emotion),
+                "planning_bias": vars_for(
+                    emotional_planning_bias(
+                        emotion.valence, emotion.arousal, emotion.sustained_low_hours
+                    )
+                ),
             },
             "roles": list(roles.values()),
             "diagnostics": list(reversed(diagnostics[-100:])),
@@ -633,6 +643,9 @@ class Life:
                 state.energy,
                 state.rest,
                 state.mastery,
+                state.valence,
+                state.arousal,
+                project_emotion(history + pending).sustained_low_hours,
                 project_identity(history + pending).values,
             )
             if story:
@@ -753,6 +766,19 @@ class Life:
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
+            emotion_now = project_emotion(history + pending)
+            context["emotion"] = {
+                "label": emotion_now.label,
+                "intensity": emotion_now.intensity,
+                "pattern": emotion_now.pattern,
+                "planning_bias": vars_for(
+                    emotional_planning_bias(
+                        emotion_now.valence,
+                        emotion_now.arousal,
+                        emotion_now.sustained_low_hours,
+                    )
+                ),
+            }
             if current.hour in (6, 12, 18):
                 text = await perform(self.gateway, "moira", context, at, pending)
                 if text:
@@ -992,6 +1018,7 @@ class Life:
             pending.extend(appraisals)
             episodes, state = affect_episode_events(history + pending, state, current)
             pending.extend(episodes)
+            pending.extend(emotion_sample_events(history + pending, state, current))
             if current.hour == 0:
                 pending.extend(consolidation_events(history + pending, current))
         final_time = DomainEvent("time.advanced", "pathos", {"simulated_at": target})
@@ -1122,6 +1149,17 @@ class Life:
                 }
                 for item in active_dream_inspirations(history, state.simulated_at)
             ],
+            "emotion": {
+                **vars_for(project_emotion(history)),
+                "planning_bias": vars_for(
+                    emotional_planning_bias(
+                        state.valence,
+                        state.arousal,
+                        project_emotion(history).sustained_low_hours,
+                    )
+                ),
+            },
+            "mind_layers": mind_context(history),
         }
         pending.extend(
             DomainEvent(

@@ -413,7 +413,7 @@ function render(next) {
   if (state.runtime.error) showError(state.runtime.error);
   setBusy(busy);
   if (!changed) return;
-  $("presence-mood").textContent = state.pathos.mood;
+  $("presence-mood").textContent = state.emotion?.label || state.pathos.mood;
   $("presence-location").textContent = `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}`;
   const thought = state.feed.find((item) => item.kind === "thought.recorded");
   $("latest-thought").textContent = thought
@@ -436,9 +436,13 @@ function render(next) {
   $("arousal-value").textContent = `${Math.round(state.pathos.arousal * 100)}%`;
   $("arousal-meter").style.width = `${state.pathos.arousal * 100}%`;
   const episode = state.affect_episodes?.[0];
+  const emotion = state.emotion;
+  const emotionalPattern = emotion
+    ? `${emotion.pattern} ${emotion.label}${emotion.sustained_low_hours ? ` · ${emotion.sustained_low_hours} low hours` : ""}`
+    : "No emotional sample yet";
   $("affect-source").textContent = episode
-    ? `Latest episode: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
-    : "No affect episode recorded yet.";
+    ? `${emotionalPattern}. Latest influence: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
+    : `${emotionalPattern}. No affect episode recorded yet.`;
   const needs = state.pathos.needs;
   const values = Object.entries(state.identity?.values || {})
     .sort((a, b) => b[1] - a[1])
@@ -483,7 +487,7 @@ function render(next) {
       },
     )
     .join("");
-  $("chat-context-mood").textContent = state.pathos.mood;
+  $("chat-context-mood").textContent = state.emotion?.label || state.pathos.mood;
   $("chat-context-location").textContent =
     `${state.pathos.location} · ${time(state.time)}`;
   $("chat-memories").innerHTML = state.memories

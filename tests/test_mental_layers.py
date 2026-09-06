@@ -13,7 +13,10 @@ class MentalLayerTests(unittest.TestCase):
         state = PathosState(simulated_at=at, location_id="park", awake=True)
         events = mental_layer_events([], state, at, {"rowan": "park", "mara": "cafe"})
         layers = {event.payload["layer"] for event in events}
-        self.assertEqual(layers, {"somatic", "attention", "associative", "deliberative", "social"})
+        self.assertEqual(
+            layers,
+            {"somatic", "affective", "attention", "associative", "deliberative", "social"},
+        )
         self.assertTrue(all(event.payload["action_authority"] is False for event in events))
         projected = project_mind(events)
         self.assertEqual(projected.latest["social"].focus_id, "rowan")

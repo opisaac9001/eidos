@@ -266,14 +266,37 @@ def choose_request_response(
     rest: float = 0.5,
     mastery: float = 0.5,
     values: Mapping[str, float] | None = None,
+    affect_valence: float = 0.0,
+    affect_arousal: float = 0.35,
+    sustained_low_hours: int = 0,
 ) -> SocialMoveProposal:
     """A deterministic baseline policy; models may later propose the same envelope."""
     if actor_id != request.awaiting_actor_id:
         raise ValueError("Only the awaited actor can choose a response")
     if any(not 0 <= value <= 1 for value in (energy, rest, mastery)):
         raise ValueError("Choice dimensions must be between zero and one")
+    if (
+        isinstance(affect_valence, bool)
+        or not isinstance(affect_valence, (int, float))
+        or isinstance(affect_arousal, bool)
+        or not isinstance(affect_arousal, (int, float))
+        or not -1 <= affect_valence <= 1
+        or not 0 <= affect_arousal <= 1
+    ):
+        raise ValueError("Affect dimensions are outside their bounds")
+    if (
+        isinstance(sustained_low_hours, bool)
+        or not isinstance(sustained_low_hours, int)
+        or sustained_low_hours < 0
+    ):
+        raise ValueError("Sustained low mood duration must be non-negative")
     proposal_id = f"respond-{request.request_id}-r{request.rounds}-{actor_id}"
-    capacity = 0.5 * energy + 0.3 * rest + 0.2 * mastery
+    emotional_adjustment = (
+        0.12 * affect_valence
+        - 0.12 * max(0.0, affect_arousal - 0.65)
+        - min(0.18, sustained_low_hours / 400)
+    )
+    capacity = 0.5 * energy + 0.3 * rest + 0.2 * mastery + emotional_adjustment
     alignment = _request_value_alignment(request.action, values)
     if capacity < 0.35:
         return SocialMoveProposal(
@@ -281,7 +304,7 @@ def choose_request_response(
             request.request_id,
             actor_id,
             SocialMove.DECLINE,
-            "My energy, rest, and confidence do not support this promise.",
+            "My current energy, rest, confidence, and emotional capacity do not support this promise.",
             expected_revision,
         )
     if values is not None and alignment < 0.4:

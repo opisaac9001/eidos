@@ -33,7 +33,7 @@ Authored initial facts must be marked as seed data rather than fake lived memori
 | Pathos | Central character's voice, attention and decisions | His permitted context, recalled memories, needs, commitments | Speech, action attempts, intentions | Read hidden state or declare his own success |
 | Ethos | Identity, memories, beliefs, directed relationships, goals | Accepted actor-relevant evidence | State revisions through rules | Erase history to remove contradictions |
 | Mnemosyne | Memory selection/consolidation/association proposals | Actor-owned evidence and recall metadata | Links, summaries, salience or belief-review candidates | Fabricate factual source records |
-| Hexus | Needs, appraisal, affect episodes and recovery rules | Perceived events, needs, bounded dream effects | Validated affect changes | Rewrite identity from one emotional sentence |
+| Hexus | Needs, appraisal, affect episodes, named emotion, duration and recovery rules | Perceived events, needs, bounded dream effects | Validated affect changes and planning bias | Rewrite identity from one emotional sentence or diagnose a condition |
 | Murmur | Low-cost private associations | Limited cues, concerns, affect and recalled memory | Attention candidates, dream seeds | Directly move actors, change beliefs or create obligations |
 | Reflection | Deliberate interpretation | Recalled experiences, beliefs, concerns and outcomes | Reframing, links, concern/plan reconsideration | Treat an interpretation as a historical event |
 | Oneiros | Dream composition | Selected permitted seed memories, concerns, affect | Labeled dream plus bounded effect candidates | Reveal secrets, complete goals or alter other actors |
@@ -233,6 +233,10 @@ Somatic pressure, attention, and association advance every simulated hour. Delib
 social awareness, reflection, and dream processing activate under distinct conditions.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.
+Hourly emotion samples interpret replayed valence, arousal and duration into states
+such as joy, contentment, sadness, anxiety or prolonged low mood. Their bounded bias
+changes initiative, social openness, risk tolerance and pace; feasibility and consent
+still decide what can happen. A prolonged pattern is not a clinical diagnosis.
 
 1. During waking, track perceived experiences, unfinished concerns and affect.
 2. Sleep begins when the chosen schedule/needs allow it, not merely because a
