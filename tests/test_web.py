@@ -84,6 +84,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b"state.scenes", body)
                 self.assertIn(b"state.emotion", body)
                 self.assertIn(b"function loadMemoryArchive", body)
+                self.assertIn(b"PRIVATE BIOGRAPHY", body)
                 self.assertIn(b'window.location.pathname === "/operator"', body)
             if path == "/api/export":
                 exported = json.loads(body)

@@ -474,6 +474,14 @@ route leaves no partial neighborhood behind. An identical release is idempotent,
 an already-imported version cannot be rewritten and version gaps are rejected. Packs
 are additive history, never an in-place replacement of people or places.
 
+Schema-v2 packs may seed resident-owned biography with an explicit familiarity
+threshold. A seed is private to that resident and never enters Pathos's recall or the
+ordinary dialogue model context. When the resident has an eligible turn in a validated
+co-present scene, one fact can become the exact utterance. The normal scene resolver
+then creates Pathos's direct perception and memory, after which a disclosure event
+marks that fact shared. A prompt mentioning a private fact, a narrator summary, or an
+operator view never counts as disclosure.
+
 An introduced object is evaluated once against Pathos's current curiosity and mastery
 plus stable curiosity and craft values. Declining records the choice without silently
 creating a goal. Pursuit creates two one-hour sessions in open, conflict-free windows

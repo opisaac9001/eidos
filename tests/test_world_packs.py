@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 import unittest
@@ -7,7 +8,10 @@ from pathlib import Path
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.world_packs import import_world_pack
+from eidos.domain.character_history import project_character_history
+from eidos.domain.relationships import Relationship
 from eidos.domain.world_catalog import project_world_catalog
 
 
@@ -149,9 +153,63 @@ class WorldPackTests(unittest.TestCase):
             import_world_pack(self.store, oversized, simulated_at=self.now)
 
     def test_bundled_canal_quarter_release_is_valid(self):
-        path = Path(__file__).resolve().parents[1] / "world_packs" / "canal-quarter-v1.json"
-        report = import_world_pack(self.store, path, simulated_at=self.now)
+        directory = Path(__file__).resolve().parents[1] / "world_packs"
+        report = import_world_pack(
+            self.store, directory / "canal-quarter-v1.json", simulated_at=self.now
+        )
         self.assertEqual(report.entity_ids, ("reading-room", "imani-cole", "community-radio"))
+        history_before = len(self.store.read("pathos"))
+        second = import_world_pack(
+            self.store, directory / "canal-quarter-v2.json", simulated_at=self.now
+        )
+        self.assertEqual(second.entity_count, 0)
+        self.assertEqual(second.character_fact_count, 3)
+        self.assertEqual(
+            second.character_fact_ids,
+            ("imani-first-interview", "imani-lost-tapes", "imani-brother-silence"),
+        )
+        self.assertEqual(second.events_appended, 4)
+        self.assertEqual(len(self.store.read("pathos")), history_before + 4)
+        facts = project_character_history(self.store.read("pathos")).facts
+        self.assertTrue(all(fact.status == "private" for fact in facts.values()))
+        snapshot = Life(self.store, StandInGateway()).snapshot()
+        self.assertEqual(len(snapshot["character_histories"]), 3)
+        self.assertTrue(
+            all(item["status"] == "private" for item in snapshot["character_histories"])
+        )
+        self.assertEqual(snapshot["world_packs"][0]["version"], 2)
+        self.assertEqual(
+            snapshot["world_packs"][0]["character_fact_ids"],
+            ["imani-first-interview", "imani-lost-tapes", "imani-brother-silence"],
+        )
+
+        history = self.store.read("pathos")
+        dialogue = asyncio.run(
+            recurring_dialogue_events(
+                history,
+                {"pathos": "reading-room", "imani-cole": "reading-room"},
+                {"imani-cole": "Imani Cole"},
+                {"imani-cole": Relationship("imani-cole", familiarity=0.2)},
+                self.now,
+                len(history),
+                StandInGateway(),
+            )
+        )
+        self.store.append("pathos", dialogue, len(history))
+        after = Life(self.store, StandInGateway()).snapshot()
+        first_fact = next(
+            item
+            for item in after["character_histories"]
+            if item["fact_id"] == "imani-first-interview"
+        )
+        self.assertEqual(first_fact["status"], "disclosed")
+        self.assertTrue(
+            any(
+                "bus driver" in item["text"]
+                for item in after["memories"]
+                if item.get("owner") == "pathos"
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -82,6 +82,7 @@ from eidos.application.world_perception import (
 from eidos.application.world_threads import world_thread_events
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import BeliefState, project_beliefs
+from eidos.domain.character_history import project_character_history
 from eidos.domain.commitments import project_renegotiations
 from eidos.domain.conversation_time import exchange_minutes, project_conversation_clocks
 from eidos.domain.development import project_development
@@ -500,6 +501,7 @@ class Life:
         world_threads = project_world_threads(history)
         relationship_dates = project_relationship_dates(history)
         relationship_repairs = project_relationship_repairs(history)
+        character_history = project_character_history(history)
         social_preferences = project_social_preferences(history)
         conversation_clocks = project_conversation_clocks(history)
         catalog = self._world_catalog(history)
@@ -528,6 +530,7 @@ class Life:
         external_signals = []
         world_packs = []
         world_pack_entities: dict[tuple[str, int], list[str]] = {}
+        world_pack_character_facts: dict[tuple[str, int], list[str]] = {}
         concerns = {}
         for event in history:
             payload: dict[str, Any] = {
@@ -595,9 +598,18 @@ class Life:
             if event.kind == "world.pack_entity_linked":
                 key = (str(payload["pack_id"]), int(payload["version"]))
                 world_pack_entities.setdefault(key, []).append(str(payload["entity_id"]))
+            if event.kind == "npc.biography_seeded" and "pack_id" in payload:
+                key = (str(payload["pack_id"]), int(payload["version"]))
+                world_pack_character_facts.setdefault(key, []).append(str(payload["fact_id"]))
             if event.kind == "world.pack_imported":
                 key = (str(payload["pack_id"]), int(payload["version"]))
-                world_packs.append({**item, "entity_ids": world_pack_entities.get(key, [])})
+                world_packs.append(
+                    {
+                        **item,
+                        "entity_ids": world_pack_entities.get(key, []),
+                        "character_fact_ids": world_pack_character_facts.get(key, []),
+                    }
+                )
             if event.kind in {
                 "thought.recorded",
                 "npc.encountered",
@@ -705,6 +717,7 @@ class Life:
                 "relationship.repair_opened",
                 "relationship.repair_contacted",
                 "relationship.repair_became_dormant",
+                "npc.biography_disclosed",
                 "social.preference_remembered",
                 "social.preference_revised",
                 "social.preference_faded",
@@ -850,6 +863,7 @@ class Life:
             ],
             "relationship_dates": [vars_for(item) for item in relationship_dates.values()],
             "relationship_repairs": [vars_for(item) for item in relationship_repairs.values()],
+            "character_histories": [vars_for(item) for item in character_history.facts.values()],
             "social_preferences": [vars_for(item) for item in social_preferences.values()],
             "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
             "season": season.name if season is not None else season_for(state.simulated_at),

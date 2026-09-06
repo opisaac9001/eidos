@@ -327,8 +327,9 @@ Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
   without contact makes the attempt dormant rather than silently resolving it.
 - Versioned world packs now import bounded additive releases atomically through the
   ordinary entity-continuity rules; the bundled Canal Quarter release adds a place,
-  person and project-capable object. Add character-history overlays only when their
-  private knowledge can be validated without leaking it to Pathos.
+  person and project-capable object. Its second release adds private character-history
+  facts with familiarity thresholds. They stay out of model context and Pathos memory
+  until the resident speaks one in a validated co-present scene.
 - Measure queue pressure, model costs, repetition and storage growth. Exercise
   outages, model swaps, backup restore, upgrades and migrations.
 - Verified experiment branches now copy an exact life, discard inherited cognition

@@ -129,12 +129,16 @@ to gain a reading room, Imani Cole, and a community radio:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/canal-quarter-v1.json
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/canal-quarter-v2.json
 ```
 
 World packs are strict, additive JSON releases. Places must be declared before pack
 entities that live there. Every entity passes the ordinary collision, route, opening
 hours and provenance rules; one invalid entity rejects the whole pack. Reimporting an
 unchanged release is safe, while rewriting or skipping a published version is refused.
+Schema-v2 releases may also add resident-private biography. These facts remain visible
+only in the local operator lens until familiarity makes one eligible during the
+resident's actual conversation turn; only the spoken turn becomes Pathos's memory.
 
 Downtime is never simulated automatically. To preview and explicitly run a bounded
 catch-up (maximum seven days), resume one interrupted between atomic chunks, or

@@ -7,6 +7,7 @@ from typing import Mapping, Sequence
 
 from eidos.application.cognition import perform
 from eidos.application.followups import project_followups
+from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import Relationship
@@ -161,29 +162,54 @@ async def _advance_scene(
         topic_id = topics[min(scene.turn_count // 2, len(topics) - 1)]
         speaker_id = scene.next_actor_id
         name = actor_names.get(partner_id, partner_id.replace("-", " ").title())
-        text = await perform(
-            gateway,
-            "firmament",
-            {
-                "time": simulated_at.isoformat(),
-                "location": scene.location_id,
-                "person": name,
-                "scene_mode": True,
-                "scene_speaker": speaker_id,
-                "scene_audience": (
-                    scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
-                ),
-                "scene_topic": topic_id.replace("-", " "),
-                "prior_turns": [
-                    str(event.payload["text"])
-                    for event in combined
-                    if event.kind == "scene.turn_taken"
-                    and event.payload.get("scene_id") == scene_id
-                ][-6:],
-            },
-            simulated_at.isoformat(),
-            output,
+        disclosure = (
+            eligible_character_fact(combined, partner_id, relationship.familiarity, scene_id)
+            if speaker_id == partner_id
+            else None
         )
+        text: str | None
+        if disclosure is not None:
+            decision = DomainEvent(
+                "npc.biography_disclosure_decided",
+                "pathos",
+                {
+                    "fact_id": disclosure.fact_id,
+                    "person_id": partner_id,
+                    "scene_id": scene_id,
+                    "decision": "share",
+                    "owner": partner_id,
+                    "visibility": "private",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                correlation_id=scene_id,
+            )
+            output.append(decision)
+            topic_id = f"personal-history-{disclosure.topic}"
+            text = f"I haven't told many people this: {disclosure.text}"
+        else:
+            text = await perform(
+                gateway,
+                "firmament",
+                {
+                    "time": simulated_at.isoformat(),
+                    "location": scene.location_id,
+                    "person": name,
+                    "scene_mode": True,
+                    "scene_speaker": speaker_id,
+                    "scene_audience": (
+                        scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
+                    ),
+                    "scene_topic": topic_id.replace("-", " "),
+                    "prior_turns": [
+                        str(event.payload["text"])
+                        for event in combined
+                        if event.kind == "scene.turn_taken"
+                        and event.payload.get("scene_id") == scene_id
+                    ][-6:],
+                },
+                simulated_at.isoformat(),
+                output,
+            )
         if text is None:
             text = (
                 f"{name} mentioned {topic_id.replace('-', ' ')}."
@@ -223,6 +249,24 @@ async def _advance_scene(
         output.extend(turn.events)
         if not turn.accepted:
             break
+        if disclosure is not None:
+            spoken = next(event for event in turn.events if event.kind == "scene.turn_taken")
+            output.append(
+                DomainEvent(
+                    "npc.biography_disclosed",
+                    "pathos",
+                    {
+                        "fact_id": disclosure.fact_id,
+                        "person_id": partner_id,
+                        "audience_id": "pathos",
+                        "scene_id": scene_id,
+                        "source_turn_event_id": str(spoken.event_id),
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=spoken.event_id,
+                    correlation_id=scene_id,
+                )
+            )
     scene = project_scenes([*history, *output]).scenes[scene_id]
     if scene.status == "active" and relationship.tension >= 0.5 and scene.turn_count >= 2:
         ended = resolve_scene_end(

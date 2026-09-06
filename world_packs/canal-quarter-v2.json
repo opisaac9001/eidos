@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "pack_id": "canal-quarter",
+  "version": 2,
+  "name": "The Canal Quarter · Imani's history",
+  "description": "Adds a private, gradually disclosed personal history for Imani without giving it to Pathos in advance.",
+  "entities": [],
+  "character_facts": [
+    {
+      "fact_id": "imani-first-interview",
+      "person_id": "imani-cole",
+      "topic": "why-history-matters",
+      "text": "My first interview was with a bus driver who remembered every passenger by the sound of their footsteps.",
+      "reveal_after_familiarity": 0.15
+    },
+    {
+      "fact_id": "imani-lost-tapes",
+      "person_id": "imani-cole",
+      "topic": "unfinished-work",
+      "text": "Years ago I lost a box of interview tapes in a flooded cellar, and I still write duplicate notes because of it.",
+      "reveal_after_familiarity": 0.45
+    },
+    {
+      "fact_id": "imani-brother-silence",
+      "person_id": "imani-cole",
+      "topic": "family-silence",
+      "text": "My brother stopped speaking to me after I recorded a family story he believed should have remained private.",
+      "reveal_after_familiarity": 0.75
+    }
+  ]
+}

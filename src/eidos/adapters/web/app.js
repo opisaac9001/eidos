@@ -115,6 +115,7 @@ const labels = {
   "relationship.repair_opened": "A REPAIR ATTEMPT OPENED",
   "relationship.repair_contacted": "CONTACT AFTER AN APOLOGY",
   "relationship.repair_became_dormant": "A REPAIR ATTEMPT WENT QUIET",
+  "npc.biography_disclosed": "A PERSONAL HISTORY WAS SHARED",
   "social.preference_remembered": "A PREFERENCE WAS REMEMBERED",
   "social.preference_revised": "A PREFERENCE CHANGED",
   "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
@@ -666,7 +667,7 @@ function render(next) {
   $("world-packs").innerHTML = worldPacks
     .map(
       (pack) =>
-        `<article class="panel person-card"><div class="panel-kicker">RELEASE ${pack.version} · VERIFIED MANIFEST</div><h2>${esc(pack.name)}</h2><p>${esc(pack.description)}</p><div class="person-foot"><span>${pack.entity_count} persistent additions</span><span>${pack.entity_ids.map((id) => esc(id)).join(" · ")}</span></div></article>`,
+        `<article class="panel person-card"><div class="panel-kicker">RELEASE ${pack.version} · VERIFIED MANIFEST</div><h2>${esc(pack.name)}</h2><p>${esc(pack.description)}</p><div class="person-foot"><span>${pack.entity_count || 0} world entities · ${pack.character_fact_count || 0} private histories</span><span>${[...(pack.entity_ids || []), ...(pack.character_fact_ids || [])].map((id) => esc(id)).join(" · ")}</span></div></article>`,
     )
     .join("");
   $("town-signals").innerHTML = (state.external_signals || []).length
@@ -687,13 +688,19 @@ function render(next) {
         );
         const preferences = (state.social_preferences || []).filter((item) => item.person_id === person.id);
         const repair = (state.relationship_repairs || []).filter((item) => item.person_id === person.id).at(-1);
+        const sharedHistory = (state.character_histories || []).filter(
+          (item) => item.person_id === person.id && item.status === "disclosed",
+        );
         const preferenceText = preferences.length
           ? `<p class="context-note">Pathos remembers: ${preferences.map((item) => `${item.status === "uncertain" ? "possibly " : ""}${esc(item.stance)} ${esc(item.topic)}`).join(" · ")}</p>`
           : "";
         const repairText = repair
           ? `<p class="context-note">Repair after disagreement: ${esc(repair.status)} · ${repair.contact_count} later contact${repair.contact_count === 1 ? "" : "s"}. This does not claim forgiveness.</p>`
           : "";
-        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
+        const historyText = sharedHistory.length
+          ? `<p class="context-note">Shared with Pathos: ${sharedHistory.map((item) => esc(item.text)).join(" · ")}</p>`
+          : "";
+        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}${historyText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
       },
     )
     .join("");
@@ -772,6 +779,15 @@ function render(next) {
       },
     )
     .join("");
+  $("npc-states").insertAdjacentHTML(
+    "beforeend",
+    (state.character_histories || [])
+      .map(
+        (fact) =>
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(fact.person_id)} · ${esc(fact.status.toUpperCase())}</span><span>PRIVATE BIOGRAPHY</span></div><p>${esc(fact.text)}</p><div class="memory-source">Topic ${esc(fact.topic)} · reveal after ${Math.round(fact.reveal_after_familiarity * 100)}% familiarity${fact.scene_id ? ` · shared in ${esc(fact.scene_id)}` : " · never passed to Pathos"}</div></article>`,
+      )
+      .join(""),
+  );
   $("npc-states").insertAdjacentHTML(
     "beforeend",
     (state.scenes || [])

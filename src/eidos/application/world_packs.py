@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from eidos.domain.character_history import project_character_history
 from eidos.domain.events import DomainEvent
 from eidos.domain.world_catalog import (
     ENTITY_ID,
@@ -17,7 +18,15 @@ from eidos.domain.world_catalog import (
 )
 from eidos.ports.event_store import EventStore
 
-_PACK_FIELDS = {"schema_version", "pack_id", "version", "name", "description", "entities"}
+_PACK_FIELDS_V1 = {"schema_version", "pack_id", "version", "name", "description", "entities"}
+_PACK_FIELDS_V2 = {*_PACK_FIELDS_V1, "character_facts"}
+_CHARACTER_FACT_FIELDS = {
+    "fact_id",
+    "person_id",
+    "topic",
+    "text",
+    "reveal_after_familiarity",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +38,8 @@ class WorldPackReport:
     checksum: str
     entity_count: int
     entity_ids: tuple[str, ...]
+    character_fact_count: int
+    character_fact_ids: tuple[str, ...]
     events_appended: int
     status: str
 
@@ -51,8 +62,16 @@ def import_world_pack(
     name = _text(raw, "name", 100)
     description = _text(raw, "description", 500)
     entities = raw["entities"]
-    if not isinstance(entities, list) or not 1 <= len(entities) <= 32:
-        raise ValueError("World pack must contain between 1 and 32 entities")
+    character_facts = raw.get("character_facts", [])
+    if (
+        not isinstance(entities, list)
+        or not isinstance(character_facts, list)
+        or len(entities) > 32
+        or len(character_facts) > 32
+        or not entities
+        and not character_facts
+    ):
+        raise ValueError("World pack must contain one to 32 entities or character facts")
     checksum = hashlib.sha256(
         json.dumps(raw, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
     ).hexdigest()
@@ -76,6 +95,8 @@ def import_world_pack(
                 checksum,
                 int(exact.payload["entity_count"]),
                 _linked_entity_ids(history, pack_id, version),
+                int(exact.payload.get("character_fact_count", 0)),
+                _linked_character_fact_ids(history, pack_id, version),
                 0,
                 "already_imported",
             )
@@ -89,6 +110,7 @@ def import_world_pack(
     catalog = project_world_catalog(history)
     events: list[DomainEvent] = []
     entity_ids: list[str] = []
+    character_fact_ids: list[str] = []
     release_id = f"world-pack:{pack_id}:v{version}"
     seen: set[str] = set()
     for index, entity in enumerate(entities, 1):
@@ -132,6 +154,46 @@ def import_world_pack(
         )
         events.append(linked)
         entity_ids.append(proposal.entity_id)
+    known_fact_ids = set(project_character_history(history).facts)
+    for index, raw_fact in enumerate(character_facts, 1):
+        if not isinstance(raw_fact, dict) or set(raw_fact) != _CHARACTER_FACT_FIELDS:
+            raise ValueError(f"World-pack character fact {index} has invalid fields")
+        fact_id = _fact_text(raw_fact, "fact_id", 40)
+        person_id = _fact_text(raw_fact, "person_id", 40)
+        topic = _fact_text(raw_fact, "topic", 80)
+        text = _fact_text(raw_fact, "text", 360)
+        threshold = raw_fact["reveal_after_familiarity"]
+        if not ENTITY_ID.fullmatch(fact_id):
+            raise ValueError("Character fact ID must be a stable lowercase slug")
+        if person_id not in catalog.people:
+            raise ValueError(f"Character fact {fact_id} belongs to an unknown resident")
+        if fact_id in known_fact_ids or fact_id in character_fact_ids:
+            raise ValueError(f"Character fact {fact_id} already exists")
+        if (
+            isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not 0 <= threshold <= 1
+        ):
+            raise ValueError("Character fact familiarity threshold must be between zero and one")
+        seeded = DomainEvent(
+            "npc.biography_seeded",
+            "pathos",
+            {
+                "fact_id": fact_id,
+                "person_id": person_id,
+                "topic": topic,
+                "text": text,
+                "reveal_after_familiarity": float(threshold),
+                "owner": person_id,
+                "visibility": "private",
+                "pack_id": pack_id,
+                "version": version,
+                "simulated_at": simulated_at.isoformat(),
+            },
+            correlation_id=release_id,
+        )
+        events.append(seeded)
+        character_fact_ids.append(fact_id)
     imported = DomainEvent(
         "world.pack_imported",
         "pathos",
@@ -142,6 +204,7 @@ def import_world_pack(
             "description": description,
             "checksum": checksum,
             "entity_count": len(entity_ids),
+            "character_fact_count": len(character_fact_ids),
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=events[-1].event_id,
@@ -157,6 +220,8 @@ def import_world_pack(
         checksum,
         len(entity_ids),
         tuple(entity_ids),
+        len(character_fact_ids),
+        tuple(character_fact_ids),
         len(events),
         "imported",
     )
@@ -171,10 +236,14 @@ def _read_manifest(path: Path) -> dict[str, object]:
         raw = json.loads(path.read_text())
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise ValueError("World-pack file is not valid UTF-8 JSON") from error
-    if not isinstance(raw, dict) or set(raw) != _PACK_FIELDS:
-        raise ValueError("World-pack manifest fields do not match schema version 1")
-    if raw["schema_version"] != 1:
+    if not isinstance(raw, dict):
+        raise ValueError("World-pack manifest must be a JSON object")
+    schema_version = raw.get("schema_version")
+    if schema_version not in {1, 2}:
         raise ValueError("Unsupported world-pack schema version")
+    expected = _PACK_FIELDS_V1 if schema_version == 1 else _PACK_FIELDS_V2
+    if set(raw) != expected:
+        raise ValueError(f"World-pack manifest fields do not match schema version {schema_version}")
     return raw
 
 
@@ -185,11 +254,27 @@ def _text(raw: dict[str, object], key: str, maximum: int) -> str:
     return value.strip()
 
 
+def _fact_text(raw: dict[str, object], key: str, maximum: int) -> str:
+    return _text(raw, key, maximum)
+
+
 def _linked_entity_ids(history: list[DomainEvent], pack_id: str, version: int) -> tuple[str, ...]:
     return tuple(
         str(event.payload["entity_id"])
         for event in history
         if event.kind == "world.pack_entity_linked"
+        and event.payload.get("pack_id") == pack_id
+        and event.payload.get("version") == version
+    )
+
+
+def _linked_character_fact_ids(
+    history: list[DomainEvent], pack_id: str, version: int
+) -> tuple[str, ...]:
+    return tuple(
+        str(event.payload["fact_id"])
+        for event in history
+        if event.kind == "npc.biography_seeded"
         and event.payload.get("pack_id") == pack_id
         and event.payload.get("version") == version
     )
