@@ -121,6 +121,20 @@ class NPCAgencyTests(unittest.TestCase):
         )
         self.assertEqual(retry, [])
 
+    def test_costly_agency_only_runs_for_promoted_residents(self):
+        gateway = CapturingStandIn()
+        events = asyncio.run(
+            autonomous_npc_plan_events(
+                [self.evidence("rowan")],
+                self.now,
+                gateway,
+                project_world_catalog([]),
+                allowed_actor_ids=frozenset({"mara"}),
+            )
+        )
+        self.assertEqual(events, [])
+        self.assertEqual(gateway.contexts, [])
+
     def test_one_resident_never_receives_anothers_private_context(self):
         rowan = self.evidence()
         mara_secret = DomainEvent(

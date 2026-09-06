@@ -159,6 +159,14 @@ class NPCCognitionTests(unittest.TestCase):
         self.assertEqual(plan.payload["evidence_need_event_id"], str(evidence.event_id))
         self.assertEqual(plan.causation_id, goal.event_id)
         self.assertEqual((plan.payload["owner"], plan.payload["visibility"]), ("rowan", "private"))
+        self.assertEqual(
+            npc_need_plan_events(
+                [evidence],
+                "2026-01-10T19:00:00+00:00",
+                allowed_actor_ids=frozenset({"mara"}),
+            ),
+            [],
+        )
 
     def test_critical_energy_interrupts_a_lower_priority_private_plan(self):
         first_need = DomainEvent(

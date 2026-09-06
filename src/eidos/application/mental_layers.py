@@ -227,6 +227,26 @@ def _attention_focus(
                 f"Notice {person_id}",
             )
         )
+    recent_encounter = next(
+        (
+            event
+            for event in reversed(history)
+            if event.kind == "npc.encountered"
+            and isinstance(event.payload.get("person_id"), str)
+            and _within_recent_hours(event, at, 2)
+        ),
+        None,
+    )
+    if recent_encounter is not None:
+        person_id = str(recent_encounter.payload["person_id"])
+        candidates.append(
+            (
+                0.7,
+                "person",
+                person_id,
+                f"Keep the recent meeting with {person_id} in mind",
+            )
+        )
     calendar = planning.calendar
     upcoming = sorted(
         (
@@ -264,6 +284,19 @@ def _attention_focus(
         key=lambda item: (item[0], item[1], item[2]),
     )
     return focus_type, item_id, text, score
+
+
+def _within_recent_hours(event: DomainEvent, at: datetime, hours: int) -> bool:
+    value = event.payload.get("simulated_at")
+    if not isinstance(value, str):
+        return False
+    try:
+        observed_at = datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return observed_at.utcoffset() is not None and timedelta(0) <= at - observed_at <= timedelta(
+        hours=hours
+    )
 
 
 def mind_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:

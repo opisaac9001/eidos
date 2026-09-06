@@ -36,6 +36,7 @@ async def autonomous_activity_events(
     preferences: Sequence[str],
     traits: Mapping[str, float],
     memories: Sequence[str],
+    known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
@@ -59,6 +60,7 @@ async def autonomous_activity_events(
     people = {
         person.person_id: {"name": person.name, "occupation": person.occupation}
         for person in catalog.people.values()
+        if known_person_ids is None or person.person_id in known_person_ids
     }
     places = {
         place.place_id: {

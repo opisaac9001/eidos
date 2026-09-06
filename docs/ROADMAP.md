@@ -267,6 +267,11 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   cooldowns and pacing budgets. Quiet days are valid; forced drama is not.
 - Low-detail offscreen NPC activity preserves consequential state and knowledge
   boundaries. Meaningful scenes receive higher-detail simulation.
+- NPC cognitive detail is now explicit: background residents use deterministic
+  needs/plans, route-near residents become local, and co-present attended residents
+  become focused. Detail is cheaply derived without per-resident bookkeeping events;
+  generated people materialize through a first encounter, and Pathos's
+  planning sees only people supported by his own encounters or memories.
 - Co-present residents now hold cooldown-paced conversations without requiring Pathos.
   Turns produce audience-owned memories, completed scenes update two separate directed
   relationships and connection needs, and only public speech heard at Pathos's actual

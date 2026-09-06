@@ -122,6 +122,7 @@ def npc_need_plan_events(
     shared_relationships: Mapping[str, Relationship] | None = None,
     *,
     allow_new_plans: bool = True,
+    allowed_actor_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Let private needs form bounded goals without leaking them into Pathos's context."""
     now = datetime.fromisoformat(simulated_at)
@@ -139,6 +140,8 @@ def npc_need_plan_events(
     latest_plan_at = _latest_plan_times(history)
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
+        if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
+            continue
         evidence = next(
             (
                 event

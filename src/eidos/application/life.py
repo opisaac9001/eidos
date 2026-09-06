@@ -27,6 +27,7 @@ from eidos.application.deliveries import delivery_events
 from eidos.application.development import development_events
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.emotional_regulation import emotional_regulation_events
+from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events, project_followups
 from eidos.application.household import (
@@ -50,6 +51,10 @@ from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.nourishment import nourishment_events, provision_foundation_events
 from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
+from eidos.application.npc_simulation import (
+    nearby_npc_ids,
+    npc_detail_tier,
+)
 from eidos.application.object_collaboration import object_collaboration_events
 from eidos.application.object_maintenance import object_maintenance_events
 from eidos.application.object_opportunities import (
@@ -875,6 +880,16 @@ class Life:
                 feed.append(item)
         npc_state = project_npcs(history, state.simulated_at)
         active_visitor_locations = visitor_locations(history)
+        known_person_ids = pathos_known_person_ids(history)
+        snapshot_attention = project_mind(history).latest.get("attention")
+        snapshot_scene_actors = frozenset(
+            actor_id
+            for scene in project_scenes(history).scenes.values()
+            if scene.status in {"active", "paused"}
+            and "pathos" in {scene.initiator_id, scene.partner_id}
+            for actor_id in {scene.initiator_id, scene.partner_id}
+            if actor_id not in {"pathos", "user"}
+        )
         population = [
             {
                 "id": person.person_id,
@@ -883,15 +898,37 @@ class Life:
                 "color": person.color,
                 "description": person.description,
                 "introduced": person.introduced,
-                "location_id": active_visitor_locations.get(
-                    person.person_id, npc_state.people[person.person_id].location_id
+                "location_id": (
+                    actual_location
+                    if actual_location == state.location_id
+                    and (actual_location != "home" or person.person_id in active_visitor_locations)
+                    else None
                 ),
                 "encounters": relationship_state.for_person(person.person_id).encounters,
                 "trust": relationship_state.for_person(person.person_id).trust,
                 "familiarity": relationship_state.for_person(person.person_id).familiarity,
                 "tension": relationship_state.for_person(person.person_id).tension,
+                "simulation_tier": npc_detail_tier(
+                    person.person_id,
+                    actual_location,
+                    state.location_id,
+                    catalog,
+                    (
+                        snapshot_attention.focus_id
+                        if snapshot_attention is not None
+                        and snapshot_attention.focus_type == "person"
+                        else None
+                    ),
+                    snapshot_scene_actors,
+                )[0].name.lower(),
             }
             for person in catalog.people.values()
+            if person.person_id in known_person_ids
+            for actual_location in (
+                active_visitor_locations.get(
+                    person.person_id, npc_state.people[person.person_id].location_id
+                ),
+            )
         ]
         memory_index = self._memory_index(history)
         memories = memory_view(history, state.simulated_at, index=memory_index)
@@ -1293,6 +1330,7 @@ class Life:
                     current,
                     len(history) + len(pending),
                     self.gateway,
+                    pathos_location_id=state.location_id,
                 )
             )
             pending.extend(
@@ -1453,6 +1491,7 @@ class Life:
                     if event.kind == "memory.recorded"
                     and isinstance(event.payload.get("text"), str)
                 ],
+                known_person_ids=pathos_known_person_ids(agency_history),
             )
             if agency:
                 self._planning(agency_history + agency)
@@ -1799,15 +1838,40 @@ class Life:
                 actor_id: person.location_id
                 for actor_id, person in project_npcs(history + pending, current).people.items()
             }
+            current_scenes = project_scenes(history + pending).scenes.values()
+            scene_actor_ids = frozenset(
+                actor_id
+                for scene in current_scenes
+                if scene.status in {"active", "paused"}
+                and "pathos" in {scene.initiator_id, scene.partner_id}
+                for actor_id in {scene.initiator_id, scene.partner_id}
+                if actor_id not in {"pathos", "user"}
+            ) | frozenset(
+                str(event.payload["person_id"])
+                for event in history + pending
+                if event.kind == "npc.encountered"
+                and event.payload.get("simulated_at") == current.isoformat()
+                and isinstance(event.payload.get("person_id"), str)
+            )
+            mental_npc_locations = {
+                actor_id: location_id
+                for actor_id, location_id in npc_locations.items()
+                if not (
+                    state.location_id == "home"
+                    and location_id == "home"
+                    and actor_id not in scene_actor_ids
+                )
+            }
             pending.extend(
                 mental_layer_events(
                     history + pending,
                     state,
                     current,
-                    npc_locations,
+                    mental_npc_locations,
                     household_loads=self._household(history + pending).loads,
                 )
             )
+            attention = project_mind(history + pending).latest.get("attention")
             observation_output = due_world_observations(
                 history + pending,
                 {"pathos": state.location_id, **npc_locations},
@@ -1838,11 +1902,24 @@ class Life:
                 npc_belief_events(history + pending, at, self._beliefs(history + pending))
             )
             open_npc_agency = (current.date() - datetime(2026, 1, 1).date()).days + 1 >= 11
+            rich_residents = nearby_npc_ids(
+                pathos_location_id=state.location_id,
+                npc_locations=npc_locations,
+                catalog=self._world_catalog(history + pending),
+                attention_person_id=(
+                    attention.focus_id
+                    if attention is not None and attention.focus_type == "person"
+                    else None
+                ),
+                active_scene_actor_ids=scene_actor_ids,
+            )
+            background_residents = frozenset(npc_locations) - rich_residents
             npc_replans = npc_need_plan_events(
                 history + pending,
                 at,
                 self._relationships(history + pending).relationships,
-                allow_new_plans=not open_npc_agency,
+                allow_new_plans=True,
+                allowed_actor_ids=(None if not open_npc_agency else background_residents),
             )
             pending.extend(npc_replans)
             if open_npc_agency:
@@ -1853,6 +1930,7 @@ class Life:
                         self.gateway,
                         self._world_catalog(history + pending),
                         self._relationships(history + pending).relationships,
+                        allowed_actor_ids=rich_residents,
                     )
                 )
             phone_emotion = project_emotion(history + pending)
@@ -2883,10 +2961,12 @@ class Life:
         query_terms = terms(text)
         planning = self._planning(history)
         catalog = self._world_catalog(history)
+        known_person_ids = pathos_known_person_ids(history)
         entity_ids = {
             person.person_id
             for person in catalog.people.values()
-            if terms(person.name) & query_terms or person.person_id in query_terms
+            if person.person_id in known_person_ids
+            and (terms(person.name) & query_terms or person.person_id in query_terms)
         } | {
             place.place_id
             for place in catalog.places.values()
@@ -2898,7 +2978,9 @@ class Life:
             if terms(item.name) & query_terms or item.object_id in query_terms
         )
         relationship_ids = {
-            person.person_id for person in catalog.people.values() if person.person_id in entity_ids
+            person.person_id
+            for person in catalog.people.values()
+            if person.person_id in known_person_ids and person.person_id in entity_ids
         }
         goal_ids = {
             goal.goal_id

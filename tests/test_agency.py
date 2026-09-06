@@ -182,6 +182,7 @@ class AgencyTests(unittest.TestCase):
                 preferences=("quiet mornings",),
                 traits={"openness": 0.68},
                 memories=["I noticed rain collecting on the old bench."],
+                known_person_ids=frozenset({"mara"}),
             )
         )
         kinds = [event.kind for event in events]
@@ -192,6 +193,7 @@ class AgencyTests(unittest.TestCase):
         self.assertNotIn("activity.completed", kinds)
         context = json.loads(gateway.requests[0].messages[0].content)
         self.assertEqual(context["current_attention"]["focus_id"], "unfinished-letter")
+        self.assertEqual(set(context["known_people"]), {"mara"})
 
 
 if __name__ == "__main__":

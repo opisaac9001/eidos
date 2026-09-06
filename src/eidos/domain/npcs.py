@@ -51,7 +51,7 @@ class NPCWorldState:
                 raise ValueError("Registered world person already exists in NPC state")
             people[introduced_id] = NPCState(
                 actor_id=introduced_id,
-                location_id="home",
+                location_id=_required(event, "location_id"),
                 usual_location_id=_required(event, "location_id"),
             )
             return NPCWorldState(people)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from datetime import datetime
 from time import perf_counter
 from typing import Sequence
@@ -25,6 +26,7 @@ async def expanding_world_events(
     simulated_at: datetime,
     actual_revision: int,
     gateway: ModelGateway,
+    pathos_location_id: str | None = None,
 ) -> list[DomainEvent]:
     """Propose at most one additive entity per weekly expansion budget."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
@@ -47,12 +49,13 @@ async def expanding_world_events(
                 json.dumps(
                     {
                         "time": simulated_at.isoformat(),
+                        "pathos_location_id": pathos_location_id,
                         "known_places": [
                             {"id": item.place_id, "name": item.name}
                             for item in catalog.places.values()
                         ],
                         "known_people": [item.name for item in catalog.people.values()],
-                        "instruction": "Invent one specific person, useful object, or reachable place not already present. Every field is required; fields irrelevant to the chosen kind should contain plausible display defaults.",
+                        "instruction": "Invent one specific person, useful object, or reachable place not already present. A person is someone Pathos plausibly meets at his current location now; they do not pre-exist as a fully authored individual. Every field is required; fields irrelevant to the chosen kind should contain plausible display defaults.",
                     }
                 ),
             ),
@@ -77,6 +80,8 @@ async def expanding_world_events(
             proposal_id=proposal_id,
             expected_revision=actual_revision + len(output) + 2,
         )
+        if proposal.entity_kind.value == "person" and pathos_location_id is not None:
+            proposal = replace(proposal, location_id=pathos_location_id)
     except (OSError, TimeoutError, TypeError, ValueError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
         output.extend(
@@ -138,6 +143,47 @@ async def expanding_world_events(
         simulated_at=simulated_at.isoformat(),
     )
     output.extend(resolution.events)
+    if resolution.accepted and proposal.entity_kind.value == "person":
+        registered = next(
+            event for event in resolution.events if event.kind == "world.person_registered"
+        )
+        if pathos_location_id is not None:
+            encounter = DomainEvent(
+                "npc.encountered",
+                "pathos",
+                {
+                    "person_id": proposal.entity_id,
+                    "text": f"Met {proposal.name} for the first time.",
+                    "simulated_at": simulated_at.isoformat(),
+                    "location_id": pathos_location_id,
+                    "source": "world-encounter",
+                    "role": "moira_expansion",
+                },
+                causation_id=registered.event_id,
+                correlation_id=proposal.proposal_id,
+            )
+            output.extend(
+                (
+                    encounter,
+                    DomainEvent(
+                        "memory.recorded",
+                        "pathos",
+                        {
+                            "text": f"I met {proposal.name} for the first time.",
+                            "simulated_at": simulated_at.isoformat(),
+                            "source": "direct-encounter",
+                            "source_event_id": str(encounter.event_id),
+                            "category": "relationship",
+                            "location_id": pathos_location_id,
+                            "person_id": proposal.entity_id,
+                            "owner": "pathos",
+                            "importance": 0.62,
+                        },
+                        causation_id=encounter.event_id,
+                        correlation_id=proposal.proposal_id,
+                    ),
+                )
+            )
     return output
 
 

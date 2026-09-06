@@ -158,6 +158,38 @@ class MentalLayerTests(unittest.TestCase):
             (attention.payload["focus_type"], attention.payload["focus_id"]), ("commitment", "soon")
         )
 
+    def test_recent_witnessed_encounter_can_remain_in_foreground_attention(self):
+        at = datetime(2026, 1, 10, 14, tzinfo=timezone.utc)
+        encounter = DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {
+                "person_id": "rowan",
+                "text": "We spoke briefly in the square.",
+                "simulated_at": (at - timedelta(hours=1)).isoformat(),
+            },
+        )
+        events = mental_layer_events(
+            [encounter],
+            PathosState(
+                simulated_at=at,
+                location_id="home",
+                rest=0.8,
+                connection=0.8,
+                curiosity=0.8,
+                mastery=0.8,
+                energy=0.8,
+                hunger=0.1,
+            ),
+            at,
+            {},
+        )
+        attention = next(event for event in events if event.payload["layer"] == "attention")
+        self.assertEqual(
+            (attention.payload["focus_type"], attention.payload["focus_id"]),
+            ("person", "rowan"),
+        )
+
     def test_household_load_is_not_continuous_attention(self):
         evening = datetime(2026, 1, 10, 18, tzinfo=timezone.utc)
         home = PathosState(

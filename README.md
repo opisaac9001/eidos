@@ -43,6 +43,12 @@ project, resident agency, and private resident-history generation can use
 deterministic stand-ins or a real compatible model endpoint. The continuity critic
 performs schema and factual-memory source checks,
 not general contradiction detection. Stand-ins remain the offline default.
+The resident world uses video-game-like cognitive levels of detail. Persistent people
+continue cheaply in the background, gain local simulation when routes bring them near
+Pathos, and gain focused generative cognition through co-presence, attention, or an
+active scene. A catalog entry is not knowledge: Pathos can plan around and recall a
+person only after direct encounter or Pathos-owned memory evidence. Newly generated
+people materialize at their first meeting rather than being silently authored offscreen.
 Pathos can experience rare, bounded bouts of ordinary physical discomfort. These are
 explicitly non-clinical, recover within one to three simulated days, and can change
 his attention, mood, pace, plans, willingness to host a visit and response time. The

@@ -21,7 +21,18 @@ daybook run at 23:00. Fractional tick sizes cannot skip or duplicate these beats
 The daybook uses the latest seven recorded experiences, so it is a brief extract
 rather than a complete daily archive. The archive itself retains the full log.
 NPC movement outside encounters is a projection of the authored schedule, not
-independent model reasoning. The continuity critic checks proposal shape and
+independent model reasoning. Resident simulation now has explicit cognitive levels
+of detail: everyone keeps a cheap deterministic offscreen life, route-near residents
+become local, and co-presence plus attention or a scene makes them focused and eligible
+for costlier generative planning. Detail is derived without growing the event log; only
+the resident's actual actions, needs, plans, and consequences persist. The tiers are
+engine state, never Pathos knowledge.
+
+The catalog is not Pathos's address book. Only direct encounters and Pathos-owned
+memories make a person available to his planning and recall. Newly generated residents
+are placed at Pathos's current location and registered together with their first causal
+encounter, rather than appearing as complete offscreen strangers before he meets them.
+The continuity critic checks proposal shape and
 allowed weather vocabulary, source-memory identity, scene fragments/missing
 scheduled actors, and explicit dream labels; it does not evaluate arbitrary prose
 for truth. Rejected calls carry stable reason codes and correlated critic traces.

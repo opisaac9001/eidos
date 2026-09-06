@@ -745,7 +745,12 @@ function render(next) {
         const historyText = sharedHistory.length
           ? `<p class="context-note">Shared with Pathos: ${sharedHistory.map((item) => esc(item.text)).join(" · ")}</p>`
           : "";
-        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}${historyText}<div class="person-foot"><span>${person.location_id === "home" ? "At their own home" : esc(state.locations.find((p) => p.id === person.location_id).name)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}%</span></div></article>`;
+        const location = person.location_id
+          ? person.location_id === "home"
+            ? "Here at home"
+            : `Here at ${state.locations.find((p) => p.id === person.location_id)?.name || "this place"}`
+          : "Current whereabouts unknown to Pathos";
+        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}${historyText}<div class="person-foot"><span>${esc(location)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}% · ${esc(person.simulation_tier)} detail</span></div></article>`;
       },
     )
     .join("");

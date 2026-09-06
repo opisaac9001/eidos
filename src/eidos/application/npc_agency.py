@@ -28,6 +28,7 @@ async def autonomous_npc_plan_events(
     gateway: ModelGateway,
     catalog: WorldCatalog,
     shared_relationships: Mapping[str, Relationship] | None = None,
+    allowed_actor_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Give each eligible resident one private proposal boundary at 19:00."""
     if simulated_at.utcoffset() is None:
@@ -46,6 +47,8 @@ async def autonomous_npc_plan_events(
     latest_failures = _latest_actor_times(history, "npc.agency_rejected")
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
+        if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
+            continue
         evidence = next(
             (
                 event

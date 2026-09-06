@@ -41,9 +41,17 @@ class WorldExpansionTests(unittest.TestCase):
         raw.update(changes)
         return json.dumps(raw)
 
-    def generate(self, gateway, at, history=None):
+    def generate(self, gateway, at, history=None, pathos_location_id=None):
         current = history or []
-        return asyncio.run(expanding_world_events(current, at, len(current), gateway))
+        return asyncio.run(
+            expanding_world_events(
+                current,
+                at,
+                len(current),
+                gateway,
+                pathos_location_id=pathos_location_id,
+            )
+        )
 
     def test_valid_model_proposal_registers_a_new_persistent_person(self):
         at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)
@@ -51,6 +59,22 @@ class WorldExpansionTests(unittest.TestCase):
         self.assertTrue(any(event.kind == "world.person_registered" for event in events))
         self.assertIn("sana-reed", project_world_catalog(events).people)
         self.assertTrue(any(event.kind == "world.expansion_accepted" for event in events))
+
+    def test_new_person_materializes_where_pathos_meets_them(self):
+        at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)
+        events = self.generate(
+            FixedGateway(self.candidate(location_id="cafe")),
+            at,
+            pathos_location_id="park",
+        )
+        registered = next(event for event in events if event.kind == "world.person_registered")
+        encounter = next(event for event in events if event.kind == "npc.encountered")
+        memory = next(event for event in events if event.kind == "memory.recorded")
+        self.assertEqual(registered.payload["location_id"], "park")
+        self.assertEqual(encounter.payload["person_id"], "sana-reed")
+        self.assertEqual(encounter.causation_id, registered.event_id)
+        self.assertEqual(memory.causation_id, encounter.event_id)
+        self.assertEqual(memory.payload["person_id"], "sana-reed")
 
     def test_invalid_generation_is_audited_without_registering_anything(self):
         at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)
