@@ -584,6 +584,7 @@ class Life:
                 "boundary.stated",
                 "apology.offered",
                 "follow_up.ready",
+                "follow_up.completed",
                 "skill.practiced",
                 "habit.reinforced",
                 "memory.recorded",

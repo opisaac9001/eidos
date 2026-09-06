@@ -46,7 +46,25 @@ class MonthSoakTests(unittest.TestCase):
             self.assertGreater(rowan["tension"], 0)
             self.assertLess(rowan["tension"], 0.08)
             self.assertTrue(snapshot["followups"])
-            self.assertTrue(all(item["status"] == "ready" for item in snapshot["followups"]))
+            self.assertTrue(
+                all(
+                    item["status"] in {"scheduled", "ready", "completed"}
+                    for item in snapshot["followups"]
+                )
+            )
+            completed_followups = [event for event in events if event.kind == "follow_up.completed"]
+            self.assertTrue(completed_followups)
+            self.assertEqual(
+                len(completed_followups),
+                len({event.payload["follow_up_id"] for event in completed_followups}),
+            )
+            self.assertTrue(
+                all(
+                    event.causation_id is not None
+                    and event.payload.get("completion_event_id") == str(event.causation_id)
+                    for event in completed_followups
+                )
+            )
             self.assertEqual(
                 {
                     item["actor_id"]

@@ -38,6 +38,43 @@ class FollowUpTests(unittest.TestCase):
         )
         self.assertEqual(follow_up_events([activity], self.now), [])
 
+    def test_visit_and_call_contact_can_complete_a_ready_follow_up(self):
+        visit = DomainEvent(
+            "visitor.departed",
+            "pathos",
+            {
+                "visit_id": "mara-visit",
+                "visitor_id": "mara",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        scheduled = follow_up_events([visit], self.now)
+        ready = follow_up_events([visit, *scheduled], self.now + timedelta(days=2))
+        call = DomainEvent(
+            "phone.call_completed",
+            "pathos",
+            {
+                "call_id": "mara-called-again",
+                "caller_id": "mara",
+                "simulated_at": (self.now + timedelta(days=3)).isoformat(),
+            },
+        )
+        history = [visit, *scheduled, *ready, call]
+        events = follow_up_events(history, self.now + timedelta(days=3))
+        completed = next(event for event in events if event.kind == "follow_up.completed")
+        self.assertEqual(completed.causation_id, call.event_id)
+        self.assertEqual(completed.payload["completion_event_id"], str(call.event_id))
+        final = [*history, *events]
+        original_id = str(scheduled[0].payload["follow_up_id"])
+        self.assertEqual(project_followups(final)[original_id].status, "completed")
+        self.assertTrue(
+            any(
+                event.kind == "follow_up.scheduled"
+                and event.payload["source_event_id"] == str(call.event_id)
+                for event in events
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

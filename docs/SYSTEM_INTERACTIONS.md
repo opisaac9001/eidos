@@ -254,6 +254,14 @@ blocks other live-visit requests, and can pause the user's conversation at the d
 The visitor departs on a later world tick, changes the relationship through the time
 actually shared, and only then resumes a still-paused user scene.
 
+Completed calls, visits, shared activities, ordinary conversations, and apologies can
+schedule a source-linked follow-up. When it becomes ready, a co-present encounter with
+that person receives priority over an unrelated available acquaintance and the reminder
+becomes the initial conversation topic. The reminder is not cleared by time or generated
+prose: a later typed contact event for the same person must causally complete it. That
+new contact may schedule a future reminder, allowing relationships to recur without a
+fixed daily script.
+
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.

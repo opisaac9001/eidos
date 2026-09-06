@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.followups import follow_up_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
@@ -77,6 +78,35 @@ class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
         scene = next(iter(project_scenes(events).scenes.values()))
         self.assertEqual((scene.turn_count, scene.status, scene.end_reason), (2, "ended", "left"))
         self.assertFalse(any(event.kind == "relationship.changed" for event in events))
+
+    async def test_a_ready_follow_up_prioritizes_that_person_and_becomes_the_topic(self):
+        source = DomainEvent(
+            "social.activity_completed",
+            "pathos",
+            {"person_id": "rowan", "simulated_at": (self.now - timedelta(days=3)).isoformat()},
+        )
+        scheduled = follow_up_events([source], self.now - timedelta(days=3))
+        ready = follow_up_events([source, *scheduled], self.now - timedelta(days=1))
+        history = [source, *scheduled, *ready]
+        locations = {"pathos": "park", "mara": "park", "rowan": "park"}
+        events = await recurring_dialogue_events(
+            history,
+            locations,
+            self.names,
+            {
+                "mara": Relationship("mara"),
+                "rowan": Relationship("rowan"),
+            },
+            self.now,
+            len(history),
+            StandInGateway(),
+        )
+        started = next(event for event in events if event.kind == "scene.started")
+        self.assertEqual(started.payload["partner_id"], "rowan")
+        self.assertEqual(started.payload["topic_id"], "following-up-with-rowan")
+        followup_events = follow_up_events([*history, *events], self.now)
+        completed = next(event for event in followup_events if event.kind == "follow_up.completed")
+        self.assertEqual(completed.payload["person_id"], "rowan")
 
 
 if __name__ == "__main__":

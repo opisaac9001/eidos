@@ -68,6 +68,7 @@ const labels = {
   "boundary.stated": "A BOUNDARY",
   "apology.offered": "AN APOLOGY",
   "follow_up.ready": "A FOLLOW-UP",
+  "follow_up.completed": "FOLLOW-UP COMPLETED",
   "skill.practiced": "SKILL PRACTICE",
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",

@@ -198,8 +198,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   and callbacks that wait for a free waking interval. Connection goals can instead
   produce a next-day physical visitor whom Pathos may miss, defer, or admit according
   to presence, energy, emotion, and relationship state. Admitted visitors occupy his
-  home, block new visits, and pause/resume an active user conversation. Extend the same
-  mechanism to deliveries, urgency and remembered follow-up. Simulation controls and
+  home, block new visits, and pause/resume an active user conversation. Calls, visits,
+  apologies, and shared time now create durable follow-ups that prioritize the relevant
+  person and topic when they next meet, and close only against later causal contact.
+  Extend the interruption mechanism to deliveries and urgency. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
 - Ordinary NPC conversations now recur from actual non-home co-presence rather than
@@ -271,8 +273,8 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-1. Extend recurring dialogue with invitations, remembered follow-up, deliveries, and
-   interruption-specific resumption choices beyond completed calls and physical visits.
+1. Extend recurring dialogue with invitations, deliveries, and interruption-specific
+   resumption choices beyond completed calls, physical visits, and causal follow-ups.
 2. Let Moira propose additions to the completed sixteen-event, resource-backed
    neighborhood palette, with novelty scoring and schema-valid opportunity metadata.
    The additive catalog now registers rare people, useful objects, and connected

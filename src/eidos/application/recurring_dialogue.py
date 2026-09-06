@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.application.cognition import perform
+from eidos.application.followups import project_followups
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
@@ -83,19 +84,25 @@ async def recurring_dialogue_events(
     location_id = actor_locations.get("pathos")
     if location_id in {None, "home"}:
         return []
+    ready_people = {
+        item.person_id for item in project_followups(history).values() if item.status == "ready"
+    }
     candidates = sorted(
-        actor_id
-        for actor_id, location in actor_locations.items()
-        if actor_id not in {"pathos", "user"}
-        and location == location_id
-        and actor_id in actor_names
-        and _cooldown_complete(history, actor_id, simulated_at, relationships)
+        (
+            actor_id
+            for actor_id, location in actor_locations.items()
+            if actor_id not in {"pathos", "user"}
+            and location == location_id
+            and actor_id in actor_names
+            and _cooldown_complete(history, actor_id, simulated_at, relationships)
+        ),
+        key=lambda actor_id: (actor_id not in ready_people, actor_id),
     )
     if not candidates:
         return []
     partner_id = candidates[0]
     relationship = relationships.get(partner_id, Relationship(partner_id))
-    topics = _observable_topics(history, location_id)
+    topics = _observable_topics(history, location_id, partner_id)
     scene_id = f"ordinary-{simulated_at.date().isoformat()}-{partner_id}-{location_id}"
     max_turns = 2 if relationship.familiarity < 0.35 else 4 if relationship.familiarity < 0.7 else 6
     start = resolve_scene_start(
@@ -143,7 +150,7 @@ async def _advance_scene(
     scene_id: str,
     partner_id: str,
 ) -> list[DomainEvent]:
-    topics = _observable_topics(history, actor_locations["pathos"])
+    topics = _observable_topics(history, actor_locations["pathos"], partner_id)
     for _ in range(2):
         combined = [*history, *output]
         scene = project_scenes(combined).scenes[scene_id]
@@ -256,8 +263,15 @@ async def _advance_scene(
     return output
 
 
-def _observable_topics(history: Sequence[DomainEvent], location_id: str) -> list[str]:
+def _observable_topics(
+    history: Sequence[DomainEvent], location_id: str, partner_id: str
+) -> list[str]:
     topics: list[str] = []
+    if any(
+        item.status == "ready" and item.person_id == partner_id
+        for item in project_followups(history).values()
+    ):
+        topics.append(f"following-up-with-{partner_id}")
     for event in reversed(history):
         if (
             event.kind != "perception.recorded"
