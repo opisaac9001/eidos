@@ -75,6 +75,24 @@ class WebTests(unittest.TestCase):
                 exported = json.loads(body)
                 self.assertEqual(exported["schema"], 2)
                 self.assertIn("correlation_id", exported["events"][0])
+        status, body = self.request("GET", "/api/events?limit=3")
+        page = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(page["events"]), 3)
+        self.assertEqual(
+            [item["revision"] for item in page["events"]],
+            sorted((item["revision"] for item in page["events"]), reverse=True),
+        )
+        self.assertIsNotNone(page["next_before"])
+        status, body = self.request("GET", f"/api/events?limit=3&before={page['next_before']}")
+        second_page = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertFalse(
+            {item["revision"] for item in page["events"]}
+            & {item["revision"] for item in second_page["events"]}
+        )
+        status, _ = self.request("GET", "/api/events?limit=999")
+        self.assertEqual(status, 400)
 
     def test_boundary_rejects_cross_origin_and_bad_requests(self):
         status, _ = self.request(

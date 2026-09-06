@@ -8,11 +8,12 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Iterator
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.domain.events import DomainEvent
 from eidos.ports.event_store import RevisionConflict
 from eidos.ports.job_store import JobConflict
 from eidos.ports.model_gateway import ModelGateway
@@ -172,23 +173,31 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
             path = urlsplit(self.path).path
             if path == "/api/state":
                 self.respond(200, runtime.snapshot())
+            elif path == "/api/events":
+                try:
+                    query = parse_qs(urlsplit(self.path).query)
+                    limit = int(query.get("limit", ["100"])[0])
+                    before_value = query.get("before", [None])[0]
+                    before = int(before_value) if before_value is not None else None
+                    with runtime.lock:
+                        page = runtime.life.store.read_page(
+                            "pathos", before_revision=before, limit=limit
+                        )
+                    self.respond(
+                        200,
+                        {
+                            "events": [
+                                {"revision": record.revision, **event_json(record.event)}
+                                for record in page.records
+                            ],
+                            "next_before": page.next_before_revision,
+                        },
+                    )
+                except (ValueError, TypeError) as error:
+                    self.respond(400, {"error": str(error)})
             elif path == "/api/export":
                 with runtime.lock:
-                    events = [
-                        {
-                            "id": str(e.event_id),
-                            "kind": e.kind,
-                            "schema_version": e.schema_version,
-                            "causation_id": str(e.causation_id) if e.causation_id else None,
-                            "correlation_id": e.correlation_id,
-                            "occurred_at": e.occurred_at.isoformat(),
-                            "payload": {
-                                k: v.isoformat() if hasattr(v, "isoformat") else v
-                                for k, v in e.payload.items()
-                            },
-                        }
-                        for e in runtime.life.history()
-                    ]
+                    events = [event_json(event) for event in runtime.life.history()]
                 self.respond(200, {"schema": 2, "events": events})
             elif path in ("/", "/app.js", "/style.css"):
                 asset = STATIC / ("index.html" if path == "/" else path[1:])
@@ -254,6 +263,21 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 )
 
     return Handler
+
+
+def event_json(event: DomainEvent) -> dict[str, Any]:
+    return {
+        "id": str(event.event_id),
+        "kind": event.kind,
+        "schema_version": event.schema_version,
+        "causation_id": str(event.causation_id) if event.causation_id else None,
+        "correlation_id": event.correlation_id,
+        "occurred_at": event.occurred_at.isoformat(),
+        "payload": {
+            key: value.isoformat() if hasattr(value, "isoformat") else value
+            for key, value in event.payload.items()
+        },
+    }
 
 
 def serve(

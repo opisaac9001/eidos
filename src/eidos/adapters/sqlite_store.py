@@ -9,7 +9,7 @@ from typing import Iterator, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.ports.event_store import RevisionConflict
+from eidos.ports.event_store import EventPage, EventRecord, RevisionConflict
 
 
 class SQLiteEventStore:
@@ -91,6 +91,59 @@ class SQLiteEventStore:
                 )
             )
         return result
+
+    def read_page(
+        self, aggregate_id: str, *, before_revision: int | None = None, limit: int = 100
+    ) -> EventPage:
+        if isinstance(limit, bool) or not 1 <= limit <= 200:
+            raise ValueError("Event page limit must be between 1 and 200")
+        if before_revision is not None and (
+            isinstance(before_revision, bool) or before_revision < 1
+        ):
+            raise ValueError("Event cursor must be a positive revision")
+        clause = "AND revision < ?" if before_revision is not None else ""
+        parameters: tuple[object, ...] = (
+            (aggregate_id, before_revision, limit + 1)
+            if before_revision is not None
+            else (aggregate_id, limit + 1)
+        )
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT revision, kind, payload, occurred_at, event_id, schema_version, "
+                "causation_id, correlation_id FROM events WHERE aggregate_id = ? "
+                f"{clause} ORDER BY revision DESC LIMIT ?",
+                parameters,
+            ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        records = tuple(
+            EventRecord(int(row[0]), self._decode_row(aggregate_id, row[1:])) for row in rows
+        )
+        next_cursor = records[-1].revision if has_more and records else None
+        return EventPage(records, next_cursor)
+
+    @staticmethod
+    def _decode_row(aggregate_id: str, row: Sequence[object]) -> DomainEvent:
+        kind, encoded, occurred_at, event_id, schema_version, causation_id, correlation_id = row
+        payload = json.loads(str(encoded))
+        payload = {
+            key: datetime.fromisoformat(value["$datetime"])
+            if isinstance(value, dict) and set(value) == {"$datetime"}
+            else value
+            for key, value in payload.items()
+        }
+        if kind == "time.advanced" and isinstance(payload["simulated_at"], str):
+            payload["simulated_at"] = datetime.fromisoformat(payload["simulated_at"])
+        return DomainEvent(
+            str(kind),
+            aggregate_id,
+            payload,
+            datetime.fromisoformat(str(occurred_at)),
+            UUID(str(event_id)),
+            int(str(schema_version)),
+            UUID(str(causation_id)) if causation_id else None,
+            str(correlation_id) if correlation_id else None,
+        )
 
     def append(
         self, aggregate_id: str, events: Sequence[DomainEvent], expected_revision: int

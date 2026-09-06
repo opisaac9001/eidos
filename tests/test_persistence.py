@@ -86,6 +86,22 @@ class PersistenceTests(unittest.TestCase):
             other.append("pathos", [DomainEvent("test", "pathos")], 0)
         self.assertEqual(len(other.read("pathos")), 1)
 
+    def test_history_pages_use_stable_exclusive_revision_cursors(self) -> None:
+        events = [DomainEvent(f"event.{index}", "pathos", {"index": index}) for index in range(7)]
+        self.store.append("pathos", events, 0)
+        first = self.store.read_page("pathos", limit=3)
+        self.assertEqual([item.revision for item in first.records], [7, 6, 5])
+        self.assertEqual(first.next_before_revision, 5)
+        second = self.store.read_page("pathos", before_revision=first.next_before_revision, limit=3)
+        self.assertEqual([item.revision for item in second.records], [4, 3, 2])
+        final = self.store.read_page("pathos", before_revision=second.next_before_revision, limit=3)
+        self.assertEqual([item.revision for item in final.records], [1])
+        self.assertIsNone(final.next_before_revision)
+        self.assertEqual(
+            [item.event for item in (*first.records, *second.records, *final.records)],
+            list(reversed(events)),
+        )
+
     def test_batch_failure_rolls_back_every_event(self) -> None:
         event = DomainEvent("test", "pathos")
         with self.assertRaises(sqlite3.IntegrityError):
