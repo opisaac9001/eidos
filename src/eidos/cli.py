@@ -24,10 +24,35 @@ def main() -> None:
     advance = commands.add_parser("advance", help="Advance an authored simulated routine")
     advance.add_argument("--hours", type=float, default=24)
     commands.add_parser("journal", help="Read accepted autobiographical events")
+    backup = commands.add_parser("backup", help="Create a verified online SQLite backup")
+    backup.add_argument("--output", type=Path, required=True)
+    verify = commands.add_parser("verify-backup", help="Verify a SQLite backup without changing it")
+    verify.add_argument("--input", type=Path, required=True)
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     try:
+        if args.command in {"backup", "verify-backup"}:
+            from eidos.adapters.sqlite_backup import create_backup, verify_backup
+
+            report = (
+                create_backup(args.database, args.output)
+                if args.command == "backup"
+                else verify_backup(args.input)
+            )
+            print(
+                json.dumps(
+                    {
+                        "path": str(report.path),
+                        "integrity": report.integrity,
+                        "schema_version": report.schema_version,
+                        "events": report.event_count,
+                        "jobs": report.job_count,
+                    },
+                    indent=2,
+                )
+            )
+            return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"
         if args.base_url or args.model:

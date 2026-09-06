@@ -57,6 +57,17 @@ another without confusing character beliefs with historical truth.
 
 ## Development
 
+Create and verify a consistent backup while the world database is in use:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 backup --output backups/eidos.sqlite3
+PYTHONPATH=src .venv/bin/python -m eidos verify-backup --input backups/eidos.sqlite3
+```
+
+Backup creation refuses to overwrite an existing file. A verified backup can be
+opened directly with `--database` to prove that the event history replays before
+it is promoted during a recovery.
+
 Python 3.12 or newer is required. With mise installed:
 
 ```bash

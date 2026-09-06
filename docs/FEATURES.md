@@ -119,7 +119,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | --- | --- | --- | --- |
 | OPS-01 | Role profiles, health, context/token budgets, prompt/config versions | Partial: one endpoint/model | P1 |
 | OPS-02 | Persistent workers, supervision, priority, backpressure, failure policy | Partial: supervised bounded queue with deadlines | P1 |
-| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: SQLite/loopback | P1 |
+| OPS-03 | Backups, restore, migrations, checkpoints, private networking, secrets | Partial: verified online SQLite backup/replay + migrations/loopback | P1 |
 | OPS-04 | Dell inventory, compatible stack, benchmarks, routing and monitoring | Planned: hardware pending | Host track |
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Planned | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |
