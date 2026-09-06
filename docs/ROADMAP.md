@@ -12,7 +12,8 @@ have their own limited knowledge and lives. Consequences persist.
 
 These are explicit, tunable simulation mechanics, not claims of consciousness or
 scientifically faithful human psychology. The first substantial release is
-**one coherent seven-day life**. The longer target is a sustainable month.
+**one coherent seven-day life**. The longer target is a sustainable month whose days
+remain recognizably different rather than a repeated short loop.
 
 - [Feature inventory](FEATURES.md): stable feature IDs, scope, status and phase.
 - [System interactions](SYSTEM_INTERACTIONS.md): ownership, event contracts,
@@ -233,11 +234,13 @@ boundaries and must not rely on emotional coercion.
    authored feasible activity profiles while preserving private knowledge boundaries.
 3. Expand the new bounded scene lifecycle beyond its first integrated two-turn
    performer-driven exchange into richer dialogue policies and interruption/resume.
-4. Make the new seasons and rotating weekly neighborhood rhythm affect resources and
-   project variety without forcing drama.
-5. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
-6. Capture the Dell inventory, then benchmark and pin its private inference stack.
-7. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
+4. Expand the new seasonal, resource-backed neighborhood rhythm into a broad palette
+   of ordinary generated events and project opportunities without forcing drama.
+5. Add an optional source-attributed British-town signal adapter for weather, daylight,
+   public events, and local-news inspiration, with a strict seed-versus-world-fact boundary.
+6. Add explicit long-run memory archive/retention maintenance and longer soak evidence.
+7. Capture the Dell inventory, then benchmark and pin its private inference stack.
+8. Expand semantic and adversarial evaluations for contradictions, perspective leaks,
    repeated prose, and low-quality but schema-valid model output.
 
 Each item ships with deterministic fixtures, failure-path tests, replay checks,

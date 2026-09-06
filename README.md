@@ -148,7 +148,9 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 - A calm four-week neighborhood rhythm plans seed swaps, repair tables, shared tea,
   and sketch walks with explicit lead time and cooldowns. Only co-present residents
   perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for
-  their own private plans during the month soak.
+  their own private plans during the month soak. Each event requires a persistent
+  physical community resource at the right place and is cancelled if it becomes
+  unavailable.
 - The simulation calendar records season transitions as replayable world facts and
   exposes the current season beside weather; it does not depend on generated prose.
 - Memories have provenance, importance, diversified term/entity/goal/relationship

@@ -1,7 +1,11 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.world_perception import authored_community_schedule, due_world_observations
+from eidos.application.world_perception import (
+    authored_community_schedule,
+    community_resource_events,
+    due_world_observations,
+)
 from eidos.domain.events import DomainEvent
 
 
@@ -46,14 +50,14 @@ class WorldPerceptionTests(unittest.TestCase):
         self.assertEqual(perception.payload["owner"], "rowan")
 
     def test_weekly_rhythm_rotates_places_and_never_duplicates_occurrences(self):
-        history = []
+        history = community_resource_events([], datetime(2026, 1, 1, tzinfo=timezone.utc))
         scheduled = []
         for day in (2, 9, 16, 23):
             now = datetime(2026, 1, day, 8, tzinfo=timezone.utc)
             events = authored_community_schedule(history, now, len(history))
-            self.assertEqual([event.kind for event in events][-1], "world_event.scheduled")
+            occurrence = next(event for event in events if event.kind == "world_event.scheduled")
             history.extend(events)
-            scheduled.append(events[-1])
+            scheduled.append(occurrence)
             self.assertEqual(authored_community_schedule(history, now, len(history)), [])
         self.assertEqual(
             [event.payload["location_id"] for event in scheduled],
@@ -65,6 +69,32 @@ class WorldPerceptionTests(unittest.TestCase):
                 datetime.fromisoformat(event.payload["starts_at"]).hour == 13 for event in scheduled
             )
         )
+
+    def test_community_resources_are_persistent_and_seed_only_once(self):
+        events = community_resource_events([], self.now)
+        registered = [event for event in events if event.kind == "object.registered"]
+        self.assertEqual(len(registered), 4)
+        self.assertTrue(all(event.causation_id == events[0].event_id for event in registered))
+        self.assertEqual(community_resource_events(events, self.now), [])
+
+    def test_linked_event_is_cancelled_if_its_resource_moves(self):
+        resources = community_resource_events([], self.now)
+        schedule_time = datetime(2026, 1, 2, 8, tzinfo=timezone.utc)
+        scheduled = authored_community_schedule(resources, schedule_time, len(resources))
+        link = next(event for event in scheduled if event.kind == "world_event.resource_linked")
+        damaged = DomainEvent(
+            "object.condition_changed",
+            "pathos",
+            {"object_id": link.payload["resource_id"], "condition": "damaged"},
+        )
+        history = [*resources, *scheduled, damaged]
+        due = due_world_observations(
+            history,
+            {"pathos": "park", "rowan": "park"},
+            schedule_time + timedelta(hours=5),
+        )
+        self.assertEqual([event.kind for event in due], ["world_event.cancelled"])
+        self.assertEqual(due_world_observations([*history, *due], {}, self.now), [])
 
 
 if __name__ == "__main__":

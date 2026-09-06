@@ -41,7 +41,11 @@ from eidos.application.relational_arc import relational_arc_events
 from eidos.application.scene_story import bounded_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.social_activity import scheduled_social_events
-from eidos.application.world_perception import authored_community_schedule, due_world_observations
+from eidos.application.world_perception import (
+    authored_community_schedule,
+    community_resource_events,
+    due_world_observations,
+)
 from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import project_beliefs
 from eidos.domain.commitments import project_renegotiations
@@ -561,6 +565,7 @@ class Life:
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
             pending.extend(season_change_events(history + pending, current))
+            pending.extend(community_resource_events(history + pending, current))
             pending.extend(npc_world_events(history + pending, current))
             need_events, state = sleep_and_need_events(state, current)
             pending.extend(need_events)

@@ -11,6 +11,24 @@ days, incomplete plans, encounters, changing relationships, private thoughts,
 and perhaps one or two genuinely memorable events. His account of that interval
 must agree with the world's account.
 
+## A routine is a floor, not a script
+
+Pathos must not cycle through the same handful of beats every day. Stable habits,
+work, sleep, and familiar places make change legible, but ordinary life also contains
+errands, visitors, weather changes, cancellations, overheard moments, new people,
+unexpected invitations, local events, idle detours, and days when little happens.
+Variety should emerge from needs, seasons, relationships, available resources, and
+the town's evolving state rather than a fixed daily content rotation.
+
+Invented detail is welcome inside the fiction. A model may propose a new resident,
+street incident, conversation, or opportunity; continuity rules decide whether and
+how it becomes true. The critic protects established facts and agency, not blandness.
+
+Real-world signals from a chosen British town may later inspire weather, daylight,
+public events, and local concerns. Their source and retrieval time must be retained.
+They are creative seeds and ambient context unless explicitly imported as world facts;
+Pathos does not claim to have witnessed a news report merely because Moira read it.
+
 ## A cast of intelligences
 
 The system uses several AI roles, but they do not compete to impersonate one
@@ -119,10 +137,11 @@ without sacrificing continuity.
 
 ## The first story
 
-The initial world will be intentionally small: Pathos's apartment, a nearby
+The initial world begins intentionally small: Pathos's apartment, a nearby
 cafe, a workplace or recurring obligation, and a handful of NPCs whose lives
-intersect naturally with his. Depth in four places is more convincing than a
-procedurally named planet with nothing happening in it.
+intersect naturally with his. This is a launch seed, not a permanent ceiling: the
+cast, places, activities, and local history should expand through accepted events.
+Depth is more convincing than a procedurally named planet with nothing happening in it.
 
 The first playable arc spans seven simulated days and is designed to test:
 

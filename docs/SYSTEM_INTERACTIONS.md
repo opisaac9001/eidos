@@ -208,6 +208,9 @@ cooldown, and becomes knowledge only for actors present at its location.
 Calendar-derived season transitions are separate replayable world facts. Weather and
 season are therefore durable inputs for later planning, not implications extracted
 from narration.
+Each recurring event is linked to a persistent community object. Scheduling and
+occurrence recheck its condition and location; unavailable resources cause an explicit
+skip or cancellation rather than a magical event with missing prerequisites.
 
 The current deterministic baseline lets each resident turn owned public-event
 perception into a private, evidence-linked plan suited to their routine. A structured

@@ -178,7 +178,8 @@ class LifeTests(unittest.TestCase):
         self.life.advance(24)
         active = self.life.snapshot()
         self.assertEqual(active["commitments"][0]["status"], "active")
-        self.assertEqual(active["objects"][0]["condition"], "broken")
+        lamp = next(item for item in active["objects"] if item["object_id"] == "mara-lamp")
+        self.assertEqual(lamp["condition"], "broken")
         self.assertEqual(active["requests"][0]["status"], "accepted")
         self.assertEqual(active["requests"][0]["rounds"], 1)
         self.assertEqual(active["requests"][0]["due_at"], active["commitments"][0]["due_at"])
@@ -194,7 +195,10 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(repair_goal["status"], "achieved")
         self.assertEqual(finished["commitments"][0]["status"], "fulfilled")
         self.assertEqual(repair_schedule["status"], "completed")
-        self.assertEqual(finished["objects"][0]["condition"], "repaired")
+        repaired_lamp = next(
+            item for item in finished["objects"] if item["object_id"] == "mara-lamp"
+        )
+        self.assertEqual(repaired_lamp["condition"], "repaired")
         self.assertEqual(repair_intention["status"], "completed")
         self_belief = next(
             belief for belief in finished["beliefs"] if belief["subject_id"] == "pathos"
