@@ -7,7 +7,8 @@ import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Iterator
+from time import monotonic
+from typing import Any, Callable, Iterator
 from urllib.parse import parse_qs, urlsplit
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -24,9 +25,17 @@ logger = logging.getLogger(__name__)
 
 
 class Runtime:
-    def __init__(self, life: Life, interval: float = 3) -> None:
+    def __init__(
+        self,
+        life: Life,
+        interval: float = 3,
+        clock: Callable[[], float] = monotonic,
+        realtime_quantum_seconds: float = 300,
+    ) -> None:
         self.life = life
         self.interval = interval
+        self.clock = clock
+        self.realtime_quantum_seconds = realtime_quantum_seconds
         self.lock = threading.RLock()
         self.stop = threading.Event()
         self.error: str | None = None
@@ -34,6 +43,8 @@ class Runtime:
         self.thread: threading.Thread | None = None
         self.cached: dict[str, Any] | None = None
         self.working = False
+        self.realtime_pending_seconds = 0.0
+        self.last_wall_tick = self.clock()
 
     def start(self) -> None:
         with self.lock:
@@ -41,28 +52,56 @@ class Runtime:
             config = self.life.snapshot()["config"]
             # Resume is explicit: downtime never creates an unbounded catch-up burst.
             if config["running"]:
-                self.life.configure(False, config["minutes_per_tick"])
+                self.life.configure(
+                    False,
+                    config["minutes_per_tick"],
+                    config.get("clock_mode", "realtime"),
+                )
             self.cached = self.life.snapshot()
+            self.realtime_pending_seconds = 0.0
+            self.last_wall_tick = self.clock()
         self.thread = threading.Thread(target=self._loop, name="eidos-chronos", daemon=True)
         self.thread.start()
 
     def _loop(self) -> None:
         while not self.stop.wait(self.interval):
+            wall_now = self.clock()
+            wall_elapsed = max(0.0, wall_now - self.last_wall_tick)
+            self.last_wall_tick = wall_now
             with self.lock:
-                config = {"minutes_per_tick": 15}
+                config: dict[str, Any] = {
+                    "running": False,
+                    "clock_mode": "realtime",
+                    "minutes_per_tick": 15,
+                }
                 try:
                     config = self.life.snapshot()["config"]
                     if config["running"]:
+                        if config.get("clock_mode", "realtime") == "realtime":
+                            self.realtime_pending_seconds += wall_elapsed
+                            if self.realtime_pending_seconds < self.realtime_quantum_seconds:
+                                continue
+                            hours = self.realtime_pending_seconds / 3600
+                            self.realtime_pending_seconds = 0.0
+                        else:
+                            self.realtime_pending_seconds = 0.0
+                            hours = config["minutes_per_tick"] / 60
                         self.working = True
-                        self.life.advance(config["minutes_per_tick"] / 60)
+                        self.life.advance(hours)
                         self.ticks += 1
                         self.error = None
                         self.cached = self.life.snapshot()
+                    else:
+                        self.realtime_pending_seconds = 0.0
                 except Exception:
                     logger.exception("Simulation tick failed")
                     self.error = "The simulation paused after a tick failed. Its last committed state is safe."
                     try:
-                        self.life.configure(False, config["minutes_per_tick"])
+                        self.life.configure(
+                            False,
+                            config["minutes_per_tick"],
+                            config.get("clock_mode", "realtime"),
+                        )
                     except Exception:
                         logger.exception("Could not persist pause")
                     self.stop.set()
@@ -132,6 +171,7 @@ class Runtime:
                 "error": self.error,
                 "worker_alive": bool(self.thread and self.thread.is_alive()),
                 "working": self.working,
+                "realtime_pending_seconds": round(self.realtime_pending_seconds, 3),
             },
         }
 
@@ -276,7 +316,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                             raise ValueError(
                                 "Restart the local server to recover its stopped worker"
                             )
-                        runtime.life.configure(body["running"], body["minutes_per_tick"])
+                        runtime.life.configure(
+                            body["running"],
+                            body["minutes_per_tick"],
+                            body.get("clock_mode", "accelerated"),
+                        )
                     elif self.path == "/api/step":
                         runtime.life.advance(body.get("hours", 1))
                     elif self.path == "/api/catch-up":

@@ -621,7 +621,11 @@ class Life:
         wellbeing = self._wellbeing(history)
         household = self._household(history)
         catalog = self._world_catalog(history)
-        config = {"running": False, "minutes_per_tick": 15}
+        config = {
+            "running": False,
+            "clock_mode": "realtime",
+            "minutes_per_tick": 15,
+        }
         outreach_config = project_outreach_config(history)
         weather = "Clear"
         relationship_state = self._relationships(history)
@@ -2632,13 +2636,21 @@ class Life:
             for request in deferred_requests:
                 self.gateway.submit_deferred(request)
 
-    def configure(self, running: bool, minutes_per_tick: int) -> None:
+    def configure(
+        self,
+        running: bool,
+        minutes_per_tick: int,
+        clock_mode: str = "accelerated",
+    ) -> None:
         if (
             type(running) is not bool
             or type(minutes_per_tick) is not int
             or minutes_per_tick not in (5, 15, 60)
+            or clock_mode not in {"realtime", "accelerated"}
         ):
-            raise ValueError("Choose running true/false and a speed of 5, 15, or 60 minutes")
+            raise ValueError(
+                "Choose running true/false, realtime or accelerated mode, and a test speed of 5, 15, or 60 minutes"
+            )
         history = self.history()
         self.store.append(
             "pathos",
@@ -2646,7 +2658,11 @@ class Life:
                 DomainEvent(
                     "runtime.configured",
                     "pathos",
-                    {"running": running, "minutes_per_tick": minutes_per_tick},
+                    {
+                        "running": running,
+                        "clock_mode": clock_mode,
+                        "minutes_per_tick": minutes_per_tick,
+                    },
                 )
             ],
             len(history),

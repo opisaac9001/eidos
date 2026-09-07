@@ -662,9 +662,18 @@ class LifeTests(unittest.TestCase):
         for running, speed in (("yes", 15), (True, True), (False, 100)):
             with self.assertRaises(ValueError):
                 self.life.configure(running, speed)
+        with self.assertRaises(ValueError):
+            self.life.configure(True, 15, "imaginary")
         for hours in (float("nan"), 0, -1, 25, True, "1"):
             with self.assertRaises(ValueError):
                 self.life.advance(hours)
+
+    def test_new_world_defaults_to_realtime_and_acceleration_is_explicit(self):
+        self.assertEqual(self.life.snapshot()["config"]["clock_mode"], "realtime")
+
+        self.life.configure(True, 15)
+
+        self.assertEqual(self.life.snapshot()["config"]["clock_mode"], "accelerated")
 
     def test_first_story_persists_a_causal_plan_across_days(self):
         self.life.advance(24)

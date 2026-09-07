@@ -76,6 +76,9 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b'id="load-memories"', body)
                 self.assertIn(b'id="world-pack-section"', body)
                 self.assertIn(b'class="controls" data-operator-only hidden', body)
+                self.assertIn(b'role="tablist"', body)
+                self.assertIn(b'data-archive-tab="dreams"', body)
+                self.assertIn(b"Real time \xc2\xb7 1\xc3\x97", body)
             if path == "/operator":
                 self.assertIn(b"data-operator-only hidden", body)
             if path == "/app.js":
@@ -84,6 +87,8 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b"state.scenes", body)
                 self.assertIn(b"state.emotion", body)
                 self.assertIn(b"function loadMemoryArchive", body)
+                self.assertIn(b"function selectArchiveTab", body)
+                self.assertIn(b'clock_mode: selected === "realtime"', body)
                 self.assertIn(b"PRIVATE BIOGRAPHY", body)
                 self.assertIn(b'window.location.pathname === "/operator"', body)
             if path == "/api/export":
@@ -116,6 +121,49 @@ class WebTests(unittest.TestCase):
         self.assertTrue(all(item.get("owner", "pathos") == "pathos" for item in memories["items"]))
         status, _ = self.request("GET", "/api/memories?limit=500")
         self.assertEqual(status, 400)
+
+    def test_realtime_clock_advances_only_real_elapsed_time(self):
+        class FakeClock:
+            def __init__(self):
+                self.now = 100.0
+
+            def __call__(self):
+                return self.now
+
+            def advance(self, seconds):
+                self.now += seconds
+
+        clock = FakeClock()
+        life = Life(
+            SQLiteEventStore(Path(self.directory.name) / "realtime.db"),
+            StandInGateway(),
+        )
+        runtime = Runtime(
+            life,
+            interval=0.005,
+            clock=clock,
+            realtime_quantum_seconds=30,
+        )
+        runtime.start()
+        self.addCleanup(runtime.close)
+        before = datetime.fromisoformat(runtime.snapshot()["time"])
+        with runtime.mutation():
+            life.configure(True, 15, "realtime")
+
+        clock.advance(29)
+        runtime.stop.wait(0.03)
+        self.assertEqual(runtime.ticks, 0)
+        self.assertAlmostEqual(runtime.snapshot()["runtime"]["realtime_pending_seconds"], 29)
+
+        clock.advance(1)
+        deadline = time.monotonic() + 1
+        while runtime.ticks < 1 and time.monotonic() < deadline:
+            runtime.stop.wait(0.01)
+        after = datetime.fromisoformat(runtime.snapshot()["time"])
+
+        self.assertEqual(runtime.ticks, 1)
+        self.assertEqual((after - before).total_seconds(), 30)
+        self.assertEqual(runtime.snapshot()["config"]["clock_mode"], "realtime")
 
     def test_boundary_rejects_cross_origin_and_bad_requests(self):
         status, _ = self.request(

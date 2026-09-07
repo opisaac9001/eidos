@@ -495,8 +495,9 @@ follow deterministic validation. Preserve existing worlds and original `main`.
 
 ## Decisions and change control
 
-Working defaults: one central Pathos; a small neighborhood; simulation time
-separate from wall time; local-first storage; no external outreach by default;
+Working defaults: one central Pathos; a small neighborhood; ordinary lived time
+tracks real wall time at 1× in persistent five-minute checkpoints; accelerated time
+and catch-up require explicit operator action; local-first storage; no external outreach by default;
 conservative personality change; subjective forgetting without audit destruction;
 bounded inference; no required cloud service. These are reversible design choices.
 

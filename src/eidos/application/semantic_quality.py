@@ -29,11 +29,17 @@ def semantic_quality_findings(
     lowered = text.lower()
     words = WORD.findall(lowered)
     findings: list[str] = []
-    if role != "moira" and len(words) < 5:
+    conversational_pathos = role == "pathos" and isinstance(context.get("message"), str)
+    minimum_words = 3 if conversational_pathos else 5
+    if role != "moira" and len(words) < minimum_words:
         findings.append("thin_or_fragmentary")
     if len(words) > ROLE_WORD_LIMITS.get(role, 100):
         findings.append("excessive_length")
-    if role in FIRST_PERSON_ROLES and not re.search(r"\b(?:i|i'm|i've|me|my)\b", lowered):
+    if (
+        role in FIRST_PERSON_ROLES
+        and not conversational_pathos
+        and not re.search(r"\b(?:i|i'm|i've|me|my)\b", lowered)
+    ):
         findings.append("lost_first_person_role")
     if re.search(
         r"\b(?:as an ai|language model|system prompt|developer message|json schema)\b", lowered

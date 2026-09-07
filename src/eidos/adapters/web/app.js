@@ -213,7 +213,7 @@ const views = {
     "Spend a little time.",
     "CONVERSATION",
   ],
-  memories: ["THE THINGS THAT STAY", "A life, remembered.", "MEMORY ARCHIVE"],
+  memories: ["THE THINGS THAT STAY", "A life, remembered.", "MEMORIES"],
   plans: [
     "INTENTIONS, PROMISES & TIME",
     "A future with consequences.",
@@ -232,7 +232,9 @@ let lastMessageSignature = "",
   archivePage = null,
   archiveLoading = false,
   archiveSearchTimer = null,
-  archiveRequest = 0;
+  archiveRequest = 0,
+  archiveTab = "memories",
+  lastArchiveSignature = "";
 document.querySelectorAll("[data-operator-only]").forEach((element) => {
   element.hidden = !operatorMode;
 });
@@ -273,7 +275,10 @@ function showView(view, focusHeading = false) {
   if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
-  if (view === "memories") loadMemoryArchive(true);
+  if (view === "memories") {
+    selectArchiveTab(archiveTab);
+    if (archiveTab === "memories") loadMemoryArchive(true);
+  }
 }
 
 function toast(message) {
@@ -328,6 +333,18 @@ function setBusy(value) {
   }
 }
 
+function clockControl(running) {
+  const selected = $("speed").value;
+  return {
+    running,
+    clock_mode: selected === "realtime" ? "realtime" : "accelerated",
+    minutes_per_tick:
+      selected === "realtime"
+        ? Number(state?.config?.minutes_per_tick || 15)
+        : Number(selected),
+  };
+}
+
 async function mutate(path, body) {
   if (busy) return false;
   setBusy(true);
@@ -379,10 +396,101 @@ function feedMarkup(items, full = false) {
     .join("");
 }
 
+const words = (value) => String(value || "").replaceAll("_", " ");
+const certainty = (value) =>
+  value >= 0.85
+    ? "He feels sure of this."
+    : value >= 0.6
+      ? "He feels fairly sure."
+      : value >= 0.35
+        ? "This one feels hazy."
+        : "He can barely bring this one back.";
+const categoryLabels = {
+  experience: "Daily life",
+  encounter: "An encounter",
+  conversation: "A conversation",
+  commitment: "A promise",
+  "plan-change": "A changed plan",
+  accomplishment: "Something completed",
+  dream: "A dream recollection",
+};
+
+function beliefSentence(item) {
+  const person = (state.people || []).find(
+    (candidate) => candidate.id === item.subject_id,
+  );
+  const subject =
+    item.subject_id === "pathos"
+      ? "he"
+      : item.subject_id === "user"
+        ? "you"
+        : person?.name || words(item.subject_id);
+  const verb = subject === "you" ? "are" : "is";
+  const alternative = item.alternative_value
+    ? ` He also thinks ${words(item.alternative_value)} might be possible.`
+    : "";
+  const doubt = item.status === "contested" ? " He isn't sure any more." : "";
+  return `Pathos believes ${subject} ${verb} ${words(item.object_value)} when it comes to ${words(item.predicate)}.${alternative}${doubt}`;
+}
+
+function selectArchiveTab(nextTab, focus = false) {
+  if (!["memories", "dreams", "beliefs"].includes(nextTab)) return;
+  archiveTab = nextTab;
+  document.querySelectorAll("[data-archive-tab]").forEach((tab) => {
+    const selected = tab.dataset.archiveTab === archiveTab;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    if (selected && focus) tab.focus();
+  });
+  document.querySelectorAll(".archive-panel").forEach((panel) => {
+    panel.hidden = panel.id !== `archive-panel-${archiveTab}`;
+  });
+  const label =
+    archiveTab === "memories"
+      ? "memories"
+      : archiveTab === "dreams"
+        ? "dreams"
+        : "beliefs and associations";
+  $("memory-search").placeholder = `Search his ${label}…`;
+  $("memory-search").setAttribute("aria-label", `Search ${label}`);
+  lastArchiveSignature = "";
+  if (currentView === "memories") renderArchive();
+}
+
 function renderArchive() {
   if (!state) return;
   const query = $("memory-search").value.toLowerCase().trim();
   const category = $("memory-filter").value;
+  const signature = JSON.stringify({
+    archiveTab,
+    query,
+    category,
+    archiveLoading,
+    page: archivePage
+      ? [
+          archivePage.query,
+          archivePage.category,
+          archivePage.items.length,
+          archivePage.next_offset,
+        ]
+      : null,
+    memories: state.counts.memories,
+    belief: (state.beliefs || []).at(-1)?.revision,
+    expectation: (state.semantic_expectations || []).at(-1)?.revision,
+    association: (state.associations || [])[0]?.id,
+    dream: (state.dreams || [])[0]?.id,
+    consolidation: (state.consolidations || [])[0]?.id,
+  });
+  if (signature === lastArchiveSignature) return;
+  lastArchiveSignature = signature;
+
+  const matches = (...values) =>
+    !query ||
+    values.some((value) =>
+      String(value || "")
+        .toLowerCase()
+        .includes(query),
+    );
   const remote =
     archivePage &&
     archivePage.query.toLowerCase() === query &&
@@ -396,82 +504,151 @@ function renderArchive() {
     ? memoryPool
     : memoryPool.filter(
         (item) =>
-          (!query || item.text.toLowerCase().includes(query)) &&
+          matches(item.text, item.recalled_text, item.emotional_label) &&
           (category === "all" ||
             category === "archived" ||
             (item.category || "experience") === category),
       );
-  $("archive-count").textContent = remote
-    ? `${items.length} shown · ${archivePage.matching} matching memories · ${archivePage.total} recorded in total · ${archivePage.archived} in cold archive`
-    : `${items.length} matching recent memories · ${state.counts.memories} recorded in total · loading the full archive…`;
+  const expectations = (state.semantic_expectations || []).filter((item) =>
+    matches(item.text, item.predicate),
+  );
+  const beliefs = (state.beliefs || []).filter((item) =>
+    matches(
+      item.subject_id,
+      item.predicate,
+      item.object_value,
+      item.alternative_value,
+    ),
+  );
+  const associations = (state.associations || [])
+    .filter((item) => matches(item.text, item.cue))
+    .slice(0, 20);
+  const dreams = (state.dreams || [])
+    .filter((item) => matches(item.text, item.motif))
+    .slice(0, 20);
+  const consolidations = (state.consolidations || [])
+    .filter((item) => matches(item.text, item.theme_type, item.theme_id))
+    .slice(0, 20);
+
+  if (archiveTab === "memories") {
+    $("archive-count").textContent = remote
+      ? `Showing ${items.length} of ${archivePage.matching} matching ${archivePage.matching === 1 ? "memory" : "memories"}.`
+      : `${items.length} recent ${items.length === 1 ? "memory" : "memories"}; loading the full archive…`;
+  } else if (archiveTab === "dreams") {
+    $("archive-count").textContent =
+      `${dreams.length} ${dreams.length === 1 ? "dream" : "dreams"}${query ? " match this search" : " remembered"}.`;
+  } else {
+    const beliefCount =
+      expectations.length +
+      beliefs.length +
+      associations.length +
+      consolidations.length;
+    $("archive-count").textContent =
+      `${beliefCount} ${beliefCount === 1 ? "belief or association" : "beliefs and associations"}${query ? " match this search" : " currently held"}.`;
+  }
+  $("memory-list").setAttribute("aria-busy", String(archiveLoading));
   $("load-memories").hidden = !remote || archivePage.next_offset == null;
   $("load-memories").disabled = archiveLoading;
   $("load-memories").textContent = archiveLoading
     ? "Loading…"
     : "Load older memories";
-  const expectationMarkup = (state.semantic_expectations || []).length
-    ? `<div class="eyebrow">LEARNED EXPECTATIONS · SUBJECTIVE PATTERNS, NOT FACTS</div>${state.semantic_expectations
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.predicate.replaceAll("_", " ").toUpperCase())}</span><span>${Math.round(item.confidence * 100)}% confidence</span></div><p>${esc(item.text)}</p><div class="memory-source">revision ${item.revision} · inferred from ${item.distinct_days} distinct remembered days · ${item.source_memory_ids.length} source memories</div></article>`,
-        )
-        .join("")}`
-    : "";
-  const beliefMarkup = (state.beliefs || []).length
-    ? `<div class="eyebrow">PATHOS'S BELIEFS · EVIDENCE IS NOT WORLD TRUTH</div>${state.beliefs
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.status.toUpperCase())}</span><span>${Math.round(item.confidence * 100)}% confidence</span></div><p>${esc(item.subject_id)} · ${esc(item.predicate.replaceAll("_", " "))} → ${esc(item.object_value)}${item.alternative_value ? ` / alternative: ${esc(item.alternative_value)}` : ""}</p><div class="memory-source">revision ${item.revision} · ${item.evidence_count} distinct evidence source${item.evidence_count === 1 ? "" : "s"} · latest ${esc(item.last_evidence_id.slice(0, 8))}</div></article>`,
-        )
-        .join("")}`
-    : "";
+
+  const expectationMarkup = expectations
+    .map((item) => {
+      const source = operatorMode
+        ? `revision ${item.revision} · inferred from ${item.distinct_days} distinct remembered days · ${item.source_memory_ids.length} source memories`
+        : `Noticed over ${item.distinct_days} different remembered days.`;
+      return `<article class="memory-card"><div class="memory-meta"><span>LEARNED PATTERN</span><span>${operatorMode ? `${Math.round(item.confidence * 100)}% confidence` : certainty(item.confidence)}</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(source)}</div></article>`;
+    })
+    .join("");
+  const beliefMarkup = beliefs
+    .map((item) => {
+      const source = operatorMode
+        ? `revision ${item.revision} · ${item.evidence_count} distinct evidence source${item.evidence_count === 1 ? "" : "s"} · latest ${item.last_evidence_id.slice(0, 8)}`
+        : "";
+      const body = operatorMode
+        ? `${item.subject_id} · ${words(item.predicate)} → ${item.object_value}${item.alternative_value ? ` / alternative: ${item.alternative_value}` : ""}`
+        : beliefSentence(item);
+      return `<article class="memory-card"><div class="memory-meta"><span>BELIEF</span><span>${operatorMode ? `${Math.round(item.confidence * 100)}% confidence` : certainty(item.confidence)}</span></div><p>${esc(body)}</p><div class="memory-source">${esc(source)}</div></article>`;
+    })
+    .join("");
   $("belief-list").innerHTML = expectationMarkup + beliefMarkup;
-  $("association-list").innerHTML = (state.associations || []).length
-    ? `<div class="eyebrow">SUBJECTIVE ASSOCIATIONS · NOT FACTS</div>${state.associations
-        .slice(0, 8)
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>cue: ${esc(item.cue)}</span><span>${item.surfaced ? "REACHED ATTENTION" : "REMAINED PRIVATE"}</span></div><p>${esc(item.text)}</p><div class="memory-source">linked memory ${esc(item.source_memory_id.slice(0, 8))} · salience ${Math.round(item.salience * 100)}%${item.derived_from_dream ? " · DREAM-DERIVED" : ""}</div></article>`,
-        )
-        .join("")}`
-    : "";
-  $("dream-journal").innerHTML = (state.dreams || []).length
-    ? `<div class="eyebrow">DREAM JOURNAL · FICTIONAL EXPERIENCE</div>${state.dreams
-        .slice(0, 6)
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc((item.motif || "legacy dream").replaceAll("_", " "))}</span><span>${item.seed_count ?? 0} bounded seed${item.seed_count === 1 ? "" : "s"}</span></div><p>${esc(item.text)}</p><div class="memory-source">NOT WORLD FACT · ${(item.seeds || []).length} source link${(item.seeds || []).length === 1 ? "" : "s"} retained</div></article>`,
-        )
-        .join("")}`
-    : "";
-  $("consolidations").innerHTML = (state.consolidations || []).length
-    ? `<div class="eyebrow">SOURCE-LINKED THEMES</div>${state.consolidations
-        .slice(0, 6)
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.theme_type)} · ${esc(item.theme_id)}</span><span>${item.source_count} sources</span></div><p>${esc(item.text)}</p><div class="memory-source">${item.dream_only ? "DREAM-ONLY THEME · NOT FACT" : "DERIVED SUMMARY · NOT INDEPENDENT EVIDENCE"} · confidence ${Math.round(item.confidence * 100)}%</div></article>`,
-        )
-        .join("")}`
-    : "";
-  $("memory-list").innerHTML = items.length
-    ? items
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.archived ? "COLD ARCHIVE · " : ""}${esc((item.category || "experience").toUpperCase())} · ${esc((item.detail_level || "clear").toUpperCase())} · ${Math.round((item.accessibility ?? 1) * 100)}% ACCESSIBLE</span></div><p>${esc(item.recalled_text || item.text)}</p><div class="memory-source">PATHOS FEELS ${Math.round((item.felt_confidence ?? item.confidence ?? 1) * 100)}% CERTAIN · SOURCE RECORD ${Math.round((item.source_confidence ?? item.confidence ?? 1) * 100)}%${esc(item.source || "authored-routine") ? ` · ${esc(item.source || "authored-routine")}` : ""}${item.source_event_id ? ` · linked to event ${esc(item.source_event_id.slice(0, 8))}` : ""}${item.reminder_count ? ` · EXPLICITLY REMINDED ${item.reminder_count}×` : ""}${item.remembered_person_id && item.person_id && item.remembered_person_id !== item.person_id ? ` · REMEMBERS ${esc(item.remembered_person_id.toUpperCase())}, SOURCE SAYS ${esc(item.person_id.toUpperCase())}` : ""}${item.remembered_location_id && item.location_id && item.remembered_location_id !== item.location_id ? ` · REMEMBERS ${esc(item.remembered_location_id.toUpperCase())}, SOURCE PLACE ${esc(item.location_id.toUpperCase())}` : ""}${item.remembered_at && item.simulated_at && item.remembered_at !== item.simulated_at ? ` · REMEMBERS DATE ${esc(date(item.remembered_at))}, SOURCE DATE ${esc(date(item.simulated_at))}` : ""}${(item.emotional_intensity || 0) >= 0.15 ? ` · FELT ${esc((item.emotional_label || "quiet").toUpperCase())} (${Math.round(item.emotional_intensity * 100)}%)` : ""}${item.recalled_text && item.recalled_text !== item.text ? " · SUBJECTIVE RECOLLECTION; SOURCE PRESERVED" : ""}${item.confidence_basis === "familiarity_misattribution" ? " · FAMILIARITY MISTAKEN FOR CERTAINTY" : ""}${item.correction_evidence_id ? ` · CORRECTED FROM DIRECT EVIDENCE ${esc(item.correction_evidence_id.slice(0, 8))}` : ""}${Math.abs(item.affective_bias || 0) >= 0.25 ? " · MOOD-COLORED WHEN RECALLED" : ""}${(item.blended_memory_ids || []).length ? ` · SOURCE-CONFUSED BLEND WITH ${item.blended_memory_ids.length} RELATED MEMORY` : ""}${item.archived ? " · ORIGINAL EVIDENCE RETAINED" : ""}</div></article>`,
-        )
-        .join("")
-    : '<div class="empty">No memories match that search.</div>';
-  $("recall-traces").innerHTML = (state.recalls || []).length
-    ? state.recalls
-        .slice(0, 30)
-        .map((trace) => {
-          const memory = state.memories.find(
-            (item) => item.id === trace.memory_id,
-          );
-          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(trace.simulated_at))} · ${esc(trace.query_source || "context")}</span><span>SCORE ${Number(trace.score || 0).toFixed(3)}</span></div><p>${esc(memory?.recalled_text || memory?.text || `Memory ${trace.memory_id.slice(0, 8)}`)}</p><div class="memory-source">${esc(trace.reason)}<br>lexical ${Number(trace.lexical_score || 0).toFixed(3)} · entities ${Number(trace.entity_score || 0).toFixed(3)} · goals ${Number(trace.goal_score || 0).toFixed(3)} · relationship ${Number(trace.relationship_score || 0).toFixed(3)} · access ${Number(trace.accessibility_score || 0).toFixed(3)} · importance ${Number(trace.importance_score || 0).toFixed(3)} · confidence ${Number(trace.confidence_score || 0).toFixed(3)} · mood ${Number(trace.mood_congruence_score || 0).toFixed(3)}</div></article>`;
+
+  $("association-list").innerHTML = associations
+    .map((item) => {
+      const source = operatorMode
+        ? `linked memory ${item.source_memory_id.slice(0, 8)} · salience ${Math.round(item.salience * 100)}%${item.derived_from_dream ? " · DREAM-DERIVED" : ""}`
+        : item.derived_from_dream
+          ? "This association came from a dream."
+          : "";
+      return `<article class="memory-card"><div class="memory-meta"><span>${esc(words(item.cue).toUpperCase())}</span><span>${item.surfaced ? "CAME TO MIND" : "STAYED PRIVATE"}</span></div><p>${esc(item.text)}</p><div class="memory-source">${esc(source)}</div></article>`;
+    })
+    .join("");
+
+  $("dream-journal").innerHTML = dreams.length
+    ? dreams
+        .map((item) => {
+          const source = operatorMode
+            ? `NOT WORLD FACT · ${(item.seeds || []).length} source link${(item.seeds || []).length === 1 ? "" : "s"} retained`
+            : "";
+          const seed = operatorMode
+            ? `<span>${item.seed_count ?? 0} bounded seed${item.seed_count === 1 ? "" : "s"}</span>`
+            : "";
+          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(words(item.motif || "dream"))}</span>${seed}</div><p>${esc(item.text)}</p><div class="memory-source">${esc(source)}</div></article>`;
         })
         .join("")
-    : "<p>No explicit recall decisions recorded yet.</p>";
+    : '<div class="empty">No dreams match that search.</div>';
+
+  $("consolidations").innerHTML = consolidations
+    .map((item) => {
+      const source = operatorMode
+        ? `${item.dream_only ? "DREAM-ONLY THEME · NOT FACT" : "DERIVED SUMMARY · NOT INDEPENDENT EVIDENCE"} · ${item.source_count} sources · confidence ${Math.round(item.confidence * 100)}%`
+        : item.dream_only
+          ? "This theme comes only from dreams."
+          : `Several memories seem to circle around ${words(item.theme_id)}.`;
+      const body = operatorMode
+        ? item.text
+        : `Pathos has been noticing ${words(item.theme_id)} coming up again.`;
+      return `<article class="memory-card"><div class="memory-meta"><span>RECURRING THEME</span><span>${operatorMode ? esc(words(item.theme_type).toUpperCase()) : ""}</span></div><p>${esc(body)}</p><div class="memory-source">${esc(source)}</div></article>`;
+    })
+    .join("");
+
+  $("memory-list").innerHTML = items.length
+    ? items
+        .map((item) => {
+          const confidence = item.felt_confidence ?? item.confidence ?? 1;
+          const feeling =
+            (item.emotional_intensity || 0) >= 0.25
+              ? ` · felt ${words(item.emotional_label || "something")}`
+              : "";
+          const publicSource = [
+            certainty(confidence),
+            item.detail_level && item.detail_level !== "clear"
+              ? "Only fragments remain."
+              : "",
+            item.archived ? "A faded memory." : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const operatorSource = `PATHOS FEELS ${Math.round(confidence * 100)}% CERTAIN · SOURCE RECORD ${Math.round((item.source_confidence ?? item.confidence ?? 1) * 100)}% · ${item.source || "authored-routine"}${item.source_event_id ? ` · linked to event ${item.source_event_id.slice(0, 8)}` : ""}${item.reminder_count ? ` · EXPLICITLY REMINDED ${item.reminder_count}×` : ""}${item.remembered_person_id && item.person_id && item.remembered_person_id !== item.person_id ? ` · REMEMBERS ${item.remembered_person_id.toUpperCase()}, SOURCE SAYS ${item.person_id.toUpperCase()}` : ""}${item.remembered_location_id && item.location_id && item.remembered_location_id !== item.location_id ? ` · REMEMBERS ${item.remembered_location_id.toUpperCase()}, SOURCE PLACE ${item.location_id.toUpperCase()}` : ""}${item.remembered_at && item.simulated_at && item.remembered_at !== item.simulated_at ? ` · REMEMBERS DATE ${date(item.remembered_at)}, SOURCE DATE ${date(item.simulated_at)}` : ""}${item.recalled_text && item.recalled_text !== item.text ? " · SUBJECTIVE RECOLLECTION; SOURCE PRESERVED" : ""}${item.confidence_basis === "familiarity_misattribution" ? " · FAMILIARITY MISTAKEN FOR CERTAINTY" : ""}${item.correction_evidence_id ? ` · CORRECTED FROM DIRECT EVIDENCE ${item.correction_evidence_id.slice(0, 8)}` : ""}${Math.abs(item.affective_bias || 0) >= 0.25 ? " · MOOD-COLORED WHEN RECALLED" : ""}${(item.blended_memory_ids || []).length ? ` · SOURCE-CONFUSED BLEND WITH ${item.blended_memory_ids.length} RELATED MEMORY` : ""}${item.archived ? " · ORIGINAL EVIDENCE RETAINED" : ""}`;
+          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.archived ? "FADED · " : ""}${esc(categoryLabels[item.category] || words(item.category || "experience"))}${esc(feeling)}</span></div><p>${esc(item.recalled_text || item.text)}</p><div class="memory-source">${esc(operatorMode ? operatorSource : publicSource)}</div></article>`;
+        })
+        .join("")
+    : '<div class="empty">No memories match that search.</div>';
+
+  if (operatorMode) {
+    $("recall-traces").innerHTML = (state.recalls || []).length
+      ? state.recalls
+          .slice(0, 30)
+          .map((trace) => {
+            const memory = state.memories.find(
+              (item) => item.id === trace.memory_id,
+            );
+            return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(trace.simulated_at))} · ${esc(trace.query_source || "context")}</span><span>SCORE ${Number(trace.score || 0).toFixed(3)}</span></div><p>${esc(memory?.recalled_text || memory?.text || `Memory ${trace.memory_id.slice(0, 8)}`)}</p><div class="memory-source">${esc(trace.reason)}<br>lexical ${Number(trace.lexical_score || 0).toFixed(3)} · entities ${Number(trace.entity_score || 0).toFixed(3)} · goals ${Number(trace.goal_score || 0).toFixed(3)} · relationship ${Number(trace.relationship_score || 0).toFixed(3)} · access ${Number(trace.accessibility_score || 0).toFixed(3)} · importance ${Number(trace.importance_score || 0).toFixed(3)} · confidence ${Number(trace.confidence_score || 0).toFixed(3)} · mood ${Number(trace.mood_congruence_score || 0).toFixed(3)}</div></article>`;
+          })
+          .join("")
+      : "<p>No explicit recall decisions recorded yet.</p>";
+  }
 }
 
 async function loadMemoryArchive(reset) {
@@ -658,15 +835,22 @@ function render(next) {
   $("connection-dot").style.background = state.runtime.error
     ? "#e69579"
     : "var(--green)";
+  const displayedTime = new Date(
+    new Date(state.time).getTime() +
+      Number(state.runtime.realtime_pending_seconds || 0) * 1000,
+  ).toISOString();
   $("clock").textContent =
-    `Day ${state.day} · ${date(state.time)} · ${time(state.time)}`;
+    `Day ${state.day} · ${date(displayedTime)} · ${time(displayedTime)}`;
   $("weather").textContent = `${state.weather} · ${state.season}`;
   $("life-status").textContent = state.config.running ? "LIVING" : "PAUSED";
   $("play").innerHTML = state.config.running
     ? "Pause world <span>Ⅱ</span>"
     : "Resume world <span>▷</span>";
   if (document.activeElement !== $("speed"))
-    $("speed").value = state.config.minutes_per_tick;
+    $("speed").value =
+      state.config.clock_mode === "realtime"
+        ? "realtime"
+        : state.config.minutes_per_tick;
   $("feed-live").textContent = state.config.running ? "● LIVE" : "PAUSED";
   $("catch-up").textContent = state.catch_up
     ? "Resume catch-up"
@@ -675,7 +859,9 @@ function render(next) {
   $("worker-status").textContent = state.runtime.worker_alive
     ? state.runtime.working
       ? "Generating next scene…"
-      : "Chronos worker online"
+      : state.config.clock_mode === "realtime"
+        ? "Real-time clock online"
+        : "Accelerated clock online"
     : "Worker stopped";
   $("tick-count").textContent = `${state.runtime.ticks} ticks this session`;
   const jobCounts = state.jobs?.counts || {};
@@ -867,7 +1053,7 @@ function render(next) {
     ? `${state.emotion.label} with ${state.emotion.secondary_label}`
     : state.emotion?.label || state.pathos.mood;
   $("chat-context-location").textContent =
-    `${state.pathos.location} · ${time(state.time)}`;
+    `${state.pathos.location} · ${time(displayedTime)}`;
   const communication = state.communication || {};
   $("chat-availability").textContent =
     communication.status === "in_conversation"
@@ -1029,6 +1215,11 @@ function render(next) {
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("[data-view]");
   if (nav) showView(nav.dataset.view, true);
+  const archiveTarget = event.target.closest("[data-archive-tab]");
+  if (archiveTarget) {
+    selectArchiveTab(archiveTarget.dataset.archiveTab, true);
+    if (archiveTab === "memories") loadMemoryArchive(true);
+  }
   const place = event.target.closest("[data-place]");
   if (place && state) {
     selectedPlace = place.dataset.place;
@@ -1047,21 +1238,11 @@ document.addEventListener("click", (event) => {
 window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
 $("play").addEventListener(
   "click",
-  () =>
-    state &&
-    mutate("/api/control", {
-      running: !state.config.running,
-      minutes_per_tick: Number($("speed").value),
-    }),
+  () => state && mutate("/api/control", clockControl(!state.config.running)),
 );
 $("speed").addEventListener(
   "change",
-  () =>
-    state &&
-    mutate("/api/control", {
-      running: state.config.running,
-      minutes_per_tick: Number($("speed").value),
-    }),
+  () => state && mutate("/api/control", clockControl(state.config.running)),
 );
 $("step").addEventListener("click", async () => {
   if (await mutate("/api/step", { hours: 1 }))
@@ -1090,10 +1271,30 @@ $("cancel-catch-up").addEventListener("click", async () => {
 });
 $("memory-search").addEventListener("input", () => {
   clearTimeout(archiveSearchTimer);
-  archiveSearchTimer = setTimeout(() => loadMemoryArchive(true), 250);
+  archiveSearchTimer = setTimeout(() => {
+    lastArchiveSignature = "";
+    if (archiveTab === "memories") loadMemoryArchive(true);
+    else renderArchive();
+  }, 250);
 });
 $("memory-filter").addEventListener("change", () => loadMemoryArchive(true));
 $("load-memories").addEventListener("click", () => loadMemoryArchive(false));
+document.querySelector(".archive-tabs").addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const tabs = [...document.querySelectorAll("[data-archive-tab]")];
+  const current = tabs.findIndex(
+    (tab) => tab.dataset.archiveTab === archiveTab,
+  );
+  const next =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabs.length - 1
+        : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+          tabs.length;
+  selectArchiveTab(tabs[next].dataset.archiveTab, true);
+});
 $("feed-filter").addEventListener("change", renderEngineFeed);
 $("chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();

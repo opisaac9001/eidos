@@ -74,9 +74,10 @@
         <div class="controls" data-operator-only hidden>
           <label class="sr-only" for="speed">Simulation speed</label
           ><select id="speed">
-            <option value="5">5 min / tick</option>
-            <option value="15" selected>15 min / tick</option>
-            <option value="60">1 hour / tick</option></select
+            <option value="realtime" selected>Real time · 1×</option>
+            <option value="5">Test · 5 min / tick</option>
+            <option value="15">Test · 15 min / tick</option>
+            <option value="60">Test · 1 hour / tick</option></select
           ><button id="step" class="button quiet">+1 hour</button
           ><button id="catch-up" class="button quiet">Let a day pass</button
           ><button id="cancel-catch-up" class="button quiet" hidden>
@@ -345,35 +346,126 @@
       <section id="view-memories" class="view" hidden>
         <div class="archive-toolbar">
           <label class="search"
-            ><span>⌕</span
+            ><span aria-hidden="true">⌕</span
             ><input
               id="memory-search"
               type="search"
+              autocomplete="off"
               placeholder="Search his memories…"
-              aria-label="Search memories" /></label
-          ><select id="memory-filter" aria-label="Memory category">
-            <option value="all">All memories</option>
-            <option value="archived">Cold archive</option>
-            <option value="experience">Daily life</option>
-            <option value="encounter">Encounters</option>
-            <option value="conversation">Conversations</option>
-            <option value="commitment">Commitments</option>
-            <option value="plan-change">Plan changes</option>
-            <option value="accomplishment">Accomplishments</option>
-            <option value="dream">Dream recollections</option></select
-          ><button id="export" class="button quiet">Export history ↓</button>
+              aria-label="Search memories"
+          /></label>
         </div>
-        <div id="archive-count" class="archive-count"></div>
-        <div id="belief-list" class="memory-list"></div>
-        <div id="association-list" class="memory-list"></div>
-        <div id="dream-journal" class="memory-list"></div>
-        <div id="consolidations" class="memory-list"></div>
-        <div id="memory-list" class="memory-list"></div>
-        <div class="archive-actions">
-          <button id="load-memories" class="button quiet" hidden>
-            Load older memories
+        <div
+          class="archive-tabs"
+          role="tablist"
+          aria-label="Things Pathos remembers"
+        >
+          <button
+            id="archive-tab-memories"
+            class="archive-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="archive-panel-memories"
+            tabindex="0"
+            data-archive-tab="memories"
+          >
+            Memories
+          </button>
+          <button
+            id="archive-tab-dreams"
+            class="archive-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="archive-panel-dreams"
+            tabindex="-1"
+            data-archive-tab="dreams"
+          >
+            Dreams
+          </button>
+          <button
+            id="archive-tab-beliefs"
+            class="archive-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="archive-panel-beliefs"
+            tabindex="-1"
+            data-archive-tab="beliefs"
+          >
+            What he believes
           </button>
         </div>
+        <div
+          id="archive-count"
+          class="archive-count"
+          role="status"
+          aria-live="polite"
+        ></div>
+        <section
+          id="archive-panel-memories"
+          class="archive-panel"
+          role="tabpanel"
+          aria-labelledby="archive-tab-memories"
+          tabindex="0"
+        >
+          <h2 class="sr-only">Memories</h2>
+          <div class="archive-controls">
+            <select id="memory-filter" aria-label="Memory category">
+              <option value="all">All memories</option>
+              <option value="archived">Faded memories</option>
+              <option value="experience">Daily life</option>
+              <option value="encounter">Encounters</option>
+              <option value="conversation">Conversations</option>
+              <option value="commitment">Commitments</option>
+              <option value="plan-change">Plan changes</option>
+              <option value="accomplishment">Accomplishments</option>
+              <option value="dream">Dream recollections</option>
+            </select>
+            <button id="export" class="button quiet" data-operator-only hidden>
+              Export full history ↓
+            </button>
+          </div>
+          <div id="memory-list" class="memory-list" aria-busy="false"></div>
+          <div class="archive-actions">
+            <button id="load-memories" class="button quiet" hidden>
+              Load older memories
+            </button>
+          </div>
+        </section>
+        <section
+          id="archive-panel-dreams"
+          class="archive-panel"
+          role="tabpanel"
+          aria-labelledby="archive-tab-dreams"
+          tabindex="0"
+          hidden
+        >
+          <h2 class="sr-only">Dreams</h2>
+          <p class="archive-explainer">Dreams are not things that happened.</p>
+          <div id="dream-journal" class="memory-list"></div>
+        </section>
+        <section
+          id="archive-panel-beliefs"
+          class="archive-panel"
+          role="tabpanel"
+          aria-labelledby="archive-tab-beliefs"
+          tabindex="0"
+          hidden
+        >
+          <h2 class="sr-only">What Pathos believes</h2>
+          <p class="archive-explainer">
+            These are his interpretations and associations, not guaranteed
+            facts.
+          </p>
+          <div id="belief-list" class="memory-list"></div>
+          <div
+            id="association-list"
+            class="memory-list archive-subsection"
+          ></div>
+          <div id="consolidations" class="memory-list archive-subsection"></div>
+        </section>
         <details class="panel call-inspector" data-operator-only hidden>
           <summary>Why memories surfaced</summary>
           <div id="recall-traces" aria-label="Memory recall explanations"></div>

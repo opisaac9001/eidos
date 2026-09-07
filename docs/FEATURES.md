@@ -8,7 +8,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| CORE-01 | Atomic event history, replay, revisions, pause/resume | Built | P0 |
+| CORE-01 | Atomic event history, replay, revisions, pause/resume | Built: ordinary runtime follows real elapsed time at 1×; acceleration and catch-up are explicit operator tools | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/speech/belief/association/travel/relating + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers + restart-safe text/structured proposals and profiles + detached/revalidated Murmur results | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role filtering + speech audience perceptions | P1–P2 |
@@ -108,7 +108,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | UX-01 | Observatory: present state, changes, while-away summary | Partial: daily dashboard with communication-only ordinary surface and separate local operator view | P5 |
 | UX-02 | Conversation: asynchronous messages plus available co-present visits, recall context, interruptions, exits, stream/cancel/retry | Partial: occupied-aware delayed inbox plus start/leave controls, elapsed simulated time, and approaching-obligation context for live visits | P2–P3 |
 | UX-03 | World/people: active scenes, objects, relationships, private/public lenses | Partial: expanding map, neighbors, world threads, attributed outside inspiration, and versioned pack provenance | P3 |
-| UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: complete Pathos-owned archive search/pagination, latest recall context, export, and revision-cursor event API | P2–P5 |
+| UX-04 | Memory explorer: full-history search, provenance, strength, links, revisions | Partial: separate human-facing memory, dream and belief tabs with plain-language uncertainty; complete Pathos-owned archive search/pagination; operator-only provenance/export; and revision-cursor event API | P2–P5 |
 | UX-05 | Calendar/projects: intentions, deadlines, conflicts, progress, changes | Partial: linked projects/promises/calendar/audit view | P3 |
 | UX-06 | Ensemble: traces, recovery, queue, budgets, context/causal inspector | Partial: latest 100 traces | P1 onward |
 | UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Partial: motif/seed journal and waking effects | P4 |

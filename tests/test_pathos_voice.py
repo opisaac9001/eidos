@@ -42,7 +42,7 @@ class PathosVoiceTests(unittest.TestCase):
     def test_unknown_private_fact_gets_a_plain_admission(self):
         reply = self.generate("what private thing did Mara hide?")
 
-        self.assertEqual(reply, "Honestly, no idea. Mara kept that to herself.")
+        self.assertEqual(reply, "Honestly, I don't know. Mara kept that to herself.")
 
 
 if __name__ == "__main__":

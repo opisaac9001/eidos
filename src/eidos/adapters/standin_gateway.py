@@ -19,9 +19,11 @@ class StandInGateway(ModelGateway):
         if role == "pathos":
             message = context.get("message", "").lower()
             if context.get("outreach_reason"):
-                text = f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
+                text = (
+                    f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
+                )
             elif "private thing" in message or "don't know" in message:
-                text = "Honestly, no idea. Mara kept that to herself."
+                text = "Honestly, I don't know. Mara kept that to herself."
             elif any(word in message for word in ("remember", "yesterday", "today", "day")):
                 opening = (
                     "Pretty good, honestly.",

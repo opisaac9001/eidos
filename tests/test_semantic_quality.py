@@ -53,6 +53,15 @@ class SemanticQualityTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_short_casual_dialogue_is_not_mistaken_for_a_broken_completion(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            "Yeah, go on.",
+            {"time": "2026-01-01T14:00:00+00:00", "message": "ok so what happened"},
+        )
+
+        self.assertEqual(findings, [])
+
     def test_required_uncertainty_language_is_role_specific(self):
         context = {
             "required_any_by_role": {
