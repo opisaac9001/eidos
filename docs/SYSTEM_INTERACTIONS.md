@@ -433,6 +433,9 @@ attendance. Its first activation can create one small source-linked anticipatory
 appraisal. Companionship and personal purpose may make it pleasant; obligation, low
 energy, poor rest, and high arousal may make it pressured or mixed. Later hourly
 prospective pulses do not repeatedly reapply that emotion.
+If that same plan is later canceled, its prior tone—not a universal rule about
+cancellation—determines a small disappointment or relief appraisal. A plan that never
+entered Pathos's prospective awareness has no assumed emotional consequence.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.
 Hourly emotion samples interpret replayed valence, arousal and duration into states

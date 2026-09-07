@@ -216,7 +216,7 @@ def _emotion_source_summary(event: DomainEvent | None) -> str:
     """Describe only the experience Pathos appraised, without inventing a cause."""
     if event is None:
         return "An earlier experience affected him."
-    for key in ("text", "description", "outcome", "reason", "title"):
+    for key in ("text", "description", "outcome", "reason", "title", "focus_text"):
         value = event.payload.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()[:220]

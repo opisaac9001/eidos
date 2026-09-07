@@ -248,6 +248,29 @@ def _effect(
             0.25 + 0.3 * float(activation),
             0.55,
         )
+    if event.kind == "schedule.cancelled":
+        schedule_id = event.payload.get("schedule_id")
+        anticipated = next(
+            (
+                item
+                for item in reversed(history)
+                if item.kind == "mind.layer_pulsed"
+                and item.payload.get("layer") == "prospective"
+                and item.payload.get("focus_id") == schedule_id
+                and isinstance(item.payload.get("anticipatory_valence"), (int, float))
+                and not isinstance(item.payload.get("anticipatory_valence"), bool)
+            ),
+            None,
+        )
+        if anticipated is not None:
+            anticipated_tone = float(anticipated.payload["anticipatory_valence"])
+            return (
+                "affect",
+                0.0,
+                max(-0.22, min(0.18, round(-0.8 * anticipated_tone, 3))),
+                0.38,
+                0.55,
+            )
     if event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine":
         location = event.payload.get("location_id")
         if not isinstance(location, str):

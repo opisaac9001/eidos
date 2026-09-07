@@ -97,6 +97,80 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(repeated, [])
         self.assertEqual(unchanged, affected)
 
+    def test_cancellation_feels_like_disappointment_or_relief_from_prior_anticipation(self):
+        def prospective(tone: float, schedule_id: str) -> DomainEvent:
+            return DomainEvent(
+                "mind.layer_pulsed",
+                "pathos",
+                {
+                    "pulse_id": f"prospective-{schedule_id}",
+                    "layer": "prospective",
+                    "mode": "background",
+                    "focus_type": "planned_activity",
+                    "focus_id": schedule_id,
+                    "focus_text": "A changeable future plan",
+                    "activation": 0.6,
+                    "anticipatory_valence": tone,
+                    "simulated_at": self.now.isoformat(),
+                    "action_authority": False,
+                },
+            )
+
+        pleasant = prospective(0.25, "pleasant")
+        pleasant_cancelled = DomainEvent(
+            "schedule.cancelled",
+            "pathos",
+            {
+                "schedule_id": "pleasant",
+                "reason": "The other person could not make it.",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        pressured = prospective(-0.2, "pressured")
+        pressured_cancelled = DomainEvent(
+            "schedule.cancelled",
+            "pathos",
+            {
+                "schedule_id": "pressured",
+                "reason": "The obligation was lifted.",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        appraisals, _ = appraisal_events(
+            [pleasant, pleasant_cancelled, pressured, pressured_cancelled],
+            PathosState(),
+            self.now,
+        )
+        by_source = {
+            event.payload["source_event_id"]: event
+            for event in appraisals
+            if event.kind == "appraisal.recorded"
+        }
+
+        self.assertLess(
+            by_source[str(pleasant_cancelled.event_id)].payload["desirability"], 0
+        )
+        self.assertGreater(
+            by_source[str(pressured_cancelled.event_id)].payload["desirability"], 0
+        )
+
+    def test_unanticipated_cancellation_has_no_assumed_emotional_meaning(self):
+        cancelled = DomainEvent(
+            "schedule.cancelled",
+            "pathos",
+            {
+                "schedule_id": "unnoticed",
+                "reason": "The plan changed.",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        events, unchanged = appraisal_events([cancelled], PathosState(), self.now)
+
+        self.assertEqual(events, [])
+        self.assertEqual(unchanged, PathosState())
+
     def test_unperceived_world_fact_does_not_change_pathos_but_owned_memory_does(self):
         occurred = DomainEvent(
             "world_event.occurred",
