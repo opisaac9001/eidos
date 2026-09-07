@@ -38,6 +38,7 @@ async def autonomous_activity_events(
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
     self_concepts: Sequence[Mapping[str, object]] = (),
+    habits: Sequence[Mapping[str, object]] = (),
     known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""
@@ -84,6 +85,7 @@ async def autonomous_activity_events(
         "recent_memories": list(memories[-8:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
+        "habits": list(habits[-6:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,
@@ -109,7 +111,8 @@ async def autonomous_activity_events(
         ],
         "permission": (
             "Invent one specific, ordinary activity Pathos might genuinely choose. Let his current "
-            "attention matter without treating it as a command. The activity "
+            "attention matter without treating it as a command. Habits are soft rhythms: he may "
+            "return to one, vary it, or choose against it. The activity "
             "type is open vocabulary. This is only a proposal: do not say it happened, spend money, "
             "create possessions, or guarantee another person's attendance. Use none when no object "
             "or companion is needed."
@@ -117,7 +120,7 @@ async def autonomous_activity_events(
     }
     request = ModelRequest(
         capability="pathos_agency",
-        task_version="1",
+        task_version="2",
         temperature=0.9,
         max_output_tokens=320,
         output_schema=agency_output_schema(list(places), list(resources), list(people)),

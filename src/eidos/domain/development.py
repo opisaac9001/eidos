@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Mapping, Sequence
 
@@ -23,6 +24,13 @@ class Habit:
     strength: float
     repetitions: int
     last_source_id: str
+    activity_type: str | None = None
+    location_id: str | None = None
+    time_band: str | None = None
+    status: str = "active"
+    revision: int = 1
+    updated_at: str | None = None
+    last_evidence_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,13 +47,50 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
     skills: dict[str, Skill] = {}
     habits: dict[str, Habit] = {}
     used_sources: set[str] = set()
+    seen: dict[str, DomainEvent] = {}
     for event in history:
-        if event.kind not in {"skill.practiced", "habit.reinforced"}:
+        if event.kind not in {
+            "skill.practiced",
+            "habit.formed",
+            "habit.reinforced",
+            "habit.lapsed",
+            "habit.reactivated",
+        }:
+            seen[str(event.event_id)] = event
+            continue
+        if event.kind.startswith("habit.") and event.aggregate_id != "pathos":
+            raise ValueError("Habits belong to Pathos")
+        if event.kind == "habit.lapsed":
+            habit_id = _required(event, "habit_id")
+            current_habit = habits.get(habit_id)
+            if current_habit is None or current_habit.status != "active":
+                raise ValueError("Only an active habit can lapse")
+            revision = _integer(event, "revision")
+            if revision != current_habit.revision + 1:
+                raise ValueError("Habit revision must be sequential")
+            changed_at = _time(event, "simulated_at")
+            last_evidence = _parsed(current_habit.last_evidence_at)
+            if last_evidence is None or changed_at - last_evidence < timedelta(days=45):
+                raise ValueError("A habit cannot lapse before forty-five days of disuse")
+            habits[habit_id] = replace(
+                current_habit,
+                status="lapsed",
+                strength=round(max(0.1, current_habit.strength - 0.15), 4),
+                revision=revision,
+                updated_at=changed_at.isoformat(),
+            )
+            seen[str(event.event_id)] = event
             continue
         source_id = _required(event, "source_event_id")
-        if source_id in used_sources:
+        rich_habit = event.kind.startswith("habit.") and isinstance(
+            event.payload.get("activity_type"), str
+        )
+        if event.kind in {"habit.formed", "habit.reactivated"} and not rich_habit:
+            raise ValueError("Contextual habit events require their lived signature")
+        if source_id in used_sources and not rich_habit:
             raise ValueError("Development evidence cannot be applied twice")
-        used_sources.add(source_id)
+        if not rich_habit:
+            used_sources.add(source_id)
         delta = _bounded(event, "delta", 0.0, 0.1)
         if event.kind == "skill.practiced":
             skill_id = _required(event, "skill_id")
@@ -60,7 +105,7 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
                     last_source_id=source_id,
                 )
             )
-        else:
+        elif not rich_habit:
             habit_id = _required(event, "habit_id")
             current_habit = habits.get(habit_id)
             habits[habit_id] = (
@@ -73,6 +118,102 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
                     last_source_id=source_id,
                 )
             )
+        else:
+            habit_id = _required(event, "habit_id")
+            activity_type = _required(event, "activity_type")
+            location_id = _required(event, "location_id")
+            time_band = _required(event, "time_band")
+            if time_band not in {"morning", "afternoon", "evening"}:
+                raise ValueError("Habit time band is invalid")
+            if habit_id != f"habit:{activity_type}:{location_id}:{time_band}":
+                raise ValueError("Habit identity must derive from its lived context")
+            current_habit = habits.get(habit_id)
+            expected_kind = (
+                "habit.formed"
+                if current_habit is None
+                else "habit.reactivated"
+                if current_habit.status == "lapsed"
+                else "habit.reinforced"
+            )
+            if event.kind != expected_kind:
+                raise ValueError("Habit event kind does not match its lifecycle")
+            revision = _integer(event, "revision")
+            if revision != (1 if current_habit is None else current_habit.revision + 1):
+                raise ValueError("Habit revision must be sequential")
+            source_count = _integer(event, "source_count")
+            minimum = 2 if event.kind == "habit.reactivated" else 3
+            if not minimum <= source_count <= 8:
+                raise ValueError("Habit evidence count is outside policy")
+            source_ids = [
+                _required(event, f"source_event_{position}")
+                for position in range(1, source_count + 1)
+            ]
+            if len(set(source_ids)) != len(source_ids) or source_id != source_ids[-1]:
+                raise ValueError("Habit evidence must be distinct and end at its latest source")
+            sources = [seen.get(item) for item in source_ids]
+            if any(source is None for source in sources):
+                raise ValueError("Habit evidence must already exist")
+            typed_sources = [source for source in sources if source is not None]
+            if any(
+                _habit_signature(source) != (activity_type, location_id, time_band)
+                for source in typed_sources
+            ):
+                raise ValueError("Habit evidence does not match the claimed rhythm")
+            source_times = [_time(source, "simulated_at") for source in typed_sources]
+            if len({item.date() for item in source_times}) != len(source_times):
+                raise ValueError("Habit evidence must come from distinct days")
+            if max(source_times) - min(source_times) < timedelta(days=7):
+                raise ValueError("Habit evidence must span at least one week")
+            changed_at = _time(event, "simulated_at")
+            if max(source_times) > changed_at:
+                raise ValueError("Habit evidence cannot come from the future")
+            if changed_at - min(source_times) > timedelta(days=60):
+                raise ValueError("Habit evidence must be recent")
+            if current_habit is not None:
+                if (activity_type, location_id, time_band) != (
+                    current_habit.activity_type,
+                    current_habit.location_id,
+                    current_habit.time_band,
+                ):
+                    raise ValueError("A habit revision cannot change its identity")
+                previous_update = _parsed(current_habit.updated_at)
+                if previous_update is None or changed_at - previous_update < timedelta(days=14):
+                    raise ValueError("Habit changes must be at least fourteen days apart")
+                last_evidence = _parsed(current_habit.last_evidence_at)
+                if last_evidence is None or min(source_times) <= last_evidence:
+                    raise ValueError("Habit reinforcement requires wholly new evidence")
+            strength = round(
+                min(
+                    1.0,
+                    (0.2 if current_habit is None else current_habit.strength) + delta,
+                ),
+                4,
+            )
+            expected_delta = (
+                0.1
+                if event.kind == "habit.formed"
+                else 0.08
+                if event.kind == "habit.reactivated"
+                else 0.05
+            )
+            if delta != expected_delta:
+                raise ValueError("Habit strength change must match its lifecycle")
+            habits[habit_id] = Habit(
+                habit_id=habit_id,
+                strength=strength,
+                repetitions=(0 if current_habit is None else current_habit.repetitions)
+                + source_count,
+                last_source_id=source_id,
+                activity_type=activity_type,
+                location_id=location_id,
+                time_band=time_band,
+                status="active",
+                revision=revision,
+                updated_at=changed_at.isoformat(),
+                last_evidence_at=max(source_times).isoformat(),
+            )
+            used_sources.update(source_ids)
+        seen[str(event.event_id)] = event
     return DevelopmentState(skills, habits)
 
 
@@ -91,3 +232,46 @@ def _bounded(event: DomainEvent, key: str, lower: float, upper: float) -> float:
     if not lower < result <= upper:
         raise ValueError(f"{key} must be greater than {lower} and at most {upper}")
     return result
+
+
+def _integer(event: DomainEvent, key: str) -> int:
+    value = event.payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{key} must be a positive integer")
+    return value
+
+
+def _time(event: DomainEvent, key: str) -> datetime:
+    value = event.payload.get(key)
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be an ISO timestamp")
+    parsed = datetime.fromisoformat(value)
+    if parsed.utcoffset() is None:
+        raise ValueError(f"{key} must be timezone-aware")
+    return parsed
+
+
+def _parsed(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value)
+    if parsed.utcoffset() is None:
+        raise ValueError("Habit state time must be timezone-aware")
+    return parsed
+
+
+def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
+    if event.kind != "agency.activity_realized" or event.aggregate_id != "pathos":
+        return None
+    activity_type = event.payload.get("activity_type")
+    location_id = event.payload.get("location_id")
+    value = event.payload.get("simulated_at")
+    if not isinstance(activity_type, str) or not isinstance(location_id, str) or not isinstance(
+        value, str
+    ):
+        return None
+    at = datetime.fromisoformat(value)
+    if at.utcoffset() is None:
+        return None
+    band = "morning" if at.hour < 12 else "afternoon" if at.hour < 18 else "evening"
+    return activity_type, location_id, band

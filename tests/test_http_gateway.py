@@ -195,6 +195,15 @@ class GatewayTests(unittest.TestCase):
                                     "epistemic_status": "subjective_self_interpretation",
                                 }
                             ],
+                            "habits": [
+                                {
+                                    "activity_type": "sketching_walk",
+                                    "location_id": "park",
+                                    "time_band": "morning",
+                                    "strength": 0.3,
+                                    "authority": "soft_pattern_only",
+                                }
+                            ],
                             "known_places": {"home": {"name": "Home"}},
                             "calendar": [],
                             "private_operator_field": "must not pass",
@@ -220,7 +229,9 @@ class GatewayTests(unittest.TestCase):
             context["self_concepts"][0]["epistemic_status"],
             "subjective_self_interpretation",
         )
+        self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
         self.assertIn("slowly learned preferences", self.payload["messages"][0]["content"])
+        self.assertIn("not obligations", self.payload["messages"][0]["content"])
         self.assertIn("not world facts", self.payload["messages"][0]["content"])
         self.assertNotIn("private_operator_field", context)
 

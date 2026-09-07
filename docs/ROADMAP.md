@@ -225,6 +225,10 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   be reinforced or revised after contradictory experience, is shown with confidence
   and source outcomes, and may affect voice or motivation without becoming a fixed
   trait or an objective verdict about him.
+- Voluntary activities repeated on distinct days over at least a week can form a
+  contextual habit keyed by activity, place, and part of day. It is a soft planning
+  influence rather than a schedule: new evidence may strengthen it, forty-five days
+  of disuse makes it lapse, and later lived repetition can reactivate it.
 - Show why a memory was selected and distinguish what happened from what is recalled.
 
 Exit: an old relevant promise outranks unrelated recent chatter; ordinary details
@@ -396,7 +400,7 @@ Beautiful prose with contradictory consequences does not pass.
 Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 
 - Tune saturation, retrieval bias, emotional feedback, remaining trait drift,
-  relationship recovery, skills, habits, recurring events, physical episode pacing
+  relationship recovery, skills, competing habits, recurring events, physical episode pacing
   and ongoing projects.
 - An apology now opens a source-linked repair attempt whose other-party response stays
   unknown. At most three later direct contacts can gently reduce Pathos's own tension

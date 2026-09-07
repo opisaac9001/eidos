@@ -138,7 +138,10 @@ const labels = {
   "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
   "conversation.time_elapsed": "TIME PASSED IN CONVERSATION",
   "skill.practiced": "SKILL PRACTICE",
-  "habit.reinforced": "A HABIT FORMED",
+  "habit.formed": "A RHYTHM TOOK SHAPE",
+  "habit.reinforced": "A RHYTHM STRENGTHENED",
+  "habit.lapsed": "A RHYTHM FADED",
+  "habit.reactivated": "A RHYTHM RETURNED",
   "dream.recalled": "A DREAM REMEMBERED",
   "memory.reminded": "A MEMORY WAS REMINDED",
   "memory.correction_resisted": "A CONTRADICTION FELT UNCONVINCING",
@@ -689,8 +692,12 @@ function render(next) {
     .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)
     .join(" · ");
   const selfView = state.self_concepts?.[0];
+  const activeHabits = (state.habits || [])
+    .filter((habit) => habit.status === "active" && habit.activity_type)
+    .slice(0, 2)
+    .map((habit) => `${habit.activity_type.replaceAll("_", " ")} in the ${habit.time_band}`);
   $("preferences-summary").textContent = preferences.length
-    ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}${selfView ? ` · Current self-view: ${selfView.text} (${Math.round(selfView.confidence * 100)}% confidence)` : ""}`
+    ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}${activeHabits.length ? ` · Familiar rhythms: ${activeHabits.join(" · ")}` : ""}${selfView ? ` · Current self-view: ${selfView.text} (${Math.round(selfView.confidence * 100)}% confidence)` : ""}`
     : "Preferences are still taking shape…";
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);

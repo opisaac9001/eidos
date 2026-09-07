@@ -38,6 +38,7 @@ async def autonomous_project_events(
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
     self_concepts: Sequence[Mapping[str, object]] = (),
+    habits: Sequence[Mapping[str, object]] = (),
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
@@ -82,6 +83,7 @@ async def autonomous_project_events(
         "recent_memories": list(memories[-10:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
+        "habits": list(habits[-6:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,
@@ -106,14 +108,15 @@ async def autonomous_project_events(
         ],
         "permission": (
             "Invent one coherent two-to-four-step ordinary project. Let his current attention "
-            "matter without treating it as a command. Each step must be "
+            "matter without treating it as a command. Habits are soft rhythms that may be "
+            "continued, varied, or deliberately broken. Each step must be "
             "distinct and chronological. Propose only: do not claim progress, spend money, "
             "create possessions, or guarantee success."
         ),
     }
     request = ModelRequest(
         capability="pathos_project",
-        task_version="1",
+        task_version="2",
         temperature=0.9,
         max_output_tokens=520,
         output_schema=self_project_output_schema(list(places), list(resources)),

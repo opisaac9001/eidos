@@ -196,6 +196,15 @@ class AgencyTests(unittest.TestCase):
                         "epistemic_status": "subjective_self_interpretation",
                     }
                 ],
+                habits=[
+                    {
+                        "activity_type": "sketching_walk",
+                        "location_id": "park",
+                        "time_band": "morning",
+                        "strength": 0.3,
+                        "authority": "soft_pattern_only",
+                    }
+                ],
                 known_person_ids=frozenset({"mara"}),
             )
         )
@@ -210,6 +219,7 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(set(context["known_people"]), {"mara"})
         self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
         self.assertEqual(context["self_concepts"][0]["confidence"], 0.55)
+        self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
 
 
 if __name__ == "__main__":
