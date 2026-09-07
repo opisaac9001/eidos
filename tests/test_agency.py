@@ -324,6 +324,59 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(link.payload["activity_schedule_id"], schedule.payload["schedule_id"])
         self.assertEqual(link.causation_id, schedule.event_id)
 
+    def test_stand_in_dream_possibility_must_pass_through_ordinary_planning(self):
+        at = datetime(2026, 1, 11, 10, tzinfo=timezone.utc)
+        inspiration = DomainEvent(
+            "dream.inspiration_considered",
+            "pathos",
+            {
+                "source_dream_id": "dream-growth",
+                "motif": "growth",
+                "suggestion": "Consider spending attentive time outdoors.",
+                "expires_at": (at + timedelta(hours=2)).isoformat(),
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": (at - timedelta(hours=1)).isoformat(),
+            },
+        )
+        workspace = [
+            {
+                "source_event_id": str(inspiration.event_id),
+                "from_faculty": "oneiros",
+                "kind": "dream_inspiration",
+                "content": inspiration.payload["suggestion"],
+                "epistemic_status": "fiction_sourced_possibility",
+                "action_authority": False,
+            }
+        ]
+
+        events = asyncio.run(
+            autonomous_activity_events(
+                [inspiration],
+                at,
+                1,
+                CapturingStandIn(),
+                planning=PlanningState(),
+                catalog=project_world_catalog([]),
+                needs={"rest": 0.7, "connection": 0.6, "curiosity": 0.7},
+                emotion={"label": "quiet", "valence": 0.1},
+                values={"curiosity": 0.8},
+                preferences=(),
+                traits={"openness": 0.68},
+                memories=(),
+                workspace=workspace,
+            )
+        )
+
+        proposed = next(event for event in events if event.kind == "agency.activity_proposed")
+        accepted = next(event for event in events if event.kind == "agency.activity_accepted")
+        linked = next(event for event in events if event.kind == "dream.inspiration_plan_linked")
+        self.assertEqual(proposed.payload["activity_type"], "street_texture_walk")
+        self.assertEqual(linked.causation_id, accepted.event_id)
+        self.assertEqual(linked.payload["source_dream_id"], "dream-growth")
+        self.assertTrue(linked.payload["fiction_source"])
+        self.assertFalse(linked.payload["action_authority"])
+
 
 if __name__ == "__main__":
     unittest.main()

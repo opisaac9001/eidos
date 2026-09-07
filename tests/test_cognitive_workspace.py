@@ -97,6 +97,36 @@ class CognitiveWorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cognitive_workspace(history, self.now, limit=0)
 
+    def test_live_dream_possibility_keeps_one_bounded_workspace_slot(self):
+        inspiration = DomainEvent(
+            "dream.inspiration_considered",
+            "pathos",
+            {
+                "source_dream_id": "dream-growth",
+                "motif": "growth",
+                "suggestion": "Consider spending attentive time outdoors.",
+                "expires_at": (self.now + timedelta(hours=2)).isoformat(),
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        history = [
+            self.event("concern.opened", "A pressing concern", concern_id="pressing"),
+            self.event("reflection.recorded", "A recent interpretation"),
+            self.event("association.formed", "A salient association", salience=0.8),
+            self.event("thought.recorded", "A current thought", salience=0.75),
+            inspiration,
+        ]
+
+        workspace = cognitive_workspace(history, self.now, limit=4)
+
+        dream = next(item for item in workspace if item["kind"] == "dream_inspiration")
+        self.assertEqual(len(workspace), 4)
+        self.assertEqual(dream["source_event_id"], str(inspiration.event_id))
+        self.assertEqual(dream["epistemic_status"], "fiction_sourced_possibility")
+        self.assertFalse(dream["action_authority"])
+
 
 if __name__ == "__main__":
     unittest.main()

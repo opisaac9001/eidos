@@ -695,6 +695,17 @@ class StandInGateway(ModelGateway):
                 ),
                 None,
             )
+            dream_possibility = next(
+                (
+                    item
+                    for item in context.get("cognitive_workspace", [])
+                    if isinstance(item, dict)
+                    and item.get("kind") == "dream_inspiration"
+                    and item.get("epistemic_status") == "fiction_sourced_possibility"
+                    and item.get("action_authority") is False
+                ),
+                None,
+            )
             activity_palette = (
                 (
                     "street_texture_walk",
@@ -769,8 +780,8 @@ class StandInGateway(ModelGateway):
                     0.51,
                 ),
             )
-            agency_item = (
-                (
+            if planning_question is not None:
+                agency_item = (
                     "plan_reconsideration",
                     "Make some quiet room to reconsider a plan",
                     str(planning_question.get("content", "Decide what still fits.")),
@@ -782,9 +793,22 @@ class StandInGateway(ModelGateway):
                     1,
                     0.62,
                 )
-                if planning_question is not None
-                else activity_palette[choice % len(activity_palette)]
-            )
+            elif dream_possibility is not None:
+                dream_text = str(dream_possibility.get("content", "")).casefold()
+                dream_choice = (
+                    2
+                    if "repair" in dream_text or "mending" in dream_text
+                    else 0
+                    if "outdoor" in dream_text or "growth" in dream_text
+                    else 4
+                    if ("social" in dream_text or "companionship" in dream_text) and people
+                    else 3
+                    if "unscheduled" in dream_text
+                    else 5
+                )
+                agency_item = activity_palette[dream_choice]
+            else:
+                agency_item = activity_palette[choice % len(activity_palette)]
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
             return ModelResponse(
                 content=json.dumps(

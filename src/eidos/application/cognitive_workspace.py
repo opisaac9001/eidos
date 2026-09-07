@@ -157,6 +157,28 @@ def cognitive_workspace(
         selected.append(item)
         if len(selected) == limit:
             break
+    live_dream = next(
+        (item for _, _, item in candidates if item.get("kind") == "dream_inspiration"), None
+    )
+    if (
+        limit >= 4
+        and live_dream is not None
+        and not any(item.get("kind") == "dream_inspiration" for item in selected)
+    ):
+        oneiros_index = next(
+            (
+                index
+                for index in range(len(selected) - 1, -1, -1)
+                if selected[index].get("from_faculty") == "oneiros"
+            ),
+            None,
+        )
+        if oneiros_index is not None:
+            selected[oneiros_index] = live_dream
+        elif len(selected) == limit:
+            selected[-1] = live_dream
+        else:
+            selected.append(live_dream)
     return selected
 
 

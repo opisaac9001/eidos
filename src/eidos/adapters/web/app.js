@@ -209,6 +209,10 @@ const labels = {
   "schedule.cancellation_rejected": "AN OPTIONAL PLAN COULD NOT BE RELEASED",
   "schedule.retimed": "PLAN RETIMED",
   "dream.inspiration_considered": "A DREAM-LINKED POSSIBILITY",
+  "dream.inspiration_plan_linked": "A DREAM POSSIBILITY ENTERED PLANNING",
+  "dream.inspiration_plan_realized": "A DREAM-LINKED IDEA WAS LIVED",
+  "dream.inspiration_plan_failed": "A DREAM-LINKED PLAN FELL THROUGH",
+  "dream.inspiration_dismissed": "A DREAM POSSIBILITY LEFT ATTENTION",
 };
 const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],

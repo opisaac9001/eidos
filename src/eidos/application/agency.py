@@ -9,6 +9,7 @@ from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
 from eidos.domain.agency import (
     agency_output_schema,
     parse_agency_candidate,
@@ -77,10 +78,11 @@ async def autonomous_activity_events(
         for place in catalog.places.values()
     }
     attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
+    planning_workspace = dream_planning_workspace(history, workspace, simulated_at)
     planning_question = next(
         (
             item
-            for item in workspace
+            for item in planning_workspace
             if item.get("epistemic_status") == "planning_question"
             and item.get("action_authority") is False
         ),
@@ -99,7 +101,7 @@ async def autonomous_activity_events(
         "self_concepts": list(self_concepts[-4:]),
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
-        "cognitive_workspace": list(workspace[-12:]),
+        "cognitive_workspace": list(planning_workspace[-12:]),
         "recent_activity_patterns": recent_activity_patterns,
         "current_attention": (
             {
@@ -268,6 +270,9 @@ async def autonomous_activity_events(
                     correlation_id=str(source_id),
                 )
             )
+    output.extend(
+        dream_plan_link_events(history, planning_workspace, resolution.events, simulated_at)
+    )
     return output
 
 

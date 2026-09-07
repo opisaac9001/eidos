@@ -87,7 +87,11 @@ async def autonomous_project_events(
         "self_concepts": list(self_concepts[-4:]),
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
-        "cognitive_workspace": list(workspace[-12:]),
+        # Multi-step project lineage is separate work; dream possibilities may
+        # influence only the auditable one-activity path for now.
+        "cognitive_workspace": [
+            item for item in workspace[-12:] if item.get("kind") != "dream_inspiration"
+        ],
         "current_attention": (
             {
                 "focus_type": attention.focus_type,

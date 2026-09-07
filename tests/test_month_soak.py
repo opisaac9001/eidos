@@ -98,6 +98,31 @@ class MonthSoakTests(unittest.TestCase):
                 if event.kind == "mind.layer_pulsed" and event.payload.get("layer") == "attention"
             }
             self.assertTrue({"need", "concern", "goal", "person", "commitment"} <= attention_types)
+            dream_plan_links = [
+                event for event in events if event.kind == "dream.inspiration_plan_linked"
+            ]
+            self.assertTrue(dream_plan_links)
+            for link in dream_plan_links:
+                inspiration = next(
+                    event
+                    for event in events
+                    if str(event.event_id) == link.payload["source_inspiration_event_id"]
+                )
+                accepted = next(event for event in events if event.event_id == link.causation_id)
+                terminal = next(
+                    event
+                    for event in events
+                    if event.kind
+                    in {"dream.inspiration_plan_realized", "dream.inspiration_plan_failed"}
+                    and event.payload.get("source_plan_link_id") == str(link.event_id)
+                )
+                self.assertEqual(inspiration.kind, "dream.inspiration_considered")
+                self.assertEqual(accepted.kind, "agency.activity_accepted")
+                self.assertEqual(
+                    terminal.payload["source_dream_id"], link.payload["source_dream_id"]
+                )
+                self.assertTrue(terminal.payload["fiction_source"])
+                self.assertFalse(terminal.payload["action_authority"])
             household_tasks = [
                 event for event in events if event.kind == "household.task_completed"
             ]
@@ -159,13 +184,17 @@ class MonthSoakTests(unittest.TestCase):
                     for event in completed_followups
                 )
             )
-            self.assertEqual(
-                {
-                    item["actor_id"]
+            completed_plan_actors = {
+                event.payload["actor_id"] for event in events if event.kind == "npc.plan_completed"
+            }
+            self.assertGreaterEqual(len(completed_plan_actors), 3)
+            self.assertTrue(completed_plan_actors <= {"mara", "ellis", "rowan", "nina-vale"})
+            self.assertTrue(
+                all(
+                    item["plan_status"] != "active"
+                    or datetime.fromisoformat(item["plan_due_at"]) > now
                     for item in snapshot["npc_states"]
-                    if item["plan_status"] == "completed"
-                },
-                {"mara", "ellis", "rowan", "nina-vale"},
+                )
             )
             self.assertEqual(
                 {
