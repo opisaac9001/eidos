@@ -281,6 +281,42 @@ class AgencyTests(unittest.TestCase):
         self.assertFalse(context["cognitive_workspace"][0]["action_authority"])
         self.assertEqual(gateway.requests[0].task_version, "3")
 
+    def test_stand_in_can_turn_a_reflective_question_into_time_to_reconsider(self):
+        at = datetime(2026, 1, 11, 10, tzinfo=timezone.utc)
+        gateway = CapturingStandIn()
+
+        events = asyncio.run(
+            autonomous_activity_events(
+                [],
+                at,
+                0,
+                gateway,
+                planning=PlanningState(),
+                catalog=project_world_catalog([]),
+                needs={"rest": 0.7, "connection": 0.4, "curiosity": 0.6},
+                emotion={"label": "uneasy", "valence": -0.2},
+                values={"responsibility": 0.8},
+                preferences=(),
+                traits={"openness": 0.68},
+                memories=(),
+                workspace=[
+                    {
+                        "from_faculty": "reflection",
+                        "content": "Should I repair, renegotiate, or release this commitment?",
+                        "epistemic_status": "planning_question",
+                        "target_type": "commitment",
+                        "target_id": "help-rowan",
+                        "action_authority": False,
+                    }
+                ],
+            )
+        )
+
+        proposal = next(event for event in events if event.kind == "agency.activity_proposed")
+        self.assertEqual(proposal.payload["activity_type"], "plan_reconsideration")
+        self.assertIn("reconsider", str(proposal.payload["title"]).lower())
+        self.assertIn("schedule.created", {event.kind for event in events})
+
 
 if __name__ == "__main__":
     unittest.main()

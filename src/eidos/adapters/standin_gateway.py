@@ -646,6 +646,16 @@ class StandInGateway(ModelGateway):
         elif role == "pathos_agency":
             places = context["known_places"]
             people = context["known_people"]
+            planning_question = next(
+                (
+                    item
+                    for item in context.get("cognitive_workspace", [])
+                    if isinstance(item, dict)
+                    and item.get("epistemic_status") == "planning_question"
+                    and item.get("action_authority") is False
+                ),
+                None,
+            )
             activity_palette = (
                 (
                     "street_texture_walk",
@@ -720,7 +730,22 @@ class StandInGateway(ModelGateway):
                     0.51,
                 ),
             )
-            agency_item = activity_palette[choice % len(activity_palette)]
+            agency_item = (
+                (
+                    "plan_reconsideration",
+                    "Make some quiet room to reconsider a plan",
+                    str(planning_question.get("content", "Decide what still fits.")),
+                    "work",
+                    "home",
+                    "none",
+                    "none",
+                    24,
+                    1,
+                    0.62,
+                )
+                if planning_question is not None
+                else activity_palette[choice % len(activity_palette)]
+            )
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
             return ModelResponse(
                 content=json.dumps(

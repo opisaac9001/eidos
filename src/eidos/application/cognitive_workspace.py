@@ -28,6 +28,12 @@ def cognitive_workspace(
             timedelta(days=3),
             0.72,
         ),
+        "reflection.reconsideration_raised": (
+            "reflection",
+            "planning_question",
+            timedelta(hours=48),
+            0.82,
+        ),
         "dream.recalled": ("oneiros", "dream_fragment", timedelta(hours=24), 0.55),
     }
     for event in history:
@@ -48,18 +54,20 @@ def cognitive_workspace(
             if isinstance(salience_value, (int, float)) and not isinstance(salience_value, bool)
             else default_salience
         )
-        candidates.append(
-            _candidate(
-                event,
-                faculty,
-                event.kind,
-                content,
-                epistemic_status,
-                max(0.0, min(1.0, salience)),
-                created_at,
-                simulated_at,
-            )
+        candidate = _candidate(
+            event,
+            faculty,
+            event.kind,
+            content,
+            epistemic_status,
+            max(0.0, min(1.0, salience)),
+            created_at,
+            simulated_at,
         )
+        if event.kind == "reflection.reconsideration_raised":
+            candidate[2]["target_type"] = event.payload.get("target_type")
+            candidate[2]["target_id"] = event.payload.get("target_id")
+        candidates.append(candidate)
 
     for event in history:
         if event.aggregate_id != "pathos" or event.kind != "mind.layer_pulsed":

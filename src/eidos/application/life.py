@@ -79,6 +79,7 @@ from eidos.application.preference_development import preference_development_even
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
+from eidos.application.reflection_followups import reflection_reconsideration_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
 from eidos.application.relationship_repairs import relationship_repair_events
@@ -2680,6 +2681,12 @@ class Life:
                                 correlation_id=f"{role}-{at}",
                             )
                             pending.append(event)
+                            if role == "reflection":
+                                pending.extend(
+                                    reflection_reconsideration_events(
+                                        history + pending, event, current
+                                    )
+                                )
                             if role == "chronicler":
                                 pending.extend(
                                     DomainEvent(

@@ -305,6 +305,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
 - Reflection now returns a bounded emotional echo only through a Pathos-owned memory's
   previously appraised lived source. It does not sentiment-score generated prose, and
   dream-category reflection cannot invent a factual emotional cause.
+- A reflection on an appraised setback may raise one source-linked 48-hour question
+  about its commitment, schedule, or goal. It cannot change the plan itself; later
+  agency can choose an ordinary, feasible hour to reconsider it.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

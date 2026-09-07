@@ -25,6 +25,13 @@ class CognitiveWorkspaceTests(unittest.TestCase):
             self.event("reflection.recorded", "I keep rushing the quiet parts."),
             self.event("dream.recalled", "A dream lingered after waking."),
             self.event("concern.opened", "I still owe Rowan an answer.", concern_id="rowan"),
+            self.event(
+                "reflection.reconsideration_raised",
+                "Should I repair, renegotiate, or release this commitment?",
+                target_type="commitment",
+                target_id="help-rowan",
+                action_authority=False,
+            ),
             DomainEvent(
                 "mind.layer_pulsed",
                 "pathos",
@@ -47,6 +54,10 @@ class CognitiveWorkspaceTests(unittest.TestCase):
         self.assertTrue(all(item["action_authority"] is False for item in workspace))
         dream = next(item for item in workspace if item["kind"] == "dream.recalled")
         self.assertEqual(dream["epistemic_status"], "dream_fragment")
+        question = next(item for item in workspace if item["kind"].endswith("raised"))
+        self.assertEqual(
+            (question["target_type"], question["target_id"]), ("commitment", "help-rowan")
+        )
 
     def test_private_future_and_expired_material_cannot_enter_workspace(self):
         history = [

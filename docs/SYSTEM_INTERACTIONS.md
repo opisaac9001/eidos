@@ -434,6 +434,11 @@ Nightly reflection can carry a small emotional echo back into this system only w
 Pathos-owned memory traces to an already appraised lived source. The echo uses that
 lineage at 35% strength with a hard cap; generated wording is never sentiment-scored,
 and a dream-category memory cannot be promoted into a factual emotional cause.
+When the same reflection traces to a negatively appraised lived setback carrying a
+commitment, schedule, or goal identifier, it can also raise one 48-hour planning
+question. The question preserves the reflection, memory, and event lineage and has no
+action authority. A later agency pass may choose to schedule ordinary time to
+reconsider it; neither the reflection nor the question edits or cancels the plan.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.
