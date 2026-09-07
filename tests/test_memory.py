@@ -167,6 +167,81 @@ class MemoryTests(unittest.TestCase):
         self.assertLessEqual(strengthened - baseline, 0.2)
         self.assertEqual(sum(e.kind == "memory.recorded" for e in events), 1)
 
+    def test_explicit_reminders_strengthen_access_without_replacing_the_memory(self):
+        memory = self.memory("Mara asked about the lamp.", self.now - timedelta(days=60), 0.4)
+        baseline = recall([memory], "lamp", self.now)[0]
+        reminder_history = []
+        for number in range(10):
+            message = DomainEvent(
+                "conversation.message",
+                "pathos",
+                {
+                    "speaker": "you",
+                    "text": f"Remember the lamp ({number}).",
+                    "simulated_at": self.now.isoformat(),
+                },
+            )
+            reminder = DomainEvent(
+                "memory.reminded",
+                "pathos",
+                {
+                    "memory_id": str(memory.event_id),
+                    "reminded_by": "user",
+                    "source_message_id": str(message.event_id),
+                    "recalled_text": baseline.recalled_text,
+                    "felt_confidence": 1.0,
+                    "confidence_basis": "source_encoding",
+                    "simulated_at": self.now.isoformat(),
+                },
+                causation_id=message.event_id,
+            )
+            reminder_history.extend((message, reminder))
+
+        strengthened = recall([memory, *reminder_history], "lamp", self.now)[0]
+
+        self.assertGreater(strengthened.accessibility, baseline.accessibility)
+        self.assertLessEqual(strengthened.accessibility - baseline.accessibility, 0.24)
+        self.assertEqual(strengthened.reminder_count, 10)
+        self.assertIn("explicitly reminded 3×", strengthened.reason)
+        self.assertEqual(strengthened.event, memory)
+        self.assertEqual(memory.payload["text"], "Mara asked about the lamp.")
+        rebuilt = MemoryIndex.build([memory, *reminder_history])
+        restored = MemoryIndex.build(
+            [memory, *reminder_history],
+            materialized_state=rebuilt.materialized_state(),
+            materialized_revision=len(reminder_history) + 1,
+        )
+        self.assertEqual(restored.materialized_state(), rebuilt.materialized_state())
+
+    def test_legacy_memory_index_without_reminders_still_restores(self):
+        memory = self.memory("An old conversation by the lamp.", self.now)
+        legacy = dict(MemoryIndex.build([memory]).materialized_state())
+        legacy["schema"] = 1
+        legacy.pop("reminder_counts")
+
+        restored = MemoryIndex.build([memory], materialized_state=legacy, materialized_revision=1)
+
+        self.assertEqual(restored.reminder_counts, {})
+
+    def test_reminder_without_its_user_message_is_rejected(self):
+        memory = self.memory("Mara asked about the lamp.", self.now - timedelta(days=10))
+        forged = DomainEvent(
+            "memory.reminded",
+            "pathos",
+            {
+                "memory_id": str(memory.event_id),
+                "reminded_by": "user",
+                "source_message_id": "missing-message",
+                "recalled_text": memory.payload["text"],
+                "felt_confidence": 1.0,
+                "confidence_basis": "source_encoding",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        with self.assertRaisesRegex(ValueError, "causal user message"):
+            recall([memory, forged], "lamp", self.now)
+
     def test_other_actors_memories_are_not_recalled_as_pathos(self):
         private = DomainEvent(
             "memory.recorded",

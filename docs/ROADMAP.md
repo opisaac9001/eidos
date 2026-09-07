@@ -184,8 +184,11 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   source appraisal overrides that background tone for mood-congruent retrieval.
 - Explainable cue-based recall using relevance, accessibility, importance,
   relationships and goals; search beyond recent items. Embeddings are optional.
-- Fade accessibility/detail in simulated time. Reminders and rehearsal strengthen
-  access within bounds; the historical audit record does not decay.
+- Fade accessibility/detail in simulated time. Rehearsal and explicit user reminders
+  now strengthen access through separate caps. A reminder records its message source,
+  cue, and the subjective version Pathos had at that moment; it never restores hidden
+  archival wording or creates a second occurrence of the remembered event. The
+  historical audit record does not decay.
 - Current mood now slightly biases recall toward memories with matching source-linked
   emotional appraisals. Hazy recollections reconsolidate at most monthly into a
   persistent subjective version with altered emphasis and a bounded trace of how

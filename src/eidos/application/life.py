@@ -180,6 +180,21 @@ def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
     return "Content" if valence > 0.15 else "Reflective" if valence < -0.1 else "Quietly curious"
 
 
+def _is_explicit_memory_reminder(text: str) -> bool:
+    lowered = text.lower()
+    return any(
+        cue in lowered
+        for cue in (
+            "remember",
+            "recall",
+            "remind you",
+            "reminder that",
+            "don't forget",
+            "do not forget",
+        )
+    )
+
+
 _AUTHORED_OPENING_END = date(2026, 1, 9)
 
 
@@ -825,6 +840,7 @@ class Life:
                 "preference.retired",
                 "trait.adjusted",
                 "memory.recorded",
+                "memory.reminded",
                 "role.failed",
                 "memory.recovered",
                 "memory.recollection_corrected",
@@ -3024,6 +3040,45 @@ class Life:
             diverse=True,
             index=self._memory_index(history),
         )
+        reminder_candidates = [
+            item
+            for item in selected
+            if item.matched_terms
+            or item.matched_entities
+            or item.matched_goals
+            or item.matched_relationships
+        ]
+        reminder = max(
+            reminder_candidates,
+            key=lambda item: (
+                len(item.matched_terms),
+                len(item.matched_entities),
+                len(item.matched_goals),
+                len(item.matched_relationships),
+                item.score,
+            ),
+            default=None,
+        )
+        if reminder is not None and _is_explicit_memory_reminder(text):
+            pending.append(
+                DomainEvent(
+                    "memory.reminded",
+                    "pathos",
+                    {
+                        "memory_id": str(reminder.event.event_id),
+                        "reminded_by": "user",
+                        "source_message_id": str(incoming.event_id),
+                        "recalled_text": reminder.recalled_text,
+                        "felt_confidence": reminder.felt_confidence,
+                        "confidence_basis": reminder.confidence_basis,
+                        "cue_terms": ",".join(reminder.matched_terms),
+                        "cue_term_count": len(reminder.matched_terms),
+                        "simulated_at": at,
+                    },
+                    causation_id=incoming.event_id,
+                    correlation_id=incoming.correlation_id or request_id,
+                )
+            )
         context = {
             "message": text.strip(),
             "time": at,

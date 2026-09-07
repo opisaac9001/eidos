@@ -104,7 +104,7 @@ Representative contracts:
 | Promise is mutually accepted | `commitment.created` | Calendar, both actors' memory, concerns | Parties/terms/deadline explicit; no consent by implication |
 | Appointment is agreed | `schedule.created` | Chronos, availability, participants | Conflicts, travel, location and recurrence checks |
 | A deadline is missed | `commitment.missed` | Appraisal, relationships, replanning | Still active, not fulfilled/cancelled, exactly once |
-| Memory is recalled | `memory.accessed`, optionally `memory.reconsolidated` | Retrieval reinforcement, attention, mood-congruent selection, selective drift or similarity blend | Actor can access every cited source; one bounded update per meaningful access, with immutable evidence kept separate |
+| Memory is recalled or explicitly prompted by the user | `memory.accessed`, optionally `memory.reminded` and `memory.reconsolidated` | Separately capped rehearsal/reminder reinforcement, attention, mood-congruent selection, selective drift or similarity blend | Actor can access every cited source; reminders retain their message source and current subjective wording, never become another occurrence, and immutable evidence stays separate |
 | Direct evidence contradicts a drifted claim | `memory.recollection_corrected` | Later recall, operator memory view, feed | Newer `resource.confirmed` evidence matches subject/predicate, differs in value, and never rewrites source history |
 | Belief is revised | `belief.revised` | Context, decisions | Owned belief, cited evidence, confidence and prior version |
 | Dream completes | `dream.recorded` | Dream journal, sleep processing | Seed lineage, fiction category, intensity/length limits |
@@ -125,7 +125,9 @@ an object transfer cannot commit without the matching ownership change.
    relevance, goal relevance and consequences. Model suggestions are bounded.
 3. **Retrieve:** find eligible candidates using cues/entities, then rank by relevance,
    accessibility, importance and current concerns. Diversify sources; record why.
-4. **Rehearse:** meaningful recall or a real reminder modestly improves access.
+4. **Rehearse:** meaningful recall or a source-linked explicit reminder modestly
+   improves access through separate caps. The reminder reinforces the recollection
+   Pathos actually has; it cannot reveal the operator's preserved source version.
    Polling the UI, repeated job retries and self-generated summaries do not count
    as repeated lived evidence.
 5. **Fade:** simulated time reduces accessibility and optional remembered detail.

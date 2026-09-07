@@ -266,6 +266,27 @@ class LifeTests(unittest.TestCase):
         )
         self.assertNotEqual(changed.payload["recalled_text"], old_memory.payload["text"])
         self.assertEqual(changed.payload["epistemic_status"], "subjective_recollection")
+        reminder = next(
+            event
+            for event in events
+            if event.kind == "memory.reminded"
+            and event.payload["memory_id"] == str(old_memory.event_id)
+        )
+        incoming = next(
+            event
+            for event in events
+            if event.kind == "conversation.message"
+            and event.payload.get("request_id") == "old-memory"
+            and event.payload.get("speaker") == "you"
+        )
+        self.assertEqual(reminder.causation_id, incoming.event_id)
+        self.assertEqual(reminder.payload["reminded_by"], "user")
+        visible = next(
+            item
+            for item in self.life.snapshot()["memories"]
+            if item["id"] == str(old_memory.event_id)
+        )
+        self.assertEqual(visible["reminder_count"], 1)
 
     def test_new_direct_evidence_corrects_a_drifted_memory_in_the_life_loop(self):
         self.life.bootstrap()

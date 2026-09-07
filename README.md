@@ -374,7 +374,9 @@ network authorization; the server remains loopback-only until authenticated depl
   fallible without editing historical facts. Repeated source confusion can make a
   blended, inaccurate recollection feel vivid and highly certain; that felt certainty
   guides Pathos's speech, thought, activities, and plans while source confidence stays
-  visible only to the operator.
+  visible only to the operator. Explicit user reminders are retained as causal events
+  and strengthen accessibility within a separate cap without duplicating the original
+  experience or repairing subjective drift.
   Newer direct structured evidence can correct a drifted claim while preserving both
   the mistaken version and its correction trail. The recall maps are maintained as a
   versioned, checksummed, event-anchored projection that can be discarded and rebuilt

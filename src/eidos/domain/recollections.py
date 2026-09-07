@@ -51,6 +51,36 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                     raw_time if isinstance(raw_time, str) else None,
                 )
                 access_counts[memory_id] = access_counts.get(memory_id, 0) + 1
+        elif event.kind == "memory.reminded":
+            memory_id = _required(event, "memory_id")
+            if memory_id not in sources:
+                raise ValueError("Reminder requires an existing Pathos memory")
+            cause = str(event.causation_id) if event.causation_id is not None else ""
+            message = evidence.get(cause)
+            if (
+                message is None
+                or message.kind != "conversation.message"
+                or message.payload.get("speaker") != "you"
+                or event.payload.get("source_message_id") != cause
+                or event.payload.get("reminded_by") != "user"
+            ):
+                raise ValueError("Reminder requires its causal user message")
+            expected = latest.get(memory_id)
+            expected_confidence = (
+                expected.confidence
+                if expected is not None
+                else _source_confidence(sources[memory_id])
+            )
+            expected_basis = (
+                expected.confidence_basis if expected is not None else "source_encoding"
+            )
+            if (
+                _level(event, "felt_confidence") != round(expected_confidence, 4)
+                or event.payload.get("confidence_basis") != expected_basis
+            ):
+                raise ValueError("Reminder must preserve Pathos's current subjective certainty")
+            _aware(event, "simulated_at")
+            access_counts[memory_id] = access_counts.get(memory_id, 0) + 1
         elif event.kind == "memory.reconsolidated":
             memory_id = _required(event, "memory_id")
             if memory_id not in sources:

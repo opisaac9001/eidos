@@ -143,7 +143,8 @@ def _drift_text(
 
 def _access_count(history: Sequence[DomainEvent], memory_id: str) -> int:
     return sum(
-        event.kind == "memory.accessed" and event.payload.get("memory_id") == memory_id
+        event.kind in {"memory.accessed", "memory.reminded"}
+        and event.payload.get("memory_id") == memory_id
         for event in history
     )
 

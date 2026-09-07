@@ -73,6 +73,7 @@ class RecalledMemory:
     felt_confidence: float
     source_confidence: float
     confidence_basis: str
+    reminder_count: int
     encoded_valence: float
     encoded_arousal: float
     emotional_label: str
@@ -90,6 +91,7 @@ class MemoryIndex:
     by_goal: Mapping[str, frozenset[UUID]]
     by_relationship: Mapping[str, frozenset[UUID]]
     access_counts: Mapping[UUID, int]
+    reminder_counts: Mapping[UUID, int]
     revision: int
 
     @classmethod
@@ -114,6 +116,7 @@ class MemoryIndex:
         goals_map: dict[str, set[UUID]]
         relationships_map: dict[str, set[UUID]]
         accesses: dict[UUID, int]
+        reminders: dict[UUID, int]
         if base_index is not None:
             memories = list(base_index.memories)
             term_sets = dict(base_index.terms_by_memory)
@@ -124,6 +127,7 @@ class MemoryIndex:
                 key: set(values) for key, values in base_index.by_relationship.items()
             }
             accesses = dict(base_index.access_counts)
+            reminders = dict(base_index.reminder_counts)
         elif materialized_state is None:
             memories = []
             term_sets = {}
@@ -132,6 +136,7 @@ class MemoryIndex:
             goals_map = {}
             relationships_map = {}
             accesses = {}
+            reminders = {}
             materialized_revision = 0
         else:
             (
@@ -142,6 +147,7 @@ class MemoryIndex:
                 goals_map,
                 relationships_map,
                 accesses,
+                reminders,
             ) = cls._restore(history, materialized_state, materialized_revision)
 
         known_memory_ids = {event.event_id for event in memories}
@@ -151,7 +157,16 @@ class MemoryIndex:
                     memory_id = UUID(str(event.payload["memory_id"]))
                 except (KeyError, ValueError):
                     continue
-                accesses[memory_id] = accesses.get(memory_id, 0) + 1
+                if memory_id in known_memory_ids:
+                    accesses[memory_id] = accesses.get(memory_id, 0) + 1
+                continue
+            if event.kind == "memory.reminded":
+                try:
+                    memory_id = UUID(str(event.payload["memory_id"]))
+                except (KeyError, ValueError):
+                    continue
+                if memory_id in known_memory_ids:
+                    reminders[memory_id] = reminders.get(memory_id, 0) + 1
                 continue
             if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
                 continue
@@ -185,6 +200,11 @@ class MemoryIndex:
             for memory_id, count in accesses.items()
             if memory_id in known_memory_ids
         }
+        reminders = {
+            memory_id: count
+            for memory_id, count in reminders.items()
+            if memory_id in known_memory_ids
+        }
         return cls(
             tuple(memories),
             MappingProxyType(term_sets),
@@ -193,6 +213,7 @@ class MemoryIndex:
             freeze(goals_map),
             freeze(relationships_map),
             MappingProxyType(accesses),
+            MappingProxyType(reminders),
             len(history),
         )
 
@@ -210,8 +231,10 @@ class MemoryIndex:
         dict[str, set[UUID]],
         dict[str, set[UUID]],
         dict[UUID, int],
+        dict[UUID, int],
     ]:
-        if state.get("schema") != 1:
+        schema = state.get("schema")
+        if schema not in {1, 2}:
             raise ValueError("Unsupported materialized memory index schema")
         prefix = history[:revision]
         events_by_id = {str(event.event_id): event for event in prefix}
@@ -265,6 +288,20 @@ class MemoryIndex:
             ):
                 raise ValueError("Materialized access count is invalid")
             accesses[parsed] = count
+        reminders: dict[UUID, int] = {}
+        raw_reminders = state.get("reminder_counts", {}) if schema == 2 else {}
+        if not isinstance(raw_reminders, dict):
+            raise ValueError("Materialized reminder counts are invalid")
+        for memory_id, count in raw_reminders.items():
+            parsed = UUID(str(memory_id))
+            if (
+                parsed not in memory_ids
+                or isinstance(count, bool)
+                or not isinstance(count, int)
+                or count < 0
+            ):
+                raise ValueError("Materialized reminder count is invalid")
+            reminders[parsed] = count
         return (
             memories,
             term_sets,
@@ -273,6 +310,7 @@ class MemoryIndex:
             restore_map("by_goal"),
             restore_map("by_relationship"),
             accesses,
+            reminders,
         )
 
     def materialized_state(self) -> Mapping[str, Any]:
@@ -283,7 +321,7 @@ class MemoryIndex:
             }
 
         return {
-            "schema": 1,
+            "schema": 2,
             "memory_ids": [str(event.event_id) for event in self.memories],
             "terms_by_memory": {
                 str(memory_id): sorted(values) for memory_id, values in self.terms_by_memory.items()
@@ -294,6 +332,9 @@ class MemoryIndex:
             "by_relationship": encode(self.by_relationship),
             "access_counts": {
                 str(memory_id): count for memory_id, count in self.access_counts.items()
+            },
+            "reminder_counts": {
+                str(memory_id): count for memory_id, count in self.reminder_counts.items()
             },
         }
 
@@ -350,11 +391,13 @@ def recall(
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
         rehearsals = min(5, index.access_counts.get(event.event_id, 0))
+        reminders = min(3, index.reminder_counts.get(event.event_id, 0))
         reactivation = 0.0
         if subjective is not None:
             subjective_age = max(0.0, (now - subjective.changed_at).total_seconds() / 86400)
             reactivation = 0.55 * (0.5 ** (subjective_age / 14.0))
-        accessibility = min(1.0, base_access + rehearsals * 0.04 + reactivation)
+        reinforcement = min(0.32, rehearsals * 0.04 + reminders * 0.08)
+        accessibility = min(1.0, base_access + reinforcement + reactivation)
         matched_terms = tuple(sorted(query_terms & index.terms_by_memory[event.event_id]))
         matched_entities = tuple(
             sorted(
@@ -414,6 +457,8 @@ def recall(
             reasons.append("recent")
         if rehearsals:
             reasons.append(f"recalled {rehearsals}×")
+        if reminders:
+            reasons.append(f"explicitly reminded {reminders}×")
         if mood_congruence >= 0.005:
             reasons.append("mood-congruent emotional tone")
         elif mood_congruence <= -0.005:
@@ -437,6 +482,7 @@ def recall(
                 round(felt_confidence, 4),
                 round(source_confidence, 4),
                 subjective.confidence_basis if subjective is not None else "source_encoding",
+                index.reminder_counts.get(event.event_id, 0),
                 encoded_valence,
                 encoded_arousal,
                 emotional_label,
@@ -566,6 +612,7 @@ def memory_view(
                 "felt_confidence": item.felt_confidence,
                 "source_confidence": item.source_confidence,
                 "confidence_basis": item.confidence_basis,
+                "reminder_count": item.reminder_count,
                 "encoded_valence": item.encoded_valence,
                 "encoded_arousal": item.encoded_arousal,
                 "emotional_label": item.emotional_label,
