@@ -180,34 +180,93 @@ def behavioral_habit_events(
         else "habit.reinforced"
     )
     delta = 0.1 if prior is None else 0.08 if prior.status == "lapsed" else 0.05
-    return [
-        DomainEvent(
-            kind,
-            "pathos",
-            {
-                "habit_id": habit_id,
-                "revision": 1 if prior is None else prior.revision + 1,
-                "activity_type": activity_type,
-                "location_id": location_id,
-                "time_band": time_band,
-                "delta": delta,
-                "source_count": len(selected),
-                "source_event_id": str(latest.event_id),
-                **{
-                    f"source_event_{position}": str(source.event_id)
-                    for position, source in enumerate(selected, 1)
-                },
-                "owner": "pathos",
-                "simulated_at": simulated_at.isoformat(),
+    selected_event = DomainEvent(
+        kind,
+        "pathos",
+        {
+            "habit_id": habit_id,
+            "revision": 1 if prior is None else prior.revision + 1,
+            "activity_type": activity_type,
+            "location_id": location_id,
+            "time_band": time_band,
+            "delta": delta,
+            "source_count": len(selected),
+            "source_event_id": str(latest.event_id),
+            **{
+                f"source_event_{position}": str(source.event_id)
+                for position, source in enumerate(selected, 1)
             },
-            causation_id=latest.event_id,
-            correlation_id=habit_id,
+            "owner": "pathos",
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=latest.event_id,
+        correlation_id=habit_id,
+    )
+    output = [selected_event]
+    competitors: list[tuple[Habit, list[DomainEvent]]] = []
+    for other_id, habit in rich_habits.items():
+        if (
+            other_id == habit_id
+            or habit.status != "active"
+            or habit.time_band != time_band
+            or _optional_time(habit.updated_at) is None
+            or simulated_at - _required_habit_time(habit.updated_at) < timedelta(days=14)
+        ):
+            continue
+        competing_sources = [
+            source
+            for source in sources
+            if _event_time(source) > _required_habit_time(habit.updated_at)
+        ]
+        if len(competing_sources) < 3 or (
+            _event_time(competing_sources[-1]) - _event_time(competing_sources[0])
+            < timedelta(days=7)
+        ):
+            continue
+        competitors.append((habit, competing_sources))
+    if competitors:
+        displaced, displacement_sources = max(
+            competitors, key=lambda item: (item[0].strength, item[0].habit_id)
         )
-    ]
+        displacement_sources = (
+            displacement_sources
+            if len(displacement_sources) <= 8
+            else [displacement_sources[0], *displacement_sources[-7:]]
+        )
+        displacement_latest = displacement_sources[-1]
+        output.append(
+            DomainEvent(
+                "habit.weakened",
+                "pathos",
+                {
+                    "habit_id": displaced.habit_id,
+                    "revision": displaced.revision + 1,
+                    "competing_habit_id": habit_id,
+                    "amount": 0.05,
+                    "source_count": len(displacement_sources),
+                    "source_event_id": str(displacement_latest.event_id),
+                    **{
+                        f"source_event_{position}": str(source.event_id)
+                        for position, source in enumerate(displacement_sources, 1)
+                    },
+                    "reason": "A different lived rhythm repeatedly occupied the same part of day.",
+                    "owner": "pathos",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=displacement_latest.event_id,
+                correlation_id=displaced.habit_id,
+            )
+        )
+    return output
 
 
 def active_habit_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:
     """Expose active learned rhythms as influences, never scheduled obligations."""
+    active = [
+        habit
+        for habit in project_development(history).habits.values()
+        if habit.activity_type is not None and habit.status == "active"
+    ]
     return [
         {
             "activity_type": habit.activity_type,
@@ -217,9 +276,13 @@ def active_habit_context(history: Sequence[DomainEvent]) -> list[dict[str, objec
             "repetitions": habit.repetitions,
             "status": habit.status,
             "authority": "soft_pattern_only",
+            "competes_with": [
+                other.habit_id
+                for other in sorted(active, key=lambda item: (-item.strength, item.habit_id))
+                if other.habit_id != habit.habit_id and other.time_band == habit.time_band
+            ],
         }
-        for habit in project_development(history).habits.values()
-        if habit.activity_type is not None and habit.status == "active"
+        for habit in active
     ]
 
 

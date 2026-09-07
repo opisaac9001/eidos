@@ -846,6 +846,7 @@ class Life:
                 "habit.reinforced",
                 "habit.lapsed",
                 "habit.reactivated",
+                "habit.weakened",
                 "preference.emerged",
                 "preference.retired",
                 "trait.adjusted",

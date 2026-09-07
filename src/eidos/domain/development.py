@@ -55,6 +55,7 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
             "habit.reinforced",
             "habit.lapsed",
             "habit.reactivated",
+            "habit.weakened",
         }:
             seen[str(event.event_id)] = event
             continue
@@ -76,6 +77,68 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
                 current_habit,
                 status="lapsed",
                 strength=round(max(0.1, current_habit.strength - 0.15), 4),
+                revision=revision,
+                updated_at=changed_at.isoformat(),
+            )
+            seen[str(event.event_id)] = event
+            continue
+        if event.kind == "habit.weakened":
+            habit_id = _required(event, "habit_id")
+            current_habit = habits.get(habit_id)
+            if current_habit is None or current_habit.status != "active":
+                raise ValueError("Only an active contextual habit can weaken")
+            if current_habit.activity_type is None or current_habit.time_band is None:
+                raise ValueError("Only a contextual habit can weaken through competition")
+            revision = _integer(event, "revision")
+            if revision != current_habit.revision + 1:
+                raise ValueError("Habit revision must be sequential")
+            changed_at = _time(event, "simulated_at")
+            previous_update = _parsed(current_habit.updated_at)
+            if previous_update is None or changed_at - previous_update < timedelta(days=14):
+                raise ValueError("Habit changes must be at least fourteen days apart")
+            amount = _bounded(event, "amount", 0.0, 0.1)
+            if amount != 0.05:
+                raise ValueError("Competing behavior weakens a habit by the bounded amount")
+            source_count = _integer(event, "source_count")
+            if not 3 <= source_count <= 8:
+                raise ValueError("Habit competition evidence count is outside policy")
+            source_ids = [
+                _required(event, f"source_event_{position}")
+                for position in range(1, source_count + 1)
+            ]
+            source_id = _required(event, "source_event_id")
+            if len(set(source_ids)) != len(source_ids) or source_id != source_ids[-1]:
+                raise ValueError("Habit competition evidence must be distinct and ordered")
+            sources = [seen.get(item) for item in source_ids]
+            if any(source is None for source in sources):
+                raise ValueError("Habit competition evidence must already exist")
+            typed_sources = [source for source in sources if source is not None]
+            signatures = {_habit_signature(source) for source in typed_sources}
+            if len(signatures) != 1 or None in signatures:
+                raise ValueError("Habit competition must derive from one alternative rhythm")
+            competing_signature = next(iter(signatures))
+            if competing_signature is None:
+                raise ValueError("Habit competition needs realized behavior")
+            activity_type, location_id, time_band = competing_signature
+            competing_habit_id = _required(event, "competing_habit_id")
+            if competing_habit_id != f"habit:{activity_type}:{location_id}:{time_band}":
+                raise ValueError("Competing habit identity must derive from lived behavior")
+            if competing_habit_id == habit_id or time_band != current_habit.time_band:
+                raise ValueError("Only a different rhythm in the same time band can compete")
+            source_times = [_time(source, "simulated_at") for source in typed_sources]
+            if len({item.date() for item in source_times}) != len(source_times):
+                raise ValueError("Habit competition evidence must come from distinct days")
+            if max(source_times) - min(source_times) < timedelta(days=7):
+                raise ValueError("Habit competition evidence must span at least one week")
+            if min(source_times) <= previous_update:
+                raise ValueError("Habit competition requires wholly new behavior")
+            if max(source_times) > changed_at or changed_at - min(source_times) > timedelta(
+                days=60
+            ):
+                raise ValueError("Habit competition evidence must be recent and not future")
+            habits[habit_id] = replace(
+                current_habit,
+                strength=round(max(0.1, current_habit.strength - amount), 4),
                 revision=revision,
                 updated_at=changed_at.isoformat(),
             )
@@ -266,8 +329,10 @@ def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
     activity_type = event.payload.get("activity_type")
     location_id = event.payload.get("location_id")
     value = event.payload.get("simulated_at")
-    if not isinstance(activity_type, str) or not isinstance(location_id, str) or not isinstance(
-        value, str
+    if (
+        not isinstance(activity_type, str)
+        or not isinstance(location_id, str)
+        or not isinstance(value, str)
     ):
         return None
     at = datetime.fromisoformat(value)

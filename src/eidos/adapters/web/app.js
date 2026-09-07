@@ -142,6 +142,7 @@ const labels = {
   "habit.reinforced": "A RHYTHM STRENGTHENED",
   "habit.lapsed": "A RHYTHM FADED",
   "habit.reactivated": "A RHYTHM RETURNED",
+  "habit.weakened": "ONE RHYTHM MADE ROOM FOR ANOTHER",
   "dream.recalled": "A DREAM REMEMBERED",
   "memory.reminded": "A MEMORY WAS REMINDED",
   "memory.correction_resisted": "A CONTRADICTION FELT UNCONVINCING",

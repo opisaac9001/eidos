@@ -114,7 +114,9 @@ async def autonomous_activity_events(
         "permission": (
             "Invent one specific, ordinary activity Pathos might genuinely choose. Let his current "
             "attention matter without treating it as a command. Habits are soft rhythms: he may "
-            "return to one, vary it, or choose against it. The activity "
+            "return to one, vary it, or choose against it. When habits compete for the same part "
+            "of day, treat both as felt possibilities rather than silently choosing the strongest. "
+            "The activity "
             "type is open vocabulary. This is only a proposal: do not say it happened, spend money, "
             "create possessions, or guarantee another person's attendance. Use none when no object "
             "or companion is needed."

@@ -13,13 +13,19 @@ from eidos.domain.events import DomainEvent
 class DevelopmentTests(unittest.TestCase):
     start = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
 
-    def realized(self, day: int, hour: int = 9) -> DomainEvent:
+    def realized(
+        self,
+        day: int,
+        hour: int = 9,
+        activity_type: str = "sketching_walk",
+        location_id: str = "park",
+    ) -> DomainEvent:
         return DomainEvent(
             "agency.activity_realized",
             "pathos",
             {
-                "activity_type": "sketching_walk",
-                "location_id": "park",
+                "activity_type": activity_type,
+                "location_id": location_id,
                 "action": "attend",
                 "simulated_at": (self.start + timedelta(days=day, hours=hour - 9)).isoformat(),
             },
@@ -98,15 +104,11 @@ class DevelopmentTests(unittest.TestCase):
         mixed_time = [self.realized(0), self.realized(4, 15), self.realized(8)]
 
         self.assertEqual(
-            behavioral_habit_events(
-                too_short, self.start.replace(hour=19) + timedelta(days=8)
-            ),
+            behavioral_habit_events(too_short, self.start.replace(hour=19) + timedelta(days=8)),
             [],
         )
         self.assertEqual(
-            behavioral_habit_events(
-                mixed_time, self.start.replace(hour=19) + timedelta(days=8)
-            ),
+            behavioral_habit_events(mixed_time, self.start.replace(hour=19) + timedelta(days=8)),
             [],
         )
 
@@ -119,9 +121,12 @@ class DevelopmentTests(unittest.TestCase):
         lapsed_at = self.start.replace(hour=19) + timedelta(days=54)
         lapsed = behavioral_habit_events(history, lapsed_at)
         self.assertEqual([event.kind for event in lapsed], ["habit.lapsed"])
-        self.assertEqual(project_development([*history, *lapsed]).habits[
-            "habit:sketching_walk:park:morning"
-        ].status, "lapsed")
+        self.assertEqual(
+            project_development([*history, *lapsed])
+            .habits["habit:sketching_walk:park:morning"]
+            .status,
+            "lapsed",
+        )
 
         new_sources = [self.realized(day) for day in (70, 78)]
         revived = behavioral_habit_events(
@@ -136,9 +141,7 @@ class DevelopmentTests(unittest.TestCase):
 
     def test_habit_projector_rejects_a_forged_context(self):
         sources = [self.realized(day) for day in (0, 4, 8)]
-        event = behavioral_habit_events(
-            sources, self.start.replace(hour=19) + timedelta(days=8)
-        )[0]
+        event = behavioral_habit_events(sources, self.start.replace(hour=19) + timedelta(days=8))[0]
         forged = DomainEvent(
             event.kind,
             event.aggregate_id,
@@ -147,6 +150,90 @@ class DevelopmentTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "derive"):
             project_development([*sources, forged])
+
+    def test_a_repeated_alternative_weakens_one_competing_time_band_habit(self):
+        first = [self.realized(day) for day in (0, 4, 8)]
+        formed_at = self.start.replace(hour=19) + timedelta(days=8)
+        formed = behavioral_habit_events(first, formed_at)
+        alternative = [
+            self.realized(day, activity_type="cafe_reading", location_id="cafe")
+            for day in (22, 26, 30)
+        ]
+
+        changed = behavioral_habit_events(
+            [*first, *formed, *alternative],
+            self.start.replace(hour=19) + timedelta(days=30),
+        )
+
+        self.assertEqual([event.kind for event in changed], ["habit.formed", "habit.weakened"])
+        state = project_development([*first, *formed, *alternative, *changed])
+        old = state.habits["habit:sketching_walk:park:morning"]
+        new = state.habits["habit:cafe_reading:cafe:morning"]
+        self.assertEqual((old.strength, old.revision, old.status), (0.25, 2, "active"))
+        self.assertEqual(new.strength, 0.3)
+        context = {
+            item["activity_type"]: item
+            for item in active_habit_context([*first, *formed, *alternative, *changed])
+        }
+        self.assertEqual(
+            context["sketching_walk"]["competes_with"],
+            ["habit:cafe_reading:cafe:morning"],
+        )
+
+    def test_competing_behavior_cannot_weaken_a_habit_inside_change_cooldown(self):
+        first = [self.realized(day) for day in (0, 4, 8)]
+        formed_at = self.start.replace(hour=19) + timedelta(days=8)
+        formed = behavioral_habit_events(first, formed_at)
+        alternative = [
+            self.realized(day, activity_type="cafe_reading", location_id="cafe")
+            for day in (10, 14, 18)
+        ]
+
+        changed = behavioral_habit_events(
+            [*first, *formed, *alternative],
+            self.start.replace(hour=19) + timedelta(days=18),
+        )
+
+        self.assertEqual([event.kind for event in changed], ["habit.formed"])
+
+    def test_competition_uses_new_evidence_even_if_the_alternative_started_earlier(self):
+        first = [self.realized(day) for day in (0, 4, 8)]
+        formed = behavioral_habit_events(first, self.start.replace(hour=19) + timedelta(days=8))
+        alternative = [
+            self.realized(day, activity_type="cafe_reading", location_id="cafe")
+            for day in (6, 22, 26, 30)
+        ]
+
+        changed = behavioral_habit_events(
+            [*first, *formed, *alternative],
+            self.start.replace(hour=19) + timedelta(days=30),
+        )
+
+        weakened = changed[-1]
+        self.assertEqual(weakened.kind, "habit.weakened")
+        self.assertEqual(weakened.payload["source_count"], 3)
+        self.assertNotIn(str(alternative[0].event_id), weakened.payload.values())
+
+    def test_habit_projector_rejects_forged_competing_identity(self):
+        first = [self.realized(day) for day in (0, 4, 8)]
+        formed = behavioral_habit_events(first, self.start.replace(hour=19) + timedelta(days=8))
+        alternative = [
+            self.realized(day, activity_type="cafe_reading", location_id="cafe")
+            for day in (22, 26, 30)
+        ]
+        changed = behavioral_habit_events(
+            [*first, *formed, *alternative],
+            self.start.replace(hour=19) + timedelta(days=30),
+        )
+        weakened = changed[-1]
+        forged = DomainEvent(
+            weakened.kind,
+            weakened.aggregate_id,
+            {**weakened.payload, "competing_habit_id": "habit:invented:cafe:morning"},
+        )
+
+        with self.assertRaisesRegex(ValueError, "derive"):
+            project_development([*first, *formed, *alternative, changed[0], forged])
 
 
 if __name__ == "__main__":

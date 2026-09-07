@@ -228,7 +228,10 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
 - Voluntary activities repeated on distinct days over at least a week can form a
   contextual habit keyed by activity, place, and part of day. It is a soft planning
   influence rather than a schedule: new evidence may strengthen it, forty-five days
-  of disuse makes it lapse, and later lived repetition can reactivate it.
+  of disuse makes it lapse, and later lived repetition can reactivate it. When a
+  different rhythm repeatedly occupies the same part of day, it can gradually weaken
+  one established habit with a fourteen-day change limit. Both remain visible as
+  competing possibilities; neither is silently promoted into an obligation.
 - Show why a memory was selected and distinguish what happened from what is recalled.
 
 Exit: an old relevant promise outranks unrelated recent chatter; ordinary details

@@ -163,3 +163,9 @@ def _speaker_reliability(state: BeliefState, owner_id: str, speaker_id: str) -> 
     if belief.object_value == "unreliable":
         return 0.35
     return 0.6
+
+
+# Its domain name begins with pytest's default ``test*`` discovery prefix.  Tests
+# import this callable directly, so mark the production function rather than
+# allowing collection to mistake its domain arguments for fixtures.
+setattr(testimony_belief_events, "__test__", False)
