@@ -1496,7 +1496,7 @@ function render(next) {
   $("roles").innerHTML = state.roles
     .map(
       (role, index) =>
-        `<article class="panel role-card"><div class="panel-kicker"><span>0${index + 1} / ${role.id === "critic" ? "RULES" : liveModel ? "MODEL" : "STAND-IN"}</span><span class="role-status">${esc(role.status.toUpperCase())}</span></div><h2>${esc(role.name)}</h2><p>${esc(role.purpose)}</p><div class="role-stats"><span>${role.calls} ${role.id === "critic" ? "checks" : "calls"}</span><span>${role.last ? `${date(role.last)} · ${time(role.last)}` : "Awaiting its moment"}</span></div></article>`,
+        `<article class="panel role-card"><div class="panel-kicker"><span>0${index + 1} / ${role.id === "critic" ? "RULES" : liveModel ? "MODEL" : "STAND-IN"}</span><span class="role-status">${esc(role.status.toUpperCase())}</span></div><h2>${esc(role.name)}</h2><p>${esc(role.purpose)}</p>${(role.semantic_findings || []).length ? `<div class="quality-warning">Quality review: ${esc(role.semantic_findings.map((item) => item.replaceAll("_", " ")).join(" · "))}</div>` : ""}<div class="role-stats"><span>${role.calls} ${role.id === "critic" ? "checks" : "calls"}</span><span>${role.last ? `${date(role.last)} · ${time(role.last)}` : "Awaiting its moment"}</span></div></article>`,
     )
     .join("");
   $("cognitive-workspace").innerHTML = (state.mind?.workspace || []).length

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected, validate_completion
+from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
@@ -67,6 +68,12 @@ async def perform(
             timeout=50,
         )
         text = validate_completion(role, response.content, response.finish_reason, context)
+        semantic_findings = semantic_quality_findings(
+            role,
+            text,
+            context,
+            prior_texts=_prior_role_texts(role, context),
+        )
         pending.append(
             DomainEvent(
                 "role.completed",
@@ -82,6 +89,8 @@ async def perform(
                     "finish_reason": response.finish_reason,
                     "prompt_tokens": response.prompt_tokens,
                     "output_tokens": response.output_tokens,
+                    "semantic_status": "warning" if semantic_findings else "clean",
+                    "semantic_findings": "|".join(semantic_findings),
                 },
             )
         )
@@ -92,11 +101,12 @@ async def perform(
                 {
                     "role": "critic",
                     "simulated_at": at,
-                    "status": "ok",
+                    "status": "warning" if semantic_findings else "ok",
                     "trace_id": trace,
                     "latency_ms": 0,
                     "model": "schema-rules-v1",
                     "backend": "rules",
+                    "semantic_findings": "|".join(semantic_findings),
                 },
             )
         )
@@ -171,3 +181,21 @@ async def perform(
                 )
             )
         return None
+
+
+def _prior_role_texts(role: str, context: Mapping[str, object]) -> list[str]:
+    if role == "pathos":
+        dialogue = context.get("recent_dialogue")
+        if isinstance(dialogue, (list, tuple)):
+            return [
+                str(item["text"])
+                for item in dialogue
+                if isinstance(item, Mapping)
+                and item.get("speaker") == "pathos"
+                and isinstance(item.get("text"), str)
+            ]
+    if role == "murmur":
+        stream = context.get("recent_inner_stream")
+        if isinstance(stream, (list, tuple)):
+            return [item for item in stream if isinstance(item, str)]
+    return []

@@ -737,6 +737,12 @@ class Life:
                         last=payload["simulated_at"],
                         status=payload["status"],
                         latency_ms=payload["latency_ms"],
+                        semantic_status=payload.get("semantic_status", "unknown"),
+                        semantic_findings=(
+                            str(payload.get("semantic_findings", "")).split("|")
+                            if payload.get("semantic_findings")
+                            else []
+                        ),
                     )
                     role["calls"] += 1
                     role["failures"] = role.get("failures", 0) + (

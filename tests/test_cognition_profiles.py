@@ -1,6 +1,21 @@
+import asyncio
 import unittest
 
-from eidos.application.cognition import ROLE_MODEL_PROFILES, request_for
+from eidos.application.cognition import ROLE_MODEL_PROFILES, perform, request_for
+from eidos.domain.events import DomainEvent
+from eidos.ports.model_gateway import ModelRequest, ModelResponse
+
+
+class AssistantLikeGateway:
+    model = "assistant-like-fixture"
+
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        return ModelResponse(
+            '{"text":"It is good to hear from you. What is on your mind?"}',
+            self.model,
+            "fixture",
+            "stop",
+        )
 
 
 class CognitionProfileTests(unittest.TestCase):
@@ -35,6 +50,33 @@ class CognitionProfileTests(unittest.TestCase):
     def test_unknown_role_cannot_inherit_an_accidental_generic_profile(self):
         with self.assertRaisesRegex(ValueError, "Unknown cognition role"):
             request_for("intruder", {})
+
+    def test_runtime_trace_preserves_nonblocking_semantic_warnings(self):
+        pending: list[DomainEvent] = []
+        text = asyncio.run(
+            perform(
+                AssistantLikeGateway(),
+                "pathos",
+                {"message": "hey", "time": "2026-01-01T12:00:00+00:00"},
+                "2026-01-01T12:00:00+00:00",
+                pending,
+            )
+        )
+
+        self.assertIsNotNone(text)
+        pathos = next(
+            event
+            for event in pending
+            if event.kind == "role.completed" and event.payload["role"] == "pathos"
+        )
+        critic = next(
+            event
+            for event in pending
+            if event.kind == "role.completed" and event.payload["role"] == "critic"
+        )
+        self.assertEqual(pathos.payload["semantic_status"], "warning")
+        self.assertIn("assistant_like_register", str(pathos.payload["semantic_findings"]))
+        self.assertEqual(critic.payload["status"], "warning")
 
 
 if __name__ == "__main__":

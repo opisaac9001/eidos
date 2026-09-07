@@ -1103,6 +1103,15 @@ hr {
   letter-spacing: 1px;
   color: var(--green);
 }
+.quality-warning {
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  background: color-mix(in srgb, var(--amber) 9%, transparent);
+  color: var(--amber);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  padding: 9px 10px;
+}
 .role-stats {
   display: flex;
   justify-content: space-between;

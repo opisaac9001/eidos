@@ -94,6 +94,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b"function dreamLifecycleMarkup", body)
                 self.assertIn(b"function renderEmotionHistory", body)
                 self.assertIn(b"cognitive-workspace", body)
+                self.assertIn(b"Quality review", body)
                 self.assertIn(b'clock_mode: selected === "realtime"', body)
                 self.assertIn(b"PRIVATE BIOGRAPHY", body)
                 self.assertIn(b'window.location.pathname === "/operator"', body)

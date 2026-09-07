@@ -129,7 +129,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | OPS-05 | Retention, metrics, swaps, upgrades, rollback, experiment branches | Partial: verified non-merging life forks with clean inference queues, immutable provenance and evidence-based divergence review | P6 |
 | QA-01 | Unit/replay/atomicity/idempotency tests, offline fixtures | Built baseline | Every phase |
 | QA-02 | Timeout/crash/duplicate/cancellation/stale-result fault injection | Partial: HTTP/concurrency tests | P1 |
-| QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: contract-separated semantic probe warnings plus open-world semantic critic | Every phase |
+| QA-03 | Contract vs semantic evaluations, role probes, honest failure reporting | Partial: contract-separated semantic probe warnings plus open-world semantic critic; every accepted live text call now retains nonblocking quality findings in its durable trace and exposes them in the operator Ensemble | Every phase |
 | QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Partial: owned recall/belief and source-membership fixtures | P2 |
 | QA-05 | Dream/fact separation, affect caps, no action bypass | Partial: category/label checks | P4 |
 | QA-06 | Seven-day plan/relationship causality and coherent recall | Partial: exact replay plus routed/durable/structured/deferred integrated week | P5 |
