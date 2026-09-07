@@ -78,6 +78,8 @@ def semantic_quality_findings(
         text, context
     ):
         findings.append("unsupported_conversation_detail")
+    if conversational_pathos and _introduces_ungrounded_current_activity(text, context):
+        findings.append("unsupported_current_activity")
     if (
         role in FIRST_PERSON_ROLES
         and not conversational_pathos
@@ -196,3 +198,21 @@ def _grounding_text(context: Mapping[str, object]) -> str:
         if key in context:
             collect(context[key])
     return " ".join(parts)
+
+
+def _introduces_ungrounded_current_activity(
+    text: str, context: Mapping[str, object]
+) -> bool:
+    match = re.search(
+        r"\b(?:i(?:'ve| have) been|i(?:'m| am))\s+"
+        r"(?:working on|building|fixing|planning|writing|reading|meeting|visiting)\s+"
+        r"([^.!?]+)",
+        text.lower(),
+    )
+    if match is None:
+        return False
+    activity_words = {
+        word for word in WORD.findall(match.group(1)) if word not in TOPIC_STOPWORDS
+    }
+    grounding_words = set(WORD.findall(_grounding_text(context).lower()))
+    return bool(activity_words and not activity_words & grounding_words)

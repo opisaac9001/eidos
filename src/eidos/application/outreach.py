@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
-from eidos.application.cognition import perform
+from eidos.application.cognition import perform_pathos_reply
 from eidos.domain.events import DomainEvent
 from eidos.domain.outreach import project_outreach_config
 from eidos.domain.scenes import project_scenes
@@ -94,7 +94,9 @@ async def outreach_events(
         "outreach_reason": "Share one ordinary thought because something from the day genuinely brought the user to mind.",
         "source_memory": str(source.payload["text"]),
     }
-    text = await perform(gateway, "pathos", model_context, simulated_at.isoformat(), pending)
+    text = await perform_pathos_reply(
+        gateway, model_context, simulated_at.isoformat(), pending
+    )
     if not text:
         return pending
     lowered = text.lower()

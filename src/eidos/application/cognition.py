@@ -21,6 +21,28 @@ ROLE_MODEL_PROFILES = {
     "oneiros": ("4", 220, 0.8),
     "chronicler": ("3", 180, 0.2),
 }
+REPAIRABLE_PATHOS_FINDINGS = {
+    "assistant_like_register",
+    "excessive_length",
+    "factual_contradiction",
+    "forbidden_knowledge_leak",
+    "identity_confusion",
+    "near_duplicate_prose",
+    "overstructured_conversation",
+    "required_grounding_missing",
+    "time_of_day_contradiction",
+    "unsupported_conversation_detail",
+    "unsupported_current_activity",
+}
+BLOCKING_PATHOS_FINDINGS = {
+    "factual_contradiction",
+    "forbidden_knowledge_leak",
+    "identity_confusion",
+    "required_grounding_missing",
+    "time_of_day_contradiction",
+    "unsupported_conversation_detail",
+    "unsupported_current_activity",
+}
 
 
 def request_for(role: str, context: Mapping[str, object]) -> ModelRequest:
@@ -199,3 +221,68 @@ def _prior_role_texts(role: str, context: Mapping[str, object]) -> list[str]:
         if isinstance(stream, (list, tuple)):
             return [item for item in stream if isinstance(item, str)]
     return []
+
+
+async def perform_pathos_reply(
+    gateway: ModelGateway,
+    context: Mapping[str, object],
+    at: str,
+    pending: list[DomainEvent],
+) -> str | None:
+    """Give a weak conversational draft one bounded, auditable revision attempt."""
+    draft = await perform(gateway, "pathos", context, at, pending)
+    if draft is None:
+        return None
+    prior_texts = _prior_role_texts("pathos", context)
+    draft_findings = semantic_quality_findings(
+        "pathos", draft, context, prior_texts=prior_texts
+    )
+    repairable = [
+        finding for finding in draft_findings if finding in REPAIRABLE_PATHOS_FINDINGS
+    ]
+    if not repairable:
+        return draft
+
+    revision_context = {
+        **dict(context),
+        "draft_to_revise": draft,
+        "quality_findings": repairable,
+        "revision_instruction": (
+            "Rewrite the draft once. Keep its supported meaning, answer the same message, "
+            "and remove the named problems. Add no facts, actions, or memories."
+        ),
+    }
+    revised = await perform(gateway, "pathos", revision_context, at, pending)
+    revision_findings = (
+        semantic_quality_findings(
+            "pathos", revised, context, prior_texts=prior_texts
+        )
+        if revised is not None
+        else ["revision_failed"]
+    )
+    if revised is not None and _finding_score(revision_findings) < _finding_score(
+        draft_findings
+    ):
+        selected = "revision"
+    elif any(finding in BLOCKING_PATHOS_FINDINGS for finding in draft_findings):
+        selected = "rejected"
+    else:
+        selected = "original"
+    pending.append(
+        DomainEvent(
+            "role.revision_selected",
+            "pathos",
+            {
+                "role": "pathos",
+                "selected": selected,
+                "draft_findings": "|".join(draft_findings),
+                "revision_findings": "|".join(revision_findings),
+                "simulated_at": at,
+            },
+        )
+    )
+    return revised if selected == "revision" else draft if selected == "original" else None
+
+
+def _finding_score(findings: list[str]) -> int:
+    return sum(3 if finding in BLOCKING_PATHOS_FINDINGS else 1 for finding in findings)

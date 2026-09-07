@@ -104,6 +104,8 @@ class GatewayTests(unittest.TestCase):
                         {
                             "message": "ok so what have you been up to",
                             "location": "Juniper Café",
+                            "ambient_presence": {"estimated_people": 4},
+                            "voice": {"cadence": "easy", "target_words": 18},
                             "recent_dialogue": [
                                 {"speaker": "you", "text": "you still at the cafe?"},
                                 {"speaker": "pathos", "text": "Yeah, for a bit."},
@@ -129,6 +131,8 @@ class GatewayTests(unittest.TestCase):
 
         context = json.loads(self.payload["messages"][1]["content"])
         self.assertEqual(context["recent_dialogue"][-1]["text"], "Yeah, for a bit.")
+        self.assertEqual(context["voice"]["target_words"], 18)
+        self.assertEqual(context["ambient_presence"]["estimated_people"], 4)
         self.assertEqual(context["remembered_preferences"][0]["topic"], "coffee")
         self.assertEqual(context["relationship_repairs"][0]["status"], "open")
         self.assertEqual(context["cognitive_workspace"][0]["from_faculty"], "murmur")

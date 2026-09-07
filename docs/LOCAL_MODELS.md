@@ -155,6 +155,13 @@ supplied day detail; the probe now screens both cases. A probe with any contract
 cannot report an overall semantic pass. This remains a narrow explainable screen, not
 open-ended fact checking.
 
+The bounded live-reply repair path was then exercised directly against Qwen with the
+emotion-derived voice target included. Its first draft and sole revision repeated the
+same afternoon/morning contradiction, over-structured answer, and unsupported project
+claim. The selector rejected the reply instead of exposing it or silently substituting
+a stand-in. This is the intended containment behavior for a performer too small to
+follow revision feedback reliably.
+
 The `smollm2:135m` comparison completed only five of eight contracts. Pathos and
 Oneiros returned incomplete envelopes and Firmament omitted Rowan. Among accepted
 outputs, the evaluator flagged overlong Murmur prose, Reflection losing first-person

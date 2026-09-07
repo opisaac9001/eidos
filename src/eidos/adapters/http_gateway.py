@@ -24,13 +24,20 @@ ROLE_PROMPTS = {
     "npc_backstory": "Invent three distinct, ordinary first-person recollections from the supplied resident's past. These are private fictional biography proposals, not current world facts. Do not involve known residents or introduce crimes, abuse, diagnoses, property, obligations, or present events.",
     "pathos_project": "Propose one coherent, modest multi-day project Pathos might choose from his needs, emotion, values, slowly learned preferences and behavioral traits, demonstrated skills, flexible habits, memories, fallible semantic expectations, revisable self-concepts, known places, usable objects, calendar, and cognitive workspace. Semantic expectations may shape anticipation but are not world facts. A self-concept may shape confidence or hesitation but is neither destiny nor proof. Dream inspirations in the workspace are temporary fiction-sourced possibilities: they may suggest a theme but are not evidence, action authority, or a promised outcome. Skills describe capability rather than permission or guaranteed success, and rusty ability may motivate a modest refresher. Habits are learned contextual rhythms, not obligations: Pathos may continue, vary, or deliberately break one. Let felt memory confidence influence motivation as Pathos's sincere certainty even though it is not proof. Preferences and traits are influences rather than commands. Give two to four distinct chronological steps. Project meaning is open vocabulary, but each step uses a safe action. Do not claim progress, spend money, create possessions, or guarantee success.",
 }
+ROLE_PROMPTS["pathos"] += (
+    " When draft_to_revise is supplied, rewrite that draft once instead of answering "
+    "afresh. Preserve supported meaning, remove the named quality_findings, follow "
+    "revision_instruction, and add nothing."
+)
 
 ROLE_FIELDS = {
     "pathos": (
         "message",
         "time",
         "location",
+        "ambient_presence",
         "mood",
+        "voice",
         "identity",
         "outreach_reason",
         "source_memory",
@@ -45,6 +52,9 @@ ROLE_FIELDS = {
         "mind_layers",
         "cognitive_workspace",
         "emotion",
+        "draft_to_revise",
+        "quality_findings",
+        "revision_instruction",
     ),
     "murmur": (
         "time",

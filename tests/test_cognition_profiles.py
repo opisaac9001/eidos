@@ -1,7 +1,13 @@
 import asyncio
+import json
 import unittest
 
-from eidos.application.cognition import ROLE_MODEL_PROFILES, perform, request_for
+from eidos.application.cognition import (
+    ROLE_MODEL_PROFILES,
+    perform,
+    perform_pathos_reply,
+    request_for,
+)
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelRequest, ModelResponse
 
@@ -12,6 +18,39 @@ class AssistantLikeGateway:
     async def generate(self, request: ModelRequest) -> ModelResponse:
         return ModelResponse(
             '{"text":"It is good to hear from you. What is on your mind?"}',
+            self.model,
+            "fixture",
+            "stop",
+        )
+
+
+class RevisingGateway:
+    model = "revising-fixture"
+
+    def __init__(self):
+        self.calls = 0
+
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        self.calls += 1
+        text = (
+            "It's good to hear from you. What's on your mind?"
+            if self.calls == 1
+            else "Yeah, hey. I've just been taking it easy."
+        )
+        return ModelResponse(
+            json.dumps({"text": text}),
+            self.model,
+            "fixture",
+            "stop",
+        )
+
+
+class StubbornContradictionGateway:
+    model = "stubborn-fixture"
+
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        return ModelResponse(
+            json.dumps({"text": "Good morning, Pathos! I've been working on a new project."}),
             self.model,
             "fixture",
             "stop",
@@ -77,6 +116,38 @@ class CognitionProfileTests(unittest.TestCase):
         self.assertEqual(pathos.payload["semantic_status"], "warning")
         self.assertIn("assistant_like_register", str(pathos.payload["semantic_findings"]))
         self.assertEqual(critic.payload["status"], "warning")
+
+    def test_pathos_reply_gets_one_audited_quality_revision(self):
+        gateway = RevisingGateway()
+        pending: list[DomainEvent] = []
+        text = asyncio.run(
+            perform_pathos_reply(
+                gateway,
+                {"message": "hey", "time": "2026-01-01T12:00:00+00:00"},
+                "2026-01-01T12:00:00+00:00",
+                pending,
+            )
+        )
+
+        self.assertEqual(text, "Yeah, hey. I've just been taking it easy.")
+        self.assertEqual(gateway.calls, 2)
+        selected = next(event for event in pending if event.kind == "role.revision_selected")
+        self.assertEqual(selected.payload["selected"], "revision")
+
+    def test_unrepaired_known_contradiction_is_not_delivered(self):
+        pending: list[DomainEvent] = []
+        text = asyncio.run(
+            perform_pathos_reply(
+                StubbornContradictionGateway(),
+                {"message": "hey", "time": "2026-01-01T16:00:00+00:00"},
+                "2026-01-01T16:00:00+00:00",
+                pending,
+            )
+        )
+
+        self.assertIsNone(text)
+        selected = next(event for event in pending if event.kind == "role.revision_selected")
+        self.assertEqual(selected.payload["selected"], "rejected")
 
 
 if __name__ == "__main__":

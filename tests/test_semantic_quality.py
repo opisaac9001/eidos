@@ -146,6 +146,24 @@ class SemanticQualityTests(unittest.TestCase):
             ),
         )
 
+    def test_current_activity_claim_needs_supplied_grounding(self):
+        self.assertIn(
+            "unsupported_current_activity",
+            semantic_quality_findings(
+                "pathos",
+                "I've been working on a new project.",
+                {"message": "What have you been doing?", "memories": ["I made breakfast."]},
+            ),
+        )
+        self.assertNotIn(
+            "unsupported_current_activity",
+            semantic_quality_findings(
+                "pathos",
+                "I've been working on the lamp project.",
+                {"message": "What have you been doing?", "memories": ["The lamp project moved forward."]},
+            ),
+        )
+
     def test_required_uncertainty_language_is_role_specific(self):
         context = {
             "required_any_by_role": {

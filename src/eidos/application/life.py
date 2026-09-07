@@ -22,7 +22,7 @@ from eidos.application.catchup import (
     preview_catch_up,
 )
 from eidos.application.character_generation import generated_character_history_events
-from eidos.application.cognition import perform, request_for
+from eidos.application.cognition import perform, perform_pathos_reply, request_for
 from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
@@ -3682,7 +3682,7 @@ class Life:
         ]
         pending.extend(access_events)
         pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))
-        reply = await perform(self.gateway, "pathos", context, at, pending)
+        reply = await perform_pathos_reply(self.gateway, context, at, pending)
         if reply:
             pacing = (
                 reply_pacing(
