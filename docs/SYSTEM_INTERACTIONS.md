@@ -430,6 +430,10 @@ Hourly emotion samples interpret replayed valence, arousal and duration into sta
 such as joy, contentment, sadness, anxiety or prolonged low mood. Their bounded bias
 changes initiative, social openness, risk tolerance and pace; feasibility and consent
 still decide what can happen. A prolonged pattern is not a clinical diagnosis.
+Nightly reflection can carry a small emotional echo back into this system only when its
+Pathos-owned memory traces to an already appraised lived source. The echo uses that
+lineage at 35% strength with a hard cap; generated wording is never sentiment-scored,
+and a dream-category memory cannot be promoted into a factual emotional cause.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.

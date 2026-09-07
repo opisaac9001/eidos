@@ -153,6 +153,81 @@ class AppraisalTests(unittest.TestCase):
         settled = PathosState(valence=0.0, arousal=0.35, awake=True)
         self.assertEqual(baseline_affect_events(settled, self.now), ([], settled))
 
+    def test_reflection_carries_a_bounded_emotional_echo_without_parsing_its_prose(self):
+        missed = DomainEvent(
+            "commitment.missed",
+            "pathos",
+            {"simulated_at": (self.now - timedelta(hours=2)).isoformat()},
+        )
+        source_appraisals, _ = appraisal_events([missed], PathosState(), self.now)
+        source_appraisal = source_appraisals[0]
+        memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I missed something I meant to do.",
+                "owner": "pathos",
+                "category": "experience",
+                "source_event_id": str(missed.event_id),
+                "simulated_at": (self.now - timedelta(hours=1)).isoformat(),
+            },
+        )
+        reflection = DomainEvent(
+            "reflection.recorded",
+            "pathos",
+            {
+                "text": "This prose can say anything; lineage, not sentiment parsing, decides.",
+                "source_memory_id": str(memory.event_id),
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=memory.event_id,
+        )
+        history = [missed, source_appraisal, memory, reflection]
+
+        appraisals, unchanged = appraisal_events(history, PathosState(), self.now)
+
+        echo = next(
+            event
+            for event in appraisals
+            if event.kind == "appraisal.recorded"
+            and event.payload["source_event_id"] == str(reflection.event_id)
+        )
+        self.assertLess(echo.payload["desirability"], 0)
+        self.assertGreater(echo.payload["desirability"], source_appraisal.payload["desirability"])
+        self.assertEqual(unchanged.valence, 0)
+        affect, changed = affect_episode_events([*history, *appraisals], unchanged, self.now)
+        self.assertTrue(affect)
+        self.assertLess(changed.valence, unchanged.valence)
+
+    def test_reflection_on_a_dream_cannot_create_a_factual_emotional_cause(self):
+        dream_memory = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I remember dreaming about an empty station.",
+                "owner": "pathos",
+                "category": "dream",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        reflection = DomainEvent(
+            "reflection.recorded",
+            "pathos",
+            {
+                "text": "The station felt lonely.",
+                "source_memory_id": str(dream_memory.event_id),
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        events, _ = appraisal_events([dream_memory, reflection], PathosState(), self.now)
+
+        self.assertFalse(
+            any(
+                event.payload.get("source_event_id") == str(reflection.event_id) for event in events
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -302,6 +302,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   lacking fact or action authority; expired, future, and other-owner material is absent.
 - Reflection proposes interpretations, memory links and plan reconsideration,
   never retroactive fact changes.
+- Reflection now returns a bounded emotional echo only through a Pathos-owned memory's
+  previously appraised lived source. It does not sentiment-score generated prose, and
+  dream-category reflection cannot invent a factual emotional cause.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

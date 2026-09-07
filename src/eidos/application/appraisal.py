@@ -167,7 +167,7 @@ def appraisal_events(
         source_id = str(source.event_id)
         if source_id in appraised:
             continue
-        effect = _effect(source)
+        effect = _effect(source, history)
         if effect is None:
             continue
         need, delta, desirability, novelty, controllability = effect
@@ -208,7 +208,9 @@ def appraisal_events(
     return output, current
 
 
-def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None:
+def _effect(
+    event: DomainEvent, history: Sequence[DomainEvent]
+) -> tuple[str, float, float, float, float] | None:
     if event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine":
         location = event.payload.get("location_id")
         if not isinstance(location, str):
@@ -283,6 +285,40 @@ def _effect(event: DomainEvent) -> tuple[str, float, float, float, float] | None
         return ("connection", 0.04, 0.55, 0.35, 0.85)
     if event.kind == "dream.effect_applied":
         return ("affect", 0.0, float(event.payload.get("valence_delta", 0)), 0.65, 0.15)
+    if event.kind == "reflection.recorded":
+        source_memory_id = event.payload.get("source_memory_id")
+        if not isinstance(source_memory_id, str):
+            return None
+        memory = next(
+            (
+                item
+                for item in history
+                if str(item.event_id) == source_memory_id
+                and item.kind == "memory.recorded"
+                and item.aggregate_id == "pathos"
+                and item.payload.get("owner", "pathos") == "pathos"
+            ),
+            None,
+        )
+        if memory is None or memory.payload.get("category") == "dream":
+            return None
+        source_ids = {str(memory.event_id)}
+        remembered_source = memory.payload.get("source_event_id")
+        if isinstance(remembered_source, str):
+            source_ids.add(remembered_source)
+        prior = next(
+            (
+                item
+                for item in reversed(history)
+                if item.kind == "appraisal.recorded"
+                and item.payload.get("source_event_id") in source_ids
+            ),
+            None,
+        )
+        if prior is None:
+            return None
+        desirability = max(-0.28, min(0.28, float(prior.payload["desirability"]) * 0.35))
+        return ("affect", 0.0, desirability, 0.12, 0.7)
     return None
 
 
