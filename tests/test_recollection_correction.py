@@ -194,6 +194,10 @@ class RecollectionCorrectionTests(unittest.TestCase):
         self.assertEqual([event.kind for event in resisted], ["memory.correction_resisted"])
         before = project_recollections(history).latest[memory_id]
         self.assertEqual(before.remembered_person_id, "mara")
+        self.assertEqual(
+            before.remembered_at,
+            datetime.fromisoformat(history[1].payload["simulated_at"]),
+        )
         after_resistance = project_recollections([*history, first_evidence, *resisted]).latest[
             memory_id
         ]
@@ -218,6 +222,7 @@ class RecollectionCorrectionTests(unittest.TestCase):
         self.assertEqual(final.confidence_basis, "direct_confirmation")
         self.assertIsNone(final.remembered_person_id)
         self.assertIsNone(final.remembered_location_id)
+        self.assertIsNone(final.remembered_at)
         self.assertIn("unavailable", final.text)
 
     def test_high_confidence_correction_cannot_bypass_resistance_history(self):

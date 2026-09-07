@@ -22,6 +22,7 @@ class Recollection:
     blended_memory_ids: tuple[str, ...]
     remembered_person_id: str | None
     remembered_location_id: str | None
+    remembered_at: datetime | None
     correction_evidence_id: str | None
     changed_at: datetime
 
@@ -82,6 +83,14 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 or event.payload.get("confidence_basis") != expected_basis
             ):
                 raise ValueError("Reminder must preserve Pathos's current subjective certainty")
+            if "remembered_at" in event.payload:
+                expected_time = (
+                    expected.remembered_at
+                    if expected is not None and expected.remembered_at is not None
+                    else _source_time(sources[memory_id])
+                )
+                if _aware(event, "remembered_at") != expected_time:
+                    raise ValueError("Reminder must preserve Pathos's subjective memory time")
             _aware(event, "simulated_at")
             access_counts[memory_id] = access_counts.get(memory_id, 0) + 1
         elif event.kind == "memory.reconsolidated":
@@ -134,6 +143,12 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 sources[memory_id],
                 sources.get(blended_memory_ids[0]) if blended_memory_ids else None,
             )
+            remembered_at = _remembered_time(
+                event,
+                sources[memory_id],
+                sources.get(blended_memory_ids[0]) if blended_memory_ids else None,
+                changed_at,
+            )
             confidently_misattributed = confidence_basis == "familiarity_misattribution"
             if confidently_misattributed:
                 if (
@@ -177,6 +192,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 blended_memory_ids,
                 remembered_person_id,
                 remembered_location_id,
+                remembered_at,
                 None,
                 changed_at,
             )
@@ -269,6 +285,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 (),
                 None,
                 None,
+                None,
                 cause,
                 changed_at,
             )
@@ -316,6 +333,49 @@ def _remembered_attribution(
     }
     if value not in allowed:
         raise ValueError("Remembered attribution must come from a cited source memory")
+    return value
+
+
+def _remembered_time(
+    event: DomainEvent,
+    source: DomainEvent,
+    blended_source: DomainEvent | None,
+    changed_at: datetime,
+) -> datetime | None:
+    value = event.payload.get("remembered_at")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Recollection remembered_at must be an ISO timestamp")
+    try:
+        remembered_at = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError("Recollection remembered_at must be an ISO timestamp") from None
+    if remembered_at.utcoffset() is None:
+        raise ValueError("Recollection remembered_at must be timezone-aware")
+    if blended_source is None:
+        raise ValueError("Changed memory time requires a source-linked memory blend")
+    allowed = {_source_time(source), _source_time(blended_source)}
+    if remembered_at not in allowed:
+        raise ValueError("Remembered time must come from a cited source memory")
+    if remembered_at > changed_at:
+        raise ValueError("A recollection cannot borrow a future memory time")
+    return remembered_at
+
+
+def _source_time(event: DomainEvent) -> datetime:
+    raw = event.payload.get("simulated_at")
+    if isinstance(raw, datetime):
+        value = raw
+    elif isinstance(raw, str):
+        try:
+            value = datetime.fromisoformat(raw)
+        except ValueError:
+            value = event.occurred_at
+    else:
+        value = event.occurred_at
+    if value.utcoffset() is None:
+        raise ValueError("Memory source time must be timezone-aware")
     return value
 
 

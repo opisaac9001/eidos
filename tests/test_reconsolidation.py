@@ -314,6 +314,7 @@ class ReconsolidationTests(unittest.TestCase):
 
         self.assertEqual(changed[0].payload["remembered_person_id"], "rowan")
         self.assertEqual(changed[0].payload["remembered_location_id"], "workshop")
+        self.assertEqual(changed[0].payload["remembered_at"], second.payload["simulated_at"])
         later_history = [*history, *accesses, *changed]
         as_rowan = next(
             item
@@ -328,6 +329,9 @@ class ReconsolidationTests(unittest.TestCase):
         )
         self.assertEqual(as_rowan.remembered_person_id, "rowan")
         self.assertEqual(as_rowan.remembered_location_id, "workshop")
+        self.assertEqual(
+            as_rowan.remembered_at, datetime.fromisoformat(second.payload["simulated_at"])
+        )
         self.assertEqual(as_rowan.matched_entities, ("rowan", "workshop"))
         self.assertEqual(as_rowan.matched_relationships, ("rowan",))
         as_source = next(
@@ -352,6 +356,7 @@ class ReconsolidationTests(unittest.TestCase):
         self.assertEqual(visible["remembered_person_id"], "rowan")
         self.assertEqual(visible["location_id"], "cafe")
         self.assertEqual(visible["remembered_location_id"], "workshop")
+        self.assertEqual(visible["remembered_at"], second.payload["simulated_at"])
 
         forged = DomainEvent(
             "memory.reconsolidated",
@@ -362,6 +367,19 @@ class ReconsolidationTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "cited source memory"):
             project_recollections([*history, *accesses, forged])
+
+        forged_time = DomainEvent(
+            "memory.reconsolidated",
+            "pathos",
+            {
+                **dict(changed[0].payload),
+                "remembered_at": (self.now - timedelta(days=50)).isoformat(),
+            },
+            causation_id=changed[0].causation_id,
+            correlation_id=changed[0].correlation_id,
+        )
+        with self.assertRaisesRegex(ValueError, "cited source memory"):
+            project_recollections([*history, *accesses, forged_time])
 
     def test_related_memory_is_not_blended_without_a_current_access(self):
         first = self.memory()

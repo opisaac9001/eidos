@@ -1441,6 +1441,7 @@ class Life:
                         "detail_level": item.detail_level,
                         "remembered_person_id": item.remembered_person_id,
                         "remembered_location_id": item.remembered_location_id,
+                        "remembered_at": item.remembered_at.isoformat(),
                     }
                     for item in recall(
                         project_history,
@@ -2190,6 +2191,7 @@ class Life:
                         "emotional_tone": item.emotional_label,
                         "remembered_person_id": item.remembered_person_id,
                         "remembered_location_id": item.remembered_location_id,
+                        "remembered_at": item.remembered_at.isoformat(),
                     }
                     for item in selected_context
                 ],
@@ -3076,6 +3078,7 @@ class Life:
                         "recalled_text": reminder.recalled_text,
                         "felt_confidence": reminder.felt_confidence,
                         "confidence_basis": reminder.confidence_basis,
+                        "remembered_at": reminder.remembered_at.isoformat(),
                         "cue_terms": ",".join(reminder.matched_terms),
                         "cue_term_count": len(reminder.matched_terms),
                         "simulated_at": at,
@@ -3103,6 +3106,7 @@ class Life:
                     "emotional_tone": item.emotional_label,
                     "remembered_person_id": item.remembered_person_id,
                     "remembered_location_id": item.remembered_location_id,
+                    "remembered_at": item.remembered_at.isoformat(),
                 }
                 for item in selected
             ],

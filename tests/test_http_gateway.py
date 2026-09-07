@@ -111,6 +111,7 @@ class GatewayTests(unittest.TestCase):
                                     "detail_level": "clear",
                                     "remembered_person_id": "rowan",
                                     "remembered_location_id": "workshop",
+                                    "remembered_at": "2026-02-01T12:00:00+00:00",
                                 }
                             ],
                             "source_confidence": 0.35,
@@ -126,6 +127,10 @@ class GatewayTests(unittest.TestCase):
         context = json.loads(self.payload["messages"][1]["content"])
         self.assertEqual(context["memory_recollections"][0]["felt_confidence"], 0.92)
         self.assertEqual(context["memory_recollections"][0]["remembered_person_id"], "rowan")
+        self.assertEqual(
+            context["memory_recollections"][0]["remembered_at"],
+            "2026-02-01T12:00:00+00:00",
+        )
         self.assertNotIn("source_confidence", context)
         self.assertIn("subjective certainty", self.payload["messages"][0]["content"])
 

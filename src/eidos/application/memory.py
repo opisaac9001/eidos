@@ -76,6 +76,7 @@ class RecalledMemory:
     reminder_count: int
     remembered_person_id: str | None
     remembered_location_id: str | None
+    remembered_at: datetime
     encoded_valence: float
     encoded_arousal: float
     emotional_label: str
@@ -404,7 +405,12 @@ def recall(
             if subjective is not None and subjective.remembered_location_id is not None
             else _string_metadata(event, "location_id")
         )
-        age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
+        remembered_at = (
+            subjective.remembered_at
+            if subjective is not None and subjective.remembered_at is not None
+            else _simulated_time(event)
+        )
+        age_days = max(0.0, (now - remembered_at).total_seconds() / 86400)
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
         rehearsals = min(5, index.access_counts.get(event.event_id, 0))
@@ -511,6 +517,7 @@ def recall(
                 index.reminder_counts.get(event.event_id, 0),
                 remembered_person_id,
                 remembered_location_id,
+                remembered_at,
                 encoded_valence,
                 encoded_arousal,
                 emotional_label,
@@ -518,7 +525,7 @@ def recall(
             )
         )
     ranked.sort(
-        key=lambda item: (item.score, _simulated_time(item.event), str(item.event.event_id)),
+        key=lambda item: (item.score, item.remembered_at, str(item.event.event_id)),
         reverse=True,
     )
     if not diverse:
@@ -643,6 +650,7 @@ def memory_view(
                 "reminder_count": item.reminder_count,
                 "remembered_person_id": item.remembered_person_id,
                 "remembered_location_id": item.remembered_location_id,
+                "remembered_at": item.remembered_at.isoformat(),
                 "encoded_valence": item.encoded_valence,
                 "encoded_arousal": item.encoded_arousal,
                 "emotional_label": item.emotional_label,

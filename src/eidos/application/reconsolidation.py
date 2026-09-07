@@ -103,6 +103,10 @@ def reconsolidation_events(
                     and companion_value != source_value
                 ):
                     payload[f"remembered_{field}"] = companion_value
+            source_time = _event_time(item.event)
+            companion_time = _event_time(companion.event)
+            if companion_time != source_time:
+                payload["remembered_at"] = companion_time.isoformat()
         output.append(
             DomainEvent(
                 "memory.reconsolidated",
@@ -220,3 +224,12 @@ def _current_affect(history: Sequence[DomainEvent], at: datetime) -> float:
         if sampled_at.utcoffset() is not None and sampled_at <= at and -1 <= value <= 1:
             return float(value)
     return 0.0
+
+
+def _event_time(event: DomainEvent) -> datetime:
+    value = event.payload.get("simulated_at")
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return event.occurred_at

@@ -380,9 +380,10 @@ network authorization; the server remains loopback-only until authenticated depl
   A highly certain familiarity-based false memory does not collapse after one
   contradiction: the first direct conflict is recorded as resistance, and independent
   direct corroboration is required before the subjective recollection is corrected.
-  Similar traces may also exchange their remembered person or place. Recall and model
-  context follow Pathos's subjective words and attribution, while the original terms
-  and entity links stay available only in the operator audit.
+  Similar traces may also exchange their remembered person, place, or date. Perceived
+  age, recall, and model context follow Pathos's subjective words, time, and attribution,
+  while the original terms, timestamp, and entity links stay available only in the
+  operator audit.
   Newer direct structured evidence can correct a drifted claim while preserving both
   the mistaken version and its correction trail. The recall maps are maintained as a
   versioned, checksummed, event-anchored projection that can be discarded and rebuilt

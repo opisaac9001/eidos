@@ -196,9 +196,10 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   can blend, with both source links retained and no change to either source. Rehearsing
   that blend can make familiarity feel like evidence: the false composite may become
   vivid and highly certain in Pathos's mind. Source confusion can also move the
-  remembered person or place to the companion trace. Subjective retrieval then follows
-  the recollection's current words and wrong attribution rather than secretly using
-  archival terms or entity links.
+  remembered person, place, or date to the companion trace. The borrowed date changes
+  perceived age and therefore accessibility. Subjective retrieval then follows the
+  recollection's current words, time, and wrong attribution rather than secretly using
+  archival terms, timestamps, or entity links.
   Conversation, inner cognition, activity choice, and project planning receive that
   felt certainty and attribution—not the operator's hidden source record. Later thought
   begins from the subjective version while immutable
