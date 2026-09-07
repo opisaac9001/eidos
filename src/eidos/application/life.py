@@ -22,6 +22,7 @@ from eidos.application.catchup import (
 )
 from eidos.application.character_generation import generated_character_history_events
 from eidos.application.cognition import perform, request_for
+from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import (
@@ -1086,6 +1087,7 @@ class Life:
             "mind": {
                 "layers": [vars_for(item) for item in mind.latest.values()],
                 "pulse_counts": dict(mind.pulse_counts),
+                "workspace": cognitive_workspace(history, state.simulated_at),
             },
             "emotion": {
                 **vars_for(emotion),
@@ -1274,6 +1276,7 @@ class Life:
                     for item in selected
                 ],
                 "recent_inner_stream": recent_stream,
+                "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
                 "stream_pulse_id": pulse_id,
                 "mind_layers": mind_context(history),
                 "emotion": {
@@ -1633,6 +1636,7 @@ class Life:
                 self_concepts=self_story_context,
                 skills=skill_context,
                 habits=habit_context,
+                workspace=cognitive_workspace(project_history, current),
             )
             if project_events:
                 self._planning(project_history + project_events)
@@ -1677,6 +1681,7 @@ class Life:
                 self_concepts=self_story_context,
                 skills=skill_context,
                 habits=habit_context,
+                workspace=cognitive_workspace(agency_history, current),
                 known_person_ids=pathos_known_person_ids(agency_history),
             )
             if agency:
@@ -2380,6 +2385,7 @@ class Life:
                     if event.kind == "thought.recorded"
                     and isinstance(event.payload.get("text"), str)
                 ][-8:],
+                "cognitive_workspace": cognitive_workspace(history + pending, current),
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
@@ -2627,7 +2633,10 @@ class Life:
             ):
                 if current.hour == scheduled_hour:
                     role_sources = selected_context
-                    role_context = context
+                    role_context = {
+                        **context,
+                        "cognitive_workspace": cognitive_workspace(history + pending, current),
+                    }
                     if role == "chronicler":
                         role_sources = [
                             item
@@ -3350,6 +3359,7 @@ class Life:
                 for event in history
                 if event.kind == "thought.recorded" and isinstance(event.payload.get("text"), str)
             ][-8:],
+            "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
         }
         access_events = [
             DomainEvent(

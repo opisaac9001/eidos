@@ -416,7 +416,11 @@ ordinary world is living at real-time speed, a separate waking Murmur heartbeat 
 one idempotent stream-of-consciousness pulse per quarter hour. Each pulse receives the
 recent stream, current focus, emotion, place, and Pathos-owned recollections, then can
 feed later conscious dialogue, reflection, and dreams through that shared persistent
-workspace. It stops during sleep, when dream processing takes over. Accelerated catch-up
+workspace. The same bounded blackboard also reaches voluntary activity and project
+proposals. Items retain their originating faculty, source, age, salience, and epistemic
+status; every item explicitly lacks action authority. The projection caps each faculty,
+drops expired and future material, and excludes another actor's private cognition.
+It stops during sleep, when dream processing takes over. Accelerated catch-up
 keeps the coarser hourly cadence instead of manufacturing thousands of retrospective
 thoughts. Deliberation,
 social awareness, reflection, and dream processing activate under distinct conditions.

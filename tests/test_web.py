@@ -89,6 +89,7 @@ class WebTests(unittest.TestCase):
                 self.assertIn(b"state.emotion", body)
                 self.assertIn(b"function loadMemoryArchive", body)
                 self.assertIn(b"function selectArchiveTab", body)
+                self.assertIn(b"cognitive-workspace", body)
                 self.assertIn(b'clock_mode: selected === "realtime"', body)
                 self.assertIn(b"PRIVATE BIOGRAPHY", body)
                 self.assertIn(b'window.location.pathname === "/operator"', body)

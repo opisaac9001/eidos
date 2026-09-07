@@ -40,6 +40,7 @@ async def autonomous_activity_events(
     self_concepts: Sequence[Mapping[str, object]] = (),
     skills: Sequence[Mapping[str, object]] = (),
     habits: Sequence[Mapping[str, object]] = (),
+    workspace: Sequence[Mapping[str, object]] = (),
     known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""
@@ -89,6 +90,7 @@ async def autonomous_activity_events(
         "self_concepts": list(self_concepts[-4:]),
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
+        "cognitive_workspace": list(workspace[-12:]),
         "recent_activity_patterns": recent_activity_patterns,
         "current_attention": (
             {
@@ -128,7 +130,7 @@ async def autonomous_activity_events(
     }
     request = ModelRequest(
         capability="pathos_agency",
-        task_version="2",
+        task_version="3",
         temperature=0.9,
         max_output_tokens=320,
         output_schema=agency_output_schema(list(places), list(resources), list(people)),

@@ -132,8 +132,12 @@ proposals, and records traces. Conscious dialogue, reflection, subconscious
 association, NPC improvisation, and dreams are distinct job types.
 They communicate through an owned, append-only cognitive workspace rather than direct
 unbounded model-to-model chat: attention, emotion, recalled experience, and the recent
-inner stream become limited inputs to the next eligible faculty. This preserves the
-ensemble design while keeping provenance, privacy, pacing, and action authority clear.
+inner stream become limited inputs to the next eligible faculty. The workspace is a
+bounded projection of Pathos-owned events, not a second mutable truth store. Every item
+identifies its faculty, source event, age, salience, epistemic status, and lack of action
+authority; future, expired, and another actor's private material are excluded. This
+preserves the ensemble design while keeping provenance, privacy, pacing, and action
+authority clear.
 
 ### Tools (Logos)
 

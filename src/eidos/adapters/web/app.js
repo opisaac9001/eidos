@@ -1251,6 +1251,14 @@ function render(next) {
         `<article class="panel role-card"><div class="panel-kicker"><span>0${index + 1} / ${role.id === "critic" ? "RULES" : liveModel ? "MODEL" : "STAND-IN"}</span><span class="role-status">${esc(role.status.toUpperCase())}</span></div><h2>${esc(role.name)}</h2><p>${esc(role.purpose)}</p><div class="role-stats"><span>${role.calls} ${role.id === "critic" ? "checks" : "calls"}</span><span>${role.last ? `${date(role.last)} · ${time(role.last)}` : "Awaiting its moment"}</span></div></article>`,
     )
     .join("");
+  $("cognitive-workspace").innerHTML = (state.mind?.workspace || []).length
+    ? state.mind.workspace
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.from_faculty.toUpperCase())} · ${esc(item.kind.replaceAll("_", " ").replaceAll(".", " ").toUpperCase())}</span><span>${Math.round(item.salience * 100)}% SALIENT · ${item.age_minutes} MIN AGO</span></div><p>${esc(item.content)}</p><div class="memory-source">${esc(item.epistemic_status.replaceAll("_", " "))} · can influence attention, but cannot act or become fact by itself</div></article>`,
+        )
+        .join("")
+    : "<p>No thought is holding the foreground right now.</p>";
 }
 
 document.addEventListener("click", (event) => {

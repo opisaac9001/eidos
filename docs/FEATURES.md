@@ -94,7 +94,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus a waking quarter-hour real-time Murmur stream that carries recent thoughts into later faculties, with inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus a waking quarter-hour real-time Murmur stream and a bounded Pathos-private cross-faculty workspace; sourced subjective handoffs reach speech, reflection, dreams, activities, and projects without fact or action authority, with inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: replayable nightly windows shaped by condition and commitments, with occupied-time delay and legacy fallback | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs, complete lineage, and varied replay-stable offline dreams | P4 |

@@ -251,6 +251,14 @@ class AgencyTests(unittest.TestCase):
                         "authority": "soft_pattern_only",
                     }
                 ],
+                workspace=[
+                    {
+                        "from_faculty": "murmur",
+                        "content": "The unfinished letter keeps tugging at me.",
+                        "epistemic_status": "inner_monologue",
+                        "action_authority": False,
+                    }
+                ],
                 known_person_ids=frozenset({"mara"}),
             )
         )
@@ -269,6 +277,9 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(context["skills"][0]["authority"], "capability_signal_only")
         self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
         self.assertEqual(context["recent_activity_patterns"][0]["companion_id"], "solo")
+        self.assertEqual(context["cognitive_workspace"][0]["from_faculty"], "murmur")
+        self.assertFalse(context["cognitive_workspace"][0]["action_authority"])
+        self.assertEqual(gateway.requests[0].task_version, "3")
 
 
 if __name__ == "__main__":

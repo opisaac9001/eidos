@@ -70,6 +70,10 @@ class LifeTests(unittest.TestCase):
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
         self.assertTrue(snapshot["emotion"]["label"])
+        self.assertTrue(snapshot["mind"]["workspace"])
+        self.assertTrue(
+            all(item["action_authority"] is False for item in snapshot["mind"]["workspace"])
+        )
         self.assertEqual(len(snapshot["sleep_windows"]), 1)
         self.assertEqual(snapshot["sleep_windows"][0]["night_date"], "2026-01-01")
         self.assertTrue(any(item["kind"] == "sleep.window_selected" for item in snapshot["feed"]))

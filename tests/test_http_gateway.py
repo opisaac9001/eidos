@@ -110,6 +110,14 @@ class GatewayTests(unittest.TestCase):
                             ],
                             "remembered_preferences": [{"topic": "coffee", "stance": "likes"}],
                             "relationship_repairs": [{"status": "open"}],
+                            "cognitive_workspace": [
+                                {
+                                    "from_faculty": "murmur",
+                                    "content": "Maybe don't rush this answer.",
+                                    "epistemic_status": "inner_monologue",
+                                    "action_authority": False,
+                                }
+                            ],
                         }
                     ),
                 ),
@@ -123,6 +131,8 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["recent_dialogue"][-1]["text"], "Yeah, for a bit.")
         self.assertEqual(context["remembered_preferences"][0]["topic"], "coffee")
         self.assertEqual(context["relationship_repairs"][0]["status"], "open")
+        self.assertEqual(context["cognitive_workspace"][0]["from_faculty"], "murmur")
+        self.assertFalse(context["cognitive_workspace"][0]["action_authority"])
         system = self.payload["messages"][0]["content"]
         self.assertIn("relaxed person talking", system)
         self.assertIn("Do not end every reply with a question", system)

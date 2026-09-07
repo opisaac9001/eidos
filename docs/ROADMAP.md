@@ -295,6 +295,11 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
 
 - Structured unresolved concerns and emotional residue feed bounded associations.
   Most remain private; only salient fragments enter conscious attention.
+- A derived Pathos-private cognitive workspace now carries bounded thoughts,
+  associations, attention, concerns, reflections, and dream residue between Murmur,
+  conscious speech, reflection, Oneiros, activity choice, and project formation. Every
+  handoff retains source, faculty, age, salience, and epistemic status while explicitly
+  lacking fact or action authority; expired, future, and other-owner material is absent.
 - Reflection proposes interpretations, memory links and plan reconsideration,
   never retroactive fact changes.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.

@@ -40,6 +40,7 @@ async def autonomous_project_events(
     self_concepts: Sequence[Mapping[str, object]] = (),
     skills: Sequence[Mapping[str, object]] = (),
     habits: Sequence[Mapping[str, object]] = (),
+    workspace: Sequence[Mapping[str, object]] = (),
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
@@ -86,6 +87,7 @@ async def autonomous_project_events(
         "self_concepts": list(self_concepts[-4:]),
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
+        "cognitive_workspace": list(workspace[-12:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,
@@ -119,7 +121,7 @@ async def autonomous_project_events(
     }
     request = ModelRequest(
         capability="pathos_project",
-        task_version="2",
+        task_version="3",
         temperature=0.9,
         max_output_tokens=520,
         output_schema=self_project_output_schema(list(places), list(resources)),

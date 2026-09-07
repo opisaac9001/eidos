@@ -11,13 +11,13 @@ from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
-    "pathos": ("4", 160, 0.55),
-    "murmur": ("4", 100, 0.65),
+    "pathos": ("5", 160, 0.55),
+    "murmur": ("5", 100, 0.65),
     "firmament": ("4", 140, 0.7),
     "moira": ("3", 16, 0.2),
     "mnemosyne": ("3", 384, 0.0),
-    "reflection": ("3", 140, 0.55),
-    "oneiros": ("3", 220, 0.8),
+    "reflection": ("4", 140, 0.55),
+    "oneiros": ("4", 220, 0.8),
     "chronicler": ("3", 180, 0.2),
 }
 
