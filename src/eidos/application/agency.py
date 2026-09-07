@@ -37,6 +37,7 @@ async def autonomous_activity_events(
     traits: Mapping[str, float],
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
+    self_concepts: Sequence[Mapping[str, object]] = (),
     known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""
@@ -82,6 +83,7 @@ async def autonomous_activity_events(
         "traits": dict(traits),
         "recent_memories": list(memories[-8:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
+        "self_concepts": list(self_concepts[-4:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,

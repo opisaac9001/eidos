@@ -91,6 +91,9 @@ const labels = {
   "preference.emerged": "A PREFERENCE TOOK SHAPE",
   "preference.retired": "A PREFERENCE FADED",
   "trait.adjusted": "A TENDENCY SHIFTED",
+  "self_concept.formed": "A SELF-UNDERSTANDING FORMED",
+  "self_concept.reinforced": "A SELF-UNDERSTANDING DEEPENED",
+  "self_concept.revised": "A SELF-UNDERSTANDING CHANGED",
   "goal.activated": "A PERSONAL GOAL",
   "goal.progressed": "GOAL PROGRESS",
   "goal.achieved": "GOAL ACHIEVED",
@@ -685,8 +688,9 @@ function render(next) {
   const traits = Object.entries(state.identity?.traits || {})
     .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)
     .join(" · ");
+  const selfView = state.self_concepts?.[0];
   $("preferences-summary").textContent = preferences.length
-    ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}`
+    ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}${selfView ? ` · Current self-view: ${selfView.text} (${Math.round(selfView.confidence * 100)}% confidence)` : ""}`
     : "Preferences are still taking shape…";
   $("mini-map").innerHTML = mapMarkup(false);
   $("large-map").innerHTML = mapMarkup(true);

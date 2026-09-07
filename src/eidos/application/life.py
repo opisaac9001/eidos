@@ -79,6 +79,7 @@ from eidos.application.relationship_repairs import relationship_repair_events
 from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
+from eidos.application.self_concept import self_concept_events
 from eidos.application.self_projects import autonomous_project_events
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.sleep_schedule import sleep_window_events
@@ -139,6 +140,7 @@ from eidos.domain.scenes import (
     resolve_scene_turn,
 )
 from eidos.domain.seasons import project_season, season_change_events, season_for
+from eidos.domain.self_concept import project_self_concepts
 from eidos.domain.semantic_memory import project_semantic_expectations
 from eidos.domain.sleep import project_sleep_windows
 from eidos.domain.social import project_social
@@ -795,6 +797,9 @@ class Life:
                 "self_project.completed",
                 "self_project.failed",
                 "self_project.step_failed",
+                "self_concept.formed",
+                "self_concept.reinforced",
+                "self_concept.revised",
                 "goal.activated",
                 "goal.progressed",
                 "goal.achieved",
@@ -965,6 +970,7 @@ class Life:
         season = project_season(history)
         beliefs = self._beliefs(history)
         semantic_expectations = project_semantic_expectations(history).expectations
+        self_concepts = project_self_concepts(history).concepts
         followups = project_followups(history)
         development = project_development(history)
         transfers = project_transfers(history)
@@ -1019,6 +1025,7 @@ class Life:
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
                 "traits": dict(traits.levels),
+                "self_concepts": self_concept_context(history),
                 "established": identity.established,
             },
             "weather": weather,
@@ -1119,6 +1126,7 @@ class Life:
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id == "pathos"
             ],
             "semantic_expectations": [vars_for(item) for item in semantic_expectations.values()],
+            "self_concepts": [vars_for(item) for item in self_concepts.values()],
             "npc_beliefs": [
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id != "pathos"
             ],
@@ -1465,6 +1473,9 @@ class Life:
             semantic_context = (
                 semantic_expectation_context(project_history) if planning_memory_due else []
             )
+            self_story_context = (
+                self_concept_context(project_history) if planning_memory_due else []
+            )
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1498,6 +1509,7 @@ class Life:
                 traits=project_trait_state.levels,
                 memories=recent_memory_context,
                 semantic_expectations=semantic_context,
+                self_concepts=self_story_context,
             )
             if project_events:
                 self._planning(project_history + project_events)
@@ -1539,6 +1551,7 @@ class Life:
                 traits=agency_traits.levels,
                 memories=recent_memory_context,
                 semantic_expectations=semantic_context,
+                self_concepts=self_story_context,
                 known_person_ids=pathos_known_person_ids(agency_history),
             )
             if agency:
@@ -2143,6 +2156,7 @@ class Life:
             pending.extend(development_events(history + pending, at))
             pending.extend(preference_development_events(history + pending, current))
             pending.extend(trait_development_events(history + pending, current))
+            pending.extend(self_concept_events(history + pending, current))
             overdue = overdue_plan_events(self._planning(history + pending), current)
             if overdue:
                 self._planning(history + pending + overdue)
@@ -2212,6 +2226,7 @@ class Life:
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
                     "traits": dict(traits_now.levels),
+                    "self_concepts": self_concept_context(history + pending),
                 },
                 "development": {
                     "skills": {
@@ -3110,6 +3125,7 @@ class Life:
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
                 "traits": dict(traits.levels),
+                "self_concepts": self_concept_context(history),
             },
             "memories": [item.recalled_text for item in selected],
             "memory_recollections": [
@@ -3276,6 +3292,20 @@ def semantic_expectation_context(events: Sequence[DomainEvent]) -> list[dict[str
             "epistemic_status": "subjective_generalization",
         }
         for item in project_semantic_expectations(events).expectations.values()
+    ]
+
+
+def self_concept_context(events: Sequence[DomainEvent]) -> list[dict[str, object]]:
+    """Expose Pathos's current self-story without its operator-only evidence ledger."""
+    return [
+        {
+            "text": item.text,
+            "dimension": item.dimension,
+            "stance": item.stance,
+            "confidence": item.confidence,
+            "epistemic_status": "subjective_self_interpretation",
+        }
+        for item in project_self_concepts(events).concepts.values()
     ]
 
 

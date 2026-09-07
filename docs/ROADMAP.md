@@ -220,6 +220,11 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   episodes, named emotional states, duration, baseline mood and recovery. Emotional
   planning bias changes attention and option weighting without removing feasibility,
   consent, or agency. Personality cannot reset with each prompt.
+- Pathos now forms a separate autobiographical interpretation of his recent
+  follow-through only after outcomes span multiple days and at least a week. It can
+  be reinforced or revised after contradictory experience, is shown with confidence
+  and source outcomes, and may affect voice or motivation without becoming a fixed
+  trait or an objective verdict about him.
 - Show why a memory was selected and distinguish what happened from what is recalled.
 
 Exit: an old relevant promise outranks unrelated recent chatter; ordinary details

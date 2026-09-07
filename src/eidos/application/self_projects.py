@@ -37,6 +37,7 @@ async def autonomous_project_events(
     traits: Mapping[str, float],
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
+    self_concepts: Sequence[Mapping[str, object]] = (),
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
@@ -80,6 +81,7 @@ async def autonomous_project_events(
         "traits": dict(traits),
         "recent_memories": list(memories[-10:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
+        "self_concepts": list(self_concepts[-4:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,

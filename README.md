@@ -73,6 +73,9 @@ expectation, such as expecting someone at a familiar place. The expectation keep
 episodic sources and revisions, follows Pathos's subjective memory when attribution
 drifts, and may influence what he says or plans without becoming proof that the person
 is actually there.
+Repeated successes and failures can similarly form a cautious autobiographical view
+of his recent follow-through. That self-view is evidence-bound, confidence-weighted,
+revisable, and distinct from both his stable values and slow behavioral traits.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,

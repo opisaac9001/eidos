@@ -188,6 +188,13 @@ class GatewayTests(unittest.TestCase):
                                     "epistemic_status": "subjective_generalization",
                                 }
                             ],
+                            "self_concepts": [
+                                {
+                                    "text": "Lately, my follow-through has felt uneven.",
+                                    "confidence": 0.55,
+                                    "epistemic_status": "subjective_self_interpretation",
+                                }
+                            ],
                             "known_places": {"home": {"name": "Home"}},
                             "calendar": [],
                             "private_operator_field": "must not pass",
@@ -208,6 +215,10 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(
             context["semantic_expectations"][0]["epistemic_status"],
             "subjective_generalization",
+        )
+        self.assertEqual(
+            context["self_concepts"][0]["epistemic_status"],
+            "subjective_self_interpretation",
         )
         self.assertIn("slowly learned preferences", self.payload["messages"][0]["content"])
         self.assertIn("not world facts", self.payload["messages"][0]["content"])

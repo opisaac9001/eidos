@@ -189,6 +189,13 @@ class AgencyTests(unittest.TestCase):
                         "epistemic_status": "subjective_generalization",
                     }
                 ],
+                self_concepts=[
+                    {
+                        "text": "Lately, my follow-through has felt uneven to me.",
+                        "confidence": 0.55,
+                        "epistemic_status": "subjective_self_interpretation",
+                    }
+                ],
                 known_person_ids=frozenset({"mara"}),
             )
         )
@@ -202,6 +209,7 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(context["current_attention"]["focus_id"], "unfinished-letter")
         self.assertEqual(set(context["known_people"]), {"mara"})
         self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
+        self.assertEqual(context["self_concepts"][0]["confidence"], 0.55)
 
 
 if __name__ == "__main__":

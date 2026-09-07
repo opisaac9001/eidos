@@ -21,14 +21,19 @@ modern tensor cores and is not supported by every contemporary inference
 engine. The initial benchmark target is therefore llama.cpp with explicit
 Pascal/CUDA configuration.
 
-The 360 GB of system memory is useful for large model loading, CPU offload,
+The verified 256 GB of system memory is useful for large model loading, CPU offload,
 retrieval indexes, databases, and caching. It does not substitute for GPU
 bandwidth, so actual model assignments will be chosen from benchmarks rather
 than aggregate memory alone.
 
+The first live inventory is recorded in [INVENTORY.md](INVENTORY.md). OS installation
+is currently blocked because the only detected 2 TB SATA SSD reports failed with
+zero usable capacity. RAID and boot configuration must remain untouched until a
+healthy installation target is present.
+
 ## Information required before installation
 
-- Exact P40 count and PCIe topology
+- Confirm that the three video controllers in PCIe slots 3, 6, and 7 are Tesla P40s
 - CPU models and NUMA layout
 - RAID controller, virtual disks, and physical drive inventory
 - SSD model, endurance, and intended boot/data role
