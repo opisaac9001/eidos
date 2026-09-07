@@ -165,6 +165,36 @@ class WebTests(unittest.TestCase):
         self.assertEqual((after - before).total_seconds(), 30)
         self.assertEqual(runtime.snapshot()["config"]["clock_mode"], "realtime")
 
+    def test_graceful_shutdown_persists_a_partial_realtime_interval(self):
+        class FakeClock:
+            def __init__(self):
+                self.now = 200.0
+
+            def __call__(self):
+                return self.now
+
+        clock = FakeClock()
+        life = Life(
+            SQLiteEventStore(Path(self.directory.name) / "shutdown-realtime.db"),
+            StandInGateway(),
+        )
+        runtime = Runtime(
+            life,
+            interval=10,
+            clock=clock,
+            realtime_quantum_seconds=300,
+        )
+        runtime.start()
+        before = datetime.fromisoformat(runtime.snapshot()["time"])
+        with runtime.mutation():
+            life.configure(True, 15, "realtime")
+        clock.now += 47
+
+        runtime.close()
+
+        after = datetime.fromisoformat(life.snapshot()["time"])
+        self.assertEqual((after - before).total_seconds(), 47)
+
     def test_boundary_rejects_cross_origin_and_bad_requests(self):
         status, _ = self.request(
             "POST",

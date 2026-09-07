@@ -112,6 +112,21 @@ class Runtime:
         self.stop.set()
         if self.thread:
             self.thread.join(timeout=30)
+        with self.lock:
+            config = self.life.snapshot()["config"]
+            wall_now = self.clock()
+            self.realtime_pending_seconds += max(0.0, wall_now - self.last_wall_tick)
+            self.last_wall_tick = wall_now
+            if (
+                self.error is None
+                and config["running"]
+                and config.get("clock_mode", "realtime") == "realtime"
+                and self.realtime_pending_seconds > 0
+            ):
+                self.life.advance(self.realtime_pending_seconds / 3600)
+                self.ticks += 1
+                self.realtime_pending_seconds = 0.0
+                self.cached = self.life.snapshot()
         close_gateway = getattr(self.life.gateway, "close", None)
         if callable(close_gateway):
             close_gateway()
