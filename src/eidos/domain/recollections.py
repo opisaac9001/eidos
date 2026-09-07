@@ -20,6 +20,8 @@ class Recollection:
     detail_level: str
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
+    remembered_person_id: str | None
+    remembered_location_id: str | None
     correction_evidence_id: str | None
     changed_at: datetime
 
@@ -120,6 +122,18 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                     raise ValueError("A memory access can contribute to only one reconsolidation")
             elif blend_access is not None:
                 raise ValueError("A blend access requires a blended memory")
+            remembered_person_id = _remembered_attribution(
+                event,
+                "person_id",
+                sources[memory_id],
+                sources.get(blended_memory_ids[0]) if blended_memory_ids else None,
+            )
+            remembered_location_id = _remembered_attribution(
+                event,
+                "location_id",
+                sources[memory_id],
+                sources.get(blended_memory_ids[0]) if blended_memory_ids else None,
+            )
             confidently_misattributed = confidence_basis == "familiarity_misattribution"
             if confidently_misattributed:
                 if (
@@ -161,6 +175,8 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 detail_level,
                 affective_bias,
                 blended_memory_ids,
+                remembered_person_id,
+                remembered_location_id,
                 None,
                 changed_at,
             )
@@ -251,6 +267,8 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 detail_level,
                 0.0,
                 (),
+                None,
+                None,
                 cause,
                 changed_at,
             )
@@ -275,6 +293,30 @@ def _evidence_contradicts(
         and new_value != old_value
         and claimed_value == new_value
     )
+
+
+def _remembered_attribution(
+    event: DomainEvent,
+    field: str,
+    source: DomainEvent,
+    blended_source: DomainEvent | None,
+) -> str | None:
+    payload_field = f"remembered_{field}"
+    value = event.payload.get(payload_field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"Recollection {payload_field} must be a non-empty string")
+    if blended_source is None:
+        raise ValueError("Changed attribution requires a source-linked memory blend")
+    allowed = {
+        candidate
+        for candidate in (source.payload.get(field), blended_source.payload.get(field))
+        if isinstance(candidate, str) and candidate
+    }
+    if value not in allowed:
+        raise ValueError("Remembered attribution must come from a cited source memory")
+    return value
 
 
 def _required(event: DomainEvent, key: str) -> str:

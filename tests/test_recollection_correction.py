@@ -67,7 +67,8 @@ class RecollectionCorrectionTests(unittest.TestCase):
                 "source": "direct-perception",
                 "confidence": 0.75,
                 "importance": 0.35,
-                "person_id": "rowan",
+                "person_id": "mara",
+                "location_id": "cafe",
                 "claim_subject_id": "lamp",
                 "claim_predicate": "switch",
                 "claim_value": "available",
@@ -192,6 +193,7 @@ class RecollectionCorrectionTests(unittest.TestCase):
 
         self.assertEqual([event.kind for event in resisted], ["memory.correction_resisted"])
         before = project_recollections(history).latest[memory_id]
+        self.assertEqual(before.remembered_person_id, "mara")
         after_resistance = project_recollections([*history, first_evidence, *resisted]).latest[
             memory_id
         ]
@@ -214,6 +216,8 @@ class RecollectionCorrectionTests(unittest.TestCase):
             [*history, first_evidence, *resisted, second_evidence, *corrected]
         ).latest[memory_id]
         self.assertEqual(final.confidence_basis, "direct_confirmation")
+        self.assertIsNone(final.remembered_person_id)
+        self.assertIsNone(final.remembered_location_id)
         self.assertIn("unavailable", final.text)
 
     def test_high_confidence_correction_cannot_bypass_resistance_history(self):

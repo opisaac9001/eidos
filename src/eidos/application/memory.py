@@ -74,6 +74,8 @@ class RecalledMemory:
     source_confidence: float
     confidence_basis: str
     reminder_count: int
+    remembered_person_id: str | None
+    remembered_location_id: str | None
     encoded_valence: float
     encoded_arousal: float
     emotional_label: str
@@ -354,6 +356,11 @@ def _metadata(event: DomainEvent) -> tuple[float, float]:
     return max(0.0, min(1.0, importance)), max(0.0, min(1.0, confidence))
 
 
+def _string_metadata(event: DomainEvent, key: str) -> str | None:
+    value = event.payload.get(key)
+    return value if isinstance(value, str) and value else None
+
+
 def recall(
     history: list[DomainEvent],
     query: str,
@@ -387,6 +394,16 @@ def recall(
         importance, source_confidence = _metadata(event)
         subjective = recollections.get(str(event.event_id))
         felt_confidence = subjective.confidence if subjective is not None else source_confidence
+        remembered_person_id = (
+            subjective.remembered_person_id
+            if subjective is not None and subjective.remembered_person_id is not None
+            else _string_metadata(event, "person_id")
+        )
+        remembered_location_id = (
+            subjective.remembered_location_id
+            if subjective is not None and subjective.remembered_location_id is not None
+            else _string_metadata(event, "location_id")
+        )
         age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
@@ -398,21 +415,30 @@ def recall(
             reactivation = 0.55 * (0.5 ** (subjective_age / 14.0))
         reinforcement = min(0.32, rehearsals * 0.04 + reminders * 0.08)
         accessibility = min(1.0, base_access + reinforcement + reactivation)
-        matched_terms = tuple(sorted(query_terms & index.terms_by_memory[event.event_id]))
-        matched_entities = tuple(
-            sorted(
-                entity for entity in entity_ids if event.event_id in index.by_entity.get(entity, ())
-            )
+        subjective_terms = (
+            terms(subjective.text)
+            if subjective is not None
+            else set(index.terms_by_memory[event.event_id])
         )
+        matched_terms = tuple(sorted(query_terms & subjective_terms))
+        remembered_entities = {
+            value
+            for key, value in event.payload.items()
+            if key.endswith("_id")
+            and key not in {"source_event_id", "memory_id", "person_id", "location_id"}
+            and isinstance(value, str)
+        }
+        remembered_entities.update(
+            value for value in (remembered_person_id, remembered_location_id) if value is not None
+        )
+        matched_entities = tuple(sorted(entity_ids & remembered_entities))
         matched_goals = tuple(
             sorted(goal for goal in goal_ids if event.event_id in index.by_goal.get(goal, ()))
         )
-        matched_relationships = tuple(
-            sorted(
-                person
-                for person in relationship_ids
-                if event.event_id in index.by_relationship.get(person, ())
-            )
+        matched_relationships = (
+            (remembered_person_id,)
+            if remembered_person_id is not None and remembered_person_id in relationship_ids
+            else ()
         )
         relevance = len(matched_terms) / max(1, len(query_terms))
         entity_relevance = min(1.0, len(matched_entities) / max(1, len(entity_ids)))
@@ -483,6 +509,8 @@ def recall(
                 round(source_confidence, 4),
                 subjective.confidence_basis if subjective is not None else "source_encoding",
                 index.reminder_counts.get(event.event_id, 0),
+                remembered_person_id,
+                remembered_location_id,
                 encoded_valence,
                 encoded_arousal,
                 emotional_label,
@@ -613,6 +641,8 @@ def memory_view(
                 "source_confidence": item.source_confidence,
                 "confidence_basis": item.confidence_basis,
                 "reminder_count": item.reminder_count,
+                "remembered_person_id": item.remembered_person_id,
+                "remembered_location_id": item.remembered_location_id,
                 "encoded_valence": item.encoded_valence,
                 "encoded_arousal": item.encoded_arousal,
                 "emotional_label": item.emotional_label,

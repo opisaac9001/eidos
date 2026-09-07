@@ -225,11 +225,15 @@ class ReconsolidationTests(unittest.TestCase):
         self.assertEqual(changed[0].payload["confidence"], 0.92)
         self.assertIn("and", changed[0].payload["recalled_text"])
         self.assertNotIn("may be missing", changed[0].payload["recalled_text"])
-        later = recall(
-            [*history, *accesses, *changed],
-            "Mara blue cup window",
-            self.now + timedelta(days=1),
-        )[0]
+        later = next(
+            item
+            for item in recall(
+                [*history, *accesses, *changed],
+                "Mara blue cup window",
+                self.now + timedelta(days=1),
+            )
+            if item.event.event_id == first.event_id
+        )
         self.assertEqual(later.felt_confidence, 0.92)
         self.assertEqual(later.source_confidence, 0.55)
         self.assertGreater(later.felt_confidence, later.source_confidence)
@@ -267,6 +271,97 @@ class ReconsolidationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "rehearsed similarity blend"):
             project_recollections([memory, access, invalid])
+
+    def test_source_confusion_can_move_a_memory_to_the_wrong_person_and_place(self):
+        first = self.memory()
+        second = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I saw Rowan place a blue cup beside the workshop window before lunch.",
+                "simulated_at": (self.now - timedelta(days=125)).isoformat(),
+                "owner": "pathos",
+                "importance": 0.35,
+                "confidence": 0.8,
+                "person_id": "rowan",
+                "location_id": "workshop",
+            },
+        )
+        rehearsals = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {
+                    "memory_id": str(first.event_id),
+                    "simulated_at": (self.now - timedelta(days=day)).isoformat(),
+                },
+            )
+            for day in (30, 20, 10)
+        ]
+        history = [first, second, *rehearsals]
+        recalled = recall(history, "blue cup window", self.now)
+        self.assertEqual(recalled[0].event.event_id, first.event_id)
+        accesses = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {"memory_id": str(item.event.event_id), "simulated_at": self.now.isoformat()},
+            )
+            for item in recalled
+        ]
+
+        changed = reconsolidation_events([*history, *accesses], recalled, self.now)
+
+        self.assertEqual(changed[0].payload["remembered_person_id"], "rowan")
+        self.assertEqual(changed[0].payload["remembered_location_id"], "workshop")
+        later_history = [*history, *accesses, *changed]
+        as_rowan = next(
+            item
+            for item in recall(
+                later_history,
+                "blue cup",
+                self.now + timedelta(days=1),
+                entity_ids={"rowan", "workshop"},
+                relationship_ids={"rowan"},
+            )
+            if item.event.event_id == first.event_id
+        )
+        self.assertEqual(as_rowan.remembered_person_id, "rowan")
+        self.assertEqual(as_rowan.remembered_location_id, "workshop")
+        self.assertEqual(as_rowan.matched_entities, ("rowan", "workshop"))
+        self.assertEqual(as_rowan.matched_relationships, ("rowan",))
+        as_source = next(
+            item
+            for item in recall(
+                later_history,
+                "blue cup",
+                self.now + timedelta(days=1),
+                entity_ids={"mara", "cafe"},
+                relationship_ids={"mara"},
+            )
+            if item.event.event_id == first.event_id
+        )
+        self.assertEqual(as_source.matched_entities, ())
+        self.assertEqual(as_source.matched_relationships, ())
+        visible = next(
+            item
+            for item in memory_view(later_history, self.now + timedelta(days=1))
+            if item["id"] == str(first.event_id)
+        )
+        self.assertEqual(visible["person_id"], "mara")
+        self.assertEqual(visible["remembered_person_id"], "rowan")
+        self.assertEqual(visible["location_id"], "cafe")
+        self.assertEqual(visible["remembered_location_id"], "workshop")
+
+        forged = DomainEvent(
+            "memory.reconsolidated",
+            "pathos",
+            {**dict(changed[0].payload), "remembered_person_id": "ellis"},
+            causation_id=changed[0].causation_id,
+            correlation_id=changed[0].correlation_id,
+        )
+        with self.assertRaisesRegex(ValueError, "cited source memory"):
+            project_recollections([*history, *accesses, forged])
 
     def test_related_memory_is_not_blended_without_a_current_access(self):
         first = self.memory()

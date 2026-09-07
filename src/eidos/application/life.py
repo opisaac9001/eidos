@@ -1439,6 +1439,8 @@ class Life:
                         "text": item.recalled_text,
                         "felt_confidence": item.felt_confidence,
                         "detail_level": item.detail_level,
+                        "remembered_person_id": item.remembered_person_id,
+                        "remembered_location_id": item.remembered_location_id,
                     }
                     for item in recall(
                         project_history,
@@ -2186,6 +2188,8 @@ class Life:
                         "felt_confidence": item.felt_confidence,
                         "detail_level": item.detail_level,
                         "emotional_tone": item.emotional_label,
+                        "remembered_person_id": item.remembered_person_id,
+                        "remembered_location_id": item.remembered_location_id,
                     }
                     for item in selected_context
                 ],
@@ -3097,6 +3101,8 @@ class Life:
                     "felt_confidence": item.felt_confidence,
                     "detail_level": item.detail_level,
                     "emotional_tone": item.emotional_label,
+                    "remembered_person_id": item.remembered_person_id,
+                    "remembered_location_id": item.remembered_location_id,
                 }
                 for item in selected
             ],

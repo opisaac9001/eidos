@@ -94,6 +94,15 @@ def reconsolidation_events(
             payload["blend_access_id"] = str(blend_access.event_id)
         if companion is not None:
             payload["blended_memory_id"] = str(companion.event.event_id)
+            for field in ("person_id", "location_id"):
+                source_value = item.event.payload.get(field)
+                companion_value = companion.event.payload.get(field)
+                if (
+                    isinstance(companion_value, str)
+                    and companion_value
+                    and companion_value != source_value
+                ):
+                    payload[f"remembered_{field}"] = companion_value
         output.append(
             DomainEvent(
                 "memory.reconsolidated",

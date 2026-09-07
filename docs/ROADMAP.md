@@ -195,9 +195,13 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   Pathos felt while remembering. Two similar hazy memories actually accessed together
   can blend, with both source links retained and no change to either source. Rehearsing
   that blend can make familiarity feel like evidence: the false composite may become
-  vivid and highly certain in Pathos's mind. Conversation, inner cognition, activity
-  choice, and project planning receive that felt certainty—not the operator's hidden
-  source score. Later thought begins from the subjective version while immutable
+  vivid and highly certain in Pathos's mind. Source confusion can also move the
+  remembered person or place to the companion trace. Subjective retrieval then follows
+  the recollection's current words and wrong attribution rather than secretly using
+  archival terms or entity links.
+  Conversation, inner cognition, activity choice, and project planning receive that
+  felt certainty and attribution—not the operator's hidden source record. Later thought
+  begins from the subjective version while immutable
   evidence remains separate. An ordinary uncertain recollection can yield to newer
   direct structured evidence immediately. A highly certain familiarity-based false
   memory instead records dissonance and resists the first contradiction; a separate
