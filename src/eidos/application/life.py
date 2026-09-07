@@ -127,7 +127,12 @@ from eidos.domain.commitments import project_renegotiations
 from eidos.domain.conversation_time import project_conversation_clocks, reply_pacing
 from eidos.domain.development import project_development
 from eidos.domain.emotional_regulation import project_regulation
-from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
+from eidos.domain.emotions import (
+    emotion_sample_events,
+    emotional_planning_bias,
+    emotional_speech_bias,
+    project_emotion,
+)
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState, project_finances
 from eidos.domain.household import HouseholdState, project_household
@@ -2433,7 +2438,7 @@ class Life:
             identity_now = project_identity(history + pending)
             traits_now = project_traits(history + pending)
             development_now = project_development(history + pending)
-            context = {
+            context: dict[str, object] = {
                 "location": catalog_now.location_name(state.location_id),
                 "time": at,
                 "ambient_presence": vars_for(
@@ -2503,6 +2508,24 @@ class Life:
                         emotion_now.sustained_low_hours,
                         emotion_now.complexity,
                     )
+                ),
+            }
+            context["voice"] = {
+                **vars_for(
+                    emotional_speech_bias(
+                        emotion_now.valence,
+                        emotion_now.arousal,
+                        effective_energy,
+                        emotion_now.sustained_low_hours,
+                        emotion_now.complexity,
+                    )
+                ),
+                "register": "casual, direct, familiar, and unpolished in a natural way",
+                "instruction": (
+                    "Use contractions and ordinary phrasing. Fragments and pauses are fine. "
+                    "Let the disposition quietly shape rhythm and disclosure without naming "
+                    "the metrics, performing an emotion, sounding therapeutic, or becoming an "
+                    "assistant. Target length is a soft ceiling, not a demand to pad the reply."
                 ),
             }
             if current.hour in (6, 12, 18):
@@ -3196,7 +3219,12 @@ class Life:
             pathos_turn_event = next(
                 event for event in pathos_turn.events if event.kind == "scene.turn_taken"
             )
-            pacing = reply_pacing(text, str(reply.payload["text"]))
+            speech_cadence = str(reply.payload.get("speech_cadence", "steady"))
+            pacing = reply_pacing(
+                text,
+                str(reply.payload["text"]),
+                speech_cadence=speech_cadence,
+            )
             elapsed_seconds = pacing.total_seconds
             output.append(
                 DomainEvent(
@@ -3211,6 +3239,7 @@ class Life:
                         "listening_seconds": pacing.listening_seconds,
                         "thinking_seconds": pacing.thinking_seconds,
                         "speaking_seconds": pacing.speaking_seconds,
+                        "speech_cadence": speech_cadence,
                         "text": (
                             f"{elapsed_seconds} seconds passed while the conversation continued."
                         ),
@@ -3397,7 +3426,29 @@ class Life:
                     correlation_id=incoming.correlation_id or request_id,
                 )
             )
-        context = {
+        reply_emotion = project_emotion(history)
+        reply_availability = communication_availability(history, state)
+        reply_voice: dict[str, object] = {
+            **vars_for(
+                emotional_speech_bias(
+                    reply_emotion.valence,
+                    reply_emotion.arousal,
+                    state.energy,
+                    reply_emotion.sustained_low_hours,
+                    reply_emotion.complexity,
+                    hurried=reply_availability.hurried,
+                )
+            ),
+            "register": "casual, direct, familiar, and unpolished in a natural way",
+            "instruction": (
+                "Answer like a person already in this conversation. Use contractions and "
+                "ordinary phrasing; fragments and pauses are fine. Let the disposition "
+                "quietly shape rhythm and how much is shared without naming its metrics, "
+                "performing an emotion, sounding therapeutic, or becoming an assistant. "
+                "Do not pad to the target length or end every reply with a question."
+            ),
+        }
+        context: dict[str, object] = {
             "message": text.strip(),
             "time": at,
             "location": catalog.location_name(state.location_id),
@@ -3409,6 +3460,7 @@ class Life:
                 )[state.location_id]
             ),
             "mood": mood_name(state.energy, state.valence, state.arousal),
+            "voice": reply_voice,
             "recent_dialogue": [
                 {
                     "speaker": str(event.payload["speaker"]),
@@ -3473,13 +3525,13 @@ class Life:
                 for item in active_dream_inspirations(history, state.simulated_at)
             ],
             "emotion": {
-                **vars_for(project_emotion(history)),
+                **vars_for(reply_emotion),
                 "planning_bias": vars_for(
                     emotional_planning_bias(
                         state.valence,
                         state.arousal,
-                        project_emotion(history).sustained_low_hours,
-                        project_emotion(history).complexity,
+                        reply_emotion.sustained_low_hours,
+                        reply_emotion.complexity,
                     )
                 ),
             },
@@ -3525,7 +3577,11 @@ class Life:
         reply = await perform(self.gateway, "pathos", context, at, pending)
         if reply:
             pacing = (
-                reply_pacing(text, reply)
+                reply_pacing(
+                    text,
+                    reply,
+                    speech_cadence=str(reply_voice["cadence"]),
+                )
                 if incoming.payload.get("channel") == "live_visit"
                 else None
             )
@@ -3541,6 +3597,7 @@ class Life:
                         "source": self.mode,
                         "channel": incoming.payload.get("channel", "inbox"),
                         "scene_id": incoming.payload.get("scene_id"),
+                        "speech_cadence": reply_voice["cadence"],
                         "pacing_listening_seconds": (
                             pacing.listening_seconds if pacing is not None else None
                         ),

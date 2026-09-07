@@ -320,6 +320,11 @@ class LifeTests(unittest.TestCase):
             context["ambient_presence"]["place_id"],
             self.life.snapshot()["pathos"]["location_id"],
         )
+        self.assertIn(
+            context["voice"]["cadence"], {"clipped", "slow", "hesitant", "easy", "steady"}
+        )
+        self.assertIn("casual", context["voice"]["register"])
+        self.assertIn("Do not pad", context["voice"]["instruction"])
 
     def test_using_an_old_memory_persists_subjective_reconsolidation(self):
         self.life.bootstrap()

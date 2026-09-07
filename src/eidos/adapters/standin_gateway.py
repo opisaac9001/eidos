@@ -286,6 +286,75 @@ def _standin_scene_text(context: dict[str, object]) -> str:
     return f"{line} {afterthought}"
 
 
+def _standin_pathos_text(
+    context: dict[str, object], choice: int, location: object, last_memory: object
+) -> str:
+    """Exercise the same emotion-shaped voice contract expected from real models."""
+    message = str(context.get("message", "")).lower()
+    raw_voice = context.get("voice", {})
+    voice = raw_voice if isinstance(raw_voice, dict) else {}
+    cadence = str(voice.get("cadence", "steady"))
+    if context.get("outreach_reason"):
+        return f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
+    if "private thing" in message or "don't know" in message:
+        return "Honestly, I don't know. Mara kept that to herself."
+    if any(word in message for word in ("remember", "yesterday", "today", "day")):
+        openings = {
+            "clipped": ("It's been a day.", "Bit full-on, honestly."),
+            "slow": ("A quiet one, mostly.", "I've been taking it slowly."),
+            "hesitant": ("Kind of mixed, I think.", "I'm still working that out."),
+            "easy": ("Pretty good, honestly.", "Yeah, it's been nice."),
+            "steady": ("Yeah, it's been alright.", "Bit of a mixed one, but not bad."),
+        }.get(cadence, ("Yeah, it's been alright.",))
+        return f"{openings[choice % len(openings)]} {last_memory}"
+    if any(word in message for word in ("feel", "mood", "how are")):
+        mood = str(context.get("mood", "quiet")).lower()
+        endings = {
+            "clipped": "A bit wound up. I'm okay, though.",
+            "slow": "Low-energy, honestly. Just taking things gently.",
+            "hesitant": f"I'm feeling {mood}, I think. It's a bit mixed.",
+            "easy": f"I'm feeling {mood}. Pretty good, actually.",
+            "steady": f"I'm feeling {mood}, I think. Nothing dramatic.",
+        }
+        return endings.get(cadence, endings["steady"])
+    if "where" in message:
+        return f"I'm at {location} right now." + (
+            " Can't stay long." if cadence == "clipped" else " Just taking it easy."
+        )
+    if "doing" in message:
+        prefix = "Not loads." if cadence in {"clipped", "slow"} else "Not much right now."
+        return f"{prefix} {last_memory}"
+    options = {
+        "clipped": (
+            "Hey. What's going on?",
+            "Yeah—go on.",
+            "Hey. I've got a minute.",
+        ),
+        "slow": (
+            "Hey. Yeah, I'm here. Just a little quiet today.",
+            "Oh, hey. Give me a second—okay.",
+            "Yeah, I'm listening. Might be a bit slow today.",
+        ),
+        "hesitant": (
+            "Oh, hey. Yeah—give me a second. What's up?",
+            "Hey. I'm here. Bit distracted, if I'm honest.",
+            "Mm? Sorry, I was somewhere else for a second.",
+        ),
+        "easy": (
+            "Hey—yeah, I've got time. What's going on with you?",
+            "Oh hey. Yeah, come sit down. What's up?",
+            "Hey. Good timing, actually. Go on.",
+        ),
+        "steady": (
+            "Hey. What's up?",
+            "Oh hey—yeah, I've got a minute.",
+            "Yeah, go on.",
+            "Oh, hey. Yeah, I'm listening.",
+        ),
+    }.get(cadence, ("Hey. What's up?",))
+    return options[choice % len(options)]
+
+
 class StandInGateway(ModelGateway):
     async def generate(self, request: ModelRequest) -> ModelResponse:
         context = json.loads(request.messages[-1].content)
@@ -296,37 +365,7 @@ class StandInGateway(ModelGateway):
         key = f"{role}:{context.get('time', '')}:{context.get('message', '')}"
         choice = int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
         if role == "pathos":
-            message = context.get("message", "").lower()
-            if context.get("outreach_reason"):
-                text = (
-                    f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
-                )
-            elif "private thing" in message or "don't know" in message:
-                text = "Honestly, I don't know. Mara kept that to herself."
-            elif any(word in message for word in ("remember", "yesterday", "today", "day")):
-                opening = (
-                    "Pretty good, honestly.",
-                    "Yeah, it's been alright.",
-                    "Bit of a mixed one, but not bad.",
-                )[choice % 3]
-                text = f"{opening} {last_memory}"
-            elif any(word in message for word in ("feel", "mood", "how are")):
-                text = f"I'm feeling {str(context.get('mood', 'quiet')).lower()}, I think. Nothing dramatic."
-            elif "where" in message:
-                text = f"I'm at {location} right now. Just taking it easy."
-            elif "doing" in message:
-                text = f"Not much right this second. {last_memory}"
-            else:
-                text = (
-                    "Hey. What's up?",
-                    "Oh hey — yeah, I've got a minute.",
-                    "Yeah, go on.",
-                    "Hey — give me a second. Okay, what's up?",
-                    "Oh, hey. Yeah, I'm listening.",
-                    "Hi. Sorry, I was miles away for a second.",
-                    "Hey. I'm here—go ahead.",
-                    "Mm? Oh, hey. What's going on?",
-                )[choice % 8]
+            text = _standin_pathos_text(context, choice, location, last_memory)
         elif role == "murmur":
             text = _standin_murmur_text(context, location, last_memory)
         elif role == "firmament":

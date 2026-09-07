@@ -7,7 +7,13 @@ from eidos.application.cognition import request_for
 
 
 class PathosVoiceTests(unittest.TestCase):
-    def generate(self, message: str, memories: list[str] | None = None) -> str:
+    def generate(
+        self,
+        message: str,
+        memories: list[str] | None = None,
+        *,
+        cadence: str = "steady",
+    ) -> str:
         response = asyncio.run(
             StandInGateway().generate(
                 request_for(
@@ -18,6 +24,7 @@ class PathosVoiceTests(unittest.TestCase):
                         "location": "Juniper Café",
                         "mood": "steady",
                         "memories": memories or [],
+                        "voice": {"cadence": cadence},
                     },
                 )
             )
@@ -43,6 +50,17 @@ class PathosVoiceTests(unittest.TestCase):
         reply = self.generate("what private thing did Mara hide?")
 
         self.assertEqual(reply, "Honestly, I don't know. Mara kept that to herself.")
+
+    def test_emotion_shifts_delivery_without_turning_into_mood_exposition(self):
+        easy = self.generate("ok so hey", cadence="easy")
+        slow = self.generate("ok so hey", cadence="slow")
+        clipped = self.generate("ok so hey", cadence="clipped")
+
+        self.assertEqual(len({easy, slow, clipped}), 3)
+        self.assertTrue(any(word in slow.lower() for word in ("quiet", "second", "slow")))
+        self.assertGreater(len(easy.split()), len(clipped.split()))
+        self.assertLessEqual(len(clipped.split()), 6)
+        self.assertFalse(any(word in clipped.lower() for word in ("valence", "arousal")))
 
 
 if __name__ == "__main__":

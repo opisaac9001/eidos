@@ -33,6 +33,16 @@ class EmotionalPlanningBias:
     pace: float
 
 
+@dataclass(frozen=True, slots=True)
+class EmotionalSpeechBias:
+    openness: float
+    warmth: float
+    elaboration: float
+    hesitation: float
+    cadence: str
+    target_words: int
+
+
 def classify_emotion(valence: float, arousal: float, sustained_low_hours: int = 0) -> str:
     _dimensions(valence, arousal)
     if sustained_low_hours >= 72 and valence <= -0.35:
@@ -82,6 +92,54 @@ def emotional_planning_bias(
         pace=_clamp(
             0.6 + 0.2 * positive - 0.2 * negative - 0.25 * strain - persistence - 0.05 * complexity
         ),
+    )
+
+
+def emotional_speech_bias(
+    valence: float,
+    arousal: float,
+    energy: float,
+    sustained_low_hours: int = 0,
+    complexity: float = 0.0,
+    *,
+    hurried: bool = False,
+) -> EmotionalSpeechBias:
+    """Translate persistent affect into style without dictating speech content."""
+    _dimensions(valence, arousal)
+    if not 0 <= energy <= 1 or not 0 <= complexity <= 1 or sustained_low_hours < 0:
+        raise ValueError("Speech disposition inputs are outside their bounds")
+    positive = max(0.0, valence)
+    negative = max(0.0, -valence)
+    strain = max(0.0, arousal - 0.6)
+    persistence = min(0.3, sustained_low_hours / 240)
+    openness = _clamp(0.52 + 0.24 * positive + 0.14 * energy - 0.25 * negative - persistence)
+    warmth = _clamp(0.58 + 0.22 * positive - 0.12 * negative - 0.08 * strain)
+    elaboration = _clamp(
+        0.32
+        + 0.32 * energy
+        + 0.18 * openness
+        - 0.2 * strain
+        - 0.12 * complexity
+        - (0.22 if hurried else 0.0)
+    )
+    hesitation = _clamp(0.12 + 0.32 * complexity + 0.18 * negative + 0.12 * strain)
+    if hurried or arousal >= 0.78:
+        cadence = "clipped"
+    elif energy <= 0.3 or sustained_low_hours >= 24:
+        cadence = "slow"
+    elif complexity >= 0.45:
+        cadence = "hesitant"
+    elif valence >= 0.3 and energy >= 0.55:
+        cadence = "easy"
+    else:
+        cadence = "steady"
+    return EmotionalSpeechBias(
+        openness=openness,
+        warmth=warmth,
+        elaboration=elaboration,
+        hesitation=hesitation,
+        cadence=cadence,
+        target_words=max(6, min(48, round(8 + 36 * elaboration))),
     )
 
 

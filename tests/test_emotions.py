@@ -5,6 +5,7 @@ from eidos.domain.emotions import (
     classify_emotion,
     emotion_sample_events,
     emotional_planning_bias,
+    emotional_speech_bias,
     project_emotion,
 )
 from eidos.domain.events import DomainEvent
@@ -48,6 +49,31 @@ class EmotionTests(unittest.TestCase):
                     joyful.social_openness,
                     joyful.risk_tolerance,
                     joyful.pace,
+                )
+            )
+        )
+
+    def test_emotion_changes_speech_disposition_without_dictating_content(self):
+        joyful = emotional_speech_bias(0.7, 0.6, 0.8)
+        low = emotional_speech_bias(-0.55, 0.3, 0.2, 48)
+        mixed = emotional_speech_bias(0.1, 0.5, 0.6, complexity=0.7)
+        hurried = emotional_speech_bias(0.4, 0.5, 0.8, hurried=True)
+
+        self.assertEqual((joyful.cadence, low.cadence), ("easy", "slow"))
+        self.assertEqual((mixed.cadence, hurried.cadence), ("hesitant", "clipped"))
+        self.assertGreater(joyful.openness, low.openness)
+        self.assertGreater(joyful.elaboration, low.elaboration)
+        self.assertGreater(mixed.hesitation, joyful.hesitation)
+        self.assertLess(hurried.target_words, joyful.target_words)
+        self.assertTrue(
+            all(
+                0 <= value <= 1
+                for disposition in (joyful, low, mixed, hurried)
+                for value in (
+                    disposition.openness,
+                    disposition.warmth,
+                    disposition.elaboration,
+                    disposition.hesitation,
                 )
             )
         )

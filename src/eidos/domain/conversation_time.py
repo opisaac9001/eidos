@@ -27,20 +27,35 @@ class ReplyPacing:
     total_seconds: int
 
 
-def reply_pacing(user_text: str, pathos_text: str) -> ReplyPacing:
+SPEECH_WORDS_PER_SECOND = {
+    "slow": 1.8,
+    "hesitant": 2.0,
+    "steady": 2.4,
+    "easy": 2.5,
+    "clipped": 2.8,
+}
+
+
+def reply_pacing(
+    user_text: str, pathos_text: str, *, speech_cadence: str = "steady"
+) -> ReplyPacing:
     """Estimate a replay-stable human conversational pause from accepted words."""
+    if speech_cadence not in SPEECH_WORDS_PER_SECOND:
+        raise ValueError("Unknown speech cadence")
     user_words = len(user_text.split())
     pathos_words = len(pathos_text.split())
     listening = max(1, round(user_words / 2.6))
     digest = sha256(f"{user_text}\0{pathos_text}".encode()).digest()
     thinking = 2 + min(8, (user_words + pathos_words) // 18) + digest[0] % 4
-    speaking = max(1, round(pathos_words / 2.4))
+    thinking += {"slow": 2, "hesitant": 3, "steady": 0, "easy": -1, "clipped": -1}[speech_cadence]
+    thinking = max(1, thinking)
+    speaking = max(1, round(pathos_words / SPEECH_WORDS_PER_SECOND[speech_cadence]))
     total = min(120, max(4, listening + thinking + speaking))
     return ReplyPacing(listening, thinking, speaking, total)
 
 
-def exchange_seconds(user_text: str, pathos_text: str) -> int:
-    return reply_pacing(user_text, pathos_text).total_seconds
+def exchange_seconds(user_text: str, pathos_text: str, *, speech_cadence: str = "steady") -> int:
+    return reply_pacing(user_text, pathos_text, speech_cadence=speech_cadence).total_seconds
 
 
 def exchange_minutes(user_text: str, pathos_text: str) -> int:
@@ -95,12 +110,16 @@ def project_conversation_clocks(
             ):
                 raise ValueError("Conversation time must cite one accepted alternating exchange")
             if seconds is not None:
+                speech_cadence = event.payload.get("speech_cadence", "steady")
                 if (
                     isinstance(seconds, bool)
                     or not isinstance(seconds, int)
+                    or not isinstance(speech_cadence, str)
                     or seconds
                     != exchange_seconds(
-                        _required(user_turn, "text"), _required(pathos_turn, "text")
+                        _required(user_turn, "text"),
+                        _required(pathos_turn, "text"),
+                        speech_cadence=speech_cadence,
                     )
                 ):
                     raise ValueError("Conversation seconds do not match their exchange")

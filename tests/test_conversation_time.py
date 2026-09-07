@@ -124,6 +124,39 @@ class ConversationTimeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "seconds"):
             project_conversation_clocks([*history, elapsed])
 
+    def test_emotional_cadence_changes_real_speech_time_and_replays(self):
+        history, user_turn, pathos_turn = self.history()
+        slow = reply_pacing(
+            "How are you?",
+            str(pathos_turn.payload["text"]),
+            speech_cadence="slow",
+        )
+        clipped = reply_pacing(
+            "How are you?",
+            str(pathos_turn.payload["text"]),
+            speech_cadence="clipped",
+        )
+        self.assertGreater(slow.total_seconds, clipped.total_seconds)
+        elapsed = DomainEvent(
+            "conversation.time_elapsed",
+            "pathos",
+            {
+                "scene_id": "user-visit",
+                "user_turn_event_id": str(user_turn.event_id),
+                "pathos_turn_event_id": str(pathos_turn.event_id),
+                "seconds": slow.total_seconds,
+                "speech_cadence": "slow",
+                "started_at": self.now.isoformat(),
+                "ends_at": (self.now + timedelta(seconds=slow.total_seconds)).isoformat(),
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=pathos_turn.event_id,
+        )
+        self.assertEqual(
+            project_conversation_clocks([*history, elapsed])["user-visit"].elapsed_seconds,
+            slow.total_seconds,
+        )
+
     def test_wrong_duration_or_reused_turns_are_rejected(self):
         history, user_turn, pathos_turn = self.history()
         bad = self.elapsed(user_turn, pathos_turn, minutes=10)

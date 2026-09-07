@@ -102,6 +102,13 @@ can win one optional hour, only at home, and completed work lowers that exact lo
 Sources are applied once, pre-feature history is not reinterpreted, domestic pressure
 can enter attention and model context, and the Observatory shows the largest current
 load without flooding the public feed with every small accumulation.
+Pathos's spoken voice now receives a separate affect-derived disposition rather than
+being expected to interpret raw emotion fields. Valence, arousal, energy, prolonged
+low mood, mixed feeling, and immediate time pressure softly shape openness, warmth,
+hesitation, elaboration, and cadence. The prompt keeps his register casual and forbids
+announcing those metrics or performing therapy language. Live conversation records
+the chosen cadence, so slow or clipped delivery changes actual replay-validated
+thinking and speaking seconds; pre-feature turns retain the original steady timing.
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe
