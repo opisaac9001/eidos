@@ -43,7 +43,10 @@ Rare non-clinical physical discomfort now forms a replayable one-to-three-day ar
 onset, monotonic recovery and resolution can alter somatic attention, mood, effective
 capacity, routine choices, plans, visit availability and queued response timing.
 Hourly foreground attention now competes among needs, concerns, goals, people, place
-and imminent commitments with bounded inertia. It informs generative context without
+and imminent commitments with bounded inertia. A separate prospective layer begins
+holding the nearest scheduled activity up to eight hours ahead, grows more salient as
+it approaches, and explicitly treats it as changeable rather than accomplished. Both
+inform generative context without
 gaining action authority. Critical need pressure may redirect one free-time beat per
 day through an auditable rule while commitments and the authored opening stay intact.
 Domestic continuity now connects meals, deliveries, obligations and daily use to

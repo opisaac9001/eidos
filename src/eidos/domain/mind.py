@@ -17,6 +17,7 @@ class CognitiveLayer(StrEnum):
     ATTENTION = "attention"
     ASSOCIATIVE = "associative"
     DELIBERATIVE = "deliberative"
+    PROSPECTIVE = "prospective"
     SOCIAL = "social"
     REFLECTIVE = "reflective"
     DREAM = "dream"

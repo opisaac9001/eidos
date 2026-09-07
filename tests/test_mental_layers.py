@@ -158,6 +158,66 @@ class MentalLayerTests(unittest.TestCase):
             (attention.payload["focus_type"], attention.payload["focus_id"]), ("commitment", "soon")
         )
 
+    def test_later_plan_enters_prospective_thought_without_becoming_fact(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "later",
+                "title": "Walk with Mara",
+                "starts_at": (at + timedelta(hours=6)).isoformat(),
+                "ends_at": (at + timedelta(hours=7)).isoformat(),
+                "location_id": "park",
+                "actor_id": "pathos",
+            },
+        )
+
+        events = mental_layer_events(
+            [schedule], PathosState(simulated_at=at, awake=True), at, {}
+        )
+        prospective = next(
+            event for event in events if event.payload["layer"] == "prospective"
+        )
+        attention = next(event for event in events if event.payload["layer"] == "attention")
+
+        self.assertEqual(prospective.payload["focus_id"], "later")
+        self.assertIn("may still change", prospective.payload["focus_text"])
+        self.assertFalse(prospective.payload["action_authority"])
+        self.assertNotEqual(attention.payload["focus_type"], "commitment")
+        projected = project_mind([schedule, *events])
+        self.assertEqual(projected.latest["prospective"].focus_type, "planned_activity")
+
+    def test_cancelled_plan_does_not_remain_in_prospective_thought(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "cancelled-later",
+                "title": "Walk with Mara",
+                "starts_at": (at + timedelta(hours=6)).isoformat(),
+                "ends_at": (at + timedelta(hours=7)).isoformat(),
+                "location_id": "park",
+                "actor_id": "pathos",
+            },
+        )
+        cancelled = DomainEvent(
+            "schedule.cancelled",
+            "pathos",
+            {
+                "schedule_id": "cancelled-later",
+                "reason": "The plan was called off.",
+                "simulated_at": at.isoformat(),
+            },
+        )
+
+        events = mental_layer_events(
+            [schedule, cancelled], PathosState(simulated_at=at, awake=True), at, {}
+        )
+
+        self.assertNotIn("prospective", {event.payload["layer"] for event in events})
+
     def test_repeated_concern_focus_fatigues_and_allows_other_attention(self):
         at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
         concern = DomainEvent(

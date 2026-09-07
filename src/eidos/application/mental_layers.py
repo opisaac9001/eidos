@@ -9,7 +9,7 @@ from eidos.application.inner_life import active_concerns
 from eidos.domain.emotions import classify_emotion, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
-from eidos.domain.planning import Goal, PlanningState, project_planning
+from eidos.domain.planning import CalendarEntry, Goal, PlanningState, project_planning
 from eidos.domain.state import PathosState
 from eidos.domain.wellbeing import project_wellbeing
 
@@ -95,6 +95,21 @@ def mental_layer_events(
             0.55 if state.awake else 0.35,
         ),
     ]
+    upcoming = _next_upcoming_plan(planning, at, within_hours=8)
+    if state.awake and upcoming is not None:
+        starts_at, item = upcoming
+        hours_until = max(0.0, (starts_at - at).total_seconds() / 3600)
+        activation = 0.38 + 0.42 * (1 - min(8.0, hours_until) / 8)
+        specs.append(
+            (
+                CognitiveLayer.PROSPECTIVE,
+                "background",
+                "planned_activity",
+                item.schedule_id,
+                f"Look ahead to {item.title}, while knowing the plan may still change",
+                activation,
+            )
+        )
     if state.awake and at.hour % 3 == 0:
         specs.append(
             (
@@ -260,19 +275,9 @@ def _attention_focus(
                 f"Keep the recent meeting with {person_id} in mind",
             )
         )
-    calendar = planning.calendar
-    upcoming = sorted(
-        (
-            (datetime.fromisoformat(item.starts_at), item)
-            for item in calendar.values()
-            if item.status == "scheduled"
-            and item.actor_id in {None, "pathos"}
-            and at <= datetime.fromisoformat(item.starts_at) <= at + timedelta(hours=2)
-        ),
-        key=lambda pair: (pair[0], pair[1].schedule_id),
-    )
-    if upcoming:
-        starts_at, item = upcoming[0]
+    upcoming = _next_upcoming_plan(planning, at, within_hours=2)
+    if upcoming is not None:
+        starts_at, item = upcoming
         minutes = max(0, int((starts_at - at).total_seconds() / 60))
         candidates.append(
             (
@@ -297,6 +302,23 @@ def _attention_focus(
         key=lambda item: (item[0], item[1], item[2]),
     )
     return focus_type, item_id, text, score
+
+
+def _next_upcoming_plan(
+    planning: PlanningState, at: datetime, *, within_hours: int
+) -> tuple[datetime, CalendarEntry] | None:
+    upcoming = sorted(
+        (
+            (datetime.fromisoformat(item.starts_at), item)
+            for item in planning.calendar.values()
+            if item.status == "scheduled"
+            and item.actor_id in {None, "pathos"}
+            and at <= datetime.fromisoformat(item.starts_at)
+            <= at + timedelta(hours=within_hours)
+        ),
+        key=lambda pair: (pair[0], pair[1].schedule_id),
+    )
+    return upcoming[0] if upcoming else None
 
 
 def _within_recent_hours(event: DomainEvent, at: datetime, hours: int) -> bool:

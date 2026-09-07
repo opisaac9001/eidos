@@ -425,8 +425,11 @@ status; every item explicitly lacks action authority. The projection caps each f
 drops expired and future material, and excludes another actor's private cognition.
 It stops during sleep, when dream processing takes over. Accelerated catch-up
 keeps the coarser hourly cadence instead of manufacturing thousands of retrospective
-thoughts. Deliberation,
-social awareness, reflection, and dream processing activate under distinct conditions.
+thoughts. Deliberation, prospective anticipation, social awareness, reflection, and
+dream processing activate under distinct conditions. Prospective activation notices
+only an actually scheduled Pathos activity, rises as its start approaches, disappears
+when the plan is canceled, and carries explicit uncertainty rather than predicting
+attendance.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.
 Hourly emotion samples interpret replayed valence, arousal and duration into states
