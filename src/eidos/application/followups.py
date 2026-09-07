@@ -65,6 +65,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             "incident.shared_aftermath",
             "object.shared_use",
             "relationship.anniversary_remembered",
+            "reflection.reconsideration_decided",
         } and not (
             source.kind == "scene.ended"
             and str(source.payload.get("scene_id", "")).startswith("ordinary-")
@@ -72,7 +73,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             continue
         if str(source.event_id) in source_ids:
             continue
-        person_id = _interaction_person(history, source)
+        person_id = _follow_up_source_person(history, source)
         if not isinstance(person_id, str):
             continue
         source_time = datetime.fromisoformat(str(source.payload["simulated_at"]))
@@ -82,6 +83,8 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             if source.kind == "apology.offered"
             else "The relationship date returned; make room to reconnect without assuming sentiment."
             if source.kind == "relationship.anniversary_remembered"
+            else "Follow up honestly after deciding the missed commitment needs repair."
+            if source.kind == "reflection.reconsideration_decided"
             else "Remember the contact and make room to reconnect."
         )
         scheduled = DomainEvent(
@@ -205,4 +208,27 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
         value = partner if initiator == "pathos" else initiator
     else:
         return None
+    return value if isinstance(value, str) and value not in {"pathos", "user"} else None
+
+
+def _follow_up_source_person(history: Sequence[DomainEvent], event: DomainEvent) -> str | None:
+    if (
+        event.kind != "reflection.reconsideration_decided"
+        or event.payload.get("decision") != "seek_repair"
+        or event.payload.get("target_type") != "commitment"
+    ):
+        return _interaction_person(history, event)
+    commitment_id = event.payload.get("target_id")
+    created = next(
+        (
+            candidate
+            for candidate in reversed(history)
+            if candidate.kind == "commitment.created"
+            and candidate.aggregate_id == "pathos"
+            and candidate.payload.get("commitment_id") == commitment_id
+            and candidate.payload.get("debtor_id") == "pathos"
+        ),
+        None,
+    )
+    value = created.payload.get("creditor_id") if created is not None else None
     return value if isinstance(value, str) and value not in {"pathos", "user"} else None

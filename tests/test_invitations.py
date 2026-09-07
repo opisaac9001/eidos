@@ -87,6 +87,56 @@ class InvitationTests(unittest.TestCase):
             project_followups(final)[history[0].payload["follow_up_id"]].status, "completed"
         )
 
+    def test_repair_decision_eventually_asks_the_actual_creditor_independently(self):
+        decided_at = self.now - timedelta(days=2)
+        commitment = DomainEvent(
+            "commitment.created",
+            "pathos",
+            {
+                "commitment_id": "help-rowan",
+                "title": "Help Rowan",
+                "debtor_id": "pathos",
+                "creditor_id": "rowan",
+                "due_at": decided_at.isoformat(),
+            },
+        )
+        decision = DomainEvent(
+            "reflection.reconsideration_decided",
+            "pathos",
+            {
+                "decision_id": "repair-rowan",
+                "target_type": "commitment",
+                "target_id": "help-rowan",
+                "decision": "seek_repair",
+                "simulated_at": decided_at.isoformat(),
+            },
+        )
+        scheduled = follow_up_events([commitment, decision], decided_at)
+        ready = follow_up_events([commitment, decision, *scheduled], self.now)
+        history = [commitment, decision, *scheduled, *ready]
+        person = NPCState(
+            "rowan", usual_location_id="park", energy=0.6, connection=0.6, purpose=0.6
+        )
+
+        events = follow_up_invitation_events(
+            history,
+            self.now,
+            len(history),
+            pathos_awake=True,
+            pathos_energy=0.8,
+            social_openness=0.8,
+            npc_people={"rowan": person},
+            planning=PlanningState(),
+            catalog=self.catalog,
+        )
+
+        invitation = next(event for event in events if event.kind == "invitation.made")
+        self.assertEqual(invitation.payload["person_id"], "rowan")
+        self.assertEqual(invitation.causation_id, ready[0].event_id)
+        self.assertTrue(
+            {"invitation.accepted", "invitation.declined"} & {event.kind for event in events}
+        )
+
     def test_sleep_or_low_social_capacity_leaves_the_choice_for_later(self):
         history = self.ready_follow_up("wait")
         person = NPCState("mara", usual_location_id="cafe")

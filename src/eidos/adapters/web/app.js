@@ -198,6 +198,9 @@ const labels = {
   "commitment.renegotiation_accepted": "NEW PROMISE TERMS ACCEPTED",
   "commitment.renegotiation_declined": "NEW PROMISE TERMS DECLINED",
   "commitment.renegotiated": "PROMISE RETIMED",
+  "reflection.reconsideration_raised": "A PLAN QUESTION SURFACED",
+  "reflection.reconsideration_scheduled": "TIME SET ASIDE TO RECONSIDER",
+  "reflection.reconsideration_decided": "PATHOS MADE UP HIS MIND",
   "schedule.retimed": "PLAN RETIMED",
   "dream.inspiration_considered": "A DREAM-LINKED POSSIBILITY",
 };

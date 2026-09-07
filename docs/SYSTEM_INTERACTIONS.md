@@ -445,6 +445,11 @@ consider renegotiation, seek repair after a miss, acknowledge a closed outcome, 
 release an already-blocked personal goal. Release is permitted only when no active
 external commitment remains and must pass the existing atomic abandonment resolver;
 all other decisions leave the plan intact for their ordinary follow-up machinery.
+A `seek_repair` decision about a missed commitment resolves its creditor from the
+original Pathos-owned commitment and schedules one ordinary follow-up. When ready, it
+uses the existing invitation path: the creditor independently accepts or declines from
+their own state. This contact does not assert an apology, forgiveness, restored trust,
+or successful repair; those require later witnessed social evidence.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.
