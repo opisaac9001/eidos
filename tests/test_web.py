@@ -197,6 +197,34 @@ class WebTests(unittest.TestCase):
         after = datetime.fromisoformat(life.snapshot()["time"])
         self.assertEqual((after - before).total_seconds(), 47)
 
+    def test_user_mutation_first_commits_exact_pending_realtime(self):
+        class FakeClock:
+            def __init__(self):
+                self.now = 250.0
+
+            def __call__(self):
+                return self.now
+
+        clock = FakeClock()
+        life = Life(
+            SQLiteEventStore(Path(self.directory.name) / "mutation-realtime.db"),
+            StandInGateway(),
+        )
+        runtime = Runtime(life, interval=10, clock=clock, realtime_quantum_seconds=300)
+        runtime.start()
+        self.addCleanup(runtime.close)
+        before = datetime.fromisoformat(runtime.snapshot()["time"])
+        with runtime.mutation():
+            life.configure(True, 15, "realtime")
+        clock.now += 47
+
+        with runtime.mutation():
+            life.configure(False, 15, "realtime")
+
+        after = datetime.fromisoformat(life.snapshot()["time"])
+        self.assertEqual((after - before).total_seconds(), 47)
+        self.assertEqual(runtime.realtime_pending_seconds, 0)
+
     def test_realtime_runtime_runs_a_bounded_waking_inner_stream(self):
         class FakeClock:
             def __init__(self):
@@ -222,7 +250,7 @@ class WebTests(unittest.TestCase):
         with runtime.mutation():
             life.configure(True, 15, "realtime")
 
-        clock.now += 900
+        clock.now += 1800
         deadline = time.monotonic() + 1
         while runtime.ticks < 1 and time.monotonic() < deadline:
             runtime.stop.wait(0.01)
@@ -230,7 +258,15 @@ class WebTests(unittest.TestCase):
         self.assertEqual(runtime.ticks, 1)
         self.assertEqual(
             sum(event.kind == "mind.stream_pulsed" for event in life.history()),
-            1,
+            2,
+        )
+        self.assertEqual(
+            [
+                event.payload["simulated_at"]
+                for event in life.history()
+                if event.kind == "mind.stream_pulsed"
+            ],
+            ["2026-01-01T07:15:00+00:00", "2026-01-01T07:30:00+00:00"],
         )
 
     def test_boundary_rejects_cross_origin_and_bad_requests(self):

@@ -8,7 +8,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
-| CORE-01 | Atomic event history, replay, revisions, pause/resume | Built: ordinary runtime follows real elapsed time at 1×; acceleration and catch-up are explicit operator tools | P0 |
+| CORE-01 | Atomic event history, replay, revisions, pause/resume | Built: ordinary runtime follows real elapsed time at 1×, commits exact pending wall time before user mutations, and reserves acceleration/catch-up for explicit operator tools | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/speech/belief/association/travel/relating + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers + restart-safe text/structured proposals and profiles + detached/revalidated Murmur results | P1 |
 | CORE-04 | Actor visibility and capability-limited context | Partial: role filtering, speech-audience perceptions, encounter-sourced acquaintance, known-only social initiation, and private-scene appraisal isolation | P1–P2 |
@@ -94,7 +94,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus a waking quarter-hour real-time Murmur stream and a bounded Pathos-private cross-faculty workspace; sourced subjective handoffs reach speech, reflection, dreams, activities, and projects without fact or action authority, with inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus a waking quarter-hour real-time Murmur stream emitted at every crossed boundary, including delayed worker intervals, and a bounded Pathos-private cross-faculty workspace; sourced subjective handoffs reach speech, reflection, dreams, activities, and projects without fact or action authority, with inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus plus source-linked scheduled interpretation whose bounded emotional echo follows the appraised lived source rather than model prose; reflection on an appraised setback can raise an expiring typed planning question, later agency may schedule actual time to reconsider, and completing that review yields a linked typed decision that can release an unobligated blocked goal, safely reschedule personal work, seek consent to alter a promise, or initiate later repair contact | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: replayable nightly windows shaped by condition and commitments, with occupied-time delay and legacy fallback | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs, complete lineage, and varied replay-stable offline dreams | P4 |

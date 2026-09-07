@@ -5,6 +5,7 @@ import logging
 import mimetypes
 import threading
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from time import monotonic, sleep
@@ -70,10 +71,6 @@ class Runtime:
     def _loop(self) -> None:
         while not self.stop.wait(self.interval):
             wall_now = self.clock()
-            wall_elapsed = max(
-                0.0, wall_now - max(self.last_wall_tick, self.realtime_suppressed_until)
-            )
-            self.last_wall_tick = wall_now
             with self.lock:
                 config: dict[str, Any] = {
                     "running": False,
@@ -84,23 +81,22 @@ class Runtime:
                     config = self.life.snapshot()["config"]
                     if config["running"]:
                         if config.get("clock_mode", "realtime") == "realtime":
-                            self.realtime_pending_seconds += wall_elapsed
+                            self._accrue_realtime(wall_now)
                             if self.realtime_pending_seconds < self.realtime_quantum_seconds:
                                 continue
-                            hours = self.realtime_pending_seconds / 3600
-                            self.realtime_pending_seconds = 0.0
+                            self.working = True
+                            self._commit_realtime_pending()
                         else:
                             self.realtime_pending_seconds = 0.0
-                            hours = config["minutes_per_tick"] / 60
-                        self.working = True
-                        self.life.advance(hours)
-                        if config.get("clock_mode", "realtime") == "realtime":
-                            self.life.pulse_inner_stream()
+                            self.last_wall_tick = wall_now
+                            self.working = True
+                            self.life.advance(config["minutes_per_tick"] / 60)
                         self.ticks += 1
                         self.error = None
                         self.cached = self.life.snapshot()
                     else:
                         self.realtime_pending_seconds = 0.0
+                        self.last_wall_tick = wall_now
                 except Exception:
                     logger.exception("Simulation tick failed")
                     self.error = "The simulation paused after a tick failed. Its last committed state is safe."
@@ -123,19 +119,15 @@ class Runtime:
         with self.lock:
             config = self.life.snapshot()["config"]
             wall_now = self.clock()
-            self.realtime_pending_seconds += max(
-                0.0, wall_now - max(self.last_wall_tick, self.realtime_suppressed_until)
-            )
-            self.last_wall_tick = wall_now
+            self._accrue_realtime(wall_now)
             if (
                 self.error is None
                 and config["running"]
                 and config.get("clock_mode", "realtime") == "realtime"
                 and self.realtime_pending_seconds > 0
             ):
-                self.life.advance(self.realtime_pending_seconds / 3600)
+                self._commit_realtime_pending()
                 self.ticks += 1
-                self.realtime_pending_seconds = 0.0
                 self.cached = self.life.snapshot()
         close_gateway = getattr(self.life.gateway, "close", None)
         if callable(close_gateway):
@@ -146,10 +138,46 @@ class Runtime:
         with self.lock:
             self.working = True
             try:
+                config = self.life.snapshot()["config"]
+                if config["running"] and config.get("clock_mode", "realtime") == "realtime":
+                    self._accrue_realtime(self.clock())
+                    if self.realtime_pending_seconds > 0:
+                        self._commit_realtime_pending()
                 yield
             finally:
                 self.working = False
                 self.cached = self.life.snapshot()
+
+    def _accrue_realtime(self, wall_now: float) -> None:
+        self.realtime_pending_seconds += max(
+            0.0, wall_now - max(self.last_wall_tick, self.realtime_suppressed_until)
+        )
+        self.last_wall_tick = wall_now
+
+    def _commit_realtime_pending(self) -> None:
+        """Commit exact wall time and pulse Murmur at crossed quarter hours."""
+        remaining = self.realtime_pending_seconds
+        self.realtime_pending_seconds = 0.0
+        simulated_at = datetime.fromisoformat(self.life.snapshot()["time"])
+        try:
+            while remaining > 0.000001:
+                seconds_into_quarter = (
+                    (simulated_at.minute % 15) * 60
+                    + simulated_at.second
+                    + simulated_at.microsecond / 1_000_000
+                )
+                until_boundary = 900 - seconds_into_quarter if seconds_into_quarter else 900
+                step = min(remaining, until_boundary)
+                self.life.advance(step / 3600)
+                remaining -= step
+                simulated_at += timedelta(seconds=step)
+                if abs(step - until_boundary) <= 0.000001:
+                    self.life.pulse_inner_stream()
+        except Exception:
+            # Completed slices are already durable; retain only wall time that was
+            # not committed so a recoverable failure cannot silently lose it.
+            self.realtime_pending_seconds += remaining
+            raise
 
     def pace_live_reply(self, previous_message_ids: set[str], started_at: float) -> float:
         """Hold listening/thought, then expose speech on a shared wall-clock timeline."""

@@ -17,6 +17,11 @@ private homes. Encounters produce source-linked memories and a small positive
 affect change. Background associations occur from 07:00 through 22:00. Weather
 changes at 06:00, 12:00, and 18:00. Reflection runs at 21:00; dreams and the
 daybook run at 23:00. Fractional tick sizes cannot skip or duplicate these beats.
+The ordinary worker commits wall time in small batches, but every user message,
+visit, pause, or control change first flushes the exact pending interval so the
+interaction cannot be timestamped several minutes in the past. A delayed real-time
+tick is split at crossed quarter hours, allowing the waking Murmur stream to retain
+its intended cadence instead of producing only one thought at the end of the gap.
 
 The daybook uses the latest seven recorded experiences, so it is a brief extract
 rather than a complete daily archive. The archive itself retains the full log.
