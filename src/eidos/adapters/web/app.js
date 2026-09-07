@@ -238,7 +238,7 @@ let lastMessageSignature = "",
   archiveRequest = 0,
   archiveTab = "memories",
   lastArchiveSignature = "";
-const heldReplies = new Map();
+const pacedReplies = new Map();
 document.querySelectorAll("[data-operator-only]").forEach((element) => {
   element.hidden = !operatorMode;
 });
@@ -352,23 +352,74 @@ function clockControl(running) {
 function holdPacedReplies(previousIds, next, paceFrom) {
   if (paceFrom === undefined) return;
   for (const item of next.conversations || []) {
-    const seconds = Number(item.pacing_total_seconds || 0);
+    const thinkingSeconds =
+      Number(item.pacing_listening_seconds || 0) +
+      Number(item.pacing_thinking_seconds || 0);
+    const speakingSeconds = Number(item.pacing_speaking_seconds || 0);
+    const seconds = thinkingSeconds + speakingSeconds;
     if (
       !previousIds.has(item.id) &&
       item.speaker === "pathos" &&
       item.channel === "live_visit" &&
       seconds > 0
     ) {
-      const releaseAt = paceFrom + seconds * 1000;
-      if (releaseAt <= Date.now()) continue;
-      heldReplies.set(item.id, releaseAt);
-      setTimeout(() => {
-        heldReplies.delete(item.id);
-        lastMessageSignature = "";
-        if (state) renderMessages();
-      }, releaseAt - Date.now());
+      const serverRemaining = Number(item.pacing_remaining_seconds || 0);
+      const speakingUntil = serverRemaining
+        ? Date.now() + serverRemaining * 1000
+        : paceFrom + seconds * 1000;
+      if (speakingUntil <= Date.now()) continue;
+      pacedReplies.set(item.id, {
+        thinkingUntil: serverRemaining
+          ? Date.now()
+          : paceFrom + thinkingSeconds * 1000,
+        speakingUntil,
+      });
+      animatePacedReply(item.id);
     }
   }
+}
+
+function animatePacedReply(id) {
+  const advanceSpeech = () => {
+    const pace = pacedReplies.get(id);
+    if (!pace) return;
+    if (pace.speakingUntil <= Date.now()) pacedReplies.delete(id);
+    lastMessageSignature = "";
+    if (state) renderMessages();
+    if (pacedReplies.has(id)) setTimeout(advanceSpeech, 100);
+  };
+  setTimeout(advanceSpeech, 100);
+}
+
+function syncServerPacing(next) {
+  for (const item of next.conversations || []) {
+    const remaining = Number(item.pacing_remaining_seconds || 0);
+    if (item.pacing_phase !== "speaking" || remaining <= 0 || pacedReplies.has(item.id))
+      continue;
+    const now = Date.now();
+    pacedReplies.set(item.id, {
+      thinkingUntil: now,
+      speakingUntil: now + remaining * 1000,
+    });
+    animatePacedReply(item.id);
+  }
+}
+
+function pacedConversationItem(item, now) {
+  const pace = pacedReplies.get(item.id);
+  if (!pace) return { item, phase: "complete" };
+  if (now < pace.thinkingUntil) return { item: null, phase: "thinking" };
+  const words = String(item.text || "").split(/\s+/).filter(Boolean);
+  const duration = Math.max(1, pace.speakingUntil - pace.thinkingUntil);
+  const progress = Math.max(
+    0,
+    Math.min(1, (now - pace.thinkingUntil) / duration),
+  );
+  const visibleWords = Math.max(1, Math.ceil(words.length * progress));
+  return {
+    item: { ...item, text: words.slice(0, visibleWords).join(" ") },
+    phase: "speaking",
+  };
 }
 
 async function mutate(path, body, paceFrom) {
@@ -811,15 +862,13 @@ function renderPlans() {
 
 function renderMessages() {
   const now = Date.now();
-  for (const [id, releaseAt] of heldReplies)
-    if (releaseAt <= now) heldReplies.delete(id);
-  const conversations = state.conversations.filter(
-    (item) => !heldReplies.has(item.id),
-  );
-  const waitingForPathos = state.conversations.some((item) =>
-    heldReplies.has(item.id),
-  );
-  const signature = `${conversations.map((item) => item.id).join(":")}:${waitingForPathos}`;
+  for (const [id, pace] of pacedReplies)
+    if (pace.speakingUntil <= now) pacedReplies.delete(id);
+  const paced = state.conversations.map((item) => pacedConversationItem(item, now));
+  const conversations = paced.map((entry) => entry.item).filter(Boolean);
+  const waitingForPathos = paced.some((entry) => entry.phase === "thinking");
+  const pathosSpeaking = paced.some((entry) => entry.phase === "speaking");
+  const signature = `${conversations.map((item) => `${item.id}:${item.text.length}`).join(":")}:${waitingForPathos}:${pathosSpeaking}`;
   if (signature === lastMessageSignature && $("messages").childElementCount)
     return;
   lastMessageSignature = signature;
@@ -837,7 +886,7 @@ function renderMessages() {
     ? conversations
         .map(
           (item) =>
-            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
+            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : pacedReplies.has(item.id) ? " · speaking…" : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
         )
         .join("") +
       (waitingForPathos
@@ -846,11 +895,15 @@ function renderMessages() {
     : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
   if (nearBottom || currentView === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
-  if (waitingForPathos) $("delivery-note").textContent = "Pathos is thinking before he answers.";
+  if (waitingForPathos)
+    $("delivery-note").textContent = "Pathos is thinking before he answers.";
+  else if (pathosSpeaking)
+    $("delivery-note").textContent = "Pathos is speaking.";
 }
 
 function render(next) {
   if (state && next.revision < state.revision) return;
+  syncServerPacing(next);
   const changed = !state || next.revision !== state.revision;
   state = next;
   const liveModel = state.mode !== "stand-in";

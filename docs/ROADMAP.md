@@ -35,8 +35,10 @@ In the ordinary real-time runtime, Murmur maintains a waking quarter-hour inner 
 whose recent pulses become bounded context for conscious speech, reflection, and dreams;
 sleep and accelerated catch-up retain their own appropriate cadences. Live user
 conversation records human-scale listening, thinking, and speaking seconds, and the UI
-reflects a runtime-enforced delay that prevents unusually fast inference, refreshes, or
-another client from making Pathos answer instantly.
+reflects a runtime-enforced listening/thinking pause followed by progressive word-paced
+speech. The shared runtime timeline prevents unusually fast inference, refreshes, or
+another client from making Pathos answer instantly while genuinely slow inference is
+not penalized with duplicate thought time.
 Rare non-clinical physical discomfort now forms a replayable one-to-three-day arc:
 onset, monotonic recovery and resolution can alter somatic attention, mood, effective
 capacity, routine choices, plans, visit availability and queued response timing.
@@ -394,7 +396,8 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   the ordinary life-facing UI changes the world only through communication.
 - Every accepted user/Pathos exchange now consumes replay-validated human-scale
   listening, thinking, and speaking seconds based on its bounded word count. The UI
-  makes unusually fast model output wait out that interval before appearing; legacy
+  holds unusually fast model output through its thought interval, then reveals it at
+  normal word-paced speaking speed on a shared refresh-safe runtime timeline; legacy
   minute-scale records remain valid. The conversation view exposes
   elapsed time and the next routine or calendar obligation. Crossing an hourly boundary
   runs the ordinary world loop, so departures and eligible interruptions can genuinely

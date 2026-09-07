@@ -47,6 +47,8 @@ class Runtime:
         self.working = False
         self.realtime_pending_seconds = 0.0
         self.last_wall_tick = self.clock()
+        self.realtime_suppressed_until = self.last_wall_tick
+        self.live_reply_speech: dict[str, float] = {}
 
     def start(self) -> None:
         with self.lock:
@@ -68,7 +70,9 @@ class Runtime:
     def _loop(self) -> None:
         while not self.stop.wait(self.interval):
             wall_now = self.clock()
-            wall_elapsed = max(0.0, wall_now - self.last_wall_tick)
+            wall_elapsed = max(
+                0.0, wall_now - max(self.last_wall_tick, self.realtime_suppressed_until)
+            )
             self.last_wall_tick = wall_now
             with self.lock:
                 config: dict[str, Any] = {
@@ -119,7 +123,9 @@ class Runtime:
         with self.lock:
             config = self.life.snapshot()["config"]
             wall_now = self.clock()
-            self.realtime_pending_seconds += max(0.0, wall_now - self.last_wall_tick)
+            self.realtime_pending_seconds += max(
+                0.0, wall_now - max(self.last_wall_tick, self.realtime_suppressed_until)
+            )
             self.last_wall_tick = wall_now
             if (
                 self.error is None
@@ -146,7 +152,7 @@ class Runtime:
                 self.cached = self.life.snapshot()
 
     def pace_live_reply(self, previous_message_ids: set[str], started_at: float) -> float:
-        """Keep a generated live reply private until its human speech interval ends."""
+        """Hold listening/thought, then expose speech on a shared wall-clock timeline."""
         conversations = self.life.snapshot().get("conversations", [])
         new_replies = [
             item
@@ -158,13 +164,22 @@ class Runtime:
         ]
         if not new_replies:
             return 0.0
-        duration = max(float(item["pacing_total_seconds"]) for item in new_replies)
-        remaining = max(0.0, started_at + duration - self.clock())
+        thought_duration = max(
+            float(item.get("pacing_listening_seconds", 0))
+            + float(item.get("pacing_thinking_seconds", 0))
+            for item in new_replies
+        )
+        remaining = max(0.0, started_at + thought_duration - self.clock())
         if remaining:
             self.sleeper(remaining)
-        # Life already advanced its simulated clock by the conversational interval.
-        # Do not let Chronos count the same wall interval again after releasing the lock.
-        self.last_wall_tick = self.clock()
+        speech_started = self.clock()
+        for item in new_replies:
+            speech_ends = speech_started + float(item.get("pacing_speaking_seconds", 0))
+            self.live_reply_speech[str(item["id"])] = speech_ends
+            self.realtime_suppressed_until = max(self.realtime_suppressed_until, speech_ends)
+        # Life already advanced its simulated clock by the whole exchange. Chronos
+        # excludes both this held thought and the still-unfolding spoken interval.
+        self.last_wall_tick = speech_started
         return remaining
 
     def snapshot(self) -> dict[str, Any]:
@@ -182,8 +197,25 @@ class Runtime:
             status: sum(job.status == status for job in jobs)
             for status in ("queued", "running", "completed", "failed", "cancelled")
         }
+        snapshot = dict(self.cached)
+        now = self.clock()
+        paced_conversations = []
+        for item in snapshot.get("conversations", []):
+            speech_ends = self.live_reply_speech.get(str(item.get("id")))
+            if speech_ends is None:
+                paced_conversations.append(item)
+                continue
+            remaining = max(0.0, speech_ends - now)
+            if remaining <= 0:
+                self.live_reply_speech.pop(str(item.get("id")), None)
+                paced_conversations.append(item)
+                continue
+            paced_conversations.append(
+                {**item, "pacing_phase": "speaking", "pacing_remaining_seconds": remaining}
+            )
+        snapshot["conversations"] = paced_conversations
         return {
-            **self.cached,
+            **snapshot,
             "jobs": {
                 "counts": job_counts,
                 "recent": [

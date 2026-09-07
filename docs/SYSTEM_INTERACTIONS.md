@@ -294,10 +294,11 @@ alternating scene for up to 40 turns, either can end it, and a routine departure
 the visit through a sourced interruption before travel occurs. Each accepted pair of
 turns records replay-validated listening, thinking, and speaking seconds derived from
 the actual accepted words. Fast inference does not make the reply appear superhumanly
-fast: the local runtime keeps it private behind a visible thinking beat until that
-human-scale interval has elapsed, so refreshing or opening another view cannot skip the
-wait. Genuinely slow inference naturally consumes the same interval rather than adding
-a second artificial delay.
+fast: the local runtime keeps it private behind a visible listening/thinking beat, then
+shares a wall-clock speech interval during which every client reveals the accepted text
+at roughly 2.4 words per second. Refreshing or opening another view cannot skip that
+interval. Genuinely slow inference consumes the thought interval naturally rather than
+adding it a second time, while its eventual words still unfold at speaking pace.
 Older saved worlds retain their valid five/ten/fifteen-minute conversation records.
 The UI shows cumulative time and a near-term routine or calendar obligation. Crossing
 an hour runs the ordinary life loop, so a long visit can encounter
