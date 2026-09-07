@@ -74,6 +74,22 @@ class VisitorTests(unittest.TestCase):
             [],
         )
 
+    def test_an_unmet_resident_cannot_plan_a_visit_from_private_state(self):
+        self.assertEqual(
+            visitor_events(
+                [self.goal("unknown")],
+                self.now,
+                1,
+                actor_locations=self.locations,
+                pathos_awake=True,
+                pathos_energy=1.0,
+                social_openness=1.0,
+                relationships={},
+                known_person_ids=frozenset(),
+            ),
+            [],
+        )
+
     def test_an_away_or_sleeping_pathos_misses_the_arrival(self):
         goal, planned = self.planned_visit()
         due = datetime.fromisoformat(str(planned.payload["arrives_at"]))

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.application.cognition import perform
+from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
@@ -134,6 +135,17 @@ async def recurring_dialogue_events(
     output = list(start.events)
     if not start.accepted:
         return output
+    started = next(event for event in output if event.kind == "scene.started")
+    introduction = pathos_person_introduction_event(
+        history,
+        person_id=partner_id,
+        source_event=started,
+        simulated_at=simulated_at,
+        location_id=location_id,
+        manner="in_person_conversation",
+    )
+    if introduction is not None:
+        output.append(introduction)
     return await _advance_scene(
         history,
         output,

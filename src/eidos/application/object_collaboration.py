@@ -6,6 +6,7 @@ from datetime import datetime
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import NPCState
 from eidos.domain.relationships import Relationship
@@ -81,8 +82,17 @@ def object_collaboration_events(
         causation_id=used.event_id,
         correlation_id=correlation,
     )
+    introduction = pathos_person_introduction_event(
+        history,
+        person_id=person.actor_id,
+        source_event=decision,
+        simulated_at=simulated_at,
+        location_id=location_id,
+        manner="shared_practical_activity" if joins else "brief_practical_exchange",
+    )
+    prefix = [decision, *([introduction] if introduction is not None else [])]
     if not joins:
-        return [decision]
+        return prefix
     shared = DomainEvent(
         "object.shared_use",
         "pathos",
@@ -132,7 +142,7 @@ def object_collaboration_events(
         causation_id=shared.event_id,
         correlation_id=correlation,
     )
-    return [decision, shared, relationship, memory]
+    return [*prefix, shared, relationship, memory]
 
 
 def _sample(key: str) -> float:

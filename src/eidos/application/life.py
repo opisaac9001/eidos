@@ -2061,10 +2061,12 @@ class Life:
                 and event.payload.get("simulated_at") == current.isoformat()
                 and isinstance(event.payload.get("person_id"), str)
             )
+            mentally_known_person_ids = pathos_known_person_ids(history + pending) | scene_actor_ids
             mental_npc_locations = {
                 actor_id: location_id
                 for actor_id, location_id in npc_locations.items()
-                if not (
+                if actor_id in mentally_known_person_ids
+                and not (
                     state.location_id == "home"
                     and location_id == "home"
                     and actor_id not in scene_actor_ids
@@ -2168,6 +2170,7 @@ class Life:
                     pathos_energy=effective_energy,
                     social_openness=phone_bias.social_openness,
                     relationships=self._relationships(history + pending).relationships,
+                    known_person_ids=pathos_known_person_ids(history + pending),
                 )
             )
             pending.extend(visit_output)
@@ -2220,6 +2223,7 @@ class Life:
                         pathos_energy=effective_energy,
                         social_openness=phone_bias.social_openness,
                         relationships=self._relationships(history + pending).relationships,
+                        known_person_ids=pathos_known_person_ids(history + pending),
                     )
                 )
             pending.extend(

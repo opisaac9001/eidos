@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
+from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.followups import follow_up_events
 from eidos.application.object_collaboration import object_collaboration_events
 from eidos.domain.events import DomainEvent
@@ -35,6 +36,8 @@ class ObjectCollaborationTests(unittest.TestCase):
     def test_neighbor_can_join_actual_co_present_object_use(self):
         used, events = self._find_decision("join", self.high_capacity_person())
         self.assertEqual(events[0].causation_id, used.event_id)
+        self.assertEqual(events[1].kind, "person.introduced_to_pathos")
+        self.assertIn("mara", pathos_known_person_ids(events))
         shared = next(event for event in events if event.kind == "object.shared_use")
         self.assertEqual(shared.causation_id, events[0].event_id)
         self.assertEqual(shared.payload["source_object_use_id"], str(used.event_id))
@@ -47,7 +50,10 @@ class ObjectCollaborationTests(unittest.TestCase):
 
     def test_neighbor_can_decline_without_shared_history_or_relationship_change(self):
         _, events = self._find_decision("decline", self.low_capacity_person())
-        self.assertEqual([event.kind for event in events], ["object.collaboration_decided"])
+        self.assertEqual(
+            [event.kind for event in events],
+            ["object.collaboration_decided", "person.introduced_to_pathos"],
+        )
 
     def test_absence_or_late_reconsideration_cannot_invent_shared_use(self):
         used = self.use("absent")

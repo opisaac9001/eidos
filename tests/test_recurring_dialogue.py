@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.followups import follow_up_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.relationship_repairs import relationship_repair_events
@@ -30,6 +31,10 @@ class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
             (scene.turn_count, scene.status, scene.end_reason), (2, "ended", "turn_budget")
         )
         self.assertTrue(any(event.kind == "relationship.changed" for event in events))
+        introduced = next(event for event in events if event.kind == "person.introduced_to_pathos")
+        started = next(event for event in events if event.kind == "scene.started")
+        self.assertEqual(introduced.causation_id, started.event_id)
+        self.assertIn("rowan", pathos_known_person_ids(events))
         memories = [event for event in events if event.kind == "memory.recorded"]
         self.assertEqual({event.payload["owner"] for event in memories}, {"pathos", "rowan"})
 

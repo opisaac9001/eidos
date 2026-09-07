@@ -54,6 +54,19 @@ class PhoneCallTests(unittest.TestCase):
         self.assertEqual(events[0].causation_id, goal.event_id)
         self.assertEqual(events[2].causation_id, events[1].event_id)
 
+    def test_an_unmet_resident_cannot_call_from_private_offscreen_state(self):
+        self.assertEqual(
+            phone_call_events(
+                [self.goal("unknown")],
+                self.now,
+                1,
+                actor_locations=self.locations,
+                pathos_awake=True,
+                known_person_ids=frozenset(),
+            ),
+            [],
+        )
+
     def test_call_can_be_declined_during_visit_then_returned_when_free(self):
         scene = self.scene()
         goal, first = self._find_visit_decision("phone.call_declined", scene)

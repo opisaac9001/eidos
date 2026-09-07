@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Mapping, Sequence
+from typing import AbstractSet, Mapping, Sequence
 
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
@@ -26,6 +26,7 @@ def phone_call_events(
     pathos_energy: float = 0.5,
     social_openness: float = 0.5,
     relationships: Mapping[str, Relationship] | None = None,
+    known_person_ids: AbstractSet[str] | None = None,
 ) -> list[DomainEvent]:
     """Advance existing calls, then allow one unmet connection goal to cause a call."""
     output = _complete_answered_call(
@@ -52,6 +53,7 @@ def phone_call_events(
             for event in history
             if event.kind == "npc.goal_formed"
             and event.payload.get("motivation_need") == "connection"
+            and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in called_goal_ids
         ),
         None,
