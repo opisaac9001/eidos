@@ -11,7 +11,7 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | CORE-01 | Atomic event history, replay, revisions, pause/resume | Built: ordinary runtime follows real elapsed time at 1×; acceleration and catch-up are explicit operator tools | P0 |
 | CORE-02 | Typed proposals, causation/entity IDs, schema migration, preconditions | Partial: action/intention/world-event/social/speech/belief/association/travel/relating + trace migration | P1 |
 | CORE-03 | Durable jobs, priority, cancel/retry, stale results, idempotent effects | Partial: supervised workers + restart-safe text/structured proposals and profiles + detached/revalidated Murmur results | P1 |
-| CORE-04 | Actor visibility and capability-limited context | Partial: role filtering + speech audience perceptions | P1–P2 |
+| CORE-04 | Actor visibility and capability-limited context | Partial: role filtering, speech-audience perceptions, encounter-sourced acquaintance, known-only social initiation, and private-scene appraisal isolation | P1–P2 |
 | CORE-05 | Attention/generation budgets and optional work shedding | Partial: request limits + nonblocking Murmur/capacity shedding | P1 |
 
 ## Memory and belief — Ethos / Mnemosyne
@@ -62,7 +62,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | WORLD-01 | Places, routes, travel, opening hours, occupancy, perception | Partial: four seed places plus replayable registered places with layout/hours/connected-route planning | P3 |
-| WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception, owner-specific scene memory, public resident conversation overhearing, and confidence-decaying resident testimony chains | P3 |
+| WORLD-02 | Actor observations, offscreen facts, information propagation | Partial: co-present public-event perception, owner-specific scene memory, public resident conversation overhearing, confidence-decaying resident testimony chains, and no Pathos affect from unperceived private resident dialogue | P3 |
 | WORLD-03 | Objects, ownership, condition, inventory, borrowing/gifts/repairs | Partial: consented bounded loans/returns with overdue consequences, gifts, finite household provisions, domestic load, wear, failed repair, replenishment, and project-capable distinct replacements | P3 |
 | WORLD-04 | Work, hobbies, activities, skills, finite resources | Partial: accepted work/learn/attend/repair plans, open-ended learning that becomes demonstrated capability, one-off and multi-day self-chosen projects, domestic work, completed bookbinding, feasible exploration, and optional introduced-object projects with co-present participation | P3 |
 | WORLD-05 | NPC-private state, needs, calendars, beliefs and plans | Partial: every persistent person receives cheap deterministic needs and plans; nearby/focused residents may originate schema-checked open-vocabulary plans from owner-only context, including their own private biography, then move/act or fail; audited priorities and critical-energy replanning remain deterministic | P3 |
@@ -82,7 +82,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | SOCIAL-06 | Directed trust/familiarity/affection/tension, shared history, obligations | Partial: Pathos and resident-to-resident directed metrics derive from witnessed contact; shared incident aftermath and capped repair contact create evidence-linked changes and follow-ups without automatic trust restoration | P3 |
 | SOCIAL-07 | Disclosure, secrets, gossip, unreliable testimony and corrections | Partial: private structured claims can travel through witnessed resident testimony with confidence loss; biography remains familiarity-gated and learned only through witnessed disclosure | P3 |
 | SOCIAL-08 | Follow-ups, anniversaries, remembered preferences, opt-in in-app outreach | Partial: source-linked reminders and annual dates, including a completed decision to repair a missed commitment flowing to the actual creditor and their independent invitation response; explicit evidence-bound preferences with correction/fading and invitation influence, plus consented memory-grounded in-app outreach with quiet hours and anti-pressure rejection | P5 |
-| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, incidents, pause/resume current company | Partial: calls, visits, deliveries, and witnessed urgent incidents share the advancing live-conversation clock, with choices, pacing, presence checks, and post-interruption resume/end decisions | P3–P5 |
+| SOCIAL-09 | Calls and interruptions: answer/decline, callback, visitors, deliveries, incidents, pause/resume current company | Partial: calls and home visits originate only from people Pathos knows; they, deliveries, and witnessed urgent incidents share the advancing live-conversation clock, with choices, pacing, presence checks, and post-interruption resume/end decisions | P3–P5 |
 
 Every scene needs turn budgets, availability, the right to decline/leave, private
 vs public speech, interruption/resume, observer-specific memories and validated

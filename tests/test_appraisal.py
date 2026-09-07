@@ -83,6 +83,52 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(events[0].causation_id, memory.event_id)
         self.assertGreater(changed.curiosity, state.curiosity)
 
+    def test_private_offscreen_dialogue_does_not_change_pathos(self):
+        turn = DomainEvent(
+            "scene.turn_taken",
+            "pathos",
+            {
+                "actor_id": "mara",
+                "audience_id": "rowan",
+                "privacy": "private",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        state = PathosState(connection=0.4)
+
+        events, unchanged = appraisal_events([turn], state, self.now)
+
+        self.assertEqual(events, [])
+        self.assertEqual(unchanged, state)
+
+    def test_an_exact_owned_perception_allows_public_dialogue_appraisal(self):
+        turn = DomainEvent(
+            "scene.turn_taken",
+            "pathos",
+            {
+                "actor_id": "mara",
+                "audience_id": "rowan",
+                "privacy": "public",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        perceived = DomainEvent(
+            "perception.recorded",
+            "pathos",
+            {
+                "owner": "pathos",
+                "source_event_id": str(turn.event_id),
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=turn.event_id,
+        )
+        state = PathosState(connection=0.4)
+
+        events, changed = appraisal_events([turn, perceived], state, self.now)
+
+        self.assertEqual(events[0].causation_id, turn.event_id)
+        self.assertGreater(changed.connection, state.connection)
+
     def test_sleep_recovers_rest_while_waking_hours_create_need_pressure(self):
         sleeping = PathosState(rest=0.4)
         night_events, rested = sleep_and_need_events(

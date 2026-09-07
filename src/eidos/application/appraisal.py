@@ -238,7 +238,7 @@ def _effect(
         return ("connection", 0.05, 0.4, 0.45, 0.6)
     if event.kind == "social.activity_completed":
         return ("connection", 0.06, 0.55, 0.35, 0.8)
-    if event.kind == "scene.turn_taken":
+    if event.kind == "scene.turn_taken" and _pathos_experienced_scene_turn(event, history):
         return ("connection", 0.025, 0.3, 0.35, 0.75)
     if event.kind == "meal.eaten":
         return ("affect", 0.0, 0.25, 0.1, 0.9)
@@ -320,6 +320,19 @@ def _effect(
         desirability = max(-0.28, min(0.28, float(prior.payload["desirability"]) * 0.35))
         return ("affect", 0.0, desirability, 0.12, 0.7)
     return None
+
+
+def _pathos_experienced_scene_turn(event: DomainEvent, history: Sequence[DomainEvent]) -> bool:
+    """Require participation or an exact owned perception before appraisal."""
+    if "pathos" in {event.payload.get("actor_id"), event.payload.get("audience_id")}:
+        return True
+    source_id = str(event.event_id)
+    return any(
+        perceived.kind == "perception.recorded"
+        and perceived.payload.get("owner") == "pathos"
+        and perceived.payload.get("source_event_id") == source_id
+        for perceived in history
+    )
 
 
 def _toward(value: float, target: float, step: float) -> float:
