@@ -70,7 +70,7 @@ async def improvised_world_events(
     signals = dict(external_signals or {})
     request = ModelRequest(
         capability="moira_event",
-        task_version="3",
+        task_version="4",
         temperature=0.85,
         max_output_tokens=300,
         output_schema=ambient_output_schema(tuple(locations), tuple(resources), tuple(signals)),
@@ -159,7 +159,7 @@ async def improvised_world_events(
                     trace_id,
                     simulated_at,
                     started,
-                    "schema-rules-v3",
+                    "schema-rules-v4",
                     "rules",
                     code,
                 )
@@ -183,7 +183,7 @@ async def improvised_world_events(
                 trace_id,
                 simulated_at,
                 started,
-                "schema-rules-v3",
+                "schema-rules-v4",
                 "rules",
                 None,
             ),
@@ -252,6 +252,7 @@ async def improvised_world_events(
                     "opportunity": candidate.opportunity,
                     "participation": candidate.participation,
                     "stakes": candidate.stakes,
+                    "affective_tone": candidate.affective_tone,
                     "cause": candidate.cause,
                     "duration_hours": candidate.duration_hours,
                     "novelty_score": novelty_score,

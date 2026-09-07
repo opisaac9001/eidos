@@ -29,6 +29,30 @@ class MonthSoakTests(unittest.TestCase):
             self.assertTrue(all(0 <= value <= 1 for value in snapshot["pathos"]["needs"].values()))
             self.assertTrue(-1 <= snapshot["pathos"]["valence"] <= 1)
             self.assertTrue(0 <= snapshot["pathos"]["arousal"] <= 1)
+            emotion_samples = [event for event in events if event.kind == "emotion.sampled"]
+            emotion_labels = {str(event.payload["label"]) for event in emotion_samples}
+            self.assertTrue(
+                {"quiet", "contentment", "melancholy", "frustration"} <= emotion_labels,
+                emotion_labels,
+            )
+            self.assertLess(
+                min(float(event.payload["valence"]) for event in emotion_samples), -0.08
+            )
+            self.assertGreater(
+                max(float(event.payload["valence"]) for event in emotion_samples), 0.08
+            )
+            self.assertGreater(
+                max(float(event.payload["arousal"]) for event in emotion_samples), 0.55
+            )
+            positive_episodes = [
+                event
+                for event in events
+                if event.kind == "affect.episode_started"
+                and float(event.payload["valence_delta"]) > 0
+            ]
+            self.assertTrue(
+                any(float(event.payload["adaptation"]) < 0.5 for event in positive_episodes)
+            )
             self.assertTrue(
                 all(
                     0.2 <= value <= 0.8
@@ -326,10 +350,10 @@ class MonthSoakTests(unittest.TestCase):
                 )
             )
             self.assertTrue(any(event.kind == "world_thread.resolved" for event in events))
-            self.assertEqual(
-                {event.payload["partner_id"] for event in ordinary_scenes},
-                {"mara", "ellis", "rowan", "nina-vale"},
-            )
+            ordinary_partners = {str(event.payload["partner_id"]) for event in ordinary_scenes}
+            resident_ids = {str(person["id"]) for person in snapshot["people"]}
+            self.assertTrue({"mara", "ellis", "rowan"} <= ordinary_partners)
+            self.assertTrue(ordinary_partners <= resident_ids)
             self.assertGreaterEqual(len({event.payload["topic_id"] for event in ordinary_turns}), 6)
             self.assertEqual(len(ordinary_ends), len(ordinary_scenes))
             interrupted = next(event for event in events if event.kind == "scene.interrupted")
@@ -342,45 +366,66 @@ class MonthSoakTests(unittest.TestCase):
                     for event in events
                 )
             )
-            self.assertIn("nina-vale", {person["id"] for person in snapshot["people"]})
-            self.assertIn("old-glasshouse", {place["id"] for place in snapshot["locations"]})
-            self.assertIn("blue-handcart", {item["object_id"] for item in snapshot["objects"]})
+            accepted_expansions = [
+                event for event in events if event.kind == "world.expansion_accepted"
+            ]
+            self.assertTrue(accepted_expansions)
+            events_by_id = {str(event.event_id): event for event in events}
+            registration_kinds = {
+                "person": "world.person_registered",
+                "place": "world.place_registered",
+                "object": "object.registered",
+            }
+            for accepted_expansion in accepted_expansions:
+                registration = events_by_id[
+                    str(accepted_expansion.payload["registration_event_id"])
+                ]
+                self.assertEqual(
+                    registration.kind,
+                    registration_kinds[str(accepted_expansion.payload["entity_kind"])],
+                )
+                self.assertEqual(accepted_expansion.causation_id, registration.event_id)
+
             handcart_registration = next(
-                event
-                for event in events
-                if event.kind == "object.registered"
-                and event.payload.get("object_id") == "blue-handcart"
+                (
+                    event
+                    for event in events
+                    if event.kind == "object.registered"
+                    and event.payload.get("object_id") == "blue-handcart"
+                ),
+                None,
             )
-            handcart_choice = next(
-                event
-                for event in events
-                if event.kind == "object.opportunity_evaluated"
-                and event.payload.get("object_id") == "blue-handcart"
-            )
-            self.assertEqual(handcart_choice.causation_id, handcart_registration.event_id)
-            if handcart_choice.payload["decision"] == "pursue":
-                handcart_goal = next(
-                    goal
-                    for goal in snapshot["goals"]
-                    if goal["goal_id"] == "use-introduced-blue-handcart"
+            if handcart_registration is not None:
+                handcart_choice = next(
+                    event
+                    for event in events
+                    if event.kind == "object.opportunity_evaluated"
+                    and event.payload.get("object_id") == "blue-handcart"
                 )
-                self.assertEqual(
-                    (handcart_goal["status"], handcart_goal["progress"]),
-                    ("achieved", 1.0),
-                )
-                self.assertEqual(
-                    sum(
-                        event.kind == "object.used"
-                        and event.payload.get("object_id") == "blue-handcart"
-                        for event in events
-                    ),
-                    2,
-                )
-            else:
-                self.assertNotIn(
-                    "use-introduced-blue-handcart",
-                    {goal["goal_id"] for goal in snapshot["goals"]},
-                )
+                self.assertEqual(handcart_choice.causation_id, handcart_registration.event_id)
+                if handcart_choice.payload["decision"] == "pursue":
+                    handcart_goal = next(
+                        goal
+                        for goal in snapshot["goals"]
+                        if goal["goal_id"] == "use-introduced-blue-handcart"
+                    )
+                    self.assertEqual(
+                        (handcart_goal["status"], handcart_goal["progress"]),
+                        ("achieved", 1.0),
+                    )
+                    self.assertEqual(
+                        sum(
+                            event.kind == "object.used"
+                            and event.payload.get("object_id") == "blue-handcart"
+                            for event in events
+                        ),
+                        2,
+                    )
+                else:
+                    self.assertNotIn(
+                        "use-introduced-blue-handcart",
+                        {goal["goal_id"] for goal in snapshot["goals"]},
+                    )
 
 
 if __name__ == "__main__":

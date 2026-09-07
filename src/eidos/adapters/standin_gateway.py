@@ -517,6 +517,7 @@ class StandInGateway(ModelGateway):
                     2,
                     0.28,
                     5,
+                    0.2,
                 ),
                 (
                     "misdirected_delivery",
@@ -528,6 +529,7 @@ class StandInGateway(ModelGateway):
                     3,
                     0.34,
                     7,
+                    -0.1,
                 ),
                 (
                     "brief_power_fault",
@@ -539,6 +541,7 @@ class StandInGateway(ModelGateway):
                     1,
                     0.43,
                     4,
+                    -0.7,
                 ),
                 (
                     "injured_migrating_bird",
@@ -550,6 +553,7 @@ class StandInGateway(ModelGateway):
                     4,
                     0.31,
                     6,
+                    -0.45,
                 ),
                 (
                     "forgotten_recording",
@@ -561,6 +565,7 @@ class StandInGateway(ModelGateway):
                     2,
                     0.37,
                     12,
+                    0.05,
                 ),
                 (
                     "water_main_markings",
@@ -572,6 +577,7 @@ class StandInGateway(ModelGateway):
                     5,
                     0.26,
                     18,
+                    -0.3,
                 ),
                 (
                     "seedling_gift",
@@ -583,6 +589,7 @@ class StandInGateway(ModelGateway):
                     3,
                     0.22,
                     8,
+                    0.55,
                 ),
                 (
                     "after_hours_rehearsal",
@@ -594,6 +601,7 @@ class StandInGateway(ModelGateway):
                     6,
                     0.35,
                     3,
+                    -0.35,
                 ),
             )
             item = agency_palette[choice % len(agency_palette)]
@@ -613,6 +621,7 @@ class StandInGateway(ModelGateway):
                         "opportunity": item[5],
                         "participation": f"A present neighbor may {item[5]} without a guaranteed outcome.",
                         "stakes": "The event may change an ordinary plan or relationship, but need not.",
+                        "affective_tone": item[9],
                         "resource_id": resource_id,
                         "inspiration_signal_id": next(
                             iter(context.get("external_signals", {})), "none"

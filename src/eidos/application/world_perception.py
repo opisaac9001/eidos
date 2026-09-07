@@ -333,6 +333,7 @@ def due_world_observations(
                 "generated_fiction",
                 "participation",
                 "stakes",
+                "affective_tone",
                 "novelty_score",
             )
             if key in event.payload

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
@@ -14,7 +14,7 @@ def baseline_affect_events(
     state: PathosState, simulated_at: datetime
 ) -> tuple[list[DomainEvent], PathosState]:
     """Move transient affect gently toward baseline without erasing its causes."""
-    valence_step = 0.025 if not state.awake else 0.015
+    valence_step = 0.025 if not state.awake else 0.012 if state.valence < 0 else 0.018
     arousal_step = 0.035 if not state.awake else 0.02
     valence = _toward(state.valence, 0.0, valence_step)
     arousal = _toward(state.arousal, 0.35, arousal_step)
@@ -51,8 +51,21 @@ def affect_episode_events(
         desirability = float(appraisal.payload["desirability"])
         novelty = float(appraisal.payload["novelty"])
         already_applied = appraisal.payload.get("source_kind") == "dream.effect_applied"
-        valence_delta = 0.0 if already_applied else max(-0.08, min(0.08, desirability * 0.06))
-        arousal_delta = max(-0.04, min(0.06, (novelty - 0.25) * 0.08))
+        valence_delta, adaptation = (
+            (0.0, 1.0)
+            if already_applied
+            else _episode_valence_delta(
+                [*history, *output], current, appraisal, desirability, simulated_at
+            )
+        )
+        arousal_delta = max(
+            -0.06,
+            min(
+                0.18,
+                (novelty - 0.25) * 0.12
+                + abs(desirability) * (0.08 if desirability < 0 else 0.04 * adaptation),
+            ),
+        )
         episode = DomainEvent(
             "affect.episode_started",
             "pathos",
@@ -61,6 +74,7 @@ def affect_episode_events(
                 "source_event_id": str(appraisal.payload["source_event_id"]),
                 "source_kind": str(appraisal.payload["source_kind"]),
                 "valence_delta": valence_delta,
+                "adaptation": adaptation,
                 "arousal_delta": arousal_delta,
                 "already_applied": already_applied,
                 "simulated_at": simulated_at.isoformat(),
@@ -227,10 +241,24 @@ def _effect(
         and event.payload.get("source") == "direct-perception"
         and event.payload.get("category") in {"world-event", "world-thread"}
     ):
+        affective_tone = event.payload.get("affective_tone")
+        if (
+            not isinstance(affective_tone, bool)
+            and isinstance(affective_tone, (int, float))
+            and -1 <= float(affective_tone) <= 1
+        ):
+            tone = float(affective_tone)
+            return (
+                "affect",
+                0.0,
+                tone,
+                max(0.2, min(0.8, float(event.payload.get("importance", 0.5)))),
+                0.45,
+            )
         return (
             "curiosity",
             0.03 if event.payload.get("category") == "world-event" else 0.02,
-            0.35,
+            0.15,
             0.5 if event.payload.get("category") == "world-event" else 0.3,
             0.55,
         )
@@ -341,3 +369,43 @@ def _toward(value: float, target: float, step: float) -> float:
     if value > target:
         return max(target, value - step)
     return value
+
+
+def _episode_valence_delta(
+    history: Sequence[DomainEvent],
+    state: PathosState,
+    appraisal: DomainEvent,
+    desirability: float,
+    simulated_at: datetime,
+) -> tuple[float, float]:
+    """Apply loss salience, positive saturation, and ordinary hedonic adaptation."""
+    if desirability == 0:
+        return 0.0, 1.0
+    if desirability < 0:
+        # Unpleasant experiences are consequential, but their effect tapers near
+        # the lower bound instead of driving an unbounded spiral.
+        saturation = max(0.4, 1.0 - max(0.0, -state.valence) * 0.6)
+        return max(-0.16, desirability * 0.16 * saturation), 1.0
+
+    source_kind = str(appraisal.payload.get("source_kind", ""))
+    cutoff = simulated_at - timedelta(hours=24)
+    repeats = 0
+    for event in history:
+        if (
+            event.kind != "affect.episode_started"
+            or event.payload.get("source_kind") != source_kind
+        ):
+            continue
+        raw_time = event.payload.get("simulated_at")
+        if not isinstance(raw_time, str):
+            continue
+        try:
+            occurred_at = datetime.fromisoformat(raw_time)
+        except ValueError:
+            continue
+        if occurred_at.utcoffset() is not None and cutoff <= occurred_at <= simulated_at:
+            repeats += 1
+    repetition = max(0.2, 1.0 / (1.0 + repeats * 0.45))
+    saturation = max(0.15, 1.0 - max(0.0, state.valence) * 0.85)
+    adaptation = round(repetition * saturation, 4)
+    return min(0.06, desirability * 0.06 * adaptation), adaptation

@@ -117,8 +117,13 @@ thinking and speaking seconds; pre-feature turns retain the original steady timi
 Dream residue receives an appraisal but cannot directly change a need, belief,
 intention or action. Selected five-to-ten-hour sleep windows recover rest while
 waking hours create modest need pressure; pre-window saved worlds retain a safe
-circadian fallback. A seven-day calibration keeps these signals away from permanent
-floors and ceilings. Richer values remain future work.
+circadian fallback. Repeated pleasant routines undergo 24-hour adaptation instead of
+ratcheting mood upward forever, while negative experiences are more salient and recover
+more slowly without creating an unbounded spiral. Perceived improvised events carry a
+validated affective tone, so disruption is not automatically treated as pleasant merely
+because it is novel. The month gate requires ordinary contentment, melancholy, and
+frustration while keeping stronger states possible but uncommon. Richer values remain
+future work.
 
 ## Persistence and failures
 

@@ -360,6 +360,12 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   pace and risk. Rate-limited regulation can lower arousal or protect a sleep intention,
   but never directly turns sadness into happiness; protected rest completes only when
   sleep actually begins.
+- Repeated positive routines now undergo bounded hedonic adaptation, while setbacks
+  carry stronger salience and slower waking recovery. Open-world proposals include a
+  validated affective tone that matters only if Pathos perceives the event. The month
+  gate requires ordinary contentment, melancholy, frustration, and quiet rather than a
+  permanently positive or emotionally flat life; intense and prolonged states remain
+  possible consequences, not a scheduled quota.
 - The Dream Journal groups each dream with its later recall, bounded emotional residue,
   waking possibility, activity/project link, and terminal outcome. The ordinary view
   explains the arc without internals; the operator view retains event and causation IDs.

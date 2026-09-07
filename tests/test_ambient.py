@@ -21,6 +21,7 @@ class AmbientCandidateTests(unittest.TestCase):
             "opportunity": "stop and listen",
             "participation": "A passerby may listen, speak with the player, or continue walking.",
             "stakes": "A brief connection or a missed ordinary encounter.",
+            "affective_tone": 0.15,
             "resource_id": "community-sketch-basket",
             "inspiration_signal_id": "none",
             "starts_in_hours": 3,
@@ -81,6 +82,7 @@ class AmbientCandidateTests(unittest.TestCase):
         schema = ambient_output_schema()
         self.assertEqual(set(schema["required"]), set(schema["properties"]))
         self.assertNotIn("enum", schema["properties"]["event_type"])
+        self.assertEqual(schema["properties"]["affective_tone"]["minimum"], -1.0)
         self.assertFalse(schema["additionalProperties"])
         expanded = ambient_output_schema(
             ("park", "old-glasshouse"),
@@ -109,6 +111,13 @@ class AmbientCandidateTests(unittest.TestCase):
                 known_signal_ids={"actual-source"},
                 history=[],
             )
+
+    def test_affective_tone_is_bounded_and_cannot_be_hidden_in_unstructured_prose(self):
+        self.assertEqual(self.candidate(affective_tone=-0.7).affective_tone, -0.7)
+        for value in (-1.1, 1.1, True, "sad"):
+            with self.subTest(value=value), self.assertRaises(ProposalRejected) as raised:
+                self.candidate(affective_tone=value)
+            self.assertEqual(raised.exception.code, "invalid_affective_tone")
 
     def test_schema_valid_but_semantically_empty_or_agency_forcing_output_is_rejected(self):
         for changes, code in (

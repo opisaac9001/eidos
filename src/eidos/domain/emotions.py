@@ -47,19 +47,19 @@ def classify_emotion(valence: float, arousal: float, sustained_low_hours: int = 
     _dimensions(valence, arousal)
     if sustained_low_hours >= 72 and valence <= -0.35:
         return "prolonged low mood"
-    if valence >= 0.55 and arousal >= 0.55:
+    if valence >= 0.35 and arousal >= 0.5:
         return "joy"
-    if valence >= 0.3 and arousal >= 0.55:
+    if valence >= 0.18 and arousal >= 0.5:
         return "excitement"
-    if valence >= 0.2:
+    if valence >= 0.07:
         return "contentment"
-    if valence <= -0.5 and arousal <= 0.5:
+    if valence <= -0.28 and arousal <= 0.5:
         return "sadness"
-    if valence <= -0.3 and arousal >= 0.65:
+    if valence <= -0.18 and arousal >= 0.55:
         return "anxiety"
-    if valence <= -0.2 and arousal >= 0.45:
+    if valence <= -0.1 and arousal >= 0.42:
         return "frustration"
-    if valence <= -0.15:
+    if valence <= -0.06:
         return "melancholy"
     if arousal >= 0.7:
         return "alertness"

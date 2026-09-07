@@ -167,6 +167,65 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(repeated, [])
         self.assertEqual(same, affected)
 
+    def test_repeated_positive_experiences_adapt_instead_of_ratchet_to_euphoria(self):
+        sources = [
+            DomainEvent(
+                "npc.encountered",
+                "pathos",
+                {"person_id": f"person-{index}", "simulated_at": self.now.isoformat()},
+            )
+            for index in range(3)
+        ]
+        appraisals, state = appraisal_events(sources, PathosState(), self.now)
+        episodes, affected = affect_episode_events([*sources, *appraisals], state, self.now)
+        deltas = [
+            float(event.payload["valence_delta"])
+            for event in episodes
+            if event.kind == "affect.episode_started"
+        ]
+        self.assertEqual(len(deltas), 3)
+        self.assertGreater(deltas[0], deltas[1])
+        self.assertGreater(deltas[1], deltas[2])
+        self.assertLess(affected.valence, sum([0.024] * 3))
+
+    def test_perceived_world_trouble_can_outweigh_routine_positive_affect(self):
+        troubling = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "owner": "pathos",
+                "source": "direct-perception",
+                "category": "world-event",
+                "affective_tone": -0.8,
+                "importance": 0.7,
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+        pleasant = DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {"person_id": "mara", "simulated_at": self.now.isoformat()},
+        )
+        appraisals, state = appraisal_events([pleasant, troubling], PathosState(), self.now)
+        self.assertEqual(
+            [
+                event.payload["desirability"]
+                for event in appraisals
+                if event.kind == "appraisal.recorded"
+            ],
+            [0.4, -0.8],
+        )
+        episodes, affected = affect_episode_events(
+            [pleasant, troubling, *appraisals], state, self.now
+        )
+        negative = [
+            event
+            for event in episodes
+            if event.kind == "affect.episode_started" and float(event.payload["valence_delta"]) < 0
+        ][0]
+        self.assertLess(float(negative.payload["valence_delta"]), -0.1)
+        self.assertLess(affected.valence, 0)
+
     def test_physical_discomfort_and_recovery_have_bounded_emotional_residue(self):
         condition = DomainEvent(
             "wellbeing.episode_started",

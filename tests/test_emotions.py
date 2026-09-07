@@ -18,8 +18,10 @@ class EmotionTests(unittest.TestCase):
         self.assertEqual(classify_emotion(0.35, 0.3), "contentment")
         self.assertEqual(classify_emotion(-0.6, 0.3), "sadness")
         self.assertEqual(classify_emotion(-0.4, 0.8), "anxiety")
-        self.assertEqual(classify_emotion(-0.25, 0.55), "frustration")
+        self.assertEqual(classify_emotion(-0.15, 0.5), "frustration")
         self.assertEqual(classify_emotion(-0.4, 0.3, 72), "prolonged low mood")
+        self.assertEqual(classify_emotion(0.1, 0.35), "contentment")
+        self.assertEqual(classify_emotion(-0.08, 0.35), "melancholy")
 
     def test_low_mood_duration_persists_without_becoming_a_diagnosis(self):
         history = []

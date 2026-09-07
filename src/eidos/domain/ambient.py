@@ -19,6 +19,7 @@ AMBIENT_FIELDS = {
     "opportunity",
     "participation",
     "stakes",
+    "affective_tone",
     "resource_id",
     "inspiration_signal_id",
     "starts_in_hours",
@@ -43,6 +44,7 @@ class AmbientCandidate:
     opportunity: str
     participation: str
     stakes: str
+    affective_tone: float
     resource_id: str
     inspiration_signal_id: str
     starts_in_hours: int
@@ -56,7 +58,7 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
     except (TypeError, ValueError):
         raise ProposalRejected("invalid_json", "Ambient proposal was not valid JSON") from None
     if not isinstance(raw, dict) or set(raw) != AMBIENT_FIELDS:
-        raise ProposalRejected("invalid_shape", "Ambient proposal fields did not match schema v3")
+        raise ProposalRejected("invalid_shape", "Ambient proposal fields did not match schema v4")
     text_values = {}
     for field, maximum in {
         "description": 220,
@@ -84,11 +86,21 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
         or not 0.05 <= intensity <= 1.0
     ):
         raise ProposalRejected("invalid_intensity", "Ambient intensity must be 0.05 to 1.0")
+    affective_tone = raw["affective_tone"]
+    if (
+        isinstance(affective_tone, bool)
+        or not isinstance(affective_tone, (int, float))
+        or not -1.0 <= affective_tone <= 1.0
+    ):
+        raise ProposalRejected(
+            "invalid_affective_tone", "Ambient affective tone must be between -1.0 and 1.0"
+        )
     duration = raw["duration_hours"]
     if isinstance(duration, bool) or not isinstance(duration, int) or not 1 <= duration <= 72:
         raise ProposalRejected("invalid_duration", "Ambient duration must be one to 72 hours")
     return AmbientCandidate(
         **text_values,
+        affective_tone=float(affective_tone),
         starts_in_hours=starts,
         intensity=float(intensity),
         duration_hours=duration,
@@ -183,6 +195,7 @@ def ambient_output_schema(
             "opportunity": {"type": "string", "minLength": 1, "maxLength": 40},
             "participation": {"type": "string", "minLength": 1, "maxLength": 100},
             "stakes": {"type": "string", "minLength": 1, "maxLength": 100},
+            "affective_tone": {"type": "number", "minimum": -1.0, "maximum": 1.0},
             "resource_id": {"type": "string", "enum": list(known_resource_ids)},
             "inspiration_signal_id": {
                 "type": "string",

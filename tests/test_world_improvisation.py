@@ -55,6 +55,7 @@ class WorldImprovisationTests(unittest.TestCase):
                 "opportunity": "ask about the maps",
                 "participation": "Visitors may ask questions or help annotate a local route.",
                 "stakes": "The mapmaker may leave with gaps in the neighborhood record.",
+                "affective_tone": -0.25,
                 "resource_id": "shared-tea-service",
                 "inspiration_signal_id": "none",
                 "starts_in_hours": 2,
@@ -84,6 +85,7 @@ class WorldImprovisationTests(unittest.TestCase):
         self.assertEqual(scheduled.payload["event_kind"], "ambient")
         self.assertEqual(scheduled.payload["source"], "model-fiction-proposal")
         self.assertEqual(link.payload["event_type"], "visiting_mapmaker")
+        self.assertEqual(link.payload["affective_tone"], -0.25)
         self.assertTrue(link.payload["generated_fiction"])
         self.assertGreater(link.payload["novelty_score"], 0.3)
         self.assertEqual(resource.payload["resource_id"], "shared-tea-service")
@@ -95,6 +97,7 @@ class WorldImprovisationTests(unittest.TestCase):
         self.assertEqual(occurred.payload["cause"], "a missed train leaves an open evening")
         memory = next(event for event in due if event.kind == "memory.recorded")
         self.assertEqual(memory.payload["event_type"], "visiting_mapmaker")
+        self.assertEqual(memory.payload["affective_tone"], -0.25)
 
     def test_invalid_output_is_a_recorded_quiet_interval_not_a_scripted_fallback(self):
         events = self.generate_events(FixedGateway("not json"))
