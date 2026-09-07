@@ -12,8 +12,8 @@ from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
     "pathos": ("4", 160, 0.55),
-    "murmur": ("3", 100, 0.65),
-    "firmament": ("3", 140, 0.7),
+    "murmur": ("4", 100, 0.65),
+    "firmament": ("4", 140, 0.7),
     "moira": ("3", 16, 0.2),
     "mnemosyne": ("3", 384, 0.0),
     "reflection": ("3", 140, 0.55),

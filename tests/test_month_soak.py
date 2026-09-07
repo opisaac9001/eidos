@@ -3,6 +3,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
+from eidos.adapters.sqlite_experiments import review_life_evidence
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
@@ -55,6 +56,13 @@ class MonthSoakTests(unittest.TestCase):
             # histories can cross a decimal 10 MB boundary. Keep a strict bound
             # with enough page-allocation headroom to avoid a flaky soak test.
             self.assertLess(path.stat().st_size, 10_500_000)
+            review = review_life_evidence(path)
+            self.assertGreater(review.narrative_lines, 500)
+            self.assertLessEqual(
+                review.narrative_repetition_rate,
+                0.2,
+                review.narrative_repetitions_by_kind,
+            )
             physical_starts = [
                 event for event in events if event.kind == "wellbeing.episode_started"
             ]

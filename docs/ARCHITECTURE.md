@@ -25,7 +25,9 @@ priority, concurrent claims, leases, bounded retry, cancellation and stale
 results before/after inference. Normal CLI and browser model paths use the queue
 through a durable gateway decorator with supervised background workers. Optional
 Murmur associations submit after the authoritative tick and are revalidated and
-reconciled idempotently later; other callers still await their requested result.
+reconciled idempotently later. The real-time waking inner stream uses separate
+quarter-hour pulse identities and retains only a bounded recent tail for continuity;
+other callers still await their requested result.
 Explainable term/entity/goal/relationship recall is implemented; vector retrieval and
 outside tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and
@@ -128,6 +130,10 @@ may describe emotion but does not set numeric state directly.
 Builds bounded context, invokes a named model capability, parses structured
 proposals, and records traces. Conscious dialogue, reflection, subconscious
 association, NPC improvisation, and dreams are distinct job types.
+They communicate through an owned, append-only cognitive workspace rather than direct
+unbounded model-to-model chat: attention, emotion, recalled experience, and the recent
+inner stream become limited inputs to the next eligible faculty. This preserves the
+ensemble design while keeping provenance, privacy, pacing, and action authority clear.
 
 ### Tools (Logos)
 

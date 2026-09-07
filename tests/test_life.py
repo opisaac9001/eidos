@@ -440,7 +440,8 @@ class LifeTests(unittest.TestCase):
             [item["speaker"] for item in during["conversations"][-2:]], ["you", "pathos"]
         )
         self.assertEqual(during["communication"]["live_turn_count"], 2)
-        self.assertEqual(during["communication"]["live_elapsed_minutes"], 5)
+        self.assertGreater(during["communication"]["live_elapsed_seconds"], 0)
+        self.assertLess(during["communication"]["live_elapsed_minutes"], 1)
         self.assertGreater(datetime.fromisoformat(during["time"]), datetime.fromisoformat(before))
         self.assertEqual(during["conversation_clocks"][0]["exchanges"], 1)
         self.assertEqual(during["conversations"][-1]["channel"], "live_visit")
@@ -450,10 +451,12 @@ class LifeTests(unittest.TestCase):
         self.assertTrue(any(event.kind == "visit.ended" for event in self.life.history()))
 
     def test_conversation_time_reaches_a_real_departure_without_manual_stepping(self):
-        self.life.advance(8.75)
-        self.life.request_visit("quarter-hour-before-cafe")
-        self.assertIn("15 minutes", self.life.snapshot()["communication"]["reason"])
-        for index in range(3):
+        self.life.advance(8 + 59 / 60 + 50 / 3600)
+        self.life.request_visit("seconds-before-cafe")
+        self.assertIn("1 minute", self.life.snapshot()["communication"]["reason"])
+        for index in range(10):
+            if self.life.snapshot()["communication"]["live_scene_id"] is None:
+                break
             self.life.chat("Go on.", f"timed-turn-{index}")
         snapshot = self.life.snapshot()
         self.assertIsNone(snapshot["communication"]["live_scene_id"])
@@ -461,7 +464,8 @@ class LifeTests(unittest.TestCase):
             event for event in reversed(self.life.history()) if event.kind == "visit.ended"
         )
         self.assertEqual(ended.payload["reason"], "scheduled_departure")
-        self.assertEqual(snapshot["conversation_clocks"][0]["elapsed_minutes"], 15)
+        self.assertGreaterEqual(snapshot["conversation_clocks"][0]["elapsed_seconds"], 10)
+        self.assertLess(snapshot["conversation_clocks"][0]["elapsed_minutes"], 1)
 
     def test_due_text_waits_while_pathos_is_in_a_live_conversation(self):
         self.life.bootstrap()

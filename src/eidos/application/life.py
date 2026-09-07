@@ -111,7 +111,7 @@ from eidos.domain.associations import AssociationProposal, resolve_association
 from eidos.domain.beliefs import BeliefState, project_beliefs
 from eidos.domain.character_history import project_character_history
 from eidos.domain.commitments import project_renegotiations
-from eidos.domain.conversation_time import exchange_minutes, project_conversation_clocks
+from eidos.domain.conversation_time import project_conversation_clocks, reply_pacing
 from eidos.domain.development import project_development
 from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotion_sample_events, emotional_planning_bias, project_emotion
@@ -1002,6 +1002,7 @@ class Life:
             for item in conversations
             if item.get("speaker") == "you"
             and str(item.get("request_id")) not in answered_request_ids
+            and "reply_due_at" in item
         ]
         user_scene = next(
             (
@@ -1181,6 +1182,11 @@ class Life:
                     if user_scene is not None and user_scene.scene_id in conversation_clocks
                     else 0
                 ),
+                "live_elapsed_seconds": (
+                    conversation_clocks[user_scene.scene_id].elapsed_seconds
+                    if user_scene is not None and user_scene.scene_id in conversation_clocks
+                    else 0
+                ),
             },
             "mode": self.mode,
             "model": getattr(self.gateway, "model", "authored-stand-in-v1"),
@@ -1201,6 +1207,105 @@ class Life:
         ):
             raise ValueError("Advance must be greater than zero and at most 24 hours")
         asyncio.run(self._advance(hours))
+
+    def pulse_inner_stream(self) -> bool:
+        """Run one idempotent waking quarter-hour of stream-of-consciousness cognition."""
+        return asyncio.run(self._pulse_inner_stream())
+
+    async def _pulse_inner_stream(self) -> bool:
+        history = self.history()
+        state = self._project_state(history)
+        if not state.awake:
+            return False
+        bucket = state.simulated_at.replace(
+            minute=(state.simulated_at.minute // 15) * 15,
+            second=0,
+            microsecond=0,
+        )
+        pulse_id = f"inner-stream-{bucket.isoformat()}"
+        if any(
+            event.kind == "mind.stream_pulsed" and event.payload.get("pulse_id") == pulse_id
+            for event in history
+        ):
+            return False
+        catalog = self._world_catalog(history)
+        location_name = catalog.location_name(state.location_id)
+        selected = recall(
+            history,
+            location_name,
+            state.simulated_at,
+            3,
+            entity_ids={state.location_id},
+            diverse=True,
+            index=self._memory_index(history),
+        )
+        recent_stream = [
+            str(event.payload["text"])
+            for event in history
+            if event.kind == "thought.recorded" and isinstance(event.payload.get("text"), str)
+        ][-8:]
+        emotion = project_emotion(history)
+        marker = DomainEvent(
+            "mind.stream_pulsed",
+            "pathos",
+            {
+                "pulse_id": pulse_id,
+                "cadence": "quarter_hour_realtime",
+                "simulated_at": state.simulated_at.isoformat(),
+                "action_authority": False,
+            },
+            correlation_id=pulse_id,
+        )
+        pending = [marker]
+        text = await perform(
+            self.gateway,
+            "murmur",
+            {
+                "time": state.simulated_at.isoformat(),
+                "location": location_name,
+                "memories": [item.recalled_text for item in selected],
+                "memory_recollections": [
+                    {
+                        "text": item.recalled_text,
+                        "felt_confidence": item.felt_confidence,
+                        "detail_level": item.detail_level,
+                        "emotional_tone": item.emotional_label,
+                    }
+                    for item in selected
+                ],
+                "recent_inner_stream": recent_stream,
+                "stream_pulse_id": pulse_id,
+                "mind_layers": mind_context(history),
+                "emotion": {
+                    "label": emotion.label,
+                    "intensity": emotion.intensity,
+                    "pattern": emotion.pattern,
+                },
+            },
+            state.simulated_at.isoformat(),
+            pending,
+        )
+        if text is not None:
+            source = selected[0].event if selected else None
+            pending.append(
+                DomainEvent(
+                    "thought.recorded",
+                    "pathos",
+                    {
+                        "text": text,
+                        "simulated_at": state.simulated_at.isoformat(),
+                        "source": "continuous-inner-stream",
+                        "source_memory_id": str(source.event_id) if source is not None else None,
+                        "factual": False,
+                        "role": "murmur",
+                        "stream_pulse_id": pulse_id,
+                    },
+                    causation_id=source.event_id if source is not None else marker.event_id,
+                    correlation_id=pulse_id,
+                )
+            )
+        self.store.append("pathos", pending, len(history))
+        return text is not None
 
     def preview_catch_up(self, hours: float) -> CatchUpPreview:
         history = self.history()
@@ -1590,7 +1695,10 @@ class Life:
                 else None
             )
             planned_beat = planned_activity_beat(
-                self._planning(history + pending), current, effective_energy
+                self._planning(history + pending),
+                current,
+                effective_energy,
+                current_location_id=state.location_id,
             )
             beat = incident_beat or planned_beat or beats.get(current)
             meals: list[DomainEvent] = []
@@ -2266,6 +2374,12 @@ class Life:
                     for item in inspirations_now
                 ],
                 "mind_layers": mind_context(history + pending),
+                "recent_inner_stream": [
+                    str(event.payload["text"])
+                    for event in history + pending
+                    if event.kind == "thought.recorded"
+                    and isinstance(event.payload.get("text"), str)
+                ][-8:],
             }
             if concerns_now:
                 context["concern"] = concerns_now[-1].payload["text"]
@@ -2942,7 +3056,7 @@ class Life:
             simulated_at=state.simulated_at.isoformat(),
         )
         output = list(pathos_turn.events)
-        elapsed_minutes = 0
+        elapsed_seconds = 0
         if pathos_turn.accepted:
             user_turn_event = next(
                 event for event in user_turn.events if event.kind == "scene.turn_taken"
@@ -2950,7 +3064,8 @@ class Life:
             pathos_turn_event = next(
                 event for event in pathos_turn.events if event.kind == "scene.turn_taken"
             )
-            elapsed_minutes = exchange_minutes(text, str(reply.payload["text"]))
+            pacing = reply_pacing(text, str(reply.payload["text"]))
+            elapsed_seconds = pacing.total_seconds
             output.append(
                 DomainEvent(
                     "conversation.time_elapsed",
@@ -2960,14 +3075,16 @@ class Life:
                         "request_id": request_id,
                         "user_turn_event_id": str(user_turn_event.event_id),
                         "pathos_turn_event_id": str(pathos_turn_event.event_id),
-                        "minutes": elapsed_minutes,
+                        "seconds": elapsed_seconds,
+                        "listening_seconds": pacing.listening_seconds,
+                        "thinking_seconds": pacing.thinking_seconds,
+                        "speaking_seconds": pacing.speaking_seconds,
                         "text": (
-                            f"{elapsed_minutes} simulated minutes passed while the conversation "
-                            "continued."
+                            f"{elapsed_seconds} seconds passed while the conversation continued."
                         ),
                         "started_at": state.simulated_at.isoformat(),
                         "ends_at": (
-                            state.simulated_at + timedelta(minutes=elapsed_minutes)
+                            state.simulated_at + timedelta(seconds=elapsed_seconds)
                         ).isoformat(),
                         "simulated_at": state.simulated_at.isoformat(),
                     },
@@ -3011,8 +3128,8 @@ class Life:
                     )
                 )
         self.store.append("pathos", output, len(history))
-        if elapsed_minutes:
-            await self._advance(elapsed_minutes / 60)
+        if elapsed_seconds:
+            await self._advance(elapsed_seconds / 3600)
 
     async def _respond_to_due_messages(self) -> None:
         while True:
@@ -3228,6 +3345,11 @@ class Life:
                 ),
             },
             "mind_layers": mind_context(history),
+            "recent_inner_stream": [
+                str(event.payload["text"])
+                for event in history
+                if event.kind == "thought.recorded" and isinstance(event.payload.get("text"), str)
+            ][-8:],
         }
         access_events = [
             DomainEvent(
@@ -3262,6 +3384,11 @@ class Life:
         pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))
         reply = await perform(self.gateway, "pathos", context, at, pending)
         if reply:
+            pacing = (
+                reply_pacing(text, reply)
+                if incoming.payload.get("channel") == "live_visit"
+                else None
+            )
             pending.append(
                 DomainEvent(
                     "conversation.message",
@@ -3274,6 +3401,18 @@ class Life:
                         "source": self.mode,
                         "channel": incoming.payload.get("channel", "inbox"),
                         "scene_id": incoming.payload.get("scene_id"),
+                        "pacing_listening_seconds": (
+                            pacing.listening_seconds if pacing is not None else None
+                        ),
+                        "pacing_thinking_seconds": (
+                            pacing.thinking_seconds if pacing is not None else None
+                        ),
+                        "pacing_speaking_seconds": (
+                            pacing.speaking_seconds if pacing is not None else None
+                        ),
+                        "pacing_total_seconds": (
+                            pacing.total_seconds if pacing is not None else None
+                        ),
                     },
                     causation_id=incoming.event_id,
                     correlation_id=incoming.correlation_id or request_id,

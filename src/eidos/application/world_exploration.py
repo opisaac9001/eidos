@@ -115,9 +115,13 @@ def exploration_plan_events(
 
 
 def planned_activity_beat(
-    planning: PlanningState, simulated_at: datetime, energy: float
+    planning: PlanningState,
+    simulated_at: datetime,
+    energy: float,
+    *,
+    current_location_id: str | None = None,
 ) -> RoutineBeat | None:
-    """Let an accepted calendar entry override loose routine at its start."""
+    """Let an accepted calendar entry override loose routine while it is happening."""
     entries = sorted(
         (
             entry
@@ -126,10 +130,10 @@ def planned_activity_beat(
             and entry.actor_id == "pathos"
             and datetime.fromisoformat(entry.starts_at)
             <= simulated_at
-            <= (
+            < (
                 datetime.fromisoformat(entry.ends_at)
                 if entry.ends_at is not None
-                else datetime.fromisoformat(entry.starts_at)
+                else datetime.fromisoformat(entry.starts_at) + timedelta(microseconds=1)
             )
         ),
         key=lambda entry: (entry.commitment_id is None, entry.schedule_id),
@@ -137,10 +141,19 @@ def planned_activity_beat(
     if not entries:
         return None
     entry = entries[0]
+    starts_at = datetime.fromisoformat(entry.starts_at)
+    if simulated_at == starts_at:
+        description = (
+            f"Set out for the planned activity: {entry.title}."
+            if current_location_id is not None and current_location_id != entry.location_id
+            else f"Started the planned activity: {entry.title}."
+        )
+    else:
+        description = f"Stayed with the planned activity: {entry.title}."
     return RoutineBeat(
         simulated_at.hour,
         entry.location_id,
-        f"Set out for the planned activity: {entry.title}.",
+        description,
         max(0.15, energy - 0.04),
         entry.action or "planned_activity",
     )

@@ -31,6 +31,12 @@ delayed inbox conversations, and five
 UX views. Eight logical AI roles use stand-ins or real HTTP inference; they are not
 eight deployed services. A deterministic critic checks contracts. The offline suite
 includes unit, replay, seven-day, and thirty-day gates under strict static typing.
+In the ordinary real-time runtime, Murmur maintains a waking quarter-hour inner stream
+whose recent pulses become bounded context for conscious speech, reflection, and dreams;
+sleep and accelerated catch-up retain their own appropriate cadences. Live user
+conversation records human-scale listening, thinking, and speaking seconds, and the UI
+reflects a runtime-enforced delay that prevents unusually fast inference, refreshes, or
+another client from making Pathos answer instantly.
 Rare non-clinical physical discomfort now forms a replayable one-to-three-day arc:
 onset, monotonic recovery and resolution can alter somatic attention, mood, effective
 capacity, routine choices, plans, visit availability and queued response timing.
@@ -364,8 +370,10 @@ Feature families: WORLD-06/07, PLAN-07, SOCIAL-08, UX, QA-06.
   conjure one. Simulation controls and
   private diagnostics now render only on the explicit local `/operator` surface, so
   the ordinary life-facing UI changes the world only through communication.
-- Every accepted user/Pathos exchange now consumes a replay-validated five to fifteen
-  simulated minutes based on its bounded word count. The conversation view exposes
+- Every accepted user/Pathos exchange now consumes replay-validated human-scale
+  listening, thinking, and speaking seconds based on its bounded word count. The UI
+  makes unusually fast model output wait out that interval before appearing; legacy
+  minute-scale records remain valid. The conversation view exposes
   elapsed time and the next routine or calendar obligation. Crossing an hourly boundary
   runs the ordinary world loop, so departures and eligible interruptions can genuinely
   occur during a long visit; queued inbox replies wait until Pathos is no longer busy.

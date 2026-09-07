@@ -38,10 +38,11 @@ def communication_availability(
         (upcoming_at - state.simulated_at).total_seconds() / 60 if upcoming_at is not None else None
     )
     hurried = minutes_until is not None and minutes_until <= 60
+    rounded_minutes = max(1, round(minutes_until)) if minutes_until is not None else None
     timing = (
-        f" Pathos expects to leave in {max(1, round(minutes_until))} minutes for "
-        f"{upcoming_title.lower()}."
-        if hurried and minutes_until is not None and upcoming_title is not None
+        f" He has about {rounded_minutes} minute{'s' if rounded_minutes != 1 else ''} "
+        "before he needs to head out."
+        if hurried and rounded_minutes is not None and upcoming_title is not None
         else ""
     )
     timing_fields = (

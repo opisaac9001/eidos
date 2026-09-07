@@ -23,7 +23,8 @@ class WebTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         life = Life(SQLiteEventStore(Path(self.directory.name) / "world.db"), StandInGateway())
-        self.runtime = Runtime(life, interval=0.02)
+        self.pacing_sleeps = []
+        self.runtime = Runtime(life, interval=0.02, sleeper=self.pacing_sleeps.append)
         self.runtime.start()
         self.addCleanup(self.runtime.close)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.runtime))
@@ -195,6 +196,42 @@ class WebTests(unittest.TestCase):
         after = datetime.fromisoformat(life.snapshot()["time"])
         self.assertEqual((after - before).total_seconds(), 47)
 
+    def test_realtime_runtime_runs_a_bounded_waking_inner_stream(self):
+        class FakeClock:
+            def __init__(self):
+                self.now = 300.0
+
+            def __call__(self):
+                return self.now
+
+        clock = FakeClock()
+        life = Life(
+            SQLiteEventStore(Path(self.directory.name) / "realtime-stream.db"),
+            StandInGateway(),
+        )
+        life.advance(7)
+        runtime = Runtime(
+            life,
+            interval=0.005,
+            clock=clock,
+            realtime_quantum_seconds=300,
+        )
+        runtime.start()
+        self.addCleanup(runtime.close)
+        with runtime.mutation():
+            life.configure(True, 15, "realtime")
+
+        clock.now += 900
+        deadline = time.monotonic() + 1
+        while runtime.ticks < 1 and time.monotonic() < deadline:
+            runtime.stop.wait(0.01)
+
+        self.assertEqual(runtime.ticks, 1)
+        self.assertEqual(
+            sum(event.kind == "mind.stream_pulsed" for event in life.history()),
+            1,
+        )
+
     def test_boundary_rejects_cross_origin_and_bad_requests(self):
         status, _ = self.request(
             "POST",
@@ -288,6 +325,8 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(snapshot["communication"]["live_turn_count"], 2)
         self.assertEqual(snapshot["conversations"][-1]["speaker"], "pathos")
+        self.assertEqual(len(self.pacing_sleeps), 1)
+        self.assertGreaterEqual(self.pacing_sleeps[0], 4)
         status, body = self.request("POST", "/api/visit/end", {"request_id": "http-leave-1"})
         self.assertEqual(status, 200)
         self.assertIsNone(json.loads(body)["communication"]["live_scene_id"])

@@ -19,6 +19,11 @@ conversation fragments, associations, and dreams must vary replay-stably. A new 
 must never read as though Pathos performed the same prose itinerary several days in a
 row.
 
+The same rule applies inside scenes. Familiar people may return to familiar topics,
+but they should notice different things, answer the turn actually in front of them,
+and sound recognizably like themselves. A relationship-repair scene may stay awkward
+or unresolved; varied dialogue must never smuggle in forgiveness or agreement.
+
 Pathos must not cycle through the same handful of beats every day. Stable habits,
 work, sleep, and familiar places make change legible, but ordinary life also contains
 errands, visitors, weather changes, cancellations, overheard moments, new people,
@@ -67,7 +72,10 @@ one conversation instead of a sequence of fresh prompts.
 Pathos's subconscious association process. It links sensations, unfinished
 intentions, emotion, and memory. Most Murmur output never becomes conscious.
 Salient fragments surface as intuitions, impulses, intrusive recollections, or
-dream seeds.
+dream seeds. During ordinary real-time life it returns on a quiet quarter-hour
+heartbeat, receives a bounded tail of its own recent stream, and can wander or leave
+something unresolved rather than producing a polished observation every time. It
+rests during sleep instead of competing with the dream system.
 
 Emotion is persistent state, not decorative prose. Appraised experiences alter
 valence and arousal; duration turns a passing feeling into a sustained pattern;

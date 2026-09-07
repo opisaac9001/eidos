@@ -75,7 +75,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | SOCIAL-01 | User dialogue, remembered messages/visits, contextual replies, idempotent sends | Partial: persistent delayed inbox that waits through occupied periods plus time-bearing availability-gated live user visits | P2–P3 |
-| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: time-bearing up-to-40-turn user visits with natural endings, recent-dialogue continuity, a casual non-assistant Pathos voice, plus recurring Pathos/NPC and NPC/NPC scenes with relationship pacing, hourly continuation, and voluntary exits | P3 |
+| SOCIAL-02 | Multi-turn greeting, small talk, questions, storytelling, topic shifts, exits | Partial: time-bearing up-to-40-turn user visits with natural endings, replay-stable listening/thinking/speaking seconds and runtime-enforced human-paced delivery, recent-dialogue continuity, a casual non-assistant Pathos voice, plus recurring Pathos/NPC and NPC/NPC scenes with relationship pacing, hourly continuation, voluntary exits, and replay-stable person/topic/turn-aware stand-in dialogue | P3 |
 | SOCIAL-03 | Requests, invitations, offers, favors, promises, accept/decline/negotiate | Partial: authored inbound requests plus follow-up-driven outbound invitations with independent NPC consent and feasible shared plans | P3 |
 | SOCIAL-04 | Shared work, teaching, learning, exploration, play, quiet company | Partial: co-present scheduled time together | P3 |
 | SOCIAL-05 | Disagreement, misunderstanding, disappointment, apology, repair, boundaries | Partial: typed disagreement/boundary/apology plus durable post-apology repair attempts that progress only through later direct contact and never imply forgiveness | P3 |
@@ -94,7 +94,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | INNER-01 | Structured unresolved concerns and emotional residue | Partial: concern lifecycle/dream residue | P4 |
-| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
+| INNER-02 | Private associations, cue selection, salience/attention competition | Partial: hourly somatic/affective/association pulses plus a waking quarter-hour real-time Murmur stream that carries recent thoughts into later faculties, with inertial foreground competition among needs, domestic load, concerns, goals, people, places and imminent commitments | P4 |
 | INNER-03 | Reflection proposes interpretations, links, concern/plan updates | Partial: continuous deliberative focus + source-linked scheduled interpretation | P4 |
 | INNER-04 | Sleep/wake transitions, rest recovery, sleep windows, dream budgets | Partial: replayable nightly windows shaped by condition and commitments, with occupied-time delay and legacy fallback | P4 |
 | INNER-05 | Dream seeds, transformation, motifs, variation, intensity/recurrence caps | Partial: bounded owned seeds, motifs, complete lineage, and varied replay-stable offline dreams | P4 |

@@ -1,7 +1,12 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.domain.conversation_time import exchange_minutes, project_conversation_clocks
+from eidos.domain.conversation_time import (
+    exchange_minutes,
+    exchange_seconds,
+    project_conversation_clocks,
+    reply_pacing,
+)
 from eidos.domain.events import DomainEvent
 
 
@@ -70,6 +75,54 @@ class ConversationTimeTests(unittest.TestCase):
         clock = project_conversation_clocks([*history, elapsed])["user-visit"]
         self.assertEqual((clock.elapsed_minutes, clock.exchanges), (5, 1))
         self.assertEqual(exchange_minutes("one " * 50, "two " * 50), 15)
+
+    def test_current_exchange_uses_human_scale_seconds(self):
+        history, user_turn, pathos_turn = self.history()
+        pacing = reply_pacing("How are you?", "I am taking the morning slowly.")
+        elapsed = DomainEvent(
+            "conversation.time_elapsed",
+            "pathos",
+            {
+                "scene_id": "user-visit",
+                "user_turn_event_id": str(user_turn.event_id),
+                "pathos_turn_event_id": str(pathos_turn.event_id),
+                "seconds": pacing.total_seconds,
+                "listening_seconds": pacing.listening_seconds,
+                "thinking_seconds": pacing.thinking_seconds,
+                "speaking_seconds": pacing.speaking_seconds,
+                "started_at": self.now.isoformat(),
+                "ends_at": (self.now + timedelta(seconds=pacing.total_seconds)).isoformat(),
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=pathos_turn.event_id,
+        )
+
+        clock = project_conversation_clocks([*history, elapsed])["user-visit"]
+        self.assertEqual(
+            clock.elapsed_seconds, exchange_seconds("How are you?", pathos_turn.payload["text"])
+        )
+        self.assertGreaterEqual(clock.elapsed_seconds, 4)
+        self.assertLess(clock.elapsed_minutes, 1)
+
+    def test_current_exchange_rejects_a_rerolled_pacing_value(self):
+        history, user_turn, pathos_turn = self.history()
+        seconds = exchange_seconds("How are you?", str(pathos_turn.payload["text"]))
+        elapsed = DomainEvent(
+            "conversation.time_elapsed",
+            "pathos",
+            {
+                "scene_id": "user-visit",
+                "user_turn_event_id": str(user_turn.event_id),
+                "pathos_turn_event_id": str(pathos_turn.event_id),
+                "seconds": seconds + 1,
+                "started_at": self.now.isoformat(),
+                "ends_at": (self.now + timedelta(seconds=seconds + 1)).isoformat(),
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=pathos_turn.event_id,
+        )
+        with self.assertRaisesRegex(ValueError, "seconds"):
+            project_conversation_clocks([*history, elapsed])
 
     def test_wrong_duration_or_reused_turns_are_rejected(self):
         history, user_turn, pathos_turn = self.history()

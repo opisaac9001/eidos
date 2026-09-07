@@ -15,8 +15,275 @@ def _temporal_choice(options: tuple[str, ...], value: object, salt: str = "") ->
         digest = hashlib.sha256(f"{value}:{salt}".encode()).digest()
         return options[int.from_bytes(digest[:4], "big") % len(options)]
     salt_value = int.from_bytes(hashlib.sha256(salt.encode()).digest()[:2], "big")
-    index = moment.date().toordinal() * 7 + moment.hour + moment.minute // 15 + salt_value
+    # Ninety-seven gives each 96-quarter day its own non-overlapping range while
+    # advancing same-time daily choices through even small palettes.
+    index = moment.date().toordinal() * 97 + moment.hour * 4 + moment.minute // 15 + salt_value
     return options[index % len(options)]
+
+
+def _short_fragment(value: object, maximum_words: int = 14) -> str:
+    words = str(value).strip().rstrip(".!?").split()
+    return " ".join(words[:maximum_words]) or "the quiet part of the day"
+
+
+def _standin_murmur_text(context: dict[str, object], location: object, last_memory: object) -> str:
+    raw_layers = context.get("mind_layers", [])
+    layers = raw_layers if isinstance(raw_layers, list) else []
+    attention = next(
+        (
+            layer.get("focus_text")
+            for layer in layers
+            if isinstance(layer, dict) and layer.get("layer") == "attention"
+        ),
+        "the thing just at the edge of my attention",
+    )
+    raw_emotion = context.get("emotion", {})
+    emotion = raw_emotion if isinstance(raw_emotion, dict) else {}
+    feeling = _short_fragment(emotion.get("label", "quiet"), 3).casefold()
+    place = _short_fragment(location, 8)
+    memory = _short_fragment(last_memory)
+    focus = _short_fragment(attention, 10).casefold()
+    moment = context.get("time")
+    prefix = _temporal_choice(
+        (
+            "Right now,",
+            "For some reason,",
+            "Quietly,",
+            "At the edge of everything else,",
+            "Without really trying,",
+            "More than I expected,",
+            "Underneath the practical stuff,",
+            "For a moment,",
+            "Somewhere in the background,",
+            "Even while I carry on,",
+            "If I'm honest,",
+        ),
+        moment,
+        "murmur-prefix",
+    )
+    core = _temporal_choice(
+        (
+            f"I keep coming back to this: {memory}.",
+            f"my attention keeps settling on {focus}.",
+            f"I feel {feeling}, but it isn't the whole shape of the moment.",
+            f"I notice how {place} changes when I stop treating it as background.",
+            f"I can't quite tell why {memory} still has a hold on me.",
+            f"part of me is still occupied with {focus}.",
+            f"I feel the familiar rhythm of {place}, though today it lands differently.",
+            f"my mind keeps putting {memory} beside {focus}.",
+            f"I am more aware of feeling {feeling} than I was a little while ago.",
+            f"I keep noticing the gap between being in {place} and paying attention to it.",
+            f"something in {memory} feels unfinished, even if it probably isn't.",
+            f"I am letting {focus} sit there without forcing it into an answer.",
+            f"my thoughts keep brushing past {memory} and then turning back.",
+        ),
+        moment,
+        "murmur-core",
+    )
+    tail_options = (
+        "I don't need to settle it yet.",
+        "It may pass if I leave it alone.",
+        "That feels worth noticing, at least.",
+        "I might feel differently after something ordinary happens.",
+        "The thought is quieter than it was, but still here.",
+        "I can hold two versions of it for a while.",
+        "There is probably more to it than the first answer.",
+        "I don't mind not knowing what to do with it.",
+        "It feels close without feeling urgent.",
+        "Maybe this is just where my attention has landed.",
+        "I can come back to it later if it still matters.",
+        "The feeling changes slightly when I name it.",
+        "For now, noticing it is enough.",
+        "I wonder what detail will replace it in a few minutes.",
+        "It is strange how quickly the mind makes a pattern.",
+        "I don't want to turn it into a bigger thing than it is.",
+        "Some thoughts are better left a little unfinished.",
+    )
+    tail = _temporal_choice(tail_options, moment, "murmur-tail")
+    candidate = f"{prefix} {core} {tail}"
+    raw_recent = context.get("recent_inner_stream", [])
+    recent = raw_recent if isinstance(raw_recent, list) else []
+    if candidate in recent:
+        tail = _temporal_choice(tail_options, moment, "murmur-tail-alternate")
+        candidate = f"{prefix} {core} {tail}"
+    return candidate
+
+
+def _standin_scene_text(context: dict[str, object]) -> str:
+    """Give development scenes varied dialogue without inventing hidden knowledge."""
+    speaker = str(context.get("scene_speaker", ""))
+    audience = str(context.get("scene_audience", ""))
+    person = str(context.get("person", "the other person"))
+    topic = str(context.get("scene_topic", "ordinary life")).casefold()
+    raw_prior = context.get("prior_turns", [])
+    prior_turns = raw_prior if isinstance(raw_prior, list) else []
+    turn = len(prior_turns) + 1
+    is_pathos = speaker == "pathos"
+    options: tuple[str, ...]
+
+    if "forgiveness unknown" in topic or "cautious repair" in topic:
+        options = (
+            (
+                "I don't expect that apology to settle everything. I just wanted to say it properly.",
+                "We don't have to sort it all out now. I know it might take time.",
+                "I meant what I said before. I'm not asking you to make me feel better about it.",
+                "I still feel awkward about how that went. I can live with leaving it there for now.",
+            )
+            if is_pathos
+            else (
+                "I heard what you said. I'm not ready to pretend it's all fine, though.",
+                "I appreciate you saying it. I still need a bit of time.",
+                "We can talk. I just don't want to rush past what happened.",
+                "I'm glad you brought it up again. That doesn't mean I've worked out how I feel yet.",
+            )
+        )
+    elif "following up" in topic:
+        options = (
+            (
+                "Yeah, I didn't want to leave that hanging. How did it turn out?",
+                "I kept thinking about that after we spoke. Did anything change?",
+                "I'm glad we ran into each other. I meant to ask what happened with that.",
+                "Before we get distracted, I wanted to come back to what you mentioned last time.",
+            )
+            if is_pathos
+            else (
+                "I was wondering if we'd come back to that. A little has changed since then.",
+                "I'm glad you remembered. I didn't really finish what I was saying last time.",
+                "It turned out less dramatically than I expected, which was probably a good thing.",
+                "I nearly brought that up myself. I've had another thought about it.",
+            )
+        )
+    elif "bench" in topic:
+        options = (
+            (
+                "I can see why replacing it outright would feel like losing something.",
+                "The worn parts are probably the reason everyone recognizes it.",
+                "Maybe fixing it doesn't have to mean making it look new.",
+                "I'd keep the marks if we can. They feel like part of the square now.",
+            )
+            if is_pathos
+            else (
+                "The weathering is part of why the old bench belongs here.",
+                "Everyone talks about the splinters, but nobody wants a shiny new bench here.",
+                "That pale patch on the arm is where people have rested their hands for years.",
+                "It needs care, not erasing. Those are different jobs.",
+            )
+        )
+    elif is_pathos:
+        options = (
+            "Yeah, I know what you mean. It's funny which small things end up sticking with you.",
+            "I hadn't thought about it that way, actually.",
+            "Maybe. I think I'd leave it alone for a bit and see how it feels tomorrow.",
+            "That sounds about right. The day has felt slightly off-center somehow.",
+            "I noticed that too, but I couldn't work out why it felt different.",
+            "Honestly, I could go either way on it. What would you do?",
+            "I like that. It makes the whole thing feel less finished, in a good way.",
+            "That's probably the sensible answer. I'm still tempted by the other one, though.",
+            "Mm. Give me a second—I think there's something in that.",
+            "I get it. I don't think I was paying enough attention before.",
+            "That's nicer than the version I had in my head.",
+            "Fair. I might change my mind later, but fair.",
+        )
+    else:
+        person_lines: dict[str, tuple[str, ...]] = {
+            "Mara": (
+                "The morning crowd all chose the same corner today. No idea why.",
+                "Someone moved the sugar jar again. Tiny mystery of the day.",
+                "I nearly changed the window display, then decided I liked it being a bit tired.",
+                "It went quiet for ten whole minutes earlier. I could hear the clock arguing with itself.",
+                "A regular ordered something completely different and looked betrayed by their own choice.",
+                "I've had three people ask if rain counts as a reason to stay for another cup.",
+                "The noticeboard is getting crowded. Half those events can't possibly all happen on Saturday.",
+                "I found a teaspoon in the plant pot. I'm choosing not to investigate.",
+                "The kettle behaved perfectly until someone complimented it.",
+                "There's a new dog outside that seems convinced the café belongs to him.",
+                "I saved the last decent pastry, then forgot who I was saving it for.",
+                "The light in here changed about an hour ago. Makes everything look calmer than it is.",
+            ),
+            "Ellis": (
+                "That drawer only sticks when someone is watching me test it.",
+                "I found the missing pencil. It was behind my ear, obviously.",
+                "This joint is nearly right, which is somehow more irritating than completely wrong.",
+                "Someone donated a box of screws sorted by color instead of size.",
+                "The workshop smells like wet coats and sawdust today. Could be worse.",
+                "I fixed the rattle and immediately started missing it.",
+                "There's a point where tidying the bench becomes avoiding the actual job.",
+                "I keep saving little scraps of good wood. Eventually they'll need their own room.",
+                "This hinge has a very specific opinion about being repaired.",
+                "The quiet jobs always take longer. They give you too much time to notice things.",
+                "I lent out the good screwdriver and got back one that might be its distant cousin.",
+                "That repair looked simple until I touched it. They usually do.",
+            ),
+            "Rowan": (
+                "Two crows have been moving the same bit of paper around the square all afternoon.",
+                "The old tree looks almost silver in this light.",
+                "I drew that corner three times and somehow made it less accurate each time.",
+                "Someone left one glove on the rail. It looks oddly deliberate.",
+                "The puddles are reflecting more sky than the actual sky seems to have.",
+                "I like the square when people are passing through instead of trying to enjoy it properly.",
+                "That shop sign is slightly crooked. Now that I've seen it, I can't stop seeing it.",
+                "A kid tried to explain pigeons to me earlier. Very confident, mostly wrong.",
+                "The wind keeps turning the same page of my sketchbook back over.",
+                "There was a patch of sun here five minutes ago. I think we imagined it.",
+                "I came out to draw people and ended up drawing their empty chairs.",
+                "Everything looks more temporary just before it rains.",
+            ),
+        }
+        options = person_lines.get(
+            person,
+            (
+                "It's been an oddly busy day without much actually happening.",
+                "I noticed something small earlier and now I can't stop thinking about it.",
+                "The place feels different today. Not worse, just different.",
+                "I took the long way here and still somehow arrived early.",
+                "Everyone seems to be between one thing and another today.",
+                "I had a thought worth keeping and lost it before I found somewhere to write it down.",
+            ),
+        )
+    line = _temporal_choice(
+        options,
+        context.get("time"),
+        f"scene:{speaker}:{audience}:{person}:{topic}:{turn}",
+    )
+    afterthoughts = (
+        (
+            "I'm still working out what I think.",
+            "Maybe that's enough of an answer for now.",
+            "I could be wrong about the shape of it.",
+            "Anyway, that's where my head is.",
+            "It feels a little different saying it out loud.",
+            "I don't need to force it any further right now.",
+            "There's probably another way of looking at it.",
+            "I'm not completely settled on it.",
+            "That might land differently with me tomorrow.",
+            "I keep coming back to the same small part of it.",
+            "It's easier to notice now that we're talking about it.",
+            "I think I mean that, even if I said it badly.",
+            "I'll leave it there for now.",
+        )
+        if is_pathos
+        else (
+            "That's about as much as I know, honestly.",
+            "I may feel differently once I've slept on it.",
+            "Anyway, it was on my mind.",
+            "I haven't quite decided what I make of it.",
+            "It sounded clearer before I said it aloud.",
+            "There is probably a less complicated version of that.",
+            "I don't think it needs solving this minute.",
+            "Maybe I only noticed because today has been quiet.",
+            "I keep finding my way back to that bit.",
+            "That might not be the important part, but it stayed with me.",
+            "I'm curious whether it will still matter tomorrow.",
+            "I suppose that's the small story of my day.",
+            "For now, that's where I've landed.",
+        )
+    )
+    afterthought = _temporal_choice(
+        afterthoughts,
+        context.get("time"),
+        f"scene-after:{speaker}:{audience}:{person}:{topic}:{turn}",
+    )
+    return f"{line} {afterthought}"
 
 
 class StandInGateway(ModelGateway):
@@ -54,33 +321,17 @@ class StandInGateway(ModelGateway):
                     "Hey. What's up?",
                     "Oh hey — yeah, I've got a minute.",
                     "Yeah, go on.",
-                )[choice % 3]
+                    "Hey — give me a second. Okay, what's up?",
+                    "Oh, hey. Yeah, I'm listening.",
+                    "Hi. Sorry, I was miles away for a second.",
+                    "Hey. I'm here—go ahead.",
+                    "Mm? Oh, hey. What's going on?",
+                )[choice % 8]
         elif role == "murmur":
-            text = _temporal_choice(
-                (
-                    f"I find something comforting in the familiar rhythm of {location}.",
-                    f"A fragment from earlier keeps coming back: {last_memory}",
-                    "I could leave a little space in the day for something unplanned.",
-                    "I think some days are held together by very small things.",
-                    "I keep noticing the sounds in the room after everyone goes quiet.",
-                    "Part of me wants to finish one thing; another part wants to wander.",
-                    "I wonder which ordinary detail from today I'll remember next week.",
-                    "There is a difference between resting and simply stopping.",
-                    f"Something about {location} feels slightly different today.",
-                    "I don't need every loose end tied up before the evening.",
-                    "The thought I avoided earlier has become quieter, not gone.",
-                    "I feel more curious about the interruption than annoyed by it now.",
-                ),
-                context.get("time"),
-                "murmur",
-            )
+            text = _standin_murmur_text(context, location, last_memory)
         elif role == "firmament":
             if context.get("scene_mode") is True:
-                text = (
-                    "The weathering is part of why the old bench belongs here."
-                    if context.get("scene_speaker") == "rowan"
-                    else "I can see why replacing it outright would feel like losing something."
-                )
+                text = _standin_scene_text(context)
             else:
                 person = context["person"]
                 lines: dict[str, tuple[str, ...]] = {
@@ -91,6 +342,12 @@ class StandInGateway(ModelGateway):
                         "Mara brings over a paper bag of screws that someone left outside the workshop door.",
                         "Mara notices the lamp cord has twisted again and kneels to straighten it.",
                         "Mara stays for tea and tells Pathos the café has changed its window display.",
+                        "Mara turns the café sign around twice before noticing it already says open.",
+                        "Mara slides a plate aside to make room for a stack of new community flyers.",
+                        "Mara watches a customer leave with the wrong umbrella and decides they may sort it out themselves.",
+                        "Mara finds a handwritten recipe tucked inside the till and tries to remember who left it.",
+                        "Mara lowers the music when the rain against the window becomes louder than the song.",
+                        "Mara counts the clean cups, loses track, and starts again with an exaggerated sigh.",
                     ),
                     "Ellis": (
                         "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
@@ -99,6 +356,12 @@ class StandInGateway(ModelGateway):
                         "Ellis sweeps a curl of wood from the bench and makes room for the next job.",
                         "Ellis tests a repaired hinge, frowns once, and reaches for the screwdriver again.",
                         "Ellis leaves half a biscuit beside Pathos's tea and denies wanting the rest.",
+                        "Ellis discovers that someone has labeled the smallest drawer simply 'probably useful'.",
+                        "Ellis holds a bent brass catch to the light and says it might still have another repair in it.",
+                        "Ellis opens the back door to clear the smell of varnish and lets in a scatter of rain.",
+                        "Ellis measures the same shelf three times and gets a different answer each time.",
+                        "Ellis sets aside a cracked handle because the obvious fix does not feel like the right one.",
+                        "Ellis finds yesterday's tea untouched behind a clamp and quietly pours it away.",
                     ),
                     "Rowan": (
                         "Rowan shares a sketch of the square and points out a detail Pathos missed.",
@@ -107,6 +370,12 @@ class StandInGateway(ModelGateway):
                         "Rowan shows Pathos a smudged drawing made while waiting for the rain to ease.",
                         "Rowan spots a lost glove on the park rail and moves it somewhere easier to see.",
                         "Rowan walks one slow circuit of the square with Pathos before turning home.",
+                        "Rowan sketches the shadow of the park rail instead of the rail itself.",
+                        "Rowan notices that someone has tied a faded ribbon around the youngest willow.",
+                        "Rowan moves along the bench to let a strip of winter sun reach the empty seat.",
+                        "Rowan points out a rooftop aerial that looks briefly like a person waving.",
+                        "Rowan closes the sketchbook when the wind begins choosing the pages.",
+                        "Rowan watches a bus pass the square and wonders aloud where everyone on it is going.",
                     ),
                 }
                 options = lines.get(
@@ -117,7 +386,52 @@ class StandInGateway(ModelGateway):
                         f"{person} notices something out of place, then decides it can wait.",
                     ),
                 )
-                text = _temporal_choice(options, context.get("time"), str(person))
+                ambient = _temporal_choice(
+                    (
+                        "A door closes somewhere nearby",
+                        "A bus passes at the end of the street",
+                        "The light shifts as a cloud moves over",
+                        "A brief draft lifts the edge of a paper",
+                        "Someone laughs in another part of the room",
+                        "Footsteps approach and then turn away",
+                        "Rain starts lightly against the nearest window",
+                        "A chair scrapes across the floor",
+                        "A bicycle bell sounds outside",
+                        "The room goes unexpectedly quiet",
+                        "A kettle begins to murmur in the background",
+                        "Someone drops a coin and follows its roll",
+                        "A coat slips from a hook nearby",
+                        "The smell of toast drifts through for a moment",
+                        "A loose sign taps once in the wind",
+                        "A delivery van pauses outside and moves on",
+                        "The clock becomes noticeable between sentences",
+                    ),
+                    context.get("time"),
+                    f"{person}:encounter-ambient",
+                )
+                ending = _temporal_choice(
+                    (
+                        "and they both lose the thread for a second",
+                        "but neither of them seems in a hurry to fill the pause",
+                        "and the conversation turns briefly toward it",
+                        "before the ordinary noise of the place returns",
+                        "and Pathos notices the interruption more than he expected",
+                        "but the small exchange carries on around it",
+                        "and the moment feels less arranged than it did before",
+                        "before they return to what they were saying",
+                        "and it gives them an easy reason to pause",
+                        "while the rest of the place carries on without them",
+                        "and for a moment they simply listen",
+                        "before one of them remembers the original point",
+                        "and the brief distraction makes them both smile",
+                    ),
+                    context.get("time"),
+                    f"{person}:encounter-ending",
+                )
+                text = (
+                    f"{_temporal_choice(options, context.get('time'), str(person))} "
+                    f"{ambient}, {ending}."
+                )
         elif role == "reflection":
             text = _temporal_choice(
                 (
@@ -138,6 +452,12 @@ class StandInGateway(ModelGateway):
                 f"In a dream, {location} becomes a quiet railway platform where the signs display feelings instead of destinations.",
                 f"In a dream, a red thread runs from {location} through the streets and knots itself around an unfinished question.",
                 f"In a dream, the memory '{last_memory}' is folded into a tiny map whose roads rearrange whenever I blink.",
+                f"In a dream, the ceiling above {location} lowers gently until everyone has to speak in whispers.",
+                f"In a dream, I carry a bowl of light through {location}, careful not to spill its moving shadows.",
+                f"In a dream, {location} is deserted except for a kettle that whistles whenever I forget somebody's name.",
+                f"In a dream, all the windows in {location} look onto different seasons, and none of them show today.",
+                f"In a dream, I find '{last_memory}' written on the back of every door I close.",
+                f"In a dream, {location} drifts a few inches above the street while everyone behaves as if nothing changed.",
             )
             text = _temporal_choice(dreams, context.get("time"), "oneiros")
         elif role == "chronicler":

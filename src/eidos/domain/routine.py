@@ -123,6 +123,53 @@ _WEEKEND_MIDDAYS = {
     ),
 }
 
+_PLACE_TEXTURE: dict[str, tuple[str, ...]] = {
+    "home": (
+        "Light shifted slowly across the kitchen wall.",
+        "The pipes clicked somewhere behind the plaster.",
+        "A draft kept finding the edge of the table.",
+        "The room held the faint smell of tea and old paper.",
+        "Footsteps crossed the landing and faded downstairs.",
+        "A patch of condensation blurred the lower window.",
+        "The building settled around each small sound.",
+    ),
+    "cafe": (
+        "Cups knocked softly together behind the counter.",
+        "The front window clouded whenever the door closed.",
+        "A chair scraped, then the room settled again.",
+        "Someone near the door kept folding the same newspaper.",
+        "The smell of toast briefly covered the smell of coffee.",
+        "Rain-dark coats gathered along the wall hooks.",
+        "A spoon turned slowly in an otherwise forgotten cup.",
+    ),
+    "workshop": (
+        "Fine dust caught in the light above the shared bench.",
+        "A loose window pane answered every passing lorry.",
+        "The tool drawers never quite closed at the same angle.",
+        "Someone had left a careful row of offcuts by the wall.",
+        "The room smelled faintly of oil, paper, and damp wool.",
+        "A clamp creaked whenever the bench shifted.",
+        "Cold light rested on the metal edges of the tools.",
+    ),
+    "park": (
+        "The willows moved before the rest of the trees noticed the wind.",
+        "A bus sighed at the corner and pulled away again.",
+        "Pigeons rearranged themselves around a dropped crust.",
+        "The empty benches held small beads of rain.",
+        "Cloud shadows crossed the paving faster than the people did.",
+        "A paper receipt worried at the edge of the railings.",
+        "Voices carried across the square and lost their words halfway.",
+    ),
+}
+
+_MOMENT_TEXTURE = (
+    "It made the hour feel briefly distinct from the rest of the day.",
+    "The detail stayed in the background without asking to mean anything.",
+    "Nothing important changed, but the moment did not feel interchangeable.",
+    "It was the sort of detail that might be forgotten by evening.",
+    "For a little while, attention rested there.",
+)
+
 _OPENING_ROUTINE = (
     RoutineBeat(7, "home", "Woke up and made breakfast.", 0.90, "breakfast"),
     RoutineBeat(9, "cafe", "Visited the cafe before work.", 0.85, "morning_cafe"),
@@ -212,10 +259,22 @@ def routine_for_day(day: date) -> tuple[RoutineBeat, ...]:
     palette = dict(_WEEKDAY_PALETTE)
     if day.weekday() >= 5:
         palette.update(_WEEKEND_MIDDAYS)
-    return tuple(
-        RoutineBeat(hour, *_choice(options, f"{day.isoformat()}:{hour}"))
-        for hour, options in sorted(palette.items())
-    )
+    output = []
+    for hour, options in sorted(palette.items()):
+        location_id, description, energy, activity = _choice(options, f"{day.isoformat()}:{hour}")
+        texture_index = day.toordinal() + hour * 11
+        place_texture = _PLACE_TEXTURE[location_id][texture_index % 7]
+        moment_texture = _MOMENT_TEXTURE[(texture_index // 7 + hour) % 5]
+        output.append(
+            RoutineBeat(
+                hour,
+                location_id,
+                f"{description} {place_texture} {moment_texture}",
+                energy,
+                activity,
+            )
+        )
+    return tuple(output)
 
 
 def beats_between(start: datetime, end: datetime) -> list[tuple[datetime, RoutineBeat]]:

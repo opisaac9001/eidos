@@ -104,11 +104,12 @@ def semantic_quality_findings(
     if len(words) >= 80 and len(set(words)) / len(words) < 0.58:
         findings.append("internally_repetitive")
 
-    fingerprint = set(words)
-    for prior in prior_texts:
-        prior_words = set(WORD.findall(prior.lower()))
-        similarity = len(fingerprint & prior_words) / max(1, len(fingerprint | prior_words))
-        if similarity >= 0.85:
-            findings.append("near_duplicate_prose")
-            break
+    if role not in {"moira", "mnemosyne"}:
+        fingerprint = set(words)
+        for prior in prior_texts:
+            prior_words = set(WORD.findall(prior.lower()))
+            similarity = len(fingerprint & prior_words) / max(1, len(fingerprint | prior_words))
+            if similarity >= 0.85:
+                findings.append("near_duplicate_prose")
+                break
     return findings

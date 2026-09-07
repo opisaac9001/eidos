@@ -292,9 +292,15 @@ energy and personal variability can defer it. A live visit must first pass the s
 availability projection. When accepted, the user and Pathos enter a private
 alternating scene for up to 40 turns, either can end it, and a routine departure ends
 the visit through a sourced interruption before travel occurs. Each accepted pair of
-turns advances a replay-validated five, ten, or fifteen simulated minutes from its
-actual word count. The UI shows cumulative time and a near-term routine or calendar
-obligation. Crossing an hour runs the ordinary life loop, so a long visit can encounter
+turns records replay-validated listening, thinking, and speaking seconds derived from
+the actual accepted words. Fast inference does not make the reply appear superhumanly
+fast: the local runtime keeps it private behind a visible thinking beat until that
+human-scale interval has elapsed, so refreshing or opening another view cannot skip the
+wait. Genuinely slow inference naturally consumes the same interval rather than adding
+a second artificial delay.
+Older saved worlds retain their valid five/ten/fifteen-minute conversation records.
+The UI shows cumulative time and a near-term routine or calendar obligation. Crossing
+an hour runs the ordinary life loop, so a long visit can encounter
 departures, calls, visitors, deliveries, or incidents without a separate operator step.
 The final turn budget creates a visible natural ending. A due inbox message remains
 delivered while Pathos is asleep or occupied and is answered only after capacity returns.
@@ -405,7 +411,14 @@ independent NPC-consent checks remain authoritative.
 ## 8. Dream and reflection feedback loop
 
 Pathos's mind is modeled as concurrent replayable layers rather than one prompt.
-Somatic pressure, attention, and association advance every simulated hour. Deliberation,
+Somatic pressure, attention, and association advance every simulated hour. While the
+ordinary world is living at real-time speed, a separate waking Murmur heartbeat adds
+one idempotent stream-of-consciousness pulse per quarter hour. Each pulse receives the
+recent stream, current focus, emotion, place, and Pathos-owned recollections, then can
+feed later conscious dialogue, reflection, and dreams through that shared persistent
+workspace. It stops during sleep, when dream processing takes over. Accelerated catch-up
+keeps the coarser hourly cadence instead of manufacturing thousands of retrospective
+thoughts. Deliberation,
 social awareness, reflection, and dream processing activate under distinct conditions.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.

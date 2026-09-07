@@ -64,11 +64,32 @@ class WorldExplorationTests(unittest.TestCase):
         planning = project_planning(events)
         visit = next(iter(planning.calendar.values()))
         starts_at = datetime.fromisoformat(visit.starts_at)
-        beat = planned_activity_beat(planning, starts_at, 0.7)
+        beat = planned_activity_beat(planning, starts_at, 0.7, current_location_id="home")
         self.assertIsNotNone(beat)
         assert beat is not None
         self.assertEqual((beat.location_id, beat.activity), ("old-glasshouse", "attend"))
+        self.assertIn("Set out", beat.description)
         self.assertIsNone(planned_activity_beat(PlanningState(), starts_at, 0.7))
+
+    def test_activity_does_not_create_an_extra_departure_at_its_end(self):
+        registration = self.registration()
+        events = exploration_plan_events(
+            [registration], self.now, project_world_catalog([registration])
+        )
+        planning = project_planning(events)
+        visit = next(iter(planning.calendar.values()))
+        starts_at = datetime.fromisoformat(visit.starts_at)
+        ends_at = datetime.fromisoformat(str(visit.ends_at))
+
+        already_there = planned_activity_beat(
+            planning, starts_at, 0.7, current_location_id="old-glasshouse"
+        )
+
+        assert already_there is not None
+        self.assertIn("Started", already_there.description)
+        self.assertIsNone(
+            planned_activity_beat(planning, ends_at, 0.7, current_location_id="old-glasshouse")
+        )
 
 
 if __name__ == "__main__":

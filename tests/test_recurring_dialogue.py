@@ -33,6 +33,26 @@ class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
         memories = [event for event in events if event.kind == "memory.recorded"]
         self.assertEqual({event.payload["owner"] for event in memories}, {"pathos", "rowan"})
 
+    async def test_repeated_meetings_do_not_replay_the_same_conversation(self):
+        history: list[DomainEvent] = []
+        for day_offset in range(0, 30, 5):
+            events = await recurring_dialogue_events(
+                history,
+                self.locations,
+                self.names,
+                {"rowan": Relationship("rowan")},
+                self.now + timedelta(days=day_offset),
+                len(history),
+                StandInGateway(),
+            )
+            history.extend(events)
+
+        turns = [
+            str(event.payload["text"]) for event in history if event.kind == "scene.turn_taken"
+        ]
+        self.assertEqual(len(turns), 12)
+        self.assertEqual(len(set(turns)), len(turns))
+
     async def test_familiar_conversation_continues_across_hours_and_changes_topic(self):
         perceptions = [
             DomainEvent(

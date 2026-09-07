@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
@@ -12,13 +13,38 @@ from eidos.domain.events import DomainEvent
 @dataclass(frozen=True, slots=True)
 class ConversationClock:
     scene_id: str
-    elapsed_minutes: int = 0
+    elapsed_minutes: float = 0
+    elapsed_seconds: int = 0
     exchanges: int = 0
     last_elapsed_at: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ReplyPacing:
+    listening_seconds: int
+    thinking_seconds: int
+    speaking_seconds: int
+    total_seconds: int
+
+
+def reply_pacing(user_text: str, pathos_text: str) -> ReplyPacing:
+    """Estimate a replay-stable human conversational pause from accepted words."""
+    user_words = len(user_text.split())
+    pathos_words = len(pathos_text.split())
+    listening = max(1, round(user_words / 2.6))
+    digest = sha256(f"{user_text}\0{pathos_text}".encode()).digest()
+    thinking = 2 + min(8, (user_words + pathos_words) // 18) + digest[0] % 4
+    speaking = max(1, round(pathos_words / 2.4))
+    total = min(120, max(4, listening + thinking + speaking))
+    return ReplyPacing(listening, thinking, speaking, total)
+
+
+def exchange_seconds(user_text: str, pathos_text: str) -> int:
+    return reply_pacing(user_text, pathos_text).total_seconds
+
+
 def exchange_minutes(user_text: str, pathos_text: str) -> int:
-    """Estimate bounded conversational time from the actual accepted words."""
+    """Validate legacy minute-granularity events from worlds created before pacing v2."""
     words = len(user_text.split()) + len(pathos_text.split())
     return 5 if words < 40 else 10 if words < 100 else 15
 
@@ -42,6 +68,7 @@ def project_conversation_clocks(
             pathos_turn_id = _required(event, "pathos_turn_event_id")
             user_turn = seen.get(user_turn_id)
             pathos_turn = seen.get(pathos_turn_id)
+            seconds = event.payload.get("seconds")
             minutes = event.payload.get("minutes")
             user_number = user_turn.payload.get("turn_number") if user_turn is not None else None
             pathos_number = (
@@ -65,12 +92,28 @@ def project_conversation_clocks(
                 or user_turn_id in used_turns
                 or pathos_turn_id in used_turns
                 or event.causation_id != pathos_turn.event_id
-                or isinstance(minutes, bool)
+            ):
+                raise ValueError("Conversation time must cite one accepted alternating exchange")
+            if seconds is not None:
+                if (
+                    isinstance(seconds, bool)
+                    or not isinstance(seconds, int)
+                    or seconds
+                    != exchange_seconds(
+                        _required(user_turn, "text"), _required(pathos_turn, "text")
+                    )
+                ):
+                    raise ValueError("Conversation seconds do not match their exchange")
+                elapsed_seconds = seconds
+            elif (
+                isinstance(minutes, bool)
                 or not isinstance(minutes, int)
                 or minutes
                 != exchange_minutes(_required(user_turn, "text"), _required(pathos_turn, "text"))
             ):
-                raise ValueError("Conversation time must cite one accepted alternating exchange")
+                raise ValueError("Conversation minutes do not match their legacy exchange")
+            else:
+                elapsed_seconds = minutes * 60
             started_at = _event_time(event, "started_at")
             ends_at = _event_time(event, "ends_at")
             current = clocks.get(scene_id, ConversationClock(scene_id))
@@ -78,7 +121,7 @@ def project_conversation_clocks(
                 started_at != _event_time(user_turn, "simulated_at")
                 or started_at != _event_time(pathos_turn, "simulated_at")
                 or started_at != _event_time(event, "simulated_at")
-                or ends_at != started_at + timedelta(minutes=minutes)
+                or ends_at != started_at + timedelta(seconds=elapsed_seconds)
                 or (
                     current.last_elapsed_at is not None
                     and started_at < datetime.fromisoformat(current.last_elapsed_at)
@@ -87,7 +130,8 @@ def project_conversation_clocks(
                 raise ValueError("Conversation time interval does not match its exchange")
             clocks[scene_id] = ConversationClock(
                 scene_id,
-                current.elapsed_minutes + minutes,
+                round((current.elapsed_seconds + elapsed_seconds) / 60, 2),
+                current.elapsed_seconds + elapsed_seconds,
                 current.exchanges + 1,
                 ends_at.isoformat(),
             )

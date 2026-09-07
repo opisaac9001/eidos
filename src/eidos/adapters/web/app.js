@@ -235,6 +235,7 @@ let lastMessageSignature = "",
   archiveRequest = 0,
   archiveTab = "memories",
   lastArchiveSignature = "";
+const heldReplies = new Map();
 document.querySelectorAll("[data-operator-only]").forEach((element) => {
   element.hidden = !operatorMode;
 });
@@ -345,11 +346,38 @@ function clockControl(running) {
   };
 }
 
-async function mutate(path, body) {
+function holdPacedReplies(previousIds, next, paceFrom) {
+  if (paceFrom === undefined) return;
+  for (const item of next.conversations || []) {
+    const seconds = Number(item.pacing_total_seconds || 0);
+    if (
+      !previousIds.has(item.id) &&
+      item.speaker === "pathos" &&
+      item.channel === "live_visit" &&
+      seconds > 0
+    ) {
+      const releaseAt = paceFrom + seconds * 1000;
+      if (releaseAt <= Date.now()) continue;
+      heldReplies.set(item.id, releaseAt);
+      setTimeout(() => {
+        heldReplies.delete(item.id);
+        lastMessageSignature = "";
+        if (state) renderMessages();
+      }, releaseAt - Date.now());
+    }
+  }
+}
+
+async function mutate(path, body, paceFrom) {
   if (busy) return false;
   setBusy(true);
   try {
-    render(await request(path, body));
+    const previousIds = new Set(
+      (state?.conversations || []).map((item) => item.id),
+    );
+    const next = await request(path, body);
+    holdPacedReplies(previousIds, next, paceFrom);
+    render(next);
     showError("");
     return true;
   } catch (error) {
@@ -779,7 +807,16 @@ function renderPlans() {
 }
 
 function renderMessages() {
-  const signature = state.conversations.map((item) => item.id).join(":");
+  const now = Date.now();
+  for (const [id, releaseAt] of heldReplies)
+    if (releaseAt <= now) heldReplies.delete(id);
+  const conversations = state.conversations.filter(
+    (item) => !heldReplies.has(item.id),
+  );
+  const waitingForPathos = state.conversations.some((item) =>
+    heldReplies.has(item.id),
+  );
+  const signature = `${conversations.map((item) => item.id).join(":")}:${waitingForPathos}`;
   if (signature === lastMessageSignature && $("messages").childElementCount)
     return;
   lastMessageSignature = signature;
@@ -789,20 +826,24 @@ function renderMessages() {
       $("messages").clientHeight <
     90;
   const answered = new Set(
-    state.conversations
+    conversations
       .filter((item) => ["pathos", "system"].includes(item.speaker))
       .map((item) => item.request_id),
   );
-  $("messages").innerHTML = state.conversations.length
-    ? state.conversations
+  $("messages").innerHTML = conversations.length || waitingForPathos
+    ? conversations
         .map(
           (item) =>
             `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
         )
-        .join("")
+        .join("") +
+      (waitingForPathos
+        ? '<article class="message pathos"><div class="message-author">PATHOS <span>thinking…</span></div><div class="message-body">…</div></article>'
+        : "")
     : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
   if (nearBottom || currentView === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
+  if (waitingForPathos) $("delivery-note").textContent = "Pathos is thinking before he answers.";
 }
 
 function render(next) {
@@ -1097,7 +1138,7 @@ function render(next) {
   $("end-visit").hidden = !communication.live_scene_id;
   $("send").textContent = liveActive ? "Speak ↗" : "Send ↗";
   $("delivery-note").textContent = liveActive
-    ? `You are speaking together · ${communication.live_elapsed_minutes || 0} simulated minutes have passed.`
+    ? `You are speaking together · ${communication.live_elapsed_seconds || 0} seconds have passed in this conversation.`
     : communication.waiting_count
       ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
       : "Messages are delivered; replies may take time.";
@@ -1200,7 +1241,7 @@ function render(next) {
         const clock = (state.conversation_clocks || []).find(
           (item) => item.scene_id === scene.scene_id,
         );
-        return `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS${clock ? ` · ${clock.elapsed_minutes} MIN` : ""}</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`;
+        return `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS${clock ? ` · ${clock.elapsed_seconds} SEC` : ""}</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`;
       })
       .join(""),
   );
@@ -1304,7 +1345,7 @@ $("chat-form").addEventListener("submit", async (event) => {
   if (!pendingChat || pendingChat.text !== text)
     pendingChat = { text, request_id: crypto.randomUUID() };
   $("send").textContent = "Sending…";
-  if (await mutate("/api/chat", pendingChat)) {
+  if (await mutate("/api/chat", pendingChat, Date.now())) {
     $("message").value = "";
     pendingChat = null;
     $("message").focus();

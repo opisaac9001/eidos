@@ -74,6 +74,8 @@ class ExperimentBranchTests(unittest.TestCase):
             self.assertGreater(comparison.experiment_review.model_calls, 0)
             self.assertGreaterEqual(comparison.experiment_review.simulated_hours, 4)
             self.assertGreater(comparison.experiment_review.distinct_event_kinds, 5)
+            self.assertGreaterEqual(comparison.experiment_review.narrative_repetition_rate, 0)
+            self.assertLessEqual(comparison.experiment_review.narrative_repetition_rate, 1)
             self.assertEqual(inspect_experiment(branch).experiment_id, report.experiment_id)
 
     def test_tampered_history_or_unrelated_canonical_is_rejected(self):

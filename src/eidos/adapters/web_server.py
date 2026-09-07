@@ -7,7 +7,7 @@ import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any, Callable, Iterator
 from urllib.parse import parse_qs, urlsplit
 
@@ -30,11 +30,13 @@ class Runtime:
         life: Life,
         interval: float = 3,
         clock: Callable[[], float] = monotonic,
+        sleeper: Callable[[float], None] = sleep,
         realtime_quantum_seconds: float = 300,
     ) -> None:
         self.life = life
         self.interval = interval
         self.clock = clock
+        self.sleeper = sleeper
         self.realtime_quantum_seconds = realtime_quantum_seconds
         self.lock = threading.RLock()
         self.stop = threading.Event()
@@ -88,6 +90,8 @@ class Runtime:
                             hours = config["minutes_per_tick"] / 60
                         self.working = True
                         self.life.advance(hours)
+                        if config.get("clock_mode", "realtime") == "realtime":
+                            self.life.pulse_inner_stream()
                         self.ticks += 1
                         self.error = None
                         self.cached = self.life.snapshot()
@@ -140,6 +144,28 @@ class Runtime:
             finally:
                 self.working = False
                 self.cached = self.life.snapshot()
+
+    def pace_live_reply(self, previous_message_ids: set[str], started_at: float) -> float:
+        """Keep a generated live reply private until its human speech interval ends."""
+        conversations = self.life.snapshot().get("conversations", [])
+        new_replies = [
+            item
+            for item in conversations
+            if str(item.get("id")) not in previous_message_ids
+            and item.get("speaker") == "pathos"
+            and item.get("channel") == "live_visit"
+            and isinstance(item.get("pacing_total_seconds"), (int, float))
+        ]
+        if not new_replies:
+            return 0.0
+        duration = max(float(item["pacing_total_seconds"]) for item in new_replies)
+        remaining = max(0.0, started_at + duration - self.clock())
+        if remaining:
+            self.sleeper(remaining)
+        # Life already advanced its simulated clock by the conversational interval.
+        # Do not let Chronos count the same wall interval again after releasing the lock.
+        self.last_wall_tick = self.clock()
+        return remaining
 
     def snapshot(self) -> dict[str, Any]:
         if self.lock.acquire(blocking=False):
@@ -325,6 +351,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     job_store.cancel(UUID(job_id))
                     self.respond(200, runtime.snapshot())
                     return
+                operation_started = runtime.clock()
                 with runtime.mutation():
                     if self.path == "/api/control":
                         if body.get("running") and runtime.stop.is_set():
@@ -349,7 +376,12 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         request_id = body.get("request_id")
                         if not isinstance(text_value, str) or not isinstance(request_id, str):
                             raise ValueError("Chat text and request ID must be strings")
+                        previous_message_ids = {
+                            str(item["id"])
+                            for item in runtime.life.snapshot().get("conversations", [])
+                        }
                         runtime.life.chat(text_value, request_id)
+                        runtime.pace_live_reply(previous_message_ids, operation_started)
                     elif self.path == "/api/outreach":
                         enabled = body.get("enabled")
                         if type(enabled) is not bool:

@@ -77,6 +77,8 @@ class LifeEvidenceReview:
     model_failures: int
     narrative_lines: int
     repeated_narrative_lines: int
+    narrative_repetition_rate: float
+    narrative_repetitions_by_kind: Mapping[str, int]
 
 
 _EVENT_COLUMNS = (
@@ -287,7 +289,7 @@ def _simulated_time(row: tuple[object, ...]) -> datetime | None:
     return parsed if parsed.utcoffset() is not None else None
 
 
-def _life_review(path: Path, offset: int) -> LifeEvidenceReview:
+def review_life_evidence(path: Path, offset: int = 0) -> LifeEvidenceReview:
     uri = f"file:{path.resolve()}?mode=ro"
     with sqlite3.connect(uri, uri=True) as connection:
         all_rows = _event_rows(connection)
@@ -307,6 +309,7 @@ def _life_review(path: Path, offset: int) -> LifeEvidenceReview:
     valences: list[float] = []
     simulated_times: list[datetime] = []
     narrative: list[str] = []
+    narrative_by_kind: dict[str, list[str]] = {}
     model_failures = 0
     relationship_contacts = 0
     for row in rows:
@@ -348,22 +351,31 @@ def _life_review(path: Path, offset: int) -> LifeEvidenceReview:
             relationship_contacts += 1
         if kind == "conversation.message" and payload.get("speaker") == "you":
             relationship_contacts += 1
-        if kind in {
+        source_narrative = kind in {
             "conversation.message",
-            "memory.recorded",
             "thought.recorded",
             "dream.recorded",
             "scene.turn_taken",
             "speech.delivered",
-        }:
+            "npc.encountered",
+            "reflection.recorded",
+            "day.summarized",
+        } or (kind == "memory.recorded" and payload.get("source") == "authored-routine")
+        if source_narrative:
             text = (
                 None
                 if kind == "conversation.message" and payload.get("speaker") == "you"
                 else _payload_text(payload, "text")
             )
             if text:
-                narrative.append(" ".join(text.casefold().split()))
+                normalized = " ".join(text.casefold().split())
+                narrative.append(normalized)
+                narrative_by_kind.setdefault(kind, []).append(normalized)
     repeated = sum(count - 1 for count in Counter(narrative).values() if count > 1)
+    repetitions_by_kind = {
+        kind: sum(count - 1 for count in Counter(lines).values() if count > 1)
+        for kind, lines in sorted(narrative_by_kind.items())
+    }
     simulated_hours = 0.0
     if simulated_times and fork_times:
         simulated_hours = max(0.0, (max(simulated_times) - max(fork_times)).total_seconds() / 3600)
@@ -405,6 +417,8 @@ def _life_review(path: Path, offset: int) -> LifeEvidenceReview:
         model_failures=model_failures,
         narrative_lines=len(narrative),
         repeated_narrative_lines=repeated,
+        narrative_repetition_rate=round(repeated / len(narrative), 4) if narrative else 0.0,
+        narrative_repetitions_by_kind=repetitions_by_kind,
     )
 
 
@@ -434,8 +448,8 @@ def compare_experiment(canonical: Path, experiment: Path) -> ExperimentCompariso
         report.backup.event_count - report.fork_event_count,
         canonical_kinds,
         experiment_kinds,
-        _life_review(canonical, report.fork_event_count),
-        _life_review(experiment, report.fork_event_count),
+        review_life_evidence(canonical, report.fork_event_count),
+        review_life_evidence(experiment, report.fork_event_count),
         canonical_ids != experiment_ids,
     )
 
