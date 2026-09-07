@@ -321,6 +321,10 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   promise and calendar remain unchanged while the offer is pending. The creditor waits
   a bounded human-scale interval, independently accepts or declines from their own
   state, and only an accepted response atomically versions the promise and retimes it.
+  A `seek_new_time` decision for interrupted personal work follows a separate path: an
+  hourly migration-safe handler preserves its duration, finds a future interval around
+  opening hours, calendar conflicts, and travel, and passes it through a typed
+  rescheduling resolver. It cannot privately move work linked to an external promise.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

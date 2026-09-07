@@ -459,6 +459,12 @@ answers only after a deterministic one-to-five-hour delay and may accept or decl
 from their own simulated capacity. Only acceptance versions the commitment and retimes
 the linked schedule; a decline or failed feasibility check leaves the old agreement in
 place.
+A `seek_new_time` decision about an interrupted Pathos-owned personal activity uses a
+distinct rescheduling resolver. It preserves the activity duration, validates the
+owner, requires a future interval, and checks place hours, calendar overlap, and travel
+on both sides. Any schedule linked to an external commitment is rejected from this
+path and must use creditor consent instead. The hourly bridge also handles qualifying
+decisions already present in an older saved world, exactly once.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.

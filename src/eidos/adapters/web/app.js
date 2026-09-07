@@ -201,6 +201,8 @@ const labels = {
   "reflection.reconsideration_raised": "A PLAN QUESTION SURFACED",
   "reflection.reconsideration_scheduled": "TIME SET ASIDE TO RECONSIDER",
   "reflection.reconsideration_decided": "PATHOS MADE UP HIS MIND",
+  "schedule.rescheduled": "AN INTERRUPTED PLAN FOUND A NEW TIME",
+  "schedule.reschedule_rejected": "A NEW TIME DID NOT FIT",
   "schedule.retimed": "PLAN RETIMED",
   "dream.inspiration_considered": "A DREAM-LINKED POSSIBILITY",
 };
@@ -845,6 +847,8 @@ function renderPlans() {
     [
       "planning.rejected",
       "schedule.interrupted",
+      "schedule.rescheduled",
+      "schedule.reschedule_rejected",
       "schedule.cancelled",
       "commitment.missed",
       "commitment.fulfilled",

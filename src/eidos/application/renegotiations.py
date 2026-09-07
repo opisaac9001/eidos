@@ -77,7 +77,7 @@ def reflective_renegotiation_offer_events(
     ]
     if created is None or commitment is None or commitment.status != "active" or len(linked) != 1:
         return [_handled(decision, simulated_at, "commitment_no_longer_eligible")]
-    interval = _find_interval(linked[0], planning, simulated_at, catalog)
+    interval = next_feasible_interval(linked[0], planning, simulated_at, catalog)
     if interval is None:
         return [_handled(decision, simulated_at, "no_feasible_time")]
     starts_at, ends_at = interval
@@ -183,7 +183,7 @@ def renegotiation_response_events(
     return [*resolution.events, handled]
 
 
-def _find_interval(
+def next_feasible_interval(
     entry: CalendarEntry,
     planning: PlanningState,
     simulated_at: datetime,
