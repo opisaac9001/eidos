@@ -667,6 +667,7 @@ class Life:
         )
         surfaced_associations: set[str] = set()
         dream_seeds: dict[str, list[dict[str, Any]]] = {}
+        dream_lifecycles: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
         catch_up_summaries = []
         npc_memories = []
@@ -736,6 +737,22 @@ class Life:
                 dreams.append(item)
             if event.kind == "dream.seed_linked":
                 dream_seeds.setdefault(str(payload["dream_id"]), []).append(item)
+            if event.kind in {
+                "dream.effect_scheduled",
+                "dream.recalled",
+                "dream.effect_applied",
+                "dream.inspiration_considered",
+                "dream.inspiration_plan_linked",
+                "dream.inspiration_plan_realized",
+                "dream.inspiration_plan_failed",
+                "dream.inspiration_project_linked",
+                "dream.inspiration_project_realized",
+                "dream.inspiration_project_failed",
+                "dream.inspiration_dismissed",
+            }:
+                source_dream_id = payload.get("source_dream_id")
+                if isinstance(source_dream_id, str):
+                    dream_lifecycles.setdefault(source_dream_id, []).append(item)
             if event.kind == "association.formed":
                 associations.append(item)
             if event.kind == "association.surfaced":
@@ -1205,7 +1222,11 @@ class Life:
             "recalls": list(reversed(recalls[-100:])),
             "consolidations": list(reversed(consolidations[-100:])),
             "dreams": [
-                {**dream, "seeds": dream_seeds.get(str(dream["id"]), [])}
+                {
+                    **dream,
+                    "seeds": dream_seeds.get(str(dream["id"]), []),
+                    "lifecycle": dream_lifecycles.get(str(dream["id"]), []),
+                }
                 for dream in reversed(dreams[-100:])
             ],
             "associations": [

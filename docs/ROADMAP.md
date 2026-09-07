@@ -360,7 +360,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   pace and risk. Rate-limited regulation can lower arousal or protect a sleep intention,
   but never directly turns sadness into happiness; protected rest completes only when
   sleep actually begins.
-- Dream journal with recalled content; operator-only seed/effect provenance.
+- The Dream Journal groups each dream with its later recall, bounded emotional residue,
+  waking possibility, activity/project link, and terminal outcome. The ordinary view
+  explains the arc without internals; the operator view retains event and causation IDs.
 
 Exit: concern → dream seed → bounded waking effect → later consideration works;
 Pathos recalls a dream as a dream. No secret revelation, task completion by

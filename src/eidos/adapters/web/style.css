@@ -921,6 +921,16 @@ hr {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.dream-lifecycle {
+  display: grid;
+  gap: 7px;
+  margin: 18px 0;
+  padding-left: 14px;
+  border-left: 2px solid #6b5a41;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
 .memory-meta {
   display: flex;
   justify-content: space-between;

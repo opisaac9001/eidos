@@ -807,6 +807,120 @@ class LifeTests(unittest.TestCase):
         self.assertLess(after_waking["pathos"]["valence"], before_waking["pathos"]["valence"])
         applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
         self.assertEqual(len(applied), 1)
+        journal_dream = next(
+            item for item in after_waking["dreams"] if item["id"] == str(dream.event_id)
+        )
+        lifecycle = journal_dream["lifecycle"]
+        self.assertEqual(
+            [item["kind"] for item in lifecycle],
+            [
+                "dream.effect_scheduled",
+                "dream.recalled",
+                "dream.effect_applied",
+                "dream.inspiration_considered",
+            ],
+        )
+        self.assertTrue(all(item["source_dream_id"] == str(dream.event_id) for item in lifecycle))
+
+    def test_dream_journal_keeps_later_project_outcome_lineage(self):
+        self.life.bootstrap()
+        history = self.life.history()
+        at = self.life.snapshot()["time"]
+        dream = DomainEvent(
+            "dream.recorded",
+            "pathos",
+            {
+                "text": "In a dream, green shoots filled an old notebook.",
+                "simulated_at": at,
+                "motif": "growth",
+                "fiction": True,
+                "seed_count": 0,
+            },
+        )
+        recalled = DomainEvent(
+            "dream.recalled",
+            "pathos",
+            {
+                "source_dream_id": str(dream.event_id),
+                "text": "A dream lingered after waking.",
+                "simulated_at": at,
+            },
+            causation_id=dream.event_id,
+        )
+        inspiration = DomainEvent(
+            "dream.inspiration_considered",
+            "pathos",
+            {
+                "source_dream_id": str(dream.event_id),
+                "suggestion": "Consider noticing ordinary outdoor growth.",
+                "motif": "growth",
+                "expires_at": "2026-01-01T19:00:00+00:00",
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": at,
+            },
+            causation_id=recalled.event_id,
+        )
+        linked = DomainEvent(
+            "dream.inspiration_project_linked",
+            "pathos",
+            {
+                "source_dream_id": str(dream.event_id),
+                "source_inspiration_event_id": str(inspiration.event_id),
+                "project_type": "seasonal_growth_notebook",
+                "proposal_id": "project-growth",
+                "goal_id": "project-growth-goal",
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": at,
+            },
+            causation_id=inspiration.event_id,
+        )
+        terminal = DomainEvent(
+            "dream.inspiration_project_realized",
+            "pathos",
+            {
+                "source_dream_id": str(dream.event_id),
+                "source_project_link_id": str(linked.event_id),
+                "proposal_id": "project-growth",
+                "goal_id": "project-growth-goal",
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": at,
+            },
+            causation_id=linked.event_id,
+        )
+        dismissed = DomainEvent(
+            "dream.inspiration_dismissed",
+            "pathos",
+            {
+                "source_dream_id": str(dream.event_id),
+                "source_project_link_id": str(linked.event_id),
+                "simulated_at": at,
+            },
+            causation_id=terminal.event_id,
+        )
+        self.life.store.append(
+            "pathos", [dream, recalled, inspiration, linked, terminal, dismissed], len(history)
+        )
+
+        snapshot = self.life.snapshot()
+        journal = next(item for item in snapshot["dreams"] if item["id"] == str(dream.event_id))
+
+        self.assertEqual(
+            [item["kind"] for item in journal["lifecycle"]],
+            [
+                "dream.recalled",
+                "dream.inspiration_considered",
+                "dream.inspiration_project_linked",
+                "dream.inspiration_project_realized",
+                "dream.inspiration_dismissed",
+            ],
+        )
+        replay = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        self.assertEqual(
+            journal, next(item for item in replay["dreams"] if item["id"] == journal["id"])
+        )
 
     def test_lived_relationship_strain_enters_the_continuing_inner_life(self):
         self.life.bootstrap()

@@ -524,6 +524,82 @@ const categoryLabels = {
   dream: "A dream recollection",
 };
 
+function dreamLifecycleMarkup(item) {
+  const lifecycle = item.lifecycle || [];
+  const latest = (kind) =>
+    [...lifecycle].reverse().find((event) => event.kind === kind);
+  const recalled = latest("dream.recalled");
+  const effect = latest("dream.effect_applied");
+  const inspiration = latest("dream.inspiration_considered");
+  const activityLink = latest("dream.inspiration_plan_linked");
+  const projectLink = latest("dream.inspiration_project_linked");
+  const outcome = [...lifecycle].reverse().find((event) =>
+    [
+      "dream.inspiration_plan_realized",
+      "dream.inspiration_plan_failed",
+      "dream.inspiration_project_realized",
+      "dream.inspiration_project_failed",
+    ].includes(event.kind),
+  );
+  const lines = [
+    recalled
+      ? "Pathos remembered part of this after waking."
+      : "No waking recollection is recorded.",
+  ];
+  if (effect) {
+    const delta = Number(effect.valence_delta || 0);
+    lines.push(
+      operatorMode
+        ? `Waking emotional residue: ${delta >= 0 ? "+" : ""}${delta.toFixed(2)} valence.`
+        : delta < 0
+          ? "It left a faintly heavier feeling after waking."
+          : delta > 0
+            ? "It left a faintly brighter feeling after waking."
+            : "It left only a subtle emotional trace.",
+    );
+  }
+  if (inspiration) {
+    lines.push(`It left him considering: ${inspiration.suggestion}`);
+    if (!activityLink && !projectLink) {
+      lines.push(
+        new Date(inspiration.expires_at) > new Date(state.time)
+          ? "That possibility is still in attention."
+          : "That possibility faded without becoming a plan.",
+      );
+    }
+  }
+  if (activityLink)
+    lines.push(`It later resembled an ordinary ${words(activityLink.activity_type)} plan.`);
+  if (projectLink)
+    lines.push(`It later resembled the ${words(projectLink.project_type)} project.`);
+  if (outcome) {
+    const outcomes = {
+      "dream.inspiration_plan_realized": "The linked activity actually happened.",
+      "dream.inspiration_plan_failed": "The linked activity fell through.",
+      "dream.inspiration_project_realized": "The whole linked project was completed.",
+      "dream.inspiration_project_failed": "The linked project failed before completion.",
+    };
+    lines.push(outcomes[outcome.kind]);
+  }
+  if (operatorMode && lifecycle.length) {
+    lines.push(
+      ...lifecycle.map(
+        (event) =>
+          `${event.kind} · ${event.id}${event.causation_id ? ` · caused by ${event.causation_id}` : ""}`,
+      ),
+    );
+  }
+  if (operatorMode && (item.seeds || []).length) {
+    lines.push(
+      ...(item.seeds || []).map(
+        (seed) =>
+          `dream.seed_linked · ${seed.id} · source ${seed.seed_event_id} · position ${seed.position}`,
+      ),
+    );
+  }
+  return `<div class="dream-lifecycle">${lines.map((line) => `<div>${esc(line)}</div>`).join("")}</div>`;
+}
+
 function beliefSentence(item) {
   const person = (state.people || []).find(
     (candidate) => candidate.id === item.subject_id,
@@ -633,7 +709,18 @@ function renderArchive() {
     .filter((item) => matches(item.text, item.cue))
     .slice(0, 20);
   const dreams = (state.dreams || [])
-    .filter((item) => matches(item.text, item.motif))
+    .filter((item) =>
+      matches(
+        item.text,
+        item.motif,
+        ...(item.lifecycle || []).flatMap((event) => [
+          event.text,
+          event.suggestion,
+          event.activity_type,
+          event.project_type,
+        ]),
+      ),
+    )
     .slice(0, 20);
   const consolidations = (state.consolidations || [])
     .filter((item) => matches(item.text, item.theme_type, item.theme_id))
@@ -703,7 +790,7 @@ function renderArchive() {
           const seed = operatorMode
             ? `<span>${item.seed_count ?? 0} bounded seed${item.seed_count === 1 ? "" : "s"}</span>`
             : "";
-          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(words(item.motif || "dream"))}</span>${seed}</div><p>${esc(item.text)}</p><div class="memory-source">${esc(source)}</div></article>`;
+          return `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(words(item.motif || "dream"))}</span>${seed}</div><p>${esc(item.text)}</p>${dreamLifecycleMarkup(item)}<div class="memory-source">${esc(source)}</div></article>`;
         })
         .join("")
     : '<div class="empty">No dreams match that search.</div>';
