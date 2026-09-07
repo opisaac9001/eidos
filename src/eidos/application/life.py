@@ -3137,6 +3137,16 @@ class Life:
             "time": at,
             "location": catalog.location_name(state.location_id),
             "mood": mood_name(state.energy, state.valence, state.arousal),
+            "recent_dialogue": [
+                {
+                    "speaker": str(event.payload["speaker"]),
+                    "text": str(event.payload["text"]),
+                }
+                for event in history
+                if event.kind == "conversation.message"
+                and event.event_id != incoming.event_id
+                and event.payload.get("speaker") in {"you", "pathos"}
+            ][-8:],
             "identity": {
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),

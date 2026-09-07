@@ -19,20 +19,27 @@ class StandInGateway(ModelGateway):
         if role == "pathos":
             message = context.get("message", "").lower()
             if context.get("outreach_reason"):
-                text = f"Something from today brought you to mind: {context.get('source_memory', last_memory)}"
+                text = f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
             elif "private thing" in message or "don't know" in message:
-                text = "I don't know what Mara kept private, and I don't want to pretend that I do."
+                text = "Honestly, no idea. Mara kept that to herself."
             elif any(word in message for word in ("remember", "yesterday", "today", "day")):
-                text = f"I've been thinking back over the day. {last_memory} I'm at {location} now."
+                opening = (
+                    "Pretty good, honestly.",
+                    "Yeah, it's been alright.",
+                    "Bit of a mixed one, but not bad.",
+                )[choice % 3]
+                text = f"{opening} {last_memory}"
             elif any(word in message for word in ("feel", "mood", "how are")):
-                text = f"{context.get('mood', 'Quiet')} is probably the word. Being at {location} suits me right now."
-            elif any(word in message for word in ("where", "doing")):
-                text = f"I'm at {location}. {last_memory} What's happening where you are?"
+                text = f"I'm feeling {str(context.get('mood', 'quiet')).lower()}, I think. Nothing dramatic."
+            elif "where" in message:
+                text = f"I'm at {location} right now. Just taking it easy."
+            elif "doing" in message:
+                text = f"Not much right this second. {last_memory}"
             else:
                 text = (
-                    f"It's good to hear from you. I'm at {location}; there's a little room to think here.",
-                    f"You caught me thinking about something from earlier. {last_memory} How has your day been?",
-                    "I'm glad you stopped by. Tell me a little more; I'd like to hear what's on your mind.",
+                    "Hey. What's up?",
+                    "Oh hey — yeah, I've got a minute.",
+                    "Yeah, go on.",
                 )[choice % 3]
         elif role == "murmur":
             text = (

@@ -11,7 +11,7 @@ from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
-    "pathos": ("3", 160, 0.55),
+    "pathos": ("4", 160, 0.55),
     "murmur": ("3", 100, 0.65),
     "firmament": ("3", 140, 0.7),
     "moira": ("3", 16, 0.2),

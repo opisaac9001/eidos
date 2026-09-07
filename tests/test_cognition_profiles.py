@@ -26,6 +26,7 @@ class CognitionProfileTests(unittest.TestCase):
         self.assertTrue(all(0 <= request.temperature <= 1 for request in requests.values()))
         self.assertLess(requests["moira"].max_output_tokens, requests["oneiros"].max_output_tokens)
         self.assertLess(requests["chronicler"].temperature, requests["oneiros"].temperature)
+        self.assertEqual(requests["pathos"].task_version, "4")
 
     def test_unknown_role_cannot_inherit_an_accidental_generic_profile(self):
         with self.assertRaisesRegex(ValueError, "Unknown cognition role"):

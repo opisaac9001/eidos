@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 import unittest
@@ -237,6 +238,60 @@ class LifeTests(unittest.TestCase):
         self.assertIn("accessibility_score", snapshot["recalls"][0])
         with self.assertRaises(ValueError):
             self.life.chat("Different content", "visit-1")
+
+    def test_reply_context_keeps_a_bounded_recent_conversation(self):
+        class CapturingGateway(StandInGateway):
+            def __init__(self):
+                self.contexts = []
+
+            async def generate(self, request):
+                context = json.loads(request.messages[-1].content)
+                self.contexts.append(context)
+                return await super().generate(request)
+
+        self.life.bootstrap()
+        at = self.life.snapshot()["time"]
+        prior = [
+            DomainEvent(
+                "conversation.message",
+                "pathos",
+                {
+                    "text": f"turn {index}",
+                    "speaker": "pathos" if index % 2 else "you",
+                    "simulated_at": at,
+                    "request_id": f"history-{index}",
+                    "source": "test",
+                    "channel": "inbox",
+                    "scene_id": None,
+                },
+            )
+            for index in range(9)
+        ]
+        incoming = DomainEvent(
+            "conversation.message",
+            "pathos",
+            {
+                "text": "and then what happened",
+                "speaker": "you",
+                "simulated_at": at,
+                "request_id": "current-turn",
+                "source": "user",
+                "channel": "inbox",
+                "scene_id": None,
+            },
+        )
+        history = self.life.history()
+        self.life.store.append("pathos", [*prior, incoming], len(history))
+        gateway = CapturingGateway()
+        self.life.gateway = gateway
+
+        asyncio.run(self.life._respond_to_message(incoming))
+
+        context = next(item for item in gateway.contexts if item.get("message"))
+        self.assertEqual(len(context["recent_dialogue"]), 8)
+        self.assertEqual(context["recent_dialogue"][0]["text"], "turn 1")
+        self.assertEqual(context["recent_dialogue"][-1]["text"], "turn 8")
+        self.assertNotIn("and then what happened", str(context["recent_dialogue"]))
 
     def test_using_an_old_memory_persists_subjective_reconsolidation(self):
         self.life.bootstrap()

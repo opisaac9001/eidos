@@ -94,6 +94,40 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["beliefs"][0]["status"], "contested")
         self.assertNotIn("private_operator_field", context)
 
+    def test_pathos_voice_is_casual_and_keeps_recent_dialogue(self):
+        request = ModelRequest(
+            capability="pathos",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps(
+                        {
+                            "message": "ok so what have you been up to",
+                            "location": "Juniper Café",
+                            "recent_dialogue": [
+                                {"speaker": "you", "text": "you still at the cafe?"},
+                                {"speaker": "pathos", "text": "Yeah, for a bit."},
+                            ],
+                            "remembered_preferences": [{"topic": "coffee", "stance": "likes"}],
+                            "relationship_repairs": [{"status": "open"}],
+                        }
+                    ),
+                ),
+            ),
+            output_schema={"type": "object"},
+        )
+
+        asyncio.run(self.gateway.generate(request))
+
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["recent_dialogue"][-1]["text"], "Yeah, for a bit.")
+        self.assertEqual(context["remembered_preferences"][0]["topic"], "coffee")
+        self.assertEqual(context["relationship_repairs"][0]["status"], "open")
+        system = self.payload["messages"][0]["content"]
+        self.assertIn("relaxed person talking", system)
+        self.assertIn("Do not end every reply with a question", system)
+        self.assertIn("never imitate spelling mistakes", system)
+
     def test_pathos_receives_felt_memory_confidence_without_hidden_source_truth(self):
         request = ModelRequest(
             capability="pathos",
