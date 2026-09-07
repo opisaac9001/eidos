@@ -379,6 +379,50 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIsNone(json.loads(body)["communication"]["live_scene_id"])
 
+    def test_slow_inference_consumes_thought_time_without_skipping_speech(self):
+        class FakeClock:
+            def __init__(self):
+                self.now = 1_000.0
+
+            def __call__(self):
+                return self.now
+
+            def sleep(self, seconds):
+                self.now += seconds
+
+        clock = FakeClock()
+        life = Life(
+            SQLiteEventStore(Path(self.directory.name) / "slow-model-pacing.db"),
+            StandInGateway(),
+        )
+        runtime = Runtime(life, clock=clock, sleeper=clock.sleep)
+        runtime.start()
+        self.addCleanup(runtime.close)
+        life.request_visit("slow-model-visit")
+        previous = {
+            str(item["id"]) for item in life.snapshot().get("conversations", [])
+        }
+        operation_started = clock.now
+        life.chat("Can we talk?", "slow-model-reply")
+        reply = life.snapshot()["conversations"][-1]
+        thought_seconds = float(reply["pacing_listening_seconds"]) + float(
+            reply["pacing_thinking_seconds"]
+        )
+        speech_seconds = float(reply["pacing_speaking_seconds"])
+
+        # The model has already spent longer generating than Pathos's minimum
+        # listening/thought beat, so no second artificial thought delay is added.
+        clock.now += thought_seconds + 2
+        self.assertEqual(runtime.pace_live_reply(previous, operation_started), 0)
+        self.assertTrue(runtime.live_reply_in_progress())
+        self.assertAlmostEqual(
+            runtime.snapshot()["conversations"][-1]["pacing_remaining_seconds"],
+            speech_seconds,
+        )
+
+        clock.now += speech_seconds
+        self.assertFalse(runtime.live_reply_in_progress())
+
     def test_catch_up_requires_explicit_preview_and_request(self):
         before = self.runtime.snapshot()["time"]
         status, body = self.request("GET", "/api/catch-up/preview?hours=2")
