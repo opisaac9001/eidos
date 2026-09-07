@@ -184,6 +184,7 @@ class MentalLayerTests(unittest.TestCase):
         self.assertEqual(prospective.payload["focus_id"], "later")
         self.assertIn("may still change", prospective.payload["focus_text"])
         self.assertFalse(prospective.payload["action_authority"])
+        self.assertGreater(prospective.payload["anticipatory_valence"], 0)
         self.assertNotEqual(attention.payload["focus_type"], "commitment")
         projected = project_mind([schedule, *events])
         self.assertEqual(projected.latest["prospective"].focus_type, "planned_activity")
@@ -217,6 +218,36 @@ class MentalLayerTests(unittest.TestCase):
         )
 
         self.assertNotIn("prospective", {event.payload["layer"] for event in events})
+
+    def test_exhausted_promise_can_feel_pressured_before_it_begins(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "tiring-promise",
+                "title": "Finish promised work",
+                "starts_at": (at + timedelta(hours=3)).isoformat(),
+                "ends_at": (at + timedelta(hours=4)).isoformat(),
+                "location_id": "workshop",
+                "actor_id": "pathos",
+                "commitment_id": "promise",
+            },
+        )
+        state = PathosState(
+            simulated_at=at,
+            awake=True,
+            energy=0.15,
+            rest=0.2,
+            arousal=0.75,
+        )
+
+        events = mental_layer_events([schedule], state, at, {})
+        prospective = next(
+            event for event in events if event.payload["layer"] == "prospective"
+        )
+
+        self.assertLess(prospective.payload["anticipatory_valence"], 0)
 
     def test_repeated_concern_focus_fatigues_and_allows_other_attention(self):
         at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)

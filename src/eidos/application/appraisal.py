@@ -225,6 +225,29 @@ def appraisal_events(
 def _effect(
     event: DomainEvent, history: Sequence[DomainEvent]
 ) -> tuple[str, float, float, float, float] | None:
+    if (
+        event.kind == "mind.layer_pulsed"
+        and event.payload.get("layer") == "prospective"
+        and not _prospective_focus_already_appraised(event, history)
+    ):
+        tone = event.payload.get("anticipatory_valence")
+        activation = event.payload.get("activation")
+        if (
+            isinstance(tone, bool)
+            or not isinstance(tone, (int, float))
+            or not -0.25 <= float(tone) <= 0.3
+            or isinstance(activation, bool)
+            or not isinstance(activation, (int, float))
+            or not 0 <= float(activation) <= 1
+        ):
+            return None
+        return (
+            "affect",
+            0.0,
+            float(tone),
+            0.25 + 0.3 * float(activation),
+            0.55,
+        )
     if event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine":
         location = event.payload.get("location_id")
         if not isinstance(location, str):
@@ -348,6 +371,28 @@ def _effect(
         desirability = max(-0.28, min(0.28, float(prior.payload["desirability"]) * 0.35))
         return ("affect", 0.0, desirability, 0.12, 0.7)
     return None
+
+
+def _prospective_focus_already_appraised(
+    event: DomainEvent, history: Sequence[DomainEvent]
+) -> bool:
+    focus_id = event.payload.get("focus_id")
+    if not isinstance(focus_id, str):
+        return True
+    sources = {
+        str(item.payload["source_event_id"])
+        for item in history
+        if item.kind == "appraisal.recorded"
+        and item.payload.get("source_kind") == "mind.layer_pulsed"
+        and isinstance(item.payload.get("source_event_id"), str)
+    }
+    return any(
+        str(item.event_id) in sources
+        and item.kind == "mind.layer_pulsed"
+        and item.payload.get("layer") == "prospective"
+        and item.payload.get("focus_id") == focus_id
+        for item in history
+    )
 
 
 def _pathos_experienced_scene_turn(event: DomainEvent, history: Sequence[DomainEvent]) -> bool:

@@ -429,7 +429,10 @@ thoughts. Deliberation, prospective anticipation, social awareness, reflection, 
 dream processing activate under distinct conditions. Prospective activation notices
 only an actually scheduled Pathos activity, rises as its start approaches, disappears
 when the plan is canceled, and carries explicit uncertainty rather than predicting
-attendance.
+attendance. Its first activation can create one small source-linked anticipatory
+appraisal. Companionship and personal purpose may make it pleasant; obligation, low
+energy, poor rest, and high arousal may make it pressured or mixed. Later hourly
+prospective pulses do not repeatedly reapply that emotion.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.
 Hourly emotion samples interpret replayed valence, arousal and duration into states

@@ -162,21 +162,26 @@ def mental_layer_events(
         pulse_id = f"{at.isoformat()}:{layer.value}"
         if pulse_id in existing:
             continue
+        payload: dict[str, object] = {
+            "pulse_id": pulse_id,
+            "layer": layer.value,
+            "mode": mode,
+            "focus_type": kind,
+            "focus_id": item_id,
+            "focus_text": text,
+            "activation": activation,
+            "simulated_at": at.isoformat(),
+            "action_authority": False,
+        }
+        if layer == CognitiveLayer.PROSPECTIVE and upcoming is not None:
+            payload["anticipatory_valence"] = _anticipatory_valence(
+                upcoming[1], state
+            )
         output.append(
             DomainEvent(
                 "mind.layer_pulsed",
                 "pathos",
-                {
-                    "pulse_id": pulse_id,
-                    "layer": layer.value,
-                    "mode": mode,
-                    "focus_type": kind,
-                    "focus_id": item_id,
-                    "focus_text": text,
-                    "activation": activation,
-                    "simulated_at": at.isoformat(),
-                    "action_authority": False,
-                },
+                payload,
                 correlation_id=f"mind-{at.isoformat()}",
             )
         )
@@ -319,6 +324,22 @@ def _next_upcoming_plan(
         key=lambda pair: (pair[0], pair[1].schedule_id),
     )
     return upcoming[0] if upcoming else None
+
+
+def _anticipatory_valence(item: CalendarEntry, state: PathosState) -> float:
+    """Give anticipation a small mixed tone without predicting the plan's outcome."""
+    value = 0.08
+    if item.companion_id is not None:
+        value += 0.14
+    if item.goal_id is not None:
+        value += 0.08
+    if item.commitment_id is not None:
+        value -= 0.1
+    capacity_shortfall = max(0.0, 0.5 - min(state.energy, state.rest))
+    value -= capacity_shortfall * 0.5
+    if state.arousal >= 0.7:
+        value -= 0.06
+    return max(-0.25, min(0.3, round(value, 3)))
 
 
 def _within_recent_hours(event: DomainEvent, at: datetime, hours: int) -> bool:
