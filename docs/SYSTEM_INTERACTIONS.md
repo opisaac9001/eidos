@@ -450,6 +450,14 @@ original Pathos-owned commitment and schedules one ordinary follow-up. When read
 uses the existing invitation path: the creditor independently accepts or declines from
 their own state. This contact does not assert an apology, forgiveness, restored trust,
 or successful repair; those require later witnessed social evidence.
+A `consider_renegotiation` decision about an active interrupted promise resolves the
+original Pathos-owned commitment, preserves the old terms, and proposes one feasible
+replacement interval through the existing renegotiation resolver. The search observes
+calendar conflicts, travel buffers, and replayed opening hours. The actual creditor
+answers only after a deterministic one-to-five-hour delay and may accept or decline
+from their own simulated capacity. Only acceptance versions the commitment and retimes
+the linked schedule; a decline or failed feasibility check leaves the old agreement in
+place.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.

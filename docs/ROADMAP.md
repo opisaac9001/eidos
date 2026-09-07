@@ -313,7 +313,12 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   commitment repair and renegotiation remain separate social processes. A decision to
   repair a missed commitment now enters the source-linked follow-up queue for its
   actual creditor, whose later invitation response remains independent; contact alone
-  does not imply apology, forgiveness, restored trust, or successful repair.
+  does not imply apology, forgiveness, restored trust, or successful repair. A decision
+  to renegotiate an interrupted active promise now finds a conflict-, travel-, and
+  opening-hours-safe replacement interval and sends it to the actual creditor. The old
+  promise and calendar remain unchanged while the offer is pending. The creditor waits
+  a bounded human-scale interval, independently accepts or declines from their own
+  state, and only an accepted response atomically versions the promise and retimes it.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

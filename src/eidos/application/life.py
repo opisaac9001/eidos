@@ -84,6 +84,10 @@ from eidos.application.reflection_followups import reflection_reconsideration_ev
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
 from eidos.application.relationship_repairs import relationship_repair_events
+from eidos.application.renegotiations import (
+    reflective_renegotiation_offer_events,
+    renegotiation_response_events,
+)
 from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
@@ -2288,6 +2292,18 @@ class Life:
                     catalog=invitation_catalog,
                 )
             )
+            negotiation_catalog = self._world_catalog(history + pending)
+            negotiation_responses = renegotiation_response_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                planning=self._planning(history + pending),
+                catalog=negotiation_catalog,
+                npc_people=project_npcs(history + pending, current).people,
+            )
+            if negotiation_responses:
+                self._planning(history + pending + negotiation_responses)
+                pending.extend(negotiation_responses)
             pending.extend(development_events(history + pending, at))
             pending.extend(preference_development_events(history + pending, current))
             pending.extend(trait_development_events(history + pending, current))
@@ -2582,6 +2598,16 @@ class Life:
                     if decisions:
                         self._planning(history + pending + decisions)
                         pending.extend(decisions)
+                        negotiation_offers = reflective_renegotiation_offer_events(
+                            history + pending,
+                            current,
+                            len(history) + len(pending),
+                            planning=self._planning(history + pending),
+                            catalog=self._world_catalog(history + pending),
+                        )
+                        if negotiation_offers:
+                            self._planning(history + pending + negotiation_offers)
+                            pending.extend(negotiation_offers)
             pending.extend(
                 object_collaboration_events(
                     history + pending,
