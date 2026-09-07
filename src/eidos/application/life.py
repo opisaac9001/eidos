@@ -42,6 +42,10 @@ from eidos.application.household import (
     household_foundation_events,
     household_load_events,
 )
+from eidos.application.inbound_invitations import (
+    pathos_invitation_response_events,
+    resident_invitation_events,
+)
 from eidos.application.inner_life import (
     active_concerns,
     active_dream_inspirations,
@@ -2274,6 +2278,16 @@ class Life:
             pending.extend(relationship_date_events(history + pending, current))
             pending.extend(social_preference_events(history + pending, current))
             pending.extend(relationship_repair_events(history + pending, current))
+            resident_invitation_catalog = self._world_catalog(history + pending)
+            pending.extend(
+                resident_invitation_events(
+                    history + pending,
+                    current,
+                    known_person_ids=pathos_known_person_ids(history + pending),
+                    npc_people=project_npcs(history + pending, current).people,
+                    catalog=resident_invitation_catalog,
+                )
+            )
             pending.extend(follow_up_events(history + pending, current))
             invitation_emotion = project_emotion(history + pending)
             invitation_bias = emotional_planning_bias(
@@ -2296,6 +2310,29 @@ class Life:
                     catalog=invitation_catalog,
                 )
             )
+            inbound_emotion = project_emotion(history + pending)
+            inbound_identity = project_identity(history + pending)
+            inbound_availability = communication_availability(history + pending, state)
+            inbound_response = pathos_invitation_response_events(
+                history + pending,
+                current,
+                len(history) + len(pending),
+                pathos_awake=state.awake,
+                pathos_available=inbound_availability.status
+                not in {"asleep", "occupied", "interrupted", "in_conversation", "unwell"},
+                energy=effective_energy,
+                rest=state.rest,
+                mastery=state.mastery,
+                values=inbound_identity.values,
+                affect_valence=inbound_emotion.valence,
+                affect_arousal=inbound_emotion.arousal,
+                sustained_low_hours=inbound_emotion.sustained_low_hours,
+                planning=self._planning(history + pending),
+                catalog=resident_invitation_catalog,
+            )
+            if inbound_response:
+                self._planning(history + pending + inbound_response)
+                pending.extend(inbound_response)
             negotiation_catalog = self._world_catalog(history + pending)
             reflective_reschedules = (
                 reflective_rescheduling_events(

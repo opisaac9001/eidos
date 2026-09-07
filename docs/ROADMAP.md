@@ -284,6 +284,11 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   scenes with intent, response, observation and validated consequences.
 - Invitations, favors, promises, cooperation, disagreement, misunderstandings,
   apologies, boundaries, shared activities and follow-ups.
+  Known residents can now originate sparse ordinary invitations from their own
+  simulated social capacity, with multi-day global and per-person cooldowns that rotate contact
+  rather than manufacturing constant attention. Pathos answers later from his own
+  capacity, emotion, values, availability, and actual calendar; either side can say no,
+  and acceptance alone creates a mutually linked feasible plan and promise.
 - Trust, familiarity, affection, tension and obligations change from evidence,
   not message counts. Show calendar, projects and causal relationship changes.
 

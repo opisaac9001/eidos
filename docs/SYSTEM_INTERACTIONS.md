@@ -470,6 +470,17 @@ For a standalone interrupted activity, the original accepted priority can also m
 closes the calendar entry and its active intention. It rejects goal-linked work,
 external commitments, another actor's activity, and already-finished intentions, so
 reflection cannot use "letting go" to erase a broader project or social obligation.
+
+Known residents may also initiate an ordinary invitation at a sparse daily decision
+point. Eligibility uses only the resident's own simulated energy, connection, purpose,
+and a public place; Pathos must already know that person. An eight-day global cooldown and
+twenty-four-day per-resident cooldown prevent repetitive pressure while a replay-stable
+selection rotates among eligible people. The request waits one to five hours for
+Pathos rather than receiving an instant answer. When he is awake and not occupied, his
+response uses his current energy, rest, mastery, affect duration, values, and actual
+calendar feasibility. Declining creates no plan. Accepting passes through the existing
+consent and planner resolvers and creates the shared schedule and Pathos-owned promise;
+the invitation itself cannot fabricate attendance or future relationship change.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.
