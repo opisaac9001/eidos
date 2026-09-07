@@ -37,6 +37,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
     accesses: dict[str, tuple[str, str | None]] = {}
     access_counts: dict[str, int] = {}
     used_accesses: set[str] = set()
+    resisted_corrections: set[tuple[str, str]] = set()
     evidence: dict[str, DomainEvent] = {}
     latest: dict[str, Recollection] = {}
     for event in events:
@@ -166,6 +167,34 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
             used_accesses.add(cause)
             if isinstance(blend_access, str):
                 used_accesses.add(blend_access)
+        elif event.kind == "memory.correction_resisted":
+            memory_id = _required(event, "memory_id")
+            source = sources.get(memory_id)
+            prior = latest.get(memory_id)
+            if source is None or prior is None:
+                raise ValueError("Correction resistance requires a drifted Pathos memory")
+            cause = str(event.causation_id) if event.causation_id is not None else ""
+            direct = evidence.get(cause)
+            if direct is None or direct.kind != "resource.confirmed":
+                raise ValueError("Correction resistance requires direct contradictory evidence")
+            if event.payload.get("evidence_event_id") != cause:
+                raise ValueError("Correction resistance must preserve its evidence link")
+            if not _evidence_contradicts(source, direct, event.payload.get("contradicting_value")):
+                raise ValueError("Resisted evidence must contradict the source claim")
+            if (
+                prior.confidence_basis != "familiarity_misattribution"
+                or prior.confidence < 0.85
+                or _level(event, "felt_confidence") != prior.confidence
+                or event.payload.get("confidence_basis") != prior.confidence_basis
+            ):
+                raise ValueError("Only a highly certain misattribution can resist correction")
+            resisted_at = _aware(event, "simulated_at")
+            if resisted_at < prior.changed_at:
+                raise ValueError("Correction resistance time cannot move backwards")
+            pair = (memory_id, cause)
+            if pair in resisted_corrections:
+                raise ValueError("Direct evidence can be resisted only once")
+            resisted_corrections.add(pair)
         elif event.kind == "memory.recollection_corrected":
             memory_id = _required(event, "memory_id")
             source = sources.get(memory_id)
@@ -189,6 +218,15 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 or event.payload.get("corrected_value") != new_value
             ):
                 raise ValueError("Correction evidence must contradict the source claim")
+            if prior.confidence_basis == "familiarity_misattribution" and prior.confidence >= 0.85:
+                independently_resisted = any(
+                    resisted_memory_id == memory_id and resisted_evidence_id != cause
+                    for resisted_memory_id, resisted_evidence_id in resisted_corrections
+                )
+                if not independently_resisted:
+                    raise ValueError(
+                        "A highly certain misattribution requires independent corroboration"
+                    )
             revision = _integer(event, "revision")
             if revision != prior.revision + 1:
                 raise ValueError("Recollection correction revision must be sequential")
@@ -218,6 +256,25 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
             )
         evidence[str(event.event_id)] = event
     return RecollectionState(latest)
+
+
+def _evidence_contradicts(
+    memory: DomainEvent, evidence: DomainEvent, claimed_value: object
+) -> bool:
+    subject = memory.payload.get("claim_subject_id")
+    predicate = memory.payload.get("claim_predicate")
+    old_value = memory.payload.get("claim_value")
+    new_value = evidence.payload.get("object_value")
+    return (
+        isinstance(subject, str)
+        and isinstance(predicate, str)
+        and isinstance(old_value, str)
+        and evidence.payload.get("subject_id") == subject
+        and evidence.payload.get("predicate") == predicate
+        and isinstance(new_value, str)
+        and new_value != old_value
+        and claimed_value == new_value
+    )
 
 
 def _required(event: DomainEvent, key: str) -> str:

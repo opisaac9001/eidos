@@ -377,6 +377,9 @@ network authorization; the server remains loopback-only until authenticated depl
   visible only to the operator. Explicit user reminders are retained as causal events
   and strengthen accessibility within a separate cap without duplicating the original
   experience or repairing subjective drift.
+  A highly certain familiarity-based false memory does not collapse after one
+  contradiction: the first direct conflict is recorded as resistance, and independent
+  direct corroboration is required before the subjective recollection is corrected.
   Newer direct structured evidence can correct a drifted claim while preserving both
   the mistaken version and its correction trail. The recall maps are maintained as a
   versioned, checksummed, event-anchored projection that can be discarded and rebuilt

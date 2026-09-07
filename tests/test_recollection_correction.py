@@ -55,6 +55,50 @@ class RecollectionCorrectionTests(unittest.TestCase):
             },
         )
 
+    def confidently_wrong(self) -> list[DomainEvent]:
+        memory = self.memory()
+        companion = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "Mara mentioned the lamp switch beside Rowan's workbench.",
+                "simulated_at": (self.now - timedelta(days=125)).isoformat(),
+                "owner": "pathos",
+                "source": "direct-perception",
+                "confidence": 0.75,
+                "importance": 0.35,
+                "person_id": "rowan",
+                "claim_subject_id": "lamp",
+                "claim_predicate": "switch",
+                "claim_value": "available",
+                "claim_confidence": 0.75,
+            },
+        )
+        rehearsals = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {
+                    "memory_id": str(memory.event_id),
+                    "simulated_at": (self.now - timedelta(days=day)).isoformat(),
+                },
+            )
+            for day in (30, 20, 10)
+        ]
+        history = [memory, companion, *rehearsals]
+        recalled = recall(history, "Rowan lamp switch", self.now)
+        accesses = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {"memory_id": str(item.event.event_id), "simulated_at": self.now.isoformat()},
+            )
+            for item in recalled
+        ]
+        changed = reconsolidation_events([*history, *accesses], recalled, self.now)
+        self.assertEqual(changed[0].payload["confidence_basis"], "familiarity_misattribution")
+        return [*history, *accesses, *changed]
+
     def test_new_direct_evidence_corrects_subjective_memory_not_source_history(self):
         history = self.drifted()
         evidence = self.confirmation()
@@ -136,6 +180,67 @@ class RecollectionCorrectionTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_confident_false_memory_resists_once_then_yields_to_independent_confirmation(self):
+        history = self.confidently_wrong()
+        memory_id = str(history[0].event_id)
+        first_evidence = self.confirmation(self.now + timedelta(hours=1))
+
+        resisted = recollection_correction_events(
+            [*history, first_evidence], self.now + timedelta(hours=1)
+        )
+
+        self.assertEqual([event.kind for event in resisted], ["memory.correction_resisted"])
+        before = project_recollections(history).latest[memory_id]
+        after_resistance = project_recollections([*history, first_evidence, *resisted]).latest[
+            memory_id
+        ]
+        self.assertEqual(after_resistance, before)
+        self.assertEqual(
+            recollection_correction_events(
+                [*history, first_evidence, *resisted], self.now + timedelta(hours=2)
+            ),
+            [],
+        )
+
+        second_evidence = self.confirmation(self.now + timedelta(hours=3))
+        corrected = recollection_correction_events(
+            [*history, first_evidence, *resisted, second_evidence],
+            self.now + timedelta(hours=3),
+        )
+
+        self.assertEqual([event.kind for event in corrected], ["memory.recollection_corrected"])
+        final = project_recollections(
+            [*history, first_evidence, *resisted, second_evidence, *corrected]
+        ).latest[memory_id]
+        self.assertEqual(final.confidence_basis, "direct_confirmation")
+        self.assertIn("unavailable", final.text)
+
+    def test_high_confidence_correction_cannot_bypass_resistance_history(self):
+        history = self.confidently_wrong()
+        memory_id = str(history[0].event_id)
+        evidence = self.confirmation()
+        forged = DomainEvent(
+            "memory.recollection_corrected",
+            "pathos",
+            {
+                "memory_id": memory_id,
+                "revision": 2,
+                "corrected_text": "I now remember the lamp switch was unavailable.",
+                "corrected_value": "unavailable",
+                "confidence": 0.95,
+                "confidence_basis": "direct_confirmation",
+                "detail_level": "clear",
+                "evidence_event_id": str(evidence.event_id),
+                "correction_kind": "direct_confirmation",
+                "epistemic_status": "subjective_recollection",
+                "simulated_at": (self.now + timedelta(hours=1)).isoformat(),
+            },
+            causation_id=evidence.event_id,
+        )
+
+        with self.assertRaisesRegex(ValueError, "independent corroboration"):
+            project_recollections([*history, evidence, forged])
 
 
 if __name__ == "__main__":

@@ -844,6 +844,7 @@ class Life:
                 "role.failed",
                 "memory.recovered",
                 "memory.recollection_corrected",
+                "memory.correction_resisted",
                 "memory.retention_reviewed",
                 "memory.archived",
                 "transfer.offered",

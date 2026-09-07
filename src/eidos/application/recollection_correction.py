@@ -27,6 +27,11 @@ def recollection_correction_events(
         for event in history
         if event.kind == "memory.recollection_corrected"
     }
+    resisted_pairs = {
+        (str(event.payload.get("memory_id")), str(event.payload.get("evidence_event_id")))
+        for event in history
+        if event.kind == "memory.correction_resisted"
+    }
     last_corrected_values = {
         str(event.payload["memory_id"]): str(event.payload["corrected_value"])
         for event in history
@@ -54,6 +59,7 @@ def recollection_correction_events(
                 source is None
                 or latest_change_positions.get(memory_id, len(history)) >= position
                 or (memory_id, evidence_id) in corrected_pairs
+                or (memory_id, evidence_id) in resisted_pairs
                 or not _contradicts(source, evidence)
                 or last_corrected_values.get(memory_id) == evidence.payload.get("object_value")
             ):
@@ -63,6 +69,34 @@ def recollection_correction_events(
             predicate = str(evidence.payload["predicate"]).replace("_", " ")
             evidence_confidence = _confidence(evidence)
             confidence = min(0.95, evidence_confidence)
+            requires_corroboration = (
+                recollection.confidence_basis == "familiarity_misattribution"
+                and recollection.confidence >= 0.85
+            )
+            has_prior_resistance = any(
+                resisted_memory_id == memory_id and resisted_evidence_id != evidence_id
+                for resisted_memory_id, resisted_evidence_id in resisted_pairs
+            )
+            if requires_corroboration and not has_prior_resistance:
+                output.append(
+                    DomainEvent(
+                        "memory.correction_resisted",
+                        "pathos",
+                        {
+                            "memory_id": memory_id,
+                            "evidence_event_id": evidence_id,
+                            "felt_confidence": recollection.confidence,
+                            "confidence_basis": recollection.confidence_basis,
+                            "contradicting_value": new_value,
+                            "reason": "familiarity_felt_more_convincing_than_one_contradiction",
+                            "simulated_at": at.isoformat(),
+                        },
+                        causation_id=evidence.event_id,
+                        correlation_id=f"recollection-{memory_id}",
+                    )
+                )
+                resisted_pairs.add((memory_id, evidence_id))
+                return output
             output.append(
                 DomainEvent(
                     "memory.recollection_corrected",

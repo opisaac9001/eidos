@@ -198,9 +198,12 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   vivid and highly certain in Pathos's mind. Conversation, inner cognition, activity
   choice, and project planning receive that felt certainty—not the operator's hidden
   source score. Later thought begins from the subjective version while immutable
-  evidence remains separate. A newer direct structured confirmation that contradicts a remembered claim
-  can restore clarity and confidence while retaining the source, drift, and correction
-  trail; testimony and evidence that predates the drift cannot do so.
+  evidence remains separate. An ordinary uncertain recollection can yield to newer
+  direct structured evidence immediately. A highly certain familiarity-based false
+  memory instead records dissonance and resists the first contradiction; a separate
+  later direct confirmation can restore clarity and confidence. The source, drift,
+  resistance, and correction trail remain visible, while testimony and evidence that
+  predates the drift cannot correct it.
 - Consolidate repeated episodes into source-linked summaries and associations.
   Maintain uncertainty and correction history; summaries are not new events.
 - Stable values/preferences/traits plus separately changing needs, emotional

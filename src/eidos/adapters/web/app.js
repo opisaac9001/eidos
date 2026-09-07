@@ -138,6 +138,7 @@ const labels = {
   "habit.reinforced": "A HABIT FORMED",
   "dream.recalled": "A DREAM REMEMBERED",
   "memory.reminded": "A MEMORY WAS REMINDED",
+  "memory.correction_resisted": "A CONTRADICTION FELT UNCONVINCING",
   "transfer.offered": "OBJECT OFFERED",
   "transfer.accepted": "OBJECT TRANSFER ACCEPTED",
   "transfer.declined": "OBJECT TRANSFER DECLINED",
