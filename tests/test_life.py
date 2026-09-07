@@ -70,6 +70,14 @@ class LifeTests(unittest.TestCase):
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
         self.assertTrue(snapshot["emotion"]["label"])
+        self.assertEqual(len(snapshot["emotion_history"]["samples"]), 24)
+        self.assertTrue(snapshot["emotion_history"]["influences"])
+        self.assertTrue(
+            all(
+                item["source_text"] and item["resulting_label"]
+                for item in snapshot["emotion_history"]["influences"]
+            )
+        )
         self.assertTrue(snapshot["mind"]["workspace"])
         self.assertTrue(
             all(item["action_authority"] is False for item in snapshot["mind"]["workspace"])

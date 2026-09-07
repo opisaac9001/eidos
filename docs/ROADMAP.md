@@ -366,6 +366,10 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   gate requires ordinary contentment, melancholy, frustration, and quiet rather than a
   permanently positive or emotionally flat life; intense and prolonged states remain
   possible consequences, not a scheduled quota.
+- The Observatory now shows a 48-sample emotional timeline, recent source-linked
+  influences, adaptation, and a plain-language account of current planning pressure.
+  The ordinary view stays experiential; operator mode retains episode, appraisal, and
+  source IDs for causal auditing.
 - The Dream Journal groups each dream with its later recall, bounded emotional residue,
   waking possibility, activity/project link, and terminal outcome. The ordinary view
   explains the arc without internals; the operator view retains event and causation IDs.

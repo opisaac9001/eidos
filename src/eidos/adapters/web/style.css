@@ -422,6 +422,123 @@ select {
   line-height: 1.6;
   margin-top: 24px;
 }
+.emotion-history-panel {
+  margin-top: 20px;
+}
+.emotion-history-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+  gap: 28px;
+  align-items: start;
+}
+.emotion-history-grid h2 {
+  margin: 17px 0 5px;
+  font-size: 24px;
+}
+.emotion-history-grid .context-note {
+  min-height: 42px;
+  margin: 8px 0 14px;
+}
+.emotion-chart {
+  min-height: 184px;
+  border: 1px solid #343e32;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(221, 172, 102, 0.035), transparent 48%),
+    #191f1a;
+  padding: 10px 12px 8px;
+}
+.emotion-chart svg {
+  display: block;
+  width: 100%;
+  height: 142px;
+  overflow: visible;
+}
+.emotion-zero {
+  stroke: #394237;
+  stroke-width: 1;
+  stroke-dasharray: 5 6;
+}
+.emotion-tone-line,
+.emotion-arousal-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.emotion-tone-line {
+  stroke: var(--green);
+  stroke-width: 2.25;
+}
+.emotion-arousal-line {
+  stroke: var(--amber);
+  stroke-width: 1.4;
+  opacity: 0.72;
+}
+.emotion-tone-dot {
+  fill: var(--green);
+  stroke: #192019;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.emotion-chart-times,
+.emotion-chart-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #7f8978;
+  font-size: 10px;
+  letter-spacing: 0.45px;
+}
+.emotion-chart-times strong {
+  color: #aeb7a5;
+  font-weight: 500;
+}
+.emotion-chart-legend {
+  justify-content: flex-start;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+.emotion-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.emotion-chart-legend i {
+  width: 13px;
+  height: 2px;
+  display: inline-block;
+  background: var(--green);
+}
+.emotion-chart-legend .arousal-key {
+  background: var(--amber);
+}
+.emotion-influences {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+  max-height: 290px;
+  overflow: auto;
+}
+.emotion-influence {
+  border-left: 2px solid #4d5848;
+  background: #1b211b;
+  padding: 10px 12px;
+}
+.emotion-influence.warm {
+  border-left-color: var(--green);
+}
+.emotion-influence.low {
+  border-left-color: #a77768;
+}
+.emotion-influence p {
+  margin: 5px 0;
+  color: #bec5b7;
+  font: 14px/1.35 var(--serif);
+}
+.emotion-influence .memory-source {
+  font-size: 10px;
+  line-height: 1.45;
+}
 .lower-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1143,7 +1260,8 @@ hr {
     padding: 0 22px;
   }
   .overview-grid,
-  .lower-grid {
+  .lower-grid,
+  .emotion-history-grid {
     grid-template-columns: 1fr;
   }
   .vitals h2 br {

@@ -113,6 +113,7 @@ money never authorize real purchases. Romance is not assumed as a default mode.
 | UX-06 | Ensemble: traces, recovery, queue, budgets, context/causal inspector | Partial: latest 100 traces | P1 onward |
 | UX-07 | Sleep/dream journal: seeds, remembered fragments, next-day effects | Partial: each dream card now carries its replay-derived recall, bounded emotional residue, waking possibility, activity/project link, and terminal outcome; ordinary language stays separate from operator-only event/causation IDs | P4 |
 | UX-08 | Keyboard/mobile/accessibility, reduced motion, onboarding, error/recovery states | Partial: five-view prototype | Every phase |
+| UX-09 | Emotional history and behavioral consequences | Partial: the Observatory graphs 48 recent hourly samples, explains source-linked influences and positive adaptation in ordinary language, summarizes current planning pressure, and exposes raw event lineage only in operator mode | P2–P6 |
 
 Operator visibility is not character knowledge. Generated private associations
 are simulation artifacts, not the inference model's literal hidden reasoning.

@@ -212,6 +212,30 @@ def mood_name(energy: float, valence: float, arousal: float = 0.35) -> str:
     return "Content" if valence > 0.15 else "Reflective" if valence < -0.1 else "Quietly curious"
 
 
+def _emotion_source_summary(event: DomainEvent | None) -> str:
+    """Describe only the experience Pathos appraised, without inventing a cause."""
+    if event is None:
+        return "An earlier experience affected him."
+    for key in ("text", "description", "outcome", "reason", "title"):
+        value = event.payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:220]
+    return {
+        "npc.encountered": "He crossed paths with someone he knows.",
+        "scene.turn_taken": "Something in a conversation affected him.",
+        "meal.eaten": "He ate and the physical relief registered.",
+        "meal.unavailable": "He could not get the meal he expected.",
+        "finance.payment_missed": "A household payment could not be made.",
+        "finance.transaction_recorded": "A change in his household money registered.",
+        "commitment.missed": "He missed something he had meant to do.",
+        "goal.achieved": "He finished something that mattered to him.",
+        "disagreement.expressed": "A disagreement stayed with him.",
+        "apology.offered": "He made an effort to repair a strained relationship.",
+        "wellbeing.episode_started": "He began feeling physically off.",
+        "wellbeing.episode_resolved": "His physical discomfort finally eased.",
+    }.get(event.kind, f"A {event.kind.replace('.', ' ')} experience affected him.")
+
+
 def _is_explicit_memory_reminder(text: str) -> bool:
     lowered = text.lower()
     return any(
@@ -670,6 +694,7 @@ class Life:
         dream_lifecycles: dict[str, list[dict[str, Any]]] = {}
         diagnostics = []
         catch_up_summaries = []
+        emotion_samples = []
         npc_memories = []
         external_signals = []
         world_packs = []
@@ -759,6 +784,8 @@ class Life:
                 surfaced_associations.add(str(payload["association_id"]))
             if event.kind == "affect.episode_started":
                 episodes.append(item)
+            if event.kind == "emotion.sampled":
+                emotion_samples.append(item)
             if event.kind == "catch_up.summarized":
                 catch_up_summaries.append(item)
             if event.kind == "external_signal.observed":
@@ -1075,6 +1102,25 @@ class Life:
             None,
         )
         ambient = ambient_population(catalog, state.simulated_at, weather)
+        event_by_id = {str(event.event_id): event for event in history}
+        sample_by_time = {
+            str(sample["simulated_at"]): sample
+            for sample in emotion_samples
+            if isinstance(sample.get("simulated_at"), str)
+        }
+        emotion_influences = []
+        for episode in episodes[-24:]:
+            source = event_by_id.get(str(episode.get("source_event_id", "")))
+            resulting_sample = sample_by_time.get(str(episode.get("simulated_at", "")))
+            emotion_influences.append(
+                {
+                    **episode,
+                    "source_text": _emotion_source_summary(source),
+                    "resulting_label": (
+                        resulting_sample.get("label") if resulting_sample is not None else None
+                    ),
+                }
+            )
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -1162,6 +1208,10 @@ class Life:
                         emotion.complexity,
                     )
                 ),
+            },
+            "emotion_history": {
+                "samples": emotion_samples[-72:],
+                "influences": list(reversed(emotion_influences)),
             },
             "indexes": {
                 "memory_revision": memory_index.revision,

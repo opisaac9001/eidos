@@ -1024,6 +1024,74 @@ function renderMessages() {
     state.communication?.status === "interrupted";
 }
 
+function renderEmotionHistory() {
+  const history = state.emotion_history || {};
+  const samples = (history.samples || []).slice(-48);
+  const chart = $("emotion-chart");
+  if (samples.length < 2) {
+    chart.innerHTML = '<div class="empty compact">His emotional history is still forming.</div>';
+  } else {
+    const width = 680;
+    const height = 150;
+    const x = (index) => 16 + (index / (samples.length - 1)) * (width - 32);
+    const toneY = (value) => 75 - Math.max(-1, Math.min(1, Number(value))) * 58;
+    const arousalY = (value) => 137 - Math.max(0, Math.min(1, Number(value))) * 120;
+    const tonePoints = samples
+      .map((sample, index) => `${x(index).toFixed(1)},${toneY(sample.valence).toFixed(1)}`)
+      .join(" ");
+    const arousalPoints = samples
+      .map((sample, index) => `${x(index).toFixed(1)},${arousalY(sample.arousal).toFixed(1)}`)
+      .join(" ");
+    const latest = samples.at(-1);
+    chart.setAttribute(
+      "aria-label",
+      `Over the last ${samples.length} emotional samples, Pathos moved from ${samples[0].label} to ${latest.label}.`,
+    );
+    chart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><line class="emotion-zero" x1="16" y1="75" x2="${width - 16}" y2="75"></line><polyline class="emotion-tone-line" points="${tonePoints}"></polyline><polyline class="emotion-arousal-line" points="${arousalPoints}"></polyline><circle class="emotion-tone-dot" cx="${x(samples.length - 1)}" cy="${toneY(latest.valence)}" r="4"></circle></svg><div class="emotion-chart-times"><span>${esc(date(samples[0].simulated_at))} · ${esc(time(samples[0].simulated_at))}</span><strong>${esc(latest.label)} now</strong><span>${esc(date(latest.simulated_at))} · ${esc(time(latest.simulated_at))}</span></div>`;
+  }
+
+  const bias = state.emotion?.planning_bias || {};
+  const effects = [];
+  if (Number(bias.initiative) < 0.48) effects.push("less inclined to start something new");
+  else if (Number(bias.initiative) > 0.62) effects.push("more ready to begin something");
+  if (Number(bias.social_openness) < 0.48) effects.push("more likely to keep to himself");
+  else if (Number(bias.social_openness) > 0.65) effects.push("more open to company");
+  if (Number(bias.risk_tolerance) < 0.42) effects.push("favoring familiar, lower-risk choices");
+  else if (Number(bias.risk_tolerance) > 0.58) effects.push("a little more willing to improvise");
+  if (Number(bias.pace) < 0.5) effects.push("moving through plans more slowly");
+  $("emotion-decision-effect").textContent = effects.length
+    ? `Right now, that leaves him ${effects.join(", ")}. These are pressures, not commands.`
+    : "Right now, his feelings are not strongly pushing his plans in one direction. They remain pressures, not commands.";
+
+  const influences = (history.influences || []).slice(0, 6);
+  $("emotion-influences").innerHTML = influences.length
+    ? influences
+        .map((item) => {
+          const tone = Number(item.valence_delta || 0);
+          const arousal = Number(item.arousal_delta || 0);
+          const effect =
+            tone >= 0.025
+              ? "lifted his emotional tone"
+              : tone <= -0.025
+                ? "weighed on him"
+                : arousal >= 0.04
+                  ? "made him more alert"
+                  : arousal <= -0.025
+                    ? "helped him settle"
+                    : "left a subtle trace";
+          const adapted =
+            tone > 0 && Number(item.adaptation ?? 1) < 0.6
+              ? " A similar good moment was recent, so it landed more softly."
+              : "";
+          const operatorSource = operatorMode
+            ? `<br>Episode ${esc(item.id)} · source ${esc(item.source_event_id || "unknown")} · appraisal ${esc(item.appraisal_id || "unknown")}`
+            : "";
+          return `<article class="emotion-influence ${tone < 0 ? "low" : tone > 0 ? "warm" : "neutral"}"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${esc(item.resulting_label || "felt response")}</span></div><p>${esc(item.source_text)}</p><div class="memory-source">It ${effect}.${esc(adapted)}${operatorSource}</div></article>`;
+        })
+        .join("")
+    : '<p class="context-note">No source-linked emotional influence has been recorded yet.</p>';
+}
+
 function render(next) {
   if (state && next.revision < state.revision) return;
   syncServerPacing(next);
@@ -1151,6 +1219,7 @@ function render(next) {
   $("affect-source").textContent = episode
     ? `${emotionalPattern}. Latest influence: ${episode.source_kind.replaceAll(".", " ")} · ${episode.valence_delta >= 0 ? "+" : ""}${Number(episode.valence_delta).toFixed(2)} tone · ${episode.arousal_delta >= 0 ? "+" : ""}${Number(episode.arousal_delta).toFixed(2)} arousal`
     : `${emotionalPattern}. No affect episode recorded yet.`;
+  renderEmotionHistory();
   const needs = state.pathos.needs;
   const values = Object.entries(state.identity?.values || {})
     .sort((a, b) => b[1] - a[1])
