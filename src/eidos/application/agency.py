@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
@@ -75,6 +75,7 @@ async def autonomous_activity_events(
         for place in catalog.places.values()
     }
     attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
+    recent_activity_patterns = _recent_activity_patterns(history, simulated_at)
     context = {
         "time": simulated_at.isoformat(),
         "needs": dict(needs),
@@ -86,6 +87,7 @@ async def autonomous_activity_events(
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
         "habits": list(habits[-6:]),
+        "recent_activity_patterns": recent_activity_patterns,
         "current_attention": (
             {
                 "focus_type": attention.focus_type,
@@ -204,6 +206,14 @@ async def autonomous_activity_events(
         known_companion_ids=set(people),
         actual_revision=actual_revision + len(output),
         simulated_at=simulated_at,
+        recent_activity_signatures=[
+            (
+                str(item["activity_type"]),
+                str(item["location_id"]),
+                str(item["companion_id"]),
+            )
+            for item in recent_activity_patterns
+        ],
     )
     output.extend(resolution.events)
     return output
@@ -232,3 +242,31 @@ def _trace(
             "trace_id": trace_id,
         },
     )
+
+
+def _recent_activity_patterns(
+    history: Sequence[DomainEvent], simulated_at: datetime
+) -> list[dict[str, str]]:
+    window_start = simulated_at - timedelta(days=21)
+    patterns: list[dict[str, str]] = []
+    for event in history:
+        if event.kind != "agency.activity_realized" or event.aggregate_id != "pathos":
+            continue
+        value = event.payload.get("simulated_at")
+        activity_type = event.payload.get("activity_type")
+        location_id = event.payload.get("location_id")
+        if not all(isinstance(item, str) for item in (value, activity_type, location_id)):
+            continue
+        at = datetime.fromisoformat(str(value))
+        if at.utcoffset() is None or not window_start <= at <= simulated_at:
+            continue
+        companion = event.payload.get("companion_id")
+        patterns.append(
+            {
+                "activity_type": str(activity_type),
+                "location_id": str(location_id),
+                "companion_id": companion if isinstance(companion, str) else "solo",
+                "realized_at": at.isoformat(),
+            }
+        )
+    return patterns[-10:]

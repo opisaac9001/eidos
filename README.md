@@ -79,7 +79,9 @@ revisable, and distinct from both his stable values and slow behavioral traits.
 Repeated voluntary activities can also become contextual rhythms tied to an activity,
 place, and part of day. These habits are soft influences rather than appointments:
 they strengthen only from new lived repetitions, lapse after prolonged disuse, and can
-return without forcing Pathos to repeat the same routine.
+return without forcing Pathos to repeat the same routine. Recent voluntary choices are
+also shown to the agency model, and an extremely overused activity/place/company pattern
+is rejected until time or meaningful variation makes it fresh again.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,

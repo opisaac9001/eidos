@@ -248,6 +248,10 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   two-to-four-step project with atomic schedule/travel/resource admission, incremental
   action-backed progress, and whole-project cleanup on a failed required step. Residents
   independently propose owner-private open-vocabulary plans after the authored opening.
+  Pathos's agency context includes the last three weeks of realized voluntary choices.
+  Exact activity/place/company combinations may recur enough to establish continuity,
+  but an extremely overused recent pattern is rejected until it changes meaningfully or
+  falls outside the window; renaming the same activity does not count as an outcome.
 - Persistent objects and validated actions: move, meet, borrow, give, repair,
   learn, rest, work and attend. Narration alone cannot perform an action.
 - A replayable household ledger now makes workshop attendance produce bounded income,

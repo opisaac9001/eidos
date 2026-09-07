@@ -6,6 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Sequence
 
 from eidos.domain.actions import ActionKind
 from eidos.domain.events import DomainEvent
@@ -144,6 +145,7 @@ def resolve_agency_candidate(
     known_companion_ids: set[str],
     actual_revision: int,
     simulated_at: datetime,
+    recent_activity_signatures: Sequence[tuple[str, str, str]] = (),
 ) -> AgencyResolution:
     """Admit a novel idea only when it can become a physically coherent plan."""
     common = {
@@ -181,6 +183,22 @@ def resolve_agency_candidate(
         return reject("unknown_location", "The proposed place does not exist")
     if candidate.companion_id is not None and candidate.companion_id not in known_companion_ids:
         return reject("unknown_companion", "The proposed companion is not known")
+    candidate_signature = (
+        candidate.activity_type,
+        candidate.location_id,
+        candidate.companion_id or "solo",
+    )
+    exact_repetitions = sum(
+        signature == candidate_signature for signature in recent_activity_signatures
+    )
+    activity_repetitions = sum(
+        signature[0] == candidate.activity_type for signature in recent_activity_signatures
+    )
+    if exact_repetitions >= 6 or activity_repetitions >= 8:
+        return reject(
+            "overused_pattern",
+            "This recent activity pattern needs time or meaningful variation before repeating.",
+        )
     resource = state.objects.get(candidate.resource_id) if candidate.resource_id else None
     if candidate.resource_id is not None and resource is None:
         return reject("unknown_resource", "The proposed resource does not exist")

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
@@ -150,6 +151,33 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(result.code, "place_closed")
         self.assertNotIn("schedule.created", [event.kind for event in result.events])
 
+    def test_an_exhausted_recent_pattern_is_rejected_without_banning_its_meaning(self):
+        signature = ("texture_noticing", "park", "solo")
+        result = resolve_agency_candidate(
+            self.candidate(),
+            proposal_id="overused",
+            state=PlanningState(),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=0,
+            simulated_at=self.now,
+            recent_activity_signatures=[signature] * 6,
+        )
+
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.code, "overused_pattern")
+        varied = resolve_agency_candidate(
+            replace(self.candidate(), location_id="cafe"),
+            proposal_id="varied",
+            state=PlanningState(),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=0,
+            simulated_at=self.now,
+            recent_activity_signatures=[signature] * 6,
+        )
+        self.assertTrue(varied.accepted)
+
     def test_stand_in_originates_an_open_ended_activity(self):
         at = datetime(2026, 1, 11, 10, tzinfo=timezone.utc)
         attention = DomainEvent(
@@ -168,9 +196,19 @@ class AgencyTests(unittest.TestCase):
             },
         )
         gateway = CapturingStandIn()
+        recent_activity = DomainEvent(
+            "agency.activity_realized",
+            "pathos",
+            {
+                "activity_type": "sketching_walk",
+                "location_id": "park",
+                "companion_id": None,
+                "simulated_at": (at - timedelta(days=2)).isoformat(),
+            },
+        )
         events = asyncio.run(
             autonomous_activity_events(
-                [attention],
+                [attention, recent_activity],
                 at,
                 1,
                 gateway,
@@ -220,6 +258,7 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
         self.assertEqual(context["self_concepts"][0]["confidence"], 0.55)
         self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
+        self.assertEqual(context["recent_activity_patterns"][0]["companion_id"], "solo")
 
 
 if __name__ == "__main__":
