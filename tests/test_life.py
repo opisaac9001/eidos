@@ -164,6 +164,22 @@ class LifeTests(unittest.TestCase):
             any(item["kind"] == "external_signal.observed" for item in snapshot["feed"])
         )
 
+    def test_snapshot_exposes_anonymous_town_life_but_only_local_presence_to_pathos(self):
+        self.life.advance(12)
+        snapshot = self.life.snapshot()
+        surroundings = snapshot["pathos"]["surroundings"]
+
+        self.assertEqual(surroundings["place_id"], snapshot["pathos"]["location_id"])
+        self.assertEqual(
+            surroundings,
+            next(
+                item
+                for item in snapshot["ambient_population"]
+                if item["place_id"] == surroundings["place_id"]
+            ),
+        )
+        self.assertFalse({"person_id", "name", "identity"} & set(surroundings))
+
     def test_monthly_retention_is_integrated_and_visible(self):
         store = SQLiteEventStore(self.path)
         old = DomainEvent(
@@ -296,6 +312,14 @@ class LifeTests(unittest.TestCase):
         self.assertEqual(context["recent_dialogue"][0]["text"], "turn 1")
         self.assertEqual(context["recent_dialogue"][-1]["text"], "turn 8")
         self.assertNotIn("and then what happened", str(context["recent_dialogue"]))
+        self.assertEqual(
+            set(context["ambient_presence"]),
+            {"place_id", "estimated_people", "pace", "activity"},
+        )
+        self.assertEqual(
+            context["ambient_presence"]["place_id"],
+            self.life.snapshot()["pathos"]["location_id"],
+        )
 
     def test_using_an_old_memory_persists_subjective_reconsolidation(self):
         self.life.bootstrap()

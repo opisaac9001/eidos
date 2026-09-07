@@ -453,7 +453,17 @@ function mapMarkup(large) {
       const occupants = state.people.filter(
         (person) => person.location_id === place.id && place.id !== "home",
       );
-      return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${here ? "● PATHOS" : occupants.length ? `${occupants.length} NEIGHBOR${occupants.length > 1 ? "S" : ""}` : " "}</span></button>`;
+      const ambient = (state.ambient_population || []).find(
+        (item) => item.place_id === place.id,
+      );
+      const others = Number(ambient?.estimated_people || 0);
+      const total = occupants.length + others;
+      const status = here
+        ? `● PATHOS${others ? ` · ${others} OTHER${others === 1 ? "" : "S"}` : ""}`
+        : total
+          ? `${total} ${total === 1 ? "PERSON" : "PEOPLE"}`
+          : " ";
+      return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}${total ? `, about ${total} other people nearby` : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${status}</span></button>`;
     })
     .join("");
 }
@@ -465,9 +475,13 @@ function renderPlace() {
   const people = state.people.filter(
     (p) => p.location_id === place.id && place.id !== "home",
   );
+  const ambient = (state.ambient_population || []).find(
+    (item) => item.place_id === place.id,
+  );
+  const others = Number(ambient?.estimated_people || 0);
   const objects = state.objects.filter((item) => item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${!pathosHere && !people.length ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {

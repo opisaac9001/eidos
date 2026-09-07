@@ -7,6 +7,7 @@ from typing import Any, Sequence
 from uuid import UUID, uuid4
 
 from eidos.application.agency import autonomous_activity_events
+from eidos.application.ambient_population import ambient_population
 from eidos.application.appraisal import (
     affect_episode_events,
     appraisal_events,
@@ -1028,6 +1029,7 @@ class Life:
             ),
             None,
         )
+        ambient = ambient_population(catalog, state.simulated_at, weather)
         return {
             "revision": len(history),
             "time": state.simulated_at.isoformat(),
@@ -1049,6 +1051,7 @@ class Life:
                 },
                 "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence, state.arousal),
+                "surroundings": vars_for(ambient[state.location_id]),
             },
             "identity": {
                 "name": identity.name,
@@ -1095,6 +1098,7 @@ class Life:
                 }
                 for place in catalog.places.values()
             ],
+            "ambient_population": [vars_for(item) for item in ambient.values()],
             "people": population,
             "npc_states": [vars_for(person) for person in npc_state.people.values()],
             "npc_memories": npc_memories[-100:],
@@ -2432,6 +2436,13 @@ class Life:
             context = {
                 "location": catalog_now.location_name(state.location_id),
                 "time": at,
+                "ambient_presence": vars_for(
+                    ambient_population(
+                        catalog_now,
+                        current,
+                        _latest_weather(history + pending),
+                    )[state.location_id]
+                ),
                 "memories": memories,
                 "memory_recollections": [
                     {
@@ -3390,6 +3401,13 @@ class Life:
             "message": text.strip(),
             "time": at,
             "location": catalog.location_name(state.location_id),
+            "ambient_presence": vars_for(
+                ambient_population(
+                    catalog,
+                    state.simulated_at,
+                    _latest_weather(history),
+                )[state.location_id]
+            ),
             "mood": mood_name(state.energy, state.valence, state.arousal),
             "recent_dialogue": [
                 {

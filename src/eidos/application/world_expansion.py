@@ -81,6 +81,11 @@ async def expanding_world_events(
             expected_revision=actual_revision + len(output) + 2,
         )
         if proposal.entity_kind.value == "person" and pathos_location_id is not None:
+            if pathos_location_id == "home":
+                raise ProposalRejected(
+                    "private_location",
+                    "A new resident cannot materialize inside Pathos's private home",
+                )
             proposal = replace(proposal, location_id=pathos_location_id)
     except (OSError, TimeoutError, TypeError, ValueError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
@@ -148,6 +153,22 @@ async def expanding_world_events(
             event for event in resolution.events if event.kind == "world.person_registered"
         )
         if pathos_location_id is not None:
+            materialized = DomainEvent(
+                "person.materialized_from_ambient_population",
+                "pathos",
+                {
+                    "person_id": proposal.entity_id,
+                    "registration_event_id": str(registered.event_id),
+                    "population_window_id": (
+                        f"{simulated_at.date().isoformat()}:{simulated_at.hour}:"
+                        f"{pathos_location_id}"
+                    ),
+                    "location_id": pathos_location_id,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=registered.event_id,
+                correlation_id=proposal.proposal_id,
+            )
             encounter = DomainEvent(
                 "npc.encountered",
                 "pathos",
@@ -159,11 +180,12 @@ async def expanding_world_events(
                     "source": "world-encounter",
                     "role": "moira_expansion",
                 },
-                causation_id=registered.event_id,
+                causation_id=materialized.event_id,
                 correlation_id=proposal.proposal_id,
             )
             output.extend(
                 (
+                    materialized,
                     encounter,
                     DomainEvent(
                         "memory.recorded",

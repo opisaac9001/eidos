@@ -28,6 +28,15 @@ for costlier generative planning. Detail is derived without growing the event lo
 the resident's actual actions, needs, plans, and consequences persist. The tiers are
 engine state, never Pathos knowledge.
 
+The town also has a cheap anonymous population layer. Public-place footfall varies
+deterministically with the hour, weekday, weather, and kind of place, but contains no
+names, person IDs, biographies, private needs, or memories. The world view can show
+that unrelated people are around; Pathos's model context receives only the aggregate
+presence at his current location. When Moira turns one of those possibilities into a
+new recurring resident, registration records the population window and immediately
+flows into a causal first encounter. A new person can never materialize inside
+Pathos's private home.
+
 The catalog is not Pathos's address book. Only direct encounters and Pathos-owned
 memories make a person available to his planning and recall. Newly generated residents
 are placed at Pathos's current location and registered together with their first causal

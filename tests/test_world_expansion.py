@@ -68,13 +68,31 @@ class WorldExpansionTests(unittest.TestCase):
             pathos_location_id="park",
         )
         registered = next(event for event in events if event.kind == "world.person_registered")
+        materialized = next(
+            event for event in events if event.kind == "person.materialized_from_ambient_population"
+        )
         encounter = next(event for event in events if event.kind == "npc.encountered")
         memory = next(event for event in events if event.kind == "memory.recorded")
         self.assertEqual(registered.payload["location_id"], "park")
         self.assertEqual(encounter.payload["person_id"], "sana-reed")
-        self.assertEqual(encounter.causation_id, registered.event_id)
+        self.assertEqual(materialized.causation_id, registered.event_id)
+        self.assertEqual(materialized.payload["location_id"], "park")
+        self.assertEqual(encounter.causation_id, materialized.event_id)
         self.assertEqual(memory.causation_id, encounter.event_id)
         self.assertEqual(memory.payload["person_id"], "sana-reed")
+
+    def test_a_new_person_cannot_appear_inside_pathos_private_home(self):
+        at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)
+
+        events = self.generate(
+            FixedGateway(self.candidate()),
+            at,
+            pathos_location_id="home",
+        )
+
+        failure = next(event for event in events if event.kind == "role.failed")
+        self.assertEqual(failure.payload["error_code"], "private_location")
+        self.assertFalse(any(event.kind == "world.person_registered" for event in events))
 
     def test_invalid_generation_is_audited_without_registering_anything(self):
         at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)
