@@ -240,7 +240,8 @@ const views = {
 let state = null,
   currentView = "observatory",
   selectedPlace = "home",
-  busy = false;
+  busy = false,
+  awaitingLiveReply = false;
 let lastMessageSignature = "",
   pendingChat = null,
   toastTimer,
@@ -982,7 +983,8 @@ function renderMessages() {
     if (pace.speakingUntil <= now) pacedReplies.delete(id);
   const paced = state.conversations.map((item) => pacedConversationItem(item, now));
   const conversations = paced.map((entry) => entry.item).filter(Boolean);
-  const waitingForPathos = paced.some((entry) => entry.phase === "thinking");
+  const waitingForPathos =
+    awaitingLiveReply || paced.some((entry) => entry.phase === "thinking");
   const pathosSpeaking = paced.some((entry) => entry.phase === "speaking");
   const signature = `${conversations.map((item) => `${item.id}:${item.text.length}`).join(":")}:${waitingForPathos}:${pathosSpeaking}`;
   if (signature === lastMessageSignature && $("messages").childElementCount)
@@ -1015,6 +1017,11 @@ function renderMessages() {
     $("delivery-note").textContent = "Pathos is thinking before he answers.";
   else if (pathosSpeaking)
     $("delivery-note").textContent = "Pathos is speaking.";
+  $("send").disabled =
+    busy ||
+    waitingForPathos ||
+    pathosSpeaking ||
+    state.communication?.status === "interrupted";
 }
 
 function render(next) {
@@ -1524,11 +1531,19 @@ $("chat-form").addEventListener("submit", async (event) => {
   if (!text) return;
   if (!pendingChat || pendingChat.text !== text)
     pendingChat = { text, request_id: crypto.randomUUID() };
+  const wasLive = state?.communication?.status === "in_conversation";
+  awaitingLiveReply = Boolean(wasLive);
   $("send").textContent = "Sending…";
-  if (await mutate("/api/chat", pendingChat, Date.now())) {
-    $("message").value = "";
-    pendingChat = null;
-    $("message").focus();
+  if (awaitingLiveReply) renderMessages();
+  try {
+    if (await mutate("/api/chat", pendingChat, Date.now())) {
+      $("message").value = "";
+      pendingChat = null;
+      $("message").focus();
+    }
+  } finally {
+    awaitingLiveReply = false;
+    renderMessages();
   }
   $("send").textContent =
     state?.communication?.status === "in_conversation" ? "Speak ↗" : "Send ↗";

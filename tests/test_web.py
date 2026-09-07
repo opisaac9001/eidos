@@ -367,6 +367,11 @@ class WebTests(unittest.TestCase):
         self.assertGreater(snapshot["conversations"][-1]["pacing_remaining_seconds"], 0)
         self.assertEqual(len(self.pacing_sleeps), 1)
         self.assertGreaterEqual(self.pacing_sleeps[0], 1.5)
+        status, body = self.request(
+            "POST", "/api/chat", {"text": "And one more thing", "request_id": "http-live-2"}
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"], "Pathos is still speaking")
         status, body = self.request("POST", "/api/visit/end", {"request_id": "http-leave-1"})
         self.assertEqual(status, 200)
         self.assertIsNone(json.loads(body)["communication"]["live_scene_id"])

@@ -297,8 +297,10 @@ the actual accepted words. Fast inference does not make the reply appear superhu
 fast: the local runtime keeps it private behind a visible listening/thinking beat, then
 shares a wall-clock speech interval during which every client reveals the accepted text
 at roughly 2.4 words per second. Refreshing or opening another view cannot skip that
-interval. Genuinely slow inference consumes the thought interval naturally rather than
-adding it a second time, while its eventual words still unfold at speaking pace.
+interval, and another turn cannot be submitted while those words are still being spoken.
+The browser shows the thinking state while inference is still running. Genuinely slow
+inference consumes the thought interval naturally rather than adding it a second time,
+while its eventual words still unfold at speaking pace.
 Older saved worlds retain their valid five/ten/fifteen-minute conversation records.
 The UI shows cumulative time and a near-term routine or calendar obligation. Crossing
 an hour runs the ordinary life loop, so a long visit can encounter

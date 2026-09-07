@@ -210,6 +210,16 @@ class Runtime:
         self.last_wall_tick = speech_started
         return remaining
 
+    def live_reply_in_progress(self) -> bool:
+        """Keep all clients from talking over a reply that is still being spoken."""
+        now = self.clock()
+        expired = [
+            message_id for message_id, ends_at in self.live_reply_speech.items() if ends_at <= now
+        ]
+        for message_id in expired:
+            self.live_reply_speech.pop(message_id, None)
+        return bool(self.live_reply_speech)
+
     def snapshot(self) -> dict[str, Any]:
         if self.lock.acquire(blocking=False):
             try:
@@ -436,6 +446,8 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         request_id = body.get("request_id")
                         if not isinstance(text_value, str) or not isinstance(request_id, str):
                             raise ValueError("Chat text and request ID must be strings")
+                        if runtime.live_reply_in_progress():
+                            raise ValueError("Pathos is still speaking")
                         previous_message_ids = {
                             str(item["id"])
                             for item in runtime.life.snapshot().get("conversations", [])
