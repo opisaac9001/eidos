@@ -124,6 +124,8 @@ class CognitiveWorkspaceTests(unittest.TestCase):
         dream = next(item for item in workspace if item["kind"] == "dream_inspiration")
         self.assertEqual(len(workspace), 4)
         self.assertEqual(dream["source_event_id"], str(inspiration.event_id))
+        self.assertEqual(dream["source_dream_id"], "dream-growth")
+        self.assertEqual(dream["motif"], "growth")
         self.assertEqual(dream["epistemic_status"], "fiction_sourced_possibility")
         self.assertFalse(dream["action_authority"])
 

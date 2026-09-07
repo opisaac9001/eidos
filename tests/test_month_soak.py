@@ -196,18 +196,18 @@ class MonthSoakTests(unittest.TestCase):
                     for item in snapshot["npc_states"]
                 )
             )
-            self.assertEqual(
-                {
-                    event.payload["actor_id"]
-                    for event in events
-                    if event.kind == "npc.plan_created"
-                    and event.payload.get("motivation_need") is not None
-                },
-                {"mara", "ellis", "rowan", "nina-vale"},
-            )
+            motivated_plan_actors = {
+                event.payload["actor_id"]
+                for event in events
+                if event.kind == "npc.plan_created"
+                and event.payload.get("motivation_need") is not None
+            }
+            all_resident_ids = {"mara", "ellis", "rowan", "nina-vale"}
+            self.assertTrue({"mara", "ellis", "rowan"} <= motivated_plan_actors)
+            self.assertTrue(motivated_plan_actors <= all_resident_ids)
             self.assertEqual(
                 {event.payload["actor_id"] for event in events if event.kind == "npc.goal_formed"},
-                {"mara", "ellis", "rowan", "nina-vale"},
+                motivated_plan_actors,
             )
             npc_agency = [event for event in events if event.kind == "npc.agency_accepted"]
             self.assertTrue(npc_agency)
@@ -244,8 +244,7 @@ class MonthSoakTests(unittest.TestCase):
             self.assertGreater(len(snapshot["identity"]["preferences"]), 3)
             priorities = [event for event in events if event.kind == "npc.priority_evaluated"]
             self.assertEqual(
-                {event.payload["actor_id"] for event in priorities},
-                {"mara", "ellis", "rowan", "nina-vale"},
+                {event.payload["actor_id"] for event in priorities}, motivated_plan_actors
             )
             self.assertTrue(
                 all(

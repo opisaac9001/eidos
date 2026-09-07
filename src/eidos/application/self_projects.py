@@ -9,6 +9,7 @@ from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.dream_planning import dream_planning_workspace, dream_project_link_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
@@ -75,6 +76,7 @@ async def autonomous_project_events(
         for place in catalog.places.values()
     }
     attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
+    planning_workspace = dream_planning_workspace(history, workspace, simulated_at)
     context = {
         "time": simulated_at.isoformat(),
         "needs": dict(needs),
@@ -87,11 +89,7 @@ async def autonomous_project_events(
         "self_concepts": list(self_concepts[-4:]),
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
-        # Multi-step project lineage is separate work; dream possibilities may
-        # influence only the auditable one-activity path for now.
-        "cognitive_workspace": [
-            item for item in workspace[-12:] if item.get("kind") != "dream_inspiration"
-        ],
+        "cognitive_workspace": list(planning_workspace[-12:]),
         "current_attention": (
             {
                 "focus_type": attention.focus_type,
@@ -116,7 +114,9 @@ async def autonomous_project_events(
         ],
         "permission": (
             "Invent one coherent two-to-four-step ordinary project. Let his current attention "
-            "matter without treating it as a command. Habits are soft rhythms that may be "
+            "matter without treating it as a command. A dream inspiration is a temporary "
+            "fiction-sourced possibility, never evidence, action authority, or a promised outcome. "
+            "Habits are soft rhythms that may be "
             "continued, varied, or deliberately broken. Skills are demonstrated capability, not "
             "permission or guaranteed success; rusty ability can support a modest refresher. Each step must be "
             "distinct and chronological. Propose only: do not claim progress, spend money, "
@@ -125,7 +125,7 @@ async def autonomous_project_events(
     }
     request = ModelRequest(
         capability="pathos_project",
-        task_version="3",
+        task_version="4",
         temperature=0.9,
         max_output_tokens=520,
         output_schema=self_project_output_schema(list(places), list(resources)),
@@ -197,6 +197,9 @@ async def autonomous_project_events(
         simulated_at=simulated_at,
     )
     output.extend(resolution.events)
+    output.extend(
+        dream_project_link_events(history, planning_workspace, resolution.events, simulated_at)
+    )
     return output
 
 

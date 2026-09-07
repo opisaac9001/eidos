@@ -33,7 +33,10 @@ from eidos.application.development import (
     development_events,
     effective_capability,
 )
-from eidos.application.dream_planning import dream_plan_outcome_events
+from eidos.application.dream_planning import (
+    dream_plan_outcome_events,
+    dream_project_outcome_events,
+)
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
@@ -781,6 +784,9 @@ class Life:
                 "dream.inspiration_plan_linked",
                 "dream.inspiration_plan_realized",
                 "dream.inspiration_plan_failed",
+                "dream.inspiration_project_linked",
+                "dream.inspiration_project_realized",
+                "dream.inspiration_project_failed",
                 "dream.inspiration_dismissed",
                 "day.summarized",
                 "request.made",
@@ -2714,6 +2720,7 @@ class Life:
                 self._planning(history + pending + scheduled_activity)
                 pending.extend(scheduled_activity)
                 pending.extend(dream_plan_outcome_events(history + pending, current))
+                pending.extend(dream_project_outcome_events(history + pending, current))
                 for realized in (
                     event
                     for event in scheduled_activity

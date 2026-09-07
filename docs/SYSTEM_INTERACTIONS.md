@@ -513,7 +513,13 @@ claim cannot manufacture recovery.
 6. On waking, select full/partial/no recalled dream and bounded emotional residue.
    Store dream recall separately from factual memory. Residue decays over time.
 7. Murmur or reflection may associate a fragment with an existing concern.
-8. Pathos may reconsider an intention; ordinary planning and action rules still apply.
+8. An active fragment may resemble an ordinary activity or modest multi-step project
+   Pathos independently proposes. The activity feasibility or atomic project resolver
+   must still accept it; the dream has no action authority.
+9. A linked activity closes on its realized/missed outcome. A linked project closes only
+   when the whole project completes or fails, retaining the accepted proposal, goal and
+   dream source in its lineage. One such influence starts a shared two-week cooldown.
+10. Pathos may reconsider an intention; ordinary planning and action rules still apply.
 
 Emotional effects need source IDs, magnitude caps, decay and a per-cycle budget.
 Do not let a dream increase a memory's importance, which causes the same dream,

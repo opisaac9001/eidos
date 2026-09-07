@@ -1026,8 +1026,86 @@ class StandInGateway(ModelGateway):
                         ),
                     ),
                 ),
+                (
+                    "seasonal_growth_notebook",
+                    "Keep a small notebook of seasonal growth",
+                    "Notice how ordinary outdoor growth changes across several days.",
+                    (
+                        (
+                            "growth_walk_notes",
+                            "Record signs of growth in Willow Square",
+                            "attend",
+                            "park",
+                            1,
+                        ),
+                        (
+                            "growth_pattern_study",
+                            "Compare the shapes and patterns in the notes",
+                            "learn",
+                            "cafe",
+                            3,
+                        ),
+                        (
+                            "growth_notebook_draft",
+                            "Assemble the seasonal growth notebook",
+                            "work",
+                            "home",
+                            5,
+                        ),
+                    ),
+                ),
+                (
+                    "shared_question_booklet",
+                    "Make a booklet of questions worth sharing",
+                    "Give companionship room to grow through ordinary future conversations.",
+                    (
+                        (
+                            "conversation_question_notes",
+                            "Collect questions prompted by life in the square",
+                            "attend",
+                            "park",
+                            1,
+                        ),
+                        (
+                            "shared_question_review",
+                            "Review which questions invite a conversation",
+                            "learn",
+                            "cafe",
+                            3,
+                        ),
+                        (
+                            "question_booklet_draft",
+                            "Draft the questions into a small booklet",
+                            "work",
+                            "home",
+                            5,
+                        ),
+                    ),
+                ),
             )
-            project = projects[choice % len(projects)]
+            dream_possibility = next(
+                (
+                    item
+                    for item in context.get("cognitive_workspace", [])
+                    if isinstance(item, dict)
+                    and item.get("kind") == "dream_inspiration"
+                    and item.get("epistemic_status") == "fiction_sourced_possibility"
+                    and item.get("action_authority") is False
+                ),
+                None,
+            )
+            dream_motif = (
+                str(dream_possibility.get("motif", "")) if dream_possibility is not None else ""
+            )
+            project = projects[
+                {
+                    "light": 2,
+                    "mending": 1,
+                    "growth": 3,
+                    "companionship": 4,
+                    "unfinished_time": 0,
+                }.get(dream_motif, choice % 3)
+            ]
             known_places = context["known_places"]
             steps = [
                 {

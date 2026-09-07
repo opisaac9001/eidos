@@ -1,7 +1,7 @@
 import asyncio
 import json
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.scheduled_activity import scheduled_activity_events
@@ -190,6 +190,58 @@ class SelfProjectTests(unittest.TestCase):
         )
         self.assertIn("self_project.accepted", [event.kind for event in events])
         self.assertEqual(sum(event.kind == "schedule.created" for event in events), 3)
+
+    def test_stand_in_dream_project_still_needs_the_ordinary_project_resolver(self):
+        inspiration = DomainEvent(
+            "dream.inspiration_considered",
+            "pathos",
+            {
+                "source_dream_id": "dream-growth",
+                "motif": "growth",
+                "suggestion": "Consider following some small sign of outdoor growth.",
+                "expires_at": (self.now + timedelta(hours=2)).isoformat(),
+                "fiction_source": True,
+                "action_authority": False,
+                "simulated_at": (self.now - timedelta(hours=1)).isoformat(),
+            },
+        )
+        workspace = [
+            {
+                "source_event_id": str(inspiration.event_id),
+                "source_dream_id": "dream-growth",
+                "motif": "growth",
+                "kind": "dream_inspiration",
+                "epistemic_status": "fiction_sourced_possibility",
+                "action_authority": False,
+                "content": inspiration.payload["suggestion"],
+            }
+        ]
+
+        events = asyncio.run(
+            autonomous_project_events(
+                [inspiration],
+                self.now,
+                1,
+                StandInGateway(),
+                planning=PlanningState(),
+                catalog=project_world_catalog([]),
+                needs={"curiosity": 0.8, "mastery": 0.5},
+                emotion={"label": "quiet"},
+                values={"curiosity": 0.8},
+                preferences=(),
+                traits={"openness": 0.68},
+                memories=(),
+                workspace=workspace,
+            )
+        )
+
+        proposed = next(event for event in events if event.kind == "self_project.proposed")
+        accepted = next(event for event in events if event.kind == "self_project.accepted")
+        linked = next(event for event in events if event.kind == "dream.inspiration_project_linked")
+        self.assertEqual(proposed.payload["project_type"], "seasonal_growth_notebook")
+        self.assertEqual(linked.causation_id, accepted.event_id)
+        self.assertEqual(sum(event.kind == "schedule.created" for event in events), 3)
+        self.assertFalse(linked.payload["action_authority"])
 
 
 if __name__ == "__main__":

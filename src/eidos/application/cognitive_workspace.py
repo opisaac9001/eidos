@@ -133,18 +133,19 @@ def cognitive_workspace(
         created_at = _event_time(source)
         if created_at is None:
             continue
-        candidates.append(
-            _candidate(
-                source,
-                "oneiros",
-                "dream_inspiration",
-                inspiration.suggestion,
-                "fiction_sourced_possibility",
-                0.58,
-                created_at,
-                simulated_at,
-            )
+        candidate = _candidate(
+            source,
+            "oneiros",
+            "dream_inspiration",
+            inspiration.suggestion,
+            "fiction_sourced_possibility",
+            0.58,
+            created_at,
+            simulated_at,
         )
+        candidate[2]["source_dream_id"] = inspiration.source_dream_id
+        candidate[2]["motif"] = inspiration.motif
+        candidates.append(candidate)
 
     candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
     selected: list[dict[str, object]] = []

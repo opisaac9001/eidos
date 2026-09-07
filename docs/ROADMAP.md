@@ -349,10 +349,12 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   Record seed IDs, symbolic transformations, recurring motifs and intensity limits.
 - Permit mundane dreams, nightmares and no recalled dream. Avoid forced profoundness.
 - Waking carries limited, decaying affect and partially recalled fragments. An active
-  dream possibility may shape an aligned activity proposal, but only the ordinary
-  feasibility resolver can accept it. The plan and its later success or failure retain
-  explicit dream lineage while dream fiction remains neither evidence nor action authority.
-  A two-week influence cooldown keeps repeated motifs from crowding out ordinary motives.
+  dream possibility may shape an aligned activity or multi-step project proposal, but
+  only the ordinary feasibility resolver can accept it. The activity or project and its
+  later terminal outcome retain explicit dream lineage while dream fiction remains
+  neither evidence nor action authority. Project steps still need valid time, travel,
+  place, resource and intention checks. A shared two-week influence cooldown keeps
+  repeated motifs from crowding out ordinary motives.
 - Opposed recent appraisals now survive as source-linked mixed emotion rather than
   cancelling into a deceptively neutral label. Complexity modestly slows initiative,
   pace and risk. Rate-limited regulation can lower arousal or protect a sleep intention,

@@ -212,6 +212,9 @@ const labels = {
   "dream.inspiration_plan_linked": "A DREAM POSSIBILITY ENTERED PLANNING",
   "dream.inspiration_plan_realized": "A DREAM-LINKED IDEA WAS LIVED",
   "dream.inspiration_plan_failed": "A DREAM-LINKED PLAN FELL THROUGH",
+  "dream.inspiration_project_linked": "A DREAM POSSIBILITY SHAPED A PROJECT",
+  "dream.inspiration_project_realized": "A DREAM-LINKED PROJECT WAS COMPLETED",
+  "dream.inspiration_project_failed": "A DREAM-LINKED PROJECT FELL APART",
   "dream.inspiration_dismissed": "A DREAM POSSIBILITY LEFT ATTENTION",
 };
 const views = {
