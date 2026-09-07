@@ -24,7 +24,12 @@ from eidos.application.character_generation import generated_character_history_e
 from eidos.application.cognition import perform, request_for
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
-from eidos.application.development import active_habit_context, development_events
+from eidos.application.development import (
+    active_habit_context,
+    active_skill_context,
+    development_events,
+    effective_capability,
+)
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
@@ -842,6 +847,7 @@ class Life:
                 "social.preference_faded",
                 "conversation.time_elapsed",
                 "skill.practiced",
+                "skill.rusted",
                 "habit.formed",
                 "habit.reinforced",
                 "habit.lapsed",
@@ -1481,6 +1487,7 @@ class Life:
                 self_concept_context(project_history) if planning_memory_due else []
             )
             habit_context = active_habit_context(project_history) if planning_memory_due else []
+            skill_context = active_skill_context(project_history) if planning_memory_due else []
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1515,6 +1522,7 @@ class Life:
                 memories=recent_memory_context,
                 semantic_expectations=semantic_context,
                 self_concepts=self_story_context,
+                skills=skill_context,
                 habits=habit_context,
             )
             if project_events:
@@ -1558,6 +1566,7 @@ class Life:
                 memories=recent_memory_context,
                 semantic_expectations=semantic_context,
                 self_concepts=self_story_context,
+                skills=skill_context,
                 habits=habit_context,
                 known_person_ids=pathos_known_person_ids(agency_history),
             )
@@ -2423,7 +2432,7 @@ class Life:
                 actor_location_id=state.location_id,
                 simulated_at=current,
                 actual_revision=len(history) + len(pending),
-                repair_mastery=state.mastery,
+                repair_mastery=effective_capability(history + pending, "repair", state.mastery),
                 actor_locations={
                     person_id: person.location_id
                     for person_id, person in project_npcs(history + pending, current).people.items()
@@ -2445,7 +2454,7 @@ class Life:
                 current,
                 self._planning(history + pending),
                 self._world_catalog(history + pending),
-                mastery=state.mastery,
+                mastery=effective_capability(history + pending, "repair", state.mastery),
                 values=project_identity(history + pending).values,
             )
             if maintenance:

@@ -38,6 +38,7 @@ async def autonomous_project_events(
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
     self_concepts: Sequence[Mapping[str, object]] = (),
+    skills: Sequence[Mapping[str, object]] = (),
     habits: Sequence[Mapping[str, object]] = (),
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
@@ -83,6 +84,7 @@ async def autonomous_project_events(
         "recent_memories": list(memories[-10:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
+        "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
         "current_attention": (
             {
@@ -109,7 +111,8 @@ async def autonomous_project_events(
         "permission": (
             "Invent one coherent two-to-four-step ordinary project. Let his current attention "
             "matter without treating it as a command. Habits are soft rhythms that may be "
-            "continued, varied, or deliberately broken. Each step must be "
+            "continued, varied, or deliberately broken. Skills are demonstrated capability, not "
+            "permission or guaranteed success; rusty ability can support a modest refresher. Each step must be "
             "distinct and chronological. Propose only: do not claim progress, spend money, "
             "create possessions, or guarantee success."
         ),

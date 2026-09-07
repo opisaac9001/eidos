@@ -5,35 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#111512" />
     <title>Eidos · A life unfolding</title>
-    <link rel="stylesheet" href="/style.css" />
-    <script src="/app.js?v=20260906-1" defer></script>
+    <link rel="stylesheet" href="/style.css?v=20260906-2" />
+    <script src="/app.js?v=20260906-2" defer></script>
   </head>
   <body>
     <aside class="sidebar">
-      <a class="brand" href="#observatory"
+      <a class="brand" href="#conversation"
         ><span class="brand-mark">e</span> eidos<span class="edition"
           >/ 01</span
         ></a
       >
       <div class="sidebar-label">A LIFE UNFOLDING</div>
       <nav aria-label="Main navigation">
-        <button class="nav active" data-view="observatory">
-          <span>◉</span> Observatory <span class="nav-index">01</span>
+        <button class="nav" data-view="observatory">
+          <span aria-hidden="true">◉</span> Now
+          <span class="nav-index">01</span>
+        </button>
+        <button class="nav active" data-view="conversation">
+          <span aria-hidden="true">◌</span> Talk
+          <span class="nav-index">02</span>
         </button>
         <button class="nav" data-view="world">
-          <span>⌘</span> The world <span class="nav-index">02</span>
-        </button>
-        <button class="nav" data-view="conversation">
-          <span>◌</span> Conversation <span class="nav-index">03</span>
+          <span aria-hidden="true">⌘</span> His world
+          <span class="nav-index">03</span>
         </button>
         <button class="nav" data-view="memories">
-          <span>▤</span> Memory archive <span class="nav-index">04</span>
+          <span aria-hidden="true">▤</span> Memories
+          <span class="nav-index">04</span>
         </button>
-        <button class="nav" data-view="plans">
-          <span>⌁</span> Plans & time <span class="nav-index">05</span>
+        <button class="nav" data-view="plans" data-operator-only hidden>
+          <span aria-hidden="true">⌁</span> Plans & time
+          <span class="nav-index">05</span>
         </button>
-        <button class="nav" data-view="engine">
-          <span>⏣</span> The ensemble <span class="nav-index">06</span>
+        <button class="nav" data-view="engine" data-operator-only hidden>
+          <span aria-hidden="true">⏣</span> The ensemble
+          <span class="nav-index">06</span>
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -62,7 +68,7 @@
       <div class="page-head">
         <div>
           <div class="eyebrow" id="page-eyebrow">THE PRESENT MOMENT</div>
-          <h1 id="page-title">A life in motion.</h1>
+          <h1 id="page-title" tabindex="-1">A life in motion.</h1>
           <p class="mobile-mode">Stand-in performers · saved locally</p>
         </div>
         <div class="controls" data-operator-only hidden>
@@ -73,7 +79,8 @@
             <option value="60">1 hour / tick</option></select
           ><button id="step" class="button quiet">+1 hour</button
           ><button id="catch-up" class="button quiet">Let a day pass</button
-          ><button id="cancel-catch-up" class="button quiet" hidden>Cancel catch-up</button
+          ><button id="cancel-catch-up" class="button quiet" hidden>
+            Cancel catch-up</button
           ><button id="play" class="button primary" disabled>
             Resume world <span>▷</span>
           </button>
@@ -119,17 +126,43 @@
             <div class="vital-label">
               <span>Energy</span><span id="energy-value">—</span>
             </div>
-            <div class="meter"><span id="energy-meter"></span></div>
+            <div
+              class="meter"
+              role="meter"
+              aria-label="Energy"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span id="energy-meter"></span>
+            </div>
             <div class="vital-label">
               <span>Emotional tone</span><span id="valence-value">—</span>
             </div>
-            <div class="meter tone"><span id="valence-meter"></span></div>
+            <div
+              class="meter tone"
+              role="meter"
+              aria-label="Emotional tone"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span id="valence-meter"></span>
+            </div>
             <div class="vital-label">
               <span>Arousal</span><span id="arousal-value">—</span>
             </div>
-            <div class="meter"><span id="arousal-meter"></span></div>
+            <div
+              class="meter"
+              role="meter"
+              aria-label="Arousal"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span id="arousal-meter"></span>
+            </div>
             <div id="affect-source" class="vitals-note"></div>
-            <div id="needs-summary" class="vitals-note">Needs are gathering context…</div>
+            <div id="needs-summary" class="vitals-note">
+              Needs are gathering context…
+            </div>
             <div id="preferences-summary" class="vitals-note">
               Preferences are still taking shape…
             </div>
@@ -200,7 +233,9 @@
         </div>
         <div class="section-heading">
           <h2>What is unfolding</h2>
-          <span>Neighborhood events can continue after their opening moment</span>
+          <span
+            >Neighborhood events can continue after their opening moment</span
+          >
         </div>
         <div id="world-threads" class="people-grid"></div>
         <div id="world-pack-section" hidden>
@@ -227,14 +262,34 @@
           <article class="panel chat-panel">
             <div class="panel-kicker">
               <span><i class="dot amber"></i> A CONVERSATION WITH PATHOS</span
-              ><span id="chat-availability" class="small-tag">CHECKING AVAILABILITY</span>
+              ><span id="chat-availability" class="small-tag"
+                >CHECKING AVAILABILITY</span
+              >
             </div>
+            <p
+              id="chat-presence-note"
+              class="chat-presence-note"
+              aria-live="polite"
+            >
+              Finding out whether he can talk…
+            </p>
             <div
               id="messages"
               class="messages"
               role="log"
               aria-label="Conversation history"
             ></div>
+            <details class="chat-settings">
+              <summary>Message settings</summary>
+              <label class="context-note"
+                ><input id="outreach-toggle" type="checkbox" /> Let Pathos send
+                occasional in-app messages</label
+              >
+              <p class="context-note">
+                Off by default · no external notifications · quiet from
+                22:00–08:00
+              </p>
+            </details>
             <form id="chat-form">
               <label for="message" class="sr-only">Your message to Pathos</label
               ><textarea
@@ -245,10 +300,22 @@
                 required
               ></textarea>
               <div class="compose-footer">
-                <span id="delivery-note">Messages are delivered; replies may take time.</span
-                ><span><button id="visit" class="button quiet" type="button">Sit down and talk</button
-                ><button id="end-visit" class="button quiet" type="button" hidden>Leave conversation</button
-                ><button id="send" class="button primary" type="submit">Send ↗</button></span>
+                <span id="delivery-note"
+                  >Messages are delivered; replies may take time.</span
+                ><span
+                  ><button id="visit" class="button quiet" type="button">
+                    Sit down and talk</button
+                  ><button
+                    id="end-visit"
+                    class="button quiet"
+                    type="button"
+                    hidden
+                  >
+                    Leave conversation</button
+                  ><button id="send" class="button primary" type="submit">
+                    Send ↗
+                  </button></span
+                >
               </div>
             </form>
           </article>
@@ -257,13 +324,6 @@
             <h2 id="chat-context-mood"></h2>
             <p id="chat-context-location"></p>
             <p id="chat-context-availability" class="context-note"></p>
-            <label class="context-note"
-              ><input id="outreach-toggle" type="checkbox" /> Let Pathos send
-              occasional in-app messages</label
-            >
-            <p class="context-note">
-              Off by default · no external notifications · quiet from 22:00–08:00
-            </p>
             <hr />
             <div class="eyebrow">RECENT EXPERIENCES</div>
             <div id="chat-memories"></div>
@@ -273,7 +333,7 @@
             <hr />
             <div class="eyebrow">WHAT HE REMEMBERS ABOUT YOU</div>
             <div id="user-preferences"></div>
-            <div class="context-note">
+            <div id="chat-disclosure" class="context-note">
               This voice uses templates and recorded context. It won't
               understand arbitrary requests yet, but conversations and memories
               persist.
@@ -336,12 +396,16 @@
           <div id="calendar-list" class="memory-list"></div>
         </article>
         <article class="panel">
-          <div class="panel-kicker">HOUSEHOLD MONEY <span>REAL CONSTRAINTS</span></div>
+          <div class="panel-kicker">
+            HOUSEHOLD MONEY <span>REAL CONSTRAINTS</span>
+          </div>
           <h2 id="finance-balance">£0.00 available</h2>
           <div id="finance-list" class="memory-list"></div>
         </article>
         <article class="panel">
-          <div class="panel-kicker">CHANGES & CONFLICTS <span>AUDIT TRAIL</span></div>
+          <div class="panel-kicker">
+            CHANGES & CONFLICTS <span>AUDIT TRAIL</span>
+          </div>
           <div id="plan-change-list" class="feed expanded"></div>
         </article>
       </section>

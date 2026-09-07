@@ -16,6 +16,11 @@ class Skill:
     level: float
     practice_count: int
     last_source_id: str
+    status: str = "active"
+    revision: int = 1
+    updated_at: str | None = None
+    last_practiced_at: str | None = None
+    rust_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +56,7 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
     for event in history:
         if event.kind not in {
             "skill.practiced",
+            "skill.rusted",
             "habit.formed",
             "habit.reinforced",
             "habit.lapsed",
@@ -59,8 +65,38 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
         }:
             seen[str(event.event_id)] = event
             continue
+        if event.kind.startswith("skill.") and event.aggregate_id != "pathos":
+            raise ValueError("Skills belong to Pathos")
         if event.kind.startswith("habit.") and event.aggregate_id != "pathos":
             raise ValueError("Habits belong to Pathos")
+        if event.kind == "skill.rusted":
+            skill_id = _required(event, "skill_id")
+            current_skill = skills.get(skill_id)
+            if current_skill is None or current_skill.last_practiced_at is None:
+                raise ValueError("Only a source-linked skill can become rusty")
+            revision = _integer(event, "revision")
+            if revision != current_skill.revision + 1:
+                raise ValueError("Skill revision must be sequential")
+            changed_at = _time(event, "simulated_at")
+            last_practiced = _parsed(current_skill.last_practiced_at)
+            previous_update = _parsed(current_skill.updated_at)
+            if last_practiced is None or changed_at - last_practiced < timedelta(days=90):
+                raise ValueError("A skill cannot rust before ninety days of disuse")
+            if previous_update is None or changed_at - previous_update < timedelta(days=30):
+                raise ValueError("Skill rust changes must be at least thirty days apart")
+            amount = _bounded(event, "amount", 0.0, 0.05)
+            if amount != 0.03:
+                raise ValueError("Skill rust uses the bounded monthly amount")
+            skills[skill_id] = replace(
+                current_skill,
+                level=round(max(0.1, current_skill.level - amount), 4),
+                status="rusty",
+                revision=revision,
+                updated_at=changed_at.isoformat(),
+                rust_count=current_skill.rust_count + 1,
+            )
+            seen[str(event.event_id)] = event
+            continue
         if event.kind == "habit.lapsed":
             habit_id = _required(event, "habit_id")
             current_habit = habits.get(habit_id)
@@ -150,6 +186,9 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
         )
         if event.kind in {"habit.formed", "habit.reactivated"} and not rich_habit:
             raise ValueError("Contextual habit events require their lived signature")
+        rich_skill = event.kind == "skill.practiced" and isinstance(
+            event.payload.get("revision"), int
+        )
         if source_id in used_sources and not rich_habit:
             raise ValueError("Development evidence cannot be applied twice")
         if not rich_habit:
@@ -158,16 +197,47 @@ def project_development(history: Sequence[DomainEvent]) -> DevelopmentState:
         if event.kind == "skill.practiced":
             skill_id = _required(event, "skill_id")
             current = skills.get(skill_id)
-            skills[skill_id] = (
-                Skill(skill_id, min(1.0, 0.25 + delta), 1, source_id)
-                if current is None
-                else replace(
-                    current,
-                    level=min(1.0, current.level + delta),
-                    practice_count=current.practice_count + 1,
-                    last_source_id=source_id,
+            if not rich_skill:
+                skills[skill_id] = (
+                    Skill(skill_id, min(1.0, 0.25 + delta), 1, source_id)
+                    if current is None
+                    else replace(
+                        current,
+                        level=min(1.0, current.level + delta),
+                        practice_count=current.practice_count + 1,
+                        last_source_id=source_id,
+                    )
                 )
-            )
+            else:
+                source = seen.get(source_id)
+                if source is None or _skill_signature(source) != skill_id:
+                    raise ValueError("Skill practice must derive from matching lived evidence")
+                revision = _integer(event, "revision")
+                if revision != (1 if current is None else current.revision + 1):
+                    raise ValueError("Skill revision must be sequential")
+                practiced_at = _time(event, "practiced_at")
+                changed_at = _time(event, "simulated_at")
+                source_at = _event_time_if_present(source)
+                if source_at is not None and source_at != practiced_at:
+                    raise ValueError("Skill practice time must match its lived evidence")
+                if practiced_at > changed_at:
+                    raise ValueError("Skill practice cannot come from the future")
+                previous_practice = _parsed(current.last_practiced_at) if current else None
+                if previous_practice is not None and practiced_at <= previous_practice:
+                    raise ValueError("Skill practice must be newer than prior evidence")
+                if delta != _skill_delta(current.level if current else None):
+                    raise ValueError("Skill growth must follow the bounded learning curve")
+                skills[skill_id] = Skill(
+                    skill_id=skill_id,
+                    level=round(min(1.0, (0.25 if current is None else current.level) + delta), 4),
+                    practice_count=(0 if current is None else current.practice_count) + 1,
+                    last_source_id=source_id,
+                    status="active",
+                    revision=revision,
+                    updated_at=changed_at.isoformat(),
+                    last_practiced_at=practiced_at.isoformat(),
+                    rust_count=0 if current is None else current.rust_count,
+                )
         elif not rich_habit:
             habit_id = _required(event, "habit_id")
             current_habit = habits.get(habit_id)
@@ -340,3 +410,40 @@ def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
         return None
     band = "morning" if at.hour < 12 else "afternoon" if at.hour < 18 else "evening"
     return activity_type, location_id, band
+
+
+def _skill_signature(event: DomainEvent) -> str | None:
+    if event.aggregate_id != "pathos":
+        return None
+    if event.kind == "action.accepted" and event.payload.get("action") == "repair":
+        return "repair"
+    if event.kind == "object.repair_attempted":
+        return "repair"
+    if (
+        event.kind == "activity.completed"
+        and event.payload.get("activity") == "learn"
+        and event.payload.get("target_id") == "bookbinding-basics"
+    ):
+        return "bookbinding"
+    if event.kind == "agency.activity_realized" and event.payload.get("action") == "learn":
+        activity_type = event.payload.get("activity_type")
+        return activity_type if isinstance(activity_type, str) and activity_type else None
+    return None
+
+
+def _event_time_if_present(event: DomainEvent) -> datetime | None:
+    value = event.payload.get("simulated_at")
+    if not isinstance(value, str):
+        return None
+    parsed = datetime.fromisoformat(value)
+    if parsed.utcoffset() is None:
+        raise ValueError("Skill evidence time must be timezone-aware")
+    return parsed
+
+
+def _skill_delta(level: float | None) -> float:
+    if level is None or level < 0.5:
+        return 0.05
+    if level < 0.75:
+        return 0.03
+    return 0.015

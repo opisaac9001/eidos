@@ -3,8 +3,10 @@ from datetime import datetime, timedelta, timezone
 
 from eidos.application.development import (
     active_habit_context,
+    active_skill_context,
     behavioral_habit_events,
     development_events,
+    effective_capability,
 )
 from eidos.domain.development import project_development
 from eidos.domain.events import DomainEvent
@@ -28,6 +30,18 @@ class DevelopmentTests(unittest.TestCase):
                 "location_id": location_id,
                 "action": "attend",
                 "simulated_at": (self.start + timedelta(days=day, hours=hour - 9)).isoformat(),
+            },
+        )
+
+    def learned(self, day: int, activity_type: str = "field_recording") -> DomainEvent:
+        return DomainEvent(
+            "agency.activity_realized",
+            "pathos",
+            {
+                "activity_type": activity_type,
+                "location_id": "park",
+                "action": "learn",
+                "simulated_at": (self.start + timedelta(days=day)).isoformat(),
             },
         )
 
@@ -66,6 +80,102 @@ class DevelopmentTests(unittest.TestCase):
         skill = project_development([activity, *events]).skills["bookbinding"]
         self.assertEqual(skill.practice_count, 1)
         self.assertEqual(events[0].causation_id, activity.event_id)
+
+    def test_realized_open_vocabulary_learning_builds_a_source_linked_skill(self):
+        source = self.learned(0)
+
+        events = development_events([source], self.start.isoformat())
+
+        self.assertEqual([event.kind for event in events], ["skill.practiced"])
+        self.assertEqual(events[0].payload["skill_id"], "field_recording")
+        self.assertEqual(events[0].payload["source_kind"], "agency.activity_realized")
+        skill = project_development([source, *events]).skills["field_recording"]
+        self.assertEqual((skill.level, skill.status, skill.revision), (0.3, "active", 1))
+        self.assertEqual(skill.last_practiced_at, self.start.isoformat())
+        context = active_skill_context([source, *events])
+        self.assertEqual(context[0]["authority"], "capability_signal_only")
+        self.assertEqual(effective_capability([source, *events], "field_recording", 0.6), 0.42)
+        self.assertEqual(effective_capability([source, *events], "sailing", 0.6), 0.6)
+        self.assertEqual(development_events([source, *events], self.start.isoformat()), [])
+
+    def test_skill_growth_slows_as_lived_practice_accumulates(self):
+        history: list[DomainEvent] = []
+        deltas: list[float] = []
+        for day in range(6):
+            source = self.learned(day)
+            history.append(source)
+            events = development_events(history, (self.start + timedelta(days=day)).isoformat())
+            practiced = next(event for event in events if event.kind == "skill.practiced")
+            deltas.append(float(practiced.payload["delta"]))
+            history.extend(events)
+
+        self.assertEqual(deltas, [0.05, 0.05, 0.05, 0.05, 0.05, 0.03])
+        skill = project_development(history).skills["field_recording"]
+        self.assertEqual((skill.level, skill.practice_count, skill.revision), (0.53, 6, 6))
+
+    def test_failed_physical_repair_attempt_still_provides_practice(self):
+        attempted_at = self.start + timedelta(hours=2)
+        attempt = DomainEvent(
+            "object.repair_attempted",
+            "pathos",
+            {"object_id": "lamp", "simulated_at": attempted_at.isoformat()},
+        )
+
+        events = development_events([attempt], attempted_at.isoformat())
+
+        self.assertEqual(events[0].payload["skill_id"], "repair")
+        self.assertEqual(events[0].causation_id, attempt.event_id)
+
+    def test_skill_rust_is_slow_bounded_and_reversible_through_new_practice(self):
+        source = self.learned(0)
+        practiced = development_events([source], self.start.isoformat())
+        history = [source, *practiced]
+        before = development_events(
+            history, (self.start.replace(hour=19) + timedelta(days=89)).isoformat()
+        )
+        self.assertNotIn("skill.rusted", [event.kind for event in before])
+
+        rusted = development_events(
+            history, (self.start.replace(hour=19) + timedelta(days=90)).isoformat()
+        )
+        self.assertEqual([event.kind for event in rusted], ["skill.rusted"])
+        rusty = project_development([*history, *rusted]).skills["field_recording"]
+        self.assertEqual((rusty.level, rusty.status, rusty.rust_count), (0.27, "rusty", 1))
+
+        refreshed_source = self.learned(91)
+        refreshed = development_events(
+            [*history, *rusted, refreshed_source],
+            (self.start + timedelta(days=91)).isoformat(),
+        )
+        current = project_development([*history, *rusted, refreshed_source, *refreshed]).skills[
+            "field_recording"
+        ]
+        self.assertEqual((current.level, current.status, current.rust_count), (0.32, "active", 1))
+        self.assertEqual(current.revision, 3)
+
+    def test_skill_projector_rejects_premature_rust_and_wrong_evidence(self):
+        source = self.learned(0)
+        practiced = development_events([source], self.start.isoformat())
+        premature = DomainEvent(
+            "skill.rusted",
+            "pathos",
+            {
+                "skill_id": "field_recording",
+                "revision": 2,
+                "amount": 0.03,
+                "simulated_at": (self.start + timedelta(days=30)).isoformat(),
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "ninety"):
+            project_development([source, *practiced, premature])
+
+        forged = DomainEvent(
+            "skill.practiced",
+            "pathos",
+            {**practiced[0].payload, "skill_id": "sailing"},
+        )
+        with self.assertRaisesRegex(ValueError, "matching lived evidence"):
+            project_development([source, forged])
 
     def test_voluntary_pattern_forms_a_contextual_but_nonbinding_habit(self):
         sources = [self.realized(day) for day in (0, 4, 8)]

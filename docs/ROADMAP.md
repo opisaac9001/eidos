@@ -110,6 +110,11 @@ changes in fourteen days, only five learned preferences may coexist, and 120 day
 behavioral disuse retires one without altering the character-pack identity. Active
 preferences are visible and feed subsequent activity and project proposals as soft
 influences rather than scripts.
+Validated open-vocabulary learning and physical repair attempts now create source-linked
+skills instead of limiting development to two authored cases. Practice gains diminish
+as capability rises; ninety days of disuse can add small monthly rust without erasing
+the skill, and later lived practice restores active fluency. Skills inform activity and
+project ambition as capability signals, never permission or guaranteed success.
 Behavioral openness, sociability, and follow-through are separate slow tendencies:
 five matching resolved outcomes across at least thirty days can move one by 0.01,
 only once per month and no farther than 0.15 from its character baseline. The active
@@ -407,7 +412,7 @@ Beautiful prose with contradictory consequences does not pass.
 Feature families: MEM-09, SELF-06, WORLD-08, OPS-04/05, QA-07.
 
 - Tune saturation, retrieval bias, emotional feedback, remaining trait drift,
-  relationship recovery, skills, competing habits, recurring events, physical episode pacing
+  relationship recovery, skill rust/relearning, competing habits, recurring events, physical episode pacing
   and ongoing projects.
 - An apology now opens a source-linked repair attempt whose other-party response stays
   unknown. At most three later direct contacts can gently reduce Pathos's own tension

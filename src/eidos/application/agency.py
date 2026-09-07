@@ -38,6 +38,7 @@ async def autonomous_activity_events(
     memories: Sequence[str | Mapping[str, object]],
     semantic_expectations: Sequence[Mapping[str, object]] = (),
     self_concepts: Sequence[Mapping[str, object]] = (),
+    skills: Sequence[Mapping[str, object]] = (),
     habits: Sequence[Mapping[str, object]] = (),
     known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
@@ -86,6 +87,7 @@ async def autonomous_activity_events(
         "recent_memories": list(memories[-8:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
+        "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
         "recent_activity_patterns": recent_activity_patterns,
         "current_attention": (
@@ -116,6 +118,8 @@ async def autonomous_activity_events(
             "attention matter without treating it as a command. Habits are soft rhythms: he may "
             "return to one, vary it, or choose against it. When habits compete for the same part "
             "of day, treat both as felt possibilities rather than silently choosing the strongest. "
+            "Skills describe demonstrated capability, not permission or guaranteed success; a "
+            "rusty skill may invite modest relearning. "
             "The activity "
             "type is open vocabulary. This is only a proposal: do not say it happened, spend money, "
             "create possessions, or guarantee another person's attendance. Use none when no object "

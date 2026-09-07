@@ -195,6 +195,14 @@ class GatewayTests(unittest.TestCase):
                                     "epistemic_status": "subjective_self_interpretation",
                                 }
                             ],
+                            "skills": [
+                                {
+                                    "skill_id": "field_recording",
+                                    "level": 0.47,
+                                    "status": "rusty",
+                                    "authority": "capability_signal_only",
+                                }
+                            ],
                             "habits": [
                                 {
                                     "activity_type": "sketching_walk",
@@ -229,6 +237,8 @@ class GatewayTests(unittest.TestCase):
             context["self_concepts"][0]["epistemic_status"],
             "subjective_self_interpretation",
         )
+        self.assertEqual(context["skills"][0]["status"], "rusty")
+        self.assertEqual(context["skills"][0]["authority"], "capability_signal_only")
         self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
         self.assertIn("slowly learned preferences", self.payload["messages"][0]["content"])
         self.assertIn("not obligations", self.payload["messages"][0]["content"])

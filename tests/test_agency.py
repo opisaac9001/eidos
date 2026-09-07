@@ -234,6 +234,14 @@ class AgencyTests(unittest.TestCase):
                         "epistemic_status": "subjective_self_interpretation",
                     }
                 ],
+                skills=[
+                    {
+                        "skill_id": "field_recording",
+                        "level": 0.47,
+                        "status": "rusty",
+                        "authority": "capability_signal_only",
+                    }
+                ],
                 habits=[
                     {
                         "activity_type": "sketching_walk",
@@ -257,6 +265,8 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(set(context["known_people"]), {"mara"})
         self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
         self.assertEqual(context["self_concepts"][0]["confidence"], 0.55)
+        self.assertEqual(context["skills"][0]["status"], "rusty")
+        self.assertEqual(context["skills"][0]["authority"], "capability_signal_only")
         self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
         self.assertEqual(context["recent_activity_patterns"][0]["companion_id"], "solo")
 

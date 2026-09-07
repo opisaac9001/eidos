@@ -16,49 +16,77 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
         in {"skill.practiced", "habit.formed", "habit.reinforced", "habit.reactivated"}
         and isinstance(event.payload.get("source_event_id"), str)
     }
+    at = _time(simulated_at)
     output: list[DomainEvent] = []
     for source in history:
         source_id = str(source.event_id)
         if source_id in processed:
             continue
-        if source.kind == "action.accepted" and source.payload.get("action") == "repair":
-            output.append(
-                DomainEvent(
-                    "skill.practiced",
-                    "pathos",
-                    {
-                        "skill_id": "repair",
-                        "delta": 0.05,
-                        "source_event_id": source_id,
-                        "owner": "pathos",
-                        "simulated_at": simulated_at,
-                    },
-                    causation_id=source.event_id,
-                    correlation_id=source.correlation_id,
-                )
-            )
-            processed.add(source_id)
-        elif (
-            source.kind == "activity.completed"
-            and source.payload.get("activity") == "learn"
-            and source.payload.get("target_id") == "bookbinding-basics"
+        skill_id = _skill_evidence(source)
+        if skill_id is None:
+            continue
+        state = project_development([*history, *output])
+        current = state.skills.get(skill_id)
+        if current is None and len(state.skills) >= 12:
+            continue
+        practiced_at = _source_time(source) or at
+        if practiced_at > at or (
+            current is not None
+            and _optional_time(current.last_practiced_at) is not None
+            and practiced_at <= _required_skill_time(current.last_practiced_at)
         ):
+            continue
+        delta = _skill_delta(current.level if current is not None else None)
+        output.append(
+            DomainEvent(
+                "skill.practiced",
+                "pathos",
+                {
+                    "skill_id": skill_id,
+                    "revision": 1 if current is None else current.revision + 1,
+                    "delta": delta,
+                    "source_event_id": source_id,
+                    "source_kind": source.kind,
+                    "practiced_at": practiced_at.isoformat(),
+                    "owner": "pathos",
+                    "simulated_at": simulated_at,
+                },
+                causation_id=source.event_id,
+                correlation_id=source.correlation_id or f"skill:{skill_id}",
+            )
+        )
+        processed.add(source_id)
+    if at.hour == 19:
+        state = project_development([*history, *output])
+        rust_candidates = [
+            skill
+            for skill in state.skills.values()
+            if skill.last_practiced_at is not None
+            and skill.updated_at is not None
+            and skill.level > 0.1
+            and at - _required_skill_time(skill.last_practiced_at) >= timedelta(days=90)
+            and at - _required_skill_time(skill.updated_at) >= timedelta(days=30)
+        ]
+        if rust_candidates:
+            skill = min(
+                rust_candidates,
+                key=lambda item: (_required_skill_time(item.last_practiced_at), item.skill_id),
+            )
             output.append(
                 DomainEvent(
-                    "skill.practiced",
+                    "skill.rusted",
                     "pathos",
                     {
-                        "skill_id": "bookbinding",
-                        "delta": 0.05,
-                        "source_event_id": source_id,
+                        "skill_id": skill.skill_id,
+                        "revision": skill.revision + 1,
+                        "amount": 0.03,
+                        "reason": "Long disuse made this ability less immediately fluent.",
                         "owner": "pathos",
                         "simulated_at": simulated_at,
                     },
-                    causation_id=source.event_id,
-                    correlation_id=source.correlation_id,
+                    correlation_id=f"skill:{skill.skill_id}",
                 )
             )
-            processed.add(source_id)
     cafe_visits = [
         event
         for event in history
@@ -88,7 +116,6 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
                     correlation_id="habit-morning-cafe-visit",
                 )
             )
-    at = _time(simulated_at)
     output.extend(behavioral_habit_events([*history, *output], at))
     return output
 
@@ -286,6 +313,37 @@ def active_habit_context(history: Sequence[DomainEvent]) -> list[dict[str, objec
     ]
 
 
+def active_skill_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:
+    """Expose demonstrated capability without turning it into permission or certainty."""
+    skills = sorted(
+        project_development(history).skills.values(),
+        key=lambda item: (-item.level, item.skill_id),
+    )
+    return [
+        {
+            "skill_id": skill.skill_id,
+            "level": skill.level,
+            "practice_count": skill.practice_count,
+            "status": skill.status,
+            "rust_count": skill.rust_count,
+            "authority": "capability_signal_only",
+        }
+        for skill in skills[:12]
+    ]
+
+
+def effective_capability(
+    history: Sequence[DomainEvent], skill_id: str, general_mastery: float
+) -> float:
+    """Blend broad confidence with demonstrated specific ability for feasibility checks."""
+    if not 0 <= general_mastery <= 1:
+        raise ValueError("General mastery must be between zero and one")
+    skill = project_development(history).skills.get(skill_id)
+    if skill is None:
+        return general_mastery
+    return round(max(0.1, min(1.0, 0.4 * general_mastery + 0.6 * skill.level)), 4)
+
+
 def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
     if event.kind != "agency.activity_realized" or event.aggregate_id != "pathos":
         return None
@@ -296,6 +354,38 @@ def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
     at = _event_time(event)
     band = "morning" if at.hour < 12 else "afternoon" if at.hour < 18 else "evening"
     return activity_type, location_id, band
+
+
+def _skill_evidence(event: DomainEvent) -> str | None:
+    if event.aggregate_id != "pathos":
+        return None
+    if event.kind == "action.accepted" and event.payload.get("action") == "repair":
+        return "repair"
+    if event.kind == "object.repair_attempted":
+        return "repair"
+    if (
+        event.kind == "activity.completed"
+        and event.payload.get("activity") == "learn"
+        and event.payload.get("target_id") == "bookbinding-basics"
+    ):
+        return "bookbinding"
+    if event.kind == "agency.activity_realized" and event.payload.get("action") == "learn":
+        activity_type = event.payload.get("activity_type")
+        return activity_type if isinstance(activity_type, str) and activity_type else None
+    return None
+
+
+def _source_time(event: DomainEvent) -> datetime | None:
+    value = event.payload.get("simulated_at")
+    return _time(value) if isinstance(value, str) else None
+
+
+def _skill_delta(level: float | None) -> float:
+    if level is None or level < 0.5:
+        return 0.05
+    if level < 0.75:
+        return 0.03
+    return 0.015
 
 
 def _event_time(event: DomainEvent) -> datetime:
@@ -320,4 +410,11 @@ def _required_habit_time(value: str | None) -> datetime:
     parsed = _optional_time(value)
     if parsed is None:
         raise ValueError("Rich habits require lifecycle timestamps")
+    return parsed
+
+
+def _required_skill_time(value: str | None) -> datetime:
+    parsed = _optional_time(value)
+    if parsed is None:
+        raise ValueError("Source-linked skills require lifecycle timestamps")
     return parsed

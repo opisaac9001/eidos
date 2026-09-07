@@ -1,6 +1,12 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const operatorMode = window.location.pathname === "/operator";
+const ordinaryViews = new Set([
+  "observatory",
+  "world",
+  "conversation",
+  "memories",
+]);
 const esc = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -138,6 +144,7 @@ const labels = {
   "social.preference_faded": "A PREFERENCE BECAME UNCERTAIN",
   "conversation.time_elapsed": "TIME PASSED IN CONVERSATION",
   "skill.practiced": "SKILL PRACTICE",
+  "skill.rusted": "SKILL RUST",
   "habit.formed": "A RHYTHM TOOK SHAPE",
   "habit.reinforced": "A RHYTHM STRENGTHENED",
   "habit.lapsed": "A RHYTHM FADED",
@@ -207,7 +214,11 @@ const views = {
     "CONVERSATION",
   ],
   memories: ["THE THINGS THAT STAY", "A life, remembered.", "MEMORY ARCHIVE"],
-  plans: ["INTENTIONS, PROMISES & TIME", "A future with consequences.", "PLANS & TIME"],
+  plans: [
+    "INTENTIONS, PROMISES & TIME",
+    "A future with consequences.",
+    "PLANS & TIME",
+  ],
   engine: ["BEHIND THE EXPERIENCE", "An ensemble of minds.", "THE ENSEMBLE"],
 };
 let state = null,
@@ -239,8 +250,10 @@ const date = (value) =>
     timeZone: "UTC",
   });
 
-function showView(view) {
-  if (!views[view]) view = "observatory";
+function showView(view, focusHeading = false) {
+  const fallback = operatorMode ? "observatory" : "conversation";
+  if (!views[view] || (!operatorMode && !ordinaryViews.has(view)))
+    view = fallback;
   currentView = view;
   document.querySelectorAll(".view").forEach((el) => {
     el.hidden = el.id !== `view-${view}`;
@@ -255,6 +268,8 @@ function showView(view) {
     $("page-title").textContent,
     $("view-label").textContent,
   ] = views[view];
+  document.title = `Eidos · ${views[view][2]}`;
+  if (focusHeading) $("page-title").focus({ preventScroll: true });
   if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
@@ -271,7 +286,7 @@ function toast(message) {
 }
 
 function showError(message) {
-  $("error").textContent = message;
+  if ($("error").textContent !== message) $("error").textContent = message;
   $("error").hidden = !message;
 }
 
@@ -294,7 +309,17 @@ async function request(path, body) {
 
 function setBusy(value) {
   busy = value;
-  ["play", "step", "catch-up", "cancel-catch-up", "speed", "send", "visit", "end-visit", "outreach-toggle"].forEach((id) => {
+  [
+    "play",
+    "step",
+    "catch-up",
+    "cancel-catch-up",
+    "speed",
+    "send",
+    "visit",
+    "end-visit",
+    "outreach-toggle",
+  ].forEach((id) => {
     $(id).disabled = value || !state;
   });
   if (state) {
@@ -381,7 +406,9 @@ function renderArchive() {
     : `${items.length} matching recent memories · ${state.counts.memories} recorded in total · loading the full archive…`;
   $("load-memories").hidden = !remote || archivePage.next_offset == null;
   $("load-memories").disabled = archiveLoading;
-  $("load-memories").textContent = archiveLoading ? "Loading…" : "Load older memories";
+  $("load-memories").textContent = archiveLoading
+    ? "Loading…"
+    : "Load older memories";
   const expectationMarkup = (state.semantic_expectations || []).length
     ? `<div class="eyebrow">LEARNED EXPECTATIONS · SUBJECTIVE PATTERNS, NOT FACTS</div>${state.semantic_expectations
         .map(
@@ -495,9 +522,10 @@ function renderEngineFeed() {
 function renderPlans() {
   const empty = (text) => `<p class="muted">${esc(text)}</p>`;
   const money = (pence) =>
-    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
-      pence / 100,
-    );
+    new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+    }).format(pence / 100);
   $("goal-list").innerHTML = state.goals.length
     ? state.goals
         .map(
@@ -514,28 +542,38 @@ function renderPlans() {
         )
         .join("")
     : empty("No promises have been accepted.");
-  const sleepCards = (state.sleep_windows || []).slice(-7).map(
-    (item) =>
-      `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.bedtime))} · ${esc(time(item.bedtime))}–${esc(time(item.wake_at))}</span><span>REST</span></div><p>Night's sleep</p><div class="memory-source">${esc(item.reason)}</div></article>`,
-  );
-  $("calendar-list").innerHTML = state.calendar.length || sleepCards.length
-    ? [
-        ...sleepCards,
-        ...[...state.calendar]
-        .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
-        .map(
-          (item) =>
-            `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.resource_id ? ` · needs ${esc(state.objects.find((object) => object.object_id === item.resource_id)?.name || item.resource_id)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
-        ),
-      ].join("")
-    : empty("The calendar is open.");
-  const finances = state.finances || { balance_pence: 0, transactions: [], missed_payments: [] };
-  $("finance-balance").textContent = `${money(finances.balance_pence)} available`;
-  const financeItems = [
-    ...[...finances.transactions].reverse().map(
+  const sleepCards = (state.sleep_windows || [])
+    .slice(-7)
+    .map(
       (item) =>
-        `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.amount_pence > 0 ? "+" : ""}${esc(money(item.amount_pence))}</span></div><p>${esc(item.description)}</p><div class="memory-source">Balance ${esc(money(item.balance_pence))} · ${esc(item.category.replaceAll("_", " "))}</div></article>`,
-    ),
+        `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.bedtime))} · ${esc(time(item.bedtime))}–${esc(time(item.wake_at))}</span><span>REST</span></div><p>Night's sleep</p><div class="memory-source">${esc(item.reason)}</div></article>`,
+    );
+  $("calendar-list").innerHTML =
+    state.calendar.length || sleepCards.length
+      ? [
+          ...sleepCards,
+          ...[...state.calendar]
+            .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+            .map(
+              (item) =>
+                `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}${item.ends_at ? `–${esc(time(item.ends_at))}` : ""}</span><span>${esc(item.status.toUpperCase())}</span></div><p>${esc(item.title)}</p><div class="memory-source">${esc(state.locations.find((place) => place.id === item.location_id)?.name || item.location_id)}${item.reason ? ` · ${esc(item.reason)}` : ""}${item.resource_id ? ` · needs ${esc(state.objects.find((object) => object.object_id === item.resource_id)?.name || item.resource_id)}` : ""}${item.commitment_id ? ` · promise ${esc(item.commitment_id)}` : ""}</div></article>`,
+            ),
+        ].join("")
+      : empty("The calendar is open.");
+  const finances = state.finances || {
+    balance_pence: 0,
+    transactions: [],
+    missed_payments: [],
+  };
+  $("finance-balance").textContent =
+    `${money(finances.balance_pence)} available`;
+  const financeItems = [
+    ...[...finances.transactions]
+      .reverse()
+      .map(
+        (item) =>
+          `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>${item.amount_pence > 0 ? "+" : ""}${esc(money(item.amount_pence))}</span></div><p>${esc(item.description)}</p><div class="memory-source">Balance ${esc(money(item.balance_pence))} · ${esc(item.category.replaceAll("_", " "))}</div></article>`,
+      ),
     ...finances.missed_payments.map(
       (item) =>
         `<article class="memory-card"><div class="memory-meta"><span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}</span><span>MISSED ${esc(money(item.amount_pence))}</span></div><p>${esc(item.reason)}</p><div class="memory-source">${esc(item.category.replaceAll("_", " "))}</div></article>`,
@@ -582,7 +620,7 @@ function renderMessages() {
     ? state.conversations
         .map(
           (item) =>
-            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "SYSTEM" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
+            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
         )
         .join("")
     : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
@@ -606,12 +644,14 @@ function render(next) {
   document.querySelector(".disclosure").textContent = liveModel
     ? "Model-generated fiction. Validation checks structure, not truth or consciousness."
     : "Authored voices are running the roles. Real models can join later.";
-  document.querySelector(".context-note").textContent = liveModel
+  $("chat-disclosure").textContent = liveModel
     ? "This experimental voice uses recorded context. It can still misinterpret or invent details. Conversations persist."
     : "This voice uses templates and recorded context. Conversations and memories persist.";
-  document.querySelectorAll(".small-tag:not(#chat-availability)").forEach((tag) => {
-    tag.textContent = liveModel ? "MODEL OUTPUT" : "STAND-IN";
-  });
+  document
+    .querySelectorAll(".small-tag:not(#chat-availability)")
+    .forEach((tag) => {
+      tag.textContent = liveModel ? "MODEL OUTPUT" : "STAND-IN";
+    });
   $("connection").textContent = state.runtime.error
     ? "Worker needs attention"
     : "Connected locally";
@@ -628,7 +668,9 @@ function render(next) {
   if (document.activeElement !== $("speed"))
     $("speed").value = state.config.minutes_per_tick;
   $("feed-live").textContent = state.config.running ? "● LIVE" : "PAUSED";
-  $("catch-up").textContent = state.catch_up ? "Resume catch-up" : "Let a day pass";
+  $("catch-up").textContent = state.catch_up
+    ? "Resume catch-up"
+    : "Let a day pass";
   $("cancel-catch-up").hidden = !state.catch_up;
   $("worker-status").textContent = state.runtime.worker_alive
     ? state.runtime.working
@@ -649,7 +691,8 @@ function render(next) {
     ? `${state.emotion.label} with ${state.emotion.secondary_label}`
     : state.emotion?.label || state.pathos.mood;
   const physical = state.wellbeing?.active;
-  $("presence-location").textContent = `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}${physical ? ` · ${physical.kind.replaceAll("_", " ")}` : ""}`;
+  $("presence-location").textContent =
+    `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}${physical ? ` · ${physical.kind.replaceAll("_", " ")}` : ""}`;
   const thought = state.feed.find((item) => item.kind === "thought.recorded");
   $("latest-thought").textContent = thought
     ? `“${thought.text}”`
@@ -661,6 +704,14 @@ function render(next) {
     : "";
   $("energy-value").textContent = `${Math.round(state.pathos.energy * 100)}%`;
   $("energy-meter").style.width = `${state.pathos.energy * 100}%`;
+  $("energy-meter").parentElement.setAttribute(
+    "aria-valuenow",
+    Math.round(state.pathos.energy * 100),
+  );
+  $("energy-meter").parentElement.setAttribute(
+    "aria-valuetext",
+    `${Math.round(state.pathos.energy * 100)} percent energy`,
+  );
   $("valence-value").textContent =
     state.pathos.valence > 0.15
       ? "Positive"
@@ -668,8 +719,24 @@ function render(next) {
         ? "Low"
         : "Balanced";
   $("valence-meter").style.width = `${(state.pathos.valence + 1) * 50}%`;
+  $("valence-meter").parentElement.setAttribute(
+    "aria-valuenow",
+    Math.round((state.pathos.valence + 1) * 50),
+  );
+  $("valence-meter").parentElement.setAttribute(
+    "aria-valuetext",
+    `${$("valence-value").textContent} emotional tone`,
+  );
   $("arousal-value").textContent = `${Math.round(state.pathos.arousal * 100)}%`;
   $("arousal-meter").style.width = `${state.pathos.arousal * 100}%`;
+  $("arousal-meter").parentElement.setAttribute(
+    "aria-valuenow",
+    Math.round(state.pathos.arousal * 100),
+  );
+  $("arousal-meter").parentElement.setAttribute(
+    "aria-valuetext",
+    `${Math.round(state.pathos.arousal * 100)} percent alertness`,
+  );
   const episode = state.affect_episodes?.[0];
   const emotion = state.emotion;
   const emotionalPattern = emotion
@@ -684,19 +751,32 @@ function render(next) {
     .slice(0, 2)
     .map(([name]) => name[0].toUpperCase() + name.slice(1))
     .join(" · ");
-  const activeLayers = (state.mind?.layers || []).map((item) => item.layer).join(" · ");
-  const attention = (state.mind?.layers || []).find((item) => item.layer === "attention");
-  const domestic = Object.entries(state.household?.loads || {}).sort((a, b) => b[1] - a[1])[0];
-  $("needs-summary").textContent = `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${domestic && domestic[1] >= 0.35 ? ` · Home: ${domestic[0]} ${Math.round(domestic[1] * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${attention ? ` · Attention: ${attention.focus_text}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
+  const activeLayers = (state.mind?.layers || [])
+    .map((item) => item.layer)
+    .join(" · ");
+  const attention = (state.mind?.layers || []).find(
+    (item) => item.layer === "attention",
+  );
+  const domestic = Object.entries(state.household?.loads || {}).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+  $("needs-summary").textContent =
+    `Rest ${Math.round(needs.rest * 100)}% · Hunger ${Math.round(needs.hunger * 100)}% · Connection ${Math.round(needs.connection * 100)}% · Curiosity ${Math.round(needs.curiosity * 100)}% · Mastery ${Math.round(needs.mastery * 100)}%${physical ? ` · Physical capacity ${Math.round((1 - physical.severity) * 100)}%` : ""}${domestic && domestic[1] >= 0.35 ? ` · Home: ${domestic[0]} ${Math.round(domestic[1] * 100)}%` : ""}${values ? ` · Values: ${values}` : ""}${attention ? ` · Attention: ${attention.focus_text}` : ""}${activeLayers ? ` · Mind: ${activeLayers}` : ""}`;
   const preferences = state.identity?.preferences || [];
   const traits = Object.entries(state.identity?.traits || {})
-    .map(([name, level]) => `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`)
+    .map(
+      ([name, level]) =>
+        `${name.replaceAll("_", " ")} ${Math.round(level * 100)}%`,
+    )
     .join(" · ");
   const selfView = state.self_concepts?.[0];
   const activeHabits = (state.habits || [])
     .filter((habit) => habit.status === "active" && habit.activity_type)
     .slice(0, 2)
-    .map((habit) => `${habit.activity_type.replaceAll("_", " ")} in the ${habit.time_band}`);
+    .map(
+      (habit) =>
+        `${habit.activity_type.replaceAll("_", " ")} in the ${habit.time_band}`,
+    );
   $("preferences-summary").textContent = preferences.length
     ? `Drawn toward: ${preferences.join(" · ")}${traits ? ` · Tendencies: ${traits}` : ""}${activeHabits.length ? ` · Familiar rhythms: ${activeHabits.join(" · ")}` : ""}${selfView ? ` · Current self-view: ${selfView.text} (${Math.round(selfView.confidence * 100)}% confidence)` : ""}`
     : "Preferences are still taking shape…";
@@ -724,7 +804,8 @@ function render(next) {
   $("event-count").textContent = state.counts.events.toLocaleString();
   $("memory-count").textContent = state.counts.memories.toLocaleString();
   $("day-count").textContent = state.day;
-  $("world-weather").textContent = `${state.weather} · ${state.season}`.toUpperCase();
+  $("world-weather").textContent =
+    `${state.weather} · ${state.season}`.toUpperCase();
   $("world-threads").innerHTML = (state.world_threads || []).length
     ? state.world_threads
         .map(
@@ -752,33 +833,35 @@ function render(next) {
     : '<p class="muted">No real-town source is configured. This world is currently self-contained.</p>';
   renderPlace();
   $("people").innerHTML = state.people
-    .map(
-      (person) => {
-        const belief = state.beliefs?.find(
-          (item) => item.owner_id === "pathos" && item.subject_id === person.id,
-        );
-        const preferences = (state.social_preferences || []).filter((item) => item.person_id === person.id);
-        const repair = (state.relationship_repairs || []).filter((item) => item.person_id === person.id).at(-1);
-        const sharedHistory = (state.character_histories || []).filter(
-          (item) => item.person_id === person.id && item.status === "disclosed",
-        );
-        const preferenceText = preferences.length
-          ? `<p class="context-note">Pathos remembers: ${preferences.map((item) => `${item.status === "uncertain" ? "possibly " : ""}${esc(item.stance)} ${esc(item.topic)}`).join(" · ")}</p>`
-          : "";
-        const repairText = repair
-          ? `<p class="context-note">Repair after disagreement: ${esc(repair.status)} · ${repair.contact_count} later contact${repair.contact_count === 1 ? "" : "s"}. This does not claim forgiveness.</p>`
-          : "";
-        const historyText = sharedHistory.length
-          ? `<p class="context-note">Shared with Pathos: ${sharedHistory.map((item) => esc(item.text)).join(" · ")}</p>`
-          : "";
-        const location = person.location_id
-          ? person.location_id === "home"
-            ? "Here at home"
-            : `Here at ${state.locations.find((p) => p.id === person.location_id)?.name || "this place"}`
-          : "Current whereabouts unknown to Pathos";
-        return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}${historyText}<div class="person-foot"><span>${esc(location)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}% · ${esc(person.simulation_tier)} detail</span></div></article>`;
-      },
-    )
+    .map((person) => {
+      const belief = state.beliefs?.find(
+        (item) => item.owner_id === "pathos" && item.subject_id === person.id,
+      );
+      const preferences = (state.social_preferences || []).filter(
+        (item) => item.person_id === person.id,
+      );
+      const repair = (state.relationship_repairs || [])
+        .filter((item) => item.person_id === person.id)
+        .at(-1);
+      const sharedHistory = (state.character_histories || []).filter(
+        (item) => item.person_id === person.id && item.status === "disclosed",
+      );
+      const preferenceText = preferences.length
+        ? `<p class="context-note">Pathos remembers: ${preferences.map((item) => `${item.status === "uncertain" ? "possibly " : ""}${esc(item.stance)} ${esc(item.topic)}`).join(" · ")}</p>`
+        : "";
+      const repairText = repair
+        ? `<p class="context-note">Repair after disagreement: ${esc(repair.status)} · ${repair.contact_count} later contact${repair.contact_count === 1 ? "" : "s"}. This does not claim forgiveness.</p>`
+        : "";
+      const historyText = sharedHistory.length
+        ? `<p class="context-note">Shared with Pathos: ${sharedHistory.map((item) => esc(item.text)).join(" · ")}</p>`
+        : "";
+      const location = person.location_id
+        ? person.location_id === "home"
+          ? "Here at home"
+          : `Here at ${state.locations.find((p) => p.id === person.location_id)?.name || "this place"}`
+        : "Current whereabouts unknown to Pathos";
+      return `<article class="panel person-card"><div class="person-head"><span class="avatar" style="color:${person.color}">${esc(person.name[0])}</span><div><h2>${esc(person.name)}</h2><p>${esc(person.occupation)}</p></div></div><p>${esc(person.description)}</p>${belief ? `<p class="context-note">Pathos currently believes: ${esc(belief.predicate.replaceAll("_", " "))} — ${esc(belief.object_value)} (${Math.round(belief.confidence * 100)}% confidence${belief.status === "contested" ? ", contested" : ""}).</p>` : ""}${preferenceText}${repairText}${historyText}<div class="person-foot"><span>${esc(location)}</span><span>${person.encounters} encounters · trust ${Math.round(person.trust * 100)}% · ${esc(person.simulation_tier)} detail</span></div></article>`;
+    })
     .join("");
   $("chat-context-mood").textContent = state.emotion?.secondary_label
     ? `${state.emotion.label} with ${state.emotion.secondary_label}`
@@ -790,21 +873,48 @@ function render(next) {
     communication.status === "in_conversation"
       ? "TOGETHER NOW"
       : communication.status === "available"
-      ? "AVAILABLE"
-      : communication.status === "hurried"
-        ? "FREE BRIEFLY"
-        : (communication.status || "UNAVAILABLE").toUpperCase();
+        ? "AVAILABLE"
+        : communication.status === "hurried"
+          ? "FREE BRIEFLY"
+          : (communication.status || "UNAVAILABLE").toUpperCase();
   $("chat-context-availability").textContent = communication.reason || "";
+  const availabilityReason =
+    communication.reason || "He may reply when his day allows.";
+  const liveActive = communication.status === "in_conversation";
+  const replyDue = communication.next_reply_due_at
+    ? `${date(communication.next_reply_due_at)} at ${time(communication.next_reply_due_at)}`
+    : null;
+  let presenceNote;
+  if (communication.status === "interrupted") {
+    presenceNote = `${availabilityReason} You can continue or leave once the interruption passes.`;
+  } else if (liveActive) {
+    presenceNote = `${availabilityReason} You are together now.`;
+  } else if (!state.config.running) {
+    presenceNote =
+      "His world is paused by its caretaker. Messages can be delivered, but time and replies will wait until it resumes.";
+  } else if (communication.can_visit) {
+    presenceNote = `${availabilityReason} He can sit down and talk now, or you can leave a message.`;
+  } else if (communication.waiting_count && replyDue) {
+    presenceNote = `${availabilityReason} Your message is waiting; he may reply around ${replyDue}.`;
+  } else {
+    presenceNote = `${availabilityReason} Your message will wait for him.`;
+  }
+  if ($("chat-presence-note").textContent !== presenceNote)
+    $("chat-presence-note").textContent = presenceNote;
+  $("chat-presence-note").classList.toggle("live", liveActive);
+  document
+    .querySelector(".chat-panel")
+    .classList.toggle("live-visit", liveActive);
   $("outreach-toggle").checked = Boolean(state.outreach?.enabled);
   $("visit").hidden = Boolean(communication.live_scene_id);
   $("visit").disabled = !communication.can_visit;
   $("end-visit").hidden = !communication.live_scene_id;
-  $("send").textContent = communication.live_scene_id ? "Speak ↗" : "Send ↗";
-  $("delivery-note").textContent = communication.live_scene_id
+  $("send").textContent = liveActive ? "Speak ↗" : "Send ↗";
+  $("delivery-note").textContent = liveActive
     ? `You are speaking together · ${communication.live_elapsed_minutes || 0} simulated minutes have passed.`
     : communication.waiting_count
-    ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
-    : "Messages are delivered; replies may take time.";
+      ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
+      : "Messages are delivered; replies may take time.";
   $("chat-memories").innerHTML = state.memories
     .slice(0, 3)
     .map((item) => `<div class="context-memory">${esc(item.text)}</div>`)
@@ -812,8 +922,13 @@ function render(next) {
   $("relationship-dates").innerHTML = (state.relationship_dates || []).length
     ? state.relationship_dates
         .map((item) => {
-          const person = state.people.find((candidate) => candidate.id === item.person_id);
-          const who = item.person_id === "user" ? "You and Pathos" : person?.name || item.person_id;
+          const person = state.people.find(
+            (candidate) => candidate.id === item.person_id,
+          );
+          const who =
+            item.person_id === "user"
+              ? "You and Pathos"
+              : person?.name || item.person_id;
           const years = item.anniversaries
             ? ` · remembered ${item.anniversaries} year${item.anniversaries === 1 ? "" : "s"}`
             : "";
@@ -821,10 +936,15 @@ function render(next) {
         })
         .join("")
     : '<p class="context-note">No shared date has formed yet.</p>';
-  const userPreferences = (state.social_preferences || []).filter((item) => item.person_id === "user");
+  const userPreferences = (state.social_preferences || []).filter(
+    (item) => item.person_id === "user",
+  );
   $("user-preferences").innerHTML = userPreferences.length
     ? userPreferences
-        .map((item) => `<div class="context-memory">Pathos ${item.status === "uncertain" ? "is less sure you " : "remembers that you "}${esc(item.stance)} ${esc(item.topic)}.</div>`)
+        .map(
+          (item) =>
+            `<div class="context-memory">Pathos ${item.status === "uncertain" ? "is less sure you " : "remembers that you "}${esc(item.stance)} ${esc(item.topic)}.</div>`,
+        )
         .join("")
     : '<p class="context-note">You have not told him a clear preference yet.</p>';
   renderMessages();
@@ -848,14 +968,12 @@ function render(next) {
       )
       .join("") || "<p>No durable jobs recorded yet.</p>";
   $("npc-states").innerHTML = (state.npc_states || [])
-    .map(
-      (person) => {
-        const plan = person.plan_title
-          ? `<p><strong>${esc(person.plan_title)}</strong> · ${esc(person.plan_status || "unknown")}${person.plan_scheduled_for ? ` · ${esc(date(person.plan_scheduled_for))} ${esc(time(person.plan_scheduled_for))}` : ""}${person.plan_motivation ? `<br><small>${esc(person.plan_motivation)}</small>` : ""}</p>`
-          : "";
-        return `<article class="memory-card"><div class="memory-meta"><span>${esc(person.actor_id)} · ${esc(person.location_id)}</span><span>PRIVATE OPERATOR LENS</span></div><p>${esc(person.private_activity)}</p>${plan}<div class="memory-source">energy ${Math.round(person.energy * 100)}% · connection ${Math.round(person.connection * 100)}% · purpose ${Math.round(person.purpose * 100)}% · never passed to Pathos automatically</div></article>`;
-      },
-    )
+    .map((person) => {
+      const plan = person.plan_title
+        ? `<p><strong>${esc(person.plan_title)}</strong> · ${esc(person.plan_status || "unknown")}${person.plan_scheduled_for ? ` · ${esc(date(person.plan_scheduled_for))} ${esc(time(person.plan_scheduled_for))}` : ""}${person.plan_motivation ? `<br><small>${esc(person.plan_motivation)}</small>` : ""}</p>`
+        : "";
+      return `<article class="memory-card"><div class="memory-meta"><span>${esc(person.actor_id)} · ${esc(person.location_id)}</span><span>PRIVATE OPERATOR LENS</span></div><p>${esc(person.private_activity)}</p>${plan}<div class="memory-source">energy ${Math.round(person.energy * 100)}% · connection ${Math.round(person.connection * 100)}% · purpose ${Math.round(person.purpose * 100)}% · never passed to Pathos automatically</div></article>`;
+    })
     .join("");
   $("npc-states").insertAdjacentHTML(
     "beforeend",
@@ -870,8 +988,12 @@ function render(next) {
     "beforeend",
     (state.resident_relationships || [])
       .map((item) => {
-        const owner = state.people.find((person) => person.id === item.owner_id)?.name || item.owner_id;
-        const person = state.people.find((candidate) => candidate.id === item.person_id)?.name || item.person_id;
+        const owner =
+          state.people.find((person) => person.id === item.owner_id)?.name ||
+          item.owner_id;
+        const person =
+          state.people.find((candidate) => candidate.id === item.person_id)
+            ?.name || item.person_id;
         return `<article class="memory-card"><div class="memory-meta"><span>${esc(owner)} → ${esc(person)}</span><span>PRIVATE RELATIONSHIP</span></div><p>${item.encounters} completed encounter${item.encounters === 1 ? "" : "s"}</p><div class="memory-source">familiarity ${Math.round(item.familiarity * 100)}% · trust ${Math.round(item.trust * 100)}% · tension ${Math.round(item.tension * 100)}% · last shared scene ${esc(item.last_scene_id || "none")}</div></article>`;
       })
       .join(""),
@@ -889,7 +1011,9 @@ function render(next) {
     "beforeend",
     (state.scenes || [])
       .map((scene) => {
-        const clock = (state.conversation_clocks || []).find((item) => item.scene_id === scene.scene_id);
+        const clock = (state.conversation_clocks || []).find(
+          (item) => item.scene_id === scene.scene_id,
+        );
         return `<article class="memory-card"><div class="memory-meta"><span>SCENE · ${esc(scene.status)}</span><span>${scene.turn_count}/${scene.max_turns} TURNS${clock ? ` · ${clock.elapsed_minutes} MIN` : ""}</span></div><p><strong>${esc(scene.initiator_id)} ↔ ${esc(scene.partner_id)}</strong> · ${esc(scene.topic_id)}</p><div class="memory-source">${esc(scene.location_id)}${scene.end_reason ? ` · ended: ${esc(scene.end_reason)}` : scene.status === "paused" ? ` · interrupted by ${esc((scene.interruption_source_id || "an event").slice(0, 8))}` : ` · awaiting ${esc(scene.next_actor_id)}`}</div></article>`;
       })
       .join(""),
@@ -904,7 +1028,7 @@ function render(next) {
 
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("[data-view]");
-  if (nav) showView(nav.dataset.view);
+  if (nav) showView(nav.dataset.view, true);
   const place = event.target.closest("[data-place]");
   if (place && state) {
     selectedPlace = place.dataset.place;
@@ -945,7 +1069,8 @@ $("step").addEventListener("click", async () => {
 });
 $("catch-up").addEventListener("click", async () => {
   if (state?.catch_up) {
-    if (await mutate("/api/catch-up/resume", {})) toast("Catch-up completed and summarized.");
+    if (await mutate("/api/catch-up/resume", {}))
+      toast("Catch-up completed and summarized.");
     return;
   }
   try {
@@ -960,7 +1085,8 @@ $("catch-up").addEventListener("click", async () => {
   }
 });
 $("cancel-catch-up").addEventListener("click", async () => {
-  if (await mutate("/api/catch-up/cancel", {})) toast("Catch-up cancelled at its last saved point.");
+  if (await mutate("/api/catch-up/cancel", {}))
+    toast("Catch-up cancelled at its last saved point.");
 });
 $("memory-search").addEventListener("input", () => {
   clearTimeout(archiveSearchTimer);
@@ -971,7 +1097,7 @@ $("load-memories").addEventListener("click", () => loadMemoryArchive(false));
 $("feed-filter").addEventListener("change", renderEngineFeed);
 $("chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (busy) return;
+  if (busy || $("send").disabled) return;
   const text = $("message").value.trim();
   if (!text) return;
   if (!pendingChat || pendingChat.text !== text)
@@ -982,12 +1108,17 @@ $("chat-form").addEventListener("submit", async (event) => {
     pendingChat = null;
     $("message").focus();
   }
-  $("send").textContent = state?.communication?.live_scene_id ? "Speak ↗" : "Send ↗";
+  $("send").textContent =
+    state?.communication?.status === "in_conversation" ? "Speak ↗" : "Send ↗";
 });
 $("outreach-toggle").addEventListener("change", async (event) => {
   const enabled = event.target.checked;
   if (await mutate("/api/outreach", { enabled }))
-    toast(enabled ? "Occasional messages enabled." : "Occasional messages turned off.");
+    toast(
+      enabled
+        ? "Occasional messages enabled."
+        : "Occasional messages turned off.",
+    );
 });
 $("visit").addEventListener("click", async () => {
   if (busy) return;
