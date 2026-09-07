@@ -54,7 +54,7 @@ Actual user-requested data deletion is a privacy workflow, not simulated fading.
 | PLAN-03 | Calendar, recurrence, availability, travel, reservations | Partial: durations/conflicts/multi-hop travel buffers/replayed place hours + model-originated personal plans | P3 |
 | PLAN-04 | Feasibility, priority, conflicts, missed-commitment consequences | Partial: repair/resource/conflict/deadline rules + absent-companion failure | P3 |
 | PLAN-05 | Interrupt, postpone, renegotiate, cancel, bounded replan | Partial: interruption, priority-sensitive optional release, reflection-triggered conflict/travel/open-hours-safe personal rescheduling, feasible two-party promise retiming with delayed independent creditor response + atomic project cancellation | P3 |
-| PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: separate agency proposal, feasibility, intention, schedule, action and realized/missed audit | P3 |
+| PLAN-06 | Proposed/accepted/attempted/resolved distinctions | Partial: separate agency proposal, feasibility, intention, schedule, prospective-memory lapse, action and realized/missed audit; replay-stable forgetting is rare and limited to low-priority solo one-off choices, becomes a mild negative realization and at most a short light concern, while promises, shared plans, projects and reconsideration remain protected | P3 |
 | PLAN-07 | Bounded catch-up, meaningful decisions, interval summaries | Partial: preview/chunks/restart/cancel + bounded sourced factual recap | P5 |
 
 ## World — Firmament / Moira

@@ -1,9 +1,12 @@
 import unittest
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.planner import plan_accepted_work
 from eidos.application.scheduled_activity import scheduled_activity_events
-from eidos.domain.planning import PlanningState
+from eidos.application.scheduled_activity import prospective_memory_lapse
+from eidos.domain.events import DomainEvent
+from eidos.domain.planning import CalendarEntry, Intention, PlanningState
 from eidos.domain.social import SocialRequest
 
 
@@ -111,6 +114,64 @@ class ScheduledActivityTests(unittest.TestCase):
         )
         self.assertIn("schedule.failed", [event.kind for event in absent])
         self.assertNotIn("social.activity_completed", [event.kind for event in absent])
+
+    def test_only_low_stakes_personal_plan_can_replay_stably_slip_his_mind(self):
+        def entry(schedule_id: str) -> CalendarEntry:
+            return CalendarEntry(
+                schedule_id,
+                "Notice shadows in the park",
+                (self.now - timedelta(hours=1)).isoformat(),
+                "park",
+                ends_at=self.now.isoformat(),
+                actor_id="pathos",
+                action="attend",
+                activity_type="shadow_noticing",
+                source_proposal_id="free-choice",
+                intention_id="optional-intention",
+            )
+
+        schedule = next(
+            entry(f"optional-{index}")
+            for index in range(10_000)
+            if prospective_memory_lapse(entry(f"optional-{index}"), 0.2, [])
+        )
+        self.assertTrue(prospective_memory_lapse(schedule, 0.2, []))
+        self.assertTrue(prospective_memory_lapse(schedule, 0.2, []))
+        promised = replace(schedule, commitment_id="promise")
+        self.assertFalse(prospective_memory_lapse(promised, 0.2, []))
+
+        state = PlanningState(
+            calendar={schedule.schedule_id: schedule},
+            intentions={
+                "optional-intention": Intention(
+                    "optional-intention",
+                    "pathos",
+                    "attend",
+                    "A passing curiosity",
+                    0.2,
+                    target_id=None,
+                )
+            },
+        )
+        events = scheduled_activity_events(
+            state,
+            actor_location_id="park",
+            simulated_at=self.now,
+            actual_revision=0,
+            cognitive_history=[],
+            cognitive_capacity=0.0,
+        )
+
+        self.assertEqual(
+            [event.kind for event in events[:4]],
+            [
+                "prospective_memory.lapsed",
+                "agency.activity_missed",
+                "schedule.failed",
+                "intention.abandoned",
+            ],
+        )
+        self.assertEqual(events[1].causation_id, events[0].event_id)
 
 
 if __name__ == "__main__":

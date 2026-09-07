@@ -229,6 +229,7 @@ def _emotion_source_summary(event: DomainEvent | None) -> str:
         "finance.transaction_recorded": "A change in his household money registered.",
         "commitment.missed": "He missed something he had meant to do.",
         "goal.achieved": "He finished something that mattered to him.",
+        "prospective_memory.lapsed": "A small personal plan slipped his mind.",
         "disagreement.expressed": "A disagreement stayed with him.",
         "apology.offered": "He made an effort to repair a strained relationship.",
         "wellbeing.episode_started": "He began feeling physically off.",
@@ -2792,6 +2793,8 @@ class Life:
                     person_id: person.location_id
                     for person_id, person in project_npcs(history + pending, current).people.items()
                 },
+                cognitive_history=history + pending,
+                cognitive_capacity=min(effective_energy, state.rest),
             )
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)

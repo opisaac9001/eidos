@@ -271,6 +271,8 @@ def _effect(
                 0.38,
                 0.55,
             )
+    if event.kind == "prospective_memory.lapsed":
+        return ("affect", 0.0, -0.2, 0.42, 0.7)
     if event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine":
         location = event.payload.get("location_id")
         if not isinstance(location, str):

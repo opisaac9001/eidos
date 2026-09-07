@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from hashlib import sha256
-from typing import Mapping
+from typing import Mapping, Sequence
+from uuid import UUID
 
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
@@ -22,6 +23,8 @@ def scheduled_activity_events(
     actual_revision: int,
     repair_mastery: float = 1.0,
     actor_locations: Mapping[str, str] | None = None,
+    cognitive_history: Sequence[DomainEvent] = (),
+    cognitive_capacity: float = 1.0,
 ) -> list[DomainEvent]:
     """Complete due non-conversation plans and their linked obligations."""
 
@@ -53,6 +56,35 @@ def scheduled_activity_events(
             None,
         )
         if intention is None:
+            continue
+        if prospective_memory_lapse(
+            entry,
+            intention.priority,
+            cognitive_history,
+            cognitive_capacity=cognitive_capacity,
+        ):
+            lapse = DomainEvent(
+                "prospective_memory.lapsed",
+                "pathos",
+                {
+                    "schedule_id": entry.schedule_id,
+                    "intention_id": intention.intention_id,
+                    "reason": "A low-priority personal plan slipped Pathos's mind.",
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                correlation_id=entry.source_proposal_id or entry.schedule_id,
+            )
+            missed_events = _failed_open_plan_events(
+                projected,
+                entry,
+                intention.intention_id,
+                str(lapse.payload["reason"]),
+                simulated_at,
+                causation_id=lapse.event_id,
+            )
+            output.extend((lapse, *missed_events))
+            for event in missed_events:
+                projected = projected.apply(event)
             continue
         if entry.location_id != actor_location_id or (
             action is ActionKind.ATTEND and simulated_at > ends_at
@@ -358,12 +390,54 @@ def scheduled_activity_events(
     return output
 
 
+def prospective_memory_lapse(
+    entry: CalendarEntry,
+    intention_priority: float,
+    history: Sequence[DomainEvent],
+    *,
+    cognitive_capacity: float = 1.0,
+) -> bool:
+    """Replay-stably miss only a low-stakes, self-chosen, one-off personal plan."""
+    if not 0 <= intention_priority <= 1 or not 0 <= cognitive_capacity <= 1:
+        raise ValueError("Prospective memory inputs must be between zero and one")
+    if (
+        entry.source_proposal_id is None
+        or entry.activity_type is None
+        or entry.activity_type == "plan_reconsideration"
+        or entry.goal_id is not None
+        or entry.commitment_id is not None
+        or entry.companion_id is not None
+        or intention_priority >= 0.6
+    ):
+        return False
+    reminders = int(
+        sum(
+            event.kind == "mind.layer_pulsed"
+            and event.payload.get("layer") == "prospective"
+            and event.payload.get("focus_id") == entry.schedule_id
+            for event in history
+        )
+    )
+    strength = float(
+        min(
+            1.0,
+            intention_priority
+            + 0.12 * min(3, reminders)
+            + 0.15 * cognitive_capacity,
+        )
+    )
+    lapse_risk = max(0.03, 0.2 - 0.18 * strength)
+    sample = int(sha256(f"prospective-lapse:{entry.schedule_id}".encode()).hexdigest()[:8], 16)
+    return sample / 0xFFFFFFFF < lapse_risk
+
+
 def _failed_open_plan_events(
     state: PlanningState,
     entry: CalendarEntry,
     intention_id: str,
     reason: str,
     simulated_at: datetime,
+    causation_id: UUID | None = None,
 ) -> list[DomainEvent]:
     correlation = entry.source_proposal_id or entry.schedule_id
     project_step = entry.goal_id is not None and entry.source_proposal_id is not None
@@ -379,6 +453,7 @@ def _failed_open_plan_events(
             "reason": reason,
             "simulated_at": simulated_at.isoformat(),
         },
+        causation_id=causation_id,
         correlation_id=correlation,
     )
     events = [

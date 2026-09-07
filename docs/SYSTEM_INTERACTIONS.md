@@ -436,6 +436,11 @@ prospective pulses do not repeatedly reapply that emotion.
 If that same plan is later canceled, its prior tone—not a universal rule about
 cancellation—determines a small disappointment or relief appraisal. A plan that never
 entered Pathos's prospective awareness has no assumed emotional consequence.
+Prospective memory is not perfect either. A low-priority, solo, one-off activity may
+replay-stably slip his mind according to its priority, recent prospective reminders,
+and current cognitive capacity. This can create a mild realization and short concern.
+Promises, shared plans, multi-step projects, and deliberate plan reconsideration never
+use this lapse path.
 A layer pulse selects focus and activation but is neither a memory nor permission to
 act; it becomes bounded context for the performers and downstream appraisal systems.
 Hourly emotion samples interpret replayed valence, arousal and duration into states

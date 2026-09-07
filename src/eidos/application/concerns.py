@@ -226,6 +226,20 @@ def _concern_source(
         identifiers = {"schedule_id": schedule_id}
         if created and isinstance(created.payload.get("goal_id"), str):
             identifiers["goal_id"] = str(created.payload["goal_id"])
+        lapse = (
+            _event_by_id(history, str(cause.causation_id))
+            if cause is not None
+            and cause.kind == "agency.activity_missed"
+            and cause.causation_id is not None
+            else None
+        )
+        if lapse is not None and lapse.kind == "prospective_memory.lapsed":
+            return (
+                f"I forgot about {title}. I need to decide whether it still matters.",
+                0.36,
+                timedelta(days=2),
+                identifiers,
+            )
         return (
             f"{title} fell through, and I haven't decided what replaces it.",
             0.68,

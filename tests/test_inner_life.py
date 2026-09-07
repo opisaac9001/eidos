@@ -162,6 +162,44 @@ class InnerLifeTests(unittest.TestCase):
         self.assertEqual(receded[0].kind, "concern.receded")
         self.assertIn("without being mistaken for solved", receded[0].payload["text"])
 
+    def test_forgotten_optional_plan_creates_only_a_short_light_concern(self):
+        at = datetime(2026, 1, 2, 10, tzinfo=timezone.utc)
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "optional-walk",
+                "title": "Notice winter shadows",
+                "simulated_at": at.isoformat(),
+            },
+        )
+        lapse = DomainEvent(
+            "prospective_memory.lapsed",
+            "pathos",
+            {"schedule_id": "optional-walk", "simulated_at": at.isoformat()},
+        )
+        missed = DomainEvent(
+            "agency.activity_missed",
+            "pathos",
+            {"schedule_id": "optional-walk", "simulated_at": at.isoformat()},
+            causation_id=lapse.event_id,
+        )
+        failed = DomainEvent(
+            "schedule.failed",
+            "pathos",
+            {"schedule_id": "optional-walk", "simulated_at": at.isoformat()},
+            causation_id=missed.event_id,
+        )
+
+        concern = concern_lifecycle_events([schedule, lapse, missed, failed], at)[0]
+
+        self.assertIn("I forgot", concern.payload["text"])
+        self.assertLess(concern.payload["importance"], 0.5)
+        self.assertEqual(
+            datetime.fromisoformat(concern.payload["recedes_at"]) - at,
+            timedelta(days=2),
+        )
+
     def test_money_failed_plans_and_repair_uncertainty_need_matching_evidence(self):
         at = datetime(2026, 1, 2, 10, tzinfo=timezone.utc)
         missed_payment = DomainEvent(

@@ -171,6 +171,27 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(events, [])
         self.assertEqual(unchanged, PathosState())
 
+    def test_realizing_a_personal_plan_was_forgotten_has_mild_negative_affect(self):
+        lapse = DomainEvent(
+            "prospective_memory.lapsed",
+            "pathos",
+            {
+                "schedule_id": "optional",
+                "reason": "A low-priority personal plan slipped Pathos's mind.",
+                "simulated_at": self.now.isoformat(),
+            },
+        )
+
+        appraisals, state = appraisal_events([lapse], PathosState(), self.now)
+        episodes, affected = affect_episode_events(
+            [lapse, *appraisals], state, self.now
+        )
+
+        self.assertEqual(appraisals[0].payload["source_event_id"], str(lapse.event_id))
+        self.assertLess(appraisals[0].payload["desirability"], 0)
+        self.assertLess(affected.valence, state.valence)
+        self.assertLess(abs(affected.valence), 0.1)
+
     def test_unperceived_world_fact_does_not_change_pathos_but_owned_memory_does(self):
         occurred = DomainEvent(
             "world_event.occurred",
