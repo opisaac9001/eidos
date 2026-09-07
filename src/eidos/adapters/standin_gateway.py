@@ -7,6 +7,18 @@ from datetime import datetime
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 
+def _temporal_choice(options: tuple[str, ...], value: object, salt: str = "") -> str:
+    """Choose replay-stably while making adjacent hours and days move through a palette."""
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        digest = hashlib.sha256(f"{value}:{salt}".encode()).digest()
+        return options[int.from_bytes(digest[:4], "big") % len(options)]
+    salt_value = int.from_bytes(hashlib.sha256(salt.encode()).digest()[:2], "big")
+    index = moment.date().toordinal() * 7 + moment.hour + moment.minute // 15 + salt_value
+    return options[index % len(options)]
+
+
 class StandInGateway(ModelGateway):
     async def generate(self, request: ModelRequest) -> ModelResponse:
         context = json.loads(request.messages[-1].content)
@@ -44,12 +56,24 @@ class StandInGateway(ModelGateway):
                     "Yeah, go on.",
                 )[choice % 3]
         elif role == "murmur":
-            text = (
-                f"I find something comforting in the familiar rhythm of {location}.",
-                f"I notice a fragment from earlier coming back: {last_memory}",
-                "I should leave a little space in the day for something unplanned.",
-                "I think some days are held together by very small things.",
-            )[choice % 4]
+            text = _temporal_choice(
+                (
+                    f"I find something comforting in the familiar rhythm of {location}.",
+                    f"A fragment from earlier keeps coming back: {last_memory}",
+                    "I could leave a little space in the day for something unplanned.",
+                    "I think some days are held together by very small things.",
+                    "I keep noticing the sounds in the room after everyone goes quiet.",
+                    "Part of me wants to finish one thing; another part wants to wander.",
+                    "I wonder which ordinary detail from today I'll remember next week.",
+                    "There is a difference between resting and simply stopping.",
+                    f"Something about {location} feels slightly different today.",
+                    "I don't need every loose end tied up before the evening.",
+                    "The thought I avoided earlier has become quieter, not gone.",
+                    "I feel more curious about the interruption than annoyed by it now.",
+                ),
+                context.get("time"),
+                "murmur",
+            )
         elif role == "firmament":
             if context.get("scene_mode") is True:
                 text = (
@@ -59,17 +83,53 @@ class StandInGateway(ModelGateway):
                 )
             else:
                 person = context["person"]
-                lines = {
-                    "Mara": "Mara asks whether the little lamp at the workshop is working yet.",
-                    "Ellis": "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
-                    "Rowan": "Rowan shares a sketch of the square and points out a detail Pathos missed.",
+                lines: dict[str, tuple[str, ...]] = {
+                    "Mara": (
+                        "Mara asks whether the little lamp at the workshop is working yet.",
+                        "Mara arrives with rain on one shoulder and sets a chipped blue mug by the kettle.",
+                        "Mara pauses over the repair shelf and asks which job has been the most stubborn.",
+                        "Mara brings over a paper bag of screws that someone left outside the workshop door.",
+                        "Mara notices the lamp cord has twisted again and kneels to straighten it.",
+                        "Mara stays for tea and tells Pathos the café has changed its window display.",
+                    ),
+                    "Ellis": (
+                        "Ellis holds up a repaired wooden joint, pleased with how neatly it fits.",
+                        "Ellis finds a pencil behind the tool chest and claims it has been missing for months.",
+                        "Ellis asks Pathos to listen to the faint click in a newly repaired drawer.",
+                        "Ellis sweeps a curl of wood from the bench and makes room for the next job.",
+                        "Ellis tests a repaired hinge, frowns once, and reaches for the screwdriver again.",
+                        "Ellis leaves half a biscuit beside Pathos's tea and denies wanting the rest.",
+                    ),
+                    "Rowan": (
+                        "Rowan shares a sketch of the square and points out a detail Pathos missed.",
+                        "Rowan stops beneath the willows to watch two crows argue over a paper wrapper.",
+                        "Rowan asks whether the old bench looks more silver or green in today's light.",
+                        "Rowan shows Pathos a smudged drawing made while waiting for the rain to ease.",
+                        "Rowan spots a lost glove on the park rail and moves it somewhere easier to see.",
+                        "Rowan walks one slow circuit of the square with Pathos before turning home.",
+                    ),
                 }
-                text = lines.get(
+                options = lines.get(
                     person,
-                    f"{person} pauses nearby and mentions a small detail from their day.",
+                    (
+                        f"{person} pauses nearby and mentions a small detail from their day.",
+                        f"{person} stops long enough to share an ordinary piece of neighborhood news.",
+                        f"{person} notices something out of place, then decides it can wait.",
+                    ),
                 )
+                text = _temporal_choice(options, context.get("time"), str(person))
         elif role == "reflection":
-            text = f"Looking back, this is the moment that stays with me: {last_memory}"
+            text = _temporal_choice(
+                (
+                    f"This is the bit that stayed with me: {last_memory}",
+                    f"I keep coming back to one ordinary moment: {last_memory}",
+                    f"The day feels clearer when I start here: {last_memory}",
+                    f"I didn't expect this to matter as much as it did: {last_memory}",
+                    f"If I carry one thing out of today, it's this: {last_memory}",
+                ),
+                context.get("time"),
+                "reflection",
+            )
         elif role == "oneiros":
             dreams = (
                 f"In a dream, {location} opens into a room full of unfinished clocks. Each one keeps a different afternoon.",
@@ -79,7 +139,7 @@ class StandInGateway(ModelGateway):
                 f"In a dream, a red thread runs from {location} through the streets and knots itself around an unfinished question.",
                 f"In a dream, the memory '{last_memory}' is folded into a tiny map whose roads rearrange whenever I blink.",
             )
-            text = dreams[choice % len(dreams)]
+            text = _temporal_choice(dreams, context.get("time"), "oneiros")
         elif role == "chronicler":
             text = " ".join(memories[-7:]) or "A quiet day, with no recorded encounters yet."
         elif role == "mnemosyne":

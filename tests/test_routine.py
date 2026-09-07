@@ -11,6 +11,21 @@ from eidos.domain.routine import (
 
 
 class RoutineTests(unittest.TestCase):
+    def test_opening_week_keeps_causal_shape_without_repeating_lived_detail(self):
+        days = [routine_for_day(datetime(2026, 1, day).date()) for day in range(1, 7)]
+        shape = [(beat.hour, beat.location_id, beat.activity, beat.energy) for beat in days[0]]
+
+        for day in days:
+            self.assertEqual(
+                [(beat.hour, beat.location_id, beat.activity, beat.energy) for beat in day],
+                shape,
+            )
+        for beat_index in range(len(days[0])):
+            self.assertEqual(len({day[beat_index].description for day in days}), 6)
+        self.assertEqual(
+            days, [routine_for_day(datetime(2026, 1, day).date()) for day in range(1, 7)]
+        )
+
     def test_month_has_broad_replayable_daily_texture(self):
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
         end = start + timedelta(days=30)

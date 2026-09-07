@@ -13,6 +13,12 @@ must agree with the world's account.
 
 ## A routine is a floor, not a script
 
+Even when an acceptance story needs Pathos and another person in the same place at a
+known time, only that causal shape is fixed. The lived description, noticed details,
+conversation fragments, associations, and dreams must vary replay-stably. A new world
+must never read as though Pathos performed the same prose itinerary several days in a
+row.
+
 Pathos must not cycle through the same handful of beats every day. Stable habits,
 work, sleep, and familiar places make change legible, but ordinary life also contains
 errands, visitors, weather changes, cancellations, overheard moments, new people,

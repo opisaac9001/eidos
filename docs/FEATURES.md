@@ -132,7 +132,7 @@ are simulation artifacts, not the inference model's literal hidden reasoning.
 | QA-04 | Recall, forgetting, evidence lineage, hidden-knowledge isolation | Partial: owned recall/belief and source-membership fixtures | P2 |
 | QA-05 | Dream/fact separation, affect caps, no action bypass | Partial: category/label checks | P4 |
 | QA-06 | Seven-day plan/relationship causality and coherent recall | Partial: exact replay plus routed/durable/structured/deferred integrated week | P5 |
-| QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Partial: offline month replay/drift/storage gate plus seven-case coverage-reporting narrative/agency/project benchmark; Dell calibration remains | P6 |
+| QA-07 | Month soak, repetition/drift/cost/storage review, model comparisons | Partial: offline month replay/drift/storage gate plus seven-case coverage-reporting narrative/agency/project benchmark; the opening week preserves causal times and places while varying every routine description, and stand-in encounters, dreams and inner thoughts rotate replay-stably; Dell calibration remains | P6 |
 
 ## Optional expansion
 

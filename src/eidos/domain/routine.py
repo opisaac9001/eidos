@@ -133,13 +133,82 @@ _OPENING_ROUTINE = (
     RoutineBeat(22, "home", "Settled down for the night.", 0.20, "bedtime"),
 )
 
+_OPENING_DESCRIPTIONS: dict[int, tuple[str, ...]] = {
+    7: (
+        "Woke up and made breakfast.",
+        "Made breakfast, then stood by the open window with a second cup of tea.",
+        "Took breakfast back to bed and read until the room warmed up.",
+        "Made porridge for breakfast and wrote down the last bit of a strange dream.",
+        "Burned the first slice of toast, laughed, and started breakfast again.",
+        "Kept breakfast simple and spent a few quiet minutes watching the street wake up.",
+    ),
+    9: (
+        "Visited the cafe before work.",
+        "Took the corner table at Juniper Café and read the community noticeboard.",
+        "Stopped at the café long enough to finish a cup of tea before work.",
+        "Waited out a brief shower at Juniper Café before heading on.",
+        "Shared the café window counter with the usual morning crowd.",
+        "Picked up something warm at Juniper and stayed for one unhurried conversation.",
+    ),
+    10: (
+        "Started work at the neighborhood workshop.",
+        "Opened the workshop and sorted a tray of mismatched screws before the first repair.",
+        "Spent the morning testing a loose chair joint at the workshop.",
+        "Cleared yesterday's scraps from the shared bench and started a binding repair.",
+        "Helped Ellis find the source of a faint rattle in an old desk drawer.",
+        "Practiced a neater stitch on a damaged notebook before taking on other work.",
+    ),
+    13: (
+        "Took a lunch break in the park.",
+        "Ate lunch on the low wall in Willow Square and watched a dog chase leaves.",
+        "Walked a slow lap of the square with lunch wrapped in paper.",
+        "Found a dry bench in the park and spent lunch sketching passing coats.",
+        "Shared the sunny end of a park bench with a stranger during lunch.",
+        "Carried lunch through Willow Square and stopped to read a faded event poster.",
+    ),
+    14: (
+        "Returned to the workshop.",
+        "Went back to the workshop and sharpened two neglected hand tools.",
+        "Returned to finish the chair joint after giving the glue time to settle.",
+        "Spent the afternoon matching loose pages back to the right notebooks.",
+        "Tested a stubborn drawer twice before admitting the runners needed replacing.",
+        "Put the shared tools in order and finished one small repair before closing.",
+    ),
+    18: (
+        "Returned home for dinner.",
+        "Made soup for dinner and left the radio murmuring in the kitchen.",
+        "Ate leftovers for dinner, then fixed a loose button at the table.",
+        "Cooked too much pasta for dinner and packed the rest away for tomorrow.",
+        "Had a late, simple dinner after stopping to watch the square lights come on.",
+        "Made dinner from what was left in the cupboard and put music on quietly.",
+    ),
+    22: (
+        "Settled down for the night.",
+        "Washed the last mug, read for a while, and let sleep arrive on its own.",
+        "Wrote a few uneven lines about the day before turning out the light.",
+        "Made tea, opened the window for a minute, and went to bed early.",
+        "Stayed up to finish one chapter, then left the book open beside the bed.",
+        "Listened to the building settle around him and drifted off without setting an alarm.",
+    ),
+}
+
 
 def routine_for_day(day: date) -> tuple[RoutineBeat, ...]:
     """Build a replay-stable day with workday/weekend texture and many combinations."""
-    # The six-day acceptance story has known co-presence requirements. After it,
-    # the seed world opens into the broader palette below.
+    # The six-day acceptance story keeps stable co-presence windows, not repeated
+    # lived content. Each day has distinct detail while retaining causal fixtures.
     if date(2026, 1, 1) <= day <= date(2026, 1, 6):
-        return _OPENING_ROUTINE
+        day_index = (day - date(2026, 1, 1)).days
+        return tuple(
+            RoutineBeat(
+                beat.hour,
+                beat.location_id,
+                _OPENING_DESCRIPTIONS[beat.hour][day_index],
+                beat.energy,
+                beat.activity,
+            )
+            for beat in _OPENING_ROUTINE
+        )
     palette = dict(_WEEKDAY_PALETTE)
     if day.weekday() >= 5:
         palette.update(_WEEKEND_MIDDAYS)

@@ -56,14 +56,14 @@ class ModelBenchmarkTests(unittest.TestCase):
             <= tags
         )
 
-    def test_full_corpus_reports_complete_coverage_and_repetition_pressure(self):
+    def test_full_corpus_reports_complete_coverage_without_repetition_pressure(self):
         report = asyncio.run(benchmark_model(StandInGateway(), runs=7))
         self.assertEqual(len(report["case_ids"]), 7)
         self.assertEqual(report["contract_pass_rate"], 1.0)
         self.assertIn("dream_fact_boundary", report["corpus_coverage"])
         firmament = next(role for role in report["roles"] if role["role"] == "firmament")
-        self.assertGreater(firmament["finding_counts"].get("near_duplicate_prose", 0), 0)
-        self.assertFalse(firmament["meets_screening_floor"])
+        self.assertEqual(firmament["finding_counts"].get("near_duplicate_prose", 0), 0)
+        self.assertTrue(firmament["meets_screening_floor"])
 
     def test_run_budget_is_bounded(self):
         for invalid in (0, 11, True, 1.5):
