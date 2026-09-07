@@ -139,6 +139,9 @@ const labels = {
   "dream.recalled": "A DREAM REMEMBERED",
   "memory.reminded": "A MEMORY WAS REMINDED",
   "memory.correction_resisted": "A CONTRADICTION FELT UNCONVINCING",
+  "semantic.expectation_formed": "A PATTERN WAS LEARNED",
+  "semantic.expectation_reinforced": "A PATTERN FELT STRONGER",
+  "semantic.expectation_revised": "A PATTERN CHANGED",
   "transfer.offered": "OBJECT OFFERED",
   "transfer.accepted": "OBJECT TRANSFER ACCEPTED",
   "transfer.declined": "OBJECT TRANSFER DECLINED",
@@ -372,7 +375,15 @@ function renderArchive() {
   $("load-memories").hidden = !remote || archivePage.next_offset == null;
   $("load-memories").disabled = archiveLoading;
   $("load-memories").textContent = archiveLoading ? "Loading…" : "Load older memories";
-  $("belief-list").innerHTML = (state.beliefs || []).length
+  const expectationMarkup = (state.semantic_expectations || []).length
+    ? `<div class="eyebrow">LEARNED EXPECTATIONS · SUBJECTIVE PATTERNS, NOT FACTS</div>${state.semantic_expectations
+        .map(
+          (item) =>
+            `<article class="memory-card"><div class="memory-meta"><span>${esc(item.predicate.replaceAll("_", " ").toUpperCase())}</span><span>${Math.round(item.confidence * 100)}% confidence</span></div><p>${esc(item.text)}</p><div class="memory-source">revision ${item.revision} · inferred from ${item.distinct_days} distinct remembered days · ${item.source_memory_ids.length} source memories</div></article>`,
+        )
+        .join("")}`
+    : "";
+  const beliefMarkup = (state.beliefs || []).length
     ? `<div class="eyebrow">PATHOS'S BELIEFS · EVIDENCE IS NOT WORLD TRUTH</div>${state.beliefs
         .map(
           (item) =>
@@ -380,6 +391,7 @@ function renderArchive() {
         )
         .join("")}`
     : "";
+  $("belief-list").innerHTML = expectationMarkup + beliefMarkup;
   $("association-list").innerHTML = (state.associations || []).length
     ? `<div class="eyebrow">SUBJECTIVE ASSOCIATIONS · NOT FACTS</div>${state.associations
         .slice(0, 8)

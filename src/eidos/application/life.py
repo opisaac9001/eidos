@@ -3,7 +3,7 @@
 import asyncio
 import math
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Sequence
 from uuid import UUID, uuid4
 
 from eidos.application.agency import autonomous_activity_events
@@ -80,6 +80,7 @@ from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_projects import autonomous_project_events
+from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
@@ -138,6 +139,7 @@ from eidos.domain.scenes import (
     resolve_scene_turn,
 )
 from eidos.domain.seasons import project_season, season_change_events, season_for
+from eidos.domain.semantic_memory import project_semantic_expectations
 from eidos.domain.sleep import project_sleep_windows
 from eidos.domain.social import project_social
 from eidos.domain.social_preferences import project_social_preferences
@@ -845,6 +847,9 @@ class Life:
                 "memory.recovered",
                 "memory.recollection_corrected",
                 "memory.correction_resisted",
+                "semantic.expectation_formed",
+                "semantic.expectation_reinforced",
+                "semantic.expectation_revised",
                 "memory.retention_reviewed",
                 "memory.archived",
                 "transfer.offered",
@@ -959,6 +964,7 @@ class Life:
         emotion = project_emotion(history)
         season = project_season(history)
         beliefs = self._beliefs(history)
+        semantic_expectations = project_semantic_expectations(history).expectations
         followups = project_followups(history)
         development = project_development(history)
         transfers = project_transfers(history)
@@ -1112,6 +1118,7 @@ class Life:
             "beliefs": [
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id == "pathos"
             ],
+            "semantic_expectations": [vars_for(item) for item in semantic_expectations.values()],
             "npc_beliefs": [
                 vars_for(item) for item in beliefs.beliefs.values() if item.owner_id != "pathos"
             ],
@@ -1455,6 +1462,9 @@ class Life:
                 if planning_memory_due
                 else []
             )
+            semantic_context = (
+                semantic_expectation_context(project_history) if planning_memory_due else []
+            )
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1487,6 +1497,7 @@ class Life:
                 preferences=project_identity_state.preferences,
                 traits=project_trait_state.levels,
                 memories=recent_memory_context,
+                semantic_expectations=semantic_context,
             )
             if project_events:
                 self._planning(project_history + project_events)
@@ -1527,6 +1538,7 @@ class Life:
                 preferences=agency_identity.preferences,
                 traits=agency_traits.levels,
                 memories=recent_memory_context,
+                semantic_expectations=semantic_context,
                 known_person_ids=pathos_known_person_ids(agency_history),
             )
             if agency:
@@ -2195,6 +2207,7 @@ class Life:
                     }
                     for item in selected_context
                 ],
+                "semantic_expectations": [*semantic_expectation_context(history + pending)],
                 "identity": {
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
@@ -2571,6 +2584,7 @@ class Life:
                         index=self._consolidation_index(history + pending),
                     )
                 )
+                pending.extend(semantic_expectation_events(history + pending, current))
         final_time = DomainEvent("time.advanced", "pathos", {"simulated_at": target})
         pending.append(final_time)
         state = state.apply(final_time)
@@ -3110,6 +3124,7 @@ class Life:
                 }
                 for item in selected
             ],
+            "semantic_expectations": [*semantic_expectation_context(history)],
             "beliefs": [
                 {
                     "subject": belief.subject_id,
@@ -3247,6 +3262,21 @@ class Life:
         self._save_beliefs(committed)
         self._save_relationships(committed)
         self._save_consolidation_index(committed)
+
+
+def semantic_expectation_context(events: Sequence[DomainEvent]) -> list[dict[str, object]]:
+    """Expose Pathos's fallible generalizations without operator-only source metadata."""
+    return [
+        {
+            "text": item.text,
+            "subject_id": item.subject_id,
+            "predicate": item.predicate,
+            "object_value": item.object_value,
+            "confidence": item.confidence,
+            "epistemic_status": "subjective_generalization",
+        }
+        for item in project_semantic_expectations(events).expectations.values()
+    ]
 
 
 def vars_for(value: Any) -> dict[str, Any]:

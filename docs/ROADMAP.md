@@ -1,6 +1,6 @@
 # Eidos master roadmap
 
-Updated September 5, 2026. This is a design and delivery plan, not a claim that
+Updated September 6, 2026. This is a design and delivery plan, not a claim that
 the planned behavior exists. Milestones are dependency-driven, not dated promises.
 
 ## Destination
@@ -211,6 +211,11 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   predates the drift cannot correct it.
 - Consolidate repeated episodes into source-linked summaries and associations.
   Maintain uncertainty and correction history; summaries are not new events.
+- Repeated lived encounters on at least three subjectively remembered days can now
+  form a separate semantic expectation, such as expecting a person at a familiar
+  place. These patterns retain their episodic sources, confidence and revisions,
+  follow Pathos's fallible attribution rather than hidden archive truth, and can
+  shape conversation or planning without guaranteeing anybody's current location.
 - Stable values/preferences/traits plus separately changing needs, emotional
   episodes, named emotional states, duration, baseline mood and recovery. Emotional
   planning bias changes attention and option weighting without removing feasibility,

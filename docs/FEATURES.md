@@ -19,10 +19,10 @@ Planned = missing; Optional = deferred. Phases indicate next substantial deliver
 | ID | Feature | Status | Phase |
 | --- | --- | --- | --- |
 | MEM-01 | Owned experiences, source links, confidence, importance, emotional tags | Partial: owner/source/confidence/importance plus replay-derived valence, arousal, intensity, and named feeling at encoding for every Pathos memory | P2 |
-| MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: recent seven | P2 |
+| MEM-02 | Working context, episodic/semantic/recent/dream memory distinctions | Partial: cue-selected episodic context plus source-linked fallible semantic expectations formed across at least three remembered days | P2 |
 | MEM-03 | Cue/entity/goal retrieval, diversity, score explanations, optional embeddings | Partial: durable term/entity/goal/relationship indexes + diverse explanations | P2 |
 | MEM-04 | Accessibility/detail fading, rehearsal, reminders, bounded reinforcement | Partial: time decay, capped rehearsal, and source-linked explicit user reminders with separately bounded reinforcement | P2 |
-| MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes with complete source membership and prefix-verified incremental grouping | P2 |
+| MEM-05 | Consolidation, recurring themes, source-linked summaries | Partial: owner-separated daily themes plus revisable person/place expectations, both with complete source membership; daily grouping is prefix-verified and incremental | P2 |
 | MEM-06 | Associations, resurfacing cues, unfinished-concern links | Partial: typed source-linked associations with bounded attention | P2 |
 | MEM-07 | Owned beliefs, uncertainty, testimony reliability, correction history | Partial: Pathos and residents form actor-owned discounted testimony, direct confirmation can strengthen or contest it, and revision ledgers/materialization remain checked | P2 |
 | MEM-08 | Intentional imperfect recall distinct from world truth | Implemented: accessibility-driven omission, mood-congruent retrieval, mood-colored reconsolidation, source-linked content/person/place/time confusion, repetition-driven false certainty, first-contradiction resistance, and independently corroborated direct correction without changing source history | P2 |

@@ -182,6 +182,13 @@ class AgencyTests(unittest.TestCase):
                 preferences=("quiet mornings",),
                 traits={"openness": 0.68},
                 memories=["I noticed rain collecting on the old bench."],
+                semantic_expectations=[
+                    {
+                        "text": "I expect Mara is usually at the cafe.",
+                        "confidence": 0.61,
+                        "epistemic_status": "subjective_generalization",
+                    }
+                ],
                 known_person_ids=frozenset({"mara"}),
             )
         )
@@ -194,6 +201,7 @@ class AgencyTests(unittest.TestCase):
         context = json.loads(gateway.requests[0].messages[0].content)
         self.assertEqual(context["current_attention"]["focus_id"], "unfinished-letter")
         self.assertEqual(set(context["known_people"]), {"mara"})
+        self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
 
 
 if __name__ == "__main__":

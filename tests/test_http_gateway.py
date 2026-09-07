@@ -181,6 +181,13 @@ class GatewayTests(unittest.TestCase):
                             "needs": {"curiosity": 0.8},
                             "preferences": ["spending reflective time outdoors"],
                             "traits": {"openness": 0.69},
+                            "semantic_expectations": [
+                                {
+                                    "text": "I expect Mara is usually at the cafe.",
+                                    "confidence": 0.61,
+                                    "epistemic_status": "subjective_generalization",
+                                }
+                            ],
                             "known_places": {"home": {"name": "Home"}},
                             "calendar": [],
                             "private_operator_field": "must not pass",
@@ -198,7 +205,12 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["needs"], {"curiosity": 0.8})
         self.assertEqual(context["preferences"], ["spending reflective time outdoors"])
         self.assertEqual(context["traits"], {"openness": 0.69})
+        self.assertEqual(
+            context["semantic_expectations"][0]["epistemic_status"],
+            "subjective_generalization",
+        )
         self.assertIn("slowly learned preferences", self.payload["messages"][0]["content"])
+        self.assertIn("not world facts", self.payload["messages"][0]["content"])
         self.assertNotIn("private_operator_field", context)
 
     def test_incomplete_and_invalid_envelopes_rejected(self):

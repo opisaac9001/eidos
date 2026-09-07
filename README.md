@@ -68,6 +68,11 @@ Behavioral traits move even more slowly: five resolved outcomes across at least 
 month can nudge one tendency by one percentage point, with hard drift and cadence
 limits. Conversation, activity, and project performers receive the resulting identity
 context, while replay verifies every cited source.
+Repeated encounters on distinct remembered days can also become a fallible semantic
+expectation, such as expecting someone at a familiar place. The expectation keeps its
+episodic sources and revisions, follows Pathos's subjective memory when attribution
+drifts, and may influence what he says or plans without becoming proof that the person
+is actually there.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,
