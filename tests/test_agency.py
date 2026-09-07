@@ -302,6 +302,7 @@ class AgencyTests(unittest.TestCase):
                 workspace=[
                     {
                         "from_faculty": "reflection",
+                        "source_event_id": "reflection-question-event",
                         "content": "Should I repair, renegotiate, or release this commitment?",
                         "epistemic_status": "planning_question",
                         "target_type": "commitment",
@@ -316,6 +317,12 @@ class AgencyTests(unittest.TestCase):
         self.assertEqual(proposal.payload["activity_type"], "plan_reconsideration")
         self.assertIn("reconsider", str(proposal.payload["title"]).lower())
         self.assertIn("schedule.created", {event.kind for event in events})
+        link = next(
+            event for event in events if event.kind == "reflection.reconsideration_scheduled"
+        )
+        schedule = next(event for event in events if event.kind == "schedule.created")
+        self.assertEqual(link.payload["activity_schedule_id"], schedule.payload["schedule_id"])
+        self.assertEqual(link.causation_id, schedule.event_id)
 
 
 if __name__ == "__main__":

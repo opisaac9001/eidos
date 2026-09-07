@@ -307,7 +307,10 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   dream-category reflection cannot invent a factual emotional cause.
 - A reflection on an appraised setback may raise one source-linked 48-hour question
   about its commitment, schedule, or goal. It cannot change the plan itself; later
-  agency can choose an ordinary, feasible hour to reconsider it.
+  agency can choose an ordinary, feasible hour to reconsider it. Completing that hour
+  produces a typed linked decision. Only a blocked personal goal with no active
+  obligation can be released directly, through the existing abandonment resolver;
+  commitment repair and renegotiation remain separate social processes.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

@@ -77,6 +77,15 @@ async def autonomous_activity_events(
         for place in catalog.places.values()
     }
     attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
+    planning_question = next(
+        (
+            item
+            for item in workspace
+            if item.get("epistemic_status") == "planning_question"
+            and item.get("action_authority") is False
+        ),
+        None,
+    )
     recent_activity_patterns = _recent_activity_patterns(history, simulated_at)
     context = {
         "time": simulated_at.isoformat(),
@@ -224,6 +233,41 @@ async def autonomous_activity_events(
         ],
     )
     output.extend(resolution.events)
+    proposed_activity = next(
+        (event for event in resolution.events if event.kind == "agency.activity_proposed"), None
+    )
+    if (
+        resolution.accepted
+        and proposed_activity is not None
+        and proposed_activity.payload.get("activity_type") == "plan_reconsideration"
+        and isinstance(planning_question, Mapping)
+    ):
+        schedule = next(
+            (event for event in resolution.events if event.kind == "schedule.created"), None
+        )
+        source_id = planning_question.get("source_event_id")
+        target_type = planning_question.get("target_type")
+        target_id = planning_question.get("target_id")
+        if schedule is not None and all(
+            isinstance(value, str) and value.strip()
+            for value in (source_id, target_type, target_id)
+        ):
+            output.append(
+                DomainEvent(
+                    "reflection.reconsideration_scheduled",
+                    "pathos",
+                    {
+                        "source_reconsideration_event_id": source_id,
+                        "activity_schedule_id": schedule.payload["schedule_id"],
+                        "target_type": target_type,
+                        "target_id": target_id,
+                        "simulated_at": simulated_at.isoformat(),
+                        "action_authority": False,
+                    },
+                    causation_id=schedule.event_id,
+                    correlation_id=str(source_id),
+                )
+            )
     return output
 
 

@@ -77,6 +77,7 @@ from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
 from eidos.application.recollection_correction import recollection_correction_events
+from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.reflection_followups import reflection_reconsideration_events
@@ -2566,6 +2567,21 @@ class Life:
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)
                 pending.extend(scheduled_activity)
+                for realized in (
+                    event
+                    for event in scheduled_activity
+                    if event.kind == "agency.activity_realized"
+                ):
+                    decisions = reconsideration_decision_events(
+                        history + pending,
+                        realized,
+                        self._planning(history + pending),
+                        len(history) + len(pending),
+                        current,
+                    )
+                    if decisions:
+                        self._planning(history + pending + decisions)
+                        pending.extend(decisions)
             pending.extend(
                 object_collaboration_events(
                     history + pending,

@@ -438,7 +438,13 @@ When the same reflection traces to a negatively appraised lived setback carrying
 commitment, schedule, or goal identifier, it can also raise one 48-hour planning
 question. The question preserves the reflection, memory, and event lineage and has no
 action authority. A later agency pass may choose to schedule ordinary time to
-reconsider it; neither the reflection nor the question edits or cancels the plan.
+reconsider it; neither the reflection nor the question edits or cancels the plan. The
+accepted activity keeps the original question and target attached. Only after Pathos
+actually completes that hour does it record a typed decision: keep, seek a new time,
+consider renegotiation, seek repair after a miss, acknowledge a closed outcome, or
+release an already-blocked personal goal. Release is permitted only when no active
+external commitment remains and must pass the existing atomic abandonment resolver;
+all other decisions leave the plan intact for their ordinary follow-up machinery.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.
