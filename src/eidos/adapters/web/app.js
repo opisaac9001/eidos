@@ -88,6 +88,7 @@ const labels = {
   "agency.activity_rejected": "AN IDEA DID NOT FIT",
   "agency.activity_realized": "A PERSONAL PLAN HAPPENED",
   "agency.activity_missed": "A PERSONAL PLAN FELL THROUGH",
+  "prospective_memory.lapsed": "A SMALL PLAN SLIPPED HIS MIND",
   "self_project.proposed": "A PROJECT IDEA OCCURRED",
   "self_project.accepted": "A NEW PROJECT BEGAN",
   "self_project.rejected": "A PROJECT DID NOT FIT",
@@ -504,6 +505,43 @@ function feedMarkup(items, full = false) {
         `<div class="feed-row"><span class="feed-time">${full ? `${esc(date(item.simulated_at))}<br>` : ""}${esc(time(item.simulated_at))}</span><div><div class="feed-type">${esc(labels[item.kind] || item.kind)}</div><div class="feed-text">${esc(item.text || item.reason || item.title || "Recorded consequence")}</div></div></div>`,
     )
     .join("");
+}
+
+function renderAheadInMind() {
+  const prospective = (state.mind?.layers || []).find(
+    (item) => item.layer === "prospective",
+  );
+  const plan = prospective
+    ? state.calendar.find(
+        (item) =>
+          item.schedule_id === prospective.focus_id &&
+          item.status === "scheduled" &&
+          new Date(item.starts_at) >= new Date(state.time),
+      )
+    : null;
+  if (!prospective || !plan) {
+    $("ahead-in-mind").innerHTML =
+      '<h2 id="ahead-title">Nothing is pressing yet.</h2><p class="context-note">Later plans will begin to enter his thoughts as they get closer.</p>';
+    return;
+  }
+  const minutes = Math.max(
+    0,
+    Math.round((new Date(plan.starts_at) - new Date(state.time)) / 60000),
+  );
+  const hours = Math.max(1, Math.round(minutes / 60));
+  const distance =
+    minutes < 60
+      ? `in about ${Math.max(1, minutes)} minute${minutes === 1 ? "" : "s"}`
+      : `in about ${hours} hour${hours === 1 ? "" : "s"}`;
+  const tone = Number(prospective.anticipatory_valence || 0);
+  const feeling =
+    tone >= 0.16
+      ? "He seems to be looking forward to it."
+      : tone <= -0.08
+        ? "It is carrying a little pressure for him."
+        : "He has started turning it over in the background.";
+  $("ahead-in-mind").innerHTML =
+    `<h2 id="ahead-title">${esc(plan.title)} · ${esc(distance)}</h2><p>${esc(feeling)}</p><p class="context-note">This is anticipation, not a completed event. The plan can still change—or, occasionally, slip his mind.</p>`;
 }
 
 const words = (value) => String(value || "").replaceAll("_", " ");
@@ -967,13 +1005,25 @@ function renderPlans() {
       "commitment.fulfilled",
       "commitment.renegotiated",
       "commitment.renegotiation_declined",
+      "prospective_memory.lapsed",
       "intention.completed",
       "goal.progressed",
       "goal.achieved",
       "goal.abandoned",
       "finance.payment_missed",
     ].includes(item.kind),
-  );
+  ).map((item) => {
+    if (item.kind !== "prospective_memory.lapsed") return item;
+    const plan = state.calendar.find(
+      (candidate) => candidate.schedule_id === item.schedule_id,
+    );
+    return {
+      ...item,
+      text: plan
+        ? `He meant to ${plan.title.toLowerCase()}, but it slipped his mind.`
+        : "A small personal plan slipped his mind.",
+    };
+  });
   $("plan-change-list").innerHTML = feedMarkup(changes, true);
 }
 
@@ -1171,6 +1221,7 @@ function render(next) {
   $("latest-thought").textContent = thought
     ? `“${thought.text}”`
     : "The day is just beginning.";
+  renderAheadInMind();
   const inspiration = state.dream_inspirations?.[0];
   $("dream-inspiration").hidden = !inspiration;
   $("dream-inspiration").textContent = inspiration

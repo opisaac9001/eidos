@@ -357,6 +357,7 @@ def _within_recent_hours(event: DomainEvent, at: datetime, hours: int) -> bool:
 
 def mind_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:
     mind = project_mind(history)
+    planning = project_planning(list(history))
     return [
         {
             "layer": pulse.layer,
@@ -365,6 +366,16 @@ def mind_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:
             "focus_id": pulse.focus_id,
             "focus_text": pulse.focus_text,
             "activation": pulse.activation,
+            **(
+                {"anticipatory_valence": pulse.anticipatory_valence}
+                if pulse.anticipatory_valence is not None
+                else {}
+            ),
         }
         for pulse in mind.latest.values()
+        if pulse.layer != CognitiveLayer.PROSPECTIVE.value
+        or (
+            (plan := planning.calendar.get(pulse.focus_id)) is not None
+            and plan.status == "scheduled"
+        )
     ]

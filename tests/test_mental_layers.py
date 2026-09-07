@@ -188,6 +188,18 @@ class MentalLayerTests(unittest.TestCase):
         self.assertNotEqual(attention.payload["focus_type"], "commitment")
         projected = project_mind([schedule, *events])
         self.assertEqual(projected.latest["prospective"].focus_type, "planned_activity")
+        self.assertEqual(
+            projected.latest["prospective"].anticipatory_valence,
+            prospective.payload["anticipatory_valence"],
+        )
+        exposed = next(
+            item
+            for item in mind_context([schedule, *events])
+            if item["layer"] == "prospective"
+        )
+        self.assertEqual(
+            exposed["anticipatory_valence"], prospective.payload["anticipatory_valence"]
+        )
 
     def test_cancelled_plan_does_not_remain_in_prospective_thought(self):
         at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
@@ -218,6 +230,27 @@ class MentalLayerTests(unittest.TestCase):
         )
 
         self.assertNotIn("prospective", {event.payload["layer"] for event in events})
+        prior = mental_layer_events(
+            [schedule], PathosState(simulated_at=at, awake=True), at, {}
+        )
+        self.assertNotIn(
+            "prospective",
+            {
+                item["layer"]
+                for item in mind_context([schedule, *prior, cancelled])
+            },
+        )
+
+    def test_non_prospective_anticipatory_valence_is_rejected(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        event = mental_layer_events([], PathosState(simulated_at=at), at, {})[0]
+        invalid = DomainEvent(
+            event.kind,
+            event.aggregate_id,
+            {**dict(event.payload), "anticipatory_valence": 0.2},
+        )
+        with self.assertRaises(ValueError):
+            project_mind([invalid])
 
     def test_exhausted_promise_can_feel_pressured_before_it_begins(self):
         at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)

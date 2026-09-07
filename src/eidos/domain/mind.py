@@ -33,6 +33,7 @@ class LayerPulse:
     focus_text: str
     activation: float
     simulated_at: str
+    anticipatory_valence: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +69,16 @@ class MindState:
         simulated_at = _required(payload, "simulated_at")
         if datetime.fromisoformat(simulated_at).utcoffset() is None:
             raise ValueError("Layer pulse time must be timezone-aware")
+        anticipatory_valence = payload.get("anticipatory_valence")
+        if anticipatory_valence is not None and (
+            layer != CognitiveLayer.PROSPECTIVE.value
+            or isinstance(anticipatory_valence, bool)
+            or not isinstance(anticipatory_valence, (int, float))
+            or not -1 <= anticipatory_valence <= 1
+        ):
+            raise ValueError(
+                "Anticipatory valence must be a prospective value between minus one and one"
+            )
         pulse = LayerPulse(
             pulse_id,
             layer,
@@ -77,6 +88,7 @@ class MindState:
             _required(payload, "focus_text"),
             float(activation),
             simulated_at,
+            float(anticipatory_valence) if anticipatory_valence is not None else None,
         )
         latest = dict(self.latest)
         counts = dict(self.pulse_counts)

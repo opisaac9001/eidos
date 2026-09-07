@@ -889,6 +889,7 @@ class Life:
                 "agency.activity_rejected",
                 "agency.activity_realized",
                 "agency.activity_missed",
+                "prospective_memory.lapsed",
                 "self_project.proposed",
                 "self_project.accepted",
                 "self_project.rejected",
@@ -1201,7 +1202,7 @@ class Life:
             "npc_states": [vars_for(person) for person in npc_state.people.values()],
             "npc_memories": npc_memories[-100:],
             "mind": {
-                "layers": [vars_for(item) for item in mind.latest.values()],
+                "layers": mind_context(history),
                 "pulse_counts": dict(mind.pulse_counts),
                 "workspace": cognitive_workspace(history, state.simulated_at),
             },
