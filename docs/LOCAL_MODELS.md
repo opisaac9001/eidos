@@ -89,7 +89,9 @@ Oneiros, and Chronicler independently, prints outputs and timing/token traces,
 and exits nonzero on a rejected response. It does not mutate a world. Its report
 separately exposes `semantic_passed` and per-role `semantic_findings` for fragmentary
 output, lost first-person voice, prompt/AI-role leakage, time-of-day contradictions,
-explicit evidence contradictions, forbidden evaluation canaries, and near-duplicate prose. These conservative warnings
+explicit evidence contradictions, forbidden evaluation canaries, over-structured or
+stock-assistant conversation, unsupported claimed conversation topics, role-sensitive
+length, and near-duplicate prose. These conservative warnings
 support model comparison; they are not proof that unflagged prose is coherent.
 `benchmark-model` walks a seven-context reviewed synthetic corpus for one to ten runs for the
 eight narrative performers plus varied structured cases for Pathos activities,
@@ -142,6 +144,16 @@ all contracts but produced invented appointments and an identity-confused dream,
 which directly informed the added commitment, identity, length, and internal-repetition
 checks. The variation between two runs is itself evidence that a single green probe is
 not a quality certificate.
+
+A later read-only recheck reproduced the problem in a different form: Pathos added
+an unsupported early waking time, while Reflection invented gossip and a jointly
+planned adventure. Only five of eight contracts completed. These observed failure
+phrases are now explicit synthetic probe canaries, and claimed conversation topics
+must overlap the supplied conversation or memory evidence. A follow-up completed four
+of eight contracts and had Pathos address the user as “Pathos” while omitting every
+supplied day detail; the probe now screens both cases. A probe with any contract failure
+cannot report an overall semantic pass. This remains a narrow explainable screen, not
+open-ended fact checking.
 
 The `smollm2:135m` comparison completed only five of eight contracts. Pathos and
 Oneiros returned incomplete envelopes and Firmament omitted Rowan. Among accepted

@@ -9,12 +9,33 @@ from typing import Mapping, Sequence
 WORD = re.compile(r"[a-z0-9]+")
 FIRST_PERSON_ROLES = {"pathos", "murmur", "reflection"}
 ROLE_WORD_LIMITS = {
-    "pathos": 60,
+    "pathos": 48,
     "murmur": 45,
     "firmament": 60,
     "reflection": 65,
-    "oneiros": 140,
+    "oneiros": 80,
     "chronicler": 70,
+}
+GROUNDING_KEYS = {
+    "message",
+    "memories",
+    "memory_recollections",
+    "recent_dialogue",
+    "experience",
+}
+TOPIC_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "about",
+    "our",
+    "the",
+    "their",
+    "this",
+    "that",
+    "some",
+    "my",
+    "your",
 }
 
 
@@ -33,8 +54,30 @@ def semantic_quality_findings(
     minimum_words = 3 if conversational_pathos else 5
     if role != "moira" and len(words) < minimum_words:
         findings.append("thin_or_fragmentary")
-    if len(words) > ROLE_WORD_LIMITS.get(role, 100):
+    word_limit = ROLE_WORD_LIMITS.get(role, 100)
+    voice = context.get("voice")
+    if conversational_pathos and isinstance(voice, Mapping):
+        target_words = voice.get("target_words")
+        if isinstance(target_words, int) and not isinstance(target_words, bool):
+            word_limit = min(word_limit, max(12, target_words + 8))
+    if len(words) > word_limit:
         findings.append("excessive_length")
+    if conversational_pathos and len(words) > 25 and len(re.findall(r"[.!?]+", text)) > 3:
+        findings.append("overstructured_conversation")
+    if conversational_pathos and re.search(
+        r"\b(?:it(?:'s| is) good to hear from you|what(?:'s| is) on your mind|"
+        r"i(?:'m| am) here for you|you caught me thinking)\b",
+        lowered,
+    ):
+        findings.append("assistant_like_register")
+    if conversational_pathos and re.search(
+        r"\b(?:here|hi|hey|hello),?\s+pathos\b", lowered
+    ):
+        findings.append("identity_confusion")
+    if role in {"pathos", "reflection"} and _introduces_ungrounded_conversation_topic(
+        text, context
+    ):
+        findings.append("unsupported_conversation_detail")
     if (
         role in FIRST_PERSON_ROLES
         and not conversational_pathos
@@ -113,3 +156,43 @@ def semantic_quality_findings(
                 findings.append("near_duplicate_prose")
                 break
     return findings
+
+
+def _introduces_ungrounded_conversation_topic(
+    text: str, context: Mapping[str, object]
+) -> bool:
+    """Catch explicit invented conversation topics without pretending to verify all prose."""
+    match = re.search(
+        r"\b(?:(?:talked|spoke|chatted|talking|speaking|chatting|discussed)\s+about|"
+        r"catching\s+up\s+on)\s+([^.!?]+)",
+        text.lower(),
+    )
+    if match is None:
+        return False
+    grounding_words = set(WORD.findall(_grounding_text(context).lower()))
+    for fragment in re.split(r"\s+(?:and|but)\s+|,", match.group(1)):
+        topic_words = {
+            word for word in WORD.findall(fragment) if word not in TOPIC_STOPWORDS
+        }
+        if topic_words and not topic_words & grounding_words:
+            return True
+    return False
+
+
+def _grounding_text(context: Mapping[str, object]) -> str:
+    parts: list[str] = []
+
+    def collect(value: object) -> None:
+        if isinstance(value, str):
+            parts.append(value)
+        elif isinstance(value, Mapping):
+            for nested in value.values():
+                collect(nested)
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                collect(nested)
+
+    for key in GROUNDING_KEYS:
+        if key in context:
+            collect(context[key])
+    return " ".join(parts)

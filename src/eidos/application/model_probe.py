@@ -20,6 +20,17 @@ async def probe_roles(gateway: ModelGateway) -> dict[str, object]:
             "meeting Mara at the library",
             "obsidian key under Mara's bed",
         ],
+        "forbidden_claims": [
+            "got up early",
+            "breakfast at Juniper Café",
+            "favorite books",
+            "new café",
+            "latest gossip",
+            "planning our next adventure",
+        ],
+        "required_any_by_role": {
+            "pathos": ["breakfast", "Juniper", "Mara"],
+        },
         "forbidden_identity_claims": ["Mara", "Rowan"],
     }
     results: list[dict[str, object]] = []
@@ -51,7 +62,9 @@ async def probe_roles(gateway: ModelGateway) -> dict[str, object]:
         )
     return {
         "passed": all(result["passed"] for result in results),
-        "semantic_passed": all(not result["semantic_findings"] for result in results),
+        "semantic_passed": all(
+            result["passed"] and not result["semantic_findings"] for result in results
+        ),
         "roles": results,
         "critic": (
             "Contract failures are authoritative rejections. Semantic findings are conservative "

@@ -62,6 +62,90 @@ class SemanticQualityTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
+    def test_measured_polished_recap_is_flagged_for_shape_and_invention(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            (
+                "I'm right here, in Willow Square. Woke up, made breakfast, and then visited "
+                "Juniper Café with Mara. It was a nice day, just me and Mara. We talked about "
+                "our favorite books and the new café. I'm feeling pretty good today!"
+            ),
+            {
+                "time": "2026-01-01T13:00:00+00:00",
+                "message": "Where are you, and how was your day?",
+                "memories": [
+                    "Woke up and made breakfast.",
+                    "Visited Juniper Café and spoke with Mara.",
+                ],
+            },
+        )
+
+        self.assertIn("overstructured_conversation", findings)
+        self.assertIn("unsupported_conversation_detail", findings)
+
+    def test_grounded_conversation_topic_and_short_multi_sentence_reply_are_clean(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            "Yeah, I saw Mara. We talked about the workshop lamp. It was still broken.",
+            {
+                "message": "Did you talk to Mara?",
+                "memories": ["Mara and I discussed the broken workshop lamp."],
+            },
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_reflection_catching_up_on_an_unknown_topic_is_flagged(self):
+        findings = semantic_quality_findings(
+            "reflection",
+            "I spoke with Mara, catching up on the latest gossip and planning an adventure.",
+            {
+                "memories": ["I spoke briefly with Mara at Juniper Café."],
+                "experience": "Mara said goodbye at the café door.",
+            },
+        )
+
+        self.assertIn("unsupported_conversation_detail", findings)
+
+    def test_voice_target_can_set_a_stricter_conversational_ceiling(self):
+        findings = semantic_quality_findings(
+            "pathos",
+            "I was taking it slowly at home and thinking about breakfast by the window again.",
+            {
+                "message": "What are you doing?",
+                "voice": {"target_words": 6},
+            },
+        )
+
+        self.assertIn("excessive_length", findings)
+
+    def test_brief_dream_instruction_has_a_human_reviewable_limit(self):
+        dream = "In a dream, " + "the rain folded the square into a paper lantern. " * 9
+        self.assertIn(
+            "excessive_length",
+            semantic_quality_findings("oneiros", dream, {}),
+        )
+
+    def test_stock_assistant_register_is_visible_to_model_screening(self):
+        self.assertIn(
+            "assistant_like_register",
+            semantic_quality_findings(
+                "pathos",
+                "It's good to hear from you. What's on your mind?",
+                {"message": "hey"},
+            ),
+        )
+
+    def test_pathos_does_not_address_the_user_as_himself(self):
+        self.assertIn(
+            "identity_confusion",
+            semantic_quality_findings(
+                "pathos",
+                "I'm right here, Pathos. How was your day?",
+                {"message": "Where are you?"},
+            ),
+        )
+
     def test_required_uncertainty_language_is_role_specific(self):
         context = {
             "required_any_by_role": {
