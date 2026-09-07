@@ -35,7 +35,7 @@ async def autonomous_activity_events(
     values: Mapping[str, float],
     preferences: Sequence[str],
     traits: Mapping[str, float],
-    memories: Sequence[str],
+    memories: Sequence[str | Mapping[str, object]],
     known_person_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
     """Ask for one open-ended idea every other day; failure simply leaves free time."""

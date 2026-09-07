@@ -168,6 +168,106 @@ class ReconsolidationTests(unittest.TestCase):
         )
         self.assertEqual(first.payload["text"], self.memory().payload["text"])
 
+    def test_rehearsed_blend_can_feel_clear_and_certain_while_being_wrong(self):
+        first = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I saw Mara place a blue cup beside the window before lunch.",
+                "simulated_at": (self.now - timedelta(days=120)).isoformat(),
+                "owner": "pathos",
+                "importance": 0.35,
+                "confidence": 0.55,
+                "person_id": "mara",
+                "location_id": "cafe",
+            },
+        )
+        second = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": "I watched Mara set a blue mug on the window sill that morning.",
+                "simulated_at": (self.now - timedelta(days=125)).isoformat(),
+                "owner": "pathos",
+                "importance": 0.35,
+                "confidence": 0.8,
+                "person_id": "mara",
+                "location_id": "cafe",
+            },
+        )
+        rehearsals = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {
+                    "memory_id": str(first.event_id),
+                    "simulated_at": (self.now - timedelta(days=day)).isoformat(),
+                },
+            )
+            for day in (30, 20, 10)
+        ]
+        history = [first, second, *rehearsals]
+        recalled = recall(history, "Mara blue cup window", self.now)
+        self.assertEqual(recalled[0].event.event_id, first.event_id)
+        accesses = [
+            DomainEvent(
+                "memory.accessed",
+                "pathos",
+                {"memory_id": str(item.event.event_id), "simulated_at": self.now.isoformat()},
+            )
+            for item in recalled
+        ]
+
+        changed = reconsolidation_events([*history, *accesses], recalled, self.now)
+
+        self.assertEqual(changed[0].payload["confidence_basis"], "familiarity_misattribution")
+        self.assertEqual(changed[0].payload["detail_level"], "clear")
+        self.assertEqual(changed[0].payload["confidence"], 0.92)
+        self.assertIn("and", changed[0].payload["recalled_text"])
+        self.assertNotIn("may be missing", changed[0].payload["recalled_text"])
+        later = recall(
+            [*history, *accesses, *changed],
+            "Mara blue cup window",
+            self.now + timedelta(days=1),
+        )[0]
+        self.assertEqual(later.felt_confidence, 0.92)
+        self.assertEqual(later.source_confidence, 0.55)
+        self.assertGreater(later.felt_confidence, later.source_confidence)
+        self.assertEqual(later.confidence_basis, "familiarity_misattribution")
+        self.assertEqual(first.payload["confidence"], 0.55)
+
+        archive = memory_view([*history, *accesses, *changed], self.now + timedelta(days=1))
+        visible = next(item for item in archive if item["id"] == str(first.event_id))
+        self.assertEqual(visible["felt_confidence"], 0.92)
+        self.assertEqual(visible["source_confidence"], 0.55)
+
+    def test_unblended_recollection_cannot_forge_increased_felt_confidence(self):
+        memory = self.memory()
+        access = DomainEvent(
+            "memory.accessed",
+            "pathos",
+            {"memory_id": str(memory.event_id), "simulated_at": self.now.isoformat()},
+        )
+        invalid = DomainEvent(
+            "memory.reconsolidated",
+            "pathos",
+            {
+                "memory_id": str(memory.event_id),
+                "revision": 1,
+                "recalled_text": "I clearly remember the cup was green.",
+                "confidence": 0.92,
+                "confidence_basis": "familiarity_misattribution",
+                "detail_level": "clear",
+                "drift_kind": "similarity_blend",
+                "epistemic_status": "subjective_recollection",
+                "simulated_at": self.now.isoformat(),
+            },
+            causation_id=access.event_id,
+        )
+
+        with self.assertRaisesRegex(ValueError, "rehearsed similarity blend"):
+            project_recollections([memory, access, invalid])
+
     def test_related_memory_is_not_blended_without_a_current_access(self):
         first = self.memory()
         second = DomainEvent(

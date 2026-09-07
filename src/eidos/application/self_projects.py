@@ -35,7 +35,7 @@ async def autonomous_project_events(
     values: Mapping[str, float],
     preferences: Sequence[str],
     traits: Mapping[str, float],
-    memories: Sequence[str],
+    memories: Sequence[str | Mapping[str, object]],
 ) -> list[DomainEvent]:
     """Propose at most one project every two weeks when no generated project is active."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1

@@ -16,6 +16,7 @@ class Recollection:
     revision: int
     text: str
     confidence: float
+    confidence_basis: str
     detail_level: str
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
@@ -34,6 +35,7 @@ class RecollectionState:
 def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
     sources: dict[str, DomainEvent] = {}
     accesses: dict[str, tuple[str, str | None]] = {}
+    access_counts: dict[str, int] = {}
     used_accesses: set[str] = set()
     evidence: dict[str, DomainEvent] = {}
     latest: dict[str, Recollection] = {}
@@ -48,6 +50,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                     memory_id,
                     raw_time if isinstance(raw_time, str) else None,
                 )
+                access_counts[memory_id] = access_counts.get(memory_id, 0) + 1
         elif event.kind == "memory.reconsolidated":
             memory_id = _required(event, "memory_id")
             if memory_id not in sources:
@@ -63,15 +66,10 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
             if revision != (prior.revision + 1 if prior else 1):
                 raise ValueError("Recollection revision must be sequential")
             confidence = _level(event, "confidence")
-            if prior is None and confidence > _source_confidence(sources[memory_id]):
-                raise ValueError("Reconsolidation cannot exceed source confidence")
-            if prior is not None and confidence > prior.confidence:
-                raise ValueError("Uncorrected reconsolidation cannot increase confidence")
+            confidence_basis = str(event.payload.get("confidence_basis", "degrading_recall"))
+            if confidence_basis not in {"degrading_recall", "familiarity_misattribution"}:
+                raise ValueError("Reconsolidation confidence basis is invalid")
             detail_level = _required(event, "detail_level")
-            if detail_level not in {"partial", "vague"}:
-                raise ValueError("Only imperfect recall can reconsolidate")
-            if prior is not None and prior.detail_level == "vague" and detail_level == "partial":
-                raise ValueError("Uncorrected reconsolidation cannot restore lost detail")
             if event.payload.get("epistemic_status") != "subjective_recollection":
                 raise ValueError("Reconsolidation must remain explicitly subjective")
             affective_bias = _signed_level(event.payload.get("affective_bias", 0.0))
@@ -91,6 +89,36 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                     raise ValueError("A memory access can contribute to only one reconsolidation")
             elif blend_access is not None:
                 raise ValueError("A blend access requires a blended memory")
+            confidently_misattributed = confidence_basis == "familiarity_misattribution"
+            if confidently_misattributed:
+                if (
+                    not blended_memory_ids
+                    or event.payload.get("drift_kind") != "similarity_blend"
+                    or access_counts.get(memory_id, 0) < 4
+                ):
+                    raise ValueError(
+                        "Familiarity misattribution requires a rehearsed similarity blend"
+                    )
+                if confidence > 0.92:
+                    raise ValueError("Misattributed confidence cannot exceed its bounded ceiling")
+                if detail_level not in {"clear", "partial"}:
+                    raise ValueError("A vivid misattribution must feel clear or partial")
+            else:
+                baseline = (
+                    prior.confidence
+                    if prior is not None
+                    else _source_confidence(sources[memory_id])
+                )
+                if confidence > baseline:
+                    raise ValueError("Ordinary reconsolidation cannot increase confidence")
+                if detail_level not in {"partial", "vague"}:
+                    raise ValueError("Only imperfect recall can reconsolidate")
+                if (
+                    prior is not None
+                    and prior.detail_level == "vague"
+                    and detail_level == "partial"
+                ):
+                    raise ValueError("Ordinary reconsolidation cannot restore lost detail")
             if prior is not None and changed_at < prior.changed_at:
                 raise ValueError("Reconsolidation time cannot move backwards")
             latest[memory_id] = Recollection(
@@ -98,6 +126,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 revision,
                 _required(event, "recalled_text"),
                 confidence,
+                confidence_basis,
                 detail_level,
                 affective_bias,
                 blended_memory_ids,
@@ -150,6 +179,7 @@ def project_recollections(events: Sequence[DomainEvent]) -> RecollectionState:
                 revision,
                 _required(event, "corrected_text"),
                 confidence,
+                "direct_confirmation",
                 detail_level,
                 0.0,
                 (),

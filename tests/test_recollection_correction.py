@@ -70,6 +70,7 @@ class RecollectionCorrectionTests(unittest.TestCase):
         subjective = state.latest[str(history[0].event_id)]
         self.assertIn("unavailable", subjective.text)
         self.assertEqual(subjective.detail_level, "clear")
+        self.assertEqual(subjective.confidence_basis, "direct_confirmation")
         self.assertEqual(subjective.blended_memory_ids, ())
         self.assertEqual(history[0].payload["text"], "Rowan told me the lamp switch was available.")
         self.assertEqual(recollection_correction_events([*history, evidence, *corrected], at), [])

@@ -50,10 +50,21 @@ def reconsolidation_events(
             companion = None
         revision = prior.revision + 1 if prior else 1
         source_confidence = float(item.event.payload.get("confidence", 1.0))
-        confidence = min(
-            prior.confidence if prior else source_confidence,
-            max(0.15, item.accessibility * (0.94**revision)),
-        )
+        access_count = _access_count(history, memory_id)
+        confidently_misattributed = companion is not None and access_count >= 4
+        if confidently_misattributed:
+            # Repetition can be mistaken for evidence. The memory feels clearer
+            # because it is familiar, even though its details now mix two sources.
+            confidence = min(0.92, 0.82 + 0.025 * min(4, access_count))
+            confidence_basis = "familiarity_misattribution"
+            detail_level = "clear"
+        else:
+            confidence = min(
+                prior.confidence if prior else source_confidence,
+                max(0.15, item.accessibility * (0.94**revision)),
+            )
+            confidence_basis = "degrading_recall"
+            detail_level = item.detail_level
         payload: dict[str, object] = {
             "memory_id": memory_id,
             "revision": revision,
@@ -63,9 +74,11 @@ def reconsolidation_events(
                 revision,
                 affective_bias,
                 companion.recalled_text if companion is not None else None,
+                confidently_misattributed,
             ),
             "confidence": round(confidence, 4),
-            "detail_level": item.detail_level,
+            "confidence_basis": confidence_basis,
+            "detail_level": detail_level,
             "affective_bias": round(affective_bias, 4),
             "drift_kind": (
                 "similarity_blend"
@@ -104,6 +117,7 @@ def _drift_text(
     revision: int,
     affective_bias: float,
     blended_text: str | None,
+    confidently_misattributed: bool,
 ) -> str:
     clause = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
     clause = re.sub(r"^I remember\s+", "", clause, flags=re.IGNORECASE).strip()
@@ -116,12 +130,22 @@ def _drift_text(
     if blended_text is not None:
         blended_clause = re.split(r"[,;.!?]", blended_text, maxsplit=1)[0].strip().lower()
         blended_clause = re.sub(r"^i (?:mostly )?(?:remember|think)\s+", "", blended_clause)
-        drifted = f"{drifted} I also picture {blended_clause} as part of it."
+        if confidently_misattributed:
+            drifted = f"I remember {clause.lower()}, and {blended_clause} was part of it."
+        else:
+            drifted = f"{drifted} I also picture {blended_clause} as part of it."
     if affective_bias <= -0.25:
         return f"{drifted} It feels heavier to me now."
     if affective_bias >= 0.25:
         return f"{drifted} It feels warmer to me now."
     return drifted
+
+
+def _access_count(history: Sequence[DomainEvent], memory_id: str) -> int:
+    return sum(
+        event.kind == "memory.accessed" and event.payload.get("memory_id") == memory_id
+        for event in history
+    )
 
 
 def _unused_access(

@@ -94,6 +94,38 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(context["beliefs"][0]["status"], "contested")
         self.assertNotIn("private_operator_field", context)
 
+    def test_pathos_receives_felt_memory_confidence_without_hidden_source_truth(self):
+        request = ModelRequest(
+            capability="pathos",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps(
+                        {
+                            "message": "What do you remember?",
+                            "memories": ["I remember the cup was green."],
+                            "memory_recollections": [
+                                {
+                                    "text": "I remember the cup was green.",
+                                    "felt_confidence": 0.92,
+                                    "detail_level": "clear",
+                                }
+                            ],
+                            "source_confidence": 0.35,
+                        }
+                    ),
+                ),
+            ),
+            output_schema={"type": "object"},
+        )
+
+        asyncio.run(self.gateway.generate(request))
+
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["memory_recollections"][0]["felt_confidence"], 0.92)
+        self.assertNotIn("source_confidence", context)
+        self.assertIn("subjective certainty", self.payload["messages"][0]["content"])
+
     def test_open_world_director_keeps_creative_temperature_and_strict_schema(self):
         request = ModelRequest(
             capability="moira_event",

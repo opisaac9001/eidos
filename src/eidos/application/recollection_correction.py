@@ -76,6 +76,7 @@ def recollection_correction_events(
                         ),
                         "corrected_value": new_value,
                         "confidence": round(confidence, 4),
+                        "confidence_basis": "direct_confirmation",
                         "detail_level": "clear" if evidence_confidence >= 0.8 else "partial",
                         "evidence_event_id": evidence_id,
                         "correction_kind": "direct_confirmation",

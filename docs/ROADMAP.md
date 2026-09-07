@@ -188,11 +188,14 @@ Feature families: MEM, SELF-01–04, UX-02/04, QA-04.
   access within bounds; the historical audit record does not decay.
 - Current mood now slightly biases recall toward memories with matching source-linked
   emotional appraisals. Hazy recollections reconsolidate at most monthly into a
-  persistent subjective version with lower confidence, altered emphasis, and a bounded
-  trace of how Pathos felt while remembering. Two similar hazy memories actually
-  accessed together can blend, with both source links retained and no change to either
-  source. Later thought begins from that version while immutable evidence remains
-  separate. A newer direct structured confirmation that contradicts a remembered claim
+  persistent subjective version with altered emphasis and a bounded trace of how
+  Pathos felt while remembering. Two similar hazy memories actually accessed together
+  can blend, with both source links retained and no change to either source. Rehearsing
+  that blend can make familiarity feel like evidence: the false composite may become
+  vivid and highly certain in Pathos's mind. Conversation, inner cognition, activity
+  choice, and project planning receive that felt certainty—not the operator's hidden
+  source score. Later thought begins from the subjective version while immutable
+  evidence remains separate. A newer direct structured confirmation that contradicts a remembered claim
   can restore clarity and confidence while retaining the source, drift, and correction
   trail; testimony and evidence that predates the drift cannot do so.
 - Consolidate repeated episodes into source-linked summaries and associations.

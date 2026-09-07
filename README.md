@@ -368,9 +368,13 @@ network authorization; the server remains loopback-only until authenticated depl
   sleeping dream layers have distinct cadences. These replayable pulses guide model
   context but have no authority to become memories or actions by themselves.
 - Memories have provenance, importance, diversified term/entity/goal/relationship
-  recall, replay-derived emotional encoding, accessibility/detail fading, capped rehearsal, and source-linked
-  consolidation. Mood-congruent recall, bounded subjective drift, and source-linked
-  blending make recollection intentionally fallible without editing historical facts.
+  recall, replay-derived emotional encoding, accessibility/detail fading, capped
+  rehearsal, and source-linked consolidation. Mood-congruent recall, bounded
+  subjective drift, and source-linked blending make recollection intentionally
+  fallible without editing historical facts. Repeated source confusion can make a
+  blended, inaccurate recollection feel vivid and highly certain; that felt certainty
+  guides Pathos's speech, thought, activities, and plans while source confidence stays
+  visible only to the operator.
   Newer direct structured evidence can correct a drifted claim while preserving both
   the mistaken version and its correction trail. The recall maps are maintained as a
   versioned, checksummed, event-anchored projection that can be discarded and rebuilt

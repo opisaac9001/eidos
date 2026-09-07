@@ -1412,6 +1412,29 @@ class Life:
             project_feeling = project_emotion(project_history)
             project_identity_state = project_identity(project_history)
             project_trait_state = project_traits(project_history)
+            simulation_day = (current.date() - date(2026, 1, 1)).days + 1
+            planning_memory_due = (
+                current.hour == 9 and simulation_day >= 16 and (simulation_day - 16) % 14 == 0
+            ) or (current.hour == 10 and simulation_day >= 11 and (simulation_day - 11) % 2 == 0)
+            recent_memory_context = (
+                [
+                    {
+                        "text": item.recalled_text,
+                        "felt_confidence": item.felt_confidence,
+                        "detail_level": item.detail_level,
+                    }
+                    for item in recall(
+                        project_history,
+                        "",
+                        current,
+                        10,
+                        diverse=True,
+                        index=self._memory_index(project_history),
+                    )
+                ]
+                if planning_memory_due
+                else []
+            )
             project_events = await autonomous_project_events(
                 project_history,
                 current,
@@ -1443,12 +1466,7 @@ class Life:
                 values=project_identity_state.values,
                 preferences=project_identity_state.preferences,
                 traits=project_trait_state.levels,
-                memories=[
-                    str(event.payload["text"])
-                    for event in project_history
-                    if event.kind == "memory.recorded"
-                    and isinstance(event.payload.get("text"), str)
-                ],
+                memories=recent_memory_context,
             )
             if project_events:
                 self._planning(project_history + project_events)
@@ -1488,12 +1506,7 @@ class Life:
                 values=agency_identity.values,
                 preferences=agency_identity.preferences,
                 traits=agency_traits.levels,
-                memories=[
-                    str(event.payload["text"])
-                    for event in agency_history
-                    if event.kind == "memory.recorded"
-                    and isinstance(event.payload.get("text"), str)
-                ],
+                memories=recent_memory_context,
                 known_person_ids=pathos_known_person_ids(agency_history),
             )
             if agency:
@@ -2150,6 +2163,15 @@ class Life:
                 "location": catalog_now.location_name(state.location_id),
                 "time": at,
                 "memories": memories,
+                "memory_recollections": [
+                    {
+                        "text": item.recalled_text,
+                        "felt_confidence": item.felt_confidence,
+                        "detail_level": item.detail_level,
+                        "emotional_tone": item.emotional_label,
+                    }
+                    for item in selected_context
+                ],
                 "identity": {
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
@@ -3013,6 +3035,15 @@ class Life:
                 "traits": dict(traits.levels),
             },
             "memories": [item.recalled_text for item in selected],
+            "memory_recollections": [
+                {
+                    "text": item.recalled_text,
+                    "felt_confidence": item.felt_confidence,
+                    "detail_level": item.detail_level,
+                    "emotional_tone": item.emotional_label,
+                }
+                for item in selected
+            ],
             "beliefs": [
                 {
                     "subject": belief.subject_id,
@@ -3082,6 +3113,8 @@ class Life:
                     "query_source": "user-conversation",
                     "detail_level": item.detail_level,
                     "recalled_text": item.recalled_text,
+                    "felt_confidence": item.felt_confidence,
+                    "confidence_basis": item.confidence_basis,
                 },
             )
             for item in selected

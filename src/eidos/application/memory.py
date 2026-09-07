@@ -70,6 +70,9 @@ class RecalledMemory:
     affective_bias: float
     blended_memory_ids: tuple[str, ...]
     correction_evidence_id: str | None
+    felt_confidence: float
+    source_confidence: float
+    confidence_basis: str
     encoded_valence: float
     encoded_arousal: float
     emotional_label: str
@@ -340,10 +343,9 @@ def recall(
         history, now, recollections
     )
     for event in index.memories:
-        importance, confidence = _metadata(event)
+        importance, source_confidence = _metadata(event)
         subjective = recollections.get(str(event.event_id))
-        if subjective is not None:
-            confidence = min(confidence, subjective.confidence)
+        felt_confidence = subjective.confidence if subjective is not None else source_confidence
         age_days = max(0.0, (now - _simulated_time(event)).total_seconds() / 86400)
         half_life = 2.0 + 28.0 * importance
         base_access = 0.5 ** (age_days / half_life)
@@ -393,7 +395,7 @@ def recall(
             "relationship": 0.1 * relationship_relevance,
             "accessibility": 0.17 * accessibility,
             "importance": 0.12 * importance,
-            "confidence": 0.05 * confidence,
+            "confidence": 0.05 * felt_confidence,
             "mood_congruence": mood_congruence,
         }
         score = sum(components.values())
@@ -432,6 +434,9 @@ def recall(
                 subjective.affective_bias if subjective is not None else 0.0,
                 subjective.blended_memory_ids if subjective is not None else (),
                 subjective.correction_evidence_id if subjective is not None else None,
+                round(felt_confidence, 4),
+                round(source_confidence, 4),
+                subjective.confidence_basis if subjective is not None else "source_encoding",
                 encoded_valence,
                 encoded_arousal,
                 emotional_label,
@@ -558,6 +563,9 @@ def memory_view(
                 "affective_bias": item.affective_bias,
                 "blended_memory_ids": list(item.blended_memory_ids),
                 "correction_evidence_id": item.correction_evidence_id,
+                "felt_confidence": item.felt_confidence,
+                "source_confidence": item.source_confidence,
+                "confidence_basis": item.confidence_basis,
                 "encoded_valence": item.encoded_valence,
                 "encoded_arousal": item.encoded_arousal,
                 "emotional_label": item.emotional_label,
