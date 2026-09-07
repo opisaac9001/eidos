@@ -111,6 +111,97 @@ class ReconsiderationDecisionTests(unittest.TestCase):
             reconsideration_decision_events([], other, PlanningState(), 0, self.now), []
         )
 
+    def test_low_priority_optional_activity_can_be_released_after_interruption(self):
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "optional-reading",
+                "title": "Read at the park",
+                "starts_at": (self.now.replace(hour=10)).isoformat(),
+                "ends_at": (self.now.replace(hour=11)).isoformat(),
+                "location_id": "park",
+                "actor_id": "pathos",
+                "activity_type": "reading",
+                "intention_id": "read-intention",
+            },
+        )
+        intention = DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "read-intention",
+                "actor_id": "pathos",
+                "action": "attend",
+                "motivation": "It might be pleasant if there is room.",
+                "priority": 0.3,
+            },
+        )
+        interrupted = DomainEvent(
+            "schedule.interrupted",
+            "pathos",
+            {"schedule_id": "optional-reading", "reason": "Rain changed the afternoon."},
+        )
+        planning = PlanningState().apply(schedule).apply(intention).apply(interrupted)
+        link, realized = self.completed_review("schedule", "optional-reading")
+        history = [schedule, intention, interrupted, link, realized]
+
+        events = reconsideration_decision_events(
+            history, realized, planning, len(history), self.now
+        )
+        projected = planning
+        for event in events:
+            projected = projected.apply(event)
+
+        self.assertEqual(events[0].payload["decision"], "release_optional_schedule")
+        self.assertIn("schedule.cancellation_accepted", [event.kind for event in events])
+        self.assertEqual(projected.calendar["optional-reading"].status, "cancelled")
+        self.assertEqual(projected.intentions["read-intention"].status, "abandoned")
+
+    def test_higher_priority_interrupted_activity_still_seeks_a_new_time(self):
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "important-reading",
+                "title": "Read at the park",
+                "starts_at": self.now.replace(hour=10).isoformat(),
+                "ends_at": self.now.replace(hour=11).isoformat(),
+                "location_id": "park",
+                "actor_id": "pathos",
+                "intention_id": "important-intention",
+            },
+        )
+        intention = DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "important-intention",
+                "actor_id": "pathos",
+                "action": "attend",
+                "motivation": "This still matters.",
+                "priority": 0.8,
+            },
+        )
+        interrupted = DomainEvent(
+            "schedule.interrupted",
+            "pathos",
+            {"schedule_id": "important-reading", "reason": "Rain changed the afternoon."},
+        )
+        planning = PlanningState().apply(schedule).apply(intention).apply(interrupted)
+        link, realized = self.completed_review("schedule", "important-reading")
+
+        events = reconsideration_decision_events(
+            [schedule, intention, interrupted, link, realized],
+            realized,
+            planning,
+            5,
+            self.now,
+        )
+
+        self.assertEqual([event.kind for event in events], ["reflection.reconsideration_decided"])
+        self.assertEqual(events[0].payload["decision"], "seek_new_time")
+
 
 if __name__ == "__main__":
     unittest.main()

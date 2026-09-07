@@ -5,7 +5,12 @@ from uuid import UUID
 from eidos.application.rescheduling import reflective_rescheduling_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
-from eidos.domain.rescheduling import RescheduleProposal, resolve_reschedule
+from eidos.domain.rescheduling import (
+    RescheduleProposal,
+    ScheduleCancellationProposal,
+    resolve_reschedule,
+    resolve_schedule_cancellation,
+)
 from eidos.domain.world_catalog import project_world_catalog
 
 
@@ -216,6 +221,55 @@ class ReschedulingTests(unittest.TestCase):
             attempt(external, "private-bypass", tomorrow.replace(hour=10)).code,
             "external_commitment",
         )
+
+    def test_optional_cancellation_cannot_release_promised_or_goal_work(self):
+        for history, code in (
+            (self.history(commitment_id="promise-to-mara")[:2], "external_commitment"),
+            (
+                [
+                    DomainEvent(
+                        "goal.activated",
+                        "pathos",
+                        {"goal_id": "reading-goal", "title": "Finish the book"},
+                    ),
+                    DomainEvent(
+                        "schedule.created",
+                        "pathos",
+                        {
+                            "schedule_id": "reading-hour",
+                            "title": "Read",
+                            "starts_at": (self.now - timedelta(hours=2)).isoformat(),
+                            "ends_at": (self.now - timedelta(hours=1)).isoformat(),
+                            "location_id": "home",
+                            "actor_id": "pathos",
+                            "goal_id": "reading-goal",
+                        },
+                    ),
+                    DomainEvent(
+                        "schedule.interrupted",
+                        "pathos",
+                        {"schedule_id": "reading-hour", "reason": "The hour was interrupted."},
+                    ),
+                ],
+                "linked_goal",
+            ),
+        ):
+            planning = project_planning(history)
+            result = resolve_schedule_cancellation(
+                ScheduleCancellationProposal(
+                    "release-reading",
+                    "reading-hour",
+                    "pathos",
+                    "It no longer fits.",
+                    len(history),
+                ),
+                planning=planning,
+                actual_revision=len(history),
+                simulated_at=self.now,
+            )
+
+            self.assertEqual(result.code, code)
+            self.assertEqual(planning.calendar["reading-hour"].status, "interrupted")
 
 
 if __name__ == "__main__":

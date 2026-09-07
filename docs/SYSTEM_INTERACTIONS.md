@@ -465,6 +465,11 @@ owner, requires a future interval, and checks place hours, calendar overlap, and
 on both sides. Any schedule linked to an external commitment is rejected from this
 path and must use creditor consent instead. The hourly bridge also handles qualifying
 decisions already present in an older saved world, exactly once.
+For a standalone interrupted activity, the original accepted priority can also make
+`release_optional_schedule` a genuine outcome. The cancellation resolver atomically
+closes the calendar entry and its active intention. It rejects goal-linked work,
+external commitments, another actor's activity, and already-finished intentions, so
+reflection cannot use "letting go" to erase a broader project or social obligation.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.

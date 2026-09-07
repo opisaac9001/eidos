@@ -325,6 +325,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   hourly migration-safe handler preserves its duration, finds a future interval around
   opening hours, calendar conflicts, and travel, and passes it through a typed
   rescheduling resolver. It cannot privately move work linked to an external promise.
+  Reconsideration can also release a low-priority interrupted standalone activity and
+  its matching intention. Goal work must be reconsidered as a whole and promised work
+  still requires the other person's consent, so "letting go" cannot erase an obligation.
 - Sleep/wake state replaces the fixed dream hour; track rest and dream budgets.
 - Nightly sleep intentions are now replayable five-to-ten-hour windows shaped by
   reserves, arousal, and nearby commitments. Active conversations and incidents delay

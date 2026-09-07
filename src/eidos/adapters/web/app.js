@@ -203,6 +203,7 @@ const labels = {
   "reflection.reconsideration_decided": "PATHOS MADE UP HIS MIND",
   "schedule.rescheduled": "AN INTERRUPTED PLAN FOUND A NEW TIME",
   "schedule.reschedule_rejected": "A NEW TIME DID NOT FIT",
+  "schedule.cancellation_rejected": "AN OPTIONAL PLAN COULD NOT BE RELEASED",
   "schedule.retimed": "PLAN RETIMED",
   "dream.inspiration_considered": "A DREAM-LINKED POSSIBILITY",
 };

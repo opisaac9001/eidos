@@ -31,6 +31,23 @@ class RescheduleResolution:
     events: tuple[DomainEvent, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ScheduleCancellationProposal:
+    proposal_id: str
+    schedule_id: str
+    actor_id: str
+    reason: str
+    expected_revision: int
+    schema_version: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleCancellationResolution:
+    accepted: bool
+    code: str
+    events: tuple[DomainEvent, ...]
+
+
 def resolve_reschedule(
     proposal: RescheduleProposal,
     *,
@@ -152,6 +169,103 @@ def resolve_reschedule(
         accepted,
     )
     return RescheduleResolution(True, "accepted", (proposed, accepted, changed))
+
+
+def resolve_schedule_cancellation(
+    proposal: ScheduleCancellationProposal,
+    *,
+    planning: PlanningState,
+    actual_revision: int,
+    simulated_at: datetime,
+) -> ScheduleCancellationResolution:
+    """Release one interrupted optional activity and its own active intention."""
+    common = {
+        "proposal_id": proposal.proposal_id,
+        "schedule_id": proposal.schedule_id,
+        "actor_id": proposal.actor_id,
+        "reason": proposal.reason,
+        "schema_version": proposal.schema_version,
+        "simulated_at": simulated_at.isoformat(),
+    }
+    proposed = DomainEvent(
+        "schedule.cancellation_proposed",
+        "pathos",
+        common,
+        correlation_id=proposal.proposal_id,
+    )
+
+    def reject(code: str, explanation: str) -> ScheduleCancellationResolution:
+        return ScheduleCancellationResolution(
+            False,
+            code,
+            (
+                proposed,
+                _effect(
+                    "schedule.cancellation_rejected",
+                    {**common, "code": code, "explanation": explanation},
+                    proposed,
+                ),
+            ),
+        )
+
+    if proposal.expected_revision != actual_revision:
+        return reject("stale_revision", "The calendar changed before cancellation")
+    if proposal.schema_version != 1:
+        return reject("unsupported_schema", "Cancellation schema is not supported")
+    if any(
+        not value.strip()
+        for value in (
+            proposal.proposal_id,
+            proposal.schedule_id,
+            proposal.actor_id,
+            proposal.reason,
+        )
+    ):
+        return reject("invalid_text", "Cancellation identifiers and reason are required")
+    if simulated_at.utcoffset() is None:
+        return reject("invalid_time", "Cancellation time requires a timezone")
+    entry = planning.calendar.get(proposal.schedule_id)
+    if entry is None:
+        return reject("unknown_schedule", "The scheduled activity does not exist")
+    if entry.status != "interrupted":
+        return reject("not_interrupted", "Only interrupted activity can be released here")
+    if proposal.actor_id != "pathos" or entry.actor_id not in {None, proposal.actor_id}:
+        return reject("wrong_actor", "Only the activity owner can release it")
+    if entry.commitment_id is not None:
+        return reject("external_commitment", "Externally owed work cannot be released privately")
+    if entry.goal_id is not None:
+        return reject("linked_goal", "Goal work must be reconsidered through its whole goal")
+    intention = (
+        planning.intentions.get(entry.intention_id) if entry.intention_id is not None else None
+    )
+    if entry.intention_id is not None and (
+        intention is None or intention.status != "active" or intention.actor_id != "pathos"
+    ):
+        return reject("closed_intention", "The linked intention is not available to release")
+    accepted = _effect("schedule.cancellation_accepted", common, proposed)
+    cancelled = _effect(
+        "schedule.cancelled",
+        {
+            "schedule_id": entry.schedule_id,
+            "reason": proposal.reason,
+            "simulated_at": simulated_at.isoformat(),
+        },
+        accepted,
+    )
+    events = [proposed, accepted, cancelled]
+    if intention is not None:
+        events.append(
+            _effect(
+                "intention.abandoned",
+                {
+                    "intention_id": intention.intention_id,
+                    "reason": proposal.reason,
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                accepted,
+            )
+        )
+    return ScheduleCancellationResolution(True, "accepted", tuple(events))
 
 
 _ONE_HOUR = timedelta(hours=1)

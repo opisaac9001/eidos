@@ -8,6 +8,10 @@ from typing import Sequence
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 from eidos.domain.projects import GoalAbandonmentProposal, resolve_goal_abandonment
+from eidos.domain.rescheduling import (
+    ScheduleCancellationProposal,
+    resolve_schedule_cancellation,
+)
 
 
 def reconsideration_decision_events(
@@ -69,7 +73,7 @@ def reconsideration_decision_events(
     )
     output = [decided]
     if decision == "release_blocked_goal":
-        resolution = resolve_goal_abandonment(
+        goal_resolution = resolve_goal_abandonment(
             GoalAbandonmentProposal(
                 proposal_id=f"release-{decision_id}",
                 actor_id="pathos",
@@ -81,7 +85,21 @@ def reconsideration_decision_events(
             actual_revision=actual_revision + 1,
             simulated_at=simulated_at,
         )
-        output.extend(resolution.events)
+        output.extend(goal_resolution.events)
+    elif decision == "release_optional_schedule":
+        cancellation = resolve_schedule_cancellation(
+            ScheduleCancellationProposal(
+                proposal_id=f"release-{decision_id}",
+                actor_id="pathos",
+                schedule_id=target_id,
+                reason="After reconsidering the interruption, the optional activity no longer fit.",
+                expected_revision=actual_revision + 1,
+            ),
+            planning=planning,
+            actual_revision=actual_revision + 1,
+            simulated_at=simulated_at,
+        )
+        output.extend(cancellation.events)
     return output
 
 
@@ -102,6 +120,22 @@ def _decision(target_type: str, target_id: str, planning: PlanningState) -> tupl
         if entry is None or entry.status in {"completed", "failed", "cancelled"}:
             return "acknowledge_closed", "The scheduled activity had already reached an ending."
         if entry.status == "interrupted":
+            intention = (
+                planning.intentions.get(entry.intention_id)
+                if entry.intention_id is not None
+                else None
+            )
+            if (
+                entry.commitment_id is None
+                and entry.goal_id is None
+                and intention is not None
+                and intention.status == "active"
+                and intention.priority <= 0.35
+            ):
+                return (
+                    "release_optional_schedule",
+                    "He decided the interrupted optional activity was not important enough to reclaim.",
+                )
             return "seek_new_time", "He decided the interrupted activity still needed a new time."
         return "keep_schedule", "He decided to leave the scheduled activity in place."
     if target_type == "commitment":

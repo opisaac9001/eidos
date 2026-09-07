@@ -825,6 +825,7 @@ class Life:
                 "schedule.interrupted",
                 "schedule.rescheduled",
                 "schedule.reschedule_rejected",
+                "schedule.cancellation_rejected",
                 "schedule.cancelled",
                 "commitment.fulfilled",
                 "commitment.missed",
