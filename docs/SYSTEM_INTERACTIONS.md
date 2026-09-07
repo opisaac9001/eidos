@@ -481,6 +481,13 @@ response uses his current energy, rest, mastery, affect duration, values, and ac
 calendar feasibility. Declining creates no plan. Accepting passes through the existing
 consent and planner resolvers and creates the shared schedule and Pathos-owned promise;
 the invitation itself cannot fabricate attendance or future relationship change.
+The invitation shape is not fixed to conversation: a replay-stable resident/date choice
+may propose a walk, shared learning, practical help, or quiet company as well. Accepted
+non-conversation plans carry the inviter as a required companion. The ordinary activity
+resolver still validates Pathos's location, duration, intention, and resources, then
+checks the resident's current location before completion. Only co-present completion
+creates `social.activity_completed`, bounded relationship evidence, and a person-linked
+memory; absence fails the schedule and cannot claim that time together occurred.
 Opposed positive and negative appraisals from the prior twelve hours may remain as a
 source-linked secondary feeling with bounded complexity. This makes initiative, pace,
 and risk slightly more cautious without pretending one scalar can cancel the other.

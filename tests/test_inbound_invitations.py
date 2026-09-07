@@ -55,7 +55,7 @@ class InboundInvitationTests(unittest.TestCase):
         self.assertEqual(invitation.payload["invitee_id"], "pathos")
         request = project_social(events).requests[str(invitation.payload["request_id"])]
         self.assertEqual(request.awaiting_actor_id, "pathos")
-        self.assertEqual(request.action, "talk")
+        self.assertIn(request.action, {"talk", "attend", "learn", "work"})
         self.assertEqual(
             resident_invitation_events(
                 events,
@@ -100,8 +100,11 @@ class InboundInvitationTests(unittest.TestCase):
                 )
             )
         invitations = [event for event in history if event.kind == "invitation.made"]
+        requests = [event for event in history if event.kind == "social.request_opened"]
 
         self.assertEqual({event.payload["inviter_id"] for event in invitations}, set(people))
+        self.assertGreaterEqual(len({event.payload["activity_type"] for event in invitations}), 4)
+        self.assertGreaterEqual(len({event.payload["action"] for event in requests}), 3)
         invitation_times = [
             datetime.fromisoformat(str(event.payload["simulated_at"])) for event in invitations
         ]

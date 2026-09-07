@@ -121,6 +121,14 @@ def plan_accepted_work(
     commitment_id = f"{request.request_id}-commitment"
     schedule_id = f"{request.request_id}-schedule"
     intention_id = f"{request.request_id}-intention"
+    shared_companion_id = (
+        counterparty if request.target_id == counterparty and counterparty != "pathos" else None
+    )
+    shared_activity_type = (
+        f"shared_{request.action}"
+        if shared_companion_id is not None and request.action != ActionKind.TALK.value
+        else None
+    )
     common = {"request_id": request.request_id, "simulated_at": simulated_at.isoformat()}
     base = (
         DomainEvent(
@@ -156,6 +164,8 @@ def plan_accepted_work(
                 "actor_id": responsible_actor,
                 "action": request.action,
                 "target_id": request.target_id,
+                "companion_id": shared_companion_id,
+                "activity_type": shared_activity_type,
                 "commitment_id": commitment_id,
                 "goal_id": goal_id,
             },

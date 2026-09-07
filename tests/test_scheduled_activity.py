@@ -10,14 +10,14 @@ from eidos.domain.social import SocialRequest
 class ScheduledActivityTests(unittest.TestCase):
     now = datetime(2026, 1, 3, 16, tzinfo=timezone.utc)
 
-    def planned(self, action: str = "learn"):
+    def planned(self, action: str = "learn", *, shared: bool = False):
         start = self.now - timedelta(hours=2)
         request = SocialRequest(
             request_id=f"shared-{action}",
             requester_id="ellis",
             responder_id="pathos",
             action=action,
-            target_id="bookbinding-basics",
+            target_id="ellis" if shared else "bookbinding-basics",
             title="Learn bookbinding with Ellis",
             due_at=(self.now + timedelta(hours=2)).isoformat(),
             earliest_start=start.isoformat(),
@@ -83,6 +83,34 @@ class ScheduledActivityTests(unittest.TestCase):
                     ),
                     [],
                 )
+
+    def test_non_conversation_shared_time_requires_company_and_becomes_shared_history(self):
+        state, plan = self.planned(shared=True)
+        schedule = state.calendar["shared-learn-schedule"]
+        self.assertEqual((schedule.companion_id, schedule.activity_type), ("ellis", "shared_learn"))
+
+        present = scheduled_activity_events(
+            state,
+            actor_location_id="workshop",
+            simulated_at=self.now,
+            actual_revision=len(plan),
+            actor_locations={"ellis": "workshop"},
+        )
+        shared = next(event for event in present if event.kind == "social.activity_completed")
+        memory = next(event for event in present if event.kind == "memory.recorded")
+        self.assertEqual(shared.payload["person_id"], "ellis")
+        self.assertEqual(memory.payload["person_id"], "ellis")
+        self.assertIn("relationship.changed", [event.kind for event in present])
+
+        absent = scheduled_activity_events(
+            state,
+            actor_location_id="workshop",
+            simulated_at=self.now,
+            actual_revision=len(plan),
+            actor_locations={"ellis": "home"},
+        )
+        self.assertIn("schedule.failed", [event.kind for event in absent])
+        self.assertNotIn("social.activity_completed", [event.kind for event in absent])
 
 
 if __name__ == "__main__":

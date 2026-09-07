@@ -289,6 +289,10 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   rather than manufacturing constant attention. Pathos answers later from his own
   capacity, emotion, values, availability, and actual calendar; either side can say no,
   and acceptance alone creates a mutually linked feasible plan and promise.
+  Resident invitations vary across conversation, an unhurried walk, trading knowledge,
+  practical help, and quiet company. Non-conversation time records the other person as
+  a required companion; completion requires real co-presence and creates witnessed
+  shared history, while absence produces ordinary failure and later consequences.
 - Trust, familiarity, affection, tension and obligations change from evidence,
   not message counts. Show calendar, projects and causal relationship changes.
 

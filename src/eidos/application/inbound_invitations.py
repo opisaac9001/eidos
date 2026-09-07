@@ -75,14 +75,21 @@ def resident_invitation_events(
         0.15 + 0.4 * _social_capacity(person)
     ):
         return []
-    location_id = _public_location(person, person_id, catalog)
+    invitation_id = f"resident-invitation-{person_id}-{simulated_at.date()}"
+    action, activity_type, title, duration_hours, preferred_place = _invitation_shape(
+        invitation_id, catalog.people[person_id].name
+    )
+    location_id = (
+        preferred_place
+        if preferred_place is not None and preferred_place in catalog.places
+        else _public_location(person, person_id, catalog)
+    )
     place = catalog.places[location_id]
-    hour = min(max(11, place.opens_hour), place.closes_hour - 1)
+    hour = min(max(11, place.opens_hour), place.closes_hour - duration_hours)
     starts_at = (simulated_at + timedelta(days=2)).replace(
         hour=hour, minute=0, second=0, microsecond=0
     )
-    ends_at = starts_at + timedelta(hours=1)
-    invitation_id = f"resident-invitation-{person_id}-{simulated_at.date()}"
+    ends_at = starts_at + timedelta(hours=duration_hours)
     request_id = f"request-{invitation_id}"
     response_due = simulated_at + timedelta(
         hours=1 + int(_sample(f"response-delay:{invitation_id}") * 5)
@@ -98,8 +105,9 @@ def resident_invitation_events(
             "person_id": person_id,
             "location_id": location_id,
             "starts_at": starts_at.isoformat(),
+            "activity_type": activity_type,
             "response_due_at": response_due.isoformat(),
-            "text": f"{catalog.people[person_id].name} invited Pathos to spend some time together.",
+            "text": f"{catalog.people[person_id].name} invited Pathos to {title.lower()}.",
             "simulated_at": simulated_at.isoformat(),
         },
         correlation_id=invitation_id,
@@ -111,13 +119,13 @@ def resident_invitation_events(
             "request_id": request_id,
             "requester_id": person_id,
             "responder_id": "pathos",
-            "action": "talk",
+            "action": action,
             "target_id": person_id,
-            "title": f"Spend time with {catalog.people[person_id].name}",
+            "title": title,
             "due_at": ends_at.isoformat(),
             "earliest_start": starts_at.isoformat(),
             "location_id": location_id,
-            "duration_hours": 1,
+            "duration_hours": duration_hours,
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=invitation.event_id,
@@ -266,3 +274,16 @@ def _sample(key: str) -> float:
 
 def _social_capacity(person: NPCState) -> float:
     return 0.45 * person.energy + 0.35 * person.connection + 0.2 * person.purpose
+
+
+def _invitation_shape(
+    invitation_id: str, person_name: str
+) -> tuple[str, str, str, int, str | None]:
+    shapes = (
+        ("talk", "conversation", f"Catch up with {person_name}", 1, None),
+        ("attend", "shared_walk", f"Take an unhurried walk with {person_name}", 1, "park"),
+        ("learn", "shared_learning", f"Trade notes with {person_name}", 1, None),
+        ("work", "shared_help", f"Help {person_name} with a small shared task", 2, None),
+        ("attend", "quiet_company", f"Spend a quiet hour alongside {person_name}", 1, None),
+    )
+    return shapes[int(_sample(f"invitation-shape:{invitation_id}") * len(shapes)) % len(shapes)]

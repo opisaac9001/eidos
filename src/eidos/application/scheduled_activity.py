@@ -311,6 +311,32 @@ def scheduled_activity_events(
                 )
                 output.append(achieved)
                 projected = projected.apply(achieved)
+        if entry.companion_id is not None:
+            output.extend(
+                (
+                    consequence(
+                        "social.activity_completed",
+                        {
+                            "activity": entry.activity_type or action.value,
+                            "person_id": entry.companion_id,
+                            "schedule_id": entry.schedule_id,
+                            "location_id": entry.location_id,
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                    ),
+                    consequence(
+                        "relationship.changed",
+                        {
+                            "person_id": entry.companion_id,
+                            "evidence_actor_id": "pathos",
+                            "familiarity_delta": 0.03,
+                            "trust_delta": 0.02,
+                            "reason": "Pathos followed through on accepted shared activity.",
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                    ),
+                )
+            )
         memory = consequence(
             "memory.recorded",
             {
@@ -321,6 +347,7 @@ def scheduled_activity_events(
                 "source_event_id": str(completion.event_id),
                 "goal_id": entry.goal_id,
                 "object_id": entry.target_id if action is ActionKind.REPAIR else entry.resource_id,
+                "person_id": entry.companion_id,
                 "location_id": entry.location_id,
                 "importance": 0.7,
                 "confidence": 1.0,
