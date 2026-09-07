@@ -203,9 +203,22 @@ def _attention_focus(
             )
     if concerns:
         concern = concerns[-1]
+        raw_importance = concern.payload.get("importance", 0.8)
+        importance = (
+            float(raw_importance)
+            if isinstance(raw_importance, (int, float)) and not isinstance(raw_importance, bool)
+            else 0.8
+        )
+        recent_focuses = sum(
+            event.kind == "mind.layer_pulsed"
+            and event.payload.get("layer") == CognitiveLayer.ATTENTION.value
+            and event.payload.get("focus_id") == concern.payload.get("concern_id")
+            and _within_recent_hours(event, at, 6)
+            for event in history
+        )
         candidates.append(
             (
-                0.78,
+                max(0.35, 0.55 + 0.28 * min(1.0, max(0.0, importance)) - 0.12 * recent_focuses),
                 "concern",
                 str(concern.payload["concern_id"]),
                 str(concern.payload["text"]),

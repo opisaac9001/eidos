@@ -305,7 +305,11 @@ magical repairs or automatic acceptance of another actor's invitation.
 Feature families: INNER, SELF-03/04, UX-07, QA-05.
 
 - Structured unresolved concerns and emotional residue feed bounded associations.
-  Most remain private; only salient fragments enter conscious attention.
+  Ordinary setbacks now open source-linked concerns, matching later evidence can
+  settle them, and unresolved issues may recede without being labelled solved.
+  Semantic cooldown and attentional fatigue keep recurring worries from becoming
+  duplicate records or permanently monopolizing consciousness. Most remain private;
+  only salient fragments enter conscious attention.
 - A derived Pathos-private cognitive workspace now carries bounded thoughts,
   associations, attention, concerns, reflections, and dream residue between Murmur,
   conscious speech, reflection, Oneiros, activity choice, and project formation. Every

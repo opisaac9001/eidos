@@ -808,6 +808,40 @@ class LifeTests(unittest.TestCase):
         applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
         self.assertEqual(len(applied), 1)
 
+    def test_lived_relationship_strain_enters_the_continuing_inner_life(self):
+        self.life.bootstrap()
+        history = self.life.history()
+        strain = DomainEvent(
+            "relationship.changed",
+            "pathos",
+            {
+                "person_id": "rowan",
+                "evidence_actor_id": "pathos",
+                "trust_delta": -0.06,
+                "tension_delta": 0.08,
+                "reason": "A sharp disagreement remained unsettled.",
+                "simulated_at": self.life.snapshot()["time"],
+            },
+        )
+        self.life.store.append("pathos", [strain], expected_revision=len(history))
+
+        self.life.advance(1)
+
+        concern = next(
+            item
+            for item in self.life.snapshot()["concerns"]
+            if item.get("source_event_id") == str(strain.event_id)
+        )
+        self.assertEqual(concern["status"], "active")
+        self.assertEqual(concern["person_id"], "rowan")
+        opened = next(
+            event
+            for event in self.life.history()
+            if event.kind == "concern.opened"
+            and event.payload.get("source_event_id") == str(strain.event_id)
+        )
+        self.assertEqual(opened.causation_id, strain.event_id)
+
     def test_public_world_event_only_enters_memories_of_present_observers(self):
         self.life.advance(24)
         self.life.advance(24)

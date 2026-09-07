@@ -158,6 +158,46 @@ class MentalLayerTests(unittest.TestCase):
             (attention.payload["focus_type"], attention.payload["focus_id"]), ("commitment", "soon")
         )
 
+    def test_repeated_concern_focus_fatigues_and_allows_other_attention(self):
+        at = datetime(2026, 1, 2, 9, tzinfo=timezone.utc)
+        concern = DomainEvent(
+            "concern.opened",
+            "pathos",
+            {"concern_id": "loose-end", "text": "The unanswered letter.", "importance": 0.8},
+        )
+        goal = DomainEvent(
+            "goal.activated",
+            "pathos",
+            {"goal_id": "garden", "title": "Tend the window box"},
+        )
+        prior_focuses = [
+            DomainEvent(
+                "mind.layer_pulsed",
+                "pathos",
+                {
+                    "pulse_id": f"concern-{hour}",
+                    "layer": "attention",
+                    "mode": "foreground",
+                    "focus_type": "concern",
+                    "focus_id": "loose-end",
+                    "focus_text": "The unanswered letter.",
+                    "activation": 0.78,
+                    "simulated_at": at.replace(hour=hour).isoformat(),
+                },
+            )
+            for hour in (7, 8)
+        ]
+
+        events = mental_layer_events(
+            [concern, goal, *prior_focuses], PathosState(simulated_at=at), at, {}
+        )
+        attention = next(event for event in events if event.payload["layer"] == "attention")
+
+        self.assertEqual(
+            (attention.payload["focus_type"], attention.payload["focus_id"]),
+            ("need", "mastery"),
+        )
+
     def test_recent_witnessed_encounter_can_remain_in_foreground_attention(self):
         at = datetime(2026, 1, 10, 14, tzinfo=timezone.utc)
         encounter = DomainEvent(

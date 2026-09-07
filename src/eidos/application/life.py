@@ -24,6 +24,7 @@ from eidos.application.catchup import (
 from eidos.application.character_generation import generated_character_history_events
 from eidos.application.cognition import perform, request_for
 from eidos.application.cognitive_workspace import cognitive_workspace
+from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import (
@@ -690,7 +691,15 @@ class Life:
             elif event.kind == "concern.opened":
                 concerns[payload["concern_id"]] = {**item, "status": "active"}
             elif event.kind == "concern.resolved" and payload["concern_id"] in concerns:
-                concerns[payload["concern_id"]]["status"] = "resolved"
+                concerns[payload["concern_id"]].update(
+                    status="resolved",
+                    resolution=item,
+                )
+            elif event.kind == "concern.receded" and payload["concern_id"] in concerns:
+                concerns[payload["concern_id"]].update(
+                    status="receded",
+                    resolution=item,
+                )
             elif event.kind == "role.completed":
                 role = roles.get(payload["role"])
                 if role:
@@ -866,6 +875,9 @@ class Life:
                 "emotion.regulation_completed",
                 "emotion.mixed_state_recognized",
                 "emotion.mixed_state_resolved",
+                "concern.opened",
+                "concern.resolved",
+                "concern.receded",
                 "npc.biography_disclosed",
                 "social.preference_remembered",
                 "social.preference_revised",
@@ -2394,6 +2406,7 @@ class Life:
             if overdue:
                 self._planning(history + pending + overdue)
                 pending.extend(overdue)
+            pending.extend(concern_lifecycle_events(history + pending, current))
             pending.extend(
                 relationship_belief_events(history + pending, at, self._beliefs(history + pending))
             )
@@ -2412,10 +2425,15 @@ class Life:
                 goal.goal_id for goal in planning_now.goals.values() if goal.status == "active"
             }
             concerns_now = active_concerns(history + pending)
+            focused_concern = (
+                attention.focus_text
+                if attention is not None and attention.focus_type == "concern"
+                else None
+            )
             recall_query = " ".join(
                 [
                     catalog_now.location_name(state.location_id),
-                    *(str(concern.payload["text"]) for concern in concerns_now[-2:]),
+                    *([focused_concern] if focused_concern is not None else []),
                     *(planning_now.goals[goal_id].title for goal_id in active_goal_ids),
                 ]
             )
@@ -2554,7 +2572,7 @@ class Life:
                 if isinstance(self.gateway, DeferredModelGateway) and selected_context:
                     source = selected_context[0]
                     importance = float(source.event.payload.get("importance", 0.5))
-                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if concerns_now else 0))
+                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if focused_concern else 0))
                     cue = (
                         source.matched_terms[0]
                         if source.matched_terms
@@ -2578,7 +2596,7 @@ class Life:
                 if text and selected_context:
                     source = selected_context[0]
                     importance = float(source.event.payload.get("importance", 0.5))
-                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if concerns_now else 0))
+                    salience = min(0.95, 0.45 + 0.3 * importance + (0.15 if focused_concern else 0))
                     cue = (
                         source.matched_terms[0]
                         if source.matched_terms

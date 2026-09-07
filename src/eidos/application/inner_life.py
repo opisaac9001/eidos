@@ -48,12 +48,14 @@ def active_dream_inspirations(
 
 
 def active_concerns(events: list[DomainEvent]) -> list[DomainEvent]:
-    concerns = {}
+    concerns: dict[str, DomainEvent] = {}
     for event in events:
+        if event.aggregate_id != "pathos":
+            continue
         if event.kind == "concern.opened":
-            concerns[event.payload["concern_id"]] = event
-        elif event.kind == "concern.resolved":
-            concerns.pop(event.payload["concern_id"], None)
+            concerns[str(event.payload["concern_id"])] = event
+        elif event.kind in {"concern.resolved", "concern.receded"}:
+            concerns.pop(str(event.payload["concern_id"]), None)
     return list(concerns.values())
 
 
