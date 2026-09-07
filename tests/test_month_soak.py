@@ -87,6 +87,12 @@ class MonthSoakTests(unittest.TestCase):
                 0.2,
                 review.narrative_repetitions_by_kind,
             )
+            self.assertGreaterEqual(len(review.dream_motifs), 6, review.dream_motifs)
+            self.assertEqual(
+                review.narrative_repetitions_by_kind.get("dream.recorded", 0),
+                0,
+                review.narrative_repetitions_by_kind,
+            )
             physical_starts = [
                 event for event in events if event.kind == "wellbeing.episode_started"
             ]

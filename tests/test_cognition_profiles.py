@@ -2,6 +2,7 @@ import asyncio
 import json
 import unittest
 
+from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.cognition import (
     ROLE_MODEL_PROFILES,
     perform,
@@ -84,7 +85,31 @@ class CognitionProfileTests(unittest.TestCase):
         self.assertEqual(requests["murmur"].task_version, "5")
         self.assertEqual(requests["firmament"].task_version, "4")
         self.assertEqual(requests["reflection"].task_version, "4")
-        self.assertEqual(requests["oneiros"].task_version, "4")
+        self.assertEqual(requests["oneiros"].task_version, "5")
+
+    def test_standin_oneiros_uses_recent_dreams_as_a_repetition_guard(self):
+        recent: list[dict[str, str]] = []
+        texts = []
+        for day in range(1, 31):
+            response = asyncio.run(
+                StandInGateway().generate(
+                    request_for(
+                        "oneiros",
+                        {
+                            "time": f"2026-01-{day:02d}T23:00:00+00:00",
+                            "location": "home",
+                            "memories": ["I noticed a lamp on the table."],
+                            "recent_dreams": recent[-12:],
+                        },
+                    )
+                )
+            )
+            text = str(json.loads(response.content)["text"])
+            texts.append(text)
+            recent.append({"text": text, "motif": "unknown"})
+
+        self.assertEqual(len(set(texts)), 30)
+        self.assertTrue(all(text.startswith("In a dream") for text in texts))
 
     def test_unknown_role_cannot_inherit_an_accidental_generic_profile(self):
         with self.assertRaisesRegex(ValueError, "Unknown cognition role"):

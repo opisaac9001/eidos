@@ -26,6 +26,73 @@ def _short_fragment(value: object, maximum_words: int = 14) -> str:
     return " ".join(words[:maximum_words]) or "the quiet part of the day"
 
 
+def _standin_dream_text(
+    context: dict[str, object], location: object, last_memory: object
+) -> str:
+    """Compose many replay-stable combinations while avoiding recent exact dreams."""
+    openings = (
+        f"In a dream, {location} opens into a room full of unfinished clocks.",
+        f"In a dream, rain fills {location} from the floor upward.",
+        f"In a dream, every doorway in {location} leads back to the same lamplit table.",
+        f"In a dream, {location} becomes a quiet railway platform with no tracks.",
+        f"In a dream, a red thread runs from {location} through the streets.",
+        f"In a dream, the memory '{last_memory}' is folded into a tiny map.",
+        f"In a dream, the ceiling above {location} lowers until everyone whispers.",
+        f"In a dream, I carry a bowl of light through {location}.",
+        f"In a dream, {location} is deserted except for a whistling kettle.",
+        f"In a dream, every window in {location} looks onto a different season.",
+        f"In a dream, I find '{last_memory}' written on a door I cannot close.",
+        f"In a dream, {location} drifts a few inches above the street.",
+    )
+    endings = (
+        "Each clock keeps a different afternoon, and I am late for none of them.",
+        "Paper boats pass my knees carrying conversations I nearly recognize.",
+        "One empty chair moves whenever I look toward the window.",
+        "The signs show feelings instead of destinations.",
+        "The thread knots itself around a question I have forgotten how to ask.",
+        "Its roads rearrange quietly whenever I blink.",
+        "Nobody is frightened; we simply make our words smaller.",
+        "Moving shadows spill over the rim, but the light never runs out.",
+        "It whistles whenever I forget a name and stops when I invent one.",
+        "None of the windows show today, though one smells like breakfast.",
+        "The writing fades as soon as I decide it must be important.",
+        "Everyone carries on normally while my footsteps miss the ground.",
+    )
+    moment_value = context.get("time")
+    try:
+        moment = datetime.fromisoformat(str(moment_value).replace("Z", "+00:00"))
+        salt = int.from_bytes(hashlib.sha256(b"oneiros-combination").digest()[:2], "big")
+        combination = (
+            moment.date().toordinal() * 97
+            + moment.hour * 4
+            + moment.minute // 15
+            + salt
+        ) % (len(openings) * len(endings))
+    except ValueError:
+        combination = int.from_bytes(
+            hashlib.sha256(f"{moment_value}:oneiros-combination".encode()).digest()[:4],
+            "big",
+        ) % (len(openings) * len(endings))
+    opening_index = combination % len(openings)
+    ending_index = combination // len(openings)
+    chosen_opening = openings[opening_index]
+    chosen_ending = endings[ending_index]
+    raw_recent = context.get("recent_dreams", [])
+    recent_raw = raw_recent if isinstance(raw_recent, (list, tuple)) else ()
+    recent = {
+        " ".join(str(item.get("text", "")).casefold().split())
+        for item in recent_raw
+        if isinstance(item, dict)
+    }
+    for offset in range(len(openings) * len(endings)):
+        opening = openings[(opening_index + offset // len(endings)) % len(openings)]
+        ending = endings[(ending_index + offset) % len(endings)]
+        candidate = f"{opening} {ending}"
+        if " ".join(candidate.casefold().split()) not in recent:
+            return candidate
+    return f"{chosen_opening} {chosen_ending}"
+
+
 def _standin_murmur_text(context: dict[str, object], location: object, last_memory: object) -> str:
     raw_layers = context.get("mind_layers", [])
     layers = raw_layers if isinstance(raw_layers, list) else []
@@ -484,21 +551,7 @@ class StandInGateway(ModelGateway):
                 "reflection",
             )
         elif role == "oneiros":
-            dreams = (
-                f"In a dream, {location} opens into a room full of unfinished clocks. Each one keeps a different afternoon.",
-                f"In a dream, rain fills {location} from the floor upward, while paper boats carry half-remembered conversations.",
-                f"In a dream, every doorway in {location} leads back to the same lamplit table, but one chair keeps moving.",
-                f"In a dream, {location} becomes a quiet railway platform where the signs display feelings instead of destinations.",
-                f"In a dream, a red thread runs from {location} through the streets and knots itself around an unfinished question.",
-                f"In a dream, the memory '{last_memory}' is folded into a tiny map whose roads rearrange whenever I blink.",
-                f"In a dream, the ceiling above {location} lowers gently until everyone has to speak in whispers.",
-                f"In a dream, I carry a bowl of light through {location}, careful not to spill its moving shadows.",
-                f"In a dream, {location} is deserted except for a kettle that whistles whenever I forget somebody's name.",
-                f"In a dream, all the windows in {location} look onto different seasons, and none of them show today.",
-                f"In a dream, I find '{last_memory}' written on the back of every door I close.",
-                f"In a dream, {location} drifts a few inches above the street while everyone behaves as if nothing changed.",
-            )
-            text = _temporal_choice(dreams, context.get("time"), "oneiros")
+            text = _standin_dream_text(context, location, last_memory)
         elif role == "chronicler":
             text = " ".join(memories[-7:]) or "A quiet day, with no recorded encounters yet."
         elif role == "mnemosyne":

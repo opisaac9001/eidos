@@ -350,6 +350,9 @@ Feature families: INNER, SELF-03/04, UX-07, QA-05.
   the transition rather than ending abruptly; older worlds retain a safe fallback.
 - Select dreams from salient memories, unresolved concerns and emotional state.
   Record seed IDs, symbolic transformations, recurring motifs and intensity limits.
+  Oneiros receives a bounded recent-dream window as a repetition guard. Dream imagery,
+  rather than familiar seed wording alone, determines the motif; the month gate requires
+  at least six motifs and no exact repeated dream prose.
 - Permit mundane dreams, nightmares and no recalled dream. Avoid forced profoundness.
 - Waking carries limited, decaying affect and partially recalled fragments. An active
   dream possibility may shape an aligned activity or multi-step project proposal, but

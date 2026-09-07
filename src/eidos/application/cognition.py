@@ -18,7 +18,7 @@ ROLE_MODEL_PROFILES = {
     "moira": ("3", 16, 0.2),
     "mnemosyne": ("3", 384, 0.0),
     "reflection": ("4", 140, 0.55),
-    "oneiros": ("4", 220, 0.8),
+    "oneiros": ("5", 220, 0.8),
     "chronicler": ("3", 180, 0.2),
 }
 REPAIRABLE_PATHOS_FINDINGS = {
@@ -220,6 +220,14 @@ def _prior_role_texts(role: str, context: Mapping[str, object]) -> list[str]:
         stream = context.get("recent_inner_stream")
         if isinstance(stream, (list, tuple)):
             return [item for item in stream if isinstance(item, str)]
+    if role == "oneiros":
+        dreams = context.get("recent_dreams")
+        if isinstance(dreams, (list, tuple)):
+            return [
+                str(item["text"])
+                for item in dreams
+                if isinstance(item, Mapping) and isinstance(item.get("text"), str)
+            ]
     return []
 
 

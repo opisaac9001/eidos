@@ -406,6 +406,31 @@ class InnerLifeTests(unittest.TestCase):
         )
         self.assertTrue(all(link.correlation_id == dream.correlation_id for link in links))
 
+    def test_dream_imagery_can_vary_motif_even_when_seeds_are_familiar(self):
+        seed = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {"owner": "pathos", "category": "experience", "text": "Mara brought the lamp."},
+        )
+        dreams = (
+            ("In a dream, rain carries paper boats through the room.", "weather"),
+            ("In a dream, a railway platform has no destination.", "journey"),
+            ("In a dream, every doorway opens onto a narrow hallway.", "thresholds"),
+            ("In a dream, the ceiling drifts above the floor.", "dislocation"),
+        )
+
+        motifs = []
+        for position, (text, expected) in enumerate(dreams):
+            event = record_dream_events(
+                text,
+                [seed],
+                f"2026-01-{position + 2:02d}T23:00:00+00:00",
+                "stand-in",
+                recent_motifs=motifs,
+            )[0]
+            self.assertEqual(event.payload["motif"], expected)
+            motifs.append(str(event.payload["motif"]))
+
 
 if __name__ == "__main__":
     unittest.main()

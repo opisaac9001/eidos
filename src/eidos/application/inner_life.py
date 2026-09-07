@@ -95,6 +95,8 @@ def record_dream_events(
     seeds: Sequence[DomainEvent],
     simulated_at: str,
     source: str,
+    *,
+    recent_motifs: Sequence[str] = (),
 ) -> list[DomainEvent]:
     """Record dream fiction plus one auditable link for every accepted seed."""
     if not text.strip():
@@ -104,7 +106,7 @@ def record_dream_events(
         [seed for seed in seeds if seed.kind == "concern.opened"],
         limit=min(5, max(1, len(seeds))),
     )
-    motif = _motif(accepted)
+    motif = _motif(accepted, text, recent_motifs)
     dream = DomainEvent(
         "dream.recorded",
         "pathos",
@@ -141,17 +143,34 @@ def record_dream_events(
     return events
 
 
-def _motif(seeds: Sequence[DomainEvent]) -> str:
-    text = " ".join(str(seed.payload.get("text", "")).lower() for seed in seeds)
-    for motif, cues in (
-        ("light", ("lamp", "light", "moon")),
-        ("mending", ("repair", "broken", "workshop", "finish")),
-        ("growth", ("park", "tree", "garden")),
-        ("companionship", ("mara", "ellis", "rowan", "cafe", "together")),
-    ):
-        if any(cue in text for cue in cues):
-            return motif
-    return "unfinished_time"
+def _motif(
+    seeds: Sequence[DomainEvent], dream_text: str, recent_motifs: Sequence[str]
+) -> str:
+    """Name the dream's imagery without letting familiar seeds monopolize it."""
+    seed_text = " ".join(str(seed.payload.get("text", "")).lower() for seed in seeds)
+    rendered = dream_text.lower()
+    catalog = (
+        ("light", ("lamp", "light", "moon", "glow", "shadow")),
+        ("mending", ("repair", "broken", "workshop", "mend", "stitch")),
+        ("growth", ("park", "tree", "garden", "root", "leaf")),
+        ("companionship", ("mara", "ellis", "rowan", "cafe", "together", "chair")),
+        ("unfinished_time", ("clock", "afternoon", "time", "late", "season")),
+        ("weather", ("rain", "water", "storm", "river", "flood")),
+        ("thresholds", ("door", "doorway", "window", "threshold", "hallway")),
+        ("journey", ("railway", "platform", "road", "map", "street", "destination")),
+        ("memory", ("remember", "forget", "forgot", "name", "written")),
+        ("silence", ("whisper", "quiet", "sound", "wordless")),
+        ("dislocation", ("float", "drift", "ceiling", "floor", "above")),
+    )
+    recent = set(recent_motifs[-3:])
+    scored = []
+    for position, (motif, cues) in enumerate(catalog):
+        score = 2 * sum(cue in rendered for cue in cues) + sum(
+            cue in seed_text for cue in cues
+        )
+        scored.append((score, motif not in recent, -position, motif))
+    score, _, _, motif = max(scored)
+    return motif if score else "unfinished_time"
 
 
 def waking_dream_events(
@@ -194,6 +213,12 @@ def waking_dream_events(
         "mending": "Consider making time for careful repair or practice.",
         "growth": "Consider spending attentive time outdoors.",
         "companionship": "Consider whether a quiet social follow-up would feel welcome.",
+        "weather": "Consider making room for whatever mood the day brings.",
+        "thresholds": "Consider one small change of scene without treating it as a demand.",
+        "journey": "Consider an unhurried walk or a different familiar route.",
+        "memory": "Consider writing down the fragment before it fades.",
+        "silence": "Consider leaving a little quiet around the day.",
+        "dislocation": "Consider choosing something steady and familiar today.",
     }.get(motif, "Consider leaving a little unscheduled room today.")
     inspiration = DomainEvent(
         "dream.inspiration_considered",

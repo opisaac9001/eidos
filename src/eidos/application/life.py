@@ -2889,6 +2889,21 @@ class Life:
                         **context,
                         "cognitive_workspace": cognitive_workspace(history + pending, current),
                     }
+                    if role == "oneiros":
+                        recent_dreams = [
+                            item
+                            for item in history + pending
+                            if item.kind == "dream.recorded"
+                            and item.aggregate_id == "pathos"
+                        ][-12:]
+                        recent_dream_context = [
+                            {
+                                "text": str(item.payload["text"]),
+                                "motif": str(item.payload.get("motif", "unfinished_time")),
+                            }
+                            for item in recent_dreams
+                        ]
+                        role_context["recent_dreams"] = recent_dream_context
                     if role == "chronicler":
                         role_sources = [
                             item
@@ -2905,7 +2920,16 @@ class Life:
                             seeds = dream_seed_sources(
                                 [item.event for item in selected_context], concerns_now
                             )
-                            dream_events = record_dream_events(text, seeds, at, self.mode)
+                            dream_events = record_dream_events(
+                                text,
+                                seeds,
+                                at,
+                                self.mode,
+                                recent_motifs=[
+                                    str(item.get("motif", "unfinished_time"))
+                                    for item in recent_dream_context
+                                ],
+                            )
                             pending.extend(dream_events)
                             event = dream_events[0]
                         else:
