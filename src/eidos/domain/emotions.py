@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GrowOnlyMap, IncrementalFold
 from eidos.domain.state import PathosState
 
 
@@ -242,80 +243,82 @@ def emotion_sample_events(
     return output
 
 
-def project_emotion(events: Sequence[DomainEvent]) -> EmotionState:
-    state = EmotionState()
-    prior: dict[str, DomainEvent] = {}
-    for event in events:
-        if event.kind == "emotion.mixed_state_recognized":
-            secondary = event.payload.get("secondary_label")
-            positive_source = event.payload.get("positive_source_event_id")
-            negative_source = event.payload.get("negative_source_event_id")
-            complexity = _number(event.payload.get("complexity"), "complexity")
-            positive = prior.get(str(positive_source))
-            negative = prior.get(str(negative_source))
-            if (
-                not isinstance(secondary, str)
-                or not secondary.strip()
-                or not 0 < complexity <= 1
-                or positive is None
-                or negative is None
-                or positive.kind != "appraisal.recorded"
-                or negative.kind != "appraisal.recorded"
-                or float(positive.payload.get("desirability", 0)) < 0.3
-                or float(negative.payload.get("desirability", 0)) > -0.3
-                or event.causation_id != negative.event_id
-            ):
-                raise ValueError("Mixed emotion requires opposed appraisal evidence")
-            state = replace(
+class _EmotionFold(NamedTuple):
+    state: EmotionState
+    appraisals: GrowOnlyMap[str, DomainEvent]
+    samples: GrowOnlyMap[str, bool]
+
+
+def _emotion_step(fold: _EmotionFold, event: DomainEvent) -> _EmotionFold:
+    state = fold.state
+    if event.kind == "appraisal.recorded":
+        return fold._replace(appraisals=fold.appraisals.with_item(str(event.event_id), event))
+    if event.kind == "emotion.mixed_state_recognized":
+        secondary = event.payload.get("secondary_label")
+        positive_source = event.payload.get("positive_source_event_id")
+        negative_source = event.payload.get("negative_source_event_id")
+        complexity = _number(event.payload.get("complexity"), "complexity")
+        positive = fold.appraisals.get(str(positive_source))
+        negative = fold.appraisals.get(str(negative_source))
+        if (
+            not isinstance(secondary, str)
+            or not secondary.strip()
+            or not 0 < complexity <= 1
+            or positive is None
+            or negative is None
+            or float(positive.payload.get("desirability", 0)) < 0.3
+            or float(negative.payload.get("desirability", 0)) > -0.3
+            or event.causation_id != negative.event_id
+        ):
+            raise ValueError("Mixed emotion requires opposed appraisal evidence")
+        return fold._replace(
+            state=replace(
                 state,
                 secondary_label=secondary.strip(),
                 complexity=complexity,
                 positive_source_event_id=str(positive_source),
                 negative_source_event_id=str(negative_source),
             )
-            prior[str(event.event_id)] = event
-            continue
-        if event.kind == "emotion.mixed_state_resolved":
-            if state.secondary_label is None or event.causation_id not in {
-                item.event_id for item in prior.values() if item.kind == "emotion.sampled"
-            }:
-                raise ValueError("Only a sampled mixed emotion can resolve")
-            state = replace(
+        )
+    if event.kind == "emotion.mixed_state_resolved":
+        if state.secondary_label is None or str(event.causation_id) not in fold.samples:
+            raise ValueError("Only a sampled mixed emotion can resolve")
+        return fold._replace(
+            state=replace(
                 state,
                 secondary_label=None,
                 complexity=0.0,
                 positive_source_event_id=None,
                 negative_source_event_id=None,
             )
-            prior[str(event.event_id)] = event
-            continue
-        if event.kind != "emotion.sampled":
-            prior[str(event.event_id)] = event
-            continue
-        payload = event.payload
-        label = payload.get("label")
-        pattern = payload.get("pattern")
-        simulated_at = payload.get("simulated_at")
-        if not all(
-            isinstance(value, str) and value.strip() for value in (label, pattern, simulated_at)
-        ):
-            raise ValueError("Emotion sample requires label, pattern, and time")
-        assert isinstance(simulated_at, str)
-        if datetime.fromisoformat(simulated_at).utcoffset() is None:
-            raise ValueError("Emotion sample time must be timezone-aware")
-        valence = _number(payload.get("valence"), "valence")
-        arousal = _number(payload.get("arousal"), "arousal")
-        _dimensions(valence, arousal)
-        intensity = _number(payload.get("intensity"), "intensity")
-        low_hours = payload.get("sustained_low_hours")
-        if (
-            not 0 <= intensity <= 1
-            or isinstance(low_hours, bool)
-            or not isinstance(low_hours, int)
-            or low_hours < 0
-        ):
-            raise ValueError("Emotion intensity or duration is invalid")
-        state = EmotionState(
+        )
+    if event.kind != "emotion.sampled":
+        return fold
+    payload = event.payload
+    label = payload.get("label")
+    pattern = payload.get("pattern")
+    simulated_at = payload.get("simulated_at")
+    if not all(
+        isinstance(value, str) and value.strip() for value in (label, pattern, simulated_at)
+    ):
+        raise ValueError("Emotion sample requires label, pattern, and time")
+    assert isinstance(simulated_at, str)
+    if datetime.fromisoformat(simulated_at).utcoffset() is None:
+        raise ValueError("Emotion sample time must be timezone-aware")
+    valence = _number(payload.get("valence"), "valence")
+    arousal = _number(payload.get("arousal"), "arousal")
+    _dimensions(valence, arousal)
+    intensity = _number(payload.get("intensity"), "intensity")
+    low_hours = payload.get("sustained_low_hours")
+    if (
+        not 0 <= intensity <= 1
+        or isinstance(low_hours, bool)
+        or not isinstance(low_hours, int)
+        or low_hours < 0
+    ):
+        raise ValueError("Emotion intensity or duration is invalid")
+    return _EmotionFold(
+        EmotionState(
             label=str(label),
             intensity=intensity,
             valence=valence,
@@ -327,9 +330,19 @@ def project_emotion(events: Sequence[DomainEvent]) -> EmotionState:
             complexity=state.complexity,
             positive_source_event_id=state.positive_source_event_id,
             negative_source_event_id=state.negative_source_event_id,
-        )
-        prior[str(event.event_id)] = event
-    return state
+        ),
+        fold.appraisals,
+        fold.samples.with_item(str(event.event_id), True),
+    )
+
+
+_EMOTION_FOLD: IncrementalFold[_EmotionFold] = IncrementalFold(
+    lambda: _EmotionFold(EmotionState(), GrowOnlyMap(), GrowOnlyMap()), _emotion_step
+)
+
+
+def project_emotion(events: Sequence[DomainEvent]) -> EmotionState:
+    return _EMOTION_FOLD(events).state
 
 
 def _dimensions(valence: float, arousal: float) -> None:

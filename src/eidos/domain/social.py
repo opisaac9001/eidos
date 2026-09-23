@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.proposals import ProposalRejected
 
 
@@ -250,11 +251,13 @@ def resolve_social_move(
     return SocialResolution(True, "accepted", (proposed, resolved))
 
 
+_SOCIAL_FOLD: IncrementalFold[SocialState] = IncrementalFold(
+    lambda: SocialState.empty(), lambda state, event: state.apply(event)
+)
+
+
 def project_social(events: Sequence[DomainEvent]) -> SocialState:
-    state = SocialState.empty()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _SOCIAL_FOLD(events)
 
 
 def choose_request_response(

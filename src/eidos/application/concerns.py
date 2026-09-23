@@ -7,6 +7,7 @@ from typing import Sequence
 
 from eidos.application.inner_life import active_concerns
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import event_index
 
 
 def concern_lifecycle_events(
@@ -434,7 +435,7 @@ def _string(event: DomainEvent | None, field: str) -> str:
 
 
 def _event_by_id(history: Sequence[DomainEvent], event_id: str) -> DomainEvent | None:
-    return next((event for event in history if str(event.event_id) == event_id), None)
+    return event_index(history).get(event_id)
 
 
 def _latest_matching(

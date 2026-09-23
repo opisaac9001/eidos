@@ -100,3 +100,53 @@ class IncrementalFold(Generic[S]):
         if entries[0] is not entry:
             entries.remove(entry)
             entries.insert(0, entry)
+
+
+K = TypeVar("K", bound=Hashable)
+V = TypeVar("V")
+
+
+class GrowOnlyMap(Generic[K, V]):
+    """A persistent map for folds whose states only ever add keys.
+
+    Successive states share one dict and each sees only the entries added before it. When a
+    state is extended after another branch already grew the shared dict, the new branch
+    copies its own visible entries first, so every state keeps an exact, immutable view
+    while the common linear case appends in O(1).
+    """
+
+    __slots__ = ("_data", "_size")
+
+    def __init__(self, data: dict[K, tuple[int, V]] | None = None, size: int = 0) -> None:
+        self._data: dict[K, tuple[int, V]] = {} if data is None else data
+        self._size = size
+
+    def get(self, key: K) -> V | None:
+        item = self._data.get(key)
+        return item[1] if item is not None and item[0] < self._size else None
+
+    def __contains__(self, key: object) -> bool:
+        item = self._data.get(key)  # type: ignore[arg-type]
+        return item is not None and item[0] < self._size
+
+    def __len__(self) -> int:
+        return self._size
+
+    def with_item(self, key: K, value: V) -> GrowOnlyMap[K, V]:
+        if key in self:
+            return self
+        data = self._data
+        if len(data) != self._size:
+            data = {k: item for k, item in data.items() if item[0] < self._size}
+        data[key] = (self._size, value)
+        return GrowOnlyMap(data, self._size + 1)
+
+
+_EVENT_INDEX: IncrementalFold[GrowOnlyMap[str, DomainEvent]] = IncrementalFold(
+    GrowOnlyMap, lambda index, event: index.with_item(str(event.event_id), event)
+)
+
+
+def event_index(events: Sequence[DomainEvent]) -> GrowOnlyMap[str, DomainEvent]:
+    """Events by id (first occurrence wins), maintained incrementally across ticks."""
+    return _EVENT_INDEX(events)

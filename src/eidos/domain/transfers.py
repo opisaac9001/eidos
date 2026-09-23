@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.planning import PlanningState
 from eidos.domain.proposals import ProposalRejected
 
@@ -339,11 +340,13 @@ def resolve_transfer_response(
     return TransferResolution(True, "accepted", (proposed, resolved, *effects))
 
 
+_TRANSFERS_FOLD: IncrementalFold[TransferState] = IncrementalFold(
+    lambda: TransferState({}), lambda state, event: state.apply(event)
+)
+
+
 def project_transfers(events: Sequence[DomainEvent]) -> TransferState:
-    state = TransferState({})
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _TRANSFERS_FOLD(events)
 
 
 def _event(

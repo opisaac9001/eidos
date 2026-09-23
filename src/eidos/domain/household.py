@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 HOUSEHOLD_TASKS = ("dishes", "laundry", "tidying", "paperwork")
 
@@ -91,11 +92,13 @@ class HouseholdState:
         return self
 
 
+_HOUSEHOLD_FOLD: IncrementalFold[HouseholdState] = IncrementalFold(
+    lambda: HouseholdState(), lambda state, event: state.apply(event)
+)
+
+
 def project_household(events: Sequence[DomainEvent]) -> HouseholdState:
-    state = HouseholdState()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _HOUSEHOLD_FOLD(events)
 
 
 def _required(event: DomainEvent, key: str) -> str:

@@ -7,6 +7,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,8 +98,10 @@ class RelationshipState:
         return cls(restored)
 
 
+_RELATIONSHIPS_FOLD: IncrementalFold[RelationshipState] = IncrementalFold(
+    lambda: RelationshipState.empty(), lambda state, event: state.apply(event)
+)
+
+
 def project_relationships(events: Sequence[DomainEvent]) -> RelationshipState:
-    state = RelationshipState.empty()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _RELATIONSHIPS_FOLD(events)

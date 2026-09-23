@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 _KINDS = {"headache", "sore_muscles", "under_the_weather", "poor_sleep_aftereffects"}
 
@@ -81,11 +82,13 @@ class WellbeingState:
         return WellbeingState(episodes)
 
 
+_WELLBEING_FOLD: IncrementalFold[WellbeingState] = IncrementalFold(
+    lambda: WellbeingState(), lambda state, event: state.apply(event)
+)
+
+
 def project_wellbeing(events: Sequence[DomainEvent]) -> WellbeingState:
-    state = WellbeingState()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _WELLBEING_FOLD(events)
 
 
 def _active(episodes: dict[str, WellbeingEpisode], event: DomainEvent) -> WellbeingEpisode:

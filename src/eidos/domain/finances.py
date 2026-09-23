@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 _CATEGORIES = {"opening", "work_income", "cafe_meal", "provisions", "housing", "refund"}
 
@@ -104,11 +105,13 @@ class FinancialState:
         return self
 
 
+_FINANCES_FOLD: IncrementalFold[FinancialState] = IncrementalFold(
+    lambda: FinancialState(), lambda state, event: state.apply(event)
+)
+
+
 def project_finances(events: Sequence[DomainEvent]) -> FinancialState:
-    state = FinancialState()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _FINANCES_FOLD(events)
 
 
 def _required(event: DomainEvent, key: str) -> str:

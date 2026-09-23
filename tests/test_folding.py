@@ -70,3 +70,28 @@ class IncrementalFoldTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GrowOnlyMapTests(unittest.TestCase):
+    def test_each_state_sees_only_its_own_entries(self) -> None:
+        from eidos.domain.folding import GrowOnlyMap
+
+        empty: GrowOnlyMap[str, int] = GrowOnlyMap()
+        one = empty.with_item("a", 1)
+        two = one.with_item("b", 2)
+        self.assertNotIn("a", empty)
+        self.assertEqual(one.get("a"), 1)
+        self.assertNotIn("b", one)
+        self.assertEqual((two.get("a"), two.get("b"), len(two)), (1, 2, 2))
+
+    def test_divergent_branches_do_not_see_each_other(self) -> None:
+        from eidos.domain.folding import GrowOnlyMap
+
+        base: GrowOnlyMap[str, int] = GrowOnlyMap().with_item("root", 0)
+        left = base.with_item("left", 1)
+        right = base.with_item("right", 2)
+        self.assertIn("left", left)
+        self.assertNotIn("right", left)
+        self.assertIn("right", right)
+        self.assertNotIn("left", right)
+        self.assertEqual(left.with_item("more", 3).get("left"), 1)

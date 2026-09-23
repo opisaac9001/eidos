@@ -7,7 +7,7 @@ only eligible elapsed intervals count. These records are not new commitments.
 from bisect import bisect_right
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import NamedTuple, Sequence
+from typing import Callable, NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.domain.events import DomainEvent
@@ -62,52 +62,109 @@ def duration_requirement(
 
 
 class _Timeline(NamedTuple):
-    """History ordered by simulated time; events without a time inherit the clock."""
+    """History ordered by simulated time; events without a time inherit the clock.
+
+    ``keys``/``entries`` are append-only lists shared between successive states, each of
+    which reads only its first ``size`` items. Appending in time order (the common case)
+    extends the shared list in place; a state whose lists have already grown past it (a
+    divergent branch) or an out-of-order event copies first. Old states stay valid.
+    """
 
     seen: int
     clock: datetime | None
-    keys: tuple[tuple[datetime, int], ...]
-    entries: tuple[tuple[datetime, int, DomainEvent], ...]
+    size: int
+    keys: list[tuple[datetime, int]]
+    entries: list[tuple[datetime, int, DomainEvent]]
 
 
-def _timeline_step(timeline: _Timeline, event: DomainEvent) -> _Timeline:
-    index = timeline.seen
-    raw = event.payload.get("simulated_at")
-    at: datetime | None
-    try:
-        at = (
-            timeline.clock
-            if raw is None
-            else raw
-            if isinstance(raw, datetime)
-            else datetime.fromisoformat(str(raw))
-        )
-    except ValueError:
-        return timeline._replace(seen=index + 1)
-    if at is None or at.utcoffset() is None:
-        return timeline._replace(seen=index + 1)
-    clock = at if event.kind == "time.advanced" else timeline.clock
-    key = (at, index)
-    position = bisect_right(timeline.keys, key)
-    return _Timeline(
-        index + 1,
-        clock,
-        (*timeline.keys[:position], key, *timeline.keys[position:]),
-        (*timeline.entries[:position], (at, index, event), *timeline.entries[position:]),
-    )
+def _timeline_folder(
+    keep: Callable[[DomainEvent], bool],
+) -> Callable[[_Timeline, DomainEvent], _Timeline]:
+    def step(timeline: _Timeline, event: DomainEvent) -> _Timeline:
+        index = timeline.seen
+        raw = event.payload.get("simulated_at")
+        at: datetime | None
+        try:
+            at = (
+                timeline.clock
+                if raw is None
+                else raw
+                if isinstance(raw, datetime)
+                else datetime.fromisoformat(str(raw))
+            )
+        except ValueError:
+            return timeline._replace(seen=index + 1)
+        if at is None or at.utcoffset() is None:
+            return timeline._replace(seen=index + 1)
+        clock = at if event.kind == "time.advanced" else timeline.clock
+        if not keep(event):
+            return timeline._replace(seen=index + 1, clock=clock)
+        key = (at, index)
+        size = timeline.size
+        keys, entries = timeline.keys, timeline.entries
+        if size and key < keys[size - 1]:
+            position = bisect_right(keys, key, 0, size)
+            keys = [*keys[:position], key, *keys[position:size]]
+            entries = [*entries[:position], (at, index, event), *entries[position:size]]
+        else:
+            if len(keys) != size:
+                keys, entries = keys[:size], entries[:size]
+            keys.append(key)
+            entries.append((at, index, event))
+        return _Timeline(index + 1, clock, size + 1, keys, entries)
+
+    return step
 
 
 _TIMELINE_FOLD: IncrementalFold[_Timeline] = IncrementalFold(
-    lambda: _Timeline(0, None, (), ()), _timeline_step, capacity=8
+    lambda: _Timeline(0, None, 0, [], []), _timeline_folder(lambda _event: True), capacity=8
 )
+
+# activity_effort only changes state at these events; skipping the rest cannot change the
+# total, because eligibility is constant between them and elapsed time is summed piecewise.
+_EFFORT_KINDS = frozenset(
+    {
+        "pathos.travel_started",
+        "pathos.moved",
+        "schedule.interrupted",
+        "schedule.cancelled",
+        "schedule.failed",
+        "schedule.completed",
+        "schedule.rescheduled",
+        "sleep.started",
+        "sleep.ended",
+        "incident.response_started",
+        "incident.response_completed",
+        "incident.response_abandoned",
+        "phone.call_answered",
+        "phone.call_completed",
+        "scene.started",
+        "scene.ended",
+        "scene.interrupted",
+        "scene.resumed",
+        "npc.moved",
+        "npc.travel_started",
+        "activity.execution_started",
+        "activity.execution_paused",
+        "activity.execution_resumed",
+    }
+)
+_EFFORT_FOLD: IncrementalFold[_Timeline] = IncrementalFold(
+    lambda: _Timeline(0, None, 0, [], []),
+    _timeline_folder(lambda event: event.kind in _EFFORT_KINDS or event.kind.startswith("object.")),
+    capacity=8,
+)
+
+
+def _visible(timeline: _Timeline, now: datetime) -> list[tuple[datetime, int, DomainEvent]]:
+    visible = bisect_right(timeline.keys, (now, timeline.seen), 0, timeline.size)
+    return timeline.entries[:visible]
 
 
 def _timeline(
     history: Sequence[DomainEvent], now: datetime
 ) -> list[tuple[datetime, int, DomainEvent]]:
-    timeline = _TIMELINE_FOLD(history)
-    visible = bisect_right(timeline.keys, (now, timeline.seen))
-    return list(timeline.entries[:visible])
+    return _visible(_TIMELINE_FOLD(history), now)
 
 
 def activity_effort(
@@ -169,7 +226,7 @@ def activity_effort(
             return "companion_absent"
         return None
 
-    for at, _, event in _timeline(history, now):
+    for at, _, event in _visible(_EFFORT_FOLD(history), now):
         boundary = min(at, window_end)
         if running and boundary > cursor and reason() is None:
             worked += (boundary - cursor).total_seconds()

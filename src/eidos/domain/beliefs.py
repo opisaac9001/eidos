@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.proposals import ProposalRejected
 
 
@@ -336,11 +337,13 @@ def resolve_belief(
     return BeliefResolution(True, "contested", (proposed, contested))
 
 
+_BELIEFS_FOLD: IncrementalFold[BeliefState] = IncrementalFold(
+    lambda: BeliefState.empty(), lambda state, event: state.apply(event)
+)
+
+
 def project_beliefs(events: Sequence[DomainEvent]) -> BeliefState:
-    state = BeliefState.empty()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _BELIEFS_FOLD(events)
 
 
 def _visible_to(owner_id: str, evidence: DomainEvent) -> bool:

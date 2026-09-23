@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.planning import PlanningState
 from eidos.domain.world import location_allows_interval
 
@@ -320,11 +321,13 @@ def resolve_renegotiation_response(
     return RenegotiationResolution(True, "accepted", (proposed, resolved, changed, retimed))
 
 
+_RENEGOTIATIONS_FOLD: IncrementalFold[RenegotiationState] = IncrementalFold(
+    lambda: RenegotiationState({}), lambda state, event: state.apply(event)
+)
+
+
 def project_renegotiations(events: Sequence[DomainEvent]) -> RenegotiationState:
-    state = RenegotiationState({})
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _RENEGOTIATIONS_FOLD(events)
 
 
 def _effect(kind: str, payload: Mapping[str, Any], cause: DomainEvent) -> DomainEvent:
