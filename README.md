@@ -82,6 +82,13 @@ they strengthen only from new lived repetitions, lapse after prolonged disuse, a
 return without forcing Pathos to repeat the same routine. Recent voluntary choices are
 also shown to the agency model, and an extremely overused activity/place/company pattern
 is rejected until time or meaningful variation makes it fresh again.
+Patrick also develops a self of his own. Sustained tension between what he values and
+how he actually lives, a value he has stopped living, or one he is thriving in, opens a
+private question about himself. Evening reflections return to it, and only after several
+revisits across days may he reach an insight in his own words. A validated insight can
+nudge a value by one small bounded step and crystallise a hoped-for or feared possible
+self, which then pulls gently on what he chooses to do. Turning points become named life
+chapters. The **Becoming** view shows all of it. See [selfhood](docs/SELFHOOD.md).
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,
