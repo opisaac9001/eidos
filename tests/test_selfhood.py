@@ -65,6 +65,12 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(value_evidence(foreign), ())
         self.assertEqual(value_evidence(event("time.advanced", at(1))), ())
 
+    def test_his_own_replies_count_as_care_but_system_notices_do_not(self) -> None:
+        reply = event("conversation.message", at(1), speaker="pathos", text="Hey.")
+        notice = event("conversation.message", at(1), speaker="system", text="He left.")
+        self.assertEqual(value_evidence(reply)[0][:2], ("care", 1))
+        self.assertEqual(value_evidence(notice), ())
+
     def test_one_lived_moment_is_felt_once_per_day(self) -> None:
         history = [missed(1), missed(1.1), missed(2)]
         state = project_selfhood(history)

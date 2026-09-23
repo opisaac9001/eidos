@@ -484,6 +484,10 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "owned something I'd got wrong"),)
     if kind == "social.activity_completed":
         return (("care", 1, "spent real time with someone"),)
+    if kind == "conversation.message" and p.get("speaker") == "pathos":
+        # Talking with the person who keeps coming back is part of his life too; at most
+        # one such moment a day is felt, so conversation cannot swamp everything else.
+        return (("care", 1, "made time for a real conversation"),)
     if kind in {"phone.call_missed", "visitor.missed"}:
         return (("care", -1, "wasn't there when someone reached out"),)
     if kind == "incident.response_declined":
