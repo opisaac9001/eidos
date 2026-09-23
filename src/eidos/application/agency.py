@@ -13,6 +13,7 @@ from eidos.application.activity_execution import execution_context
 from eidos.application.causal_opportunities import fresh_cause
 from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
 from eidos.application.opportunities import available_opportunities
+from eidos.application.place_discovery import known_place_ids
 from eidos.application.preparation import preparation_context
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.volition import attended_impulses, impulse_attention_event
@@ -108,6 +109,7 @@ async def autonomous_activity_events(
         for person in catalog.people.values()
         if known_person_ids is None or person.person_id in known_person_ids
     }
+    known_places = known_place_ids(history, catalog)
     places = {
         place.place_id: {
             "name": place.name,
@@ -116,6 +118,8 @@ async def autonomous_activity_events(
             "closes_hour": place.closes_hour,
         }
         for place in catalog.places.values()
+        # He can only plan around places he actually knows of.
+        if place.place_id in known_places
     }
     attention = project_mind(history).latest.get(CognitiveLayer.ATTENTION.value)
     planning_workspace = dream_planning_workspace(history, workspace, simulated_at)

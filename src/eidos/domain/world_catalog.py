@@ -85,6 +85,12 @@ class WorldCatalog:
         object.__setattr__(self, "route_minutes", MappingProxyType(dict(self.route_minutes)))
 
     def apply(self, event: DomainEvent) -> WorldCatalog:
+        if event.kind not in {
+            "world.place_registered",
+            "world.person_registered",
+            "object.registered",
+        }:
+            return self
         places, people, routes = dict(self.places), dict(self.people), dict(self.route_minutes)
         object_ids, object_names = set(self.object_ids), set(self.object_names)
         if event.kind == "world.place_registered":

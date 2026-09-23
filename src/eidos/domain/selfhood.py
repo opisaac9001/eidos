@@ -491,6 +491,8 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return ()
     if kind == "setback.resolved" and p.get("outcome") == "cleared":
         return (("care", 1, "cleared the air with someone"),)
+    if kind == "place.discovered":
+        return (("curiosity", 1, "noticed somewhere new"),)
     if kind == "want.purchased":
         value = p.get("value_id")
         if value in STARTING_VALUES:
