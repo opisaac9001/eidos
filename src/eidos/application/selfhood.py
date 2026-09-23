@@ -51,6 +51,7 @@ from eidos.domain.selfhood import (
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, ModelResponse
 
 DAILY_HOUR = 20
+FIRST_QUESTION_AFTER = timedelta(days=7)
 CHAPTER_WEEKDAY = 6  # Sunday evening, when a week naturally closes.
 
 _QUESTIONS: Mapping[tuple[str, str], tuple[str, ...]] = {
@@ -179,6 +180,9 @@ def _maybe_open_inquiry(state: SelfhoodState, simulated_at: datetime) -> DomainE
         return None
     values = developed_values(STARTING_VALUES, state)
     lived_since = min((item.at for item in state.evidence), default=None)
+    if lived_since is None or simulated_at - lived_since < FIRST_QUESTION_AFTER:
+        # A few awkward days are not yet a pattern worth questioning himself over.
+        return None
     candidates: list[tuple[float, str, str, list[Evidence]]] = []
     for theme in (*VALUE_IDS, "mood"):
         if any(item.theme == theme for item in open_now) or _cooling(state, theme, simulated_at):

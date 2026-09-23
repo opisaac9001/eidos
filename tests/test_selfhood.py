@@ -91,7 +91,14 @@ class InquiryTests(unittest.TestCase):
         history = [identity_established_event(at(0).isoformat())] + [
             missed(day) for day in (1, 2, 3, 4)
         ]
-        output = selfhood_daily_events(history, at(5, 20))
+        self.assertFalse(
+            any(
+                item.kind == "self.inquiry_opened"
+                for item in selfhood_daily_events(history, at(5, 20))
+            ),
+            "a few awkward days are not yet a pattern",
+        )
+        output = selfhood_daily_events(history, at(9, 20))
         opened = [item for item in output if item.kind == "self.inquiry_opened"]
         self.assertEqual(len(opened), 1)
         self.assertEqual(opened[0].payload["theme"], "reliability")
@@ -99,7 +106,7 @@ class InquiryTests(unittest.TestCase):
         self.assertIn("?", str(opened[0].payload["question"]))
         self.assertTrue(any(item.kind == "self.chapter_opened" for item in output))
         project_selfhood([*history, *output])  # replay validates what was emitted
-        again = selfhood_daily_events([*history, *output], at(6, 20))
+        again = selfhood_daily_events([*history, *output], at(10, 20))
         self.assertFalse(any(item.kind == "self.inquiry_opened" for item in again))
 
     def test_daily_pass_only_runs_in_the_evening(self) -> None:
@@ -120,8 +127,8 @@ class InquiryTests(unittest.TestCase):
 
     def test_unrevisited_question_quietly_fades(self) -> None:
         history = [missed(day) for day in (1, 2, 3, 4)]
-        history += selfhood_daily_events(history, at(5, 20))
-        output = selfhood_daily_events(history, at(27, 20))
+        history += selfhood_daily_events(history, at(9, 20))
+        output = selfhood_daily_events(history, at(31, 20))
         self.assertTrue(any(item.kind == "self.inquiry_faded" for item in output))
 
 
@@ -196,8 +203,8 @@ class InsightTests(unittest.TestCase):
         gateway = FixedGateway(INSIGHT)
         history = [identity_established_event(at(0).isoformat())]
         history += [missed(day) for day in (1, 2, 3, 4)]
-        history += selfhood_daily_events(history, at(4, 20))
-        for day in (4, 6, 8):
+        history += selfhood_daily_events(history, at(8, 20))
+        for day in (8, 10, 12):
             history += _revisit(history, day, gateway)
         kinds = [item.kind for item in history]
         self.assertIn("self.insight_formed", kinds)
