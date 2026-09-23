@@ -49,6 +49,7 @@ from eidos.domain.selfhood import (
     project_selfhood,
     source_payload,
 )
+from eidos.domain.wellbeing import project_wellbeing
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, ModelResponse
 
 DAILY_HOUR = 20
@@ -871,10 +872,13 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
 
 
 def _feeling_unwell(history: Sequence[DomainEvent]) -> str | None:
-    from eidos.application.setbacks import open_illness
+    from eidos.application.setbacks import UNWELL_WORDS
 
-    illness = open_illness(history)
-    return None if illness is None else str(illness.payload.get("text"))
+    episode = project_wellbeing(history).active
+    if episode is None or episode.severity < 0.3:
+        return None
+    words = UNWELL_WORDS.get(episode.kind, "not quite right.")
+    return words[0].upper() + words[1:]
 
 
 def _saving_for(history: Sequence[DomainEvent]) -> dict[str, object] | None:

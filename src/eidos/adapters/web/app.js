@@ -1019,7 +1019,7 @@ function renderSelf() {
   const unwell = self.feeling_unwell;
   $("presence-self").hidden = !chapter && !wondering && !unwell;
   $("presence-self").innerHTML = [
-    unwell ? `<span class="presence-unwell">Under the weather: ${esc(unwell)}</span>` : "",
+    unwell ? `<span class="presence-unwell">Not feeling great. ${esc(unwell)}</span>` : "",
     chapter
       ? `<span class="presence-chapter">Chapter ${esc(chapter.number)} · ${esc(chapter.title)}</span>`
       : "",

@@ -337,13 +337,11 @@ def _effect(
             "work_friction": ("connection", -0.05, -0.45, 0.5, 0.45),
             "quiet_week": ("mastery", -0.03, -0.2, 0.35, 0.2),
             "friendship_drift": ("connection", -0.04, -0.3, 0.3, 0.6),
-            "illness": ("rest", -0.25, -0.4, 0.3, 0.15),
+            "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
         }.get(str(event.payload.get("kind")))
     if event.kind == "setback.resolved":
         if event.payload.get("outcome") == "cleared":
             return ("connection", 0.05, 0.5, 0.35, 0.8)
-        if event.payload.get("outcome") == "recovered":
-            return ("rest", 0.1, 0.35, 0.15, 0.5)
         return ("affect", 0.0, -0.1, 0.1, 0.4)
     if event.kind == "prospective_memory.lapsed":
         return ("affect", 0.0, -0.2, 0.42, 0.7)

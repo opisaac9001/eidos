@@ -149,50 +149,42 @@ def test_he_notices_a_friend_he_has_not_seen_in_weeks() -> None:
     assert run([*history, *output], later + timedelta(days=7), known=frozenset({"mara"})) == []
 
 
-def test_he_sometimes_wakes_up_ill_rings_in_sick_and_gets_better() -> None:
+def unwell(at: datetime, severity: float) -> DomainEvent:
+    return DomainEvent(
+        "wellbeing.episode_started",
+        "pathos",
+        {
+            "episode_id": f"wellbeing:{at.date()}",
+            "condition_kind": "under_the_weather",
+            "severity": severity,
+            "expected_end_at": (at + timedelta(hours=48)).isoformat(),
+            "reason": "An ordinary spell of physical discomfort surfaced.",
+            "simulated_at": at.isoformat(),
+            "clinical_diagnosis": False,
+        },
+    )
+
+
+def test_on_a_bad_morning_he_rings_in_sick_but_works_through_a_mild_one() -> None:
+    tuesday = MONDAY + timedelta(days=1, hours=8)
     base = [identity_established_event(MONDAY.isoformat())]
-    for day in range(400):
-        at = MONDAY + timedelta(days=day, hours=7)
-        planning = project_planning(base)
-        if f"work-rota-{at.date().isoformat()}" not in planning.calendar:
-            base += work_rota_events(base, planning, at - timedelta(hours=1))
-            planning = project_planning(base)
-        output = run(base, at, planning)
-        if not output:
-            continue
-        occurred = output[0]
-        assert occurred.payload["kind"] == "illness"
-        history = [*base, *output]
-        assert selfhood_context(history, at)["feeling_unwell"] == occurred.payload["text"]
-        cancelled = [e for e in history if e.kind == "schedule.cancelled"]
-        today = f"work-rota-{at.date().isoformat()}"
-        assert (today in {e.payload["schedule_id"] for e in cancelled}) == (
-            today in planning.calendar
-        )
-        recovered = None
-        for later in range(1, 10):
-            morning = at + timedelta(days=later)
-            planning = project_planning(history)
-            if f"work-rota-{morning.date().isoformat()}" not in planning.calendar:
-                history += work_rota_events(history, planning, morning - timedelta(hours=1))
-                planning = project_planning(history)
-            step = run(history, morning, planning)
-            history += step
-            if any(e.kind == "setback.resolved" for e in step):
-                recovered = later
-                break
-        assert recovered == occurred.payload["days"]
-        assert selfhood_context(history, at + timedelta(days=recovered))["feeling_unwell"] is None
-        after = project_planning(history)
-        for gap_day in range(1, recovered):
-            sick_day = (at + timedelta(days=gap_day)).date().isoformat()
-            entry = after.calendar.get(f"work-rota-{sick_day}")
-            assert entry is None or entry.status == "cancelled"
-        soon = at + timedelta(days=recovered + 1)
-        assert all(
-            e.payload.get("kind") != "illness"
-            for day in range(20)
-            for e in run(history, soon + timedelta(days=day))
-        )
-        return
-    raise AssertionError("never ill in 400 days")
+    base += work_rota_events(base, PlanningState(), MONDAY + timedelta(hours=6))
+    shift = f"work-rota-{tuesday.date().isoformat()}"
+    assert project_planning(base).calendar[shift].status == "scheduled"
+
+    mild = [*base, unwell(tuesday, 0.35)]
+    assert run(mild, tuesday) == []
+    assert selfhood_context(mild, tuesday)["feeling_unwell"]
+
+    bad = [*base, unwell(tuesday, 0.55)]
+    output = run(bad, tuesday)
+    assert [e.kind for e in output[:3]] == [
+        "setback.occurred",
+        "schedule.cancelled",
+        "intention.abandoned",
+    ]
+    assert output[0].payload["kind"] == "sick_day"
+    after = [*bad, *output]
+    assert project_planning(after).calendar[shift].status == "cancelled"
+    assert run(after, tuesday) == []
+    assert selfhood_context(base, tuesday)["feeling_unwell"] is None

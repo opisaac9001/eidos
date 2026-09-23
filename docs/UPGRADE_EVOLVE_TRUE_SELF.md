@@ -44,7 +44,7 @@ Only ever advance the **copy**.
 | Calls and visits | Neighbours reach out far less often: each person at most every three days, one unprompted contact a day. |
 | Finishing things | Work that is at least 80% done when its time runs out is finished off if he is still there and free, so shifts with a lunch hour count as complete. |
 | Ordinary friction | Rarely, something breaks and costs money, Ellis cancels a shift in a quiet week, a rushed or cut-short shift leaves Ellis short with him (which he may clear over a later lunch), or he notices a friend he hasn't seen in weeks. Repeated clashes with Ellis can become a question he asks himself. |
-| Illness | Two or three times a year he wakes up with a cold, flu or stomach bug. His rest drops, he rings in sick for any shift while ill (unpaid), and he recovers after two to four days. If you ask how he is, he says so. |
+| Sick days | The existing wellbeing episodes (headaches, aches, feeling under the weather) now reach work: on a morning bad enough that he couldn't work through it, he rings Ellis in sick and that shift is cancelled (unpaid). Milder spells he works through. If you ask how he is while unwell, he says so. |
 | Places he knows | He starts knowing home, the café, the workshop and the park. Other places become known when he goes there, notices one next to where he is, or is invited there. His own plans and projects only use places he knows, so a world with the city-life pack will see him choose fewer outings to far places until he has found them. The ordinary map shows only known places. |
 
 None of this touches past messages, memories or relationships.
