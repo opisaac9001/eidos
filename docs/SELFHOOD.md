@@ -100,6 +100,19 @@ at least six weeks into a chapter, a real turning point (an insight **and** a va
 new possible self) invites the performer to name the next chapter and summarise it from
 cited candidates. Titles must be new. Chapters are the autobiography he can actually cite.
 
+### 7. Wants
+
+Money is part of identity only if it can become something. On Saturday mornings, if he
+has no live want, the value he has lived most over three weeks, or the value behind a hope
+he holds, points toward one ordinary thing that fits his authored interests: a secondhand
+film camera (curiosity), a block plane (craft), a hand coffee grinder (autonomy), a
+vegetarian cookbook (care), a notebook (reliability), a record player (curiosity). He
+sits with it for three days, saves until he can buy it and keep a £200 cushion, and picks
+it up on a free day while he is out. The purchase is charged to the ledger and becomes an
+owned object at home that his plans can use. It is recorded as a milestone memory and as
+lived evidence for its value. A want still out of reach after 60 days is let go.
+(`application/wants.py`)
+
 ## What performers see
 
 `identity.selfhood` (voice, Murmur, reflection, dreams):
