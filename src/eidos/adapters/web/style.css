@@ -1839,3 +1839,7 @@ input[type="checkbox"] { accent-color: var(--amber); }
   font-size: 11px;
   color: var(--muted);
 }
+
+.place.undiscovered {
+  opacity: 0.35;
+}

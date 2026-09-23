@@ -512,13 +512,16 @@ async function mutate(path, body, paceFrom) {
 
 function mapMarkup(large) {
   const icons = { home: "⌂", cafe: "◒", workshop: "◇", park: "✳" };
+  // He only knows the places he has been or noticed; the operator sees the whole town.
+  const undiscovered = (id) => state.city_map?.places?.[id]?.experience === "undiscovered";
+  const shown = state.locations.filter((place) => operatorMode || !undiscovered(place.id));
   const routes = (state.city_map?.routes || []).map((route) => {
-    const a = state.locations.find(p => p.id === route.from);
-    const b = state.locations.find(p => p.id === route.to);
+    const a = shown.find(p => p.id === route.from);
+    const b = shown.find(p => p.id === route.to);
     if (!a || !b) return "";
     return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"><title>${esc(a.name)} to ${esc(b.name)} · ${route.minutes} minutes</title></line>`;
   }).join("");
-  return `<svg class="city-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${routes}</svg>` + state.locations
+  return `<svg class="city-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${routes}</svg>` + shown
     .map((place) => {
       const here = state.pathos.location_id === place.id;
       const occupants = state.people.filter(
@@ -533,8 +536,12 @@ function mapMarkup(large) {
         ? `● PATHOS${others ? ` · ${others} OTHER${others === 1 ? "" : "S"}` : ""}`
         : total
           ? `${total} ${total === 1 ? "PERSON" : "PEOPLE"}`
-          : state.city_map?.places?.[place.id]?.experience === "visited" ? "VISITED" : "NOT YET VISITED";
-      return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}${total ? `, about ${total} other people nearby` : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${status}</span></button>`;
+          : state.city_map?.places?.[place.id]?.experience === "visited"
+            ? "VISITED"
+            : undiscovered(place.id)
+              ? "UNDISCOVERED"
+              : "NOT YET VISITED";
+      return `<button class="place ${here ? "current" : ""} ${undiscovered(place.id) ? "undiscovered" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}${total ? `, about ${total} other people nearby` : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${status}</span></button>`;
     })
     .join("");
 }
@@ -552,7 +559,7 @@ function renderPlace() {
   const others = Number(ambient?.estimated_people || 0);
   const objects = state.objects.filter((item) => pathosHere && item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><p class="context-note">${esc(state.city_map?.places?.[place.id]?.visits || 0)} recorded arrivals · ${esc(state.city_map?.places?.[place.id]?.experience === "known_not_visited" ? "Not yet visited" : "Part of his lived world")}</p><div class="eyebrow">WHAT HE CAN SEE</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>Pathos cannot see who is here right now.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><p class="context-note">${esc(state.city_map?.places?.[place.id]?.visits || 0)} recorded arrivals · ${esc({ known_not_visited: "Known, not yet visited", undiscovered: "He hasn't noticed this place yet" }[state.city_map?.places?.[place.id]?.experience] || "Part of his lived world")}</p><div class="eyebrow">WHAT HE CAN SEE</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>Pathos cannot see who is here right now.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {

@@ -20,6 +20,13 @@ def test_city_pack_is_connected_without_fabricated_visits(tmp_path):
     for place in catalog.places:
         assert route_duration("home", place, catalog.route_minutes).total_seconds() >= 0
         assert atlas["places"][place]["visits"] == 0
+    assert atlas["places"]["library"]["experience"] == "undiscovered"
+    noticed = DomainEvent(
+        "place.discovered",
+        "pathos",
+        {"place_id": "library", "simulated_at": "2026-01-02T09:00:00+00:00"},
+    )
+    atlas = city_map(history + [noticed], catalog, "home")
     assert atlas["places"]["library"]["experience"] == "known_not_visited"
     moved = DomainEvent(
         "pathos.moved",

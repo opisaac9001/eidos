@@ -3,6 +3,7 @@
 from collections import Counter
 from typing import Sequence
 
+from eidos.application.place_discovery import known_place_ids
 from eidos.domain.events import DomainEvent
 from eidos.domain.world_catalog import WorldCatalog
 
@@ -18,6 +19,7 @@ def city_map(
             if isinstance(place, str) and place in catalog.places:
                 visits[place] += 1
                 last_visit[place] = event.payload.get("simulated_at")
+    known = known_place_ids(history, catalog)
     return {
         "places": {
             place_id: {
@@ -25,7 +27,9 @@ def city_map(
                 if place_id == current_location_id
                 else "visited"
                 if visits[place_id]
-                else "known_not_visited",
+                else "known_not_visited"
+                if place_id in known
+                else "undiscovered",
                 "visits": visits[place_id],
                 "last_visit": last_visit.get(place_id),
             }
