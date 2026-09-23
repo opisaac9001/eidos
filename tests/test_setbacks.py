@@ -188,3 +188,40 @@ def test_on_a_bad_morning_he_rings_in_sick_but_works_through_a_mild_one() -> Non
     assert project_planning(after).calendar[shift].status == "cancelled"
     assert run(after, tuesday) == []
     assert selfhood_context(base, tuesday)["feeling_unwell"] is None
+
+
+def test_he_turns_up_for_something_on_in_town_and_finds_it_called_off() -> None:
+    from eidos.application.town_calendar import called_off
+
+    outcomes = {}
+    for week in range(40):
+        tuesday = MONDAY + timedelta(weeks=week, days=1, hours=19)
+        planned = event_at(
+            "schedule.created",
+            tuesday - timedelta(hours=6),
+            schedule_id=f"quiz-{week}",
+            title="Go along to the quiz",
+            starts_at=tuesday.isoformat(),
+            ends_at=(tuesday + timedelta(hours=3)).isoformat(),
+            location_id="crown-anchor",
+            actor_id="pathos",
+            action="attend",
+        )
+        history = [identity_established_event(MONDAY.isoformat()), planned]
+        output = run(history, tuesday, here="crown-anchor")
+        off = called_off(f"quiz-{tuesday.date().isoformat()}")
+        outcomes[off] = output
+        if off:
+            assert output[0].payload["kind"] == "called_off"
+            assert output[1].kind == "schedule.cancelled"
+            assert run([*history, *output], tuesday, here="crown-anchor") == []
+            assert run(history, tuesday, here="home") == []
+        else:
+            assert output == []
+        if len(outcomes) == 2:
+            return
+    raise AssertionError("never saw both an evening on and an evening off")
+
+
+def event_at(kind: str, when: datetime, **payload: object) -> DomainEvent:
+    return DomainEvent(kind, "pathos", {**payload, "simulated_at": when.isoformat()})

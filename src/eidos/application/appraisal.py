@@ -338,6 +338,7 @@ def _effect(
             "quiet_week": ("mastery", -0.03, -0.2, 0.35, 0.2),
             "friendship_drift": ("connection", -0.04, -0.3, 0.3, 0.6),
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
+            "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
     if event.kind == "setback.resolved":
         if event.payload.get("outcome") == "cleared":

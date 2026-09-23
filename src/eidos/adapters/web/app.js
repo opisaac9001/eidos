@@ -1624,7 +1624,7 @@ function render(next) {
   $("whats-on").innerHTML = whatsOn
     .map(
       (item) =>
-        `<article class="panel person-card${item.known ? "" : " undiscovered"}"><div class="panel-kicker">${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}–${esc(time(item.ends_at))}${item.called_off ? " · CALLED OFF" : ""}</div><h2>${esc(item.title)}</h2><p>${esc(item.note)}</p><div class="person-foot"><span>${esc(item.place)}</span></div></article>`,
+        `<article class="panel person-card${item.known ? "" : " undiscovered"}"><div class="panel-kicker">${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}–${esc(time(item.ends_at))}${operatorMode && item.called_off ? " · CALLED OFF" : ""}</div><h2>${esc(item.title)}</h2><p>${esc(item.note)}</p><div class="person-foot"><span>${esc(item.place)}</span></div></article>`,
     )
     .join("");
   const worldPacks = state.world_packs || [];

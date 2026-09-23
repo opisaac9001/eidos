@@ -2,8 +2,8 @@
 
 A believable life is not a run of honoured values. Every so often something costs money he
 had not planned to spend, a working day ends with Ellis short with him, a quiet week means
-a shift is cancelled, he wakes up too unwell to work and rings in sick, or he realises he
-has not seen a friend in weeks. None of these are dramas. They are rare, replay-stable,
+a shift is cancelled, he wakes up too unwell to work and rings in sick, something he
+went along to turns out not to be on, or he realises he has not seen a friend in weeks. None of these are dramas. They are rare, replay-stable,
 grounded in his actual situation (money, shifts, people he knows), and they give his inner
 life something real to push against. Work friction can be cleared at a later shift, but
 only sometimes, and only if he is someone who cares enough to.
@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.town_calendar import called_off, occurrence_starting
 from eidos.application.work_rota import ROTA_PREFIX
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -51,7 +52,8 @@ def setback_events(
 ) -> list[DomainEvent]:
     """Advance at most one kind of ordinary friction this hour."""
     return (
-        _ringing_in_sick(history, simulated_at, planning)
+        _called_off_on_arrival(history, simulated_at, planning, pathos_location_id)
+        or _ringing_in_sick(history, simulated_at, planning)
         or _expense(history, simulated_at)
         or _quiet_week(history, simulated_at, planning)
         or _work_friction(history, simulated_at, planning)
@@ -224,6 +226,79 @@ def _ringing_in_sick(
             )
         )
     output.append(_memory(occurred, text, at, importance=0.45, person_id="ellis"))
+    return output
+
+
+def _called_off_on_arrival(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    planning: PlanningState,
+    pathos_location_id: str,
+) -> list[DomainEvent]:
+    """He turns up for something on in town and finds it isn't on this week."""
+    found = occurrence_starting(pathos_location_id, at)
+    if found is None or not called_off(found[0]):
+        return []
+    occurrence_id, happening = found
+    starts = at.replace(minute=0, second=0, microsecond=0)
+    entry = next(
+        (
+            item
+            for item in planning.calendar.values()
+            if item.status == "scheduled"
+            and item.actor_id in {None, "pathos"}
+            and item.location_id == pathos_location_id
+            and datetime.fromisoformat(item.starts_at) == starts
+        ),
+        None,
+    )
+    setback_id = f"called-off-{occurrence_id}"
+    if entry is None or _occurred(history, setback_id):
+        return []
+    text = (
+        f"Turned up for {happening.title[0].lower()}{happening.title[1:]} and it was off this "
+        "week, just a note on the door. Stood there a minute feeling daft."
+    )
+    occurred = DomainEvent(
+        "setback.occurred",
+        "pathos",
+        {
+            "setback_id": setback_id,
+            "kind": "called_off",
+            "schedule_id": entry.schedule_id,
+            "location_id": pathos_location_id,
+            "text": text,
+            "simulated_at": at.isoformat(),
+        },
+        correlation_id=setback_id,
+    )
+    cancelled = DomainEvent(
+        "schedule.cancelled",
+        "pathos",
+        {
+            "schedule_id": entry.schedule_id,
+            "reason": "It was called off this week.",
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=occurred.event_id,
+        correlation_id=entry.schedule_id,
+    )
+    output = [occurred, cancelled]
+    if entry.intention_id and entry.intention_id in planning.intentions:
+        output.append(
+            DomainEvent(
+                "intention.abandoned",
+                "pathos",
+                {
+                    "intention_id": entry.intention_id,
+                    "reason": "It wasn't on after all.",
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=cancelled.event_id,
+                correlation_id=entry.schedule_id,
+            )
+        )
+    output.append(_memory(occurred, text, at, importance=0.4))
     return output
 
 

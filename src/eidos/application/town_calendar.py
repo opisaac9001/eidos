@@ -151,6 +151,21 @@ def whats_on(
     return sorted(upcoming, key=lambda entry: (str(entry["starts_at"]), str(entry["title"])))
 
 
+def occurrence_starting(place_id: str, at: datetime) -> tuple[str, Happening] | None:
+    """The happening due to start at this place this hour, called off or not."""
+    week = at.isocalendar().week
+    for item in WEEKLY:
+        if (
+            item.place_id == place_id
+            and item.weekday == at.weekday()
+            and item.starts_hour == at.hour
+            and not (item.weeks == "odd" and week % 2 == 0)
+            and not (item.weeks == "even" and week % 2 == 1)
+        ):
+            return f"{item.happening_id}-{at.date().isoformat()}", item
+    return None
+
+
 def called_off(occurrence_id: str) -> bool:
     """Some weeks it just doesn't happen: the organiser's ill, the band cancels."""
     roll = int(sha256(f"called-off:{occurrence_id}".encode()).hexdigest()[:8], 16)
@@ -186,9 +201,9 @@ def happening_opportunities(
             "epistemic_status": "noticeboard",
             "action_authority": False,
         }
+        # He can't know it's off until he gets there, so called-off ones are offered too.
         for item in whats_on(catalog, known_place_ids, at, days=2)
-        if not item["called_off"]
-        and datetime.fromisoformat(str(item["starts_at"])) >= at + timedelta(hours=2)
+        if datetime.fromisoformat(str(item["starts_at"])) >= at + timedelta(hours=2)
     ]
 
 

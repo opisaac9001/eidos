@@ -21,7 +21,7 @@ What exists now:
 - **What's on.** The weekly rhythm below is live as a derived calendar
   (`eidos.application.town_calendar`): quiz night at the Crown on Tuesdays, the repair
   café and a drawing class on alternating Thursdays, Friday music and film, the Saturday
-  market, and Sunday allotment and football mornings. Roughly one in eight is called off.
+  market, and Sunday allotment and football mornings. Roughly one in eight is called off, and he only finds out when he gets there.
   He only hears about happenings at places he knows. The next one reaches his choices as a
   noticed possibility that pulls harder when he is short of company, and a happening draws
   a crowd. It adds no events, so nothing in the past changes.

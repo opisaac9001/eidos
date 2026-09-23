@@ -33,7 +33,7 @@ def test_he_only_hears_of_happenings_at_places_he_knows(tmp_path: Path) -> None:
     assert len(hall) == 1  # Repair café and drawing class alternate weeks.
 
 
-def test_happenings_are_offered_with_time_to_get_there_and_never_when_called_off(
+def test_happenings_are_offered_with_time_to_get_there_and_some_are_called_off(
     tmp_path: Path,
 ) -> None:
     catalog = project_world_catalog(imported_world(tmp_path))
