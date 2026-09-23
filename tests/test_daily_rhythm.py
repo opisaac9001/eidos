@@ -305,3 +305,22 @@ def test_an_empty_larder_is_not_left_empty_for_weeks_by_one_repeated_choice() ->
         if "order" in decisions:
             break
     assert "order" in decisions
+
+
+def test_shifts_at_the_repair_workshop_are_practice_at_repair() -> None:
+    from eidos.application.development import development_events
+    from eidos.domain.development import project_development
+
+    history = [identity_established_event(at(0).isoformat())]
+    history.append(
+        event(
+            "activity.completed",
+            at(16),
+            activity="work",
+            schedule_id="work-rota-2026-01-05",
+            location_id="workshop",
+        )
+    )
+    output = development_events(history, at(17).isoformat())
+    assert any(item.payload.get("skill_id") == "repair" for item in output)
+    assert project_development([*history, *output]).skills["repair"].level > 0

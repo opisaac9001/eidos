@@ -447,6 +447,13 @@ def _skill_signature(event: DomainEvent) -> str | None:
         return "repair"
     if (
         event.kind == "activity.completed"
+        and event.payload.get("activity") == "work"
+        and str(event.payload.get("schedule_id", "")).startswith("work-rota-")
+    ):
+        # A shift at the repair workshop is practice at repair.
+        return "repair"
+    if (
+        event.kind == "activity.completed"
         and event.payload.get("activity") == "learn"
         and event.payload.get("target_id") == "bookbinding-basics"
     ):
