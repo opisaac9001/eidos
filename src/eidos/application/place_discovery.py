@@ -2,9 +2,10 @@
 
 A place existing in the world is not the same as Patrick knowing it (the blueprint's
 discovery policy: planned is not known). He knows his home ground from the start, every
-place he has actually been, and places he has discovered. Discovery is ordinary: arriving
-somewhere, he sometimes notices a place he hadn't clocked just along the way. Planning,
-invitations and his own ideas only reach for places he knows.
+place he has actually been, places he has discovered, and places friends have invited him
+to. Discovery is ordinary: arriving somewhere, he sometimes notices a place he hadn't
+clocked just along the way, or someone suggests meeting somewhere he'd never been. His
+own plans and ideas only reach for places he knows.
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ NOTICE_CHANCE = 0.3
 
 def known_place_ids(history: Sequence[DomainEvent], catalog: WorldCatalog) -> frozenset[str]:
     known = set(HOME_GROUND)
-    for event in events_of(history, "pathos.moved", "place.discovered"):
+    for event in events_of(history, "pathos.moved", "place.discovered", "invitation.made"):
+        if event.kind == "invitation.made" and event.payload.get("invitee_id") != "pathos":
+            continue
         place = event.payload.get("location_id") or event.payload.get("place_id")
         if isinstance(place, str):
             known.add(place)

@@ -72,6 +72,12 @@ def test_importing_the_town_does_not_make_him_know_it(tmp_path: Path) -> None:
         },
     )
     assert "hardware" in known_place_ids([*history, visited], catalog)
+    invited = DomainEvent(
+        "invitation.made",
+        "pathos",
+        {"inviter_id": "mara", "invitee_id": "pathos", "location_id": "crown-anchor"},
+    )
+    assert "crown-anchor" in known_place_ids([*history, invited], catalog)
 
 
 def test_he_notices_new_places_nearby_at_most_once_a_day(tmp_path: Path) -> None:
