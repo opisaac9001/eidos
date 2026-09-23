@@ -2,11 +2,11 @@
 
 A believable life is not a run of honoured values. Every so often something costs money he
 had not planned to spend, a working day ends with Ellis short with him, a quiet week means
-a shift is cancelled, or he realises he has not seen a friend in weeks. None of these are
-dramas. They are rare, replay-stable, grounded in his actual situation (money, shifts,
-people he knows), and they give his inner life something real to push against. Work
-friction can be cleared at a later shift, but only sometimes, and only if he is someone who
-cares enough to.
+a shift is cancelled, he wakes up with a cold and has to ring in sick, or he realises he
+has not seen a friend in weeks. None of these are dramas. They are rare, replay-stable,
+grounded in his actual situation (money, shifts, people he knows), and they give his inner
+life something real to push against. Work friction can be cleared at a later shift, but
+only sometimes, and only if he is someone who cares enough to.
 """
 
 from __future__ import annotations
@@ -24,8 +24,16 @@ EXPENSE_WEEKLY_CHANCE = 0.12
 FRICTION_CHANCE = 0.05
 FRICTION_CHANCE_AFTER_SHORT_SHIFT = 0.35
 QUIET_WEEK_CHANCE = 0.035
+ILLNESS_DAILY_CHANCE = 0.012  # A cold or a stomach bug two or three times a year.
+ILLNESS_GAP = timedelta(days=45)
 DRIFT_AFTER = timedelta(days=21)
 REPAIR_WINDOW = timedelta(days=14)
+
+ILLNESSES: tuple[tuple[str, str, int], ...] = (
+    ("cold", "Woke up full of cold, head like cotton wool.", 3),
+    ("stomach", "Something I ate disagreed with me; a wretched night and a washed-out morning.", 2),
+    ("flu", "Aching all over and shivery. Proper flu, I think.", 4),
+)
 
 EXPENSES: tuple[tuple[str, str, int], ...] = (
     ("boiler", "The boiler packed in and needed a callout.", 18_000),
@@ -49,7 +57,8 @@ def setback_events(
 ) -> list[DomainEvent]:
     """Advance at most one kind of ordinary friction this hour."""
     return (
-        _expense(history, simulated_at)
+        _under_the_weather(history, simulated_at, planning)
+        or _expense(history, simulated_at)
         or _quiet_week(history, simulated_at, planning)
         or _work_friction(history, simulated_at, planning)
         or _clearing_the_air(history, simulated_at, values, pathos_location_id, ellis_location_id)
@@ -158,6 +167,117 @@ def _quiet_week(
             )
         )
     output.append(_memory(occurred, str(occurred.payload["text"]), at))
+    return output
+
+
+def _latest_illness(history: Sequence[DomainEvent]) -> DomainEvent | None:
+    return next(
+        (
+            event
+            for event in reversed(events_of(history, "setback.occurred"))
+            if event.payload.get("kind") == "illness"
+        ),
+        None,
+    )
+
+
+def _open_illness(history: Sequence[DomainEvent]) -> DomainEvent | None:
+    latest = _latest_illness(history)
+    if latest is None or _resolved(history, str(latest.payload["setback_id"])):
+        return None
+    return latest
+
+
+def _resolved(history: Sequence[DomainEvent], setback_id: str) -> bool:
+    return any(
+        event.payload.get("setback_id") == setback_id
+        for event in events_of(history, "setback.resolved")
+    )
+
+
+def _under_the_weather(
+    history: Sequence[DomainEvent], at: datetime, planning: PlanningState
+) -> list[DomainEvent]:
+    """Now and then he wakes up ill, rings in sick, and takes a few days to shake it off."""
+    if at.hour != 7:
+        return []
+    today = at.date().isoformat()
+    illness = _open_illness(history)
+    output: list[DomainEvent] = []
+    if illness is not None:
+        began = datetime.fromisoformat(str(illness.payload["simulated_at"]))
+        if (at.date() - began.date()).days >= int(illness.payload["days"]):
+            setback_id = str(illness.payload["setback_id"])
+            return [
+                DomainEvent(
+                    "setback.resolved",
+                    "pathos",
+                    {
+                        "setback_id": setback_id,
+                        "outcome": "recovered",
+                        "text": "Felt more like myself this morning.",
+                        "simulated_at": at.isoformat(),
+                    },
+                    causation_id=illness.event_id,
+                    correlation_id=setback_id,
+                )
+            ]
+        cause = illness
+    else:
+        setback_id = f"illness-{today}"
+        latest = _latest_illness(history)
+        if (
+            latest is not None
+            and at - datetime.fromisoformat(str(latest.payload["simulated_at"])) < ILLNESS_GAP
+        ):
+            return []
+        if _roll(setback_id) >= ILLNESS_DAILY_CHANCE:
+            return []
+        illness_id, text, days = ILLNESSES[int(_roll(setback_id, "which") * len(ILLNESSES))]
+        cause = DomainEvent(
+            "setback.occurred",
+            "pathos",
+            {
+                "setback_id": setback_id,
+                "kind": "illness",
+                "illness_id": illness_id,
+                "days": days,
+                "text": text,
+                "simulated_at": at.isoformat(),
+            },
+            correlation_id=setback_id,
+        )
+        output += [cause, _memory(cause, text, at, importance=0.5)]
+    schedule_id = f"{ROTA_PREFIX}{today}"
+    entry = planning.calendar.get(schedule_id)
+    if entry is None or entry.status != "scheduled":
+        return output
+    cancelled = DomainEvent(
+        "schedule.cancelled",
+        "pathos",
+        {
+            "schedule_id": schedule_id,
+            "reason": "Rang Ellis first thing to say I was too ill to come in.",
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=cause.event_id,
+        correlation_id=schedule_id,
+    )
+    output.append(cancelled)
+    if entry.intention_id and entry.intention_id in planning.intentions:
+        output.append(
+            DomainEvent(
+                "intention.abandoned",
+                "pathos",
+                {
+                    "intention_id": entry.intention_id,
+                    "reason": "Too ill to work today.",
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=cancelled.event_id,
+                correlation_id=schedule_id,
+            )
+        )
     return output
 
 

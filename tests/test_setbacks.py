@@ -146,3 +146,50 @@ def test_he_notices_a_friend_he_has_not_seen_in_weeks() -> None:
     assert output[0].payload["kind"] == "friendship_drift"
     assert value_evidence(output[0])[0][:2] == ("care", -1)
     assert run([*history, *output], later + timedelta(days=7), known=frozenset({"mara"})) == []
+
+
+def test_he_sometimes_wakes_up_ill_rings_in_sick_and_gets_better() -> None:
+    base = [identity_established_event(MONDAY.isoformat())]
+    for day in range(400):
+        at = MONDAY + timedelta(days=day, hours=7)
+        planning = project_planning(base)
+        if f"work-rota-{at.date().isoformat()}" not in planning.calendar:
+            base += work_rota_events(base, planning, at - timedelta(hours=1))
+            planning = project_planning(base)
+        output = run(base, at, planning)
+        if not output:
+            continue
+        occurred = output[0]
+        assert occurred.payload["kind"] == "illness"
+        history = [*base, *output]
+        cancelled = [e for e in history if e.kind == "schedule.cancelled"]
+        today = f"work-rota-{at.date().isoformat()}"
+        assert (today in {e.payload["schedule_id"] for e in cancelled}) == (
+            today in planning.calendar
+        )
+        recovered = None
+        for later in range(1, 10):
+            morning = at + timedelta(days=later)
+            planning = project_planning(history)
+            if f"work-rota-{morning.date().isoformat()}" not in planning.calendar:
+                history += work_rota_events(history, planning, morning - timedelta(hours=1))
+                planning = project_planning(history)
+            step = run(history, morning, planning)
+            history += step
+            if any(e.kind == "setback.resolved" for e in step):
+                recovered = later
+                break
+        assert recovered == occurred.payload["days"]
+        after = project_planning(history)
+        for gap_day in range(1, recovered):
+            sick_day = (at + timedelta(days=gap_day)).date().isoformat()
+            entry = after.calendar.get(f"work-rota-{sick_day}")
+            assert entry is None or entry.status == "cancelled"
+        soon = at + timedelta(days=recovered + 1)
+        assert all(
+            e.payload.get("kind") != "illness"
+            for day in range(20)
+            for e in run(history, soon + timedelta(days=day))
+        )
+        return
+    raise AssertionError("never ill in 400 days")
