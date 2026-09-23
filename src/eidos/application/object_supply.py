@@ -198,8 +198,20 @@ def _replenishment_choice(
         if item.quantity > threshold:
             continue
         reliability = max(0.0, min(1.0, float(values.get("reliability", 0.5))))
-        score = 0.25 + 0.55 * reliability
-        sample = _sample(f"replenish-{object_id}-{item.quantity}-{source.event_id}")
+        # Each further day of an empty larder makes going without harder to keep choosing.
+        empty_days = sum(
+            1
+            for event in decisions
+            if event.payload.get("object_id") == object_id
+            and event.payload.get("decision") == "go_without"
+            and str(event.payload.get("source_stock_event_id")) == str(source.event_id)
+        )
+        score = min(0.97, 0.25 + 0.55 * reliability + 0.25 * empty_days)
+        reconsidered = str(source.event_id) in handled
+        sample = _sample(
+            f"replenish-{object_id}-{item.quantity}-{source.event_id}"
+            + (f"-{simulated_at.date().isoformat()}" if reconsidered else "")
+        )
         affordable = (
             item.unit != "meal portions"
             or available_pence is None

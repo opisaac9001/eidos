@@ -282,3 +282,26 @@ class TestEmployerKeepsTheAgreedHours:
         location, events = ellis_after(at(16, 30))
         assert location == "home"
         assert any(item.payload.get("reason") == "closing up for the day" for item in events)
+
+
+def test_an_empty_larder_is_not_left_empty_for_weeks_by_one_repeated_choice() -> None:
+    food = TestFood()
+    history = food.provisions(0)
+    decisions = []
+    for day in range(6):
+        output = object_supply_events(
+            history,
+            at(9, day=day),
+            project_planning(history),
+            pathos_awake=True,
+            pathos_location_id="home",
+            pathos_energy=0.8,
+            curiosity=0.5,
+            values={"reliability": 0.0},
+            available_pence=20_000,
+        )
+        history += output
+        decisions += [item.payload["decision"] for item in output if "decision" in item.payload]
+        if "order" in decisions:
+            break
+    assert "order" in decisions
