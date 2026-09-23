@@ -11,25 +11,35 @@ from eidos.domain.state import PathosState
 
 
 def baseline_affect_events(
-    state: PathosState, simulated_at: datetime
+    state: PathosState, simulated_at: datetime, *, energy_rhythm: bool = False
 ) -> tuple[list[DomainEvent], PathosState]:
-    """Move transient affect gently toward baseline without erasing its causes."""
+    """Move transient affect gently toward baseline without erasing its causes.
+
+    With ``energy_rhythm``, sleep also restores energy and waking hours slowly spend it, so a
+    night's rest actually leaves him refreshed and an evening actually finds him tired.
+    """
     valence_step = 0.025 if not state.awake else 0.012 if state.valence < 0 else 0.018
     arousal_step = 0.035 if not state.awake else 0.02
     valence = _toward(state.valence, 0.0, valence_step)
     arousal = _toward(state.arousal, 0.35, arousal_step)
-    if valence == state.valence and arousal == state.arousal:
+    energy = state.energy
+    if energy_rhythm:
+        energy = (
+            round(min(1.0, state.energy + 0.1), 4)
+            if not state.awake
+            else round(max(0.1, state.energy - 0.03), 4)
+        )
+    if valence == state.valence and arousal == state.arousal and energy == state.energy:
         return [], state
-    event = DomainEvent(
-        "affect.changed",
-        "pathos",
-        {
-            "valence": valence,
-            "arousal": arousal,
-            "reason": "sleep recovery" if not state.awake else "baseline recovery",
-            "simulated_at": simulated_at.isoformat(),
-        },
-    )
+    payload: dict[str, object] = {
+        "valence": valence,
+        "arousal": arousal,
+        "reason": "sleep recovery" if not state.awake else "baseline recovery",
+        "simulated_at": simulated_at.isoformat(),
+    }
+    if energy != state.energy:
+        payload["energy"] = energy
+    event = DomainEvent("affect.changed", "pathos", payload)
     return [event], state.apply(event)
 
 

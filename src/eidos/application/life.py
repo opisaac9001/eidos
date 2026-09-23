@@ -1778,7 +1778,9 @@ class Life:
                 pathos_busy=pathos_busy,
             )
             pending.extend(need_events)
-            recovery, state = baseline_affect_events(state, current)
+            recovery, state = baseline_affect_events(
+                state, current, energy_rhythm=not self.authored_scenario
+            )
             pending.extend(recovery)
             physical_events = wellbeing_events(history + pending, state, current)
             if physical_events:
