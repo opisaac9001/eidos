@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Mapping, Sequence
+from typing import Iterator, Mapping, Sequence
 
 WORD = re.compile(r"[a-z0-9]+")
 FIRST_PERSON_ROLES = {"pathos", "murmur", "reflection"}
@@ -231,7 +231,7 @@ def _unsupported_history_denial(text: str, context: Mapping[str, object]) -> boo
     It is not a general entailment test or a requirement to distrust clear memories.
     """
 
-    def strings(value):
+    def strings(value: object) -> Iterator[str]:
         if isinstance(value, str):
             yield value
         elif isinstance(value, Mapping):

@@ -232,7 +232,7 @@ def scheduled_activity_events(
                     },
                     correlation_id=correlation,
                 )
-                failed = DomainEvent(
+                repair_failed = DomainEvent(
                     "object.repair_failed",
                     "pathos",
                     {
@@ -252,7 +252,7 @@ def scheduled_activity_events(
                         "reason": "The physical repair attempt did not succeed.",
                         "simulated_at": simulated_at.isoformat(),
                     },
-                    causation_id=failed.event_id,
+                    causation_id=repair_failed.event_id,
                     correlation_id=correlation,
                 )
                 abandoned_intention = DomainEvent(
@@ -263,10 +263,10 @@ def scheduled_activity_events(
                         "reason": "The linked repair attempt failed.",
                         "simulated_at": simulated_at.isoformat(),
                     },
-                    causation_id=failed.event_id,
+                    causation_id=repair_failed.event_id,
                     correlation_id=correlation,
                 )
-                consequences = [attempted, failed, schedule_failed, abandoned_intention]
+                consequences = [attempted, repair_failed, schedule_failed, abandoned_intention]
                 for event in consequences:
                     projected = projected.apply(event)
                 if entry.goal_id is not None:
@@ -278,7 +278,7 @@ def scheduled_activity_events(
                             "reason": "The repair attempt failed and the object remains broken.",
                             "simulated_at": simulated_at.isoformat(),
                         },
-                        causation_id=failed.event_id,
+                        causation_id=repair_failed.event_id,
                         correlation_id=correlation,
                     )
                     consequences.append(abandoned_goal)
@@ -292,7 +292,7 @@ def scheduled_activity_events(
                             "owner": "pathos",
                             "category": "setback",
                             "source": "deterministic-consequence",
-                            "source_event_id": str(failed.event_id),
+                            "source_event_id": str(repair_failed.event_id),
                             "goal_id": entry.goal_id,
                             "object_id": entry.target_id,
                             "location_id": entry.location_id,
@@ -300,7 +300,7 @@ def scheduled_activity_events(
                             "confidence": 1.0,
                             "simulated_at": simulated_at.isoformat(),
                         },
-                        causation_id=failed.event_id,
+                        causation_id=repair_failed.event_id,
                         correlation_id=correlation,
                     )
                 )

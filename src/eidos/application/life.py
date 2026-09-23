@@ -2488,11 +2488,13 @@ class Life:
                         known_person_ids=pathos_known_person_ids(history + pending),
                         instant_calls=self.authored_scenario,
                         attention_absorption=float(
-                            attention_state(
-                                history + pending,
-                                self._planning(history + pending),
-                                current,
-                            )["absorption"]
+                            str(
+                                attention_state(
+                                    history + pending,
+                                    self._planning(history + pending),
+                                    current,
+                                )["absorption"]
+                            )
                         ),
                     )
                 )

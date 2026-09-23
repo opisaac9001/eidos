@@ -221,13 +221,15 @@ def attended_impulses(
     )
     for item in impulses:
         if item["impulse_id"] in previous_ids:
-            item["attention_strength"] = round(min(1.0, float(item["attention_strength"]) + 0.1), 3)
+            item["attention_strength"] = round(
+                min(1.0, float(str(item["attention_strength"])) + 0.1), 3
+            )
             item["inertial_carryover"] = True
 
     capacity = 3 if energy < 0.3 or arousal > 0.75 else 4
     ranked = sorted(
         impulses,
-        key=lambda item: (float(item["attention_strength"]), str(item["impulse_id"])),
+        key=lambda item: (float(str(item["attention_strength"])), str(item["impulse_id"])),
         reverse=True,
     )
     selected = ranked[:capacity]
@@ -249,7 +251,11 @@ def impulse_attention_event(
     field: Mapping[str, object], decision_id: str, source: DomainEvent, simulated_at: datetime
 ) -> DomainEvent:
     attended = field.get("attended_impulses", ())
-    items = [item for item in attended if isinstance(item, Mapping)]
+    items = (
+        [item for item in attended if isinstance(item, Mapping)]
+        if isinstance(attended, (list, tuple))
+        else []
+    )
     scalar_items: dict[str, object] = {}
     for index, item in enumerate(items, 1):
         scalar_items.update(

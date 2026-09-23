@@ -174,10 +174,11 @@ async def autonomous_activity_events(
         time_budget=time_budget,
         current_location_id=current_location_id,
     )
-    context = {
+    ongoing_activities = execution_context(history, planning, simulated_at)
+    context: dict[str, object] = {
         "time": simulated_at.isoformat(),
         "available_opportunities": opportunities,
-        "ongoing_activities": execution_context(history, planning, simulated_at),
+        "ongoing_activities": ongoing_activities,
         "household_tasks": [
             {"task": task, "pressure": "noticeable" if load < 0.5 else "piling up"}
             for task, load in project_household(history).loads.items()
@@ -382,7 +383,7 @@ async def autonomous_activity_events(
         return output
     chosen_impulse = next(
         item
-        for item in choice_field["attended_impulses"]
+        for item in _attended_impulse_items(choice_field)
         if item["impulse_id"] == chosen_impulse_id
     )
     output.append(
@@ -522,7 +523,7 @@ async def autonomous_activity_events(
             response.content,
             completed_activity_titles=[
                 str(item["title"])
-                for item in context["ongoing_activities"]
+                for item in ongoing_activities
                 if item.get("outcome") == "completed"
             ],
         )
@@ -735,11 +736,17 @@ def _pursuable_impulse_ids(choice_field: Mapping[str, object]) -> list[str]:
     """Return impulses that can become new work rather than a quiet-mode choice."""
     return [
         str(item["impulse_id"])
-        for item in choice_field.get("attended_impulses", ())
-        if isinstance(item, Mapping)
-        and isinstance(item.get("impulse_id"), str)
+        for item in _attended_impulse_items(choice_field)
+        if isinstance(item.get("impulse_id"), str)
         and item.get("kind") not in {"inaction", "continuation", "prospective"}
     ]
+
+
+def _attended_impulse_items(choice_field: Mapping[str, object]) -> list[Mapping[str, object]]:
+    attended = choice_field.get("attended_impulses", ())
+    if not isinstance(attended, (list, tuple)):
+        return []
+    return [item for item in attended if isinstance(item, Mapping)]
 
 
 def _validate_choice_alignment(activity_type: str, chosen_impulse: Mapping[str, object]) -> None:

@@ -49,7 +49,9 @@ def attention_state(
         "absorption": round(absorption, 3),
         "focus_type": pulse.focus_type if fresh_pulse and pulse else None,
         "focus_id": pulse.focus_id if fresh_pulse and pulse else None,
-        "working_schedule_id": latest_execution.payload.get("schedule_id") if working else None,
+        "working_schedule_id": latest_execution.payload.get("schedule_id")
+        if working and latest_execution is not None
+        else None,
         "action_authority": False,
         "meaning": (
             "Absorption can narrow notice and increase switching cost. It cannot invent work, force "

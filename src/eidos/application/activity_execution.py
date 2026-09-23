@@ -470,6 +470,7 @@ def execution_context(
             continue
         required = float(str(item["required_seconds"]))
         proportion = float(str(item["worked_seconds"])) / max(1, required)
+        stages = item["stages"] if isinstance(item["stages"], list) else []
         output.append(
             {
                 "title": item["title"],
@@ -500,11 +501,11 @@ def execution_context(
                 "interruption": item["blocked_by"] if not item["window_ended"] else None,
                 "unfinished": bool(item["window_ended"] and not item["ready"]),
                 "current_stage": next(
-                    (stage["label"] for stage in item["stages"] if stage["status"] != "completed"),
+                    (stage["label"] for stage in stages if stage["status"] != "completed"),
                     None,
                 ),
                 "completed_stages": [
-                    stage["label"] for stage in item["stages"] if stage["status"] == "completed"
+                    stage["label"] for stage in stages if stage["status"] == "completed"
                 ],
                 "action_authority": False,
                 "meaning": "This recent activity was actually completed and its outcome validated."
