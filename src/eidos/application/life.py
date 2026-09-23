@@ -110,6 +110,7 @@ from eidos.application.outreach import outreach_events
 from eidos.application.personal_journeys import journey_context
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
+from eidos.application.place_discovery import place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
 from eidos.application.recollection_correction import recollection_correction_events
@@ -1312,6 +1313,16 @@ class Life(LifeConversation):
         Sets ``npc_locations``, ``scene_actor_ids``, ``attention`` and ``incident_output``.
         """
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
+        if not self.authored_scenario:
+            pending.extend(
+                place_discovery_events(
+                    history + pending,
+                    self._world_catalog(history + pending),
+                    tick.state.location_id,
+                    tick.state.awake,
+                    current,
+                )
+            )
         tick.npc_locations = _npc_locations(history + pending, current)
         npc_locations = tick.npc_locations
         current_scenes = project_scenes(history + pending).scenes.values()
