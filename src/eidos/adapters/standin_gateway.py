@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
@@ -950,6 +950,15 @@ class StandInGateway(ModelGateway):
             else:
                 agency_item = activity_palette[choice % len(activity_palette)]
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
+            slot = _standin_free_slot(context, location, int(agency_item[8]))
+            if slot is None:
+                # No sensible gap in the next two days: leave the idea for another time.
+                return ModelResponse(
+                    content=json.dumps({"no_change": True, "mode": "defer"}),
+                    resolved_model="authored-stand-in-v1",
+                    backend="deterministic",
+                    finish_reason="stop",
+                )
             return ModelResponse(
                 content=json.dumps(
                     {
@@ -960,7 +969,7 @@ class StandInGateway(ModelGateway):
                         "location_id": location,
                         "resource_id": agency_item[5],
                         "companion_id": agency_item[6],
-                        "starts_in_hours": agency_item[7],
+                        "starts_in_hours": slot,
                         "duration_hours": agency_item[8],
                         "priority": agency_item[9],
                         "estimate_confidence": 0.65,
@@ -1535,4 +1544,42 @@ def _standin_self_reply(message: str, context: dict[str, object], cadence: str) 
         return f"{opener}. I keep wondering {question}. I don't have an answer yet."
     if insights:
         return f"I've been thinking about it less lately. {insights[-1]}"
+    return None
+
+
+def _standin_free_slot(
+    context: dict[str, Any], location_id: str, duration_hours: int
+) -> int | None:
+    """First waking hour, within two days, when the place is open and the calendar is clear.
+
+    A person fits a new idea into the gaps in their week; they do not book the same hour
+    tomorrow regardless of work, sleep, or whether the door will be unlocked.
+    """
+    try:
+        now = datetime.fromisoformat(str(context.get("time")))
+    except ValueError:
+        return None
+    place = context.get("known_places", {}).get(location_id, {})
+    opens = int(place.get("opens_hour", 0)) if isinstance(place, dict) else 0
+    closes = int(place.get("closes_hour", 24)) if isinstance(place, dict) else 24
+    busy: list[tuple[datetime, datetime]] = []
+    for entry in context.get("calendar", []):
+        try:
+            start = datetime.fromisoformat(str(entry["starts_at"]))
+            end = datetime.fromisoformat(str(entry.get("ends_at") or entry["starts_at"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        # Leave an hour either side for getting there and back.
+        busy.append((start - timedelta(hours=1), end + timedelta(hours=1)))
+    base = now.replace(minute=0, second=0, microsecond=0)
+    for offset in range(2, 49):
+        start = base + timedelta(hours=offset)
+        end = start + timedelta(hours=duration_hours)
+        if not (9 <= start.hour and end.hour <= 20 and end.date() == start.date()):
+            continue
+        if not (opens <= start.hour and (end.hour <= closes or end.hour == 0 and closes == 24)):
+            continue
+        if any(start < busy_end and busy_start < end for busy_start, busy_end in busy):
+            continue
+        return offset
     return None
