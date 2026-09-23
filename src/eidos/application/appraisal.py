@@ -170,18 +170,14 @@ def appraisal_events(
     history: Sequence[DomainEvent], state: PathosState, simulated_at: datetime
 ) -> tuple[list[DomainEvent], PathosState]:
     """Appraise each eligible source once and return updated projected state."""
-    appraised = {
-        str(event.payload["source_event_id"])
-        for event in history
-        if event.kind == "appraisal.recorded"
-    }
+    index = _AppraisalIndex(history)
+    appraised = index.appraised
     output: list[DomainEvent] = []
     current = state
-    for source in history:
-        source_id = str(source.event_id)
+    for source, source_id in zip(history, index.ids):
         if source_id in appraised:
             continue
-        effect = _effect(source, history)
+        effect = _effect(source, index)
         if effect is None:
             continue
         need, delta, desirability, novelty, controllability = effect
@@ -222,13 +218,59 @@ def appraisal_events(
     return output, current
 
 
+class _AppraisalIndex:
+    """One pass over history answering every lookup appraisal needs.
+
+    Appraisal runs every simulated hour over the whole life; scanning history again for
+    each candidate made that quadratic. Lookups reflect ``history`` exactly as it was
+    passed in, matching the previous per-candidate scans.
+    """
+
+    def __init__(self, history: Sequence[DomainEvent]) -> None:
+        self.ids = [str(event.event_id) for event in history]
+        self.appraised: set[str] = set()
+        self.by_id: dict[str, DomainEvent] = {}
+        self.pathos_perceived: set[str] = set()
+        self.latest_appraisal: dict[str, tuple[int, DomainEvent]] = {}
+        self.latest_anticipation: dict[object, DomainEvent] = {}
+        pulse_sources: set[str] = set()
+        prospective: list[tuple[str, object]] = []
+        for position, (event, event_id) in enumerate(zip(history, self.ids)):
+            self.by_id.setdefault(event_id, event)
+            payload = event.payload
+            if event.kind == "appraisal.recorded":
+                source_id = payload["source_event_id"]
+                self.appraised.add(str(source_id))
+                self.latest_appraisal[source_id] = (position, event)
+                if payload.get("source_kind") == "mind.layer_pulsed" and isinstance(source_id, str):
+                    pulse_sources.add(source_id)
+            elif event.kind == "perception.recorded":
+                if payload.get("owner") == "pathos":
+                    source_id = payload.get("source_event_id")
+                    if isinstance(source_id, str):
+                        self.pathos_perceived.add(source_id)
+            elif event.kind == "mind.layer_pulsed" and payload.get("layer") == "prospective":
+                focus_id = payload.get("focus_id")
+                prospective.append((event_id, focus_id))
+                tone = payload.get("anticipatory_valence")
+                if isinstance(tone, (int, float)) and not isinstance(tone, bool):
+                    self.latest_anticipation[focus_id] = event
+        self.appraised_focus = {
+            focus_id for event_id, focus_id in prospective if event_id in pulse_sources
+        }
+
+    def latest_appraisal_of(self, source_ids: set[str]) -> DomainEvent | None:
+        found = [self.latest_appraisal[i] for i in source_ids if i in self.latest_appraisal]
+        return max(found, key=lambda item: item[0])[1] if found else None
+
+
 def _effect(
-    event: DomainEvent, history: Sequence[DomainEvent]
+    event: DomainEvent, index: _AppraisalIndex
 ) -> tuple[str, float, float, float, float] | None:
     if (
         event.kind == "mind.layer_pulsed"
         and event.payload.get("layer") == "prospective"
-        and not _prospective_focus_already_appraised(event, history)
+        and not _prospective_focus_already_appraised(event, index)
     ):
         tone = event.payload.get("anticipatory_valence")
         activation = event.payload.get("activation")
@@ -249,19 +291,7 @@ def _effect(
             0.55,
         )
     if event.kind == "schedule.cancelled":
-        schedule_id = event.payload.get("schedule_id")
-        anticipated = next(
-            (
-                item
-                for item in reversed(history)
-                if item.kind == "mind.layer_pulsed"
-                and item.payload.get("layer") == "prospective"
-                and item.payload.get("focus_id") == schedule_id
-                and isinstance(item.payload.get("anticipatory_valence"), (int, float))
-                and not isinstance(item.payload.get("anticipatory_valence"), bool)
-            ),
-            None,
-        )
+        anticipated = index.latest_anticipation.get(event.payload.get("schedule_id"))
         if anticipated is not None:
             anticipated_tone = float(anticipated.payload["anticipatory_valence"])
             return (
@@ -314,7 +344,7 @@ def _effect(
         return ("connection", 0.05, 0.4, 0.45, 0.6)
     if event.kind == "social.activity_completed":
         return ("connection", 0.06, 0.55, 0.35, 0.8)
-    if event.kind == "scene.turn_taken" and _pathos_experienced_scene_turn(event, history):
+    if event.kind == "scene.turn_taken" and _pathos_experienced_scene_turn(event, index):
         return ("connection", 0.025, 0.3, 0.35, 0.75)
     if event.kind == "meal.eaten":
         return ("affect", 0.0, 0.25, 0.1, 0.9)
@@ -365,32 +395,20 @@ def _effect(
         source_memory_id = event.payload.get("source_memory_id")
         if not isinstance(source_memory_id, str):
             return None
-        memory = next(
-            (
-                item
-                for item in history
-                if str(item.event_id) == source_memory_id
-                and item.kind == "memory.recorded"
-                and item.aggregate_id == "pathos"
-                and item.payload.get("owner", "pathos") == "pathos"
-            ),
-            None,
-        )
-        if memory is None or memory.payload.get("category") == "dream":
+        memory = index.by_id.get(source_memory_id)
+        if (
+            memory is None
+            or memory.kind != "memory.recorded"
+            or memory.aggregate_id != "pathos"
+            or memory.payload.get("owner", "pathos") != "pathos"
+            or memory.payload.get("category") == "dream"
+        ):
             return None
         source_ids = {str(memory.event_id)}
         remembered_source = memory.payload.get("source_event_id")
         if isinstance(remembered_source, str):
             source_ids.add(remembered_source)
-        prior = next(
-            (
-                item
-                for item in reversed(history)
-                if item.kind == "appraisal.recorded"
-                and item.payload.get("source_event_id") in source_ids
-            ),
-            None,
-        )
+        prior = index.latest_appraisal_of(source_ids)
         if prior is None:
             return None
         desirability = max(-0.28, min(0.28, float(prior.payload["desirability"]) * 0.35))
@@ -398,39 +416,18 @@ def _effect(
     return None
 
 
-def _prospective_focus_already_appraised(
-    event: DomainEvent, history: Sequence[DomainEvent]
-) -> bool:
+def _prospective_focus_already_appraised(event: DomainEvent, index: _AppraisalIndex) -> bool:
     focus_id = event.payload.get("focus_id")
     if not isinstance(focus_id, str):
         return True
-    sources = {
-        str(item.payload["source_event_id"])
-        for item in history
-        if item.kind == "appraisal.recorded"
-        and item.payload.get("source_kind") == "mind.layer_pulsed"
-        and isinstance(item.payload.get("source_event_id"), str)
-    }
-    return any(
-        str(item.event_id) in sources
-        and item.kind == "mind.layer_pulsed"
-        and item.payload.get("layer") == "prospective"
-        and item.payload.get("focus_id") == focus_id
-        for item in history
-    )
+    return focus_id in index.appraised_focus
 
 
-def _pathos_experienced_scene_turn(event: DomainEvent, history: Sequence[DomainEvent]) -> bool:
+def _pathos_experienced_scene_turn(event: DomainEvent, index: _AppraisalIndex) -> bool:
     """Require participation or an exact owned perception before appraisal."""
     if "pathos" in {event.payload.get("actor_id"), event.payload.get("audience_id")}:
         return True
-    source_id = str(event.event_id)
-    return any(
-        perceived.kind == "perception.recorded"
-        and perceived.payload.get("owner") == "pathos"
-        and perceived.payload.get("source_event_id") == source_id
-        for perceived in history
-    )
+    return str(event.event_id) in index.pathos_perceived
 
 
 def _toward(value: float, target: float, step: float) -> float:

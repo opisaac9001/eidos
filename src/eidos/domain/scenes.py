@@ -9,6 +9,7 @@ from typing import Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 
 class ScenePrivacy(StrEnum):
@@ -512,11 +513,13 @@ def resolve_scene_resume(
     return SceneResolution(True, "resumed", (proposed, resumed))
 
 
+_SCENE_FOLD: IncrementalFold[SceneState] = IncrementalFold(
+    SceneState.empty, lambda state, event: state.apply(event)
+)
+
+
 def project_scenes(events: Sequence[DomainEvent]) -> SceneState:
-    state = SceneState.empty()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _SCENE_FOLD(events)
 
 
 def _proposal_event(kind: str, proposal_id: str, scene_id: str) -> DomainEvent:

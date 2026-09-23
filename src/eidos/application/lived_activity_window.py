@@ -11,11 +11,27 @@ from eidos.application.phone_calls import complete_answered_call
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.scenes import project_scenes
 from eidos.domain.state import PathosState
 from eidos.domain.world_catalog import WorldCatalog
+
+
+def _visible_state_step(state: PathosState, event: DomainEvent) -> PathosState:
+    # Time-ordered windows can place a meal before the clock event that preceded it in
+    # history; align the clock so the meal validates against its own moment.
+    if event.kind == "meal.eaten" and isinstance(event.payload.get("simulated_at"), str):
+        state = replace(
+            state, simulated_at=datetime.fromisoformat(str(event.payload["simulated_at"]))
+        )
+    return state.apply(event)
+
+
+_VISIBLE_STATE: IncrementalFold[PathosState] = IncrementalFold(
+    PathosState, _visible_state_step, capacity=8
+)
 
 
 def lived_activity_window(
@@ -91,14 +107,7 @@ def lived_activity_window(
         output.extend(e for e in crossing if e.kind != "pathos.travel_started")
         visible = [e for _, _, e in _timeline([*history, *output], at)]
         projected = project_planning(visible)
-        state = PathosState()
-        for event in visible:
-            if event.kind == "meal.eaten" and isinstance(event.payload.get("simulated_at"), str):
-                state = replace(
-                    state,
-                    simulated_at=datetime.fromisoformat(str(event.payload["simulated_at"])),
-                )
-            state = state.apply(event)
+        state = _VISIBLE_STATE(visible)
         visitor_scene = next(
             (
                 s

@@ -8,6 +8,26 @@ from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 
+class EventId(UUID):
+    """A UUID that remembers its canonical text.
+
+    Projections key almost everything by ``str(event.event_id)`` and fold the whole life
+    every simulated hour, so re-rendering the same 36 characters dominated tick time.
+    Equality, hashing and ordering are unchanged from ``UUID``.
+    """
+
+    __slots__ = ("_text",)
+    _text: str
+
+    def __str__(self) -> str:
+        try:
+            return self._text
+        except AttributeError:
+            text = UUID.__str__(self)
+            object.__setattr__(self, "_text", text)
+            return text
+
+
 @dataclass(frozen=True, slots=True)
 class DomainEvent:
     """An immutable fact accepted by the simulation.
@@ -25,6 +45,8 @@ class DomainEvent:
     correlation_id: str | None = None
 
     def __post_init__(self) -> None:
+        if type(self.event_id) is not EventId:
+            object.__setattr__(self, "event_id", EventId(int=self.event_id.int))
         if not self.kind.strip():
             raise ValueError("event kind must not be empty")
         if not self.aggregate_id.strip():

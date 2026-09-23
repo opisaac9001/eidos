@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 
 class CognitiveLayer(StrEnum):
@@ -97,11 +98,13 @@ class MindState:
         return MindState(latest, counts)
 
 
+_MIND_FOLD: IncrementalFold[MindState] = IncrementalFold(
+    MindState.empty, lambda state, event: state.apply(event)
+)
+
+
 def project_mind(events: Sequence[DomainEvent]) -> MindState:
-    state = MindState.empty()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _MIND_FOLD(events)
 
 
 def _required(payload: Mapping[str, object], key: str) -> str:

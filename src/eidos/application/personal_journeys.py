@@ -7,7 +7,7 @@ from eidos.application.activity_execution import _timeline
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 from eidos.domain.scenes import project_scenes
-from eidos.domain.state import PathosState
+from eidos.domain.state import replay_state
 from eidos.domain.travel import route_duration
 from eidos.domain.world_catalog import WorldCatalog
 
@@ -96,9 +96,7 @@ def journey_window_events(
         at = min(points)
         points.remove(at)
         visible = [e for _, _, e in _timeline([*history, *output], at)]
-        state = PathosState()
-        for event in visible:
-            state = state.apply(event)
+        state = replay_state(visible)
         active = current_journey(visible)
         if active:
             arrival = datetime.fromisoformat(str(active.payload["arrive_at"]))

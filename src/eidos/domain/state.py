@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from typing import Sequence
 
 from .events import DomainEvent
+from .folding import IncrementalFold
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,3 +155,13 @@ def _bounded_dimension(value: object, name: str, lower: float, upper: float) -> 
     if not lower <= result <= upper:
         raise ValueError(f"{name} must be between {lower} and {upper}")
     return result
+
+
+_STATE_FOLD: IncrementalFold[PathosState] = IncrementalFold(
+    PathosState, lambda state, event: state.apply(event), capacity=8
+)
+
+
+def replay_state(events: Sequence[DomainEvent]) -> PathosState:
+    """Pathos's state after ``events``, resuming from any identical folded prefix."""
+    return _STATE_FOLD(events)

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
-from typing import Any, Mapping, TypeVar
+from typing import Any, Mapping, Sequence, TypeVar
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,11 +407,13 @@ class PlanningState:
         return PlanningState(goals, commitments, calendar, objects, intentions)
 
 
-def project_planning(events: list[DomainEvent]) -> PlanningState:
-    state = PlanningState()
-    for event in events:
-        state = state.apply(event)
-    return state
+_PLANNING_FOLD: IncrementalFold[PlanningState] = IncrementalFold(
+    PlanningState, lambda state, event: state.apply(event)
+)
+
+
+def project_planning(events: Sequence[DomainEvent]) -> PlanningState:
+    return _PLANNING_FOLD(events)
 
 
 T = TypeVar("T")

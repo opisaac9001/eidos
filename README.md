@@ -256,7 +256,7 @@ variable is optional.
 
 ```bash
 .venv/bin/python -m pip install -e '.[dev]'
-PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pytest -q
 .venv/bin/ruff check src tests
 .venv/bin/ruff format --check src tests
 ```

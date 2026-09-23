@@ -6,6 +6,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Iterator, Sequence
 from uuid import UUID
 
@@ -20,9 +21,19 @@ from eidos.ports.event_store import (
 
 
 class SQLiteEventStore:
+    """Event log whose decoded history is cached in process and extended by tail reads.
+
+    Returning the same immutable event objects on every read lets incremental projections
+    resume across ticks instead of re-folding a freshly decoded life each time. Another
+    process may append at any moment; each read fetches only rows past the cached revision
+    and drops the cache if its last event no longer anchors the stored stream.
+    """
+
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
+        self._history: dict[str, list[DomainEvent]] = {}
+        self._history_lock = Lock()
         with self._connect() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
@@ -84,13 +95,29 @@ class SQLiteEventStore:
             connection.close()
 
     def read(self, aggregate_id: str) -> list[DomainEvent]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT kind, payload, occurred_at, event_id, schema_version, "
-                "causation_id, correlation_id FROM events "
-                "WHERE aggregate_id = ? ORDER BY revision",
-                (aggregate_id,),
-            ).fetchall()
+        with self._history_lock:
+            cached = self._history.get(aggregate_id, [])
+            with self._connect() as connection:
+                if cached:
+                    anchor = connection.execute(
+                        "SELECT event_id FROM events WHERE aggregate_id = ? AND revision = ?",
+                        (aggregate_id, len(cached)),
+                    ).fetchone()
+                    if anchor is None or anchor[0] != str(cached[-1].event_id):
+                        cached = []
+                rows = connection.execute(
+                    "SELECT kind, payload, occurred_at, event_id, schema_version, "
+                    "causation_id, correlation_id FROM events "
+                    "WHERE aggregate_id = ? AND revision > ? ORDER BY revision",
+                    (aggregate_id, len(cached)),
+                ).fetchall()
+            if rows or aggregate_id not in self._history or not cached:
+                cached = [*cached, *self._decode_rows(aggregate_id, rows)]
+                self._history[aggregate_id] = cached
+            return list(cached)
+
+    @staticmethod
+    def _decode_rows(aggregate_id: str, rows: Sequence[Sequence[object]]) -> list[DomainEvent]:
         result = []
         for (
             kind,
@@ -101,7 +128,7 @@ class SQLiteEventStore:
             causation_id,
             correlation_id,
         ) in rows:
-            payload = json.loads(encoded)
+            payload = json.loads(str(encoded))
             payload = {
                 key: datetime.fromisoformat(value["$datetime"])
                 if isinstance(value, dict) and set(value) == {"$datetime"}
@@ -112,14 +139,14 @@ class SQLiteEventStore:
                 payload["simulated_at"] = datetime.fromisoformat(payload["simulated_at"])
             result.append(
                 DomainEvent(
-                    kind,
+                    str(kind),
                     aggregate_id,
                     payload,
-                    datetime.fromisoformat(occurred_at),
-                    UUID(event_id),
-                    schema_version,
-                    UUID(causation_id) if causation_id else None,
-                    correlation_id,
+                    datetime.fromisoformat(str(occurred_at)),
+                    UUID(str(event_id)),
+                    int(str(schema_version)),
+                    UUID(str(causation_id)) if causation_id else None,
+                    str(correlation_id) if correlation_id else None,
                 )
             )
         return result
@@ -215,6 +242,12 @@ class SQLiteEventStore:
                 "causation_id, correlation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rows,
             )
+        # The committed objects are exactly what decoding would rebuild, so the next read can
+        # hand back the very events the caller just folded as ``pending``.
+        with self._history_lock:
+            cached = self._history.get(aggregate_id)
+            if cached is not None and len(cached) == expected_revision:
+                self._history[aggregate_id] = [*cached, *events]
 
     def load_checkpoint(self, aggregate_id: str, max_revision: int) -> StateCheckpoint | None:
         if isinstance(max_revision, bool) or max_revision < 0:

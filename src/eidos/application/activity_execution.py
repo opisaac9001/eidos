@@ -4,12 +4,14 @@ No completion is inferred from a booking. Work starts when observed eligible and
 only eligible elapsed intervals count. These records are not new commitments.
 """
 
+from bisect import bisect_right
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
@@ -59,31 +61,53 @@ def duration_requirement(
     return estimate, actual, confidence
 
 
+class _Timeline(NamedTuple):
+    """History ordered by simulated time; events without a time inherit the clock."""
+
+    seen: int
+    clock: datetime | None
+    keys: tuple[tuple[datetime, int], ...]
+    entries: tuple[tuple[datetime, int, DomainEvent], ...]
+
+
+def _timeline_step(timeline: _Timeline, event: DomainEvent) -> _Timeline:
+    index = timeline.seen
+    raw = event.payload.get("simulated_at")
+    at: datetime | None
+    try:
+        at = (
+            timeline.clock
+            if raw is None
+            else raw
+            if isinstance(raw, datetime)
+            else datetime.fromisoformat(str(raw))
+        )
+    except ValueError:
+        return timeline._replace(seen=index + 1)
+    if at is None or at.utcoffset() is None:
+        return timeline._replace(seen=index + 1)
+    clock = at if event.kind == "time.advanced" else timeline.clock
+    key = (at, index)
+    position = bisect_right(timeline.keys, key)
+    return _Timeline(
+        index + 1,
+        clock,
+        (*timeline.keys[:position], key, *timeline.keys[position:]),
+        (*timeline.entries[:position], (at, index, event), *timeline.entries[position:]),
+    )
+
+
+_TIMELINE_FOLD: IncrementalFold[_Timeline] = IncrementalFold(
+    lambda: _Timeline(0, None, (), ()), _timeline_step, capacity=8
+)
+
+
 def _timeline(
     history: Sequence[DomainEvent], now: datetime
 ) -> list[tuple[datetime, int, DomainEvent]]:
-    clock: datetime | None = None
-    timeline = []
-    for index, event in enumerate(history):
-        raw = event.payload.get("simulated_at")
-        at: datetime | None
-        try:
-            at = (
-                clock
-                if raw is None
-                else raw
-                if isinstance(raw, datetime)
-                else datetime.fromisoformat(str(raw))
-            )
-        except ValueError:
-            continue
-        if at is None or at.utcoffset() is None:
-            continue
-        if event.kind == "time.advanced":
-            clock = at
-        if at <= now:
-            timeline.append((at, index, event))
-    return sorted(timeline, key=lambda item: (item[0], item[1]))
+    timeline = _TIMELINE_FOLD(history)
+    visible = bisect_right(timeline.keys, (now, timeline.seen))
+    return list(timeline.entries[:visible])
 
 
 def activity_effort(

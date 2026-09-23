@@ -11,6 +11,7 @@ from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world import LOCATIONS, OPEN_HOURS, PEOPLE
 
@@ -273,11 +274,13 @@ def seed_world_catalog() -> WorldCatalog:
     return WorldCatalog(places, people, SEED_ROUTE_MINUTES)
 
 
+_CATALOG_FOLD: IncrementalFold[WorldCatalog] = IncrementalFold(
+    seed_world_catalog, lambda state, event: state.apply(event)
+)
+
+
 def project_world_catalog(events: Sequence[DomainEvent]) -> WorldCatalog:
-    state = seed_world_catalog()
-    for event in events:
-        state = state.apply(event)
-    return state
+    return _CATALOG_FOLD(events)
 
 
 def resolve_world_expansion(

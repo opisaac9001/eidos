@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
 from eidos.domain.world import PEOPLE, npc_location
 
 
@@ -145,19 +146,32 @@ class NPCWorldState:
 def project_npcs(events: Sequence[DomainEvent], now: datetime) -> NPCWorldState:
     if now.utcoffset() is None:
         raise ValueError("NPC projection time must be timezone-aware")
-    explicit = any(event.kind == "npc.simulation_started" for event in events)
-    state = NPCWorldState(
+    # Before explicit simulation begins, residents are seeded from the authored schedule at
+    # the requested hour, so each hour needs its own fold; afterwards everyone starts home.
+    seed_hour = None if _SIMULATION_STARTED(events) else now.hour
+    return _NPC_FOLD(events, key=seed_hour, initial=lambda: _seed_npcs(seed_hour))
+
+
+def _seed_npcs(seed_hour: int | None) -> NPCWorldState:
+    return NPCWorldState(
         {
             str(person["id"]): NPCState(
                 actor_id=str(person["id"]),
-                location_id="home" if explicit else npc_location(str(person["id"]), now.hour),
+                location_id="home"
+                if seed_hour is None
+                else npc_location(str(person["id"]), seed_hour),
             )
             for person in PEOPLE
         }
     )
-    for event in events:
-        state = state.apply(event)
-    return state
+
+
+_SIMULATION_STARTED: IncrementalFold[bool] = IncrementalFold(
+    lambda: False, lambda seen, event: seen or event.kind == "npc.simulation_started"
+)
+_NPC_FOLD: IncrementalFold[NPCWorldState] = IncrementalFold(
+    lambda: _seed_npcs(None), lambda state, event: state.apply(event)
+)
 
 
 def _required(event: DomainEvent, key: str) -> str:
