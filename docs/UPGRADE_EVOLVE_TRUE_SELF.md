@@ -47,6 +47,7 @@ Only ever advance the **copy**.
 | Sick days | The existing wellbeing episodes (headaches, aches, feeling under the weather) now reach work: on a morning bad enough that he couldn't work through it, he rings Ellis in sick and that shift is cancelled (unpaid). Milder spells he works through. If you ask how he is while unwell, he says so. |
 | Places he knows | He starts knowing home, the café, the workshop and the park. Other places become known when he goes there, notices one next to where he is, or is invited there. His own plans and projects only use places he knows, so a world with the city-life pack will see him choose fewer outings to far places until he has found them. The ordinary map shows only known places. |
 | Meetings | Anyone who has agreed a time with him now sets off to be there and stays until it ends. Before, meetings only worked when the other person happened to be nearby, and he was blamed for the missed commitment when they weren't. |
+| What's on | With the city-life or Alderwick places installed, venues have a weekly rhythm (quiz, repair café, music, film, market). Once he knows a venue, its next happening can reach his choices, and he may go. The World view lists the week's happenings at places he knows. |
 | Shifts | Talking with Ellis during a shift no longer pauses the work, and a chat in the last hour of a long stint no longer leaves it unfinished. Expect far fewer "left the bench half-done" clashes. |
 
 None of this touches past messages, memories or relationships.

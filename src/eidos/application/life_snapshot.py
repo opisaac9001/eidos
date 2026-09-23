@@ -20,8 +20,10 @@ from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability
 from eidos.application.npc_simulation import npc_detail_tier
 from eidos.application.personal_journeys import journey_context
+from eidos.application.place_discovery import known_place_ids
 from eidos.application.selfhood import selfhood_view
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.town_calendar import whats_on
 from eidos.application.visitors import visitor_locations
 from eidos.application.volition import volition_snapshot
 from eidos.application.wants import wants_view
@@ -596,6 +598,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
     )
     ambient = ambient_population(catalog, state.simulated_at, scan.weather)
     emotion_influences = _emotion_influences(history, scan)
+    known_places = known_place_ids(history, catalog)
     return {
         "revision": len(history),
         "preview": any(event.kind == "simulation.preview_established" for event in history),
@@ -669,6 +672,10 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
             "minimum_interval_hours": outreach_config.minimum_interval_hours,
         },
         "city_map": city_map(history, catalog, state.location_id),
+        "whats_on": [
+            {**item, "known": item["place_id"] in known_places}
+            for item in whats_on(catalog, None, state.simulated_at, days=6)
+        ],
         "locations": [
             {
                 "id": place.place_id,

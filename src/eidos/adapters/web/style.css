@@ -1840,7 +1840,8 @@ input[type="checkbox"] { accent-color: var(--amber); }
   color: var(--muted);
 }
 
-.place.undiscovered {
+.place.undiscovered,
+.person-card.undiscovered {
   opacity: 0.35;
 }
 

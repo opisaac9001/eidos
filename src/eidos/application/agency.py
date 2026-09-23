@@ -16,6 +16,7 @@ from eidos.application.opportunities import available_opportunities
 from eidos.application.place_discovery import known_place_ids, visited_place_ids
 from eidos.application.preparation import preparation_context
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.town_calendar import happening_opportunities
 from eidos.application.volition import attended_impulses, impulse_attention_event
 from eidos.domain.agency import (
     agency_output_schema,
@@ -165,7 +166,11 @@ async def autonomous_activity_events(
     time_budget = personal_time_budget(
         planning, catalog, simulated_at, current_location_id or "home"
     )
-    opportunities = available_opportunities(history, simulated_at)
+    # What he has noticed around him, plus the next thing on at a place he knows.
+    opportunities = [
+        *available_opportunities(history, simulated_at)[-3:],
+        *happening_opportunities(catalog, known_places, simulated_at)[:1],
+    ]
     preparation = preparation_context(
         history, location_id=current_location_id, needs=needs, time_budget=time_budget
     )
@@ -468,6 +473,16 @@ async def autonomous_activity_events(
                 }
                 for item in possible_selves
                 if item["aspiration_id"] == chosen_impulse.get("target_id")
+            ),
+            None,
+        )
+    if chosen_source_context is None and chosen_impulse.get("kind") == "opportunity":
+        chosen_source_context = next(
+            (
+                item
+                for item in opportunities
+                if item.get("kind") == "public_happening"
+                and item.get("opportunity_id") == chosen_impulse.get("target_id")
             ),
             None,
         )

@@ -1,7 +1,7 @@
 # Alderwick — a town Pathos can grow into
 
-Status: the town's public places ship as an ordinary world pack; people, venue
-calendars and transport are still to come. The companion
+Status: the town's public places ship as an ordinary world pack with a weekly calendar
+of happenings; its people and transport are still to come. The companion
 [`world_plans/alderwick-v1.json`](../world_plans/alderwick-v1.json) is a versioned
 geographic blueprint, **not** a Pathos prompt. `eidos.application.town_pack` builds
 [`world_packs/alderwick-v1.json`](../world_packs/alderwick-v1.json) from it, and a test
@@ -18,6 +18,13 @@ What exists now:
   the park. He learns a place by going there, by noticing it along the way (at most one a
   day, only next to where he actually is, with a small memory of it), or by being invited
   there by someone. His own plans and project ideas only reach for places he knows.
+- **What's on.** The weekly rhythm below is live as a derived calendar
+  (`eidos.application.town_calendar`): quiz night at the Crown on Tuesdays, the repair
+  café and a drawing class on alternating Thursdays, Friday music and film, the Saturday
+  market, and Sunday allotment and football mornings. Roughly one in eight is called off.
+  He only hears about happenings at places he knows. The next one reaches his choices as a
+  noticed possibility that pulls harder when he is short of company, and a happening draws
+  a crowd. It adds no events, so nothing in the past changes.
 - **The map is his map.** The ordinary view shows only known places; the operator view
   shows the whole town, with undiscovered places faded.
 

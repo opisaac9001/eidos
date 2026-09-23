@@ -795,7 +795,14 @@ class StandInGateway(ModelGateway):
                             item
                             for item in impulses
                             if isinstance(item, dict)
-                            and item.get("kind") in {"thought", "aspiration"}
+                            and (
+                                item.get("kind") in {"thought", "aspiration"}
+                                # Now and then, something on in town wins out.
+                                or (
+                                    str(item.get("target_id", "")).startswith("happening-")
+                                    and choice % 3 == 0
+                                )
+                            )
                         ),
                         next(
                             (
@@ -920,6 +927,14 @@ class StandInGateway(ModelGateway):
                     0.51,
                 ),
             )
+            happening = (
+                source_context
+                if isinstance(source_context, dict)
+                and source_context.get("kind") == "public_happening"
+                else None
+            )
+            if happening is not None:
+                return _standin_happening_response(context, happening)
             if planning_question is not None:
                 agency_item = (
                     "plan_reconsideration",
@@ -1768,6 +1783,47 @@ def _standin_unexplored_place(
     )
 
 
+def _standin_happening_response(
+    context: dict[str, Any], happening: dict[str, Any]
+) -> ModelResponse:
+    """Go to the happening at its own time, if the calendar leaves room; otherwise let it go."""
+    try:
+        now = datetime.fromisoformat(str(context.get("time")))
+        starts = datetime.fromisoformat(str(happening["starts_at"]))
+        ends = datetime.fromisoformat(str(happening["ends_at"]))
+    except (KeyError, ValueError):
+        starts = ends = now = datetime.min
+    clash = any(
+        starts - timedelta(hours=1)
+        < datetime.fromisoformat(str(entry.get("ends_at") or entry["starts_at"]))
+        and datetime.fromisoformat(str(entry["starts_at"])) < ends + timedelta(hours=1)
+        for entry in context.get("calendar", [])
+        if isinstance(entry, dict) and entry.get("starts_at")
+    )
+    if now == datetime.min or clash or starts <= now:
+        content: dict[str, object] = {"no_change": True, "mode": "defer"}
+    else:
+        content = {
+            "activity_type": "public_happening",
+            "title": f"Go along to {happening.get('title', 'the thing on in town')}",
+            "motivation": "It's on anyway, and I'd like to be somewhere with people for a bit.",
+            "action": "attend",
+            "location_id": happening.get("location_id"),
+            "resource_id": "none",
+            "companion_id": "none",
+            "starts_in_hours": round((starts - now).total_seconds() / 3600, 2),
+            "duration_hours": round((ends - starts).total_seconds() / 3600, 2),
+            "priority": 0.5,
+            "estimate_confidence": 0.9,
+        }
+    return ModelResponse(
+        content=json.dumps(content),
+        resolved_model="authored-stand-in-v1",
+        backend="deterministic",
+        finish_reason="stop",
+    )
+
+
 def _standin_step_hour(
     context: dict[str, Any], location_id: str, day_offset: int, duration_hours: int
 ) -> int:
@@ -1799,6 +1855,9 @@ def _standin_step_hour(
     return 8
 
 
+MAX_PLANNED_PER_DAY = 3
+
+
 def _standin_free_slot(
     context: dict[str, Any], location_id: str, duration_hours: int
 ) -> int | None:
@@ -1815,6 +1874,7 @@ def _standin_free_slot(
     opens = int(place.get("opens_hour", 0)) if isinstance(place, dict) else 0
     closes = int(place.get("closes_hour", 24)) if isinstance(place, dict) else 24
     busy: list[tuple[datetime, datetime]] = []
+    planned_per_day: dict[object, int] = {}
     for entry in context.get("calendar", []):
         try:
             start = datetime.fromisoformat(str(entry["starts_at"]))
@@ -1823,11 +1883,15 @@ def _standin_free_slot(
             continue
         # Leave an hour either side for getting there and back.
         busy.append((start - timedelta(hours=1), end + timedelta(hours=1)))
+        planned_per_day[start.date()] = planned_per_day.get(start.date(), 0) + 1
     base = now.replace(minute=0, second=0, microsecond=0)
     for offset in range(2, 49):
         start = base + timedelta(hours=offset)
         end = start + timedelta(hours=duration_hours)
         if not (9 <= start.hour and end.hour <= 20 and end.date() == start.date()):
+            continue
+        # Nobody books every gap: a day with three things in it is full enough.
+        if planned_per_day.get(start.date(), 0) >= MAX_PLANNED_PER_DAY:
             continue
         if not (opens <= start.hour and (end.hour <= closes or end.hour == 0 and closes == 24)):
             continue

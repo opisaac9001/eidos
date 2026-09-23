@@ -1615,6 +1615,18 @@ function render(next) {
         )
         .join("")
     : '<p class="muted">No neighborhood story is unfolding right now.</p>';
+  // Ordinary viewers see his noticeboard; the operator sees the whole town's week.
+  const whatsOn = (state.whats_on || []).filter((item) => operatorMode || item.known);
+  $("whats-on-section").hidden = !whatsOn.length;
+  $("whats-on-note").textContent = operatorMode
+    ? "The town's week; faded entries are at places he hasn't found"
+    : "The week's ordinary happenings at places he knows";
+  $("whats-on").innerHTML = whatsOn
+    .map(
+      (item) =>
+        `<article class="panel person-card${item.known ? "" : " undiscovered"}"><div class="panel-kicker">${esc(date(item.starts_at))} · ${esc(time(item.starts_at))}–${esc(time(item.ends_at))}${item.called_off ? " · CALLED OFF" : ""}</div><h2>${esc(item.title)}</h2><p>${esc(item.note)}</p><div class="person-foot"><span>${esc(item.place)}</span></div></article>`,
+    )
+    .join("");
   const worldPacks = state.world_packs || [];
   $("world-pack-section").hidden = !worldPacks.length;
   $("world-packs").innerHTML = worldPacks

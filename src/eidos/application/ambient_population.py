@@ -7,6 +7,7 @@ from datetime import datetime
 from hashlib import sha256
 from typing import Mapping
 
+from eidos.application.town_calendar import happenings_now
 from eidos.domain.world_catalog import WorldCatalog, WorldPlace
 
 
@@ -26,9 +27,16 @@ def ambient_population(
     """Derive replay-stable public footfall without creating fictional individuals."""
     if simulated_at.utcoffset() is None:
         raise ValueError("Ambient population time must be timezone-aware")
-    return {
+    presences = {
         place.place_id: _presence(place, simulated_at, weather) for place in catalog.places.values()
     }
+    for place_id, on in happenings_now(catalog, simulated_at).items():
+        presence = presences[place_id]
+        if _is_open(catalog.places[place_id], simulated_at.hour):
+            # Something on draws a crowd, and it is what everyone there is doing.
+            crowd = presence.estimated_people + 10 + _sample(f"crowd:{on['happening_id']}") % 12
+            presences[place_id] = AmbientPresence(place_id, crowd, _pace(crowd), str(on["title"]))
+    return presences
 
 
 def _presence(place: WorldPlace, at: datetime, weather: str) -> AmbientPresence:

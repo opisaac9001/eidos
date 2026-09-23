@@ -161,11 +161,23 @@ def attended_impulses(
         text = item.get("text")
         opportunity_id = item.get("opportunity_id")
         if isinstance(text, str) and isinstance(opportunity_id, str):
+            pull = 0.48 + 0.18 * openness
+            if item.get("kind") == "public_happening":
+                # Something on in town pulls harder when he is short of company, and as it
+                # gets close enough to actually go.
+                hours_away = item.get("starts_in_hours")
+                soon = isinstance(hours_away, (int, float)) and hours_away <= 12
+                pull = (
+                    0.44
+                    + 0.14 * openness
+                    + 0.3 * sociability * (1 - _level(needs, "connection", 0.5))
+                    + (0.08 if soon else 0.0)
+                )
             add(
                 f"opportunity:{opportunity_id}",
                 "opportunity",
                 text[:180],
-                0.48 + 0.18 * openness,
+                pull,
                 0.16 + 0.18 * (1 - energy),
                 "noticed_opportunity",
                 target_id=opportunity_id,
