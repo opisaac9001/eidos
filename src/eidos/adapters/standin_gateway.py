@@ -1350,6 +1350,14 @@ _STANDIN_INSIGHTS: dict[tuple[str, str], tuple[str, str, int, str, str]] = {
         "hoped",
         "I'd like to be someone people are glad to see come in.",
     ),
+    ("care", "strain"): (
+        "I think Ellis and I clash when I'm half somewhere else. When I'm actually there, "
+        "properly, we're fine.",
+        "care",
+        1,
+        "hoped",
+        "I want to be fully there when I'm with people, not already leaving.",
+    ),
     ("care", "dormant"): (
         "I've let the people around here drift to the edge of my weeks. I don't want that to "
         "become normal.",

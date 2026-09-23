@@ -23,7 +23,7 @@ from eidos.domain.planning import PlanningState
 EXPENSE_WEEKLY_CHANCE = 0.12
 FRICTION_CHANCE = 0.05
 FRICTION_CHANCE_AFTER_SHORT_SHIFT = 0.35
-QUIET_WEEK_CHANCE = 0.06
+QUIET_WEEK_CHANCE = 0.035
 DRIFT_AFTER = timedelta(days=21)
 REPAIR_WINDOW = timedelta(days=14)
 

@@ -107,6 +107,10 @@ _QUESTIONS: Mapping[tuple[str, str], tuple[str, ...]] = {
         "Why do my own quiet hours feel so necessary lately?",
         "Am I protecting my free time, or hiding in it?",
     ),
+    ("care", "strain"): (
+        "Why do Ellis and I keep rubbing each other up the wrong way?",
+        "What is it about work lately that keeps ending in words with Ellis?",
+    ),
     ("mood", "tension"): (
         "What has been weighing on me lately?",
         "Why has everything felt heavier than it should these past few days?",
@@ -231,6 +235,20 @@ def _maybe_open_inquiry(state: SelfhoodState, simulated_at: datetime) -> DomainE
         # A few awkward days are not yet a pattern worth questioning himself over.
         return None
     candidates: list[tuple[float, str, str, list[Evidence]]] = []
+    strain = [
+        item
+        for item in state.recent_evidence(simulated_at, "craft")
+        if item.label == "got called on a rushed job"
+        and simulated_at - item.at <= timedelta(days=30)
+    ]
+    if (
+        len(strain) >= 2
+        and not any(item.theme == "care" for item in open_now)
+        and not _cooling(state, "care", simulated_at)
+    ):
+        # People reflect on salient moments, not statistics: clashing twice with the same
+        # person within a month is itself worth wondering about.
+        candidates.append((10.0 + len(strain), "care", "strain", strain))
     for theme in (*VALUE_IDS, "mood"):
         if any(item.theme == theme for item in open_now) or _cooling(state, theme, simulated_at):
             continue

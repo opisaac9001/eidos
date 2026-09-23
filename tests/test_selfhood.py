@@ -392,3 +392,32 @@ class ProportionalQuestionTests(unittest.TestCase):
         events = self.history(12, 1, "activity.completed", "activity.execution_unfinished")
         (opened,) = self.opened(events)
         self.assertEqual((opened.payload["theme"], opened.payload["kind"]), ("craft", "thriving"))
+
+
+class SalientStrainTests(unittest.TestCase):
+    def test_clashing_twice_with_ellis_becomes_a_question_about_it(self) -> None:
+        events = [identity_established_event(at(0).isoformat())]
+        for day in range(1, 13):
+            events.append(event("activity.completed", at(day, 10), activity="work"))
+        for day in (6, 12):
+            events.append(
+                DomainEvent(
+                    "setback.occurred",
+                    "pathos",
+                    {
+                        "kind": "work_friction",
+                        "person_id": "ellis",
+                        "simulated_at": at(day, 17).isoformat(),
+                    },
+                )
+            )
+        opened = [
+            item
+            for item in selfhood_daily_events(events, at(13, 20))
+            if item.kind == "self.inquiry_opened"
+        ]
+        self.assertEqual(len(opened), 1)
+        self.assertEqual(
+            (opened[0].payload["theme"], opened[0].payload["kind"]), ("care", "strain")
+        )
+        self.assertIn("Ellis", str(opened[0].payload["question"]))
