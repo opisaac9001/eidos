@@ -773,6 +773,7 @@ def memory_archive_page(
         "commitment",
         "plan-change",
         "accomplishment",
+        "milestone",
         "dream",
     }
     if category not in allowed:

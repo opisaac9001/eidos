@@ -16,7 +16,7 @@ import asyncio
 import json
 import re
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import sha256
 from time import perf_counter
 from uuid import uuid4
@@ -52,6 +52,7 @@ from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, 
 
 DAILY_HOUR = 20
 FIRST_QUESTION_AFTER = timedelta(days=7)
+BIRTHDAY = date(1998, 10, 27)
 CHAPTER_WEEKDAY = 6  # Sunday evening, when a week naturally closes.
 
 _QUESTIONS: Mapping[tuple[str, str], tuple[str, ...]] = {
@@ -145,7 +146,47 @@ def selfhood_daily_events(
     if opened_inquiry is not None:
         output.append(opened_inquiry)
     output.extend(_aspiration_events(project_selfhood([*history, *output]), simulated_at))
+    output.extend(_birthday_events(history, simulated_at))
     return output
+
+
+def is_birthday(simulated_at: datetime) -> bool:
+    return (simulated_at.month, simulated_at.day) == (BIRTHDAY.month, BIRTHDAY.day)
+
+
+def _birthday_events(history: Sequence[DomainEvent], simulated_at: datetime) -> list[DomainEvent]:
+    """Mark the day he turns a year older: a grounded fact, not an invented celebration."""
+    if not is_birthday(simulated_at) or simulated_at.date() <= BIRTHDAY:
+        return []
+    marker = f"birthday-{simulated_at.year}"
+    if any(event.correlation_id == marker for event in history[-2000:]):
+        return []
+    age = simulated_at.year - BIRTHDAY.year
+    marked = DomainEvent(
+        "self.birthday_marked",
+        "pathos",
+        {"age": age, "year": simulated_at.year, "simulated_at": simulated_at.isoformat()},
+        correlation_id=marker,
+    )
+    return [
+        marked,
+        DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": f"Turned {age} today.",
+                "simulated_at": simulated_at.isoformat(),
+                "category": "milestone",
+                "source": "calendar-fact",
+                "source_event_id": str(marked.event_id),
+                "owner": "pathos",
+                "importance": 0.7,
+                "confidence": 1.0,
+            },
+            causation_id=marked.event_id,
+            correlation_id=marker,
+        ),
+    ]
 
 
 def _first_chapter(state: SelfhoodState, simulated_at: datetime) -> DomainEvent | None:
@@ -588,8 +629,10 @@ def parse_insight_proposal(
 async def selfhood_chapter_events(
     history: Sequence[DomainEvent], simulated_at: datetime, gateway: ModelGateway
 ) -> list[DomainEvent]:
-    """On Sunday evenings, a real turning point may close one chapter and open another."""
-    if simulated_at.hour != DAILY_HOUR or simulated_at.weekday() != CHAPTER_WEEKDAY:
+    """On Sunday evenings (or his birthday), a turning point may open a new chapter."""
+    if simulated_at.hour != DAILY_HOUR or not (
+        simulated_at.weekday() == CHAPTER_WEEKDAY or is_birthday(simulated_at)
+    ):
         return []
     state = project_selfhood(history)
     current = state.current_chapter

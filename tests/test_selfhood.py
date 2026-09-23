@@ -309,3 +309,27 @@ class StandInVoiceTests(unittest.TestCase):
         question = project_selfhood(history).open_inquiries()[0].question
         self.assertIn(question.rstrip("?").lower(), reply)
         self.assertIn("don't have an answer", reply)
+
+
+class BirthdayTests(unittest.TestCase):
+    def test_his_birthday_leaves_one_grounded_memory_a_year(self) -> None:
+        evening = datetime(2026, 10, 27, 20, tzinfo=timezone.utc)
+        history = [identity_established_event(evening.replace(month=1).isoformat())]
+        output = selfhood_daily_events(history, evening)
+        memory = next(item for item in output if item.kind == "memory.recorded")
+        self.assertEqual(memory.payload["text"], "Turned 28 today.")
+        self.assertEqual(memory.payload["category"], "milestone")
+        self.assertFalse(
+            any(
+                item.kind == "self.birthday_marked"
+                for item in selfhood_daily_events([*history, *output], evening)
+            )
+        )
+        self.assertEqual(
+            [
+                item
+                for item in selfhood_daily_events(history, evening.replace(day=26))
+                if item.kind == "self.birthday_marked"
+            ],
+            [],
+        )
