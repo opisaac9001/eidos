@@ -88,6 +88,27 @@ class DurableGatewayTests(unittest.TestCase):
         self.assertEqual(inner.calls, 1)
         self.assertEqual(len(self.jobs.list_jobs()), 1)
 
+    def test_every_schema_bearing_capability_survives_the_durable_path(self):
+        proposals = {
+            "pathos_deliberation": '{"mode":"pursue","chosen_impulse_id":"a","intention":"x"}',
+            "pathos_agency": '{"mode":"no_change"}',
+            "pathos_project": '{"mode":"no_change"}',
+            "npc_agency": '{"mode":"no_change"}',
+            "npc_backstory": '{"mode":"no_change"}',
+            "moira_expansion": '{"mode":"no_change"}',
+        }
+        for capability, proposal in proposals.items():
+            with self.subTest(capability=capability):
+                gateway = DurableModelGateway(
+                    CountingGateway(proposal), self.jobs, lambda _: self.revision
+                )
+                request = ModelRequest(
+                    capability=capability,
+                    messages=(ModelMessage("user", "{}"),),
+                    output_schema={"type": "object"},
+                )
+                self.assertEqual(asyncio.run(gateway.generate(request)).content, proposal)
+
     def test_incomplete_structured_proposal_is_never_cached_as_success(self):
         class IncompleteGateway(CountingGateway):
             async def generate(self, request):

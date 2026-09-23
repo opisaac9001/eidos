@@ -10,6 +10,7 @@ STRUCTURED_CAPABILITIES = {
     "npc_agency",
     "npc_backstory",
     "pathos_agency",
+    "pathos_deliberation",
     "pathos_project",
 }
 

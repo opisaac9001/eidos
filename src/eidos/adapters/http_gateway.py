@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 from eidos.domain.identity import NAME_CONTEXT
 from eidos.domain.persona import PERSONA_DIRECTIVE, PERSONAL_ROLES, calendar_identity
+from eidos.domain.proposals import STRUCTURED_CAPABILITIES
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 ROLE_PROMPTS = {
@@ -330,15 +331,7 @@ class HTTPModelGateway(ModelGateway):
     def _generate(self, request: ModelRequest) -> ModelResponse:
         if request.capability not in ROLE_PROMPTS:
             raise ValueError("Unknown model capability")
-        if request.capability in {
-            "moira_event",
-            "moira_expansion",
-            "pathos_deliberation",
-            "pathos_agency",
-            "npc_agency",
-            "npc_backstory",
-            "pathos_project",
-        }:
+        if request.capability in STRUCTURED_CAPABILITIES:
             system = (
                 "You are one performer in Eidos, a fictional neighborhood simulation. "
                 "Return only JSON conforming exactly to the supplied schema. Do not include markdown. "
@@ -458,16 +451,7 @@ class HTTPModelGateway(ModelGateway):
             "temperature": min(
                 request.temperature,
                 0.95
-                if request.capability
-                in {
-                    "moira_event",
-                    "moira_expansion",
-                    "pathos_deliberation",
-                    "pathos_agency",
-                    "npc_agency",
-                    "npc_backstory",
-                    "pathos_project",
-                }
+                if request.capability in STRUCTURED_CAPABILITIES
                 else 0.7
                 if request.capability in {"pathos", "murmur", "reflection"}
                 else 0.9

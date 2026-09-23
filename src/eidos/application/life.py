@@ -2093,11 +2093,19 @@ class Life:
                         route_minutes=travel_catalog.route_minutes,
                     )
                     pending.extend(travel.events)
-                    if not travel.accepted:
-                        continue
-                    for event in travel.events:
-                        state = state.apply(event)
-                    arrival = travel.events[-1]
+                    if travel.accepted:
+                        for event in travel.events:
+                            state = state.apply(event)
+                        arrival = travel.events[-1]
+                    else:
+                        # A failed trip strands the beat, not the hour: meals, sleep, reflection,
+                        # dreams and everyone else's life still happen where he already is.
+                        beat = RoutineBeat(
+                            beat.hour,
+                            state.location_id,
+                            "Stayed where he was when the trip did not work out.",
+                            beat.energy,
+                        )
                 energy = DomainEvent("affect.changed", "pathos", {"energy": beat.energy})
                 pending.append(energy)
                 state = state.apply(energy)
@@ -2496,24 +2504,25 @@ class Life:
                     len(history) + len(pending),
                 )
             )
-            pending.extend(
-                await bounded_scene_events(
-                    history + pending,
-                    {"pathos": state.location_id, **npc_locations},
-                    current,
-                    len(history) + len(pending),
-                    self.gateway,
+            if self.authored_scenario:
+                pending.extend(
+                    await bounded_scene_events(
+                        history + pending,
+                        {"pathos": state.location_id, **npc_locations},
+                        current,
+                        len(history) + len(pending),
+                        self.gateway,
+                    )
                 )
-            )
-            pending.extend(
-                await continuing_scene_events(
-                    history + pending,
-                    {"pathos": state.location_id, **npc_locations},
-                    current,
-                    len(history) + len(pending),
-                    self.gateway,
+                pending.extend(
+                    await continuing_scene_events(
+                        history + pending,
+                        {"pathos": state.location_id, **npc_locations},
+                        current,
+                        len(history) + len(pending),
+                        self.gateway,
+                    )
                 )
-            )
             pending.extend(
                 await recurring_dialogue_events(
                     history + pending,
