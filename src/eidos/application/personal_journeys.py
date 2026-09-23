@@ -95,6 +95,13 @@ def journey_window_events(
             "incident.response_abandoned",
         }:
             points.add(at)
+    wanted = {entry.schedule_id for entry in entries}
+    origins: dict[str, DomainEvent] = {}
+    for event in history:
+        if event.kind in {"schedule.created", "schedule.rescheduled"}:
+            schedule_id = event.payload.get("schedule_id")
+            if schedule_id in wanted:
+                origins[str(schedule_id)] = event
     output: list[DomainEvent] = []
     active = current_journey(history)
     if active:
@@ -162,13 +169,8 @@ def journey_window_events(
             if end < at or (end == at and entry.ends_at) or state.location_id == entry.location_id:
                 continue
             # A plan created later in this batch cannot authorize an earlier trip.
-            origins = [
-                e
-                for e in history
-                if e.kind in {"schedule.created", "schedule.rescheduled"}
-                and e.payload.get("schedule_id") == entry.schedule_id
-            ]
-            if origins and origins[-1] not in visible:
+            plan_origin = origins.get(entry.schedule_id)
+            if plan_origin is not None and _event_moment(plan_origin) > at:
                 continue
             try:
                 duration = route_duration(
@@ -199,7 +201,7 @@ def journey_window_events(
                     "schedule_id": entry.schedule_id,
                     "simulated_at": at.isoformat(),
                 },
-                causation_id=origins[-1].event_id if origins else None,
+                causation_id=plan_origin.event_id if plan_origin is not None else None,
                 correlation_id=entry.schedule_id,
             )
             output.append(departure)
@@ -298,3 +300,8 @@ def _homeward_reason(
     if isinstance(arrived_at, str) and at - datetime.fromisoformat(arrived_at) >= LINGER_LIMIT:
         return "nothing more to do there"
     return None
+
+
+def _event_moment(event: DomainEvent) -> datetime:
+    raw = event.payload.get("simulated_at")
+    return raw if isinstance(raw, datetime) else datetime.fromisoformat(str(raw))
