@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
+from eidos.application.selfhood import selfhood_context
 from eidos.application.setbacks import setback_events
 from eidos.application.work_rota import work_rota_events
 from eidos.domain.events import DomainEvent
@@ -162,6 +163,7 @@ def test_he_sometimes_wakes_up_ill_rings_in_sick_and_gets_better() -> None:
         occurred = output[0]
         assert occurred.payload["kind"] == "illness"
         history = [*base, *output]
+        assert selfhood_context(history, at)["feeling_unwell"] == occurred.payload["text"]
         cancelled = [e for e in history if e.kind == "schedule.cancelled"]
         today = f"work-rota-{at.date().isoformat()}"
         assert (today in {e.payload["schedule_id"] for e in cancelled}) == (
@@ -180,6 +182,7 @@ def test_he_sometimes_wakes_up_ill_rings_in_sick_and_gets_better() -> None:
                 recovered = later
                 break
         assert recovered == occurred.payload["days"]
+        assert selfhood_context(history, at + timedelta(days=recovered))["feeling_unwell"] is None
         after = project_planning(history)
         for gap_day in range(1, recovered):
             sick_day = (at + timedelta(days=gap_day)).date().isoformat()

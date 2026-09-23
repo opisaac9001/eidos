@@ -842,6 +842,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             if abs(values[value_id] - base) >= VALUE_STEP - 1e-9
         ],
         "still_bothering_him": _still_bothering(history, simulated_at),
+        "feeling_unwell": _feeling_unwell(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -867,6 +868,13 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         if open_friction or simulated_at - at <= timedelta(days=5):
             bothering.append(str(event.payload.get("text")))
     return bothering[-3:]
+
+
+def _feeling_unwell(history: Sequence[DomainEvent]) -> str | None:
+    from eidos.application.setbacks import open_illness
+
+    illness = open_illness(history)
+    return None if illness is None else str(illness.payload.get("text"))
 
 
 def _saving_for(history: Sequence[DomainEvent]) -> dict[str, object] | None:

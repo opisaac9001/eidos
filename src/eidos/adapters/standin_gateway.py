@@ -383,6 +383,11 @@ def _standin_pathos_text(
         }.get(cadence, ("Yeah, it's been alright.",))
         return f"{openings[choice % len(openings)]} {last_memory}"
     if any(word in message for word in ("feel", "mood", "how are")):
+        identity = context.get("identity")
+        selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+        unwell = selfhood.get("feeling_unwell") if isinstance(selfhood, dict) else None
+        if isinstance(unwell, str) and unwell:
+            return f"Honestly, not great. {unwell} I'm keeping my head down till it passes."
         mood = str(context.get("mood", "quiet")).lower()
         endings = {
             "clipped": "A bit wound up. I'm okay, though.",

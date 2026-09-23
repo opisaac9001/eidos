@@ -181,7 +181,8 @@ def _latest_illness(history: Sequence[DomainEvent]) -> DomainEvent | None:
     )
 
 
-def _open_illness(history: Sequence[DomainEvent]) -> DomainEvent | None:
+def open_illness(history: Sequence[DomainEvent]) -> DomainEvent | None:
+    """The illness he is still getting over, if any."""
     latest = _latest_illness(history)
     if latest is None or _resolved(history, str(latest.payload["setback_id"])):
         return None
@@ -202,7 +203,7 @@ def _under_the_weather(
     if at.hour != 7:
         return []
     today = at.date().isoformat()
-    illness = _open_illness(history)
+    illness = open_illness(history)
     output: list[DomainEvent] = []
     if illness is not None:
         began = datetime.fromisoformat(str(illness.payload["simulated_at"]))
