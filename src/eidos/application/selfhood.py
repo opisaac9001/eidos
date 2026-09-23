@@ -825,6 +825,15 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
             for value_id, base in STARTING_VALUES.items()
         ],
         "mood_marks_recently": sum(1 for item in recent if item.value_id == "mood"),
+        "recent_moments": [
+            {
+                "at": item.at.isoformat(),
+                "value_id": item.value_id,
+                "direction": item.direction,
+                "label": item.label,
+            }
+            for item in recent[-10:][::-1]
+        ],
     }
 
 

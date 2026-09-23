@@ -1069,6 +1069,18 @@ function renderSelf() {
           )
           .join("")}</div>`
       : "");
+  const moments = self.recent_moments || [];
+  $("self-lately").innerHTML = moments.length
+    ? moments
+        .map(
+          (item) => `<li class="moment ${item.direction > 0 ? "toward" : "away"}">
+            <span class="moment-mark" aria-hidden="true">${item.direction > 0 ? "●" : "○"}</span>
+            <span class="moment-text">${esc(item.label)}</span>
+            <span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || (item.value_id === "mood" ? "Mood" : words(item.value_id)))} · ${date(item.at)}</span>
+          </li>`,
+        )
+        .join("")
+    : '<li class="empty-note">Nothing has left a mark yet.</li>';
   const possible = (self.aspirations || []).filter((item) => item.status === "active");
   $("self-possible").innerHTML = possible.length
     ? possible
