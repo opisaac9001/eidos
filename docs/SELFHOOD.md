@@ -46,12 +46,12 @@ weeks:
 
 | Kind | When | Example |
 |---|---|---|
-| tension | a held value (≥0.6) was neglected at least three times, at least as often as honoured | "Am I someone who follows through, or just someone who means to?" |
-| thriving | a value below 0.8 was honoured six or more times without neglect | "Is making things properly becoming who I am?" |
+| tension | a held value (≥0.6) was neglected at least three times, and at least 60% as often as honoured (real ambivalence counts) | "Am I someone who follows through, or just someone who means to?" |
+| thriving | a value below 0.8 was honoured six or more times, with neglect at most a fifth as often | "Is making things properly becoming who I am?" |
 | dormant | a strongly held value (≥0.7) went completely unlived for three weeks | "When did I last go and learn something just because I wanted to?" |
 | mood | two heavy stretches within a week | "What has been weighing on me lately?" |
 
-At most three questions are open at a time. They open at least two days apart, never twice
+A theme and kind he has already been through ranks lower than parts of his life not yet asked about. At most three questions are open at a time. They open at least two days apart, never twice
 on the same theme, and a closed theme cools off for 30 days. A question that sits untouched
 for three weeks, or has been revisited six times without an answer, fades: "set down
 without an answer" is a real, common outcome.

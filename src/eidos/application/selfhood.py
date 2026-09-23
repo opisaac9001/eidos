@@ -238,10 +238,12 @@ def _maybe_open_inquiry(state: SelfhoodState, simulated_at: datetime) -> DomainE
                 candidates.append((2.0 + len(week), theme, "tension", week))
             continue
         held = values[theme]
-        if held >= 0.6 and len(neglected) >= 3 and len(neglected) >= len(honoured):
+        # Proportions, not absolutes: a busy life honours and neglects the same value often.
+        # Real ambivalence (finishing some things, abandoning others) is itself worth asking.
+        if held >= 0.6 and len(neglected) >= 3 and len(neglected) >= 0.6 * len(honoured):
             candidates.append((held * len(neglected), theme, "tension", neglected))
-        elif held < 0.8 and len(honoured) >= 6 and not neglected:
-            candidates.append((0.5 * len(honoured) * (1 - held), theme, "thriving", honoured))
+        elif held < 0.8 and len(honoured) >= 6 and len(neglected) <= 0.2 * len(honoured):
+            candidates.append((0.5 * len(honoured) * (1 - held), theme, "thriving", honoured[-5:]))
         elif (
             held >= 0.7
             and not recent
@@ -251,6 +253,12 @@ def _maybe_open_inquiry(state: SelfhoodState, simulated_at: datetime) -> DomainE
             candidates.append((held, theme, "dormant", []))
     if not candidates:
         return None
+    asked = {(item.theme, item.kind) for item in state.inquiries.values()}
+    # A question he has already lived through gives way to parts of his life not yet asked.
+    candidates = [
+        (score * (0.25 if (theme, kind) in asked else 1.0), theme, kind, evidence)
+        for score, theme, kind, evidence in candidates
+    ]
     _, theme, kind, evidence = max(candidates, key=lambda item: (item[0], item[1]))
     sources = [item.event_id for item in evidence[-5:]] or list(state.reflection_ids[-3:])
     if not sources:

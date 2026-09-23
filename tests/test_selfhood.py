@@ -365,3 +365,30 @@ class StandInHonestyTests(unittest.TestCase):
             time_budget={"next_plan": "Shift at the repair workshop"},
         )
         self.assertIn("Ellis", reply)
+
+
+class ProportionalQuestionTests(unittest.TestCase):
+    def history(self, honoured: int, neglected: int, kind_plus: str, kind_minus: str):
+        events = [identity_established_event(at(0).isoformat())]
+        for day in range(honoured):
+            events.append(event(kind_plus, at(day + 1, 10), activity="work"))
+        for day in range(neglected):
+            events.append(event(kind_minus, at(day + 1, 15), schedule_id=f"s{day}"))
+        return events
+
+    def opened(self, events):
+        return [
+            item
+            for item in selfhood_daily_events(events, at(15, 20))
+            if item.kind == "self.inquiry_opened"
+        ]
+
+    def test_real_ambivalence_about_a_value_is_worth_asking(self) -> None:
+        events = self.history(10, 7, "activity.completed", "activity.execution_unfinished")
+        (opened,) = self.opened(events)
+        self.assertEqual((opened.payload["theme"], opened.payload["kind"]), ("craft", "tension"))
+
+    def test_a_value_he_mostly_lives_can_be_thriving_despite_one_slip(self) -> None:
+        events = self.history(12, 1, "activity.completed", "activity.execution_unfinished")
+        (opened,) = self.opened(events)
+        self.assertEqual((opened.payload["theme"], opened.payload["kind"]), ("craft", "thriving"))
