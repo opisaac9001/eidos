@@ -127,6 +127,7 @@ def sleep_and_need_events(
     history: Sequence[DomainEvent] = (),
     *,
     pathos_busy: bool = False,
+    in_company: bool = False,
 ) -> tuple[list[DomainEvent], PathosState]:
     """Apply selected sleep or a legacy circadian fallback and hourly needs."""
     events: list[DomainEvent] = []
@@ -160,7 +161,8 @@ def sleep_and_need_events(
     deltas = (
         {
             "rest": -0.03,
-            "connection": -0.012,
+            # An hour among people he knows tops up company rather than draining it.
+            "connection": 0.015 if in_company else -0.012,
             "curiosity": -0.003,
             "mastery": -0.006,
             "hunger": 0.045,

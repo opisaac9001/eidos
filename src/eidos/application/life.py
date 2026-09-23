@@ -3,7 +3,7 @@
 import asyncio
 import math
 from datetime import date, datetime, timedelta
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 from uuid import UUID, uuid4
 
 from eidos.application.activity_execution import (
@@ -166,6 +166,7 @@ from eidos.domain.emotions import (
 )
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState, project_finances
+from eidos.domain.folding import events_of
 from eidos.domain.household import HouseholdState, project_household
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
@@ -185,6 +186,7 @@ from eidos.domain.routine import (
     needs_adjusted_beat,
 )
 from eidos.domain.scenes import (
+    Scene,
     SceneEndProposal,
     SceneEndReason,
     ScenePrivacy,
@@ -1776,6 +1778,9 @@ class Life:
                 current,
                 history + pending,
                 pathos_busy=pathos_busy,
+                in_company=False
+                if self.authored_scenario
+                else _in_company(history + pending, state, current, active_scenes),
             )
             pending.extend(need_events)
             recovery, state = baseline_affect_events(
@@ -4115,6 +4120,39 @@ class Life:
         self._save_beliefs(committed)
         self._save_relationships(committed)
         self._save_consolidation_index(committed)
+
+
+def _in_company(
+    history: Sequence[DomainEvent],
+    state: PathosState,
+    now: datetime,
+    scenes: Iterable[Scene],
+) -> bool:
+    """Whether this waking hour was spent among people: company is felt, not just met."""
+    if not state.awake or state.location_id == "in_transit":
+        return False
+    if any(
+        scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
+        for scene in scenes
+    ):
+        return True
+    known = pathos_known_person_ids(history)
+    if state.location_id != "home":
+        people = project_npcs(history, now).people
+        if any(
+            person_id in known and person.location_id == state.location_id
+            for person_id, person in people.items()
+        ):
+            return True
+    hour_ago = now - timedelta(hours=1)
+    for event in reversed(events_of(history, "conversation.message")[-6:]):
+        at = event.payload.get("simulated_at")
+        moment = at if isinstance(at, datetime) else datetime.fromisoformat(str(at))
+        if moment < hour_ago:
+            break
+        if event.payload.get("speaker") == "pathos":
+            return True
+    return False
 
 
 ENCOUNTER_COOLDOWN = timedelta(hours=3)
