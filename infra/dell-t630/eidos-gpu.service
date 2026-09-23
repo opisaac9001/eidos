@@ -1,0 +1,15 @@
+[Unit]
+Description=Pathos GPU persistence and commissioning power limits
+After=systemd-modules-load.service
+Before=ollama@pathos.service ollama@world.service ollama@cognition.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nvidia-smi -pm 1
+ExecStart=/usr/bin/nvidia-smi -i 00000000:83:00.0 -pl 180
+ExecStart=/usr/bin/nvidia-smi -i 00000000:84:00.0 -pl 180
+ExecStart=/usr/bin/nvidia-smi -i 00000000:04:00.0 -pl 140
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,668 @@
+{
+  "synthetic": true,
+  "model": "qwen2.5:7b",
+  "rows": [
+    {
+      "case": "scene_0",
+      "seconds": 0.62,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "834a9ade-2a1f-4f86-a4e9-10c4493fc674",
+            "latency_ms": 622.03,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 393,
+            "output_tokens": 22,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "834a9ade-2a1f-4f86-a4e9-10c4493fc674",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"The rain's a symphony outside. Care to join me for a cup?\"}",
+          "usage": {
+            "prompt_tokens": 393,
+            "prompt_tokens_details": {
+              "cached_tokens": 5
+            },
+            "completion_tokens": 22,
+            "total_tokens": 415
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "The rain's a symphony outside. Care to join me for a cup?"
+    },
+    {
+      "case": "scene_1",
+      "seconds": 0.57,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "c8390d28-393c-4fbf-95e8-d56e67c0d858",
+            "latency_ms": 565.39,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 411,
+            "output_tokens": 22,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "c8390d28-393c-4fbf-95e8-d56e67c0d858",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I swear, the rain's trying to keep us in here all day long.\"}",
+          "usage": {
+            "prompt_tokens": 411,
+            "prompt_tokens_details": {
+              "cached_tokens": 386
+            },
+            "completion_tokens": 22,
+            "total_tokens": 433
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Got soaked on the way here."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "I swear, the rain's trying to keep us in here all day long."
+    },
+    {
+      "case": "scene_2",
+      "seconds": 0.49,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "df666b95-6119-4b4d-a445-d4ca7981f97d",
+            "latency_ms": 494.08,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 395,
+            "output_tokens": 27,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "df666b95-6119-4b4d-a445-d4ca7981f97d",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Hey Pathos, quick fix needed on that bench leg before the meeting. Can you whip it up?\"}",
+          "usage": {
+            "prompt_tokens": 395,
+            "prompt_tokens_details": {
+              "cached_tokens": 335
+            },
+            "completion_tokens": 27,
+            "total_tokens": 422
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": true,
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Hey Pathos, quick fix needed on that bench leg before the meeting. Can you whip it up?"
+    },
+    {
+      "case": "scene_3",
+      "seconds": 0.42,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "2825a74b-217f-4c25-a800-e5777e876d42",
+            "latency_ms": 418.39,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 413,
+            "output_tokens": 23,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "2825a74b-217f-4c25-a800-e5777e876d42",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Thanks, but I've got it. Let's focus on the new project instead.\"}",
+          "usage": {
+            "prompt_tokens": 413,
+            "prompt_tokens_details": {
+              "cached_tokens": 388
+            },
+            "completion_tokens": 23,
+            "total_tokens": 436
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": true,
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Want me to hold it steady?"
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Thanks, but I've got it. Let's focus on the new project instead."
+    },
+    {
+      "case": "scene_4",
+      "seconds": 0.41,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "c7194127-9712-4940-a2b4-d538eda65534",
+            "latency_ms": 413.45,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 395,
+            "output_tokens": 22,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "c7194127-9712-4940-a2b4-d538eda65534",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Want to check out that new sci-fi series? It's got great reviews!\"}",
+          "usage": {
+            "prompt_tokens": 395,
+            "prompt_tokens_details": {
+              "cached_tokens": 335
+            },
+            "completion_tokens": 22,
+            "total_tokens": 417
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Want to check out that new sci-fi series? It's got great reviews!"
+    },
+    {
+      "case": "scene_5",
+      "seconds": 0.52,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "d7009f56-add4-435f-96aa-437c867e9aa8",
+            "latency_ms": 517.15,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 413,
+            "output_tokens": 18,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "d7009f56-add4-435f-96aa-437c867e9aa8",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"No worries, just wanted to catch up before you go.\"}",
+          "usage": {
+            "prompt_tokens": 413,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 18,
+            "total_tokens": 431
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "No worries, just wanted to catch up before you go."
+    },
+    {
+      "case": "world_0",
+      "seconds": 0.48,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-e141355f-36ef-45f9-bad0-bdad74a76cbe",
+            "director_id": "moira",
+            "source_event_id": "e141355f-36ef-45f9-bad0-bdad74a76cbe",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "b1f2ce2a-ffef-4ee2-b454-ec48b0d493a0",
+            "latency_ms": 484.5,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-e141355f-36ef-45f9-bad0-bdad74a76cbe",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 550,
+            "prompt_tokens_details": {
+              "cached_tokens": 17
+            },
+            "completion_tokens": 10,
+            "total_tokens": 560
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_1",
+      "seconds": 0.29,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-2cde8090-2e6c-4e9c-96dc-20211d432a26",
+            "director_id": "moira",
+            "source_event_id": "2cde8090-2e6c-4e9c-96dc-20211d432a26",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "4f090279-3e61-4a7b-a9fc-ba88a1d0a4c3",
+            "latency_ms": 293.95,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-2cde8090-2e6c-4e9c-96dc-20211d432a26",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 556,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 566
+          }
+        }
+      ],
+      "context": {
+        "location": "park",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_2",
+      "seconds": 0.29,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-748fc30c-4b1b-44f9-a9a3-6b3af83407c1",
+            "director_id": "moira",
+            "source_event_id": "748fc30c-4b1b-44f9-a9a3-6b3af83407c1",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "e1f4d04b-a465-4cbd-bd3a-b70e763860fd",
+            "latency_ms": 288.39,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-748fc30c-4b1b-44f9-a9a3-6b3af83407c1",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 548,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 558
+          }
+        }
+      ],
+      "context": {
+        "location": "workshop",
+        "cause_kind": "npc.activity_recorded"
+      }
+    },
+    {
+      "case": "world_3",
+      "seconds": 0.26,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-c2bec0e2-480b-4cd3-b9f9-f71b8500b38e",
+            "director_id": "moira",
+            "source_event_id": "c2bec0e2-480b-4cd3-b9f9-f71b8500b38e",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "f716b3f8-64c5-483b-97fa-374b862d4907",
+            "latency_ms": 262.32,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-c2bec0e2-480b-4cd3-b9f9-f71b8500b38e",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 551,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 561
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "object.condition_changed"
+      }
+    }
+  ],
+  "no_cause_and_repeated_cause_checks": "passed"
+}

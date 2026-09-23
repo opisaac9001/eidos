@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.npc_agency import autonomous_npc_plan_events
-from eidos.application.offscreen import npc_world_events
+from eidos.application.offscreen import authored_npc_world_events as npc_world_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.npc_agency import parse_npc_agency_candidate
 from eidos.domain.npcs import project_npcs

@@ -43,8 +43,8 @@ def npc_agency_output_schema(location_ids: list[str]) -> dict[str, object]:
             "motivation": {"type": "string", "minLength": 8, "maxLength": 240},
             "action": {"type": "string", "pattern": _SLUG.pattern},
             "location_id": {"type": "string", "enum": location_ids},
-            "day_offset": {"type": "integer", "minimum": 1, "maximum": 3},
-            "scheduled_hour": {"type": "integer", "enum": [0, 6, 12, 18]},
+            "day_offset": {"type": "integer", "minimum": 0, "maximum": 3},
+            "scheduled_hour": {"type": "integer", "minimum": 0, "maximum": 23},
         },
     }
 
@@ -70,10 +70,10 @@ def parse_npc_agency_candidate(content: str) -> NPCAgencyCandidate:
     if not isinstance(location, str) or not location:
         raise ProposalRejected("invalid_location", "location_id must be a non-empty string")
     day_offset, hour = value["day_offset"], value["scheduled_hour"]
-    if isinstance(day_offset, bool) or not isinstance(day_offset, int) or not 1 <= day_offset <= 3:
-        raise ProposalRejected("invalid_day", "day_offset must be from one to three")
-    if isinstance(hour, bool) or not isinstance(hour, int) or hour not in {0, 6, 12, 18}:
-        raise ProposalRejected("invalid_hour", "scheduled_hour must match an offscreen tick")
+    if isinstance(day_offset, bool) or not isinstance(day_offset, int) or not 0 <= day_offset <= 3:
+        raise ProposalRejected("invalid_day", "day_offset must be from zero to three")
+    if isinstance(hour, bool) or not isinstance(hour, int) or not 0 <= hour <= 23:
+        raise ProposalRejected("invalid_hour", "scheduled_hour must be from zero to 23")
     return NPCAgencyCandidate(
         value["activity_type"],
         value["title"].strip(),

@@ -154,6 +154,7 @@ def resolve_world_event(
         return reject("past_start", "A world event cannot begin in the past")
     if proposal.event_kind in {WorldEventKind.COMMUNITY, WorldEventKind.AMBIENT} and (
         proposal.starts_at < simulated_at + timedelta(hours=1)
+        and proposal.source != "causal-world-response"
     ):
         return reject(
             "insufficient_lead_time", "Scheduled events need at least one hour of lead time"
@@ -169,7 +170,7 @@ def resolve_world_event(
         ),
         None,
     )
-    if last_same is not None:
+    if last_same is not None and proposal.source != "causal-world-response":
         previous = datetime.fromisoformat(str(last_same.payload["starts_at"]))
         cooldown = timedelta(
             hours=6

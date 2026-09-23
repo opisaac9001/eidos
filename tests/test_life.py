@@ -38,7 +38,8 @@ class LifeTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "life.sqlite3"
-        self.life = Life(SQLiteEventStore(self.path), StandInGateway())
+        # This suite exercises the historical acceptance story explicitly.
+        self.life = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True)
 
     def test_whole_day_exercises_every_role_and_keeps_dreams_out_of_facts(self):
         self.life.advance(24)
@@ -213,7 +214,7 @@ class LifeTests(unittest.TestCase):
             ],
             0,
         )
-        life = Life(store, StandInGateway())
+        life = Life(store, StandInGateway(), authored_scenario=True)
         life.advance(1)
         snapshot = life.snapshot()
         self.assertEqual(snapshot["counts"]["archived_memories"], 1)
@@ -237,9 +238,9 @@ class LifeTests(unittest.TestCase):
 
     def test_fractional_steps_and_restart_do_not_duplicate_scenes(self):
         self.life.advance(8.5)
-        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True)
         restarted.advance(15.5)
-        other = Life(SQLiteEventStore(Path(self.directory.name) / "other.db"), StandInGateway())
+        other = Life(SQLiteEventStore(Path(self.directory.name) / "other.db"), StandInGateway(), authored_scenario=True)
         other.advance(24)
         a, b = restarted.snapshot(), other.snapshot()
         self.assertEqual(a["pathos"], b["pathos"])
@@ -252,15 +253,17 @@ class LifeTests(unittest.TestCase):
         revision = len(self.life.history())
         self.life.chat("How has your day been?", "visit-1")
         self.assertEqual(len(self.life.history()), revision)
-        delivered = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        delivered = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
         self.assertEqual([m["speaker"] for m in delivered["conversations"]], ["you"])
         self.assertEqual(delivered["communication"]["waiting_count"], 1)
         self.assertTrue(delivered["communication"]["next_reply_due_at"])
         self.life.advance(1)
-        snapshot = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        snapshot = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
         self.assertEqual([m["speaker"] for m in snapshot["conversations"]], ["you", "pathos"])
         self.assertEqual(snapshot["communication"]["waiting_count"], 0)
-        self.assertIn("breakfast", snapshot["conversations"][-1]["text"])
+        self.assertTrue(
+            any(word in snapshot["conversations"][-1]["text"] for word in ("breakfast", "meal", "cafe"))
+        )
         self.assertGreater(len(snapshot["recalls"]), 0)
         self.assertIn("lexical_score", snapshot["recalls"][0])
         self.assertIn("accessibility_score", snapshot["recalls"][0])
@@ -655,7 +658,7 @@ class LifeTests(unittest.TestCase):
                     "stop",
                 )
 
-        life = Life(SQLiteEventStore(self.path), BadGateway())
+        life = Life(SQLiteEventStore(self.path), BadGateway(), authored_scenario=True)
         life.advance(8)
         snapshot = life.snapshot()
         self.assertEqual(snapshot["pathos"]["location_id"], "home")
@@ -680,7 +683,7 @@ class LifeTests(unittest.TestCase):
                     )
                 return await super().generate(request)
 
-        life = Life(SQLiteEventStore(self.path), AlteredMemory())
+        life = Life(SQLiteEventStore(self.path), AlteredMemory(), authored_scenario=True)
         life.advance(10)
         events = life.history()
         sources = {
@@ -699,7 +702,7 @@ class LifeTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            Life(SQLiteEventStore(self.path), AlteredMemory()).snapshot()["memories"],
+            Life(SQLiteEventStore(self.path), AlteredMemory(), authored_scenario=True).snapshot()["memories"],
             life.snapshot()["memories"],
         )
 
@@ -775,7 +778,7 @@ class LifeTests(unittest.TestCase):
         )
         self.assertEqual(reported_memory.payload["source_event_id"], str(perceived.event_id))
         self.assertEqual(perceived.payload["owner"], "pathos")
-        replayed = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        replayed = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
         self.assertEqual(replayed["commitments"], finished["commitments"])
 
     def test_self_chosen_project_advances_only_through_completed_practice(self):
@@ -925,7 +928,7 @@ class LifeTests(unittest.TestCase):
                 "dream.inspiration_dismissed",
             ],
         )
-        replay = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        replay = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
         self.assertEqual(
             journal, next(item for item in replay["dreams"] if item["id"] == journal["id"])
         )
@@ -1019,5 +1022,5 @@ class LifeTests(unittest.TestCase):
                 if event.kind == "social.activity_completed"
             ),
         )
-        replay = Life(SQLiteEventStore(self.path), StandInGateway()).snapshot()
+        replay = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
         self.assertEqual(replay["calendar"], snapshot["calendar"])

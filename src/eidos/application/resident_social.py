@@ -180,7 +180,10 @@ async def _advance(
                     "scene_audience": audience_id,
                     "scene_topic": scene.topic_id.replace("-", " "),
                     "prior_turns": [
-                        str(event.payload["text"])
+                        {
+                            "speaker": str(event.payload["actor_id"]),
+                            "text": str(event.payload["text"]),
+                        }
                         for event in combined
                         if event.kind == "scene.turn_taken"
                         and event.payload.get("scene_id") == scene_id

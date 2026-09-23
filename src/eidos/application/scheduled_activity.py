@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from hashlib import sha256
 from typing import Mapping, Sequence
 from uuid import UUID
 
+from eidos.application.activity_execution import activity_effort
+from eidos.application.nourishment import nourishment_events, planned_meal_kind
 from eidos.domain.actions import ActionKind, ActionProposal, resolve_action
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import CalendarEntry, PlanningState
+from eidos.domain.state import PathosState
 
 SCHEDULED_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND, ActionKind.REPAIR}
 SCHEDULED_ACTION_VALUES = {action.value for action in SCHEDULED_ACTIONS}
@@ -25,6 +29,9 @@ def scheduled_activity_events(
     actor_locations: Mapping[str, str] | None = None,
     cognitive_history: Sequence[DomainEvent] = (),
     cognitive_capacity: float = 1.0,
+    require_execution_evidence: bool = False,
+    actor_state: PathosState | None = None,
+    available_pence: int | None = None,
 ) -> list[DomainEvent]:
     """Complete due non-conversation plans and their linked obligations."""
 
@@ -41,7 +48,12 @@ def scheduled_activity_events(
             if entry.activity_type is not None
             else (starts_at if action is ActionKind.ATTEND else ends_at)
         )
-        if simulated_at < due:
+        effort = (
+            activity_effort(cognitive_history, entry, simulated_at)
+            if require_execution_evidence
+            else None
+        )
+        if simulated_at < due and not (effort is not None and effort["ready"]):
             continue
         intention = next(
             (
@@ -57,6 +69,39 @@ def scheduled_activity_events(
         )
         if intention is None:
             continue
+        if require_execution_evidence:
+            assert effort is not None
+            if not effort["ready"]:
+                if simulated_at >= ends_at:
+                    unfinished = next(
+                        (
+                            e
+                            for e in reversed(cognitive_history)
+                            if e.kind == "activity.execution_unfinished"
+                            and e.payload.get("schedule_id") == entry.schedule_id
+                        ),
+                        None,
+                    )
+                    # Losing a work window does not erase the desire, abandon the
+                    # whole project, or discharge a promise. A new window requires
+                    # a separate choice; the partial effort remains in history.
+                    missed = [
+                        DomainEvent(
+                            "schedule.interrupted",
+                            "pathos",
+                            {
+                                "schedule_id": entry.schedule_id,
+                                "reason": "The reserved time ended without enough actual activity; unfinished work remains recorded.",
+                                "simulated_at": simulated_at.isoformat(),
+                            },
+                            causation_id=unfinished.event_id if unfinished else None,
+                            correlation_id=entry.schedule_id,
+                        )
+                    ]
+                    output.extend(missed)
+                    for event in missed:
+                        projected = projected.apply(event)
+                continue
         if prospective_memory_lapse(
             entry,
             intention.priority,
@@ -115,6 +160,61 @@ def scheduled_activity_events(
             for event in companion_consequences:
                 projected = projected.apply(event)
             continue
+        meal_kind = planned_meal_kind(entry)
+        meal_consequences: list[DomainEvent] = []
+        if meal_kind is not None:
+            if actor_state is None or available_pence is None:
+                reason = "The meal could not be verified against his body and available food."
+                failed = _failed_open_plan_events(
+                    projected,
+                    entry,
+                    intention.intention_id,
+                    reason,
+                    simulated_at,
+                )
+                output.extend(failed)
+                for event in failed:
+                    projected = projected.apply(event)
+                continue
+            meal_state = replace(
+                actor_state,
+                location_id=actor_location_id,
+                simulated_at=simulated_at,
+            )
+            meal_consequences = nourishment_events(
+                cognitive_history,
+                meal_state,
+                simulated_at,
+                projected,
+                available_pence,
+                pathos_busy=False,
+                planned_schedule_id=entry.schedule_id,
+                planned_meal_kind=meal_kind,
+            )
+            if not any(event.kind == "meal.eaten" for event in meal_consequences):
+                unavailable = next(
+                    (event for event in meal_consequences if event.kind == "meal.unavailable"),
+                    None,
+                )
+                reason = (
+                    str(unavailable.payload["reason"])
+                    if unavailable is not None
+                    else "By then, eating no longer answered a present bodily need."
+                )
+                if unavailable is not None:
+                    output.append(unavailable)
+                failed = _failed_open_plan_events(
+                    projected,
+                    entry,
+                    intention.intention_id,
+                    reason,
+                    simulated_at,
+                    causation_id=unavailable.event_id if unavailable is not None else None,
+                )
+                output.extend(failed)
+                for event in failed:
+                    projected = projected.apply(event)
+                continue
         if action is ActionKind.REPAIR and entry.schedule_id.startswith("maintain-introduced-"):
             success_score = max(0.1, min(0.9, 0.25 + 0.65 * repair_mastery))
             sample = _sample(f"repair-attempt-{entry.schedule_id}")
@@ -221,6 +321,7 @@ def scheduled_activity_events(
             actual_revision=actual_revision + len(output),
             simulated_at=simulated_at,
             goal_progress_delta=entry.goal_progress_delta or 0.5,
+            execution_complete=bool(effort is not None and effort["ready"]),
         )
         output.extend(resolution.events)
         for event in resolution.events:
@@ -244,6 +345,9 @@ def scheduled_activity_events(
             if event.kind
             == ("object.condition_changed" if action is ActionKind.REPAIR else "activity.completed")
         )
+        output.extend(meal_consequences)
+        for event in meal_consequences:
+            projected = projected.apply(event)
         correlation = entry.commitment_id or entry.goal_id or entry.schedule_id
 
         if entry.activity_type is not None:
@@ -421,9 +525,7 @@ def prospective_memory_lapse(
     strength = float(
         min(
             1.0,
-            intention_priority
-            + 0.12 * min(3, reminders)
-            + 0.15 * cognitive_capacity,
+            intention_priority + 0.12 * min(3, reminders) + 0.15 * cognitive_capacity,
         )
     )
     lapse_risk = max(0.03, 0.2 - 0.18 * strength)

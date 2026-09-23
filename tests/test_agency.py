@@ -5,14 +5,23 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
-from eidos.application.agency import autonomous_activity_events
+from eidos.application.agency import (
+    _deliberation_schema,
+    _parse_deliberation_choice,
+    _validate_choice_alignment,
+    autonomous_activity_events,
+)
+from eidos.application.lived_activity_window import lived_activity_window
+from eidos.application.nourishment import provision_foundation_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.actions import ActionKind
 from eidos.domain.agency import AgencyCandidate, parse_agency_candidate, resolve_agency_candidate
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import PlanningState
+from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.proposals import ProposalRejected
+from eidos.domain.state import PathosState
 from eidos.domain.world_catalog import project_world_catalog
+from eidos.ports.model_gateway import ModelResponse
 
 
 class CapturingStandIn(StandInGateway):
@@ -26,6 +35,44 @@ class CapturingStandIn(StandInGateway):
 
 class AgencyTests(unittest.TestCase):
     now = datetime(2026, 1, 5, 10, tzinfo=timezone.utc)
+
+    def test_quiet_impulses_cannot_be_encoded_as_new_pursuits(self):
+        field = {
+            "attended_impulses": [
+                {"impulse_id": "quiet:none", "kind": "inaction"},
+                {"impulse_id": "continue:letter", "kind": "continuation"},
+                {"impulse_id": "protect:shift", "kind": "prospective"},
+                {"impulse_id": "thought:map", "kind": "thought"},
+            ]
+        }
+        pursue = _deliberation_schema(field)["anyOf"][0]
+        self.assertEqual(pursue["properties"]["chosen_impulse_id"]["enum"], ["thought:map"])
+        quiet_schema = _deliberation_schema(
+            {"attended_impulses": [{"impulse_id": "quiet:none", "kind": "inaction"}]}
+        )
+        self.assertEqual(len(quiet_schema["anyOf"]), 2)
+        self.assertTrue(
+            all("chosen_impulse_id" not in branch["properties"] for branch in quiet_schema["anyOf"])
+        )
+        with self.assertRaisesRegex(ProposalRejected, "never reached attention"):
+            _parse_deliberation_choice(
+                {
+                    "mode": "pursue",
+                    "chosen_impulse_id": "continue:letter",
+                    "intention": "Keep writing the letter.",
+                },
+                field,
+            )
+
+    def test_known_execution_contracts_cannot_hijack_an_unrelated_choice(self):
+        thought = {"kind": "thought", "target_id": "thought-1"}
+        with self.assertRaisesRegex(ProposalRejected, "Dishes were not"):
+            _validate_choice_alignment("household_dishes", thought)
+        with self.assertRaisesRegex(ProposalRejected, "Food was not"):
+            _validate_choice_alignment("prepare_and_eat_meal", thought)
+        question = {**thought, "epistemic_status": "planning_question"}
+        with self.assertRaisesRegex(ProposalRejected, "chosen question"):
+            _validate_choice_alignment("letter_writing", question)
 
     def candidate(self, companion_id=None):
         return AgencyCandidate(
@@ -67,10 +114,107 @@ class AgencyTests(unittest.TestCase):
             "companion_id": "none",
             "starts_in_hours": 24,
             "duration_hours": 1,
+            "estimate_confidence": 0.6,
             "priority": 0.4,
         }
         with self.assertRaisesRegex(ProposalRejected, "cannot claim"):
             parse_agency_candidate(json.dumps(value))
+
+    def test_scheduler_cannot_replace_a_chosen_food_impulse_with_a_chore(self):
+        class DriftingGateway(StandInGateway):
+            async def generate(self, request):
+                context = json.loads(request.messages[0].content)
+                if request.capability == "pathos_deliberation":
+                    hunger = next(
+                        item
+                        for item in context["choice_field"]["attended_impulses"]
+                        if item.get("target_id") == "hunger"
+                    )
+                    return ModelResponse(
+                        json.dumps(
+                            {
+                                "mode": "pursue",
+                                "chosen_impulse_id": hunger["impulse_id"],
+                                "intention": "Get something to eat.",
+                            }
+                        ),
+                        "test",
+                        "test",
+                        "stop",
+                    )
+                return ModelResponse(
+                    json.dumps(
+                        {
+                            "activity_type": "household_dishes",
+                            "title": "Wash a few dishes",
+                            "motivation": "Do the easiest concrete thing instead.",
+                            "action": "work",
+                            "location_id": "home",
+                            "resource_id": "none",
+                            "companion_id": "none",
+                            "starts_in_hours": 0,
+                            "duration_hours": 0.25,
+                            "estimate_confidence": 0.7,
+                            "priority": 0.5,
+                        }
+                    ),
+                    "test",
+                    "test",
+                    "stop",
+                )
+
+        events = asyncio.run(
+            autonomous_activity_events(
+                [
+                    DomainEvent(
+                        "thought.recorded",
+                        "pathos",
+                        {"text": "I am properly hungry.", "simulated_at": self.now.isoformat()},
+                    )
+                ],
+                self.now,
+                1,
+                DriftingGateway(),
+                planning=PlanningState(),
+                catalog=project_world_catalog([]),
+                needs={"hunger": 0.95, "energy": 0.7, "rest": 0.7},
+                emotion={},
+                values={},
+                preferences=(),
+                traits={},
+                memories=(),
+                current_location_id="home",
+            )
+        )
+        failure = next(event for event in events if event.kind == "role.failed")
+        self.assertEqual(failure.payload["error_code"], "choice_drift")
+        self.assertNotIn("schedule.created", [event.kind for event in events])
+
+    def test_past_completion_in_a_motive_needs_recent_matching_execution(self):
+        value = {
+            "activity_type": "short_walk",
+            "title": "Take a short walk",
+            "motivation": "Having finished the letter, get a little air.",
+            "action": "attend",
+            "location_id": "park",
+            "resource_id": "none",
+            "companion_id": "none",
+            "starts_in_hours": 1,
+            "duration_hours": 0.5,
+            "estimate_confidence": 0.7,
+            "priority": 0.4,
+        }
+        with self.assertRaisesRegex(ProposalRejected, "cannot claim"):
+            parse_agency_candidate(json.dumps(value))
+        candidate = parse_agency_candidate(
+            json.dumps(value), completed_activity_titles=["Write a letter to Rowan"]
+        )
+        self.assertEqual(candidate.activity_type, "short_walk")
+        with self.assertRaisesRegex(ProposalRejected, "cannot claim"):
+            parse_agency_candidate(
+                json.dumps({**value, "motivation": "Having finished the repair, get some air."}),
+                completed_activity_titles=["Write a letter to Rowan"],
+            )
 
     def test_feasible_open_ended_idea_becomes_plan_not_accomplishment(self):
         result, state = self.resolved()
@@ -83,6 +227,216 @@ class AgencyTests(unittest.TestCase):
         self.assertNotIn("activity.completed", kinds)
         entry = state.calendar["pathos-agency-2026-01-05-schedule"]
         self.assertEqual(entry.activity_type, "texture_noticing")
+
+    def test_chosen_meal_needs_real_provisions_and_changes_the_body(self):
+        provisions = provision_foundation_events([], self.now)
+        planning = PlanningState()
+        for event in provisions:
+            planning = planning.apply(event)
+        candidate = AgencyCandidate(
+            "prepare_and_eat_meal",
+            "Make a quick breakfast",
+            "Hunger is becoming hard to ignore this morning.",
+            ActionKind.WORK,
+            "home",
+            None,
+            None,
+            0,
+            0.25,
+            0.8,
+            0.65,
+        )
+        accepted = resolve_agency_candidate(
+            candidate,
+            proposal_id="chosen-breakfast",
+            state=planning,
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=len(provisions),
+            simulated_at=self.now,
+        )
+        self.assertTrue(accepted.accepted)
+        for event in accepted.events:
+            planning = planning.apply(event)
+        due = self.now + timedelta(minutes=15)
+        history = [*provisions, *accepted.events]
+        events = scheduled_activity_events(
+            planning,
+            actor_location_id="home",
+            simulated_at=due,
+            actual_revision=len(history),
+            cognitive_history=history,
+            actor_state=PathosState(
+                simulated_at=due,
+                location_id="home",
+                awake=True,
+                hunger=0.7,
+                energy=0.45,
+            ),
+            available_pence=12_000,
+        )
+        self.assertIn("activity.completed", [event.kind for event in events])
+        self.assertIn("meal.eaten", [event.kind for event in events])
+        self.assertIn("object.stock_changed", [event.kind for event in events])
+        meal = next(event for event in events if event.kind == "meal.eaten")
+        self.assertEqual(meal.payload["source_schedule_id"], "chosen-breakfast-schedule")
+        self.assertLess(float(meal.payload["hunger_after"]), 0.7)
+
+    def test_chosen_meal_crosses_execution_window_before_physical_completion(self):
+        provisions = provision_foundation_events([], self.now)
+        history = [
+            *provisions,
+            DomainEvent("sleep.ended", "pathos", {"simulated_at": self.now.isoformat()}),
+            DomainEvent(
+                "needs.changed",
+                "pathos",
+                {"hunger": 0.7, "simulated_at": self.now.isoformat()},
+            ),
+        ]
+        candidate = AgencyCandidate(
+            "prepare_and_eat_meal",
+            "Make and eat breakfast",
+            "I am hungry enough to stop and eat before carrying on.",
+            ActionKind.WORK,
+            "home",
+            "household-provisions",
+            None,
+            0,
+            0.25,
+            0.8,
+            1.0,
+        )
+        accepted = resolve_agency_candidate(
+            candidate,
+            proposal_id="lived-breakfast-0",
+            state=project_planning(history),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=len(history),
+            simulated_at=self.now,
+        )
+        self.assertTrue(accepted.accepted)
+        history.extend(accepted.events)
+        events = lived_activity_window(
+            history,
+            project_planning(history),
+            project_world_catalog(history),
+            self.now,
+            self.now + timedelta(minutes=15),
+            repair_mastery=1,
+            available_pence=12_000,
+        )
+        kinds = [event.kind for event in events]
+        self.assertIn("activity.execution_started", kinds)
+        self.assertIn("activity.completed", kinds)
+        self.assertIn("meal.eaten", kinds)
+        self.assertIn("schedule.completed", kinds)
+        self.assertLess(kinds.index("activity.completed"), kinds.index("meal.eaten"))
+
+    def test_home_meal_is_rejected_before_booking_when_cupboard_is_empty(self):
+        candidate = AgencyCandidate(
+            "prepare_and_eat_meal",
+            "Make a quick breakfast",
+            "Hunger is becoming hard to ignore this morning.",
+            ActionKind.WORK,
+            "home",
+            None,
+            None,
+            0,
+            0.25,
+            0.8,
+            0.65,
+        )
+        result = resolve_agency_candidate(
+            candidate,
+            proposal_id="impossible-breakfast",
+            state=PlanningState(),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=0,
+            simulated_at=self.now,
+        )
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.code, "resource_unavailable")
+
+    def test_irrelevant_food_resource_is_audited_and_removed_from_dish_plan(self):
+        provisions = provision_foundation_events([], self.now)
+        result = resolve_agency_candidate(
+            AgencyCandidate(
+                "household_dishes",
+                "Wash a few dishes",
+                "The small pile is beginning to bother me.",
+                ActionKind.WORK,
+                "home",
+                "household-provisions",
+                None,
+                0,
+                0.2,
+                0.5,
+                0.7,
+            ),
+            proposal_id="bad-dish-resource",
+            state=project_planning(provisions),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=len(provisions),
+            simulated_at=self.now,
+        )
+        self.assertTrue(result.accepted)
+        proposed = next(
+            event for event in result.events if event.kind == "agency.activity_proposed"
+        )
+        schedule = next(event for event in result.events if event.kind == "schedule.created")
+        self.assertEqual(proposed.payload["requested_resource_id"], "household-provisions")
+        self.assertIsNone(proposed.payload["resource_id"])
+        self.assertIsNone(schedule.payload["resource_id"])
+
+    def test_cafe_meal_does_not_complete_when_money_is_short(self):
+        candidate = AgencyCandidate(
+            "prepare_and_eat_meal",
+            "Get a small lunch at the cafe",
+            "Hunger and being near the cafe make lunch appealing.",
+            ActionKind.WORK,
+            "cafe",
+            None,
+            None,
+            0,
+            0.25,
+            0.7,
+            0.8,
+        )
+        accepted = resolve_agency_candidate(
+            candidate,
+            proposal_id="cafe-lunch",
+            state=PlanningState(),
+            catalog=project_world_catalog([]),
+            known_companion_ids=set(),
+            actual_revision=0,
+            simulated_at=self.now,
+        )
+        self.assertTrue(accepted.accepted)
+        planning = PlanningState()
+        for event in accepted.events:
+            planning = planning.apply(event)
+        due = self.now + timedelta(minutes=15)
+        events = scheduled_activity_events(
+            planning,
+            actor_location_id="cafe",
+            simulated_at=due,
+            actual_revision=len(accepted.events),
+            cognitive_history=list(accepted.events),
+            actor_state=PathosState(
+                simulated_at=due,
+                location_id="cafe",
+                awake=True,
+                hunger=0.7,
+            ),
+            available_pence=599,
+        )
+        kinds = [event.kind for event in events]
+        self.assertIn("meal.unavailable", kinds)
+        self.assertIn("schedule.failed", kinds)
+        self.assertNotIn("activity.completed", kinds)
 
     def test_due_activity_uses_normal_action_path_before_becoming_memory(self):
         result, state = self.resolved()
@@ -208,7 +562,18 @@ class AgencyTests(unittest.TestCase):
         )
         events = asyncio.run(
             autonomous_activity_events(
-                [attention, recent_activity],
+                [
+                    attention,
+                    recent_activity,
+                    DomainEvent(
+                        "thought.recorded",
+                        "pathos",
+                        {
+                            "text": "I might do something about that unfinished letter.",
+                            "simulated_at": at.isoformat(),
+                        },
+                    ),
+                ],
                 at,
                 1,
                 gateway,
@@ -268,18 +633,36 @@ class AgencyTests(unittest.TestCase):
         schedule = next(event for event in events if event.kind == "schedule.created")
         self.assertTrue(schedule.payload["activity_type"])
         self.assertNotIn("activity.completed", kinds)
-        context = json.loads(gateway.requests[0].messages[0].content)
-        self.assertEqual(context["current_attention"]["focus_id"], "unfinished-letter")
-        self.assertEqual(set(context["known_people"]), {"mara"})
-        self.assertEqual(context["semantic_expectations"][0]["confidence"], 0.61)
-        self.assertEqual(context["self_concepts"][0]["confidence"], 0.55)
-        self.assertEqual(context["skills"][0]["status"], "rusty")
-        self.assertEqual(context["skills"][0]["authority"], "capability_signal_only")
-        self.assertEqual(context["habits"][0]["authority"], "soft_pattern_only")
-        self.assertEqual(context["recent_activity_patterns"][0]["companion_id"], "solo")
-        self.assertEqual(context["cognitive_workspace"][0]["from_faculty"], "murmur")
-        self.assertFalse(context["cognitive_workspace"][0]["action_authority"])
-        self.assertEqual(gateway.requests[0].task_version, "3")
+        deliberation = next(
+            request for request in gateway.requests if request.capability == "pathos_deliberation"
+        )
+        planner = next(
+            request for request in gateway.requests if request.capability == "pathos_agency"
+        )
+        deliberation_context = json.loads(deliberation.messages[0].content)
+        planning_context = json.loads(planner.messages[0].content)
+        self.assertEqual(deliberation_context["current_attention"]["focus_id"], "unfinished-letter")
+        self.assertEqual(set(planning_context["known_people"]), {"mara"})
+        self.assertNotIn("semantic_expectations", planning_context)
+        self.assertNotIn("self_concepts", planning_context)
+        self.assertNotIn("skills", planning_context)
+        self.assertNotIn("habits", planning_context)
+        self.assertNotIn("recent_activity_patterns", planning_context)
+        self.assertNotIn("cognitive_workspace", planning_context)
+        self.assertEqual(deliberation.task_version, "1")
+        self.assertEqual(planner.task_version, "11")
+        self.assertIn("choice_field", deliberation_context)
+        self.assertNotIn("choice_field", planning_context)
+        self.assertIn("chosen_impulse", planning_context)
+        self.assertTrue(deliberation_context["choice_field"]["attended_impulses"])
+        self.assertTrue(
+            all(
+                not item["action_authority"]
+                for item in deliberation_context["choice_field"]["attended_impulses"]
+            )
+        )
+        self.assertIn("time_budget", planning_context)
+        self.assertIn("ongoing_activities", planning_context)
 
     def test_stand_in_can_turn_a_reflective_question_into_time_to_reconsider(self):
         at = datetime(2026, 1, 11, 10, tzinfo=timezone.utc)
@@ -287,7 +670,16 @@ class AgencyTests(unittest.TestCase):
 
         events = asyncio.run(
             autonomous_activity_events(
-                [],
+                [
+                    DomainEvent(
+                        "thought.recorded",
+                        "pathos",
+                        {
+                            "text": "Should I reconsider this commitment?",
+                            "simulated_at": at.isoformat(),
+                        },
+                    )
+                ],
                 at,
                 0,
                 gateway,
@@ -304,6 +696,7 @@ class AgencyTests(unittest.TestCase):
                         "from_faculty": "reflection",
                         "source_event_id": "reflection-question-event",
                         "content": "Should I repair, renegotiate, or release this commitment?",
+                        "salience": 0.95,
                         "epistemic_status": "planning_question",
                         "target_type": "commitment",
                         "target_id": "help-rowan",
@@ -345,6 +738,7 @@ class AgencyTests(unittest.TestCase):
                 "from_faculty": "oneiros",
                 "kind": "dream_inspiration",
                 "content": inspiration.payload["suggestion"],
+                "salience": 0.9,
                 "epistemic_status": "fiction_sourced_possibility",
                 "action_authority": False,
             }

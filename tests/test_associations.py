@@ -53,6 +53,12 @@ class AssociationTests(unittest.TestCase):
             ],
         )
         self.assertFalse(resolution.events[1].payload["factual"])
+        self.assertEqual(resolution.events[1].payload["text"], self.proposal(memory).text)
+        self.assertNotIn("text", resolution.events[0].payload)
+        self.assertNotIn("text", resolution.events[2].payload)
+        self.assertEqual(
+            resolution.events[2].payload["association_id"], str(resolution.events[1].event_id)
+        )
         quiet = resolve_association(
             self.proposal(memory, proposal_id="quiet", salience=0.4),
             history=[memory],

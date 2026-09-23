@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Sequence
 from uuid import uuid4
@@ -28,21 +28,45 @@ async def expanding_world_events(
     gateway: ModelGateway,
     pathos_location_id: str | None = None,
 ) -> list[DomainEvent]:
-    """Propose at most one additive entity per weekly expansion budget."""
-    day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
-    if day < 14 or (day - 14) % 7 != 0 or simulated_at.hour != 17:
+    """Consider one discovery per fresh public arrival, never because a day is due."""
+    if simulated_at.utcoffset() is None:
+        raise ValueError("World expansion time must be timezone-aware")
+    if pathos_location_id is None or pathos_location_id == "home":
         return []
-    proposal_id = f"moira-world-expansion-{simulated_at.date().isoformat()}"
+    arrival = next((event for event in reversed(history) if event.kind == "pathos.moved"), None)
+    if arrival is None or arrival.payload.get("location_id") != pathos_location_id:
+        return []
+    try:
+        arrived_at = datetime.fromisoformat(str(arrival.payload.get("simulated_at")))
+        if arrived_at.utcoffset() is None or not timedelta(
+            0
+        ) <= simulated_at - arrived_at <= timedelta(hours=1):
+            return []
+    except ValueError:
+        return []
+    proposal_id = f"moira-world-expansion-arrival-{arrival.event_id}"
     if any(event.payload.get("proposal_id") == proposal_id for event in history):
         return []
     catalog = project_world_catalog(history)
+    if pathos_location_id not in catalog.places:
+        return []
     known_locations = list(catalog.places)
     request = ModelRequest(
         capability="moira_expansion",
-        task_version="1",
+        task_version="2",
         temperature=0.9,
         max_output_tokens=420,
-        output_schema=world_expansion_output_schema(known_locations),
+        output_schema={
+            "anyOf": [
+                world_expansion_output_schema(known_locations),
+                {
+                    "type": "object",
+                    "properties": {"no_change": {"const": True}},
+                    "required": ["no_change"],
+                    "additionalProperties": False,
+                },
+            ]
+        },
         messages=(
             ModelMessage(
                 "user",
@@ -50,12 +74,13 @@ async def expanding_world_events(
                     {
                         "time": simulated_at.isoformat(),
                         "pathos_location_id": pathos_location_id,
+                        "cause": {"event_id": str(arrival.event_id), "kind": arrival.kind},
                         "known_places": [
                             {"id": item.place_id, "name": item.name}
                             for item in catalog.places.values()
                         ],
                         "known_people": [item.name for item in catalog.people.values()],
-                        "instruction": "Invent one specific person, useful object, or reachable place not already present. A person is someone Pathos plausibly meets at his current location now; they do not pre-exist as a fully authored individual. Every field is required; fields irrelevant to the chosen kind should contain plausible display defaults.",
+                        "instruction": 'Pathos has arrived here. Usually nothing new needs to be invented: return {"no_change": true} for an ordinary arrival. Only if this situation naturally supports a discovery, propose one person he encounters, an object he notices, or a place he learns about here. Do not create a tour, automatic friendship, past memory or remote encounter. A new place must connect to his current location. For an entity, every schema field is required.',
                     }
                 ),
             ),
@@ -64,7 +89,12 @@ async def expanding_world_events(
     requested = DomainEvent(
         "world.expansion_generation_requested",
         "pathos",
-        {"proposal_id": proposal_id, "simulated_at": simulated_at.isoformat()},
+        {
+            "proposal_id": proposal_id,
+            "source_event_id": str(arrival.event_id),
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=arrival.event_id,
         correlation_id=proposal_id,
     )
     output = [requested]
@@ -75,11 +105,36 @@ async def expanding_world_events(
         response = await asyncio.wait_for(gateway.generate(request), timeout=50)
         if response.finish_reason != "stop":
             raise ProposalRejected("incomplete", "World expansion proposal was incomplete")
+        if json.loads(response.content) == {"no_change": True}:
+            output.append(
+                _trace(
+                    "moira_expansion",
+                    "ok",
+                    trace_id,
+                    simulated_at,
+                    started,
+                    response.resolved_model,
+                    response.backend,
+                    None,
+                )
+            )
+            output.append(
+                DomainEvent(
+                    "world.expansion_kept_ordinary",
+                    "pathos",
+                    {"proposal_id": proposal_id, "simulated_at": simulated_at.isoformat()},
+                    causation_id=arrival.event_id,
+                    correlation_id=proposal_id,
+                )
+            )
+            return output
         proposal = parse_world_expansion_candidate(
             response.content,
             proposal_id=proposal_id,
             expected_revision=actual_revision + len(output) + 2,
         )
+        if proposal.entity_kind.value in {"place", "object"}:
+            proposal = replace(proposal, location_id=pathos_location_id)
         if proposal.entity_kind.value == "person" and pathos_location_id is not None:
             if pathos_location_id == "home":
                 raise ProposalRejected(

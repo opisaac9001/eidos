@@ -351,7 +351,10 @@ class InnerLifeTests(unittest.TestCase):
         )
         state = PathosState(valence=0.1)
         events = waking_dream_events(
-            [dream, effect], state, datetime(2026, 1, 2, 7, tzinfo=timezone.utc).isoformat()
+            [dream, effect],
+            state,
+            datetime(2026, 1, 2, 7, tzinfo=timezone.utc).isoformat(),
+            authored_scenario=True,
         )
         affect = next(event for event in events if event.kind == "affect.changed")
         memory = next(event for event in events if event.kind == "memory.recorded")

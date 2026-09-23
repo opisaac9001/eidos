@@ -168,6 +168,10 @@ def behavioral_habit_events(
     candidates: list[tuple[int, str, str, Habit | None, list[DomainEvent]]] = []
     for (activity_type, location_id, time_band), all_sources in grouped.items():
         all_sources.sort(key=lambda event: (_event_time(event), str(event.event_id)))
+        # Repeating an activity several times today is still one day's evidence
+        # for a sustained rhythm. Keep the latest source per day deterministically.
+        by_day = {_event_time(event).date(): event for event in all_sources}
+        all_sources = list(by_day.values())
         habit_id = f"habit:{activity_type}:{location_id}:{time_band}"
         prior = rich_habits.get(habit_id)
         threshold = 3

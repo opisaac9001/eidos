@@ -1,0 +1,326 @@
+[
+  {
+    "scenario": "balanced",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-40d737a0-abac-4635-8039-ee4f121249b1",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "705d5954-d2ae-496b-a1ba-1633dc67ef56"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "hungry",
+    "needs": {
+      "energy": 0.65,
+      "rest": 0.65,
+      "hunger": 0.92,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-63bb68e3-eda3-496c-87d7-23dd35451c01",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "56ea174e-08fd-4a9a-a336-58ee71c57822"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "exhausted",
+    "needs": {
+      "energy": 0.12,
+      "rest": 0.12,
+      "hunger": 0.4,
+      "connection": 0.55,
+      "curiosity": 0.55,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-adeafbe4-ae14-4918-84b4-d4a66e365f36",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "061ea509-757c-4014-b6da-58cc4925982a"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "lonely",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.3,
+      "connection": 0.08,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-b3649696-ab57-45ad-bcb9-b9bdc8e76aba",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "b6f25e57-0053-4161-9c82-d9b7ee9be969"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "curious",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.08,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-5ac03684-d968-4097-b4dd-34a8bfa2413c",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:00:00+00:00",
+          "trace_id": "67397b0b-157b-41a2-be6e-f68ff7a30fa1"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "late",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.75,
+      "connection": 0.4,
+      "curiosity": 0.5,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-b632abb5-07d0-4b39-9c3b-48e142e2d0f5",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T08:30:00+00:00",
+          "trace_id": "30bafcd1-0970-4796-a241-fdeb25664eac"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "balanced",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-d3143dca-31fc-4df0-8ced-4e139d187a42",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "00455f78-e6ed-460b-b45a-175ec7272443"
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "scenario": "hungry",
+    "needs": {
+      "energy": 0.65,
+      "rest": 0.65,
+      "hunger": 0.92,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-bf4e3297-2df9-4e82-9889-4c21c2868d3e",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "8df467de-4e92-4ee4-b35e-7ca3f6bda0d1"
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "scenario": "exhausted",
+    "needs": {
+      "energy": 0.12,
+      "rest": 0.12,
+      "hunger": 0.4,
+      "connection": 0.55,
+      "curiosity": 0.55,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-fe268613-3971-4288-8fb7-8ec692c3b36f",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "306352cf-4d69-4fd1-8cba-babf99fd3ceb"
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "scenario": "lonely",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.3,
+      "connection": 0.08,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-8c17b5d1-43d5-4169-875b-1a7a3b26f242",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "trace_id": "ff58b44b-bca4-4fc4-9a7b-61f888adf018"
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "scenario": "curious",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.08,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-ad79fe2a-3438-4f99-ba7a-a3fe9569babc",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T07:00:00+00:00",
+          "trace_id": "ea526211-54f6-4070-97d9-331771697895"
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "scenario": "late",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.75,
+      "connection": 0.4,
+      "curiosity": 0.5,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [],
+    "outcome": [
+      {
+        "kind": "role.failed",
+        "payload": {
+          "role": "pathos_agency",
+          "proposal_id": "pathos-agency-cause-10f32704-f42c-4ced-99b4-7771e9e1bc55",
+          "text": "Autonomous activity proposal rejected: Model endpoint returned HTTP 404",
+          "error_code": "proposal_failed",
+          "simulated_at": "2026-01-15T08:30:00+00:00",
+          "trace_id": "804e4a56-f2f6-406e-b2f3-5122ebbb18f6"
+        }
+      }
+    ],
+    "repeat": 2
+  }
+]

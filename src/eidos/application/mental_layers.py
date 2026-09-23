@@ -25,10 +25,17 @@ def mental_layer_events(
     """Emit bounded hourly layer activations from Pathos-accessible state."""
     if at.utcoffset() is None:
         raise ValueError("Mental layer time must be timezone-aware")
-    existing = {
+    existing_ids = {
         str(event.payload["pulse_id"])
         for event in history
         if event.kind == "mind.layer_pulsed" and isinstance(event.payload.get("pulse_id"), str)
+    }
+    existing_slots = {
+        (str(event.payload.get("simulated_at")), str(event.payload.get("layer")))
+        for event in history
+        if event.kind == "mind.layer_pulsed"
+        and isinstance(event.payload.get("simulated_at"), str)
+        and isinstance(event.payload.get("layer"), str)
     }
     planning = project_planning(list(history))
     previous_emotion = project_emotion(history)
@@ -159,8 +166,8 @@ def mental_layer_events(
         )
     output = []
     for layer, mode, kind, item_id, text, activation in specs:
-        pulse_id = f"{at.isoformat()}:{layer.value}"
-        if pulse_id in existing:
+        pulse_id = _pulse_id(at, layer)
+        if pulse_id in existing_ids or (at.isoformat(), layer.value) in existing_slots:
             continue
         payload: dict[str, object] = {
             "pulse_id": pulse_id,
@@ -182,10 +189,13 @@ def mental_layer_events(
                 "mind.layer_pulsed",
                 "pathos",
                 payload,
-                correlation_id=f"mind-{at.isoformat()}",
             )
         )
     return output
+
+
+def _pulse_id(at: datetime, layer: CognitiveLayer) -> str:
+    return f"{at:%Y%m%dT%H%M%z}:{layer.value}"
 
 
 def _attention_focus(

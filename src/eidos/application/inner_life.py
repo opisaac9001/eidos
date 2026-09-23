@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
@@ -143,9 +144,7 @@ def record_dream_events(
     return events
 
 
-def _motif(
-    seeds: Sequence[DomainEvent], dream_text: str, recent_motifs: Sequence[str]
-) -> str:
+def _motif(seeds: Sequence[DomainEvent], dream_text: str, recent_motifs: Sequence[str]) -> str:
     """Name the dream's imagery without letting familiar seeds monopolize it."""
     seed_text = " ".join(str(seed.payload.get("text", "")).lower() for seed in seeds)
     rendered = dream_text.lower()
@@ -165,17 +164,21 @@ def _motif(
     recent = set(recent_motifs[-3:])
     scored = []
     for position, (motif, cues) in enumerate(catalog):
-        score = 2 * sum(cue in rendered for cue in cues) + sum(
-            cue in seed_text for cue in cues
-        )
+        score = 2 * sum(cue in rendered for cue in cues) + sum(cue in seed_text for cue in cues)
         scored.append((score, motif not in recent, -position, motif))
     score, _, _, motif = max(scored)
     return motif if score else "unfinished_time"
 
 
 def waking_dream_events(
-    events: list[DomainEvent], state: PathosState, simulated_at: str
+    events: list[DomainEvent],
+    state: PathosState,
+    simulated_at: str,
+    *,
+    authored_scenario: bool = False,
 ) -> list[DomainEvent]:
+    if not authored_scenario and not state.awake:
+        return []
     applied = {
         event.payload["source_dream_id"] for event in events if event.kind == "dream.effect_applied"
     }
@@ -235,7 +238,7 @@ def waking_dream_events(
         causation_id=recalled.event_id,
         correlation_id=dream.correlation_id,
     )
-    return [
+    output = [
         recalled,
         DomainEvent(
             "memory.recorded",
@@ -273,3 +276,79 @@ def waking_dream_events(
         ),
         inspiration,
     ]
+    if authored_scenario:
+        return output
+
+    # Replay-stable simulation choices, not claims about human recall rates.
+    def sample(label: str) -> float:
+        return int(sha256(f"{dream_id}:{label}".encode()).hexdigest()[:12], 16) / 16**12
+
+    recall_fragment = sample("recall") < 0.25 + abs(delta)
+    retain_memory = recall_fragment and sample("retain") < 0.25
+    inspires = recall_fragment and sample("inspire") < 0.2
+    selection = DomainEvent(
+        "dream.residue_selected",
+        "pathos",
+        {
+            "source_dream_id": dream_id,
+            "fragment_recalled": recall_fragment,
+            "memory_retained": retain_memory,
+            "inspiration_retained": inspires,
+            "simulated_at": simulated_at,
+            "action_authority": False,
+        },
+        causation_id=dream.event_id,
+        correlation_id=dream.correlation_id,
+    )
+    result = [selection]
+    for event in output:
+        if event.kind == "dream.recalled" and not recall_fragment:
+            continue
+        if event.kind == "memory.recorded":
+            if not retain_memory:
+                continue
+            fragment = str(dream.payload["text"])[:160].rsplit(" ", 1)[0]
+            event = DomainEvent(
+                event.kind,
+                "pathos",
+                {
+                    **event.payload,
+                    "text": f"A fragment of a dream: {fragment}…",
+                    "importance": 0.25,
+                    "confidence": 0.45,
+                    "fiction": True,
+                    "factual": False,
+                },
+                causation_id=recalled.event_id,
+                correlation_id=dream.correlation_id,
+            )
+        if event.kind == "dream.inspiration_considered":
+            if not inspires:
+                continue
+            event = DomainEvent(
+                event.kind,
+                "pathos",
+                {
+                    **event.payload,
+                    "expires_at": (waking_at + timedelta(minutes=45)).isoformat(),
+                    "fleeting": True,
+                },
+                causation_id=recalled.event_id,
+                correlation_id=dream.correlation_id,
+            )
+        result.append(event)
+    if not recall_fragment:
+        result.append(
+            DomainEvent(
+                "dream.forgotten",
+                "pathos",
+                {
+                    "source_dream_id": dream_id,
+                    "simulated_at": simulated_at,
+                    "reason": "No dream fragment remained on waking; a feeling may linger.",
+                },
+                causation_id=selection.event_id,
+                correlation_id=dream.correlation_id,
+            )
+        )
+    return result

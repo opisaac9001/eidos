@@ -10,7 +10,19 @@ from eidos.domain.npcs import project_npcs
 from eidos.domain.world import npc_activity, npc_location
 
 
-def npc_world_events(history: Sequence[DomainEvent], simulated_at: datetime) -> list[DomainEvent]:
+def npc_world_events(
+    history: Sequence[DomainEvent], simulated_at: datetime, *, authored_scenario: bool = False
+) -> list[DomainEvent]:
+    if authored_scenario:
+        return authored_npc_world_events(history, simulated_at)
+    from eidos.application.npc_movement import npc_movement_events
+
+    return npc_movement_events(history, simulated_at)
+
+
+def authored_npc_world_events(
+    history: Sequence[DomainEvent], simulated_at: datetime
+) -> list[DomainEvent]:
     """Advance location hourly and private needs at six-hour intervals."""
     state = project_npcs(history, simulated_at)
     output: list[DomainEvent] = []

@@ -1,0 +1,3546 @@
+[
+  {
+    "free_minutes": 15,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T08:15:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 45.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 15.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "fb90f00f-4327-428e-8dd2-65ee84bdaa7c",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Wash Dishes\",\n  \"motivation\": \"Tackle the piling up dishes to lighten the load before leaving for work.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"duration_hours\": 0.25,\n  \"priority\": 0.8\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 11.092951917000391
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule",
+          "title": "Wash Dishes",
+          "starts_at": "2026-01-08T08:15:00+00:00",
+          "ends_at": "2026-01-08T08:30:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c",
+          "intention_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-intention",
+          "simulated_at": "2026-01-08T08:15:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.525,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 90.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 90.0,
+          "schedule_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "35c2d4c0-f755-4403-9f66-cc7836ee351f",
+          "simulated_at": "2026-01-08T08:30:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 675.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 765.0,
+          "schedule_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "35c2d4c0-f755-4403-9f66-cc7836ee351f",
+          "simulated_at": "2026-01-08T08:30:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.275,
+          "load": 0.525,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 135.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 900.0,
+          "schedule_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "35c2d4c0-f755-4403-9f66-cc7836ee351f",
+          "simulated_at": "2026-01-08T08:30:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-fb90f00f-4327-428e-8dd2-65ee84bdaa7c-schedule",
+          "simulated_at": "2026-01-08 08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "11101afe-7537-4a5c-81b4-a367581e9f31"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "77dbaef5-644c-44e5-918d-cbade746f646",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "de31eaf5-9c76-43e5-9d09-d7897d10c929",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Clear a few dishes before leaving\", \"motivation\": \"Reduce the pile without a full session.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0, \"duration_hours\": 0.25, \"priority\": 0.75}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 8.462744082999961
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule",
+          "title": "Clear a few dishes before leaving",
+          "starts_at": "2026-01-08T07:50:00+00:00",
+          "ends_at": "2026-01-08T08:05:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929",
+          "intention_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.525,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 90.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 90.0,
+          "schedule_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "1f09588a-0cfe-464b-bbbc-bbe0f0118e60",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 675.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 765.0,
+          "schedule_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "1f09588a-0cfe-464b-bbbc-bbe0f0118e60",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.275,
+          "load": 0.525,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:05:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 135.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 900.0,
+          "schedule_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "1f09588a-0cfe-464b-bbbc-bbe0f0118e60",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-de31eaf5-9c76-43e5-9d09-d7897d10c929-schedule",
+          "simulated_at": "2026-01-08 08:05:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "3b0544b3-5549-4b59-bcc2-70c6b3bf775c"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "446193e5-8fbb-465d-8c80-f92b9b0f02a7",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "free_minutes": 90,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:00:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 120.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 90.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "0d54b340-b09c-470b-8cbd-aff504d90b18",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Deal with the piling up dishes\", \"motivation\": \"Address the building pile of dishes at home.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0.5, \"duration_hours\": 0.25, \"priority\": 0.85}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 7.665900582999711
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule",
+          "title": "Deal with the piling up dishes",
+          "starts_at": "2026-01-08T07:30:00+00:00",
+          "ends_at": "2026-01-08T07:45:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18",
+          "intention_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-intention",
+          "simulated_at": "2026-01-08T07:00:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.525,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 90.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 90.0,
+          "schedule_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "66c4c592-064b-415a-b8ac-604407bcb1e9",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 675.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 765.0,
+          "schedule_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "66c4c592-064b-415a-b8ac-604407bcb1e9",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.275,
+          "load": 0.525,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T07:45:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 135.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 900.0,
+          "schedule_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "66c4c592-064b-415a-b8ac-604407bcb1e9",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-0d54b340-b09c-470b-8cbd-aff504d90b18-schedule",
+          "simulated_at": "2026-01-08 07:45:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "d90b13a5-9e18-4764-a223-e21850177702"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "e696a5c1-9353-43e5-b4c5-9b77b2944433",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.2,
+      "rest": 0.2,
+      "connection": 0.2,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Low energy: starting or returning to effort may feel harder; resting is an option.",
+              "Wanting company can coexist with tiredness or unfinished chores."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  8
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  23
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  45
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "d9c58575-4c12-4123-ace3-cc86b85ccb3a",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.2,
+            "rest": 0.2,
+            "connection": 0.2,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Wash a few dishes\",\n  \"motivation\": \"Washing a small batch of dishes helps clear some mental space before leaving for work.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.1666666666666666,\n  \"duration_hours\": 0.125,\n  \"priority\": 0.5\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 10.523797541999556
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule",
+          "title": "Wash a few dishes",
+          "starts_at": "2026-01-08T08:00:00+00:00",
+          "ends_at": "2026-01-08T08:07:30+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a",
+          "intention_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.6625000000000001,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 45.0,
+          "worked_seconds": 450.0,
+          "status": "completed",
+          "threshold_seconds": 45.0,
+          "schedule_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a4ccf61c-2dd6-4283-9818-272be9c02822",
+          "simulated_at": "2026-01-08T08:07:30+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 337.5,
+          "worked_seconds": 450.0,
+          "status": "completed",
+          "threshold_seconds": 382.5,
+          "schedule_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a4ccf61c-2dd6-4283-9818-272be9c02822",
+          "simulated_at": "2026-01-08T08:07:30+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.1375,
+          "load": 0.6625000000000001,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:07:30+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 67.5,
+          "worked_seconds": 450.0,
+          "status": "completed",
+          "threshold_seconds": 450.0,
+          "schedule_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a4ccf61c-2dd6-4283-9818-272be9c02822",
+          "simulated_at": "2026-01-08T08:07:30+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-d9c58575-4c12-4123-ace3-cc86b85ccb3a-schedule",
+          "simulated_at": "2026-01-08 08:07:30+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "d6ea5d87-d649-44f5-be6f-42e6ebb617f9"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "06f10b8b-221d-4445-ac96-1e428b9f2c88",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "free_minutes": 15,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T08:15:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 45.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 15.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "34eba934-05a9-46c5-9eb4-bef944016ad5",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Clear a small batch of dishes\", \"motivation\": \"To clear a manageable but noticeable part of the piling-up dishes.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0, \"duration_hours\": 0.05, \"priority\": 0.65}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 8.167221790999974
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule",
+          "title": "Clear a small batch of dishes",
+          "starts_at": "2026-01-08T08:15:00+00:00",
+          "ends_at": "2026-01-08T08:18:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5",
+          "intention_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-intention",
+          "simulated_at": "2026-01-08T08:15:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.745,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 18.0,
+          "worked_seconds": 180.0,
+          "status": "completed",
+          "threshold_seconds": 18.0,
+          "schedule_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "78ca7239-9dc9-4632-9aab-caa3a8d54277",
+          "simulated_at": "2026-01-08T08:18:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 135.0,
+          "worked_seconds": 180.0,
+          "status": "completed",
+          "threshold_seconds": 153.0,
+          "schedule_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "78ca7239-9dc9-4632-9aab-caa3a8d54277",
+          "simulated_at": "2026-01-08T08:18:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.05500000000000001,
+          "load": 0.745,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:18:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 27.0,
+          "worked_seconds": 180.0,
+          "status": "completed",
+          "threshold_seconds": 180.0,
+          "schedule_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "78ca7239-9dc9-4632-9aab-caa3a8d54277",
+          "simulated_at": "2026-01-08T08:18:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-34eba934-05a9-46c5-9eb4-bef944016ad5-schedule",
+          "simulated_at": "2026-01-08 08:18:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "4b9ea1b9-0439-4180-9716-4dd10e18e6c1"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "a6c436b9-982f-49ca-98a8-f9191f6cd187",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "ede11d13-c144-472e-8049-158512e48b0a",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Start washing dishes\",\n  \"motivation\": \"Address the pressure of piling up dishes without committing to a huge session.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.0666666666666666,\n  \"duration_hours\": 0.1,\n  \"priority\": 0.75\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 9.419353958999636
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule",
+          "title": "Start washing dishes",
+          "starts_at": "2026-01-08T07:54:00+00:00",
+          "ends_at": "2026-01-08T08:00:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a",
+          "intention_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.6900000000000001,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 36.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 36.0,
+          "schedule_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "e3ba7376-509d-4e70-80a0-459b708b4fed",
+          "simulated_at": "2026-01-08T08:00:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 270.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 306.0,
+          "schedule_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "e3ba7376-509d-4e70-80a0-459b708b4fed",
+          "simulated_at": "2026-01-08T08:00:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.11000000000000001,
+          "load": 0.6900000000000001,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:00:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 54.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "e3ba7376-509d-4e70-80a0-459b708b4fed",
+          "simulated_at": "2026-01-08T08:00:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-ede11d13-c144-472e-8049-158512e48b0a-schedule",
+          "simulated_at": "2026-01-08 08:00:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "22a2e0ab-d702-40cb-b202-95e625da451a"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "03ce8e93-96a7-44c9-afb6-d1e371674646",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "free_minutes": 90,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:00:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 120.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 90.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "e5041139-8f6e-4d20-b1eb-1b1379491873",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Do a small batch of dishes\",\n  \"motivation\": \"Reduce the immediate clutter without overcommitting the morning.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.5,\n  \"duration_hours\": 0.1,\n  \"priority\": 0.55\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 8.295983875000275
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule",
+          "title": "Do a small batch of dishes",
+          "starts_at": "2026-01-08T07:30:00+00:00",
+          "ends_at": "2026-01-08T07:36:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873",
+          "intention_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-intention",
+          "simulated_at": "2026-01-08T07:00:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.6900000000000001,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 36.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 36.0,
+          "schedule_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "cbaa85ef-e53e-4507-94e7-c3cf6d4a3181",
+          "simulated_at": "2026-01-08T07:36:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 270.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 306.0,
+          "schedule_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "cbaa85ef-e53e-4507-94e7-c3cf6d4a3181",
+          "simulated_at": "2026-01-08T07:36:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.11000000000000001,
+          "load": 0.6900000000000001,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T07:36:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 54.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "cbaa85ef-e53e-4507-94e7-c3cf6d4a3181",
+          "simulated_at": "2026-01-08T07:36:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-e5041139-8f6e-4d20-b1eb-1b1379491873-schedule",
+          "simulated_at": "2026-01-08 07:36:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "8219b48c-233e-4067-a5f6-d0e127281584"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "beed0485-8cb1-40dc-a77c-aeb406f97e52",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.2,
+      "rest": 0.2,
+      "connection": 0.2,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Low energy: starting or returning to effort may feel harder; resting is an option.",
+              "Wanting company can coexist with tiredness or unfinished chores."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  8
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  23
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  45
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "a2e42e5e-3ae0-448f-bde5-f81e8d848ea7",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.2,
+            "rest": 0.2,
+            "connection": 0.2,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Wash Dishes\",\n  \"motivation\": \"Addressing a mounting pile of dishes, even if just a bit, to clear some space and regain a sense of order in the small apartment.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.0,\n  \"duration_hours\": 0.1,\n  \"priority\": 0.55\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 9.112380125000527
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule",
+          "title": "Wash Dishes",
+          "starts_at": "2026-01-08T07:50:00+00:00",
+          "ends_at": "2026-01-08T07:56:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7",
+          "intention_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.6900000000000001,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 36.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 36.0,
+          "schedule_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "3648033f-8f52-4862-b5ca-4782423b9411",
+          "simulated_at": "2026-01-08T07:56:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 270.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 306.0,
+          "schedule_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "3648033f-8f52-4862-b5ca-4782423b9411",
+          "simulated_at": "2026-01-08T07:56:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.11000000000000001,
+          "load": 0.6900000000000001,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T07:56:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 54.0,
+          "worked_seconds": 360.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "3648033f-8f52-4862-b5ca-4782423b9411",
+          "simulated_at": "2026-01-08T07:56:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-a2e42e5e-3ae0-448f-bde5-f81e8d848ea7-schedule",
+          "simulated_at": "2026-01-08 07:56:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "43e17db1-b59e-46b6-93eb-70f3ecf1b7eb"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "b4735a0c-0c51-46e5-9de4-e1a82570cb52",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 2
+  },
+  {
+    "free_minutes": 15,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T08:15:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 45.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 15.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "c9bd99a0-8953-4408-ad26-1e7c3dde113a",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Tackle the dishes\", \"motivation\": \"Reducing the pile of dishes will clear some mental space before the day starts\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0.25, \"duration_hours\": 0.25, \"priority\": 0.85}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 8.370164832999762
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "agency.activity_rejected",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-c9bd99a0-8953-4408-ad26-1e7c3dde113a",
+          "activity_type": "household_dishes",
+          "title": "Tackle the dishes",
+          "motivation": "Reducing the pile of dishes will clear some mental space before the day starts",
+          "action": "work",
+          "location_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "simulated_at": "2026-01-08T08:15:00+00:00",
+          "code": "travel_conflict",
+          "explanation": "Travel time conflicts with Work at the workshop"
+        }
+      }
+    ],
+    "dish_load_after": 0.8,
+    "execution": [
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "2cc32e22-0f01-4856-b02a-417d96c9e5e9"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "79e2c223-6a1b-4f9c-8cd9-a01f9f260d4b",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 3
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "bc45bc3a-9ca7-46a0-8c13-13911ee103f2",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Wash Dishes at Home\",\n  \"motivation\": \"Reduce the pile of dishes piling up in the kitchen.\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"duration_hours\": 0.25,\n  \"priority\": 0.6\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 8.804209957999774
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule",
+          "title": "Wash Dishes at Home",
+          "starts_at": "2026-01-08T07:50:00+00:00",
+          "ends_at": "2026-01-08T08:05:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2",
+          "intention_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.525,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 90.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 90.0,
+          "schedule_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a25efac4-be5a-45eb-a890-11c5388e2299",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 675.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 765.0,
+          "schedule_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a25efac4-be5a-45eb-a890-11c5388e2299",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.275,
+          "load": 0.525,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T08:05:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 135.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 900.0,
+          "schedule_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "a25efac4-be5a-45eb-a890-11c5388e2299",
+          "simulated_at": "2026-01-08T08:05:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-bc45bc3a-9ca7-46a0-8c13-13911ee103f2-schedule",
+          "simulated_at": "2026-01-08 08:05:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "2cabe025-ebf5-44b9-8f30-f72df3a83034"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "ae52b395-b680-4be4-9c83-c459e940cf91",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 3
+  },
+  {
+    "free_minutes": 90,
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "connection": 0.6,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:00:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 120.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 90.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "73a39d63-ba22-4d3f-ad0e-d8ce6617837c",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "connection": 0.6,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Clean a few dishes\", \"motivation\": \"Address the piling up of dishes at home.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0.5, \"duration_hours\": 0.25, \"priority\": 0.85}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 7.696057416999793
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule",
+          "title": "Clean a few dishes",
+          "starts_at": "2026-01-08T07:30:00+00:00",
+          "ends_at": "2026-01-08T07:45:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c",
+          "intention_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-intention",
+          "simulated_at": "2026-01-08T07:00:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.525,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 90.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 90.0,
+          "schedule_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "c28190e3-3f30-42a4-b0af-b257d8bf349f",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 675.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 765.0,
+          "schedule_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "c28190e3-3f30-42a4-b0af-b257d8bf349f",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.275,
+          "load": 0.525,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T07:45:00+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 135.0,
+          "worked_seconds": 900.0,
+          "status": "completed",
+          "threshold_seconds": 900.0,
+          "schedule_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "c28190e3-3f30-42a4-b0af-b257d8bf349f",
+          "simulated_at": "2026-01-08T07:45:00+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-73a39d63-ba22-4d3f-ad0e-d8ce6617837c-schedule",
+          "simulated_at": "2026-01-08 07:45:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "a094eb79-d830-475c-aa9d-4ef7798b039a"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "75346099-29ff-48e7-afd6-49ae0973f2a8",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 3
+  },
+  {
+    "free_minutes": 40,
+    "needs": {
+      "energy": 0.2,
+      "rest": 0.2,
+      "connection": 0.2,
+      "hunger": 0.3
+    },
+    "calls": [
+      {
+        "context": {
+          "time": "2026-01-08T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "fixture-work-schedule",
+            "starts_at": "2026-01-08T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Low energy: starting or returning to effort may feel harder; resting is an option.",
+              "Wanting company can coexist with tiredness or unfinished chores."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  8
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  23
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  45
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "7d0e51f0-e5ab-4b33-b874-0831a458798e",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.2,
+            "rest": 0.2,
+            "connection": 0.2,
+            "hunger": 0.3
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0.0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {},
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {},
+          "known_people": {
+            "mara": {
+              "name": "Mara",
+              "occupation": "Caf\u00e9 owner"
+            },
+            "ellis": {
+              "name": "Ellis",
+              "occupation": "Repair artist"
+            },
+            "rowan": {
+              "name": "Rowan",
+              "occupation": "Illustrator"
+            }
+          },
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-08T09:00:00+00:00",
+              "ends_at": "2026-01-08T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} to keep thinking, continue what he is doing, defer a decision or do nothing. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes and action work. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "reply": "{\"activity_type\": \"household_dishes\", \"title\": \"Clean the dishes\", \"motivation\": \"Clear a small batch of dishes to prepare for the day.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0.0, \"duration_hours\": 0.13, \"priority\": 0.65}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 7.859203541999705
+      }
+    ],
+    "decisions": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule",
+          "title": "Clean the dishes",
+          "starts_at": "2026-01-08T07:50:00+00:00",
+          "ends_at": "2026-01-08T07:57:48+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e",
+          "intention_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-intention",
+          "simulated_at": "2026-01-08T07:50:00+00:00"
+        }
+      }
+    ],
+    "dish_load_after": 0.657,
+    "execution": [
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "gather",
+          "label": "Gather the dishes",
+          "required_seconds": 46.800000000000004,
+          "worked_seconds": 468.0,
+          "status": "completed",
+          "threshold_seconds": 46.800000000000004,
+          "schedule_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "fee8da42-c94f-4794-af51-1686ca0fe979",
+          "simulated_at": "2026-01-08T07:57:48+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "wash",
+          "label": "Wash the dishes",
+          "required_seconds": 351.0,
+          "worked_seconds": 468.0,
+          "status": "completed",
+          "threshold_seconds": 397.8,
+          "schedule_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "fee8da42-c94f-4794-af51-1686ca0fe979",
+          "simulated_at": "2026-01-08T07:57:48+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "household.task_completed",
+        "payload": {
+          "task_id": "activity:pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule:wash",
+          "task_kind": "dishes",
+          "from_load": 0.8,
+          "amount": 0.14300000000000002,
+          "load": 0.657,
+          "location_id": "home",
+          "text": "Washed a batch of dishes; more may remain, and putting things away is separate.",
+          "simulated_at": "2026-01-08T07:57:48+00:00"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "put_away",
+          "label": "Put things away",
+          "required_seconds": 70.2,
+          "worked_seconds": 468.0,
+          "status": "completed",
+          "threshold_seconds": 468.0,
+          "schedule_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule",
+          "activity_type": "household_dishes",
+          "action": "work",
+          "location_id": "home",
+          "source_execution_id": "fee8da42-c94f-4794-af51-1686ca0fe979",
+          "simulated_at": "2026-01-08T07:57:48+00:00",
+          "action_authority": false
+        }
+      },
+      {
+        "kind": "schedule.completed",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-7d0e51f0-e5ab-4b33-b874-0831a458798e-schedule",
+          "simulated_at": "2026-01-08 07:57:48+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_started",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T08:30:00+00:00"
+        }
+      },
+      {
+        "kind": "pathos.travel_arrived",
+        "payload": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "depart_at": "2026-01-08T08:30:00+00:00",
+          "arrive_at": "2026-01-08T09:00:00+00:00",
+          "schedule_id": "fixture-work-schedule",
+          "simulated_at": "2026-01-08T09:00:00+00:00",
+          "journey_id": "a2558f90-66aa-4aed-9a6a-44dfabc2e405"
+        }
+      },
+      {
+        "kind": "activity.stage_completed",
+        "payload": {
+          "stage_id": "prepare",
+          "label": "Get set up",
+          "required_seconds": 360.0,
+          "worked_seconds": 1800.0,
+          "status": "completed",
+          "threshold_seconds": 360.0,
+          "schedule_id": "fixture-work-schedule",
+          "activity_type": "workshop_shift",
+          "action": "work",
+          "location_id": "workshop",
+          "source_execution_id": "2d57e80a-c57c-4ed7-b764-e8760fe21fcc",
+          "simulated_at": "2026-01-08T09:30:00+00:00",
+          "action_authority": false
+        }
+      }
+    ],
+    "repeat": 3
+  }
+]

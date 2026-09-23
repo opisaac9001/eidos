@@ -51,6 +51,8 @@ class WebTests(unittest.TestCase):
         return response.status, body
 
     def test_live_loop_runs_pauses_and_serves_assets(self):
+        self.assertEqual(self.runtime.snapshot()["identity"]["name"], "Patrick Shaw")
+        self.assertEqual(self.runtime.snapshot()["identity"]["nickname"], "Pathos")
         self.request("POST", "/api/control", {"running": True, "minutes_per_tick": 60})
         deadline = time.monotonic() + 3
         while self.runtime.ticks < 2 and time.monotonic() < deadline:
@@ -69,6 +71,7 @@ class WebTests(unittest.TestCase):
             self.assertEqual(status, 200, path)
             self.assertTrue(body)
             if path == "/":
+                self.assertIn(b"PATRICK SHAW", body)
                 self.assertIn(b'data-view="plans"', body)
                 self.assertIn(b'id="calendar-list"', body)
                 self.assertIn(b'id="catch-up"', body)
@@ -161,7 +164,11 @@ class WebTests(unittest.TestCase):
             life.configure(True, 15, "realtime")
 
         clock.advance(29)
-        runtime.stop.wait(0.03)
+        # Wait for the background worker to observe the fake clock. A fixed
+        # 30 ms sleep races startup and disk I/O on slower or busy hosts.
+        deadline = time.monotonic() + 2
+        while runtime.realtime_pending_seconds < 29 and time.monotonic() < deadline:
+            runtime.stop.wait(0.01)
         self.assertEqual(runtime.ticks, 0)
         self.assertAlmostEqual(runtime.snapshot()["runtime"]["realtime_pending_seconds"], 29)
 
@@ -169,7 +176,10 @@ class WebTests(unittest.TestCase):
         deadline = time.monotonic() + 1
         while runtime.ticks < 1 and time.monotonic() < deadline:
             runtime.stop.wait(0.01)
-        after = datetime.fromisoformat(runtime.snapshot()["time"])
+        # The tick counter increments before the worker publishes its cached
+        # snapshot. Observe the completed mutation, not that brief handoff.
+        with runtime.lock:
+            after = datetime.fromisoformat(runtime.snapshot()["time"])
 
         self.assertEqual(runtime.ticks, 1)
         self.assertEqual((after - before).total_seconds(), 30)
@@ -347,7 +357,8 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status, 200)
         status, body = self.request("POST", "/api/step", {"hours": 1})
         snapshot = json.loads(body)
-        self.assertEqual(snapshot["pathos"]["location_id"], "cafe")
+        # Advancing the clock must not prescribe the old nine-o'clock cafe visit.
+        self.assertEqual(snapshot["pathos"]["location_id"], "home")
         self.assertEqual(len(snapshot["conversations"]), 2)
 
     def test_user_can_opt_in_and_back_out_of_in_app_outreach(self):

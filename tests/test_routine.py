@@ -5,6 +5,7 @@ from eidos.domain.routine import (
     RoutineBeat,
     beats_between,
     emotionally_adjusted_beat,
+    lived_moment_description,
     needs_adjusted_beat,
     routine_for_day,
 )
@@ -33,6 +34,40 @@ class RoutineTests(unittest.TestCase):
         self.assertEqual(first, beats_between(start, end))
         self.assertGreaterEqual(len({beat.description for _, beat in first}), 25)
         self.assertGreaterEqual(len({beat.activity for _, beat in first}), 18)
+
+    def test_repeated_consequence_gets_a_distinct_lived_moment_for_a_month(self):
+        start = datetime(2026, 1, 1, 13, tzinfo=timezone.utc)
+        descriptions = [
+            lived_moment_description(
+                "The usual meal was delayed while the hour remained occupied.",
+                "home",
+                start + timedelta(days=day),
+                "meal_delayed",
+            )
+            for day in range(30)
+        ]
+
+        self.assertEqual(len(set(descriptions)), 30)
+        self.assertEqual(
+            descriptions,
+            [
+                lived_moment_description(
+                    "The usual meal was delayed while the hour remained occupied.",
+                    "home",
+                    start + timedelta(days=day),
+                    "meal_delayed",
+                )
+                for day in range(30)
+            ],
+        )
+
+    def test_existing_routine_texture_is_not_layered_twice(self):
+        at = datetime(2026, 1, 8, 10, tzinfo=timezone.utc)
+        beat = next(item for item in routine_for_day(at.date()) if item.hour == at.hour)
+        self.assertEqual(
+            lived_moment_description(beat.description, beat.location_id, at, beat.activity),
+            beat.description,
+        )
 
     def test_weekends_have_a_different_shape_from_workdays(self):
         friday = routine_for_day(datetime(2026, 1, 9).date())

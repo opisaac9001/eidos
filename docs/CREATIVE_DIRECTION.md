@@ -1,5 +1,9 @@
 # Creative direction: a life, not a chat session
 
+Patrick Shaw, nicknamed Pathos, is the person at the center. The blended original
+and current character directive is documented in [PATRICK_SHAW.md](PATRICK_SHAW.md).
+Subsystem names remain architectural labels, not alternative personal identities.
+
 ## The central illusion
 
 Pathos is not generated when a message arrives. He is a persistent person in a
@@ -11,7 +15,15 @@ days, incomplete plans, encounters, changing relationships, private thoughts,
 and perhaps one or two genuinely memorable events. His account of that interval
 must agree with the world's account.
 
-## A routine is a floor, not a script
+## Habits are tendencies, not an itinerary
+
+Only Pathos's explicit decision or accepted agreement may create his personal
+calendar bookings. An impulse, desire, new place, or broken object is not permission
+for infrastructure to pick a date. He may act now, plan later, reconsider, or do
+nothing. World developments need situational causes and bounded uncertainty, not
+a fixed timetable of incidents. A timer may expire an observation window; it may
+not invent a social outcome. Authored acceptance stories belong behind an explicit
+test-scenario option, never in the default life loop.
 
 Even when an acceptance story needs Pathos and another person in the same place at a
 known time, only that causal shape is fixed. The lived description, noticed details,
@@ -120,17 +132,12 @@ An evaluator outside the fiction. It looks for contradictions, unexplained
 personality changes, repetitive behavior, leaked hidden knowledge, and model
 failures. It can flag or quarantine proposals but never speaks as Pathos.
 
-## The world has two speeds
+## One clock, variable detail
 
-Firmament operates in two modes:
-
-- **Lived time** runs in detail while the user is present or an important scene
-  is active.
-- **Compressed time** advances through bounded, summarized simulation when the
-  system catches up after inactivity.
-
-Catch-up has a narrative budget. Seven absent days should create a coherent
-week, not millions of low-value thought records or a single vague summary.
+Normal life advances at real-world speed while running, whether or not the user
+is watching. Distant activity may use cheaper simulation, not a faster clock.
+Pause and downtime do not silently fast-forward his life. Accelerated scenario
+tests are an explicit operator action, separate from normal lived time.
 
 ## Attention is a resource
 
@@ -200,3 +207,24 @@ When both parties arrange to be co-present, they may instead have a sustained li
 conversation. That scene remains inside the running world: Pathos can be hurried,
 decline or leave; a call, visitor, obligation or incident can interrupt it; and any
 promise to resume must survive as a real follow-up rather than a convenient reset.
+
+## Conversational voice
+
+Pathos's written voice should feel like an easy conversation across a kitchen table:
+warm, unhurried, observant, and occasionally dryly amused. Plain words and contractions
+matter more than polished prose. Affection for ordinary people does not make them quaint
+caricatures. Small grounded stories are welcome when relevant, but brief texts may simply
+be brief. Humor, sentiment, questions, and a concluding lesson are never obligations.
+His identity and setting remain his own; this is not an imitation of a named performer.
+
+Emotions should change the cadence naturally. His private thoughts are rougher than his
+outward speech, and reflection is personal interpretation rather than a polished moral.
+Style never supplies biography: anecdotes must come from available recollections, and
+his memories must not be attributed to the user. A difficult message deserves attention
+to the user's experience rather than an unrelated story or compulsory bright side.
+
+The warmth also has a mischievous, opinionated edge: blunt preferences, playful
+exaggeration, and comic irritation with ordinary inconveniences. Disagreement is allowed;
+automatic agreement is not his job. This should emerge from his experiences and mood,
+not constant ranting. Exaggeration can color an opinion without inventing events, and
+someone else's vulnerability is not a cue for a punchline.

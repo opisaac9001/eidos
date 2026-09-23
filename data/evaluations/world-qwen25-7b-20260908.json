@@ -1,0 +1,692 @@
+{
+  "synthetic": true,
+  "model": "qwen2.5:7b",
+  "rows": [
+    {
+      "case": "scene_0",
+      "seconds": 0.65,
+      "events": [
+        {
+          "kind": "role.failed",
+          "payload": {
+            "role": "firmament",
+            "text": "firmament: Encounter omitted its scheduled neighbor.",
+            "error_code": "missing_actor",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "trace_id": "972bb4da-87de-41e2-a4a3-6f4b24833818"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "failed",
+            "error_code": "missing_actor",
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "trace_id": "972bb4da-87de-41e2-a4a3-6f4b24833818",
+            "latency_ms": 647.66
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "rejected",
+            "trace_id": "972bb4da-87de-41e2-a4a3-6f4b24833818",
+            "latency_ms": 0,
+            "error_code": "missing_actor",
+            "model": "schema-rules-v1",
+            "backend": "rules"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\":\"Pathos, look at the rain drizzling outside. Perfect weather for a cozy cafe, isn't it?\"}",
+          "usage": {
+            "prompt_tokens": 287,
+            "prompt_tokens_details": {
+              "cached_tokens": 5
+            },
+            "completion_tokens": 27,
+            "total_tokens": 314
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": "dialogue",
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": null
+    },
+    {
+      "case": "scene_1",
+      "seconds": 0.36,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "39badf8b-78a0-4f02-8d26-eb423283814e",
+            "latency_ms": 356.26,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 305,
+            "output_tokens": 20,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "39badf8b-78a0-4f02-8d26-eb423283814e",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Mara, grab an umbrella next time. It's pouring outside.\"}",
+          "usage": {
+            "prompt_tokens": 305,
+            "prompt_tokens_details": {
+              "cached_tokens": 280
+            },
+            "completion_tokens": 20,
+            "total_tokens": 325
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": "dialogue",
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Got soaked on the way here."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Mara, grab an umbrella next time. It's pouring outside."
+    },
+    {
+      "case": "scene_2",
+      "seconds": 0.53,
+      "events": [
+        {
+          "kind": "role.failed",
+          "payload": {
+            "role": "firmament",
+            "text": "firmament: Encounter omitted its scheduled neighbor.",
+            "error_code": "missing_actor",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "trace_id": "083e2e0a-c854-4b13-a5cc-9a3de150b6fd"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "failed",
+            "error_code": "missing_actor",
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "trace_id": "083e2e0a-c854-4b13-a5cc-9a3de150b6fd",
+            "latency_ms": 526.79
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "rejected",
+            "trace_id": "083e2e0a-c854-4b13-a5cc-9a3de150b6fd",
+            "latency_ms": 0,
+            "error_code": "missing_actor",
+            "model": "schema-rules-v1",
+            "backend": "rules"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\":\"Pathos, we've got a loose leg on that old bench over there. Think you can help me tighten it up?\"}",
+          "usage": {
+            "prompt_tokens": 289,
+            "prompt_tokens_details": {
+              "cached_tokens": 227
+            },
+            "completion_tokens": 30,
+            "total_tokens": 319
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": "dialogue",
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": null
+    },
+    {
+      "case": "scene_3",
+      "seconds": 0.39,
+      "events": [
+        {
+          "kind": "role.failed",
+          "payload": {
+            "role": "firmament",
+            "text": "firmament: Encounter omitted its scheduled neighbor.",
+            "error_code": "missing_actor",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "trace_id": "96e6e15e-36f9-40ec-ae2e-4420e7b92102"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "failed",
+            "error_code": "missing_actor",
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "trace_id": "96e6e15e-36f9-40ec-ae2e-4420e7b92102",
+            "latency_ms": 394.01
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "rejected",
+            "trace_id": "96e6e15e-36f9-40ec-ae2e-4420e7b92102",
+            "latency_ms": 0,
+            "error_code": "missing_actor",
+            "model": "schema-rules-v1",
+            "backend": "rules"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Sure, thanks. This old bench is a project we've been putting off.\"}",
+          "usage": {
+            "prompt_tokens": 307,
+            "prompt_tokens_details": {
+              "cached_tokens": 282
+            },
+            "completion_tokens": 22,
+            "total_tokens": 329
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": "dialogue",
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Want me to hold it steady?"
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": null
+    },
+    {
+      "case": "scene_4",
+      "seconds": 0.51,
+      "events": [
+        {
+          "kind": "role.failed",
+          "payload": {
+            "role": "firmament",
+            "text": "firmament: Encounter omitted its scheduled neighbor.",
+            "error_code": "missing_actor",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "trace_id": "1233290f-941b-4cd0-9980-0505185a665d"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "failed",
+            "error_code": "missing_actor",
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "trace_id": "1233290f-941b-4cd0-9980-0505185a665d",
+            "latency_ms": 513.1
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "rejected",
+            "trace_id": "1233290f-941b-4cd0-9980-0505185a665d",
+            "latency_ms": 0,
+            "error_code": "missing_actor",
+            "model": "schema-rules-v1",
+            "backend": "rules"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\":\"Pathos, have you started reading the new sci-fi novel yet? I heard it's a real page-turner!\"}",
+          "usage": {
+            "prompt_tokens": 289,
+            "prompt_tokens_details": {
+              "cached_tokens": 227
+            },
+            "completion_tokens": 29,
+            "total_tokens": 318
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": "dialogue",
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": null
+    },
+    {
+      "case": "scene_5",
+      "seconds": 0.39,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "69ac584a-122a-4104-8d5b-49b11fdacb2e",
+            "latency_ms": 386.63,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 307,
+            "output_tokens": 20,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "69ac584a-122a-4104-8d5b-49b11fdacb2e",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Pathos quickly sips his coffee, then looks at Mara. \"}",
+          "usage": {
+            "prompt_tokens": 307,
+            "prompt_tokens_details": {
+              "cached_tokens": 269
+            },
+            "completion_tokens": 20,
+            "total_tokens": 327
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": "dialogue",
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Pathos quickly sips his coffee, then looks at Mara. "
+    },
+    {
+      "case": "world_0",
+      "seconds": 0.46,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-24e10251-6336-4e86-8ddf-96156ae829ef",
+            "director_id": "moira",
+            "source_event_id": "24e10251-6336-4e86-8ddf-96156ae829ef",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "8cce1121-ea57-4880-a71b-1554e4dec17b",
+            "latency_ms": 464.42,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-24e10251-6336-4e86-8ddf-96156ae829ef",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 553,
+            "prompt_tokens_details": {
+              "cached_tokens": 17
+            },
+            "completion_tokens": 10,
+            "total_tokens": 563
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_1",
+      "seconds": 0.26,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-f1fe5daa-1723-4c4d-b1d2-615f6b364816",
+            "director_id": "moira",
+            "source_event_id": "f1fe5daa-1723-4c4d-b1d2-615f6b364816",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "9d3a9f33-5979-4fa0-ba93-24326a6681fa",
+            "latency_ms": 263.15,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-f1fe5daa-1723-4c4d-b1d2-615f6b364816",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 555,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 565
+          }
+        }
+      ],
+      "context": {
+        "location": "park",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_2",
+      "seconds": 0.29,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-1f0aa8d0-de5f-43da-ae87-4d60640afd33",
+            "director_id": "moira",
+            "source_event_id": "1f0aa8d0-de5f-43da-ae87-4d60640afd33",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "987a9d3d-e780-4081-8181-524ce30fe0c7",
+            "latency_ms": 288.52,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-1f0aa8d0-de5f-43da-ae87-4d60640afd33",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 544,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 554
+          }
+        }
+      ],
+      "context": {
+        "location": "workshop",
+        "cause_kind": "npc.activity_recorded"
+      }
+    },
+    {
+      "case": "world_3",
+      "seconds": 0.26,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-754ba755-6b2a-49f0-93b5-b06ef208c4ff",
+            "director_id": "moira",
+            "source_event_id": "754ba755-6b2a-49f0-93b5-b06ef208c4ff",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "463dfc44-dfc4-4a2b-92bc-a165fbd9fafb",
+            "latency_ms": 260.75,
+            "model": "qwen2.5:7b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.left_ordinary",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-754ba755-6b2a-49f0-93b5-b06ef208c4ff",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"no_change\": true\n}",
+          "usage": {
+            "prompt_tokens": 552,
+            "prompt_tokens_details": {
+              "cached_tokens": 375
+            },
+            "completion_tokens": 10,
+            "total_tokens": 562
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "object.condition_changed"
+      }
+    }
+  ],
+  "no_cause_and_repeated_cause_checks": "passed"
+}

@@ -9,6 +9,7 @@ from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.causal_opportunities import optional_schema
 from eidos.domain.events import DomainEvent
 from eidos.domain.npc_agency import (
     npc_agency_output_schema,
@@ -30,21 +31,17 @@ async def autonomous_npc_plan_events(
     shared_relationships: Mapping[str, Relationship] | None = None,
     allowed_actor_ids: frozenset[str] | None = None,
 ) -> list[DomainEvent]:
-    """Give each eligible resident one private proposal boundary at 19:00."""
+    """Consider a changed private need, not a daily appointment with the model."""
     if simulated_at.utcoffset() is None:
         raise ValueError("NPC agency time must be timezone-aware")
-    day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
-    if day < 11 or simulated_at.hour != 19:
-        return []
     state = project_npcs(history, simulated_at)
     consumed = {
         str(event.payload["evidence_need_event_id"])
         for event in history
-        if event.kind in {"npc.plan_created", "npc.agency_rejected"}
+        if event.kind
+        in {"npc.plan_created", "npc.agency_rejected", "npc.agency_generation_requested"}
         and isinstance(event.payload.get("evidence_need_event_id"), str)
     }
-    latest_plans = _latest_actor_times(history, "npc.plan_created")
-    latest_failures = _latest_actor_times(history, "npc.agency_rejected")
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
         if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
@@ -62,10 +59,13 @@ async def autonomous_npc_plan_events(
         )
         if evidence is None or person.plan_status == "active":
             continue
-        if (
-            person.plan_status != "interrupted"
-            and _within(latest_plans.get(actor_id), simulated_at, timedelta(days=7))
-        ) or _within(latest_failures.get(actor_id), simulated_at, timedelta(days=2)):
+        try:
+            evidence_at = datetime.fromisoformat(str(evidence.payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if evidence_at.utcoffset() is None or not timedelta(
+            0
+        ) <= simulated_at - evidence_at <= timedelta(hours=6):
             continue
         needs = {
             "energy": person.energy,
@@ -87,7 +87,23 @@ async def autonomous_npc_plan_events(
             for name, level in eligible.items()
         }
         need = min(eligible, key=lambda name: (scores[name], name))
-        proposal_id = f"npc-agency-{actor_id}-{simulated_at.date().isoformat()}"
+        pressure_band = f"{need}:{int(eligible[need] * 5)}"
+        previous = next(
+            (
+                event
+                for event in reversed(history)
+                if event.kind == "npc.agency_generation_requested"
+                and event.payload.get("actor_id") == actor_id
+            ),
+            None,
+        )
+        if (
+            previous is not None
+            and previous.payload.get("pressure_band") == pressure_band
+            and person.plan_status != "interrupted"
+        ):
+            continue
+        proposal_id = f"npc-agency-{actor_id}-{evidence.event_id}"
         trace_id = str(uuid4())
         requested = DomainEvent(
             "npc.agency_generation_requested",
@@ -96,6 +112,7 @@ async def autonomous_npc_plan_events(
                 "actor_id": actor_id,
                 "proposal_id": proposal_id,
                 "evidence_need_event_id": str(evidence.event_id),
+                "pressure_band": pressure_band,
                 "owner": actor_id,
                 "visibility": "private",
                 "simulated_at": simulated_at.isoformat(),
@@ -127,16 +144,17 @@ async def autonomous_npc_plan_events(
             },
             "private_context": owned_context,
             "permission": (
-                "Invent one ordinary private plan for this resident. Use only their context. "
+                'Return {"no_change": true} to continue, defer, or leave the need unacted on. '
+                "Only propose a private plan if this resident chooses it, including its timing. Use only their context. "
                 "Do not claim it happened, create property, spend money, or control another actor."
             ),
         }
         request = ModelRequest(
             capability="npc_agency",
-            task_version="1",
+            task_version="2",
             temperature=0.9,
             max_output_tokens=280,
-            output_schema=npc_agency_output_schema(list(catalog.places)),
+            output_schema=optional_schema(npc_agency_output_schema(list(catalog.places))),
             messages=(ModelMessage("user", json.dumps(context)),),
         )
         started = perf_counter()
@@ -145,6 +163,37 @@ async def autonomous_npc_plan_events(
             response = await asyncio.wait_for(gateway.generate(request), timeout=50)
             if response.finish_reason != "stop":
                 raise ProposalRejected("incomplete", "NPC agency proposal was incomplete")
+            if json.loads(response.content) == {"no_change": True}:
+                output.extend(
+                    [
+                        _trace(
+                            actor_id,
+                            "ok",
+                            trace_id,
+                            simulated_at,
+                            started,
+                            response.resolved_model,
+                            response.backend,
+                            None,
+                            response.prompt_tokens,
+                            response.output_tokens,
+                        ),
+                        DomainEvent(
+                            "npc.idea_left_unplanned",
+                            "pathos",
+                            {
+                                "actor_id": actor_id,
+                                "owner": actor_id,
+                                "visibility": "private",
+                                "proposal_id": proposal_id,
+                                "simulated_at": simulated_at.isoformat(),
+                            },
+                            causation_id=requested.event_id,
+                            correlation_id=proposal_id,
+                        ),
+                    ]
+                )
+                continue
             candidate = parse_npc_agency_candidate(response.content)
             if candidate.location_id not in catalog.places:
                 raise ProposalRejected("unknown_location", "The proposed place does not exist")
@@ -152,6 +201,8 @@ async def autonomous_npc_plan_events(
                 hour=candidate.scheduled_hour, minute=0, second=0, microsecond=0
             )
             ends_at = starts_at + timedelta(hours=1)
+            if starts_at < simulated_at:
+                raise ProposalRejected("past_start", "A chosen NPC plan cannot start in the past")
             if not location_allows_interval(
                 candidate.location_id, starts_at, ends_at, catalog.opening_hours
             ):

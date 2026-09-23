@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#111512" />
+    <meta name="theme-color" content="#0c0a09" />
     <title>Eidos · A life unfolding</title>
-    <link rel="stylesheet" href="/style.css?v=20260906-3" />
-    <script src="/app.js?v=20260906-3" defer></script>
+    <link rel="stylesheet" href="/style.css?v=20260907-hearth" />
+    <script src="/app.js?v=20260907-hearth" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -23,6 +23,7 @@
         </button>
         <button class="nav active" data-view="conversation">
           <span aria-hidden="true">◌</span> Talk
+          <span id="unread-count" class="unread-badge" aria-live="polite" hidden></span>
           <span class="nav-index">02</span>
         </button>
         <button class="nav" data-view="world">
@@ -65,6 +66,7 @@
         </div>
       </header>
       <div id="error" role="alert" hidden></div>
+      <p id="preview-banner" class="context-note" role="status" hidden>TEST WORLD · Synthetic data. This preview does not change Patrick’s live history.</p>
       <div class="page-head">
         <div>
           <div class="eyebrow" id="page-eyebrow">THE PRESENT MOMENT</div>
@@ -89,10 +91,11 @@
       </div>
 
       <section id="view-observatory" class="view">
+        <section class="panel life-progress" aria-label="Activity and journeys" data-life-progress></section>
         <div class="overview-grid">
           <article class="panel presence">
             <div class="panel-kicker">
-              PATHOS <span id="life-status" class="status-tag">PAUSED</span>
+              PATRICK SHAW · PATHOS <span id="life-status" class="status-tag">PAUSED</span>
             </div>
             <div class="presence-main">
               <div class="identity-disc" aria-hidden="true">
@@ -257,14 +260,14 @@
         <div class="world-layout">
           <article class="panel">
             <div class="panel-kicker">
-              THE NEIGHBORHOOD <span class="muted" id="world-weather"></span>
+              HIS CITY ATLAS <span class="muted" id="world-weather"></span>
             </div>
-            <div
+            <div class="city-map-scroll" tabindex="0" aria-label="Scrollable city map"><div
               id="large-map"
               class="world-map large"
-              aria-label="Interactive neighborhood map"
-            ></div>
-            <div class="map-footer">Select a place to see who's there.</div>
+              aria-label="Interactive city map"
+            ></div></div>
+            <div class="map-footer">Select a place to explore his experience. Lines show travel connections, not surveyed streets. Scroll to explore.</div>
           </article>
           <article class="panel place-detail" id="place-detail"></article>
         </div>
@@ -298,7 +301,7 @@
         <div class="conversation-layout">
           <article class="panel chat-panel">
             <div class="panel-kicker">
-              <span><i class="dot amber"></i> A CONVERSATION WITH PATHOS</span
+              <span><i class="dot amber"></i> A CONVERSATION WITH PATRICK · PATHOS</span
               ><span id="chat-availability" class="small-tag"
                 >CHECKING AVAILABILITY</span
               >
@@ -316,14 +319,19 @@
               role="log"
               aria-label="Conversation history"
             ></div>
+            <button id="new-messages" class="button quiet" type="button" hidden>New messages ↓</button>
+            <details class="day-progress">
+              <summary>His day right now</summary>
+              <section class="life-progress" aria-label="Activity and journeys" data-life-progress></section>
+            </details>
             <details class="chat-settings">
               <summary>Message settings</summary>
               <label class="context-note"
                 ><input id="outreach-toggle" type="checkbox" /> Let Pathos send
-                occasional in-app messages</label
+                messages when he wants to reach out</label
               >
               <p class="context-note">
-                Off by default · no external notifications · quiet from
+                His choice to send or keep a thought private · no external notifications · quiet from
                 22:00–08:00
               </p>
             </details>

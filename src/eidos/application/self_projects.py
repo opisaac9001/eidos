@@ -9,6 +9,7 @@ from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.causal_opportunities import fresh_cause, optional_schema
 from eidos.application.dream_planning import dream_planning_workspace, dream_project_link_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
@@ -43,16 +44,25 @@ async def autonomous_project_events(
     habits: Sequence[Mapping[str, object]] = (),
     workspace: Sequence[Mapping[str, object]] = (),
 ) -> list[DomainEvent]:
-    """Propose at most one project every two weeks when no generated project is active."""
-    day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
-    if day < 16 or (day - 16) % 14 != 0 or simulated_at.hour != 9:
+    """An idea can invite a project decision, without obliging him to make one."""
+    cause = fresh_cause(
+        history,
+        simulated_at,
+        frozenset(
+            {
+                "thought.recorded",
+                "dream.inspiration_considered",
+            }
+        ),
+    )
+    if cause is None:
         return []
     if any(
         goal.status == "active" and goal.goal_id.startswith("pathos-project-")
         for goal in planning.goals.values()
     ):
         return []
-    proposal_id = f"pathos-project-{simulated_at.date().isoformat()}"
+    proposal_id = f"pathos-project-cause-{cause.event_id}"
     if any(event.payload.get("proposal_id") == proposal_id for event in history):
         return []
     resources = {
@@ -113,7 +123,9 @@ async def autonomous_project_events(
             if entry.status == "scheduled" and entry.actor_id in {None, "pathos"}
         ],
         "permission": (
-            "Invent one coherent two-to-four-step ordinary project. Let his current attention "
+            'Return {"no_change": true} unless Pathos deliberately wants to plan a project now. '
+            "He chooses whether to commit and the timing of every step. A thought is not a booking. "
+            "If chosen, propose one coherent two-to-four-step ordinary project. Let his current attention "
             "matter without treating it as a command. A dream inspiration is a temporary "
             "fiction-sourced possibility, never evidence, action authority, or a promised outcome. "
             "Habits are soft rhythms that may be "
@@ -125,16 +137,21 @@ async def autonomous_project_events(
     }
     request = ModelRequest(
         capability="pathos_project",
-        task_version="4",
+        task_version="5",
         temperature=0.9,
         max_output_tokens=520,
-        output_schema=self_project_output_schema(list(places), list(resources)),
+        output_schema=optional_schema(self_project_output_schema(list(places), list(resources))),
         messages=(ModelMessage("user", json.dumps(context)),),
     )
     requested = DomainEvent(
         "self_project.generation_requested",
         "pathos",
-        {"proposal_id": proposal_id, "simulated_at": simulated_at.isoformat()},
+        {
+            "proposal_id": proposal_id,
+            "source_event_id": str(cause.event_id),
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=cause.event_id,
         correlation_id=proposal_id,
     )
     output = [requested]
@@ -143,6 +160,33 @@ async def autonomous_project_events(
         response = await asyncio.wait_for(gateway.generate(request), timeout=50)
         if response.finish_reason != "stop":
             raise ProposalRejected("incomplete", "Project proposal was incomplete")
+        if json.loads(response.content) == {"no_change": True}:
+            output.append(
+                _trace(
+                    "ok",
+                    trace_id,
+                    simulated_at,
+                    started,
+                    response.resolved_model,
+                    response.backend,
+                    None,
+                    response.prompt_tokens,
+                    response.output_tokens,
+                )
+            )
+            output.append(
+                DomainEvent(
+                    "self_project.left_unplanned",
+                    "pathos",
+                    {
+                        "proposal_id": proposal_id,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=cause.event_id,
+                    correlation_id=proposal_id,
+                )
+            )
+            return output
         candidate = parse_self_project_candidate(response.content)
     except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"

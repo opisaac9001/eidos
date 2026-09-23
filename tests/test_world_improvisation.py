@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
-from eidos.application.world_improvisation import improvised_world_events
+from eidos.application.world_improvisation import improvised_world_events, public_world_cause
 from eidos.application.world_perception import due_world_observations
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelResponse
@@ -26,7 +26,75 @@ class FixedGateway:
 
 
 class WorldImprovisationTests(unittest.TestCase):
+    def test_cause_context_is_physical_not_private(self):
+        event = DomainEvent(
+            "npc.activity_recorded",
+            "pathos",
+            {
+                "actor_id": "mara",
+                "action": "repair",
+                "location_id": "workshop",
+                "activity": "repair something because I feel lonely",
+                "private_thought": "secret",
+            },
+        )
+        self.assertEqual(
+            public_world_cause(event, "workshop"),
+            {
+                "kind": "npc.activity_recorded",
+                "location_id": "workshop",
+                "actor_id": "mara",
+                "action": "repair",
+            },
+        )
+
+    def test_object_change_without_location_uses_known_resource_location(self):
+        class RecordingGateway(FixedGateway):
+            async def generate(self, request):
+                self.context = json.loads(request.messages[-1].content)
+                return await super().generate(request)
+
+        gateway = RecordingGateway('{"no_change": true}')
+        cause = DomainEvent(
+            "object.condition_changed",
+            "pathos",
+            {
+                "object_id": "shared-tea-service",
+                "condition": "repaired",
+                "simulated_at": self.now.isoformat(),
+                "private_note": "do not share",
+            },
+        )
+        events = asyncio.run(
+            improvised_world_events(
+                [cause],
+                self.now,
+                1,
+                gateway,
+                season="winter",
+                weather="Clear",
+            )
+        )
+        self.assertTrue(any(e.kind == "world_event.left_ordinary" for e in events))
+        self.assertEqual(
+            gateway.context["world_cause"],
+            {
+                "kind": "object.condition_changed",
+                "location_id": "cafe",
+                "object_id": "shared-tea-service",
+                "condition": "repaired",
+            },
+        )
+
     now = datetime(2026, 1, 7, 18, tzinfo=timezone.utc)
+    arrival = DomainEvent(
+        "pathos.moved",
+        "pathos",
+        {
+            "location_id": "cafe",
+            "simulated_at": now.isoformat(),
+        },
+    )
 
     def resource(self):
         return DomainEvent(
@@ -58,7 +126,7 @@ class WorldImprovisationTests(unittest.TestCase):
                 "affective_tone": -0.25,
                 "resource_id": "shared-tea-service",
                 "inspiration_signal_id": "none",
-                "starts_in_hours": 2,
+                "starts_in_hours": 0,
                 "intensity": 0.3,
                 "duration_hours": 4,
             }
@@ -67,9 +135,9 @@ class WorldImprovisationTests(unittest.TestCase):
     def generate_events(self, gateway, history=None, external_signals=None):
         return asyncio.run(
             improvised_world_events(
-                history or [],
+                [self.arrival, *(history or [])],
                 self.now,
-                len(history or []),
+                len(history or []) + 1,
                 gateway,
                 season="winter",
                 weather="Clear",
@@ -83,7 +151,8 @@ class WorldImprovisationTests(unittest.TestCase):
         link = next(event for event in events if event.kind == "world_event.theme_linked")
         resource = next(event for event in events if event.kind == "world_event.resource_linked")
         self.assertEqual(scheduled.payload["event_kind"], "ambient")
-        self.assertEqual(scheduled.payload["source"], "model-fiction-proposal")
+        self.assertEqual(scheduled.payload["source"], "causal-world-response")
+        self.assertEqual(scheduled.payload["starts_at"], self.now.isoformat())
         self.assertEqual(link.payload["event_type"], "visiting_mapmaker")
         self.assertEqual(link.payload["affective_tone"], -0.25)
         self.assertTrue(link.payload["generated_fiction"])

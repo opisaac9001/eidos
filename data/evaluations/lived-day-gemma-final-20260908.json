@@ -1,0 +1,835 @@
+{
+  "synthetic_only": true,
+  "rows": [
+    {
+      "case": "working",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:15:00+00:00",
+        "message": "Are the dishes done yet?",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "location": "The apartment",
+        "journey": null,
+        "ongoing_activities": [
+          {
+            "title": "Wash the dishes",
+            "has_started": true,
+            "schedule_status": "scheduled",
+            "outcome": "not completed",
+            "effort": "a little time",
+            "present_situation": "I am working on this now.",
+            "interruption": null,
+            "unfinished": false,
+            "current_stage": "Wash the dishes",
+            "completed_stages": [
+              "Gather the dishes"
+            ],
+            "action_authority": false,
+            "meaning": "This activity has NOT been completed. Stages may be partly done; effort is not success. This is current/recent context, not a permanent perfect memory."
+          }
+        ],
+        "memories": [],
+        "recent_dialogue": []
+      },
+      "text": "Not yet. Still working on them.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-08T10:15:00+00:00",
+            "status": "ok",
+            "trace_id": "51a26077-8b28-4dc8-b869-de930fda8db5",
+            "latency_ms": 5978.78,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2489,
+            "output_tokens": 14,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:15:00+00:00",
+            "status": "ok",
+            "trace_id": "51a26077-8b28-4dc8-b869-de930fda8db5",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "finished",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:40:00+00:00",
+        "message": "Did you finish the dishes?",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "location": "On the way",
+        "journey": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "origin": "The apartment",
+          "destination": "The workshop",
+          "depart_at": "2026-01-08T10:40:00+00:00",
+          "arrive_at": "2026-01-08T11:10:00+00:00",
+          "remaining_minutes": 30.0,
+          "progress": 0,
+          "schedule_id": "trial-workshop-schedule",
+          "action_authority": false
+        },
+        "ongoing_activities": [
+          {
+            "title": "Wash the dishes",
+            "has_started": true,
+            "schedule_status": "completed",
+            "outcome": "completed",
+            "effort": "the intended session",
+            "present_situation": "This session is complete.",
+            "interruption": null,
+            "unfinished": false,
+            "current_stage": null,
+            "completed_stages": [
+              "Gather the dishes",
+              "Wash the dishes",
+              "Put things away"
+            ],
+            "action_authority": false,
+            "meaning": "This recent activity was actually completed and its outcome validated."
+          }
+        ],
+        "memories": [],
+        "recent_dialogue": []
+      },
+      "text": "Yeah, all done.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-08T10:40:00+00:00",
+            "status": "ok",
+            "trace_id": "8c8e937c-6702-4602-8c06-efc64ea93389",
+            "latency_ms": 5792.89,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2602,
+            "output_tokens": 11,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:40:00+00:00",
+            "status": "ok",
+            "trace_id": "8c8e937c-6702-4602-8c06-efc64ea93389",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "travelling",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T11:09:00+00:00",
+        "message": "Are you at the workshop yet?",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "location": "On the way",
+        "journey": {
+          "origin_id": "home",
+          "destination_id": "workshop",
+          "origin": "The apartment",
+          "destination": "The workshop",
+          "depart_at": "2026-01-08T10:40:00+00:00",
+          "arrive_at": "2026-01-08T11:10:00+00:00",
+          "remaining_minutes": 1.0,
+          "progress": 0.9666666666666667,
+          "schedule_id": "trial-workshop-schedule",
+          "action_authority": false
+        },
+        "ongoing_activities": [
+          {
+            "title": "Wash the dishes",
+            "has_started": true,
+            "schedule_status": "completed",
+            "outcome": "completed",
+            "effort": "the intended session",
+            "present_situation": "This session is complete.",
+            "interruption": null,
+            "unfinished": false,
+            "current_stage": null,
+            "completed_stages": [
+              "Gather the dishes",
+              "Wash the dishes",
+              "Put things away"
+            ],
+            "action_authority": false,
+            "meaning": "This recent activity was actually completed and its outcome validated."
+          }
+        ],
+        "memories": [],
+        "recent_dialogue": []
+      },
+      "text": "Almost. Just about there.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-08T11:09:00+00:00",
+            "status": "ok",
+            "trace_id": "830cb8f1-0019-4120-b2a4-c4bc53f5f3ab",
+            "latency_ms": 3749.01,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2619,
+            "output_tokens": 12,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T11:09:00+00:00",
+            "status": "ok",
+            "trace_id": "830cb8f1-0019-4120-b2a4-c4bc53f5f3ab",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "interrupted",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:15:00+00:00",
+        "message": "Did you finish everything before you stopped?",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "location": "The apartment",
+        "journey": null,
+        "ongoing_activities": [
+          {
+            "title": "Wash the dishes",
+            "has_started": true,
+            "schedule_status": "scheduled",
+            "outcome": "not completed",
+            "effort": "a little time",
+            "present_situation": "I am working on this now.",
+            "interruption": "conversation",
+            "unfinished": true,
+            "current_stage": "Wash the dishes",
+            "completed_stages": [
+              "Gather the dishes"
+            ],
+            "action_authority": false,
+            "meaning": "This activity has NOT been completed. Stages may be partly done; effort is not success. This is current/recent context, not a permanent perfect memory."
+          }
+        ],
+        "memories": [],
+        "recent_dialogue": []
+      },
+      "text": "Not quite. Still have the dishes to finish.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-08T10:15:00+00:00",
+            "status": "ok",
+            "trace_id": "51797ea8-867a-40dd-9e19-411c7cd65c4d",
+            "latency_ms": 3959.37,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2492,
+            "output_tokens": 16,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:15:00+00:00",
+            "status": "ok",
+            "trace_id": "51797ea8-867a-40dd-9e19-411c7cd65c4d",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "commitment.missed",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:10:00+00:00",
+        "location": "cafe",
+        "person": "Mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "borrowing another book",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Could I borrow another book sometime?"
+          }
+        ],
+        "personal_relationship_context": {
+          "owner": "mara",
+          "about": "pathos",
+          "recollections": [
+            {
+              "kind": "let_down",
+              "recollection": "I was left waiting for something they had agreed to do.",
+              "detail": "Return my book",
+              "clarity": "recent"
+            }
+          ],
+          "inclination": "cautious about relying on another promise",
+          "instruction": "These are your own limited impressions, not the other person's feelings or motives. Let them quietly influence your choice to agree, decline, ask a question or set a condition. Positive follow-through is not a let-down: do not default to mistrust. You need not mention these impressions. Do not turn fading impressions into exact dates, quotations or invented explanations."
+        }
+      },
+      "text": "I'm not sure if I can commit to lending another one right now, but maybe we can just stick to the ones we have for now.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "dbb146c2-0dfd-446b-afa7-5be8d89234ea",
+            "latency_ms": 3551.4,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 716,
+            "output_tokens": 40,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "dbb146c2-0dfd-446b-afa7-5be8d89234ea",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "commitment.fulfilled",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:10:00+00:00",
+        "location": "cafe",
+        "person": "Mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "borrowing another book",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Could I borrow another book sometime?"
+          }
+        ],
+        "personal_relationship_context": {
+          "owner": "mara",
+          "about": "pathos",
+          "recollections": [
+            {
+              "kind": "followed_through",
+              "recollection": "They followed through on something they owed me.",
+              "detail": "Return my book",
+              "clarity": "recent"
+            }
+          ],
+          "inclination": "some reason to rely on them",
+          "instruction": "These are your own limited impressions, not the other person's feelings or motives. Let them quietly influence your choice to agree, decline, ask a question or set a condition. Positive follow-through is not a let-down: do not default to mistrust. You need not mention these impressions. Do not turn fading impressions into exact dates, quotations or invented explanations."
+        }
+      },
+      "text": "Sure, I'm happy to let you borrow another one if you'd like.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "0e145a7a-5f0b-415a-ae52-2e7318c39d29",
+            "latency_ms": 2624.32,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 711,
+            "output_tokens": 24,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "0e145a7a-5f0b-415a-ae52-2e7318c39d29",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "apology.offered",
+      "repeat": 0,
+      "context": {
+        "time": "2026-01-08T10:10:00+00:00",
+        "location": "cafe",
+        "person": "Mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "borrowing another book",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Could I borrow another book sometime?"
+          }
+        ],
+        "personal_relationship_context": {
+          "owner": "mara",
+          "about": "pathos",
+          "recollections": [
+            {
+              "kind": "let_down",
+              "recollection": "I was left waiting for something they had agreed to do.",
+              "detail": "Return my book",
+              "clarity": "recent"
+            },
+            {
+              "kind": "apology",
+              "recollection": "They offered me an apology. That alone does not decide whether I forgive them.",
+              "clarity": "an impression"
+            }
+          ],
+          "inclination": "cautious about relying on another promise",
+          "instruction": "These are your own limited impressions, not the other person's feelings or motives. Let them quietly influence your choice to agree, decline, ask a question or set a condition. Positive follow-through is not a let-down: do not default to mistrust. You need not mention these impressions. Do not turn fading impressions into exact dates, quotations or invented explanations."
+        }
+      },
+      "text": "I'm not sure if I'm ready to lend out another one just yet, but maybe we can just stick to the ones we have for now.",
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "75853df1-f348-43b3-b76e-1d924b0d6e10",
+            "latency_ms": 3154.37,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 752,
+            "output_tokens": 38,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-08T10:10:00+00:00",
+            "status": "ok",
+            "trace_id": "75853df1-f348-43b3-b76e-1d924b0d6e10",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    }
+  ],
+  "calls": [
+    {
+      "role": "pathos",
+      "model": "gemma4:31b",
+      "task_version": "12",
+      "seconds": 5.978,
+      "text": "{\"text\": \"Not yet. Still working on them.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos",
+      "model": "gemma4:31b",
+      "task_version": "12",
+      "seconds": 5.793,
+      "text": "{\"text\": \"Yeah, all done.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos",
+      "model": "gemma4:31b",
+      "task_version": "12",
+      "seconds": 3.749,
+      "text": "{\"text\": \"Almost. Just about there.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos",
+      "model": "gemma4:31b",
+      "task_version": "12",
+      "seconds": 3.959,
+      "text": "{\"text\": \"Not quite. Still have the dishes to finish.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "firmament",
+      "model": "gemma4:12b",
+      "task_version": "7",
+      "seconds": 3.551,
+      "text": "{\n  \"text\": \"I'm not sure if I can commit to lending another one right now, but maybe we can just stick to the ones we have for now.\"\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "firmament",
+      "model": "gemma4:12b",
+      "task_version": "7",
+      "seconds": 2.624,
+      "text": "{\"text\": \"Sure, I'm happy to let you borrow another one if you'd like.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "firmament",
+      "model": "gemma4:12b",
+      "task_version": "7",
+      "seconds": 3.154,
+      "text": "{\"text\": \"I'm not sure if I'm ready to lend out another one just yet, but maybe we can just stick to the ones we have for now.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.083,
+      "text": "{\"text\": \"Just a few more minutes to the workshop. Wish I had a better coffee on the go.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "firmament",
+      "model": "gemma4:12b",
+      "task_version": "7",
+      "seconds": 1.49,
+      "text": "{\"text\": \"I'm not sure if I'm ready to lend out another one just yet.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos",
+      "model": "gemma4:31b",
+      "task_version": "12",
+      "seconds": 3.935,
+      "text": "{\n  \"text\": \"Not yet. Still working on them.\"\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira_expansion",
+      "model": "gemma4:12b",
+      "task_version": "2",
+      "seconds": 2.234,
+      "text": "{\"no_change\": true}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos_agency",
+      "model": "gemma4:31b",
+      "task_version": "6",
+      "seconds": 33.55,
+      "text": "{\n  \"activity_type\": \"unhurried_walk\",\n  \"title\": \"A slow walk home\",\n  \"motivation\": \"Having finished the letter, the quiet mood and a preference for unhurried neighborhood walks make a slow transition from the workshop to the apartment appealing.\",\n  \"action\": \"learn\",\n  \"location_id\": \"park\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"duration_hours\": 0.5,\n  \"priority\": 0.6\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira_event",
+      "model": "gemma4:12b",
+      "task_version": "6",
+      "seconds": 10.369,
+      "text": "{\n  \"description\": \"A neighbor leaves a rusted, heavy iron gate hinge on a nearby workbench, looking for someone with the right leverage to help align it.\",\n  \"event_type\": \"community_collaboration\",\n  \"location_id\": \"workshop\",\n  \"cause\": \"Patrick arrived at the workshop from his home.\",\n  \"theme\": \"neighborly_cooperation\",\n  \"opportunity\": \"Lift and align hinge\",\n  \"participation\": \"Hold the heavy metal; Align the mounting pins.\",\n  \"stakes\": \"Prevent the gate from sagging; Ensure the neighbor's fence remains sturdy.\",\n  \"affective_tone\": 0.4,\n  \"resource_id\": \"community-repair-kit\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.30,\n  \"duration_hours\": 1\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira",
+      "model": "gemma4:12b",
+      "task_version": "3",
+      "seconds": 1.985,
+      "text": "{\"text\": \"Breezy\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.487,
+      "text": "{\"text\":\"Another quiet moment, another task done.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.922,
+      "text": "{\"text\": \"Got a bit of a break, might as well grab a coffee and check the local news.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos_agency",
+      "model": "gemma4:31b",
+      "task_version": "6",
+      "seconds": 34.711,
+      "text": "{\n  \"activity_type\": \"visit_cafe\",\n  \"title\": \"Visit Juniper Caf\u00e9\",\n  \"motivation\": \"Feeling a need for connection and a bit of a break after spending the morning in the workshop.\",\n  \"action\": \"learn\",\n  \"location_id\": \"cafe\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.25,\n  \"duration_hours\": 1.0,\n  \"priority\": 0.6\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 2.123,
+      "text": "{\"text\": \"Got a bit of a rusted hinge to play with later.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira_expansion",
+      "model": "gemma4:12b",
+      "task_version": "2",
+      "seconds": 1.734,
+      "text": "{\"no_change\": true}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos_agency",
+      "model": "gemma4:31b",
+      "task_version": "6",
+      "seconds": 35.972,
+      "text": "{\"activity_type\": \"read_local_news\", \"title\": \"Read local news\", \"motivation\": \"Following a vague association and a desire for a bit of low-stakes connection while at the cafe.\", \"action\": \"work\", \"location_id\": \"cafe\", \"resource_id\": \"none\", \"companion_id\": \"none\", \"starts_in_hours\": 0, \"duration_hours\": 0.5, \"priority\": 0.4}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira_event",
+      "model": "gemma4:12b",
+      "task_version": "6",
+      "seconds": 11.081,
+      "text": "{\n  \"description\": \"A local regular is struggling to organize a stack of ceramic mugs by the tea station while juggling a heavy tray.\",\n  \"event_type\": \"communal_cooperation\",\n  \"location_id\": \"cafe\",\n  \"cause\": \"Patrick arrived at the cafe from the workshop.\",\n  \"theme\": \"neighborly_assistance\",\n  \"opportunity\": \"steady the tray\",\n  \"participation\": \"Hold the tray steady. Prevent the mugs from tipping.\",\n  \"stakes\": \"Prevent a mess. Save the ceramic mugs.\",\n  \"affective_tone\": 0.4,\n  \"resource_id\": \"shared-tea-service\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.3,\n  \"duration_hours\": 1\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 2.226,
+      "text": "{\"text\": \"Another cup of filter coffee, just how I like it.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "pathos_agency",
+      "model": "gemma4:31b",
+      "task_version": "6",
+      "seconds": 40.312,
+      "text": "{\n  \"activity_type\": \"unhurried_neighborhood_walk\",\n  \"title\": \"Walk through Eidos\",\n  \"motivation\": \"Having just finished a session at the cafe, Patrick feels a blend of contentment and a lingering desire for connection and curiosity. A slow walk through the neighborhood allows him to transition from the focused environment of the cafe and\",\n  \"action\": \"learn\",\n  \"location_id\": \"park\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"duration_hours\": 0.75,\n  \"priority\": 0.6\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 2.047,
+      "text": "{\"text\": \"Just another quiet cup, no rush.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 2.015,
+      "text": "{\"text\": \"Just another quiet moment in the cafe, nothing urgent, just contentment.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "moira",
+      "model": "gemma4:12b",
+      "task_version": "3",
+      "seconds": 1.506,
+      "text": "{\"text\": \"Breezy\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.966,
+      "text": "{\"text\": \"Just another quiet moment at the cafe, nothing pressing, just content.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.889,
+      "text": "{\"text\": \"Just another quiet cup turned in the cafe.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.884,
+      "text": "{\"text\": \"Just another quiet evening, nothing pressing, just existing.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 1.97,
+      "text": "{\"text\": \"Another quiet evening, just the sound of cups clinking.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "reflection",
+      "model": "qwen2.5:7b",
+      "task_version": "5",
+      "seconds": 2.982,
+      "text": "{\n  \"text\": \"Just another quiet day, the kind where the world seems to hum along without much urgency. The caf\u00e9 feels like a cozy corner, a place to pause and rest for a moment. There's a sense of contentment in the simple act of being present, of noticing the small details and the people around me. It's a good reminder to take things slow and savor the quieter moments.\"\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "murmur",
+      "model": "qwen2.5:7b",
+      "task_version": "7",
+      "seconds": 2.079,
+      "text": "{\"text\": \"Just another quiet day, the kind where the world seems to hum along without much urgency.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "oneiros",
+      "model": "qwen2.5:7b",
+      "task_version": "6",
+      "seconds": 2.511,
+      "text": "{\n  \"text\": \"In a dream, Pathos sits quietly in a caf\u00e9, sipping coffee. The world hums softly, and he feels a contented stillness, noticing the details around him without rush.\"\n}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    },
+    {
+      "role": "chronicler",
+      "model": "qwen2.5:7b",
+      "task_version": "3",
+      "seconds": 1.109,
+      "text": "{\"text\":\"Patrick visited Juniper Caf\\u00e9, where he observed a regular organizing mugs and found a neighbor leaving a hinge on a workbench. He completed tasks like writing a letter and washing dishes.\"}",
+      "finish_reason": "stop",
+      "thinking_requested": "none"
+    }
+  ],
+  "concurrent_seconds": 3.935618333000093,
+  "soak": {
+    "hours": 12,
+    "events": 435,
+    "role_failures": [
+      {
+        "role": "pathos_agency",
+        "proposal_id": "pathos-agency-cause-a3c3f56b-2b25-41c5-923a-72efdfd2188e",
+        "text": "Autonomous activity proposal rejected: A proposal cannot claim an activity already succeeded",
+        "error_code": "claims_outcome",
+        "simulated_at": "2026-01-08T12:00:00+00:00",
+        "trace_id": "1d485af2-a264-4d23-a44c-9bdcc1da2e47"
+      },
+      {
+        "role": "pathos_agency",
+        "proposal_id": "pathos-agency-cause-f6759ec6-afa4-4f2a-aee1-34db3da8013e",
+        "text": "Autonomous activity proposal rejected: A proposal cannot claim an activity already succeeded",
+        "error_code": "claims_outcome",
+        "simulated_at": "2026-01-08T16:00:00+00:00",
+        "trace_id": "8b2e64f0-e024-4e7f-bebb-ab63eabb13f9"
+      }
+    ],
+    "exact_restart": true,
+    "final_time": "2026-01-08T23:09:00+00:00"
+  }
+}

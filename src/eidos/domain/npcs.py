@@ -59,7 +59,14 @@ class NPCWorldState:
         if not isinstance(actor_id, str) or actor_id not in people:
             return self
         person = people[actor_id]
-        if event.kind == "npc.moved":
+        if event.kind == "npc.travel_started":
+            if (
+                event.payload.get("owner") != actor_id
+                or event.payload.get("visibility") != "private"
+            ):
+                raise ValueError("NPC journeys must retain their private owner")
+            people[actor_id] = replace(person, location_id="in-transit")
+        elif event.kind == "npc.moved":
             location_id = _required(event, "location_id")
             people[actor_id] = replace(person, location_id=location_id)
         elif event.kind == "npc.activity_recorded":

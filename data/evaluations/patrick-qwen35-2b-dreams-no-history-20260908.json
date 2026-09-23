@@ -1,0 +1,510 @@
+{
+  "model": "qwen3.5:2b",
+  "synthetic": true,
+  "thinking": false,
+  "omit_recent_dreams": true,
+  "rows": [
+    {
+      "case": "1_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I sat alone on a park bench as the sun dipped low, watching clouds drift like wool over the wet pavement. The cold wind bit through my damp hoodie, making me shiver slightly against the railing. Suddenly, a warm cup of filter coffee appeared beside me, steaming against the glass. I took a sip, and for a moment, the gray sky brightened to soft orange, while the distant hum of traffic faded into silence. It felt like a quiet escape from the heavy afternoon.",
+      "seconds": 2.39,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "698e2872-c3f4-4894-80db-df26bce4f9b4",
+          "latency_ms": 2393.08,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 837,
+          "output_tokens": 112,
+          "semantic_status": "warning",
+          "semantic_findings": "excessive_length"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "698e2872-c3f4-4894-80db-df26bce4f9b4",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "excessive_length"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I sat alone on a park bench as the sun dipped low, watching clouds drift like wool over the wet pavement. The cold wind bit through my damp hoodie, making me shiver slightly against the railing. Suddenly, a warm cup of filter coffee appeared beside me, steaming against the glass. I took a sip, and for a moment, the gray sky brightened to soft orange, while the distant hum of traffic faded into silence. It felt like a quiet escape from the heavy afternoon.\"\n}",
+          "usage": {
+            "prompt_tokens": 837,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 112,
+            "total_tokens": 949
+          }
+        }
+      ]
+    },
+    {
+      "case": "2_unfinished_conversation",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I left a conversation with Mara unfinished."
+        ],
+        "emotion": {
+          "label": "uneasy",
+          "valence": -0.3,
+          "arousal": 0.5
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I tried to finish sending my email to Mara but got stuck halfway through the sentence about her new project. The cursor blinked like it was waiting for permission to continue, and my fingers hovered over the send button while the screen faded into gray dust.",
+      "seconds": 1.54,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "b6b84c40-884f-4994-991d-e2fedf46d9fe",
+          "latency_ms": 1537.38,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 832,
+          "output_tokens": 61,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "b6b84c40-884f-4994-991d-e2fedf46d9fe",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I tried to finish sending my email to Mara but got stuck halfway through the sentence about her new project. The cursor blinked like it was waiting for permission to continue, and my fingers hovered over the send button while the screen faded into gray dust.\"}",
+          "usage": {
+            "prompt_tokens": 832,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 61,
+            "total_tokens": 893
+          }
+        }
+      ]
+    },
+    {
+      "case": "3_work_pressure",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I still have a piece of writing to finish tomorrow."
+        ],
+        "emotion": {
+          "label": "tense",
+          "valence": -0.2,
+          "arousal": 0.6
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, the old Bristol flat smells like filter coffee and damp wool. I'm sitting at the kitchen table, trying to draft notes on post-rock theory while staring at a spreadsheet of red ink that refuses to stop. Patrick is there, muttering about ethics in an argument with his own shadow, which looks remarkably like me but doesn't quite have that distinct grey humor. We're just talking about whether buying another flat would actually help us solve the writing problems.",
+      "seconds": 2.39,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1531f985-da81-4109-b89f-a5872dc196e4",
+          "latency_ms": 2390.48,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 835,
+          "output_tokens": 102,
+          "semantic_status": "warning",
+          "semantic_findings": "excessive_length"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "1531f985-da81-4109-b89f-a5872dc196e4",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "excessive_length"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, the old Bristol flat smells like filter coffee and damp wool. I'm sitting at the kitchen table, trying to draft notes on post-rock theory while staring at a spreadsheet of red ink that refuses to stop. Patrick is there, muttering about ethics in an argument with his own shadow, which looks remarkably like me but doesn't quite have that distinct grey humor. We're just talking about whether buying another flat would actually help us solve the writing problems.\"\n}",
+          "usage": {
+            "prompt_tokens": 835,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 102,
+            "total_tokens": 937
+          }
+        }
+      ]
+    },
+    {
+      "case": "4_music_and_food",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I listened to music while chopping vegetables for dinner."
+        ],
+        "emotion": {
+          "label": "pleased",
+          "valence": 0.5,
+          "arousal": 0.3
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I stood in my kitchen with the smell of roasting garlic drifting through an open window. Rain tapped against the glass like a metronome counting down to dinner. A stray dog barked from the hallway, its tail thumping once against the wood. I froze as a single shadow fell across the counter, blocking the light. The shadows moved independently, shifting between the vegetables and the floor tiles without any clear source. My breath hitched in the quiet chaos of the room.",
+      "seconds": 2.15,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "21cfae51-c777-497d-a516-48aae8af428f",
+          "latency_ms": 2149.84,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 834,
+          "output_tokens": 110,
+          "semantic_status": "warning",
+          "semantic_findings": "excessive_length"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "21cfae51-c777-497d-a516-48aae8af428f",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "excessive_length"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"text\": \"In a dream, I stood in my kitchen with the smell of roasting garlic drifting through an open window. Rain tapped against the glass like a metronome counting down to dinner. A stray dog barked from the hallway, its tail thumping once against the wood. I froze as a single shadow fell across the counter, blocking the light. The shadows moved independently, shifting between the vegetables and the floor tiles without any clear source. My breath hitched in the quiet chaos of the room.\"\n}",
+          "usage": {
+            "prompt_tokens": 834,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 110,
+            "total_tokens": 944
+          }
+        }
+      ]
+    },
+    {
+      "case": "5_no_recalled_seed",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [],
+        "emotion": {
+          "label": "quiet",
+          "valence": 0.0,
+          "arousal": 0.1
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream I stood in a quiet room with the smell of damp wool and stale coffee, watching the clock tick past midnight. I felt the familiar ache of an unfinished sentence, a knot in my chest that tightened when I thought of tomorrow's deadline. The air hummed with static electricity, distorting the edges of objects until they melted into shapes I couldn't quite name. It was heavy but necessary, like the ground beneath my feet.",
+      "seconds": 2.02,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "a4405a6f-bb2d-4c5c-9216-75f9c2292ae5",
+          "latency_ms": 2016.48,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 822,
+          "output_tokens": 97,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "a4405a6f-bb2d-4c5c-9216-75f9c2292ae5",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream I stood in a quiet room with the smell of damp wool and stale coffee, watching the clock tick past midnight. I felt the familiar ache of an unfinished sentence, a knot in my chest that tightened when I thought of tomorrow's deadline. The air hummed with static electricity, distorting the edges of objects until they melted into shapes I couldn't quite name. It was heavy but necessary, like the ground beneath my feet.\"\n}",
+          "usage": {
+            "prompt_tokens": 822,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 97,
+            "total_tokens": 919
+          }
+        }
+      ]
+    },
+    {
+      "case": "6_missed_train",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I missed a train and waited on the platform."
+        ],
+        "emotion": {
+          "label": "frustrated",
+          "valence": -0.4,
+          "arousal": 0.4
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I sat in a crowded London tube station near Bishopsgate, clutching a train map while the digital display blinked red and green like an erratic heartbeat. The platform was dark, smelling of wet concrete and old paper, but my mind couldn't focus on the ticket machine's hum. Suddenly, a shadow detached itself from the crowd\u2014a tall figure with headphones around their neck, eyes fixed on the screen as if they were reading code I never wrote. 'Just one more,' I whispered to the empty air. They turned slowly, hands clasped behind their back, and smiled without showing teeth. The platform dissolved into a blur of blue light, leaving me alone in the shadows. It was terrifyingly simple.",
+      "seconds": 2.88,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "94569833-5481-472a-b5ba-4ee69e87e4a6",
+          "latency_ms": 2879.07,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 835,
+          "output_tokens": 154,
+          "semantic_status": "warning",
+          "semantic_findings": "excessive_length"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "94569833-5481-472a-b5ba-4ee69e87e4a6",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "excessive_length"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I sat in a crowded London tube station near Bishopsgate, clutching a train map while the digital display blinked red and green like an erratic heartbeat. The platform was dark, smelling of wet concrete and old paper, but my mind couldn't focus on the ticket machine's hum. Suddenly, a shadow detached itself from the crowd\u2014a tall figure with headphones around their neck, eyes fixed on the screen as if they were reading code I never wrote. 'Just one more,' I whispered to the empty air. They turned slowly, hands clasped behind their back, and smiled without showing teeth. The platform dissolved into a blur of blue light, leaving me alone in the shadows. It was terrifyingly simple.\"\n}",
+          "usage": {
+            "prompt_tokens": 835,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 154,
+            "total_tokens": 989
+          }
+        }
+      ]
+    },
+    {
+      "case": "7_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream I sat alone on a damp bench, watching raincoat tails blur past like ghosts. A stranger laughed too high in the fog, then vanished into puddles where no sound could remain. The cold bit through my coat and made me think about a cancelled trip to Iceland.",
+      "seconds": 1.39,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "0a44eb24-45cb-4da7-8315-312292a681f2",
+          "latency_ms": 1389.81,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 837,
+          "output_tokens": 65,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "0a44eb24-45cb-4da7-8315-312292a681f2",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream I sat alone on a damp bench, watching raincoat tails blur past like ghosts. A stranger laughed too high in the fog, then vanished into puddles where no sound could remain. The cold bit through my coat and made me think about a cancelled trip to Iceland.\"\n}",
+          "usage": {
+            "prompt_tokens": 837,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 65,
+            "total_tokens": 902
+          }
+        }
+      ]
+    },
+    {
+      "case": "8_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I stepped into a rainy alleyway and found an old coat hanging alone on a rusted door. The wind howled softly against the brickwork, making me feel small inside my own clothes. I touched the fabric, but it felt warm despite the cold air outside. As I walked further down the narrow path, the world blurred into streaks of grey light.",
+      "seconds": 1.53,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "4a081b77-1b36-4811-963f-7b2a26c4270d",
+          "latency_ms": 1532.77,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 837,
+          "output_tokens": 85,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "4a081b77-1b36-4811-963f-7b2a26c4270d",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stepped into a rainy alleyway and found an old coat hanging alone on a rusted door. The wind howled softly against the brickwork, making me feel small inside my own clothes. I touched the fabric, but it felt warm despite the cold air outside. As I walked further down the narrow path, the world blurred into streaks of grey light.\"\n}",
+          "usage": {
+            "prompt_tokens": 837,
+            "prompt_tokens_details": {
+              "cached_tokens": 833
+            },
+            "completion_tokens": 85,
+            "total_tokens": 922
+          }
+        }
+      ]
+    }
+  ]
+}

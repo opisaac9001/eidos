@@ -1,0 +1,27 @@
+[Unit]
+Description=Pathos observatory and simulation
+After=network-online.target ollama@pathos.service ollama@world.service ollama@cognition.service
+Wants=network-online.target
+RequiresMountsFor=/srv/eidos-data
+
+[Service]
+Type=simple
+User=isaac
+Group=isaac
+WorkingDirectory=/srv/eidos
+Environment=PYTHONUNBUFFERED=1
+Environment=EIDOS_MODEL_ROUTES_FILE=/etc/eidos/model-routes.json
+ExecStart=/srv/eidos/.venv/bin/python -m eidos --database /var/lib/eidos/observatory.sqlite3 serve --port 8767
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=120
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/eidos
+
+[Install]
+WantedBy=multi-user.target

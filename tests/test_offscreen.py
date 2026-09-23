@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.offscreen import npc_world_events
+from eidos.application.offscreen import authored_npc_world_events as npc_world_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
 

@@ -29,38 +29,62 @@ class WorldExplorationTests(unittest.TestCase):
             },
         )
 
-    def test_new_place_becomes_a_source_linked_two_visit_goal(self):
-        registration = self.registration()
-        history = [registration]
-        events = exploration_plan_events(history, self.now, project_world_catalog(history))
-        planning = project_planning(events)
-        goal = planning.goals["explore-old-glasshouse"]
-        visits = sorted(planning.calendar.values(), key=lambda item: item.starts_at)
-        self.assertEqual(goal.status, "active")
-        self.assertEqual(len(visits), 2)
-        self.assertTrue(all(item.location_id == "old-glasshouse" for item in visits))
-        self.assertTrue(
-            all(10 <= datetime.fromisoformat(item.starts_at).hour < 16 for item in visits)
-        )
-        self.assertTrue(
-            all(
-                event.causation_id == registration.event_id
-                for event in events
-                if event.kind in {"goal.activated", "schedule.created"}
-            )
-        )
-        self.assertEqual(
-            exploration_plan_events(
-                [*history, *events], self.now, project_world_catalog([*history, *events])
-            ),
-            [],
+    def intention(self):
+        return DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "intention_id": "visit-glasshouse",
+                "actor_id": "pathos",
+                "action": "attend",
+                "target_id": "old-glasshouse",
+                "priority": 0.5,
+                "motivation": "Look for restoration ideas for my project.",
+                "goal_id": None,
+            },
         )
 
-    def test_calendar_entry_replaces_loose_routine_at_departure_time(self):
-        registration = self.registration()
-        events = exploration_plan_events(
-            [registration], self.now, project_world_catalog([registration])
+    def test_registration_alone_does_not_invent_desire(self):
+        history = [self.registration()]
+        self.assertEqual(
+            exploration_plan_events(history, self.now, project_world_catalog(history)), []
         )
+
+    def test_abandoned_desire_does_not_get_an_outing(self):
+        history = [
+            self.registration(),
+            self.intention(),
+            DomainEvent("intention.abandoned", "pathos", {"intention_id": "visit-glasshouse"}),
+        ]
+        self.assertEqual(
+            exploration_plan_events(history, self.now, project_world_catalog(history)), []
+        )
+
+    def test_desire_does_not_authorize_the_scheduler_to_pick_a_date(self):
+        history = [self.registration(), self.intention()]
+        self.assertEqual(
+            exploration_plan_events(history, self.now, project_world_catalog(history)), []
+        )
+
+    def explicit_plan(self):
+        return [
+            DomainEvent(
+                "schedule.created",
+                "pathos",
+                {
+                    "schedule_id": "deliberate-visit",
+                    "title": "Visit the glasshouse",
+                    "actor_id": "pathos",
+                    "action": "attend",
+                    "location_id": "old-glasshouse",
+                    "starts_at": "2026-01-22T10:00:00+00:00",
+                    "ends_at": "2026-01-22T11:00:00+00:00",
+                },
+            )
+        ]
+
+    def test_calendar_entry_replaces_loose_routine_at_departure_time(self):
+        events = self.explicit_plan()
         planning = project_planning(events)
         visit = next(iter(planning.calendar.values()))
         starts_at = datetime.fromisoformat(visit.starts_at)
@@ -72,10 +96,7 @@ class WorldExplorationTests(unittest.TestCase):
         self.assertIsNone(planned_activity_beat(PlanningState(), starts_at, 0.7))
 
     def test_activity_does_not_create_an_extra_departure_at_its_end(self):
-        registration = self.registration()
-        events = exploration_plan_events(
-            [registration], self.now, project_world_catalog([registration])
-        )
+        events = self.explicit_plan()
         planning = project_planning(events)
         visit = next(iter(planning.calendar.values()))
         starts_at = datetime.fromisoformat(visit.starts_at)

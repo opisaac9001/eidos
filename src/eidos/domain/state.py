@@ -48,6 +48,14 @@ class PathosState:
                 if simulated_at < self.simulated_at:
                     raise ValueError("simulated time cannot move backwards")
                 return replace(self, simulated_at=simulated_at)
+            case "pathos.travel_started":
+                if event.payload.get("origin_id") != self.location_id:
+                    raise ValueError("Journey must start at the current location")
+                depart = datetime.fromisoformat(str(event.payload["depart_at"]))
+                arrive = datetime.fromisoformat(str(event.payload["arrive_at"]))
+                if depart.utcoffset() is None or arrive.utcoffset() is None or arrive <= depart:
+                    raise ValueError("Journey requires an aware, positive duration")
+                return replace(self, location_id="in_transit")
             case "pathos.moved":
                 location_id = event.payload.get("location_id")
                 if not isinstance(location_id, str) or not location_id.strip():

@@ -174,7 +174,16 @@ class SelfProjectTests(unittest.TestCase):
     def test_stand_in_project_enters_the_same_validated_boundary(self):
         events = asyncio.run(
             autonomous_project_events(
-                [],
+                [
+                    DomainEvent(
+                        "thought.recorded",
+                        "pathos",
+                        {
+                            "text": "I would like to try a longer project.",
+                            "simulated_at": self.now.isoformat(),
+                        },
+                    )
+                ],
                 self.now,
                 0,
                 StandInGateway(),

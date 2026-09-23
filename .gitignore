@@ -12,3 +12,4 @@ build/
 *.sqlite3
 .DS_Store
 infra/dell-t630/*.local.json
+infra/dell-t630/*.local.env

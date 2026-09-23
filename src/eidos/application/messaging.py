@@ -32,6 +32,25 @@ def communication_availability(
 ) -> CommunicationAvailability:
     if not state.awake:
         return CommunicationAvailability("asleep", "He is asleep.", False, False)
+    if state.location_id == "in_transit":
+        return CommunicationAvailability(
+            "travelling",
+            "He is on his way somewhere. A message can wait for him; he cannot sit down for a visit yet.",
+            False,
+            True,
+        )
+    closed_calls = {e.payload.get("call_id") for e in history if e.kind == "phone.call_completed"}
+    if any(
+        e.kind == "phone.call_answered" and e.payload.get("call_id") not in closed_calls
+        for e in history
+    ):
+        interrupted = any(
+            s.status == "paused" and {s.initiator_id, s.partner_id} == {"pathos", "user"}
+            for s in project_scenes(history).scenes.values()
+        )
+        return CommunicationAvailability(
+            "interrupted" if interrupted else "occupied", "He is on a phone call.", False, False
+        )
     planning = project_planning(list(history))
     upcoming_at, upcoming_title = _next_commitment(state, planning)
     minutes_until = (

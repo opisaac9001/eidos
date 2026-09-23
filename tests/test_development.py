@@ -15,6 +15,25 @@ from eidos.domain.events import DomainEvent
 class DevelopmentTests(unittest.TestCase):
     start = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
 
+    def test_multiple_activities_on_one_day_are_one_day_of_habit_evidence(self):
+        history = [self.realized(day, hour) for day in (0, 4, 8) for hour in (9, 10)]
+        reviewed_at = self.start.replace(hour=19) + timedelta(days=9)
+        events = behavioral_habit_events(history, reviewed_at)
+        formed = next(e for e in events if e.kind == "habit.formed")
+        self.assertEqual(formed.payload["source_count"], 3)
+        self.assertEqual(
+            [formed.payload[f"source_event_{i}"] for i in range(1, 4)],
+            [str(history[i].event_id) for i in (1, 3, 5)],
+        )
+        self.assertEqual(len(project_development([*history, *events]).habits), 1)
+        self.assertEqual(behavioral_habit_events([*history, *events], reviewed_at), [])
+
+    def test_two_distinct_days_do_not_form_a_habit_despite_many_repetitions(self):
+        history = [self.realized(day, hour) for day in (0, 8) for hour in (9, 10, 11)]
+        self.assertEqual(
+            behavioral_habit_events(history, self.start.replace(hour=19) + timedelta(days=9)), []
+        )
+
     def realized(
         self,
         day: int,

@@ -26,9 +26,7 @@ def _short_fragment(value: object, maximum_words: int = 14) -> str:
     return " ".join(words[:maximum_words]) or "the quiet part of the day"
 
 
-def _standin_dream_text(
-    context: dict[str, object], location: object, last_memory: object
-) -> str:
+def _standin_dream_text(context: dict[str, object], location: object, last_memory: object) -> str:
     """Compose many replay-stable combinations while avoiding recent exact dreams."""
     openings = (
         f"In a dream, {location} opens into a room full of unfinished clocks.",
@@ -63,10 +61,7 @@ def _standin_dream_text(
         moment = datetime.fromisoformat(str(moment_value).replace("Z", "+00:00"))
         salt = int.from_bytes(hashlib.sha256(b"oneiros-combination").digest()[:2], "big")
         combination = (
-            moment.date().toordinal() * 97
-            + moment.hour * 4
-            + moment.minute // 15
-            + salt
+            moment.date().toordinal() * 97 + moment.hour * 4 + moment.minute // 15 + salt
         ) % (len(openings) * len(endings))
     except ValueError:
         combination = int.from_bytes(
@@ -657,7 +652,14 @@ class StandInGateway(ModelGateway):
                     -0.35,
                 ),
             )
-            item = agency_palette[choice % len(agency_palette)]
+            available = tuple(
+                item for item in agency_palette if item[2] in context["known_resources"].values()
+            )
+            if not available:
+                return ModelResponse(
+                    '{"no_change": true}', "authored-stand-in-v1", "stand-in", "stop"
+                )
+            item = available[choice % len(available)]
             resource_id = next(
                 object_id
                 for object_id, resource_location in context["known_resources"].items()
@@ -679,7 +681,7 @@ class StandInGateway(ModelGateway):
                         "inspiration_signal_id": next(
                             iter(context.get("external_signals", {})), "none"
                         ),
-                        "starts_in_hours": item[6],
+                        "starts_in_hours": 0,
                         "intensity": item[7],
                         "duration_hours": item[8],
                     }
@@ -744,29 +746,76 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "pathos_deliberation":
+            field = context.get("choice_field", {})
+            impulses = field.get("attended_impulses", []) if isinstance(field, dict) else []
+            chosen = next(
+                (
+                    item
+                    for item in impulses
+                    if isinstance(item, dict)
+                    and item.get("epistemic_status") == "planning_question"
+                ),
+                next(
+                    (
+                        item
+                        for item in impulses
+                        if isinstance(item, dict)
+                        and item.get("workspace_kind") == "dream_inspiration"
+                    ),
+                    next(
+                        (
+                            item
+                            for item in impulses
+                            if isinstance(item, dict) and item.get("kind") == "thought"
+                        ),
+                        next(
+                            (
+                                item
+                                for item in impulses
+                                if isinstance(item, dict)
+                                and item.get("kind")
+                                not in {"inaction", "continuation", "prospective"}
+                            ),
+                            None,
+                        ),
+                    ),
+                ),
+            )
+            if chosen is None:
+                content = {"no_change": True, "mode": "do_nothing"}
+            else:
+                content = {
+                    "mode": "pursue",
+                    "chosen_impulse_id": chosen["impulse_id"],
+                    "intention": str(chosen.get("description", "Follow what caught my attention"))[
+                        :160
+                    ],
+                }
+            return ModelResponse(
+                content=json.dumps(content),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_agency":
             places = context["known_places"]
             people = context["known_people"]
-            planning_question = next(
-                (
-                    item
-                    for item in context.get("cognitive_workspace", [])
-                    if isinstance(item, dict)
-                    and item.get("epistemic_status") == "planning_question"
-                    and item.get("action_authority") is False
-                ),
-                None,
+            source_context = context.get("chosen_source_context")
+            planning_question = (
+                source_context
+                if isinstance(source_context, dict)
+                and source_context.get("epistemic_status") == "planning_question"
+                and source_context.get("action_authority") is False
+                else None
             )
-            dream_possibility = next(
-                (
-                    item
-                    for item in context.get("cognitive_workspace", [])
-                    if isinstance(item, dict)
-                    and item.get("kind") == "dream_inspiration"
-                    and item.get("epistemic_status") == "fiction_sourced_possibility"
-                    and item.get("action_authority") is False
-                ),
-                None,
+            dream_possibility = (
+                source_context
+                if isinstance(source_context, dict)
+                and source_context.get("kind") == "dream_inspiration"
+                and source_context.get("epistemic_status") == "fiction_sourced_possibility"
+                and source_context.get("action_authority") is False
+                else None
             )
             activity_palette = (
                 (
@@ -885,6 +934,7 @@ class StandInGateway(ModelGateway):
                         "starts_in_hours": agency_item[7],
                         "duration_hours": agency_item[8],
                         "priority": agency_item[9],
+                        "estimate_confidence": 0.65,
                     }
                 ),
                 resolved_model="authored-stand-in-v1",

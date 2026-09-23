@@ -21,6 +21,7 @@ CAPABILITIES = {
     "chronicler",
     "moira_event",
     "moira_expansion",
+    "pathos_deliberation",
     "pathos_agency",
     "npc_agency",
     "npc_backstory",

@@ -12,10 +12,10 @@ class SevenDayAcceptanceTests(unittest.TestCase):
     def test_one_coherent_week_survives_restart_with_owned_fact_boundaries(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "week.sqlite3"
-            life = Life(SQLiteEventStore(path), StandInGateway())
+            life = Life(SQLiteEventStore(path), StandInGateway(), authored_scenario=True)
             for _ in range(3):
                 life.advance(24)
-            life = Life(SQLiteEventStore(path), StandInGateway())
+            life = Life(SQLiteEventStore(path), StandInGateway(), authored_scenario=True)
             for _ in range(4):
                 life.advance(24)
 

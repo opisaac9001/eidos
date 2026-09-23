@@ -86,28 +86,33 @@ def resolve_association(
     actual_revision: int,
     simulated_at: str,
 ) -> AssociationResolution:
-    common: dict[str, object] = {
+    proposal_audit: dict[str, object] = {
         "proposal_id": proposal.proposal_id,
         "actor_id": proposal.actor_id,
         "source_memory_id": str(proposal.source_memory_id),
-        "cue": proposal.cue,
-        "text": proposal.text,
         "salience": proposal.salience,
         "schema_version": proposal.schema_version,
         "simulated_at": simulated_at,
     }
+    accepted_payload: dict[str, object] = {
+        **proposal_audit,
+        "cue": proposal.cue,
+        "text": proposal.text,
+    }
     proposed = DomainEvent(
         "association.proposed",
         proposal.actor_id,
-        common,
+        proposal_audit,
         correlation_id=proposal.proposal_id,
     )
 
-    def effect(kind: str, extra: Mapping[str, object]) -> DomainEvent:
+    def effect(
+        kind: str, extra: Mapping[str, object], *, payload: Mapping[str, object] = proposal_audit
+    ) -> DomainEvent:
         return DomainEvent(
             kind,
             proposal.actor_id,
-            {**common, **extra},
+            {**payload, **extra},
             causation_id=proposed.event_id,
             correlation_id=proposal.proposal_id,
         )
@@ -140,6 +145,7 @@ def resolve_association(
             "derived_from_dream": source_category == "dream",
             "factual": False,
         },
+        payload=accepted_payload,
     )
     events = [proposed, formed]
     if proposal.salience >= 0.65:
@@ -149,10 +155,9 @@ def resolve_association(
                     "association.surfaced",
                     proposal.actor_id,
                     {
-                        **common,
+                        "proposal_id": proposal.proposal_id,
                         "association_id": str(formed.event_id),
-                        "source_category": source_category,
-                        "factual": False,
+                        "simulated_at": simulated_at,
                     },
                     causation_id=formed.event_id,
                     correlation_id=proposal.proposal_id,

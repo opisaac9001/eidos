@@ -1,0 +1,1567 @@
+[
+  {
+    "scenario": "balanced",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "balanced-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "protect:balanced-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "balanced-fixed-work-schedule",
+                "felt_pull": 0.851,
+                "felt_friction": 0.04,
+                "attention_strength": 0.85,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "household:dishes",
+                "kind": "domestic",
+                "description": "Deal with some of the dishes, at whatever scale actually fits",
+                "target_id": "dishes",
+                "felt_pull": 0.623,
+                "felt_friction": 0.195,
+                "attention_strength": 0.45,
+                "source": "noticed_home",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "quiet:none",
+                "kind": "inaction",
+                "description": "Do not make a new plan; wait, continue idling, or let the moment pass",
+                "target_id": null,
+                "felt_pull": 0.402,
+                "felt_friction": 0.02,
+                "attention_strength": 0.401,
+                "source": "behavioral_inertia",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:connection",
+                "kind": "need",
+                "description": "Seek some kind of contact",
+                "target_id": "connection",
+                "felt_pull": 0.522,
+                "felt_friction": 0.194,
+                "attention_strength": 0.373,
+                "source": "felt_need",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 4,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "ff7b0a20-d28a-4d55-a619-14e769707f19",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "hunger": 0.3,
+            "connection": 0.6,
+            "curiosity": 0.6,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "ff7b0a20-d28a-4d55-a619-14e769707f19",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\"activity_type\": \"household_dishes\", \"title\": \"Tackle some dishes\", \"motivation\": \"The dishes are becoming a noticeable presence in the morning, and I have enough time before work to make a dent in them.\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"household-provisions\", \"companion_id\": \"none\", \"starts_in_hours\": 0.1, \"duration_hours\": 0.25, \"estimate_confidence\": 1, \"priority\": 0.65}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 12.299165791002451
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-ff7b0a20-d28a-4d55-a619-14e769707f19-schedule",
+          "title": "Tackle some dishes",
+          "starts_at": "2026-01-15T07:56:00+00:00",
+          "ends_at": "2026-01-15T08:11:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-ff7b0a20-d28a-4d55-a619-14e769707f19",
+          "intention_id": "pathos-agency-cause-ff7b0a20-d28a-4d55-a619-14e769707f19-intention",
+          "estimated_duration_seconds": 900.0,
+          "estimate_confidence": 1.0,
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      },
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-ff7b0a20-d28a-4d55-a619-14e769707f19",
+          "decision": "new_plan",
+          "new_plan": true,
+          "activity_type": "household_dishes",
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "hungry",
+    "needs": {
+      "energy": 0.65,
+      "rest": 0.65,
+      "hunger": 0.92,
+      "connection": 0.6,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "hungry-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Hunger competes for attention; a chore does not satisfy it."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "protect:hungry-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "hungry-fixed-work-schedule",
+                "felt_pull": 0.851,
+                "felt_friction": 0.04,
+                "attention_strength": 0.765,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:hunger",
+                "kind": "need",
+                "description": "Find something to eat",
+                "target_id": "hunger",
+                "felt_pull": 0.876,
+                "felt_friction": 0.197,
+                "attention_strength": 0.67,
+                "source": "felt_need",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "household:dishes",
+                "kind": "domestic",
+                "description": "Deal with some of the dishes, at whatever scale actually fits",
+                "target_id": "dishes",
+                "felt_pull": 0.623,
+                "felt_friction": 0.207,
+                "attention_strength": 0.461,
+                "source": "noticed_home",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "quiet:none",
+                "kind": "inaction",
+                "description": "Do not make a new plan; wait, continue idling, or let the moment pass",
+                "target_id": null,
+                "felt_pull": 0.429,
+                "felt_friction": 0.02,
+                "attention_strength": 0.431,
+                "source": "behavioral_inertia",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 4,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "b31a482f-34a5-4c12-9418-a6dc2134e442",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.65,
+            "rest": 0.65,
+            "hunger": 0.92,
+            "connection": 0.6,
+            "curiosity": 0.6,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "b31a482f-34a5-4c12-9418-a6dc2134e442",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\n  \"activity_type\": \"prepare_and_eat_meal\",\n  \"title\": \"Breakfast at Home\",\n  \"motivation\": \"Addressing hunger before the workday starts\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"household-provisions\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.25,\n  \"duration_hours\": 0.5,\n  \"estimate_confidence\": 0.9,\n  \"priority\": 0.8\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 12.816882250001072
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "agency.activity_rejected",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-b31a482f-34a5-4c12-9418-a6dc2134e442",
+          "activity_type": "prepare_and_eat_meal",
+          "title": "Breakfast at Home",
+          "motivation": "Addressing hunger before the workday starts",
+          "action": "work",
+          "location_id": "home",
+          "resource_id": "household-provisions",
+          "companion_id": null,
+          "estimate_confidence": 0.9,
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "code": "travel_conflict",
+          "explanation": "Travel time conflicts with Work at the workshop"
+        }
+      },
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-b31a482f-34a5-4c12-9418-a6dc2134e442",
+          "decision": "attempt_rejected",
+          "new_plan": false,
+          "activity_type": "prepare_and_eat_meal",
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "exhausted",
+    "needs": {
+      "energy": 0.12,
+      "rest": 0.12,
+      "hunger": 0.4,
+      "connection": 0.55,
+      "curiosity": 0.55,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "exhausted-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Low energy: starting or returning to effort may feel harder; resting is an option."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  8
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  23
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  45
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "protect:exhausted-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "exhausted-fixed-work-schedule",
+                "felt_pull": 0.851,
+                "felt_friction": 0.04,
+                "attention_strength": 0.837,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "quiet:none",
+                "kind": "inaction",
+                "description": "Do not make a new plan; wait, continue idling, or let the moment pass",
+                "target_id": null,
+                "felt_pull": 0.715,
+                "felt_friction": 0.02,
+                "attention_strength": 0.646,
+                "source": "behavioral_inertia",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:rest",
+                "kind": "need",
+                "description": "Rest or remain still",
+                "target_id": "rest",
+                "felt_pull": 0.848,
+                "felt_friction": 0.274,
+                "attention_strength": 0.552,
+                "source": "felt_need",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 3,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "ed671e8b-acef-4eda-a615-407813396567",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.12,
+            "rest": 0.12,
+            "hunger": 0.4,
+            "connection": 0.55,
+            "curiosity": 0.55,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "ed671e8b-acef-4eda-a615-407813396567",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\n  \"no_change\": true,\n  \"mode\": \"continue\"\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 6.6646387910004705
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-ed671e8b-acef-4eda-a615-407813396567",
+          "decision": "continue",
+          "new_plan": false,
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      },
+      {
+        "kind": "agency.left_unplanned",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-ed671e8b-acef-4eda-a615-407813396567",
+          "decision": "continue",
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "lonely",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.3,
+      "connection": 0.08,
+      "curiosity": 0.6,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T07:50:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "lonely-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 70.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 40.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Wanting company can coexist with tiredness or unfinished chores."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "protect:lonely-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "lonely-fixed-work-schedule",
+                "felt_pull": 0.851,
+                "felt_friction": 0.04,
+                "attention_strength": 0.834,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:connection",
+                "kind": "need",
+                "description": "Seek some kind of contact",
+                "target_id": "connection",
+                "felt_pull": 0.876,
+                "felt_friction": 0.216,
+                "attention_strength": 0.681,
+                "source": "felt_need",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "household:dishes",
+                "kind": "domestic",
+                "description": "Deal with some of the dishes, at whatever scale actually fits",
+                "target_id": "dishes",
+                "felt_pull": 0.623,
+                "felt_friction": 0.22,
+                "attention_strength": 0.416,
+                "source": "noticed_home",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "quiet:none",
+                "kind": "inaction",
+                "description": "Do not make a new plan; wait, continue idling, or let the moment pass",
+                "target_id": null,
+                "felt_pull": 0.456,
+                "felt_friction": 0.02,
+                "attention_strength": 0.403,
+                "source": "behavioral_inertia",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 4,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "2cfda369-8ad0-4e8b-bdb6-c405eacc03be",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.6,
+            "rest": 0.6,
+            "hunger": 0.3,
+            "connection": 0.08,
+            "curiosity": 0.6,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "2cfda369-8ad0-4e8b-bdb6-c405eacc03be",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\n  \"activity_type\": \"prepare_and_eat_meal\",\n  \"title\": \"Morning meal at home\",\n  \"motivation\": \"Balance tiredness with the need for connection and food\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"household-provisions\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.5,\n  \"duration_hours\": 0.5,\n  \"estimate_confidence\": 0.8,\n  \"priority\": 0.7\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 11.970828457997413
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "agency.activity_rejected",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-2cfda369-8ad0-4e8b-bdb6-c405eacc03be",
+          "activity_type": "prepare_and_eat_meal",
+          "title": "Morning meal at home",
+          "motivation": "Balance tiredness with the need for connection and food",
+          "action": "work",
+          "location_id": "home",
+          "resource_id": "household-provisions",
+          "companion_id": null,
+          "estimate_confidence": 0.8,
+          "simulated_at": "2026-01-15T07:50:00+00:00",
+          "code": "travel_conflict",
+          "explanation": "Travel time conflicts with Work at the workshop"
+        }
+      },
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-2cfda369-8ad0-4e8b-bdb6-c405eacc03be",
+          "decision": "attempt_rejected",
+          "new_plan": false,
+          "activity_type": "prepare_and_eat_meal",
+          "simulated_at": "2026-01-15T07:50:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "curious",
+    "needs": {
+      "energy": 0.7,
+      "rest": 0.7,
+      "hunger": 0.3,
+      "connection": 0.6,
+      "curiosity": 0.08,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T07:00:00+00:00",
+          "available_opportunities": [
+            {
+              "opportunity_id": "temporary-map-display",
+              "owner": "pathos",
+              "text": "A temporary display of hand-drawn neighborhood maps is open in the cafe.",
+              "location_id": "cafe",
+              "expires_at": "2026-01-15T11:00:00+00:00",
+              "action_authority": false,
+              "simulated_at": "2026-01-15T07:00:00+00:00"
+            }
+          ],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "curious-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 120.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 90.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": true,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "need:curiosity",
+                "kind": "need",
+                "description": "Follow something interesting",
+                "target_id": "curiosity",
+                "felt_pull": 0.876,
+                "felt_friction": 0.204,
+                "attention_strength": 0.708,
+                "source": "felt_need",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "protect:curious-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "curious-fixed-work-schedule",
+                "felt_pull": 0.664,
+                "felt_friction": 0.04,
+                "attention_strength": 0.62,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "household:dishes",
+                "kind": "domestic",
+                "description": "Deal with some of the dishes, at whatever scale actually fits",
+                "target_id": "dishes",
+                "felt_pull": 0.623,
+                "felt_friction": 0.195,
+                "attention_strength": 0.475,
+                "source": "noticed_home",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "opportunity:temporary-map-display",
+                "kind": "opportunity",
+                "description": "A temporary display of hand-drawn neighborhood maps is open in the cafe.",
+                "target_id": "temporary-map-display",
+                "felt_pull": 0.602,
+                "felt_friction": 0.214,
+                "attention_strength": 0.384,
+                "source": "noticed_opportunity",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 4,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "61b59f18-d747-4a93-a9af-8a6cbb5ead41",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.7,
+            "rest": 0.7,
+            "hunger": 0.3,
+            "connection": 0.6,
+            "curiosity": 0.08,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "61b59f18-d747-4a93-a9af-8a6cbb5ead41",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\n  \"activity_type\": \"household_dishes\",\n  \"title\": \"Deal with some of the dishes\",\n  \"motivation\": \"Follow something interesting, protect enough time to reach Work at the workshop\",\n  \"action\": \"work\",\n  \"location_id\": \"home\",\n  \"resource_id\": \"none\",\n  \"companion_id\": \"none\",\n  \"starts_in_hours\": 0.5,\n  \"duration_hours\": 0.25,\n  \"estimate_confidence\": 0.6,\n  \"priority\": 0.85\n}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 12.801837999999407
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "schedule.created",
+        "payload": {
+          "schedule_id": "pathos-agency-cause-61b59f18-d747-4a93-a9af-8a6cbb5ead41-schedule",
+          "title": "Deal with some of the dishes",
+          "starts_at": "2026-01-15T07:30:00+00:00",
+          "ends_at": "2026-01-15T07:45:00+00:00",
+          "location_id": "home",
+          "actor_id": "pathos",
+          "action": "work",
+          "target_id": "home",
+          "resource_id": null,
+          "companion_id": null,
+          "activity_type": "household_dishes",
+          "source_proposal_id": "pathos-agency-cause-61b59f18-d747-4a93-a9af-8a6cbb5ead41",
+          "intention_id": "pathos-agency-cause-61b59f18-d747-4a93-a9af-8a6cbb5ead41-intention",
+          "estimated_duration_seconds": 900.0,
+          "estimate_confidence": 0.6,
+          "simulated_at": "2026-01-15T07:00:00+00:00"
+        }
+      },
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-61b59f18-d747-4a93-a9af-8a6cbb5ead41",
+          "decision": "new_plan",
+          "new_plan": true,
+          "activity_type": "household_dishes",
+          "simulated_at": "2026-01-15T07:00:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  },
+  {
+    "scenario": "late",
+    "needs": {
+      "energy": 0.6,
+      "rest": 0.6,
+      "hunger": 0.75,
+      "connection": 0.4,
+      "curiosity": 0.5,
+      "mastery": 0.55,
+      "household_dishes": 0.65
+    },
+    "calls": [
+      {
+        "request": {
+          "time": "2026-01-15T08:30:00+00:00",
+          "available_opportunities": [],
+          "ongoing_activities": [],
+          "household_tasks": [
+            {
+              "task": "dishes",
+              "pressure": "piling up"
+            },
+            {
+              "task": "laundry",
+              "pressure": "noticeable"
+            }
+          ],
+          "time_budget": {
+            "next_plan": "Work at the workshop",
+            "schedule_id": "late-fixed-work-schedule",
+            "starts_at": "2026-01-15T09:00:00+00:00",
+            "location_id": "workshop",
+            "is_commitment": false,
+            "minutes_until_start": 30.0,
+            "travel_minutes": 30.0,
+            "free_minutes": 0.0,
+            "late_by_minutes": 0.0,
+            "action_authority": false,
+            "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked."
+          },
+          "preparation": {
+            "felt_tradeoffs": [
+              "Hunger competes for attention; a chore does not satisfy it."
+            ],
+            "optional_scales": [
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "small_batch",
+                "estimated_minutes": [
+                  5,
+                  6
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Wash a few things; most of a large pile may remain."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "make_a_dent",
+                "estimated_minutes": [
+                  15,
+                  18
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Reduce the pile, without promising a clear kitchen."
+              },
+              {
+                "activity_type": "household_dishes",
+                "action": "work",
+                "location_id": "home",
+                "scope": "longer_session",
+                "estimated_minutes": [
+                  30,
+                  36
+                ],
+                "fits_before_departure": false,
+                "possible_consequence": "Work through more of the pile; a large backlog may remain."
+              }
+            ],
+            "action_authority": false,
+            "meaning": "Examples, not a menu or checklist. No activity has happened. You may choose another activity, do less, defer chores, leave early, or make no new plan. Estimates can be wrong; do not shrink the same accomplishment into fewer minutes. Mood and needs can pull in different directions; no strongest need is required to win. Existing commitments are not moved or renegotiated by this context."
+          },
+          "choice_field": {
+            "attended_impulses": [
+              {
+                "impulse_id": "protect:late-fixed-work-schedule",
+                "kind": "prospective",
+                "description": "Protect enough time to reach Work at the workshop",
+                "target_id": "late-fixed-work-schedule",
+                "felt_pull": 1.0,
+                "felt_friction": 0.04,
+                "attention_strength": 0.962,
+                "source": "accepted_plan",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:hunger",
+                "kind": "need",
+                "description": "Find something to eat",
+                "target_id": "hunger",
+                "felt_pull": 0.76,
+                "felt_friction": 0.208,
+                "attention_strength": 0.579,
+                "source": "felt_need",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "quiet:none",
+                "kind": "inaction",
+                "description": "Do not make a new plan; wait, continue idling, or let the moment pass",
+                "target_id": null,
+                "felt_pull": 0.456,
+                "felt_friction": 0.02,
+                "attention_strength": 0.477,
+                "source": "behavioral_inertia",
+                "action_authority": false
+              },
+              {
+                "impulse_id": "need:connection",
+                "kind": "need",
+                "description": "Seek some kind of contact",
+                "target_id": "connection",
+                "felt_pull": 0.658,
+                "felt_friction": 0.216,
+                "attention_strength": 0.456,
+                "source": "felt_need",
+                "action_authority": false
+              }
+            ],
+            "attention_capacity": 4,
+            "current_location_id": "home",
+            "action_authority": false,
+            "meaning": "These are the few possibilities currently reaching awareness, not commands or a complete menu. Strength is felt pull after friction, not a probability or winner. Patrick may reshape one, continue what he is doing, defer all of them, wait, or do nothing. Unattended possibilities are not available to this decision. Do not maximize a score or invent an accomplished result."
+          },
+          "current_location_id": "home",
+          "decision_cause": {
+            "event_id": "9b157bb0-badb-4158-b474-566daeb56add",
+            "kind": "thought.recorded"
+          },
+          "needs": {
+            "energy": 0.6,
+            "rest": 0.6,
+            "hunger": 0.75,
+            "connection": 0.4,
+            "curiosity": 0.5,
+            "mastery": 0.55,
+            "household_dishes": 0.65
+          },
+          "emotion": {
+            "label": "quiet",
+            "valence": 0,
+            "arousal": 0.35
+          },
+          "values": {},
+          "preferences": [],
+          "traits": {
+            "openness": 0.68,
+            "sociability": 0.52,
+            "follow_through": 0.64
+          },
+          "recent_memories": [],
+          "semantic_expectations": [],
+          "self_concepts": [],
+          "skills": [],
+          "habits": [],
+          "cognitive_workspace": [
+            {
+              "source_event_id": "9b157bb0-badb-4158-b474-566daeb56add",
+              "from_faculty": "murmur",
+              "kind": "inner_monologue",
+              "content": "There is a little room before work. I wonder what, if anything, I feel like doing.",
+              "salience": 0.45,
+              "epistemic_status": "inner_monologue",
+              "action_authority": false
+            }
+          ],
+          "recent_activity_patterns": [],
+          "current_attention": null,
+          "known_places": {
+            "home": {
+              "name": "The apartment",
+              "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+              "opens_hour": 0,
+              "closes_hour": 24
+            },
+            "cafe": {
+              "name": "Juniper Caf\u00e9",
+              "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+              "opens_hour": 7,
+              "closes_hour": 18
+            },
+            "workshop": {
+              "name": "The workshop",
+              "description": "A shared repair studio, full of unfinished objects and patient work.",
+              "opens_hour": 8,
+              "closes_hour": 20
+            },
+            "park": {
+              "name": "Willow Square",
+              "description": "A quiet square between home and work. Rowan comes here to sketch.",
+              "opens_hour": 6,
+              "closes_hour": 22
+            }
+          },
+          "usable_resources": {
+            "household-provisions": {
+              "name": "Household provisions",
+              "location_id": "home",
+              "condition": "usable"
+            }
+          },
+          "known_people": {},
+          "calendar": [
+            {
+              "title": "Work at the workshop",
+              "starts_at": "2026-01-15T09:00:00+00:00",
+              "ends_at": "2026-01-15T10:00:00+00:00",
+              "location_id": "workshop"
+            }
+          ],
+          "permission": "Decide whether Pathos actually wants to make a plan now. Return {\"no_change\": true} or {\"no_change\": true, \"mode\": \"continue|wait|defer|do_nothing\"} to keep thinking, continue what he is doing, defer a decision or do nothing. choice_field contains only what reached awareness; do not recover or act on missing alternatives. Its scores are felt pressure, not instructions to maximize. Contradictory pulls may remain unresolved. Wanting something is not permission to book it. Only output an activity when he deliberately chooses its start time and duration. There is no novelty quota. Let his current attention matter without treating it as a command. Habits are soft rhythms: he may return to one, vary it, or choose against it. When habits compete for the same part of day, treat both as felt possibilities rather than silently choosing the strongest. Skills describe demonstrated capability, not permission or guaranteed success; a rusty skill may invite modest relearning. activity_type is a machine identifier of 3\u201340 lowercase letters, digits or underscores, such as letter_writing, never a phrase with spaces. priority is a fraction from 0 to 1, not a rank like 2 or 3. location_id is where the chosen activity will happen; travel there is handled separately, not disguised as learning at the place you are leaving. Household tasks are noticed burdens, not commands. If he actually chooses to wash dishes at home, use activity_type household_dishes, action work, and resource_id none. Household provisions are food, never dishwashing equipment. Its gather, wash and put-away stages consume the chosen session's actual effort. Other descriptions do not magically clean the house. If he chooses to prepare and eat food, use activity_type prepare_and_eat_meal and action work, at home or cafe. That reserves time but does not create a decorative meal: the physical system must find provisions (or cafe money), observe him awake and present, consume the provision, and change hunger. A failed meal is not an accomplishment. A work start or accepted appointment can be fixed without fixing the morning around it. Use time_budget after travel and current energy: a short window may suit a smaller version, skipping optional preparation, or leaving something unfinished. With spare time he may linger, do more, or simply rest; no daily preparation checklist is required. preparation describes optional scales and competing pulls, not instructions. A five-minute batch and a longer wash leave different amounts of mess. Choose scope and time together; you cannot compress the same result into any available gap. Leave room for uncertainty if that matters to him; no buffer or chore is compulsory. Fractional hours allow ordinary short choices: 0.25 is fifteen minutes. estimate_confidence is his confidence in the duration estimate from 0 to 1. Use 1 only when duration is genuinely fixed; ordinary work is usually uncertain. The world, not the proposal, decides the actual effort required. Ongoing activities are evidence of effort, not proof the task succeeded. The activity type is open vocabulary. This is only a proposal: do not say it happened, spend money, create possessions, or guarantee another person's attendance. Use none when no object or companion is needed."
+        },
+        "response": "{\"activity_type\": \"prepare_and_eat_meal\", \"title\": \"Breakfast\", \"motivation\": \"Address hunger\", \"action\": \"work\", \"location_id\": \"home\", \"resource_id\": \"household-provisions\", \"companion_id\": \"none\", \"starts_in_hours\": 0, \"duration_hours\": 0.25, \"estimate_confidence\": 1, \"priority\": 0.75}",
+        "model": "qwen2.5:14b",
+        "finish_reason": "stop",
+        "seconds": 11.75453458300035
+      }
+    ],
+    "outcome": [
+      {
+        "kind": "agency.activity_rejected",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-9b157bb0-badb-4158-b474-566daeb56add",
+          "activity_type": "prepare_and_eat_meal",
+          "title": "Breakfast",
+          "motivation": "Address hunger",
+          "action": "work",
+          "location_id": "home",
+          "resource_id": "household-provisions",
+          "companion_id": null,
+          "estimate_confidence": 1.0,
+          "simulated_at": "2026-01-15T08:30:00+00:00",
+          "code": "travel_conflict",
+          "explanation": "Travel time conflicts with Work at the workshop"
+        }
+      },
+      {
+        "kind": "agency.choice_made",
+        "payload": {
+          "proposal_id": "pathos-agency-cause-9b157bb0-badb-4158-b474-566daeb56add",
+          "decision": "attempt_rejected",
+          "new_plan": false,
+          "activity_type": "prepare_and_eat_meal",
+          "simulated_at": "2026-01-15T08:30:00+00:00"
+        }
+      }
+    ],
+    "repeat": 1
+  }
+]

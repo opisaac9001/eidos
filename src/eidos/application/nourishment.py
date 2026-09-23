@@ -7,7 +7,7 @@ from hashlib import sha256
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import PlanningState
+from eidos.domain.planning import CalendarEntry, PlanningState
 from eidos.domain.state import PathosState
 
 PROVISIONS_ID = "household-provisions"
@@ -36,6 +36,55 @@ _DESCRIPTIONS = {
     ),
 }
 
+_MEAL_ACTIVITY_TYPES = frozenset(
+    {
+        "breakfast",
+        "cook_food",
+        "eat_meal",
+        "evening_meal",
+        "lunch",
+        "make_breakfast",
+        "make_dinner",
+        "make_lunch",
+        "meal",
+        "meal_preparation",
+        "prepare_and_eat_meal",
+        "prepare_food",
+        "snack",
+    }
+)
+
+
+def planned_meal_kind(entry: CalendarEntry) -> str | None:
+    """Recognize an agency meal without treating any mention of food as eating."""
+    activity_type = (entry.activity_type or "").casefold()
+    title = entry.title.casefold()
+    if activity_type not in _MEAL_ACTIVITY_TYPES:
+        return None
+    if "breakfast" in activity_type or "breakfast" in title:
+        return "breakfast"
+    if "lunch" in activity_type or "lunch" in title:
+        return "lunch"
+    if "dinner" in activity_type or "evening" in activity_type or "dinner" in title:
+        return "evening_meal"
+    if "snack" in activity_type or "snack" in title:
+        return "snack"
+    starts_at = datetime.fromisoformat(entry.starts_at)
+    return next((name for name, hours in _MEAL_WINDOWS.items() if starts_at.hour in hours), "snack")
+
+
+def pending_planned_meal(planning: PlanningState, at: datetime) -> bool:
+    """Keep reflex nourishment from pre-empting a meal Patrick already chose."""
+    horizon = at + timedelta(hours=1)
+    return any(
+        entry.status == "scheduled"
+        and entry.actor_id in {None, "pathos"}
+        and planned_meal_kind(entry) is not None
+        and datetime.fromisoformat(entry.starts_at) <= horizon
+        and datetime.fromisoformat(entry.ends_at or entry.starts_at) >= at
+        for entry in planning.calendar.values()
+    )
+
 
 def nourishment_events(
     history: Sequence[DomainEvent],
@@ -45,6 +94,8 @@ def nourishment_events(
     available_pence: int,
     *,
     pathos_busy: bool,
+    planned_schedule_id: str | None = None,
+    planned_meal_kind: str | None = None,
 ) -> list[DomainEvent]:
     """Eat within a flexible meal window, or later when hunger becomes pressing."""
     if at.utcoffset() is None:
@@ -52,7 +103,9 @@ def nourishment_events(
     if not state.awake or pathos_busy or state.hunger < 0.22:
         return []
 
-    meal_kind = next((name for name, hours in _MEAL_WINDOWS.items() if at.hour in hours), None)
+    meal_kind = planned_meal_kind or next(
+        (name for name, hours in _MEAL_WINDOWS.items() if at.hour in hours), None
+    )
     urgent = state.hunger >= 0.78
     if meal_kind is None and not urgent:
         return []
@@ -60,7 +113,11 @@ def nourishment_events(
         meal_kind = "snack"
 
     date = at.date().isoformat()
-    meal_id = f"meal:{date}:{meal_kind}"
+    meal_id = (
+        f"meal-plan:{planned_schedule_id}"
+        if planned_schedule_id is not None
+        else f"meal:{date}:{meal_kind}"
+    )
     completed = {
         str(event.payload["meal_id"])
         for event in history
@@ -131,10 +188,13 @@ def nourishment_events(
             "provision_source": "household_stock" if uses_household_stock else "cafe_service",
             "provision_object_id": PROVISIONS_ID if uses_household_stock else None,
             "reason": (
-                "hunger became difficult to ignore"
+                "he followed through on a meal he had chosen"
+                if planned_schedule_id is not None
+                else "hunger became difficult to ignore"
                 if urgent
                 else "hunger and a free moment aligned"
             ),
+            "source_schedule_id": planned_schedule_id,
             "simulated_at": at.isoformat(),
         },
         correlation_id=meal_id,

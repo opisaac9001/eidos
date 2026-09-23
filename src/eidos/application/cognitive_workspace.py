@@ -20,8 +20,8 @@ def cognitive_workspace(
 
     candidates: list[tuple[float, datetime, dict[str, object]]] = []
     specs = {
-        "thought.recorded": ("murmur", "inner_monologue", timedelta(hours=6), 0.62),
-        "association.formed": ("murmur", "association", timedelta(hours=24), 0.68),
+        "thought.recorded": ("murmur", "inner_monologue", timedelta(minutes=45), 0.35),
+        "association.formed": ("murmur", "association", timedelta(hours=2), 0.45),
         "reflection.recorded": (
             "reflection",
             "subjective_interpretation",
@@ -34,10 +34,12 @@ def cognitive_workspace(
             timedelta(hours=48),
             0.82,
         ),
-        "dream.recalled": ("oneiros", "dream_fragment", timedelta(hours=24), 0.55),
+        "dream.recalled": ("oneiros", "dream_fragment", timedelta(hours=2), 0.35),
     }
     for event in history:
         if event.aggregate_id != "pathos" or event.kind not in specs:
+            continue
+        if event.payload.get("owner", "pathos") != "pathos":
             continue
         created_at = _event_time(event)
         if created_at is None or created_at > simulated_at:
@@ -54,6 +56,13 @@ def cognitive_workspace(
             if isinstance(salience_value, (int, float)) and not isinstance(salience_value, bool)
             else default_salience
         )
+        if event.kind in {"thought.recorded", "association.formed", "dream.recalled"}:
+            half_life_minutes = 10 if event.kind == "thought.recorded" else 30
+            salience *= 0.5 ** (
+                (simulated_at - created_at).total_seconds() / 60 / half_life_minutes
+            )
+            if salience < 0.04:
+                continue
         candidate = _candidate(
             event,
             faculty,
@@ -145,6 +154,7 @@ def cognitive_workspace(
         )
         candidate[2]["source_dream_id"] = inspiration.source_dream_id
         candidate[2]["motif"] = inspiration.motif
+        candidate[2]["fleeting"] = source.payload.get("fleeting", False)
         candidates.append(candidate)
 
     candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
@@ -159,7 +169,12 @@ def cognitive_workspace(
         if len(selected) == limit:
             break
     live_dream = next(
-        (item for _, _, item in candidates if item.get("kind") == "dream_inspiration"), None
+        (
+            item
+            for _, _, item in candidates
+            if item.get("kind") == "dream_inspiration" and not item.get("fleeting")
+        ),
+        None,
     )
     if (
         limit >= 4
@@ -221,3 +236,26 @@ def _event_time(event: DomainEvent) -> datetime | None:
     else:
         return None
     return parsed if parsed.utcoffset() is not None else None
+
+
+def recent_inner_stream(history: Sequence[DomainEvent], now: datetime, limit: int = 3) -> list[str]:
+    """A short-lived thread, never the archive's last eight forever."""
+    if now.utcoffset() is None or not 1 <= limit <= 8:
+        raise ValueError("Inner stream requires aware time and a bounded limit")
+    selected = []
+    for event in history:
+        if (
+            event.aggregate_id != "pathos"
+            or event.kind != "thought.recorded"
+            or event.payload.get("owner", "pathos") != "pathos"
+        ):
+            continue
+        at = _event_time(event)
+        text = event.payload.get("text")
+        if (
+            at is not None
+            and timedelta(0) <= now - at < timedelta(minutes=30)
+            and isinstance(text, str)
+        ):
+            selected.append((at, text))
+    return [text for _, text in sorted(selected, key=lambda item: item[0])[-limit:]]

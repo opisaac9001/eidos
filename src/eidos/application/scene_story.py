@@ -77,7 +77,7 @@ async def bounded_scene_events(
                 "scene_audience": audience_id,
                 "scene_topic": "care for the weathered park bench",
                 "prior_turns": [
-                    str(event.payload["text"])
+                    {"speaker": str(event.payload["actor_id"]), "text": str(event.payload["text"])}
                     for event in output
                     if event.kind == "scene.turn_taken"
                 ],
@@ -274,7 +274,7 @@ async def _turn_batch(
                 "scene_audience": audience_id,
                 "scene_topic": topic_id.replace("-", " "),
                 "prior_turns": [
-                    str(event.payload["text"])
+                    {"speaker": str(event.payload["actor_id"]), "text": str(event.payload["text"])}
                     for event in context_history
                     if event.kind == "scene.turn_taken"
                     and event.payload.get("scene_id") == scene_id

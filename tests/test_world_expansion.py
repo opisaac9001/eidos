@@ -2,6 +2,7 @@ import asyncio
 import json
 import unittest
 from datetime import datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.world_expansion import expanding_world_events
@@ -42,14 +43,24 @@ class WorldExpansionTests(unittest.TestCase):
         return json.dumps(raw)
 
     def generate(self, gateway, at, history=None, pathos_location_id=None):
-        current = history or []
+        location = pathos_location_id or "cafe"
+        arrival = DomainEvent(
+            "pathos.moved",
+            "pathos",
+            {
+                "location_id": location,
+                "simulated_at": at.isoformat(),
+            },
+            event_id=uuid5(NAMESPACE_URL, f"arrival:{at}:{location}"),
+        )
+        current = [arrival, *(history or [])]
         return asyncio.run(
             expanding_world_events(
                 current,
                 at,
                 len(current),
                 gateway,
-                pathos_location_id=pathos_location_id,
+                pathos_location_id=location,
             )
         )
 
@@ -90,9 +101,53 @@ class WorldExpansionTests(unittest.TestCase):
             pathos_location_id="home",
         )
 
-        failure = next(event for event in events if event.kind == "role.failed")
-        self.assertEqual(failure.payload["error_code"], "private_location")
-        self.assertFalse(any(event.kind == "world.person_registered" for event in events))
+        self.assertEqual(events, [])
+
+    def test_ordinary_arrival_can_remain_ordinary(self):
+        at = datetime(2026, 1, 2, 11, tzinfo=timezone.utc)
+        events = self.generate(FixedGateway('{"no_change": true}'), at)
+        self.assertTrue(any(event.kind == "world.expansion_kept_ordinary" for event in events))
+        self.assertFalse(any(event.kind.endswith("_registered") for event in events))
+        self.assertEqual(self.generate(FixedGateway(self.candidate()), at, events), [])
+
+    def test_clock_alone_does_not_generate_discoveries(self):
+        events = asyncio.run(
+            expanding_world_events(
+                [],
+                datetime(2026, 1, 14, 17, tzinfo=timezone.utc),
+                0,
+                FixedGateway(self.candidate()),
+                pathos_location_id="cafe",
+            )
+        )
+        self.assertEqual(events, [])
+
+    def test_old_future_or_other_location_arrivals_are_not_current_causes(self):
+        at = datetime(2026, 1, 2, 11, tzinfo=timezone.utc)
+        for timestamp, location in (
+            ("2026-01-01T11:00:00+00:00", "cafe"),
+            ("2026-01-03T11:00:00+00:00", "cafe"),
+            ("2026-01-02T11:00:00+00:00", "park"),
+            ("invalid", "cafe"),
+        ):
+            arrival = DomainEvent(
+                "pathos.moved",
+                "pathos",
+                {
+                    "location_id": location,
+                    "simulated_at": timestamp,
+                },
+            )
+            events = asyncio.run(
+                expanding_world_events(
+                    [arrival],
+                    at,
+                    1,
+                    FixedGateway(self.candidate()),
+                    pathos_location_id="cafe",
+                )
+            )
+            self.assertEqual(events, [])
 
     def test_invalid_generation_is_audited_without_registering_anything(self):
         at = datetime(2026, 1, 14, 17, tzinfo=timezone.utc)

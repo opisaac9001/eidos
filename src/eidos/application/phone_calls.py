@@ -27,9 +27,11 @@ def phone_call_events(
     social_openness: float = 0.5,
     relationships: Mapping[str, Relationship] | None = None,
     known_person_ids: AbstractSet[str] | None = None,
+    instant_calls: bool = True,
+    attention_absorption: float = 0.0,
 ) -> list[DomainEvent]:
     """Advance existing calls, then allow one unmet connection goal to cause a call."""
-    output = _complete_answered_call(
+    output = complete_answered_call(
         history,
         simulated_at,
         actual_revision,
@@ -38,6 +40,14 @@ def phone_call_events(
     )
     if output:
         return output
+    output = _notice_due_notification(history, simulated_at, pathos_awake=pathos_awake)
+    if output:
+        return output
+    closed = {e.payload.get("call_id") for e in history if e.kind == "phone.call_completed"}
+    if any(
+        e.kind == "phone.call_answered" and e.payload.get("call_id") not in closed for e in history
+    ):
+        return []
     output = _complete_due_callback(history, simulated_at, pathos_awake=pathos_awake)
     if output:
         return output
@@ -88,6 +98,28 @@ def phone_call_events(
         None,
     )
     sample = int(sha256(call_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+    notice_sample = int(sha256(f"notice:{call_id}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+    notice_probability = max(0.08, min(0.98, 0.94 - 0.68 * attention_absorption))
+    if not instant_calls and notice_sample >= notice_probability:
+        notice_after = simulated_at + timedelta(minutes=5 + round(notice_sample * 35))
+        output.append(
+            DomainEvent(
+                "phone.call_missed",
+                "pathos",
+                {
+                    "call_id": call_id,
+                    "caller_id": caller_id,
+                    "reason": "The call did not break through his current focus in time.",
+                    "attention_absorption": attention_absorption,
+                    "notice_probability": notice_probability,
+                    "notice_after": notice_after.isoformat(),
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=received.event_id,
+                correlation_id=call_id,
+            )
+        )
+        return output
     relationship = (
         relationships.get(caller_id, Relationship(caller_id))
         if relationships is not None
@@ -106,7 +138,7 @@ def phone_call_events(
         ),
     )
     answer = sample < answer_threshold
-    if scene is not None and not answer:
+    if not answer and (scene is not None or not instant_calls):
         output.extend(
             (
                 DomainEvent(
@@ -114,7 +146,11 @@ def phone_call_events(
                     "pathos",
                     {
                         "call_id": call_id,
-                        "reason": "Pathos chose not to leave the current conversation.",
+                        "reason": (
+                            "Pathos chose not to leave the current conversation."
+                            if scene is not None
+                            else "Pathos chose not to interrupt what he was doing."
+                        ),
                         "decision_energy": pathos_energy,
                         "decision_social_openness": social_openness,
                         "decision_trust": relationship.trust,
@@ -147,6 +183,11 @@ def phone_call_events(
             "call_id": call_id,
             "caller_id": caller_id,
             "scene_id": scene.scene_id if scene else None,
+            **(
+                {"ends_at": (simulated_at + timedelta(minutes=3 + round(sample * 9))).isoformat()}
+                if not instant_calls
+                else {}
+            ),
             "decision_energy": pathos_energy,
             "decision_social_openness": social_openness,
             "decision_trust": relationship.trust,
@@ -159,7 +200,8 @@ def phone_call_events(
     )
     output.append(answered)
     if scene is None:
-        output.append(_call_completed(answered, simulated_at))
+        if instant_calls:
+            output.append(_call_completed(answered, simulated_at))
         return output
     interrupted = resolve_scene_interruption(
         SceneInterruptProposal(
@@ -178,7 +220,53 @@ def phone_call_events(
     return output
 
 
-def _complete_answered_call(
+def _notice_due_notification(
+    history: Sequence[DomainEvent], simulated_at: datetime, *, pathos_awake: bool
+) -> list[DomainEvent]:
+    if not pathos_awake:
+        return []
+    noticed = {
+        str(event.payload["call_id"])
+        for event in history
+        if event.kind == "phone.notification_noticed"
+    }
+    missed = next(
+        (
+            event
+            for event in history
+            if event.kind == "phone.call_missed"
+            and str(event.payload["call_id"]) not in noticed
+            and datetime.fromisoformat(str(event.payload["notice_after"])) <= simulated_at
+        ),
+        None,
+    )
+    if missed is None:
+        return []
+    call_id = str(missed.payload["call_id"])
+    caller_id = str(missed.payload["caller_id"])
+    notification = DomainEvent(
+        "phone.notification_noticed",
+        "pathos",
+        {"call_id": call_id, "caller_id": caller_id, "simulated_at": simulated_at.isoformat()},
+        causation_id=missed.event_id,
+        correlation_id=call_id,
+    )
+    callback = DomainEvent(
+        "phone.callback_scheduled",
+        "pathos",
+        {
+            "call_id": call_id,
+            "caller_id": caller_id,
+            "due_at": (simulated_at + timedelta(hours=2)).isoformat(),
+            "simulated_at": simulated_at.isoformat(),
+        },
+        causation_id=notification.event_id,
+        correlation_id=call_id,
+    )
+    return [notification, callback]
+
+
+def complete_answered_call(
     history: Sequence[DomainEvent],
     simulated_at: datetime,
     actual_revision: int,
@@ -198,6 +286,10 @@ def _complete_answered_call(
             if event.kind == "phone.call_answered"
             and str(event.payload["call_id"]) not in completed
             and datetime.fromisoformat(str(event.payload["simulated_at"])) < simulated_at
+            and (
+                not event.payload.get("ends_at")
+                or datetime.fromisoformat(str(event.payload["ends_at"])) <= simulated_at
+            )
         ),
         None,
     )

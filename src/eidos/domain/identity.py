@@ -22,6 +22,15 @@ DEFAULT_PREFERENCES = (
     "unhurried neighborhood walks",
 )
 
+FULL_NAME = "Patrick Shaw"
+NICKNAME = "Pathos"
+NAME_CONTEXT = (
+    "Patrick Shaw is his ordinary full name; he normally introduces himself as Patrick. "
+    "Pathos is the nickname some close friends from university use. Both refer to the "
+    "same person, whose stable internal actor identifier remains pathos. "
+    "Do not invent a new naming ceremony, recent name change, or remembered conversation."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class IdentityState:
@@ -30,9 +39,13 @@ class IdentityState:
     preferences: tuple[str, ...]
     established: bool
 
+    @property
+    def nickname(self) -> str:
+        return NICKNAME if self.name == FULL_NAME else ""
+
 
 def default_identity() -> IdentityState:
-    return IdentityState("Pathos", dict(DEFAULT_VALUES), DEFAULT_PREFERENCES, False)
+    return IdentityState(FULL_NAME, dict(DEFAULT_VALUES), DEFAULT_PREFERENCES, False)
 
 
 def identity_established_event(simulated_at: str) -> DomainEvent:
@@ -40,14 +53,15 @@ def identity_established_event(simulated_at: str) -> DomainEvent:
         "identity.established",
         "pathos",
         {
-            "name": "Pathos",
+            "name": FULL_NAME,
+            "nickname": NICKNAME,
             **{f"value_{name}": value for name, value in DEFAULT_VALUES.items()},
             **{
                 f"preference_{position}": preference
                 for position, preference in enumerate(DEFAULT_PREFERENCES, 1)
             },
             "simulated_at": simulated_at,
-            "source": "character-pack-v1",
+            "source": "character-pack-v2-original-name",
         },
         correlation_id="identity-pathos-v1",
     )
@@ -168,7 +182,12 @@ def project_identity(events: Sequence[DomainEvent]) -> IdentityState:
             if not all(isinstance(item, str) and item.strip() for item in raw_preferences):
                 raise ValueError("Identity preferences must be non-empty text")
             identity = IdentityState(
-                name, values, tuple(str(item) for item in raw_preferences), True
+                # Legacy packs recorded only his nickname. Resolve that alias without
+                # rewriting the historical event or changing any actor identifiers.
+                FULL_NAME if name == NICKNAME else name,
+                values,
+                tuple(str(item) for item in raw_preferences),
+                True,
             )
         seen[str(event.event_id)] = event
     return identity

@@ -51,6 +51,10 @@ def semantic_quality_findings(
     words = WORD.findall(lowered)
     findings: list[str] = []
     conversational_pathos = role == "pathos" and isinstance(context.get("message"), str)
+    if conversational_pathos and _unsupported_history_denial(text, context):
+        findings.append("unsupported_history_denial")
+    if conversational_pathos:
+        findings.extend(_current_execution_findings(text, context))
     minimum_words = 3 if conversational_pathos else 5
     if role != "moira" and len(words) < minimum_words:
         findings.append("thin_or_fragmentary")
@@ -70,9 +74,7 @@ def semantic_quality_findings(
         lowered,
     ):
         findings.append("assistant_like_register")
-    if conversational_pathos and re.search(
-        r"\b(?:here|hi|hey|hello),?\s+pathos\b", lowered
-    ):
+    if conversational_pathos and re.search(r"\b(?:here|hi|hey|hello),?\s+pathos\b", lowered):
         findings.append("identity_confusion")
     if role in {"pathos", "reflection"} and _introduces_ungrounded_conversation_topic(
         text, context
@@ -84,6 +86,11 @@ def semantic_quality_findings(
         role in FIRST_PERSON_ROLES
         and not conversational_pathos
         and not re.search(r"\b(?:i|i'm|i've|me|my)\b", lowered)
+        and not (
+            role == "murmur"
+            and len(words) <= 30
+            and not re.match(r"^(?:you|your|pathos|he|she|dear|hello)\b", lowered)
+        )
     ):
         findings.append("lost_first_person_role")
     if re.search(
@@ -160,9 +167,115 @@ def semantic_quality_findings(
     return findings
 
 
-def _introduces_ungrounded_conversation_topic(
-    text: str, context: Mapping[str, object]
-) -> bool:
+def _current_execution_findings(text: str, context: Mapping[str, object]) -> list[str]:
+    """Narrow contradictions of explicitly supplied present execution, not memory truth."""
+    lowered = text.lower().replace("’", "'")
+    findings = []
+    journey = context.get("journey")
+    if (
+        isinstance(journey, Mapping)
+        and journey
+        and re.search(
+            r"\b(?:i(?:'ve| have)?|yeah,?)\s+(?:just\s+)?arrived\b|\bi(?:'m| am)\s+(?:already\s+)?there\b",
+            lowered,
+        )
+    ):
+        findings.append("premature_arrival")
+    message = str(context.get("message", "")).lower()
+    if not re.search(r"\b(?:done|finish|finished|complete|completed)\b", message):
+        return findings
+    activities = context.get("ongoing_activities")
+    if not isinstance(activities, (list, tuple)):
+        return findings
+    activities = [item for item in activities if isinstance(item, Mapping)]
+    stop = {"the", "a", "at", "to", "of", "with", "my", "your", "it", "them", "work", "task"}
+    matched = [
+        item
+        for item in activities
+        if (set(WORD.findall(str(item.get("title", "")).lower())) - stop)
+        & set(WORD.findall(message))
+    ]
+    if len(matched) == 1:
+        item = matched[0]
+    elif len(activities) == 1:
+        item = activities[0]
+    else:
+        return findings
+    completed = item.get("outcome") == "completed" or item.get("schedule_status") == "completed"
+    negative = re.search(
+        r"^(?:nah|nope|not yet|not quite)\b|\bi(?:'ve| have)?\s+(?:only\s+)?just\s+(?:got\s+)?started\b|\bi\s+haven't\s+finished\b",
+        lowered,
+    )
+    affirmative = re.search(
+        r"\bi(?:'ve| have)?\s+(?:just\s+)?finished\b|\b(?:they|it)(?:'re|'s| are| is)\s+(?:all\s+)?done\b|\ball done\b|\bjust finished up\b",
+        lowered,
+    )
+    if completed and negative:
+        findings.append("contradicted_activity_status")
+    elif not completed and affirmative and not negative:
+        # Explicit partial-stage speech remains valid; 'I finished washing, but
+        # haven't put them away' is not a claim to have completed the whole task.
+        partial = (
+            any(str(stage).lower().startswith("wash") for stage in item.get("completed_stages", []))
+            and "washing" in lowered
+        )
+        if not partial:
+            findings.append("contradicted_activity_status")
+    return findings
+
+
+def _unsupported_history_denial(text: str, context: Mapping[str, object]) -> bool:
+    """Catch ungrounded categorical denials, never compare with hidden source truth.
+
+    Deliberately narrow: a matching subjective recollection makes this check defer.
+    It is not a general entailment test or a requirement to distrust clear memories.
+    """
+
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, Mapping):
+            for item in value.values():
+                yield from strings(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                yield from strings(item)
+
+    evidence = " ".join(
+        strings(
+            {
+                key: context.get(key)
+                for key in (
+                    "memories",
+                    "memory_recollections",
+                    "beliefs",
+                    "identity",
+                    "ongoing_activities",
+                )
+            }
+        )
+    ).lower()
+    # Earlier statements by Patrick count as his subjective account; questions and
+    # statements by someone else do not prove his own actions or possessions.
+    dialogue = context.get("recent_dialogue", ())
+    if isinstance(dialogue, (list, tuple)):
+        evidence += (
+            " "
+            + " ".join(
+                str(turn.get("text", ""))
+                for turn in dialogue
+                if isinstance(turn, Mapping) and turn.get("speaker") in {"pathos", "patrick"}
+            ).lower()
+        )
+    lowered = text.lower().replace("’", "'")
+    for verbs in (r"call(?:ed)?|rang|rung|phone(?:d)?", r"meet|met", r"buy|bought", r"sell|sold"):
+        denial = rf"\bi\s+(?:haven't|have not|didn't|did not|never)\s+(?:ever\s+)?(?:{verbs})\b"
+        if re.search(denial, lowered) and not re.search(rf"\b(?:{verbs})\b", evidence):
+            return True
+    return False
+
+
+def _introduces_ungrounded_conversation_topic(text: str, context: Mapping[str, object]) -> bool:
     """Catch explicit invented conversation topics without pretending to verify all prose."""
     match = re.search(
         r"\b(?:(?:talked|spoke|chatted|talking|speaking|chatting|discussed)\s+about|"
@@ -173,9 +286,7 @@ def _introduces_ungrounded_conversation_topic(
         return False
     grounding_words = set(WORD.findall(_grounding_text(context).lower()))
     for fragment in re.split(r"\s+(?:and|but)\s+|,", match.group(1)):
-        topic_words = {
-            word for word in WORD.findall(fragment) if word not in TOPIC_STOPWORDS
-        }
+        topic_words = {word for word in WORD.findall(fragment) if word not in TOPIC_STOPWORDS}
         if topic_words and not topic_words & grounding_words:
             return True
     return False
@@ -197,12 +308,15 @@ def _grounding_text(context: Mapping[str, object]) -> str:
     for key in GROUNDING_KEYS:
         if key in context:
             collect(context[key])
+    activities = context.get("ongoing_activities", [])
+    if isinstance(activities, (list, tuple)):
+        for activity in activities:
+            if isinstance(activity, Mapping) and activity.get("has_started") is True:
+                collect(activity.get("title"))
     return " ".join(parts)
 
 
-def _introduces_ungrounded_current_activity(
-    text: str, context: Mapping[str, object]
-) -> bool:
+def _introduces_ungrounded_current_activity(text: str, context: Mapping[str, object]) -> bool:
     match = re.search(
         r"\b(?:i(?:'ve| have) been|i(?:'m| am))\s+"
         r"(?:working on|building|fixing|planning|writing|reading|meeting|visiting)\s+"
@@ -211,8 +325,6 @@ def _introduces_ungrounded_current_activity(
     )
     if match is None:
         return False
-    activity_words = {
-        word for word in WORD.findall(match.group(1)) if word not in TOPIC_STOPWORDS
-    }
+    activity_words = {word for word in WORD.findall(match.group(1)) if word not in TOPIC_STOPWORDS}
     grounding_words = set(WORD.findall(_grounding_text(context).lower()))
     return bool(activity_words and not activity_words & grounding_words)

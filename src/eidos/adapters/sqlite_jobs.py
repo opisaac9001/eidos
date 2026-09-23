@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -82,10 +84,17 @@ class SQLiteJobStore:
                 ON cognition_jobs(status, available_at, priority DESC, created_at)
             """)
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=5)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            # SQLite's transaction context commits/rolls back but does not close.
+            # Queue polling must not depend on garbage collection to release FDs.
+            connection.close()
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> CognitionJob:

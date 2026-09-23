@@ -30,6 +30,29 @@ class DeferredFixtureGateway:
 
 
 class DeferredCognitionTests(unittest.TestCase):
+    def test_present_moment_thought_needs_no_fake_memory_and_applies_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = DeferredModelResult(
+                uuid4(),
+                "murmur",
+                {"deferred_kind": "inner_thought"},
+                "completed",
+                "I might open the window.",
+                None,
+            )
+            life = Life(
+                SQLiteEventStore(Path(directory) / "thought.db"), DeferredFixtureGateway([result])
+            )
+            life.advance(1)
+            thoughts = [event for event in life.history() if event.kind == "thought.recorded"]
+            self.assertEqual(len(thoughts), 1)
+            self.assertFalse(thoughts[0].payload["factual"])
+            self.assertFalse(any(event.kind == "memory.recorded" for event in life.history()))
+            life.advance(1)
+            self.assertEqual(
+                sum(event.kind == "cognition.result_applied" for event in life.history()), 1
+            )
+
     def test_murmur_is_submitted_after_tick_instead_of_blocking_it(self):
         with tempfile.TemporaryDirectory() as directory:
             gateway = DeferredFixtureGateway()
@@ -39,7 +62,7 @@ class DeferredCognitionTests(unittest.TestCase):
             self.assertGreater(len(gateway.submitted), 0)
             self.assertTrue(
                 all(
-                    '"deferred_kind": "association"' in request.messages[0].content
+                    '"deferred_kind": "inner_thought"' in request.messages[0].content
                     for request in gateway.submitted
                 )
             )

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 from datetime import datetime, timezone
 
@@ -13,6 +14,36 @@ class InvalidDialogueGateway:
 
 
 class SceneStoryTests(unittest.TestCase):
+    def test_scene_handoff_preserves_who_said_each_line(self):
+        class RecordingGateway(InvalidDialogueGateway):
+            def __init__(self):
+                self.contexts = []
+
+            async def generate(self, request):
+                self.contexts.append(json.loads(request.messages[-1].content))
+                return await super().generate(request)
+
+        gateway = RecordingGateway()
+        events = asyncio.run(
+            bounded_scene_events(
+                [],
+                {"pathos": "park", "rowan": "park", "mara": "cafe", "ellis": "workshop"},
+                datetime(2026, 1, 4, 13, tzinfo=timezone.utc),
+                0,
+                gateway,
+            )
+        )
+        first = next(event for event in events if event.kind == "scene.turn_taken")
+        self.assertEqual(
+            gateway.contexts[1]["prior_turns"],
+            [
+                {
+                    "speaker": first.payload["actor_id"],
+                    "text": first.payload["text"],
+                }
+            ],
+        )
+
     def test_invalid_dialogue_is_audited_and_uses_bounded_authored_fallback(self):
         events = asyncio.run(
             bounded_scene_events(

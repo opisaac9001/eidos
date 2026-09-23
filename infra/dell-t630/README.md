@@ -1,8 +1,58 @@
 # Dell T630 inference host
 
-This directory will contain reproducible host configuration after iDRAC hardware
-inventory is captured. It intentionally does not yet pin an operating system,
-driver, CUDA toolkit, or container image.
+Latest checked code deployment: `natural20260908a`, September 8, 2026.
+See [deployment and recovery record](../../docs/DEPLOYMENT_2026_09_08.md).
+The service is running, but Pathos's simulation clock remains paused.
+
+This directory contains the systemd configuration for the commissioned Ubuntu
+host. See [INVENTORY.md](INVENTORY.md) for current hardware and storage findings.
+
+## Installed layout
+
+- Ubuntu 26.04 LTS, UEFI, proprietary NVIDIA 580.173.02 driver.
+- `/srv/eidos`: deployed working-tree snapshot and Python virtual environment.
+- `/var/lib/eidos/observatory.sqlite3`: active SQLite database on the boot SSD.
+- `/srv/eidos-data/eidos/models`: shared Ollama model files on the 8 TB HDD.
+- `/srv/eidos-data/eidos/backups`: verified daily database snapshots on the HDD.
+- `/etc/eidos`: role routing and per-worker GPU/listener configuration.
+- `eidos.service`: observatory on loopback port 8767, with supervised cognition.
+- `ollama@pathos`, `ollama@world`, `ollama@cognition`: isolated model workers.
+- `eidos-backup.timer`: daily online SQLite backup with integrity verification.
+- `eidos-gpu.service`: persistent GPU initialization and initial 180 W P40 /
+  140 W RTX 3060 power limits, addressed by verified PCI slots.
+
+Ollama 0.33.3 is the initial runtime, using its bundled CUDA 12 support for the
+P40s. It provides the existing OpenAI-compatible model boundary without a full
+CUDA development toolkit or container stack. A custom llama.cpp build remains a
+future benchmarking option. Qwen2.5 14B is assigned to each P40 and Qwen2.5 7B to
+the RTX 3060; the two 14B workers share stored weights but have separate GPU
+allocations. `warm_model.py` loads the model before a worker reports readiness.
+
+The mount unit is specific to this machine's existing XFS filesystem UUID. The
+GPU environment files must match this machine's verified GPU ordering; prefer
+UUIDs in the installed copies. These files do not format disks or create arrays.
+Model routes are commissioning candidates, not a claim of semantic quality.
+
+Run `python3 infra/dell-t630/smoke_models.py` on the server to exercise all three
+workers concurrently with synthetic prompts and measure output throughput.
+Run `.venv/bin/python -m eidos --routes-file /etc/eidos/model-routes.json probe-model`
+to test the actual role contracts and semantic warning checks without changing
+the saved world.
+Run `.venv/bin/python infra/dell-t630/smoke_queue.py` to repeat the eight-role
+probe through SQLite persistence and supervised workers, using a disposable
+queue. Direct endpoint success alone does not verify this deployment boundary.
+
+From a trusted Tailscale-connected computer, forward the observatory with:
+
+```sh
+ssh -N -L 127.0.0.1:8767:127.0.0.1:8767 isaac@pathos-server
+```
+
+Open `http://127.0.0.1:8767`. The matching port is required by the observatory's
+Host/Origin checks. The application starts paused after restart by design;
+resuming it is explicit and does not simulate server downtime at high speed.
+Backups currently retain every snapshot; monitor free space and add retention
+and off-host copies before long-term unattended operation.
 
 ## Intended responsibilities
 
@@ -26,10 +76,9 @@ retrieval indexes, databases, and caching. It does not substitute for GPU
 bandwidth, so actual model assignments will be chosen from benchmarks rather
 than aggregate memory alone.
 
-The first live inventory is recorded in [INVENTORY.md](INVENTORY.md). OS installation
-is currently blocked because the only detected 2 TB SATA SSD reports failed with
-zero usable capacity. RAID and boot configuration must remain untouched until a
-healthy installation target is present.
+The Kingston SSD now provides a working boot target. The 1 TB and 2 TB drives are
+still unavailable; the older inventory entries document the inconsistent views
+that led to that choice. Commissioning proceeds using the two verified disks.
 
 ## Information required before installation
 

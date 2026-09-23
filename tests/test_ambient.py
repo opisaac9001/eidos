@@ -11,6 +11,57 @@ from eidos.domain.proposals import ProposalRejected
 
 
 class AmbientCandidateTests(unittest.TestCase):
+    def test_finished_json_cannot_hide_clipped_prose_or_uuid_cause(self):
+        for changes in (
+            {"opportunity": "The seed table is nearby; one could"},
+            {
+                "description": "The rhythmic tapping of rain against the corrugated roof of the workshop provides a heavy backdrop as a neighbor, clutching a broken bicycle frame, stands at the door, asking if anyone can help stabilize the frame before"
+            },
+            {"participation": "Help clear the damp surfaces to prevent'"},
+            {"stakes": "The table remains unusable until the steam dissipates,"},
+            {"cause": "25aa805b-dd9e-4a55-a578-8453fdcf4d79"},
+        ):
+            with self.subTest(changes=changes), self.assertRaises(ProposalRejected):
+                validate_ambient_candidate(
+                    self.candidate(**changes),
+                    known_locations={"park"},
+                    known_resources={"community-sketch-basket": "park"},
+                    known_signal_ids=set(),
+                    history=[],
+                )
+
+    def test_nickname_and_full_name_share_the_same_agency_boundary(self):
+        for name in ("Pathos", "Patrick", "Patrick Shaw"):
+            for action in (
+                "agrees to help the nearby gardener",
+                "arrives to check the seed inventory",
+            ):
+                with (
+                    self.subTest(name=name, action=action),
+                    self.assertRaisesRegex(ProposalRejected, "pre-commits"),
+                ):
+                    validate_ambient_candidate(
+                        self.candidate(description=f"{name} {action} by the old park clock."),
+                        known_locations={"park"},
+                        known_resources={"community-sketch-basket": "park"},
+                        known_signal_ids=set(),
+                        history=[],
+                    )
+
+    def test_complete_short_phrases_and_balanced_quotations_remain_valid(self):
+        for changes in (
+            {"opportunity": "Carry on as before"},
+            {"description": "The visiting gardener calls the old park clock 'a reliable friend'"},
+        ):
+            with self.subTest(changes=changes):
+                validate_ambient_candidate(
+                    self.candidate(**changes),
+                    known_locations={"park"},
+                    known_resources={"community-sketch-basket": "park"},
+                    known_signal_ids=set(),
+                    history=[],
+                )
+
     def candidate(self, **changes):
         raw = {
             "event_type": "unexpected_violinist",

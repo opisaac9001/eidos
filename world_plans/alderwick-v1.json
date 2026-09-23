@@ -1,0 +1,1008 @@
+{
+  "schema_version": 1,
+  "status": "design_blueprint_not_live_world_facts",
+  "town": {
+    "id": "alderwick",
+    "name": "Alderwick",
+    "fictional": true,
+    "setting": "A small English market town, contemporary, with a former mill and foundry economy.",
+    "population_design_target": 8500,
+    "extent_m": [
+      2400,
+      2400
+    ],
+    "north": "negative_y",
+    "river": {
+      "name": "River Alder",
+      "north_bank_y": 1400,
+      "south_bank_y": 1600,
+      "flow": "west_to_east"
+    },
+    "walking_speed_m_per_minute": 75,
+    "walking_time_policy": "ceil(distance / speed), then add access and crossing delays; never change historic travel events"
+  },
+  "districts": [
+    {
+      "id": "old-town",
+      "name": "Old Town",
+      "character": "Brick terraces above a compact high street; errands and familiar faces.",
+      "bounds": [
+        0,
+        0,
+        1300,
+        850
+      ]
+    },
+    {
+      "id": "station-quarter",
+      "name": "Station Quarter",
+      "character": "Arrivals, commuters, modest evening venues, and movement beyond town.",
+      "bounds": [
+        1300,
+        0,
+        2400,
+        850
+      ]
+    },
+    {
+      "id": "westfield",
+      "name": "Westfield",
+      "character": "Library, recreation ground, school streets, and quieter residential edges.",
+      "bounds": [
+        0,
+        850,
+        650,
+        1500
+      ]
+    },
+    {
+      "id": "mill-quarter",
+      "name": "Mill Quarter",
+      "character": "Bakery, Willow Square, mill leat, and the north-bank walking route.",
+      "bounds": [
+        650,
+        850,
+        1500,
+        1500
+      ]
+    },
+    {
+      "id": "foundry",
+      "name": "Foundry Ward",
+      "character": "Repair studios, reused industrial buildings, practical work and music.",
+      "bounds": [
+        1500,
+        850,
+        2400,
+        1500
+      ]
+    },
+    {
+      "id": "southbank",
+      "name": "Southbank",
+      "character": "Allotments, playing fields, modest housing and paths into the countryside.",
+      "bounds": [
+        0,
+        1500,
+        2400,
+        2400
+      ]
+    }
+  ],
+  "junctions": [
+    {
+      "id": "j00",
+      "x": 250,
+      "y": 250
+    },
+    {
+      "id": "j01",
+      "x": 700,
+      "y": 250
+    },
+    {
+      "id": "j02",
+      "x": 1150,
+      "y": 250
+    },
+    {
+      "id": "j03",
+      "x": 1600,
+      "y": 250
+    },
+    {
+      "id": "j04",
+      "x": 2050,
+      "y": 250
+    },
+    {
+      "id": "j10",
+      "x": 250,
+      "y": 650
+    },
+    {
+      "id": "j11",
+      "x": 700,
+      "y": 650
+    },
+    {
+      "id": "j12",
+      "x": 1150,
+      "y": 650
+    },
+    {
+      "id": "j13",
+      "x": 1600,
+      "y": 650
+    },
+    {
+      "id": "j14",
+      "x": 2050,
+      "y": 650
+    },
+    {
+      "id": "j20",
+      "x": 250,
+      "y": 1050
+    },
+    {
+      "id": "j21",
+      "x": 700,
+      "y": 1050
+    },
+    {
+      "id": "j22",
+      "x": 1150,
+      "y": 1050
+    },
+    {
+      "id": "j23",
+      "x": 1600,
+      "y": 1050
+    },
+    {
+      "id": "j24",
+      "x": 2050,
+      "y": 1050
+    },
+    {
+      "id": "j30",
+      "x": 250,
+      "y": 1400
+    },
+    {
+      "id": "j31",
+      "x": 700,
+      "y": 1400
+    },
+    {
+      "id": "j32",
+      "x": 1150,
+      "y": 1400
+    },
+    {
+      "id": "j33",
+      "x": 1600,
+      "y": 1400
+    },
+    {
+      "id": "j34",
+      "x": 2050,
+      "y": 1400
+    },
+    {
+      "id": "j40",
+      "x": 250,
+      "y": 1600
+    },
+    {
+      "id": "j41",
+      "x": 700,
+      "y": 1600
+    },
+    {
+      "id": "j42",
+      "x": 1150,
+      "y": 1600
+    },
+    {
+      "id": "j43",
+      "x": 1600,
+      "y": 1600
+    },
+    {
+      "id": "j44",
+      "x": 2050,
+      "y": 1600
+    },
+    {
+      "id": "j50",
+      "x": 250,
+      "y": 2000
+    },
+    {
+      "id": "j51",
+      "x": 700,
+      "y": 2000
+    },
+    {
+      "id": "j52",
+      "x": 1150,
+      "y": 2000
+    },
+    {
+      "id": "j53",
+      "x": 1600,
+      "y": 2000
+    },
+    {
+      "id": "j54",
+      "x": 2050,
+      "y": 2000
+    }
+  ],
+  "streets": [
+    {
+      "id": "h00",
+      "from": "j00",
+      "to": "j01",
+      "name": "North Terrace",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h01",
+      "from": "j01",
+      "to": "j02",
+      "name": "North Terrace",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h02",
+      "from": "j02",
+      "to": "j03",
+      "name": "North Terrace",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h03",
+      "from": "j03",
+      "to": "j04",
+      "name": "North Terrace",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h10",
+      "from": "j10",
+      "to": "j11",
+      "name": "High Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h11",
+      "from": "j11",
+      "to": "j12",
+      "name": "High Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h12",
+      "from": "j12",
+      "to": "j13",
+      "name": "High Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h13",
+      "from": "j13",
+      "to": "j14",
+      "name": "High Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h20",
+      "from": "j20",
+      "to": "j21",
+      "name": "Mill Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h21",
+      "from": "j21",
+      "to": "j22",
+      "name": "Mill Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h22",
+      "from": "j22",
+      "to": "j23",
+      "name": "Mill Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h23",
+      "from": "j23",
+      "to": "j24",
+      "name": "Mill Street",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h30",
+      "from": "j30",
+      "to": "j31",
+      "name": "North Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h31",
+      "from": "j31",
+      "to": "j32",
+      "name": "North Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h32",
+      "from": "j32",
+      "to": "j33",
+      "name": "North Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h33",
+      "from": "j33",
+      "to": "j34",
+      "name": "North Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h40",
+      "from": "j40",
+      "to": "j41",
+      "name": "South Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h41",
+      "from": "j41",
+      "to": "j42",
+      "name": "South Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h42",
+      "from": "j42",
+      "to": "j43",
+      "name": "South Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h43",
+      "from": "j43",
+      "to": "j44",
+      "name": "South Quay",
+      "kind": "quayside",
+      "distance_m": 450
+    },
+    {
+      "id": "h50",
+      "from": "j50",
+      "to": "j51",
+      "name": "Meadow Lane",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h51",
+      "from": "j51",
+      "to": "j52",
+      "name": "Meadow Lane",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h52",
+      "from": "j52",
+      "to": "j53",
+      "name": "Meadow Lane",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "h53",
+      "from": "j53",
+      "to": "j54",
+      "name": "Meadow Lane",
+      "kind": "street",
+      "distance_m": 450
+    },
+    {
+      "id": "v00",
+      "from": "j00",
+      "to": "j10",
+      "name": "Westfield Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v01",
+      "from": "j01",
+      "to": "j11",
+      "name": "Willow Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v02",
+      "from": "j02",
+      "to": "j12",
+      "name": "Market Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v03",
+      "from": "j03",
+      "to": "j13",
+      "name": "Foundry Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v04",
+      "from": "j04",
+      "to": "j14",
+      "name": "Station Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v10",
+      "from": "j10",
+      "to": "j20",
+      "name": "Westfield Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v11",
+      "from": "j11",
+      "to": "j21",
+      "name": "Willow Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v12",
+      "from": "j12",
+      "to": "j22",
+      "name": "Market Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v13",
+      "from": "j13",
+      "to": "j23",
+      "name": "Foundry Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v14",
+      "from": "j14",
+      "to": "j24",
+      "name": "Station Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v20",
+      "from": "j20",
+      "to": "j30",
+      "name": "Westfield Road",
+      "kind": "street",
+      "distance_m": 350
+    },
+    {
+      "id": "v21",
+      "from": "j21",
+      "to": "j31",
+      "name": "Willow Lane",
+      "kind": "street",
+      "distance_m": 350
+    },
+    {
+      "id": "v22",
+      "from": "j22",
+      "to": "j32",
+      "name": "Market Lane",
+      "kind": "street",
+      "distance_m": 350
+    },
+    {
+      "id": "v23",
+      "from": "j23",
+      "to": "j33",
+      "name": "Foundry Road",
+      "kind": "street",
+      "distance_m": 350
+    },
+    {
+      "id": "v24",
+      "from": "j24",
+      "to": "j34",
+      "name": "Station Road",
+      "kind": "street",
+      "distance_m": 350
+    },
+    {
+      "id": "v31",
+      "from": "j31",
+      "to": "j41",
+      "name": "Willow Footbridge",
+      "kind": "footbridge",
+      "distance_m": 200
+    },
+    {
+      "id": "v33",
+      "from": "j33",
+      "to": "j43",
+      "name": "Foundry Bridge",
+      "kind": "bridge",
+      "distance_m": 200
+    },
+    {
+      "id": "v40",
+      "from": "j40",
+      "to": "j50",
+      "name": "Westfield Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v41",
+      "from": "j41",
+      "to": "j51",
+      "name": "Willow Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v42",
+      "from": "j42",
+      "to": "j52",
+      "name": "Market Lane",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v43",
+      "from": "j43",
+      "to": "j53",
+      "name": "Foundry Road",
+      "kind": "street",
+      "distance_m": 400
+    },
+    {
+      "id": "v44",
+      "from": "j44",
+      "to": "j54",
+      "name": "Station Road",
+      "kind": "street",
+      "distance_m": 400
+    }
+  ],
+  "places": [
+    {
+      "id": "home",
+      "name": "Pathos’s apartment",
+      "district": "old-town",
+      "junction": "j01",
+      "address": "12 North Terrace, upstairs",
+      "status": "existing",
+      "purpose": "rest, private life, domestic upkeep"
+    },
+    {
+      "id": "grocer",
+      "name": "Corner Grocer",
+      "district": "old-town",
+      "junction": "j00",
+      "address": "4 North Terrace",
+      "status": "existing",
+      "purpose": "ingredients, small errands, noticing regulars"
+    },
+    {
+      "id": "cafe",
+      "name": "Juniper Café",
+      "district": "old-town",
+      "junction": "j12",
+      "address": "18 High Street",
+      "status": "existing",
+      "purpose": "Mara, conversation, lunch, a place to sit"
+    },
+    {
+      "id": "market-hall",
+      "name": "Market Hall",
+      "district": "old-town",
+      "junction": "j11",
+      "address": "Market Court, High Street",
+      "status": "existing",
+      "purpose": "weekly stalls, practical purchases, public notices"
+    },
+    {
+      "id": "bakery",
+      "name": "Mill Street Bakery",
+      "district": "mill-quarter",
+      "junction": "j22",
+      "address": "6 Mill Street",
+      "status": "existing",
+      "purpose": "breakfast, queues, an everyday destination"
+    },
+    {
+      "id": "station",
+      "name": "Alderwick Station",
+      "district": "station-quarter",
+      "junction": "j04",
+      "address": "Station Road terminus",
+      "status": "existing",
+      "purpose": "travel, arrivals, departures; legacy display name Central Station"
+    },
+    {
+      "id": "cinema",
+      "name": "Regent Cinema",
+      "district": "station-quarter",
+      "junction": "j14",
+      "address": "42 High Street",
+      "status": "existing",
+      "purpose": "screenings, shared evenings, changing programmes"
+    },
+    {
+      "id": "library",
+      "name": "Municipal Library",
+      "district": "westfield",
+      "junction": "j20",
+      "address": "3 Westfield Road",
+      "status": "existing",
+      "purpose": "reading, research, local history, public computers"
+    },
+    {
+      "id": "secondhand",
+      "name": "Secondhand Bookshop",
+      "district": "westfield",
+      "junction": "j30",
+      "address": "Quay Steps, Westfield Road",
+      "status": "existing",
+      "purpose": "browsing, recommendations, book exchanges"
+    },
+    {
+      "id": "sports-ground",
+      "name": "Westfield Recreation Ground",
+      "district": "westfield",
+      "junction": "j20",
+      "address": "Westfield Road, west gate",
+      "status": "existing",
+      "purpose": "walks, informal sport, shared public space"
+    },
+    {
+      "id": "park",
+      "name": "Willow Square",
+      "district": "mill-quarter",
+      "junction": "j21",
+      "address": "Willow Lane and Mill Street",
+      "status": "existing",
+      "purpose": "Rowan, sketching, sitting, everyday crossings"
+    },
+    {
+      "id": "workshop",
+      "name": "The workshop",
+      "district": "foundry",
+      "junction": "j23",
+      "address": "8 Foundry Road",
+      "status": "existing",
+      "purpose": "Ellis, repairs, work, projects"
+    },
+    {
+      "id": "community-hall",
+      "name": "Foundry Hall",
+      "district": "foundry",
+      "junction": "j33",
+      "address": "Foundry Road, north end of bridge",
+      "status": "existing",
+      "purpose": "classes, meetings, volunteering"
+    },
+    {
+      "id": "music-room",
+      "name": "The Listening Room",
+      "district": "foundry",
+      "junction": "j24",
+      "address": "Old Foundry Yard, Station Road",
+      "status": "existing",
+      "purpose": "rehearsals, small gigs, shared interests"
+    },
+    {
+      "id": "riverside",
+      "name": "Riverside Walk",
+      "district": "southbank",
+      "junction": "j42",
+      "address": "South Quay, between the bridges",
+      "status": "existing",
+      "purpose": "walking, weather, chance meetings"
+    },
+    {
+      "id": "allotments",
+      "name": "Southbank Allotments",
+      "district": "southbank",
+      "junction": "j53",
+      "address": "Meadow Lane east gate",
+      "status": "existing",
+      "purpose": "seasonal tending, learning, slow projects"
+    },
+    {
+      "id": "reading-room",
+      "name": "The Reading Room",
+      "district": "mill-quarter",
+      "junction": "j32",
+      "address": "North Quay, beside the mill leat",
+      "status": "planned",
+      "purpose": "existing optional canal-quarter pack; interviews and quiet research"
+    },
+    {
+      "id": "crown-anchor",
+      "name": "The Crown & Anchor",
+      "district": "old-town",
+      "junction": "j10",
+      "address": "2 High Street",
+      "status": "planned",
+      "purpose": "pub meals, a quiet drink, occasional quiz nights"
+    },
+    {
+      "id": "post-office",
+      "name": "Post Office",
+      "district": "old-town",
+      "junction": "j11",
+      "address": "7 High Street",
+      "status": "planned",
+      "purpose": "letters, parcels, noticeboard, ordinary queues"
+    },
+    {
+      "id": "pharmacy",
+      "name": "High Street Pharmacy",
+      "district": "old-town",
+      "junction": "j12",
+      "address": "22 High Street",
+      "status": "planned",
+      "purpose": "ordinary health errands; no diagnosis engine"
+    },
+    {
+      "id": "launderette",
+      "name": "North Terrace Laundry",
+      "district": "old-town",
+      "junction": "j02",
+      "address": "30 North Terrace",
+      "status": "planned",
+      "purpose": "domestic necessity, waiting, repeated acquaintances"
+    },
+    {
+      "id": "charity-shop",
+      "name": "Second Chances",
+      "district": "old-town",
+      "junction": "j10",
+      "address": "5 High Street",
+      "status": "planned",
+      "purpose": "secondhand objects, donations, volunteering"
+    },
+    {
+      "id": "barber",
+      "name": "Lane’s Barbers",
+      "district": "old-town",
+      "junction": "j01",
+      "address": "Willow Lane corner",
+      "status": "planned",
+      "purpose": "personal upkeep, routine conversation"
+    },
+    {
+      "id": "bus-interchange",
+      "name": "Station Forecourt",
+      "district": "station-quarter",
+      "junction": "j04",
+      "address": "Outside Alderwick Station",
+      "status": "planned",
+      "purpose": "local buses, missed connections, weather delays"
+    },
+    {
+      "id": "supermarket",
+      "name": "Eastgate Food Store",
+      "district": "station-quarter",
+      "junction": "j13",
+      "address": "High Street east",
+      "status": "planned",
+      "purpose": "weekly shopping, household supplies"
+    },
+    {
+      "id": "guesthouse",
+      "name": "Station House Guest Rooms",
+      "district": "station-quarter",
+      "junction": "j03",
+      "address": "Foundry Road north",
+      "status": "planned",
+      "purpose": "plausible visitors; no invented relationship"
+    },
+    {
+      "id": "parcel-depot",
+      "name": "East Yard Parcel Depot",
+      "district": "station-quarter",
+      "junction": "j14",
+      "address": "Station Road service yard",
+      "status": "planned",
+      "purpose": "missed deliveries, collections, practical frustrations"
+    },
+    {
+      "id": "clinic",
+      "name": "Westfield Practice",
+      "district": "westfield",
+      "junction": "j20",
+      "address": "Westfield Road",
+      "status": "planned",
+      "purpose": "appointments and recovery routines; no clinical advice simulation"
+    },
+    {
+      "id": "primary-school",
+      "name": "Westfield Primary",
+      "district": "westfield",
+      "junction": "j30",
+      "address": "Westfield Road south",
+      "status": "planned",
+      "purpose": "school-run traffic and community rhythm; private interior"
+    },
+    {
+      "id": "churchyard",
+      "name": "St Anne’s Churchyard",
+      "district": "westfield",
+      "junction": "j30",
+      "address": "Westfield Road by Quay Steps",
+      "status": "planned",
+      "purpose": "quiet walks, history, community notices"
+    },
+    {
+      "id": "council-office",
+      "name": "Town Council Rooms",
+      "district": "mill-quarter",
+      "junction": "j21",
+      "address": "Willow Square north side",
+      "status": "planned",
+      "purpose": "public meetings, local disputes, practical civic life"
+    },
+    {
+      "id": "mill-museum",
+      "name": "Old Mill Rooms",
+      "district": "mill-quarter",
+      "junction": "j32",
+      "address": "North Quay",
+      "status": "planned",
+      "purpose": "small exhibitions, local history, volunteers"
+    },
+    {
+      "id": "hardware",
+      "name": "Foundry Hardware",
+      "district": "foundry",
+      "junction": "j23",
+      "address": "11 Foundry Road",
+      "status": "planned",
+      "purpose": "materials, tools, advice supporting repair projects"
+    },
+    {
+      "id": "print-studio",
+      "name": "Quay Print Studio",
+      "district": "foundry",
+      "junction": "j34",
+      "address": "North Quay east",
+      "status": "planned",
+      "purpose": "posters, art, collaboration, practical commissions"
+    },
+    {
+      "id": "bike-repair",
+      "name": "Bridge Cycles",
+      "district": "foundry",
+      "junction": "j33",
+      "address": "Foundry Bridge approach",
+      "status": "planned",
+      "purpose": "repairs, cycling interests, material constraints"
+    },
+    {
+      "id": "riverside-kiosk",
+      "name": "South Quay Kiosk",
+      "district": "southbank",
+      "junction": "j41",
+      "address": "Willow Footbridge south landing",
+      "status": "planned",
+      "purpose": "seasonal refreshments and walkers"
+    },
+    {
+      "id": "southbank-housing",
+      "name": "Meadow Terrace",
+      "district": "southbank",
+      "junction": "j50",
+      "address": "Meadow Lane west",
+      "status": "planned",
+      "purpose": "residential frontage; individual homes emerge only as needed"
+    },
+    {
+      "id": "football-pavilion",
+      "name": "Southbank Pavilion",
+      "district": "southbank",
+      "junction": "j51",
+      "address": "Meadow Lane recreation entrance",
+      "status": "planned",
+      "purpose": "amateur sport, volunteering, social events"
+    },
+    {
+      "id": "dog-walk",
+      "name": "Meadow Common",
+      "district": "southbank",
+      "junction": "j52",
+      "address": "Meadow Lane central gate",
+      "status": "planned",
+      "purpose": "open green space, walks, unplanned encounters"
+    },
+    {
+      "id": "nature-path",
+      "name": "Reedbeds Path",
+      "district": "southbank",
+      "junction": "j54",
+      "address": "East end of Meadow Lane",
+      "status": "planned",
+      "purpose": "birdwatching and longer walks; daylight/weather constraints"
+    },
+    {
+      "id": "hill-path",
+      "name": "Westfield Hill Path",
+      "district": "westfield",
+      "junction": "j20",
+      "address": "Westfield Road western boundary",
+      "status": "planned",
+      "purpose": "a reachable edge of town and viewpoint"
+    },
+    {
+      "id": "cemetery",
+      "name": "Alderwick Cemetery",
+      "district": "southbank",
+      "junction": "j50",
+      "address": "Meadow Lane beyond the houses",
+      "status": "planned",
+      "purpose": "quiet reflection; no invented bereavement"
+    }
+  ],
+  "discovery_policy": {
+    "planned_is_known": false,
+    "default": "undiscovered",
+    "stages": [
+      "undiscovered",
+      "heard_of",
+      "located",
+      "visited",
+      "familiar"
+    ],
+    "private_interiors_require_permission": true,
+    "existing_history_is_preserved": true,
+    "operator_blueprint_is_never_model_context": true
+  }
+}

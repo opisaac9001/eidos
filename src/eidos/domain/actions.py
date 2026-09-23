@@ -111,6 +111,7 @@ def resolve_action(
     actual_revision: int,
     simulated_at: datetime,
     goal_progress_delta: float = 0.5,
+    execution_complete: bool = False,
 ) -> ActionResolution:
     """Validate a proposal against current state and return its only legal effects."""
 
@@ -201,7 +202,7 @@ def resolve_action(
                 ends_at = datetime.fromisoformat(schedule.ends_at)
             except ValueError:
                 return reject("invalid_schedule_time", "The scheduled end time is invalid")
-            if simulated_at < ends_at:
+            if simulated_at < ends_at and not execution_complete:
                 return reject("work_incomplete", "The scheduled work duration has not elapsed")
         effects.extend(
             (
@@ -305,7 +306,11 @@ def resolve_action(
         ends_at = datetime.fromisoformat(schedule.ends_at) if schedule.ends_at else starts_at
         if simulated_at < starts_at:
             return reject("too_early", "The scheduled activity has not started")
-        if proposal.action in {ActionKind.WORK, ActionKind.LEARN} and simulated_at < ends_at:
+        if (
+            proposal.action in {ActionKind.WORK, ActionKind.LEARN}
+            and simulated_at < ends_at
+            and not execution_complete
+        ):
             return reject("activity_incomplete", "The scheduled activity duration has not elapsed")
         if proposal.action is ActionKind.ATTEND and simulated_at > ends_at:
             return reject("activity_missed", "The attendance window has passed")

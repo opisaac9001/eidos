@@ -1,0 +1,16 @@
+[Unit]
+Description=Verified Pathos database backup to data HDD
+RequiresMountsFor=/srv/eidos-data
+
+[Service]
+Type=oneshot
+User=isaac
+Group=isaac
+WorkingDirectory=/srv/eidos
+ExecStart=/bin/sh /srv/eidos/infra/dell-t630/backup.sh
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/eidos /srv/eidos-data/eidos/backups

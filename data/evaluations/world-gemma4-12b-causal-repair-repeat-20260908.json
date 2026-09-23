@@ -1,0 +1,904 @@
+{
+  "synthetic": true,
+  "model": "gemma4:12b",
+  "rows": [
+    {
+      "case": "scene_0",
+      "seconds": 1.62,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "8f296e49-0054-4258-a63d-fdef9fe32b2b",
+            "latency_ms": 1617.12,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 456,
+            "output_tokens": 41,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "8f296e49-0054-4258-a63d-fdef9fe32b2b",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"It's really coming down out there, isn't it? I'm glad we're stuck inside where it's dry for a bit.\"\n}",
+          "usage": {
+            "prompt_tokens": 456,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 41,
+            "total_tokens": 497
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "It's really coming down out there, isn't it? I'm glad we're stuck inside where it's dry for a bit."
+    },
+    {
+      "case": "scene_1",
+      "seconds": 1.09,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "210ee393-3ce6-45d0-8c02-ab9c4f37653b",
+            "latency_ms": 1091.56,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 473,
+            "output_tokens": 22,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "210ee393-3ce6-45d0-8c02-ab9c4f37653b",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"You're lucky you made it inside before the downpour got any worse.\"}",
+          "usage": {
+            "prompt_tokens": 473,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 22,
+            "total_tokens": 495
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "the rain outside the cafe",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Got soaked on the way here."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "You're lucky you made it inside before the downpour got any worse."
+    },
+    {
+      "case": "scene_2",
+      "seconds": 1.13,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "4a2f5731-45fe-4da8-b0b0-8d59a8c54634",
+            "latency_ms": 1131.62,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 460,
+            "output_tokens": 24,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "4a2f5731-45fe-4da8-b0b0-8d59a8c54634",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Hey, you should probably tighten that bolt on the workbench before it gives out on you.\"}",
+          "usage": {
+            "prompt_tokens": 460,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 24,
+            "total_tokens": 484
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": true,
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Hey, you should probably tighten that bolt on the workbench before it gives out on you."
+    },
+    {
+      "case": "scene_3",
+      "seconds": 1.19,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "4b1c53bb-37d2-4a95-b647-5ff89b3506f4",
+            "latency_ms": 1187.6,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 477,
+            "output_tokens": 26,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "4b1c53bb-37d2-4a95-b647-5ff89b3506f4",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"Yeah, if you could just hold it for a second while I tighten this bolt.\"\n}",
+          "usage": {
+            "prompt_tokens": 477,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 26,
+            "total_tokens": 503
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "workshop",
+        "person": "rowan",
+        "scene_mode": true,
+        "scene_speaker": "rowan",
+        "scene_audience": "pathos",
+        "scene_topic": "a loose bench leg at the workshop",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Want me to hold it steady?"
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "Yeah, if you could just hold it for a second while I tighten this bolt."
+    },
+    {
+      "case": "scene_4",
+      "seconds": 1.51,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "e299f130-4d52-4d85-8556-b6e4671d947a",
+            "latency_ms": 1511.48,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 458,
+            "output_tokens": 38,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "e299f130-4d52-4d85-8556-b6e4671d947a",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm trying to pick my next read, but I can't decide between this mystery or that biography. Do you have a preference between the two?\"}",
+          "usage": {
+            "prompt_tokens": 458,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 38,
+            "total_tokens": 496
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "I'm trying to pick my next read, but I can't decide between this mystery or that biography. Do you have a preference between the two?"
+    },
+    {
+      "case": "scene_5",
+      "seconds": 1.27,
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "7e435be5-01b9-40a7-99fe-04e6690e944e",
+            "latency_ms": 1266.55,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 474,
+            "output_tokens": 29,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "7e435be5-01b9-40a7-99fe-04e6690e944e",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"No worries at all, I'll keep this quick since you're on a tight schedule.\"\n}",
+          "usage": {
+            "prompt_tokens": 474,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 29,
+            "total_tokens": 503
+          }
+        }
+      ],
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "No worries at all, I'll keep this quick since you're on a tight schedule."
+    },
+    {
+      "case": "world_0",
+      "seconds": 7.75,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-0583943b-461e-4006-9431-de0480ff3d20",
+            "director_id": "moira",
+            "source_event_id": "0583943b-461e-4006-9431-de0480ff3d20",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.failed",
+          "payload": {
+            "role": "moira_event",
+            "proposal_id": "moira-open-world-cause-0583943b-461e-4006-9431-de0480ff3d20",
+            "text": "Open-world proposal rejected: Ambient stakes lacks concrete semantic detail",
+            "error_code": "low_semantic_detail",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "trace_id": "35de7399-721d-4e77-ab01-358e69067fb0"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "failed",
+            "trace_id": "35de7399-721d-4e77-ab01-358e69067fb0",
+            "latency_ms": 7753.93,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "error_code": "low_semantic_detail"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "rejected",
+            "trace_id": "35de7399-721d-4e77-ab01-358e69067fb0",
+            "latency_ms": 7753.94,
+            "model": "schema-rules-v4",
+            "backend": "rules",
+            "error_code": "low_semantic_detail"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"description\": \"A neighbor at the adjacent table notices the condensation on the shared tea service and offers to pour a cup for Patrick.\",\n  \"event_type\": \"social_interaction\",\n  \"location_id\": \"cafe\",\n  \"cause\": \"Patrick moved to the cafe.\",\n  \"theme\": \"neighborly_gesture\",\n  \"opportunity\": \"Accept shared tea\",\n  \"participation\": \"Engage in brief talk. Risk of social awkwardness.\",\n  \"stakes\": \"A moment of connection. A polite exchange.\",\n  \"affective_tone\": 0.4,\n  \"resource_id\": \"shared-tea-service\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.3,\n  \"duration_hours\": 1\n}",
+          "usage": {
+            "prompt_tokens": 642,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 201,
+            "total_tokens": 843
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_1",
+      "seconds": 8.06,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "director_id": "moira",
+            "source_event_id": "259b87a2-ccc4-4741-812a-b9d974867b31",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "20acd5a4-fa98-4780-990e-5b1f9d312f3b",
+            "latency_ms": 8064.19,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "20acd5a4-fa98-4780-990e-5b1f9d312f3b",
+            "latency_ms": 8064.3,
+            "model": "schema-rules-v4",
+            "backend": "rules",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.proposed",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "event_kind": "ambient",
+            "description": "The light rain makes the wooden surface of the seed-swap table slick as Patrick arrives to check the seasonal inventory.",
+            "location_id": "park",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.accepted",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "event_kind": "ambient",
+            "description": "The light rain makes the wooden surface of the seed-swap table slick as Patrick arrives to check the seasonal inventory.",
+            "location_id": "park",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.scheduled",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "event_kind": "ambient",
+            "description": "The light rain makes the wooden surface of the seed-swap table slick as Patrick arrives to check the seasonal inventory.",
+            "location_id": "park",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.resource_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "resource_id": "seed-swap-table",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "world_event.theme_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-259b87a2-ccc4-4741-812a-b9d974867b31",
+            "event_type": "Resource Interaction",
+            "theme": "Community Maintenance",
+            "opportunity": "Organize seed packets",
+            "participation": "Sort the damp packets. Ensure labels stay dry.",
+            "stakes": "Preserve the seeds. Prevent mold damage.",
+            "affective_tone": 0.1,
+            "cause": "Patrick moved to the park.",
+            "duration_hours": 1,
+            "novelty_score": 1.0,
+            "generated_fiction": true,
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"description\": \"The light rain makes the wooden surface of the seed-swap table slick as Patrick arrives to check the seasonal inventory.\",\n  \"event_type\": \"Resource Interaction\",\n  \"location_id\": \"park\",\n  \"cause\": \"Patrick moved to the park.\",\n  \"theme\": \"Community Maintenance\",\n  \"opportunity\": \"Organize seed packets\",\n  \"participation\": \"Sort the damp packets. Ensure labels stay dry.\",\n  \"stakes\": \"Preserve the seeds. Prevent mold damage.\",\n  \"affective_tone\": 0.1,\n  \"resource_id\": \"seed-swap-table\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.30,\n  \"duration_hours\": 1\n}",
+          "usage": {
+            "prompt_tokens": 645,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 198,
+            "total_tokens": 843
+          }
+        }
+      ],
+      "context": {
+        "location": "park",
+        "cause_kind": "pathos.moved"
+      }
+    },
+    {
+      "case": "world_2",
+      "seconds": 10.05,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "director_id": "moira",
+            "source_event_id": "da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "a37a0d03-dff9-44bf-86cd-f7478407ced7",
+            "latency_ms": 10049.73,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "a37a0d03-dff9-44bf-86cd-f7478407ced7",
+            "latency_ms": 10049.77,
+            "model": "schema-rules-v4",
+            "backend": "rules",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.proposed",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "event_kind": "ambient",
+            "description": "Rowan has just finished repairing a heavy-duty industrial lathe, leaving the motor humming and the metal parts oiled and ready for use.",
+            "location_id": "workshop",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.accepted",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "event_kind": "ambient",
+            "description": "Rowan has just finished repairing a heavy-duty industrial lathe, leaving the motor humming and the metal parts oiled and ready for use.",
+            "location_id": "workshop",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.scheduled",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "event_kind": "ambient",
+            "description": "Rowan has just finished repairing a heavy-duty industrial lathe, leaving the motor humming and the metal parts oiled and ready for use.",
+            "location_id": "workshop",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.3,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.resource_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "resource_id": "community-repair-kit",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "world_event.theme_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-da44a9f0-7ed7-4c9b-b63d-39fe700c2aaa",
+            "event_type": "workshop_maintenance_update",
+            "theme": "utility",
+            "opportunity": "operate the lathe",
+            "participation": "Use the heavy-duty machine. Attempt to shape a steel spindle.",
+            "stakes": "The metal may warp. The blades could slip.",
+            "affective_tone": 0.4,
+            "cause": "Rowan completed repairs on the machinery.",
+            "duration_hours": 1,
+            "novelty_score": 1.0,
+            "generated_fiction": true,
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"description\": \"Rowan has just finished repairing a heavy-duty industrial lathe, leaving the motor humming and the metal parts oiled and ready for use.\",\n  \"event_type\": \"workshop_maintenance_update\",\n  \"location_id\": \"workshop\",\n  \"cause\": \"Rowan completed repairs on the machinery.\",\n  \"theme\": \"utility\",\n  \"opportunity\": \"operate the lathe\",\n  \"participation\": \"Use the heavy-duty machine. Attempt to shape a steel spindle.\",\n  \"stakes\": \"The metal may warp. The blades could slip.\",\n  \"affective_tone\": 0.4,\n  \"resource_id\": \"community-repair-kit\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.3,\n  \"duration_hours\": 1\n}",
+          "usage": {
+            "prompt_tokens": 642,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 209,
+            "total_tokens": 851
+          }
+        }
+      ],
+      "context": {
+        "location": "workshop",
+        "cause_kind": "npc.activity_recorded"
+      }
+    },
+    {
+      "case": "world_3",
+      "seconds": 9.58,
+      "events": [
+        {
+          "kind": "world_event.generation_requested",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "director_id": "moira",
+            "source_event_id": "43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "moira_event",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "acff7ea6-8455-4ab6-8a25-327d6cc4faf5",
+            "latency_ms": 9575.31,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "acff7ea6-8455-4ab6-8a25-327d6cc4faf5",
+            "latency_ms": 9575.35,
+            "model": "schema-rules-v4",
+            "backend": "rules",
+            "error_code": null
+          }
+        },
+        {
+          "kind": "world_event.proposed",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "event_kind": "ambient",
+            "description": "The steaming porcelain tea service sits on the counter, polished and functional after a long period of being out of commission.",
+            "location_id": "cafe",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.4,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.accepted",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "event_kind": "ambient",
+            "description": "The steaming porcelain tea service sits on the counter, polished and functional after a long period of being out of commission.",
+            "location_id": "cafe",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.4,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.scheduled",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "event_kind": "ambient",
+            "description": "The steaming porcelain tea service sits on the counter, polished and functional after a long period of being out of commission.",
+            "location_id": "cafe",
+            "starts_at": "2026-01-07T16:00:00+00:00",
+            "intensity": 0.4,
+            "schema_version": 1,
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "source": "causal-world-response"
+          }
+        },
+        {
+          "kind": "world_event.resource_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "resource_id": "shared-tea-service",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        },
+        {
+          "kind": "world_event.theme_linked",
+          "payload": {
+            "proposal_id": "moira-open-world-cause-43e7b5ed-63f2-4f44-83fe-a3f64c9c9b5a",
+            "event_type": "Restored Amenity",
+            "theme": "Community Comfort",
+            "opportunity": "Brew a first pot",
+            "participation": "Prepare the tea; Ensure the first cup is served hot.",
+            "stakes": "Restore the cafe's morning ritual; Offer a warm gesture to a stranger.",
+            "affective_tone": 0.6,
+            "cause": "The shared tea service has been repaired.",
+            "duration_hours": 1,
+            "novelty_score": 1.0,
+            "generated_fiction": true,
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"description\": \"The steaming porcelain tea service sits on the counter, polished and functional after a long period of being out of commission.\",\n  \"event_type\": \"Restored Amenity\",\n  \"location_id\": \"cafe\",\n  \"cause\": \"The shared tea service has been repaired.\",\n  \"theme\": \"Community Comfort\",\n  \"opportunity\": \"Brew a first pot\",\n  \"participation\": \"Prepare the tea; Ensure the first cup is served hot.\",\n  \"stakes\": \"Restore the cafe's morning ritual; Offer a warm gesture to a stranger.\",\n  \"affective_tone\": 0.6,\n  \"resource_id\": \"shared-tea-service\",\n  \"inspiration_signal_id\": \"none\",\n  \"starts_in_hours\": 0,\n  \"intensity\": 0.4,\n  \"duration_hours\": 1\n}",
+          "usage": {
+            "prompt_tokens": 653,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 207,
+            "total_tokens": 860
+          }
+        }
+      ],
+      "context": {
+        "location": "cafe",
+        "cause_kind": "object.condition_changed"
+      }
+    }
+  ],
+  "no_cause_and_repeated_cause_checks": "passed"
+}

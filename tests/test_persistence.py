@@ -36,6 +36,10 @@ class PersistenceTests(unittest.TestCase):
         self.store.append("pathos", [event], 0)
         self.assertEqual(self.store.read("pathos"), [event])
 
+    def test_new_databases_reclaim_freed_projection_pages(self) -> None:
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("PRAGMA auto_vacuum").fetchone()[0], 1)
+
     def test_v1_database_migrates_without_rewriting_events(self) -> None:
         legacy_path = Path(self.directory.name) / "legacy.sqlite3"
         event = DomainEvent("legacy", "pathos", {"value": "kept"})
@@ -239,13 +243,14 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(life._project_state(history), Life.project(history))
 
     def test_day_survives_restart_without_repeating_memories(self) -> None:
-        first = Life(self.store, StandInGateway())
+        first = Life(self.store, StandInGateway(), authored_scenario=True)
         first.advance(9)
-        restarted = Life(SQLiteEventStore(self.path), StandInGateway())
+        restarted = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True)
         self.assertEqual(first.snapshot(), restarted.snapshot())
         restarted.advance(15)
         whole = Life(
-            SQLiteEventStore(Path(self.directory.name) / "whole.sqlite3"), StandInGateway()
+            SQLiteEventStore(Path(self.directory.name) / "whole.sqlite3"), StandInGateway(),
+            authored_scenario=True,
         )
         whole.advance(24)
         self.assertEqual(restarted.snapshot()["pathos"], whole.snapshot()["pathos"])

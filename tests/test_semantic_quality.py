@@ -4,6 +4,41 @@ from eidos.application.semantic_quality import semantic_quality_findings
 
 
 class SemanticQualityTests(unittest.TestCase):
+    def test_unknown_history_is_not_negative_evidence(self):
+        context = {"message": "What did he say when you called?", "memories": ["I made tea."]}
+        self.assertIn(
+            "unsupported_history_denial",
+            semantic_quality_findings(
+                "pathos",
+                "I haven't called him today.",
+                context,
+            ),
+        )
+        for reply in ("I can't remember that call.", "I haven't decided what to do."):
+            self.assertNotIn(
+                "unsupported_history_denial",
+                semantic_quality_findings(
+                    "pathos",
+                    reply,
+                    context,
+                ),
+            )
+
+    def test_explicit_subjective_memory_is_not_overruled_by_hidden_truth(self):
+        context = {
+            "message": "Did you call?",
+            "memory_recollections": [{"text": "I didn't call him today", "felt_confidence": 0.95}],
+            "operator_hidden_truth": "He did call him",
+        }
+        self.assertNotIn(
+            "unsupported_history_denial",
+            semantic_quality_findings(
+                "pathos",
+                "I didn't call him today.",
+                context,
+            ),
+        )
+
     def test_detects_known_lab_failure_and_identity_leak(self):
         context = {"time": "2026-01-01T13:00:00+00:00"}
         self.assertIn(
@@ -147,6 +182,16 @@ class SemanticQualityTests(unittest.TestCase):
         )
 
     def test_current_activity_claim_needs_supplied_grounding(self):
+        for started in (True, False):
+            findings = semantic_quality_findings(
+                "pathos",
+                "I've been writing a letter.",
+                {
+                    "message": "How are you?",
+                    "ongoing_activities": [{"title": "Write a letter", "has_started": started}],
+                },
+            )
+            self.assertEqual("unsupported_current_activity" in findings, not started)
         self.assertIn(
             "unsupported_current_activity",
             semantic_quality_findings(
@@ -160,7 +205,10 @@ class SemanticQualityTests(unittest.TestCase):
             semantic_quality_findings(
                 "pathos",
                 "I've been working on the lamp project.",
-                {"message": "What have you been doing?", "memories": ["The lamp project moved forward."]},
+                {
+                    "message": "What have you been doing?",
+                    "memories": ["The lamp project moved forward."],
+                },
             ),
         )
 

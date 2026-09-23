@@ -1,0 +1,288 @@
+{
+  "synthetic": true,
+  "revision": 4108,
+  "rows": [
+    {
+      "mode": "serial",
+      "repeat": 0,
+      "pair_seconds": 2.59,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.52,
+          "text": "Damn, sorry to hear that\u2014sending good vibes your way.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 14,
+            "total_tokens": 58
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.06,
+          "text": "A elderly woman in a floral dress is slowly walking down the main street, stopping occasionally to admire the storefronts, her steps echoing softly on the cobblestones. A young boy in a baseball cap is chasing a bright yellow canary, which keeps fluttering just out of reach, causing small crowds to pause and smile.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 66,
+            "total_tokens": 124
+          }
+        }
+      ]
+    },
+    {
+      "mode": "serial",
+      "repeat": 1,
+      "pair_seconds": 3.06,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.78,
+          "text": "Damn, sorry to hear that\u2014I'm here if you just need to vent.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 19,
+            "total_tokens": 63
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.27,
+          "text": "A elderly man in a tweed jacket pauses in front of the local bakery, his eyes narrowing in concentration as he tries to select the perfect loaf from the displayed cases, before finally choosing and placing it carefully into a paper bag. Nearby, a group of high school students chat and laugh as they cross the street, their backpacks bouncing with each step.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 72,
+            "total_tokens": 130
+          }
+        }
+      ]
+    },
+    {
+      "mode": "serial",
+      "repeat": 2,
+      "pair_seconds": 2.74,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.44,
+          "text": "Damn, sorry to hear that\u2014sending good vibes your way.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 14,
+            "total_tokens": 58
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.31,
+          "text": "A elderly man in a worn-out sweater is carefully tying the shoelaces of his leather shoes on the sidewalk, occasionally glancing at the bustling high street filled with shops and cafes. Nearby, a young girl in a polka-dot dress is admiring the window display of a local bookstore, her fingers running lightly over the titles before her mother calls her over to join the queue at the ice cream shop.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 83,
+            "total_tokens": 141
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 0,
+      "pair_seconds": 1.74,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.73,
+          "text": "Damn, sorry to hear that\u2014I'm here if you just want to vent.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 19,
+            "total_tokens": 63
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 0.94,
+          "text": "A elderly man in a worn-out jacket is sitting on a bench, knitting a scarf while listening to music through a pair of earphones, his cat curled up beside him. Nearby, a group of teenagers are laughing and taking selfies with a colorful ice cream truck parked on the sidewalk.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 58,
+            "total_tokens": 116
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 1,
+      "pair_seconds": 1.72,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.72,
+          "text": "Damn, sorry to hear that\u2014I'm here if you just need to vent.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 19,
+            "total_tokens": 63
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 0.85,
+          "text": "A elderly woman in a bright yellow sweater is carefully navigating her way through the crowded high street, stopping occasionally to admire the windows of a local antique shop. A young boy in a superhero t-shirt is eagerly following behind her, occasionally offering to carry her shopping bags.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 54,
+            "total_tokens": 112
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 2,
+      "pair_seconds": 1.27,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "gemma4:31b",
+          "seconds": 1.0,
+          "text": "Damn, sorry to hear that, man.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 44,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 10,
+            "total_tokens": 54
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.27,
+          "text": "A elderly woman in a bright red coat stops to admire the display of seasonal decorations in the window of the local bookstore, her weathered hands gently touching the crisp paper wrapped around the books. Nearby, a young boy in a baseball cap and jeans hurries past a bakery, his nose wrinkling as he catches a whiff of freshly baked bread, his eyes scanning the street for his friend.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 80,
+            "total_tokens": 138
+          }
+        }
+      ]
+    }
+  ]
+}

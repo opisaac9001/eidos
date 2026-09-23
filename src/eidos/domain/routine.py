@@ -125,49 +125,59 @@ _WEEKEND_MIDDAYS = {
 
 _PLACE_TEXTURE: dict[str, tuple[str, ...]] = {
     "home": (
-        "Light shifted slowly across the kitchen wall.",
-        "The pipes clicked somewhere behind the plaster.",
-        "A draft kept finding the edge of the table.",
-        "The room held the faint smell of tea and old paper.",
-        "Footsteps crossed the landing and faded downstairs.",
-        "A patch of condensation blurred the lower window.",
-        "The building settled around each small sound.",
+        "A mug cooled by the sink.",
+        "One stair creak echoed from outside.",
+        "The light drifted across the table.",
+        "Paper rustled in the back room.",
+        "A draft nudged the curtain seam.",
+        "Footsteps faded on the stairwell.",
+        "Plumbing clicked once in the wall.",
     ),
     "cafe": (
-        "Cups knocked softly together behind the counter.",
-        "The front window clouded whenever the door closed.",
-        "A chair scraped, then the room settled again.",
-        "Someone near the door kept folding the same newspaper.",
-        "The smell of toast briefly covered the smell of coffee.",
-        "Rain-dark coats gathered along the wall hooks.",
-        "A spoon turned slowly in an otherwise forgotten cup.",
+        "A spoon turned in a quiet cup.",
+        "The door sighed shut and reopened.",
+        "A chair scraped, then stopped.",
+        "Rain darkened the window edge.",
+        "The radio hissed briefly, then steadied.",
+        "Someone folded a paper by the door.",
+        "Two cups were stacked and left.",
     ),
     "workshop": (
-        "Fine dust caught in the light above the shared bench.",
-        "A loose window pane answered every passing lorry.",
-        "The tool drawers never quite closed at the same angle.",
-        "Someone had left a careful row of offcuts by the wall.",
-        "The room smelled faintly of oil, paper, and damp wool.",
-        "A clamp creaked whenever the bench shifted.",
-        "Cold light rested on the metal edges of the tools.",
+        "A clamp shifted once on the bench.",
+        "Dust drifted in the blade of light.",
+        "The drawers clicked near the shared tools.",
+        "Offcuts waited in a neat row.",
+        "Oil and paper smelled faintly warm.",
+        "Metal edges held a thin shine.",
+        "The room hummed at a lower pitch.",
     ),
     "park": (
-        "The willows moved before the rest of the trees noticed the wind.",
-        "A bus sighed at the corner and pulled away again.",
-        "Pigeons rearranged themselves around a dropped crust.",
-        "The empty benches held small beads of rain.",
-        "Cloud shadows crossed the paving faster than the people did.",
-        "A paper receipt worried at the edge of the railings.",
-        "Voices carried across the square and lost their words halfway.",
+        "The square held one more wind shift.",
+        "Pigeons shuffled around a dropped crumb.",
+        "Rain had just touched the paving.",
+        "A bus sighed beyond the trees.",
+        "A bench edge caught the light.",
+        "Clouds moved without hurry.",
+        "The square kept a small, dull hum.",
     ),
 }
 
 _MOMENT_TEXTURE = (
-    "It made the hour feel briefly distinct from the rest of the day.",
-    "The detail stayed in the background without asking to mean anything.",
-    "Nothing important changed, but the moment did not feel interchangeable.",
-    "It was the sort of detail that might be forgotten by evening.",
-    "For a little while, attention rested there.",
+    "One small detail made the hour feel separate.",
+    "The pause held for a breath before moving on.",
+    "Attention settled there and then drifted.",
+    "Nothing felt urgent, only distinctly present.",
+    "The moment was real, if a little ordinary.",
+)
+
+_GENERIC_PLACE_TEXTURE = (
+    "A small sound came and then went away.",
+    "The room shifted at the edge of the hour.",
+    "Someone moved past and disappeared into the hall.",
+    "A faint warmth lingered in the air.",
+    "A draft passed and softened.",
+    "A distant scrape answered the silence.",
+    "The place settled and kept going.",
 )
 
 _OPENING_ROUTINE = (
@@ -275,6 +285,26 @@ def routine_for_day(day: date) -> tuple[RoutineBeat, ...]:
             )
         )
     return tuple(output)
+
+
+def lived_moment_description(
+    description: str, location_id: str, at: datetime, activity: str
+) -> str:
+    """Give consequence-shaped routine memories distinct, replay-stable lived texture."""
+    clean = description.strip()
+    if not clean:
+        raise ValueError("Lived moment description must not be empty")
+    existing_textures = (*_MOMENT_TEXTURE, *(line for lines in _PLACE_TEXTURE.values() for line in lines))
+    if any(texture in clean for texture in existing_textures):
+        return clean
+    place_options = _PLACE_TEXTURE.get(location_id, _GENERIC_PLACE_TEXTURE)
+    salt = int.from_bytes(sha256(f"{clean}:{activity}".encode()).digest()[:2], "big")
+    # Thirteen is coprime with the 35 place/moment combinations, so an otherwise
+    # identical hourly experience does not repeat for more than a month.
+    sequence = (at.date().toordinal() * 13 + at.hour * 7 + salt) % 35
+    place_texture = place_options[sequence % len(place_options)]
+    moment_texture = _MOMENT_TEXTURE[(sequence // len(place_options)) % len(_MOMENT_TEXTURE)]
+    return f"{clean} {place_texture} {moment_texture}"
 
 
 def beats_between(start: datetime, end: datetime) -> list[tuple[datetime, RoutineBeat]]:

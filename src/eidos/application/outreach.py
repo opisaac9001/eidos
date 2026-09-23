@@ -20,11 +20,13 @@ async def outreach_events(
     pathos_awake: bool,
     context: Mapping[str, object],
 ) -> list[DomainEvent]:
-    """Send at most one grounded message per 72 hours during the fixed daytime window."""
+    """Allow a recent user-linked thought to prompt bounded daytime outreach."""
     if simulated_at.utcoffset() is None:
         raise ValueError("Outreach time must be timezone-aware")
     config = project_outreach_config(history)
-    if not config.enabled or not pathos_awake or simulated_at.hour != 18:
+    if (not config.enabled or not pathos_awake
+            or simulated_at.hour >= config.quiet_start_hour
+            or simulated_at.hour < config.quiet_end_hour):
         return []
     messages = [event for event in history if event.kind == "conversation.message"]
     if not any(event.payload.get("speaker") == "you" for event in messages):
@@ -46,33 +48,33 @@ async def outreach_events(
         for scene in project_scenes(history).scenes.values()
     ):
         return []
-    prior = next(
-        (
-            event
-            for event in reversed(messages)
-            if event.payload.get("channel") == "in_app_outreach"
-        ),
-        None,
-    )
-    if prior is not None and simulated_at - _event_time(prior) < timedelta(
-        hours=config.minimum_interval_hours
-    ):
-        return []
+    memories = {
+        str(event.event_id): event for event in history
+        if event.kind == "memory.recorded"
+        and event.payload.get("owner", "pathos") == "pathos"
+        and event.payload.get("source") == "user-conversation"
+    }
     source = next(
         (
             event
             for event in reversed(history)
-            if event.kind == "memory.recorded"
-            and event.payload.get("owner", "pathos") == "pathos"
-            and event.payload.get("category") != "dream"
+            if event.kind == "thought.recorded"
+            and str(event.payload.get("source_memory_id")) in memories
             and isinstance(event.payload.get("text"), str)
+            and isinstance(event.payload.get("simulated_at"), str)
+            and timedelta(0) <= simulated_at - _event_time(event) <= timedelta(minutes=30)
         ),
         None,
     )
     if source is None:
         return []
-    request_id = f"outreach-{simulated_at.date().isoformat()}"
-    if any(event.payload.get("request_id") == request_id for event in messages):
+    request_id = f"outreach-{source.event_id}"
+    if any(
+        event.kind == "outreach.considered"
+        and (event.payload.get("request_id") == request_id
+             or event.payload.get("source_thought_id") == str(source.event_id))
+        for event in history
+    ) or any(event.payload.get("request_id") == request_id for event in messages):
         return []
     pending = [
         DomainEvent(
@@ -80,7 +82,8 @@ async def outreach_events(
             "pathos",
             {
                 "request_id": request_id,
-                "source_memory_id": str(source.event_id),
+                "source_memory_id": source.payload["source_memory_id"],
+                "source_thought_id": str(source.event_id),
                 "simulated_at": simulated_at.isoformat(),
                 "channel": "in_app_only",
             },
@@ -91,13 +94,34 @@ async def outreach_events(
     model_context = {
         **dict(context),
         "message": "",
-        "outreach_reason": "Share one ordinary thought because something from the day genuinely brought the user to mind.",
+        "outreach_reason": (
+            "Decide whether this private thought actually motivates contacting the user. "
+            "Merely remembering them is not enough. You may want to share something specific, "
+            "ask a genuine question, or invite them to talk or do something in the simulated world. "
+            "If there is no meaningful reason to act, return exactly [KEEP_PRIVATE] as the text. "
+            "Otherwise write only the natural message you choose to send. Consider recent_dialogue: "
+            "do not repeat an invitation, chase an unanswered message, or send the same idea again. "
+            "The supplied thought is subjective, not proof of new events. An invitation is only "
+            "a proposal: never claim the user agreed, an activity was booked, or a visit began. "
+            "Do not claim the user is absent or owes a reply."
+        ),
         "source_memory": str(source.payload["text"]),
+        "recent_dialogue": [
+            {"speaker": event.payload.get("speaker"), "text": event.payload.get("text")}
+            for event in messages[-12:]
+        ],
     }
     text = await perform_pathos_reply(
         gateway, model_context, simulated_at.isoformat(), pending
     )
     if not text:
+        return pending
+    if "[keep_private]" in text.lower():
+        pending.append(DomainEvent("outreach.kept_private", "pathos", {
+            "request_id": request_id,
+            "source_thought_id": str(source.event_id),
+            "simulated_at": simulated_at.isoformat(),
+        }, causation_id=source.event_id, correlation_id=request_id))
         return pending
     lowered = text.lower()
     forbidden_pressure = (
@@ -134,7 +158,8 @@ async def outreach_events(
                 "request_id": request_id,
                 "delivery_status": "sent",
                 "channel": "in_app_outreach",
-                "source_memory_id": str(source.event_id),
+                "source_memory_id": source.payload["source_memory_id"],
+                "source_thought_id": str(source.event_id),
             },
             causation_id=source.event_id,
             correlation_id=request_id,

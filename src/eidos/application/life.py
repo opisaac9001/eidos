@@ -6,6 +6,10 @@ from datetime import date, datetime, timedelta
 from typing import Any, Sequence
 from uuid import UUID, uuid4
 
+from eidos.application.activity_execution import (
+    execution_context,
+    execution_events,
+)
 from eidos.application.agency import autonomous_activity_events
 from eidos.application.ambient_population import ambient_population
 from eidos.application.appraisal import (
@@ -14,6 +18,7 @@ from eidos.application.appraisal import (
     baseline_affect_events,
     sleep_and_need_events,
 )
+from eidos.application.attention import attention_state
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
 from eidos.application.catchup import (
     CatchUpPreview,
@@ -22,8 +27,9 @@ from eidos.application.catchup import (
     preview_catch_up,
 )
 from eidos.application.character_generation import generated_character_history_events
+from eidos.application.city_map import city_map
 from eidos.application.cognition import perform, perform_pathos_reply, request_for
-from eidos.application.cognitive_workspace import cognitive_workspace
+from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import ConsolidationIndex, consolidation_events
 from eidos.application.deliveries import delivery_events
@@ -60,11 +66,16 @@ from eidos.application.inner_life import (
     waking_dream_events,
 )
 from eidos.application.invitations import follow_up_invitation_events
+from eidos.application.lived_activity_window import lived_activity_window
 from eidos.application.memory import MemoryIndex, memory_archive_page, memory_view, recall, terms
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
-from eidos.application.nourishment import nourishment_events, provision_foundation_events
+from eidos.application.nourishment import (
+    nourishment_events,
+    pending_planned_meal,
+    provision_foundation_events,
+)
 from eidos.application.npc_agency import autonomous_npc_plan_events
 from eidos.application.npc_cognition import npc_belief_events, npc_need_plan_events
 from eidos.application.npc_simulation import (
@@ -81,7 +92,9 @@ from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
+from eidos.application.opportunities import opportunity_events
 from eidos.application.outreach import outreach_events
+from eidos.application.personal_journeys import journey_context
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
 from eidos.application.planner import overdue_plan_events
@@ -108,6 +121,7 @@ from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
+from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.trait_development import trait_development_events
 from eidos.application.urgent_incidents import (
@@ -115,9 +129,10 @@ from eidos.application.urgent_incidents import (
     urgent_incident_events,
 )
 from eidos.application.visitors import visitor_events, visitor_locations
+from eidos.application.volition import volition_snapshot
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.world_expansion import expanding_world_events
-from eidos.application.world_exploration import exploration_plan_events, planned_activity_beat
+from eidos.application.world_exploration import planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
 from eidos.application.world_perception import (
     authored_community_schedule,
@@ -145,6 +160,7 @@ from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.outreach import project_outreach_config
+from eidos.domain.persona import persona_context
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.relationship_dates import project_relationship_dates
 from eidos.domain.relationship_repairs import project_relationship_repairs
@@ -154,6 +170,7 @@ from eidos.domain.routine import (
     RoutineBeat,
     beats_between,
     emotionally_adjusted_beat,
+    lived_moment_description,
     needs_adjusted_beat,
 )
 from eidos.domain.scenes import (
@@ -264,11 +281,14 @@ class Life:
         gateway: ModelGateway,
         mode: str = "stand-in",
         town_signal_source: TownSignalSource | None = None,
+        *,
+        authored_scenario: bool = False,
     ) -> None:
         self.store = store
         self.gateway = gateway
         self.mode = mode
         self.town_signal_source = town_signal_source
+        self.authored_scenario = authored_scenario
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None
         self._planning_cache: tuple[int, str, PlanningState] | None = None
@@ -1131,6 +1151,16 @@ class Life:
             )
         return {
             "revision": len(history),
+            "preview": any(event.kind == "simulation.preview_established" for event in history),
+            "activity_execution": execution_context(
+                history, self._planning(history), state.simulated_at, observer=True
+            ),
+            "attention": attention_state(history, self._planning(history), state.simulated_at),
+            "volition": volition_snapshot(history),
+            "journey": journey_context(history, state.simulated_at, catalog),
+            "time_budget": personal_time_budget(
+                self._planning(history), catalog, state.simulated_at, state.location_id
+            ),
             "time": state.simulated_at.isoformat(),
             "day": (state.simulated_at.date() - PathosState().simulated_at.date()).days + 1,
             "pathos": {
@@ -1150,10 +1180,14 @@ class Life:
                 },
                 "awake": state.awake,
                 "mood": mood_name(state.energy, state.valence, state.arousal),
-                "surroundings": vars_for(ambient[state.location_id]),
+                "surroundings": vars_for(ambient[state.location_id])
+                if state.location_id in ambient
+                else {"activity": "Travelling; neither endpoint is currently visible."},
             },
             "identity": {
                 "name": identity.name,
+                "nickname": identity.nickname,
+                "character_background": persona_context(),
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
                 "traits": dict(traits.levels),
@@ -1183,6 +1217,7 @@ class Life:
                 "quiet_end_hour": outreach_config.quiet_end_hour,
                 "minimum_interval_hours": outreach_config.minimum_interval_hours,
             },
+            "city_map": city_map(history, catalog, state.location_id),
             "locations": [
                 {
                     "id": place.place_id,
@@ -1366,11 +1401,7 @@ class Life:
             diverse=True,
             index=self._memory_index(history),
         )
-        recent_stream = [
-            str(event.payload["text"])
-            for event in history
-            if event.kind == "thought.recorded" and isinstance(event.payload.get("text"), str)
-        ][-8:]
+        recent_stream = recent_inner_stream(history, state.simulated_at)
         emotion = project_emotion(history)
         marker = DomainEvent(
             "mind.stream_pulsed",
@@ -1390,6 +1421,7 @@ class Life:
             {
                 "time": state.simulated_at.isoformat(),
                 "location": location_name,
+                "journey": journey_context(history, state.simulated_at, catalog),
                 "memories": [item.recalled_text for item in selected],
                 "memory_recollections": [
                     {
@@ -1401,6 +1433,12 @@ class Life:
                     for item in selected
                 ],
                 "recent_inner_stream": recent_stream,
+                "time_budget": personal_time_budget(
+                    self._planning(history), catalog, state.simulated_at, state.location_id
+                ),
+                "ongoing_activities": execution_context(
+                    history, self._planning(history), state.simulated_at
+                ),
                 "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
                 "stream_pulse_id": pulse_id,
                 "mind_layers": mind_context(history),
@@ -1430,6 +1468,21 @@ class Life:
                     },
                     causation_id=source.event_id if source is not None else marker.event_id,
                     correlation_id=pulse_id,
+                )
+            )
+        if text is not None:
+            pending.extend(
+                await outreach_events(
+                    history + pending,
+                    state.simulated_at,
+                    self.gateway,
+                    pathos_awake=state.awake,
+                    context={
+                        "time": state.simulated_at.isoformat(),
+                        "location": location_name,
+                        "memories": [item.recalled_text for item in selected],
+                        "emotion": {"label": emotion.label, "intensity": emotion.intensity},
+                    },
                 )
             )
         self.store.append("pathos", pending, len(history))
@@ -1562,7 +1615,12 @@ class Life:
         deferred_requests: list[ModelRequest] = []
         if not project_identity(history).established:
             pending.append(identity_established_event(state.simulated_at.isoformat()))
-        beats = dict(beats_between(state.simulated_at, target))
+        # Preserve the historical acceptance fixture, never prescribe an ongoing day.
+        beats = {
+            at: beat
+            for at, beat in beats_between(state.simulated_at, target)
+            if self.authored_scenario
+        }
         hour = state.simulated_at.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         times = []
         while hour <= target:
@@ -1570,6 +1628,19 @@ class Life:
             hour += timedelta(hours=1)
         for current in times:
             at = current.isoformat()
+            if not self.authored_scenario:
+                journeys = lived_activity_window(
+                    history + pending,
+                    self._planning(history + pending),
+                    self._world_catalog(history + pending),
+                    state.simulated_at,
+                    current,
+                    repair_mastery=effective_capability(history + pending, "repair", state.mastery),
+                    available_pence=self._finances(history + pending).balance_pence,
+                )
+                pending.extend(journeys)
+                for event in journeys:
+                    state = state.apply(event)
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
             provisions = provision_foundation_events(history + pending, current)
@@ -1623,36 +1694,40 @@ class Life:
                 )
             )
             expansion_catalog = self._world_catalog(history + pending)
-            pending.extend(
-                exploration_plan_events(
+            object_opportunity = (
+                object_opportunity_events(
+                    history + pending,
+                    current,
+                    expansion_catalog,
+                    self._planning(history + pending),
+                    curiosity=state.curiosity,
+                    mastery=state.mastery,
+                    values=project_identity(history + pending).values,
+                )
+                if self.authored_scenario
+                else []
+            )
+            if object_opportunity:
+                self._planning(history + pending + object_opportunity)
+                pending.extend(object_opportunity)
+            borrowed_opportunity = (
+                borrowed_object_opportunity_events(
                     history + pending,
                     current,
                     expansion_catalog,
                     self._planning(history + pending),
                 )
-            )
-            object_opportunity = object_opportunity_events(
-                history + pending,
-                current,
-                expansion_catalog,
-                self._planning(history + pending),
-                curiosity=state.curiosity,
-                mastery=state.mastery,
-                values=project_identity(history + pending).values,
-            )
-            if object_opportunity:
-                self._planning(history + pending + object_opportunity)
-                pending.extend(object_opportunity)
-            borrowed_opportunity = borrowed_object_opportunity_events(
-                history + pending,
-                current,
-                expansion_catalog,
-                self._planning(history + pending),
+                if self.authored_scenario
+                else []
             )
             if borrowed_opportunity:
                 self._planning(history + pending + borrowed_opportunity)
                 pending.extend(borrowed_opportunity)
-            pending.extend(npc_world_events(history + pending, current))
+            pending.extend(
+                npc_world_events(
+                    history + pending, current, authored_scenario=self.authored_scenario
+                )
+            )
             pending.extend(
                 sleep_window_events(
                     history + pending,
@@ -1663,7 +1738,8 @@ class Life:
             )
             active_scenes = project_scenes(history + pending).scenes.values()
             pathos_busy = (
-                any(
+                state.location_id == "in_transit"
+                or any(
                     scene.status in {"active", "paused"}
                     and "pathos" in {scene.initiator_id, scene.partner_id}
                     for scene in active_scenes
@@ -1725,93 +1801,117 @@ class Life:
             )
             habit_context = active_habit_context(project_history) if planning_memory_due else []
             skill_context = active_skill_context(project_history) if planning_memory_due else []
-            project_events = await autonomous_project_events(
-                project_history,
-                current,
-                len(project_history),
-                self.gateway,
-                planning=self._planning(project_history),
-                catalog=self._world_catalog(project_history),
-                needs={
-                    "rest": state.rest,
-                    "connection": state.connection,
-                    "curiosity": state.curiosity,
-                    "mastery": state.mastery,
-                    "energy": effective_energy,
-                    "hunger": state.hunger,
-                    "financial_margin": min(
-                        1.0, self._finances(project_history).balance_pence / 20_000
-                    ),
-                    "physical_capacity": physical_capacity,
-                    **{f"household_{task}": load for task, load in household_now.loads.items()},
-                },
-                emotion={
-                    "label": project_feeling.label,
-                    "valence": project_feeling.valence,
-                    "arousal": project_feeling.arousal,
-                    "sustained_low_hours": project_feeling.sustained_low_hours,
-                    "secondary_label": project_feeling.secondary_label,
-                    "complexity": project_feeling.complexity,
-                },
-                values=project_identity_state.values,
-                preferences=project_identity_state.preferences,
-                traits=project_trait_state.levels,
-                memories=recent_memory_context,
-                semantic_expectations=semantic_context,
-                self_concepts=self_story_context,
-                skills=skill_context,
-                habits=habit_context,
-                workspace=cognitive_workspace(project_history, current),
+            project_events = (
+                await autonomous_project_events(
+                    project_history,
+                    current,
+                    len(project_history),
+                    self.gateway,
+                    planning=self._planning(project_history),
+                    catalog=self._world_catalog(project_history),
+                    needs={
+                        "rest": state.rest,
+                        "connection": state.connection,
+                        "curiosity": state.curiosity,
+                        "mastery": state.mastery,
+                        "energy": effective_energy,
+                        "hunger": state.hunger,
+                        "financial_margin": min(
+                            1.0, self._finances(project_history).balance_pence / 20_000
+                        ),
+                        "physical_capacity": physical_capacity,
+                        **{f"household_{task}": load for task, load in household_now.loads.items()},
+                    },
+                    emotion={
+                        "label": project_feeling.label,
+                        "valence": project_feeling.valence,
+                        "arousal": project_feeling.arousal,
+                        "sustained_low_hours": project_feeling.sustained_low_hours,
+                        "secondary_label": project_feeling.secondary_label,
+                        "complexity": project_feeling.complexity,
+                    },
+                    values=project_identity_state.values,
+                    preferences=project_identity_state.preferences,
+                    traits=project_trait_state.levels,
+                    memories=recent_memory_context,
+                    semantic_expectations=semantic_context,
+                    self_concepts=self_story_context,
+                    skills=skill_context,
+                    habits=habit_context,
+                    workspace=cognitive_workspace(project_history, current),
+                )
+                if (state.awake and not pathos_busy and not self.authored_scenario)
+                else []
             )
             if project_events:
                 self._planning(project_history + project_events)
                 pending.extend(project_events)
             agency_history = history + pending
+            pending.extend(opportunity_events(agency_history, current))
+            agency_history = history + pending
             current_emotion = project_emotion(agency_history)
             agency_identity = project_identity(agency_history)
             agency_traits = project_traits(agency_history)
-            agency = await autonomous_activity_events(
-                agency_history,
-                current,
-                len(agency_history),
-                self.gateway,
-                planning=self._planning(agency_history),
-                catalog=self._world_catalog(agency_history),
-                needs={
-                    "rest": state.rest,
-                    "connection": state.connection,
-                    "curiosity": state.curiosity,
-                    "mastery": state.mastery,
-                    "energy": effective_energy,
-                    "hunger": state.hunger,
-                    "financial_margin": min(
-                        1.0, self._finances(agency_history).balance_pence / 20_000
-                    ),
-                    "physical_capacity": physical_capacity,
-                    **{f"household_{task}": load for task, load in household_now.loads.items()},
-                },
-                emotion={
-                    "label": current_emotion.label,
-                    "valence": current_emotion.valence,
-                    "arousal": current_emotion.arousal,
-                    "sustained_low_hours": current_emotion.sustained_low_hours,
-                    "secondary_label": current_emotion.secondary_label,
-                    "complexity": current_emotion.complexity,
-                },
-                values=agency_identity.values,
-                preferences=agency_identity.preferences,
-                traits=agency_traits.levels,
-                memories=recent_memory_context,
-                semantic_expectations=semantic_context,
-                self_concepts=self_story_context,
-                skills=skill_context,
-                habits=habit_context,
-                workspace=cognitive_workspace(agency_history, current),
-                known_person_ids=pathos_known_person_ids(agency_history),
+            agency = (
+                await autonomous_activity_events(
+                    agency_history,
+                    current,
+                    len(agency_history),
+                    self.gateway,
+                    planning=self._planning(agency_history),
+                    catalog=self._world_catalog(agency_history),
+                    needs={
+                        "rest": state.rest,
+                        "connection": state.connection,
+                        "curiosity": state.curiosity,
+                        "mastery": state.mastery,
+                        "energy": effective_energy,
+                        "hunger": state.hunger,
+                        "financial_margin": min(
+                            1.0, self._finances(agency_history).balance_pence / 20_000
+                        ),
+                        "physical_capacity": physical_capacity,
+                        **{f"household_{task}": load for task, load in household_now.loads.items()},
+                    },
+                    emotion={
+                        "label": current_emotion.label,
+                        "valence": current_emotion.valence,
+                        "arousal": current_emotion.arousal,
+                        "sustained_low_hours": current_emotion.sustained_low_hours,
+                        "secondary_label": current_emotion.secondary_label,
+                        "complexity": current_emotion.complexity,
+                    },
+                    values=agency_identity.values,
+                    preferences=agency_identity.preferences,
+                    traits=agency_traits.levels,
+                    memories=recent_memory_context,
+                    semantic_expectations=semantic_context,
+                    self_concepts=self_story_context,
+                    skills=skill_context,
+                    habits=habit_context,
+                    workspace=cognitive_workspace(agency_history, current),
+                    known_person_ids=pathos_known_person_ids(agency_history),
+                    current_location_id=state.location_id,
+                )
+                if (state.awake and not pathos_busy and not self.authored_scenario)
+                else []
             )
             if agency:
                 self._planning(agency_history + agency)
                 pending.extend(agency)
+            if not self.authored_scenario:
+                journeys = lived_activity_window(
+                    history + pending,
+                    self._planning(history + pending),
+                    self._world_catalog(history + pending),
+                    current,
+                    current,
+                    repair_mastery=effective_capability(history + pending, "repair", state.mastery),
+                    available_pence=self._finances(history + pending).balance_pence,
+                )
+                pending.extend(journeys)
+                for event in journeys:
+                    state = state.apply(event)
             incident_location = active_incident_location(history + pending, current)
             incident_beat = (
                 RoutineBeat(
@@ -1831,6 +1931,14 @@ class Life:
                 current_location_id=state.location_id,
             )
             beat = incident_beat or planned_beat or beats.get(current)
+            if not self.authored_scenario and (
+                state.location_id == "in_transit"
+                or beat is not None
+                and beat.location_id != state.location_id
+            ):
+                # Natural trips execute above. A calendar description cannot move
+                # him instantly or claim work at an endpoint he has not reached.
+                beat = None
             meals: list[DomainEvent] = []
             meal_checked = False
             if beat:
@@ -2000,10 +2108,15 @@ class Life:
                     self._household(history + pending + household_work)
                     pending.extend(household_work)
                 household_event = household_work[0] if household_work else None
-                meal_busy = incident_location is not None or any(
-                    scene.status in {"active", "paused"}
-                    and "pathos" in {scene.initiator_id, scene.partner_id}
-                    for scene in project_scenes(history + pending).scenes.values()
+                meal_busy = (
+                    state.location_id == "in_transit"
+                    or incident_location is not None
+                    or pending_planned_meal(self._planning(history + pending), current)
+                    or any(
+                        scene.status in {"active", "paused"}
+                        and "pathos" in {scene.initiator_id, scene.partner_id}
+                        for scene in project_scenes(history + pending).scenes.values()
+                    )
                 )
                 meals = nourishment_events(
                     history + pending,
@@ -2030,6 +2143,12 @@ class Life:
                         if unavailable
                         else "The usual meal was delayed while the hour remained occupied."
                     )
+                remembered_description = lived_moment_description(
+                    remembered_description,
+                    beat.location_id,
+                    current,
+                    beat.activity,
+                )
                 pending.append(
                     DomainEvent(
                         "memory.recorded",
@@ -2072,10 +2191,15 @@ class Life:
                     )
                 )
             if not meal_checked:
-                meal_busy = incident_location is not None or any(
-                    scene.status in {"active", "paused"}
-                    and "pathos" in {scene.initiator_id, scene.partner_id}
-                    for scene in project_scenes(history + pending).scenes.values()
+                meal_busy = (
+                    state.location_id == "in_transit"
+                    or incident_location is not None
+                    or pending_planned_meal(self._planning(history + pending), current)
+                    or any(
+                        scene.status in {"active", "paused"}
+                        and "pathos" in {scene.initiator_id, scene.partner_id}
+                        for scene in project_scenes(history + pending).scenes.values()
+                    )
                 )
                 meals = nourishment_events(
                     history + pending,
@@ -2105,34 +2229,47 @@ class Life:
                 self._finances(history + pending + money)
                 pending.extend(money)
             effective_energy = min(state.energy, physical_capacity)
-            story = story_events(
-                current,
-                history + pending,
-                state.location_id,
-                effective_energy,
-                state.rest,
-                state.mastery,
-                state.valence,
-                state.arousal,
-                project_emotion(history + pending).sustained_low_hours,
-                project_identity(history + pending).values,
+            story = (
+                story_events(
+                    current,
+                    history + pending,
+                    state.location_id,
+                    effective_energy,
+                    state.rest,
+                    state.mastery,
+                    state.valence,
+                    state.arousal,
+                    project_emotion(history + pending).sustained_low_hours,
+                    project_identity(history + pending).values,
+                )
+                if self.authored_scenario
+                else []
             )
             if story:
                 self._planning(history + pending + story)
                 pending.extend(story)
-            object_story = object_story_events(current, history + pending, state.location_id)
+            object_story = (
+                object_story_events(current, history + pending, state.location_id)
+                if self.authored_scenario
+                else []
+            )
             if object_story:
                 self._planning(history + pending + object_story)
                 pending.extend(object_story)
-            personal_project = personal_project_events(
-                current, history + pending, state.location_id
+            personal_project = (
+                personal_project_events(current, history + pending, state.location_id)
+                if self.authored_scenario
+                else []
             )
             if personal_project:
                 self._planning(history + pending + personal_project)
                 pending.extend(personal_project)
-            pending.extend(
-                authored_community_schedule(history + pending, current, len(history) + len(pending))
-            )
+            if self.authored_scenario:
+                pending.extend(
+                    authored_community_schedule(
+                        history + pending, current, len(history) + len(pending)
+                    )
+                )
             pending.extend(
                 await improvised_world_events(
                     history + pending,
@@ -2152,6 +2289,8 @@ class Life:
                     },
                     external_signals=active_town_signal_context(history + pending, current),
                 )
+                if not self.authored_scenario
+                else []
             )
             npc_locations = {
                 actor_id: person.location_id
@@ -2222,7 +2361,10 @@ class Life:
             pending.extend(
                 npc_belief_events(history + pending, at, self._beliefs(history + pending))
             )
-            open_npc_agency = (current.date() - datetime(2026, 1, 1).date()).days + 1 >= 11
+            open_npc_agency = (
+                not self.authored_scenario
+                or (current.date() - datetime(2026, 1, 1).date()).days + 1 >= 11
+            )
             rich_residents = nearby_npc_ids(
                 pathos_location_id=state.location_id,
                 npc_locations=npc_locations,
@@ -2241,6 +2383,7 @@ class Life:
                 self._relationships(history + pending).relationships,
                 allow_new_plans=True,
                 allowed_actor_ids=(None if not open_npc_agency else background_residents),
+                authored_scenario=self.authored_scenario,
             )
             pending.extend(npc_replans)
             if open_npc_agency:
@@ -2335,6 +2478,14 @@ class Life:
                         social_openness=phone_bias.social_openness,
                         relationships=self._relationships(history + pending).relationships,
                         known_person_ids=pathos_known_person_ids(history + pending),
+                        instant_calls=self.authored_scenario,
+                        attention_absorption=float(
+                            attention_state(
+                                history + pending,
+                                self._planning(history + pending),
+                                current,
+                            )["absorption"]
+                        ),
                     )
                 )
             pending.extend(
@@ -2503,8 +2654,12 @@ class Life:
             pending.extend(
                 testimony_belief_events(history + pending, at, self._beliefs(history + pending))
             )
-            if current.hour == 7:
-                waking = waking_dream_events(history + pending, state, at)
+            if (self.authored_scenario and current.hour == 7) or (
+                not self.authored_scenario and state.awake
+            ):
+                waking = waking_dream_events(
+                    history + pending, state, at, authored_scenario=self.authored_scenario
+                )
                 for event in waking:
                     pending.append(event)
                     state = state.apply(event)
@@ -2549,7 +2704,12 @@ class Life:
             context: dict[str, object] = {
                 "location": catalog_now.location_name(state.location_id),
                 "time": at,
-                "ambient_presence": vars_for(
+                "journey": journey_context(history + pending, current, catalog_now),
+                "ambient_presence": {
+                    "activity": "Travelling; neither endpoint is currently visible."
+                }
+                if state.location_id == "in_transit"
+                else vars_for(
                     ambient_population(
                         catalog_now,
                         current,
@@ -2571,6 +2731,8 @@ class Life:
                 ],
                 "semantic_expectations": [*semantic_expectation_context(history + pending)],
                 "identity": {
+                    "name": identity_now.name,
+                    "nickname": identity_now.nickname,
                     "values": dict(identity_now.values),
                     "preferences": list(identity_now.preferences),
                     "traits": dict(traits_now.levels),
@@ -2594,12 +2756,13 @@ class Life:
                     for item in inspirations_now
                 ],
                 "mind_layers": mind_context(history + pending),
-                "recent_inner_stream": [
-                    str(event.payload["text"])
-                    for event in history + pending
-                    if event.kind == "thought.recorded"
-                    and isinstance(event.payload.get("text"), str)
-                ][-8:],
+                "time_budget": personal_time_budget(
+                    self._planning(history + pending), catalog_now, current, state.location_id
+                ),
+                "ongoing_activities": execution_context(
+                    history + pending, self._planning(history + pending), current
+                ),
+                "recent_inner_stream": recent_inner_stream(history + pending, current),
                 "cognitive_workspace": cognitive_workspace(history + pending, current),
             }
             if concerns_now:
@@ -2681,8 +2844,33 @@ class Life:
                         )
                     )
                     text = None
+                elif isinstance(self.gateway, DeferredModelGateway):
+                    deferred_requests.append(
+                        request_for(
+                            "murmur",
+                            {
+                                **context,
+                                "deferred_kind": "inner_thought",
+                            },
+                        )
+                    )
+                    text = None
                 else:
                     text = await perform(self.gateway, "murmur", context, at, pending)
+                if text and not selected_context:
+                    pending.append(
+                        DomainEvent(
+                            "thought.recorded",
+                            "pathos",
+                            {
+                                "text": text,
+                                "simulated_at": at,
+                                "source": "present-moment-thinking",
+                                "factual": False,
+                                "role": "murmur",
+                            },
+                        )
+                    )
                 if text and selected_context:
                     source = selected_context[0]
                     importance = float(source.event.payload.get("importance", 0.5))
@@ -2784,6 +2972,10 @@ class Life:
             if social_activity:
                 self._planning(history + pending + social_activity)
                 pending.extend(social_activity)
+            if not self.authored_scenario:
+                pending.extend(
+                    execution_events(history + pending, self._planning(history + pending), current)
+                )
             scheduled_activity = scheduled_activity_events(
                 self._planning(history + pending),
                 actor_location_id=state.location_id,
@@ -2796,6 +2988,9 @@ class Life:
                 },
                 cognitive_history=history + pending,
                 cognitive_capacity=min(effective_energy, state.rest),
+                require_execution_evidence=not self.authored_scenario,
+                actor_state=state,
+                available_pence=self._finances(history + pending).balance_pence,
             )
             if scheduled_activity:
                 self._planning(history + pending + scheduled_activity)
@@ -2825,13 +3020,17 @@ class Life:
                     relationships=self._relationships(history + pending).relationships,
                 )
             )
-            maintenance = object_maintenance_events(
-                history + pending,
-                current,
-                self._planning(history + pending),
-                self._world_catalog(history + pending),
-                mastery=effective_capability(history + pending, "repair", state.mastery),
-                values=project_identity(history + pending).values,
+            maintenance = (
+                object_maintenance_events(
+                    history + pending,
+                    current,
+                    self._planning(history + pending),
+                    self._world_catalog(history + pending),
+                    mastery=effective_capability(history + pending, "repair", state.mastery),
+                    values=project_identity(history + pending).values,
+                )
+                if self.authored_scenario
+                else []
             )
             if maintenance:
                 self._planning(history + pending + maintenance)
@@ -2893,8 +3092,7 @@ class Life:
                         recent_dreams = [
                             item
                             for item in history + pending
-                            if item.kind == "dream.recorded"
-                            and item.aggregate_id == "pathos"
+                            if item.kind == "dream.recorded" and item.aggregate_id == "pathos"
                         ][-12:]
                         recent_dream_context = [
                             {
@@ -3025,6 +3223,40 @@ class Life:
                     )
                 )
                 pending.extend(semantic_expectation_events(history + pending, current))
+        if not self.authored_scenario:
+            pending.extend(npc_world_events(history + pending, target))
+            journeys = lived_activity_window(
+                history + pending,
+                self._planning(history + pending),
+                self._world_catalog(history + pending),
+                state.simulated_at,
+                target,
+                repair_mastery=effective_capability(history + pending, "repair", state.mastery),
+                available_pence=self._finances(history + pending).balance_pence,
+            )
+            pending.extend(journeys)
+            for event in journeys:
+                state = state.apply(event)
+            fractional_activity = scheduled_activity_events(
+                self._planning(history + pending),
+                actor_location_id=state.location_id,
+                simulated_at=target,
+                actual_revision=len(history) + len(pending),
+                repair_mastery=effective_capability(history + pending, "repair", state.mastery),
+                actor_locations={
+                    p: n.location_id
+                    for p, n in project_npcs(history + pending, target).people.items()
+                },
+                cognitive_history=history + pending,
+                cognitive_capacity=min(state.energy, state.rest),
+                require_execution_evidence=True,
+                actor_state=state,
+                available_pence=self._finances(history + pending).balance_pence,
+            )
+            pending.extend(fractional_activity)
+            if fractional_activity:
+                pending.extend(dream_plan_outcome_events(history + pending, target))
+                pending.extend(dream_project_outcome_events(history + pending, target))
         final_time = DomainEvent("time.advanced", "pathos", {"simulated_at": target})
         pending.append(final_time)
         state = state.apply(final_time)
@@ -3588,7 +3820,10 @@ class Life:
             "message": text.strip(),
             "time": at,
             "location": catalog.location_name(state.location_id),
-            "ambient_presence": vars_for(
+            "journey": journey_context(history, state.simulated_at, catalog),
+            "ambient_presence": {"activity": "Travelling; neither endpoint is currently visible."}
+            if state.location_id == "in_transit"
+            else vars_for(
                 ambient_population(
                     catalog,
                     state.simulated_at,
@@ -3597,6 +3832,12 @@ class Life:
             ),
             "mood": mood_name(state.energy, state.valence, state.arousal),
             "voice": reply_voice,
+            "time_budget": personal_time_budget(
+                self._planning(history), catalog, state.simulated_at, state.location_id
+            ),
+            "ongoing_activities": execution_context(
+                history, self._planning(history), state.simulated_at
+            ),
             "recent_dialogue": [
                 {
                     "speaker": str(event.payload["speaker"]),
@@ -3608,6 +3849,8 @@ class Life:
                 and event.payload.get("speaker") in {"you", "pathos"}
             ][-8:],
             "identity": {
+                "name": identity.name,
+                "nickname": identity.nickname,
                 "values": dict(identity.values),
                 "preferences": list(identity.preferences),
                 "traits": dict(traits.levels),
@@ -3672,11 +3915,7 @@ class Life:
                 ),
             },
             "mind_layers": mind_context(history),
-            "recent_inner_stream": [
-                str(event.payload["text"])
-                for event in history
-                if event.kind == "thought.recorded" and isinstance(event.payload.get("text"), str)
-            ][-8:],
+            "recent_inner_stream": recent_inner_stream(history, state.simulated_at),
             "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
         }
         access_events = [
@@ -3879,6 +4118,38 @@ def _deferred_cognition_events(
                     discard(result.error_code or result.status, failed.event_id),
                 )
             )
+            continue
+        if result.context.get("deferred_kind") == "inner_thought" and result.capability == "murmur":
+            thought = DomainEvent(
+                "thought.recorded",
+                "pathos",
+                {
+                    "text": result.result,
+                    "simulated_at": simulated_at,
+                    "source": "present-moment-thinking",
+                    "factual": False,
+                    "role": "murmur",
+                },
+                correlation_id=job_id,
+            )
+            output.extend(
+                [
+                    thought,
+                    DomainEvent(
+                        "cognition.result_applied",
+                        "pathos",
+                        {
+                            "job_id": job_id,
+                            "capability": result.capability,
+                            "code": "accepted",
+                            "simulated_at": simulated_at,
+                        },
+                        causation_id=thought.event_id,
+                        correlation_id=job_id,
+                    ),
+                ]
+            )
+            settled.add(job_id)
             continue
         if result.context.get("deferred_kind") != "association":
             output.append(discard("unsupported_deferred_kind"))

@@ -13,7 +13,7 @@ class OutreachConfig:
     enabled: bool = False
     quiet_start_hour: int = 22
     quiet_end_hour: int = 8
-    minimum_interval_hours: int = 72
+    minimum_interval_hours: int = 0
 
 
 def project_outreach_config(history: Sequence[DomainEvent]) -> OutreachConfig:
@@ -27,7 +27,8 @@ def project_outreach_config(history: Sequence[DomainEvent]) -> OutreachConfig:
         if (
             event.payload.get("quiet_start_hour") != config.quiet_start_hour
             or event.payload.get("quiet_end_hour") != config.quiet_end_hour
-            or event.payload.get("minimum_interval_hours") != config.minimum_interval_hours
+            # Replay legacy 72-hour settings without retaining the retired cooldown.
+            or event.payload.get("minimum_interval_hours") not in {0, 72}
         ):
             raise ValueError("Outreach safety limits cannot be changed by an event")
         config = OutreachConfig(enabled=enabled)

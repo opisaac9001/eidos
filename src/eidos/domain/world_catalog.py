@@ -130,6 +130,8 @@ class WorldCatalog:
         return WorldCatalog(places, people, routes, frozenset(object_ids), frozenset(object_names))
 
     def location_name(self, location_id: str) -> str:
+        if location_id == "in_transit":
+            return "On the way"
         place = self.places.get(location_id)
         if place is None:
             raise ValueError("Unknown world location")

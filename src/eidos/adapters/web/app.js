@@ -222,7 +222,7 @@ const views = {
   observatory: ["THE PRESENT MOMENT", "A life in motion.", "OBSERVATORY"],
   world: [
     "PLACES, PEOPLE & POSSIBILITY",
-    "His corner of the world.",
+    "A city becoming familiar.",
     "THE WORLD",
   ],
   conversation: [
@@ -254,6 +254,43 @@ let lastMessageSignature = "",
   archiveTab = "memories",
   lastArchiveSignature = "";
 const pacedReplies = new Map();
+const readMessageIds = new Set();
+try { JSON.parse(localStorage.getItem("eidos-read-messages-v1") || "[]").forEach(id => readMessageIds.add(id)); } catch (_) { /* Storage is optional. */ }
+
+function messageListAtBottom() {
+  const list = $("messages");
+  return list.scrollHeight - list.scrollTop - list.clientHeight < 90;
+}
+
+function updateUnread(markVisible = false) {
+  if (!state) return;
+  const incoming = (state.conversations || []).filter(item => ["pathos", "patrick"].includes(item.speaker));
+  if (markVisible && currentView === "conversation" && document.visibilityState === "visible" && messageListAtBottom()) {
+    incoming.filter(item => !pacedReplies.has(item.id)).forEach(item => readMessageIds.add(item.id));
+    try { localStorage.setItem("eidos-read-messages-v1", JSON.stringify([...readMessageIds].slice(-1000))); } catch (_) { /* Reading still works without storage. */ }
+  }
+  const count = incoming.filter(item => !readMessageIds.has(item.id)).length;
+  $("unread-count").hidden = count === 0;
+  $("unread-count").textContent = String(count);
+  $("unread-count").setAttribute("aria-label", `${count} unread messages`);
+  $("new-messages").hidden = count === 0 || messageListAtBottom();
+  $("new-messages").textContent = `${count} new ${count === 1 ? "message" : "messages"} ↓`;
+}
+
+function renderLifeProgress() {
+  const journey = state.journey;
+  const attention = state.attention;
+  const volition = state.volition;
+  const blockNames = { asleep: "Asleep", elsewhere: "Not at the task", conversation: "In conversation", interruption: "Something interrupted him", companion_absent: "Waiting for company", resource_unavailable: "A needed object is unavailable" };
+  const entries = (state.activity_execution || []).filter(item => item.schedule_status !== "completed").slice(-4);
+  const html = '<div class="panel-kicker">A DAY IN PROGRESS</div><p class="context-note">Observed activity—not a perfect account of what he remembers.</p>' +
+    (journey ? `<article class="activity-progress"><strong>On the way to ${esc(journey.destination)}</strong><p>From ${esc(journey.origin)} · about ${Math.ceil(journey.remaining_minutes)} minutes left</p><progress max="1" value="${Number(journey.progress)}" aria-label="Journey progress"></progress></article>` : '') +
+    (attention ? `<article class="activity-progress"><strong>Attention · ${esc(attention.mode)}</strong><p class="context-note">${attention.focus_id ? `Focused on ${esc(attention.focus_id)} · ` : ""}${Math.round(Number(attention.absorption) * 100)}% absorbed. This can affect what he notices; it does not dictate a choice.</p></article>` : '') +
+    (volition?.impulses?.length ? `<article class="activity-progress"><strong>What reached his attention</strong><ol>${volition.impulses.map(item => `<li><span>${esc(item.description)}</span> <small>pull ${Math.round(Number(item.strength) * 100)} · friction ${Math.round(Number(item.friction) * 100)}</small></li>`).join("")}</ol>${volition.stated_intention ? `<p>Chosen intention: ${esc(volition.stated_intention)}</p>` : ""}<p class="context-note">Current decision: ${esc(String(volition.choice).replaceAll("_", " "))}. These were possibilities, not commands.</p></article>` : '') +
+    entries.map(item => `<article class="activity-progress"><strong>${esc(item.title)}</strong><p class="context-note">${esc(item.schedule_status === "cancelled" ? "Set aside" : item.schedule_status === "interrupted" || item.window_ended && !item.ready ? "Unfinished—another session has not been assumed" : item.ready ? "Effort recorded—outcome still requires validation" : blockNames[item.blocked_by] || "In progress")}${Math.abs(Number(item.required_seconds) - Number(item.estimated_seconds)) > 0.5 || Number(item.estimate_confidence) < 0.8 ? ` · He estimated ${Math.round(Number(item.estimated_seconds) / 60)} minutes; confidence doesn’t guarantee reality.` : ""}</p><progress max="${Math.max(1, Number(item.required_seconds))}" value="${Number(item.worked_seconds)}" aria-label="Recorded effort for ${esc(item.title)}"></progress><ol>${(item.stages || []).map(stage => `<li data-status="${esc(stage.status)}">${esc(stage.label)} · ${esc(stage.status)}</li>`).join('')}</ol></article>`).join('') +
+    (!journey && !entries.length ? '<p class="context-note">No journey or unfinished work to show. A quiet moment is allowed.</p>' : '');
+  document.querySelectorAll("[data-life-progress]").forEach(node => { if (node.innerHTML !== html) node.innerHTML = html; });
+}
 document.querySelectorAll("[data-operator-only]").forEach((element) => {
   element.hidden = !operatorMode;
 });
@@ -294,6 +331,7 @@ function showView(view, focusHeading = false) {
   if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
+  updateUnread(true);
   if (view === "memories") {
     selectArchiveTab(archiveTab);
     if (archiveTab === "memories") loadMemoryArchive(true);
@@ -459,14 +497,20 @@ async function mutate(path, body, paceFrom) {
 
 function mapMarkup(large) {
   const icons = { home: "⌂", cafe: "◒", workshop: "◇", park: "✳" };
-  return state.locations
+  const routes = (state.city_map?.routes || []).map((route) => {
+    const a = state.locations.find(p => p.id === route.from);
+    const b = state.locations.find(p => p.id === route.to);
+    if (!a || !b) return "";
+    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"><title>${esc(a.name)} to ${esc(b.name)} · ${route.minutes} minutes</title></line>`;
+  }).join("");
+  return `<svg class="city-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${routes}</svg>` + state.locations
     .map((place) => {
       const here = state.pathos.location_id === place.id;
       const occupants = state.people.filter(
-        (person) => person.location_id === place.id && place.id !== "home",
+        (person) => here && person.location_id === place.id && place.id !== "home",
       );
       const ambient = (state.ambient_population || []).find(
-        (item) => item.place_id === place.id,
+        (item) => here && item.place_id === place.id,
       );
       const others = Number(ambient?.estimated_people || 0);
       const total = occupants.length + others;
@@ -474,7 +518,7 @@ function mapMarkup(large) {
         ? `● PATHOS${others ? ` · ${others} OTHER${others === 1 ? "" : "S"}` : ""}`
         : total
           ? `${total} ${total === 1 ? "PERSON" : "PEOPLE"}`
-          : " ";
+          : state.city_map?.places?.[place.id]?.experience === "visited" ? "VISITED" : "NOT YET VISITED";
       return `<button class="place ${here ? "current" : ""} ${large && selectedPlace === place.id ? "selected" : ""}" style="left:${place.x}%;top:${place.y}%" data-place="${esc(place.id)}" aria-label="${esc(place.name)}${here ? ", Pathos is here" : ""}${total ? `, about ${total} other people nearby` : ""}"><span class="place-icon" aria-hidden="true">${icons[place.id] || "◈"}</span><span class="place-label">${esc(place.label)}</span><span class="here">${status}</span></button>`;
     })
     .join("");
@@ -485,15 +529,15 @@ function renderPlace() {
   const place = state.locations.find((p) => p.id === selectedPlace);
   const pathosHere = state.pathos.location_id === place.id;
   const people = state.people.filter(
-    (p) => p.location_id === place.id && place.id !== "home",
+    (p) => pathosHere && p.location_id === place.id && place.id !== "home",
   );
   const ambient = (state.ambient_population || []).find(
-    (item) => item.place_id === place.id,
+    (item) => pathosHere && item.place_id === place.id,
   );
   const others = Number(ambient?.estimated_people || 0);
-  const objects = state.objects.filter((item) => item.location_id === place.id);
+  const objects = state.objects.filter((item) => pathosHere && item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><div class="eyebrow">HERE RIGHT NOW</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>No one is here at the moment.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><p class="context-note">${esc(state.city_map?.places?.[place.id]?.visits || 0)} recorded arrivals · ${esc(state.city_map?.places?.[place.id]?.experience === "known_not_visited" ? "Not yet visited" : "Part of his lived world")}</p><div class="eyebrow">WHAT HE CAN SEE</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>Pathos cannot see who is here right now.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {
@@ -1038,7 +1082,7 @@ function renderMessages() {
   const pathosSpeaking = paced.some((entry) => entry.phase === "speaking");
   const signature = `${conversations.map((item) => `${item.id}:${item.text.length}`).join(":")}:${waitingForPathos}:${pathosSpeaking}`;
   if (signature === lastMessageSignature && $("messages").childElementCount)
-    return;
+    { updateUnread(true); return; }
   lastMessageSignature = signature;
   const nearBottom =
     $("messages").scrollHeight -
@@ -1050,19 +1094,35 @@ function renderMessages() {
       .filter((item) => ["pathos", "system"].includes(item.speaker))
       .map((item) => item.request_id),
   );
-  $("messages").innerHTML = conversations.length || waitingForPathos
-    ? conversations
-        .map(
-          (item) =>
-            `<article class="message ${item.speaker === "you" ? "you" : "pathos"}"><div class="message-author">${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATHOS"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : pacedReplies.has(item.id) ? " · speaking…" : ""}</span></div><div class="message-body">${esc(item.text)}</div></article>`,
-        )
-        .join("") +
-      (waitingForPathos
-        ? '<article class="message pathos"><div class="message-author">PATHOS <span>thinking…</span></div><div class="message-body">…</div></article>'
-        : "")
-    : '<div class="empty"><div class="identity-disc" style="margin:15px auto 30px">P</div><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button><button class="suggestion" data-suggestion="What are you doing?">What are you doing?</button></div>';
-  if (nearBottom || currentView === "conversation")
+  const list = $("messages");
+  if (conversations.length || waitingForPathos) {
+    list.querySelector(".empty")?.remove();
+    const existing = new Map([...list.children].map(node => [node.dataset.messageId, node]));
+    const items = [...conversations, ...(waitingForPathos ? [{id: "waiting-for-patrick", speaker: "pathos", text: "…", waiting: true}] : [])];
+    const keep = new Set(items.map(item => item.id));
+    for (const [id, node] of existing) if (!keep.has(id)) node.remove();
+    let previous = null;
+    for (const item of items) {
+      let node = existing.get(item.id);
+      if (!node) {
+        node = document.createElement("article");
+        node.dataset.messageId = item.id;
+        node.className = `message ${item.speaker === "you" ? "you" : "pathos"}`;
+        node.innerHTML = '<div class="message-author"></div><div class="message-body"></div>';
+      }
+      const author = item.waiting ? "PATRICK <span>thinking…</span>" : `${item.speaker === "you" ? "YOU" : item.speaker === "system" ? "LIFE INTERRUPTED" : "PATRICK"} <span>${esc(date(item.simulated_at))} · ${esc(time(item.simulated_at))}${item.speaker === "you" ? ` · ${item.channel === "live_visit" ? "heard" : answered.has(item.request_id) ? "answered" : "delivered"}` : pacedReplies.has(item.id) ? " · speaking…" : ""}</span>`;
+      if (node.firstElementChild.innerHTML !== author) node.firstElementChild.innerHTML = author;
+      if (node.lastElementChild.textContent !== item.text) node.lastElementChild.textContent = item.text;
+      const expected = previous ? previous.nextSibling : list.firstChild;
+      if (node !== expected) list.insertBefore(node, expected);
+      previous = node;
+    }
+  } else {
+    list.innerHTML = '<div class="empty"><h2>He has a day to tell you about.</h2><p>Ask about where he is, how he feels, or what he remembers.</p><button class="suggestion" data-suggestion="How has your day been?">How has your day been?</button></div>';
+  }
+  if (nearBottom)
     $("messages").scrollTop = $("messages").scrollHeight;
+  updateUnread(true);
   if (waitingForPathos)
     $("delivery-note").textContent = "Pathos is thinking before he answers.";
   else if (pathosSpeaking)
@@ -1147,6 +1207,8 @@ function render(next) {
   syncServerPacing(next);
   const changed = !state || next.revision !== state.revision;
   state = next;
+  $("preview-banner").hidden = !state.preview;
+  renderLifeProgress();
   const liveModel = state.mode !== "stand-in";
   $("backend-label").textContent = liveModel
     ? "LOCAL MODEL PERFORMERS"
@@ -1411,13 +1473,12 @@ function render(next) {
     ? `${date(communication.next_reply_due_at)} at ${time(communication.next_reply_due_at)}`
     : null;
   let presenceNote;
-  if (communication.status === "interrupted") {
+  if (!state.config.running) {
+    presenceNote = "His world is paused by its caretaker. Messages can be delivered, but time and replies will wait until it resumes.";
+  } else if (communication.status === "interrupted") {
     presenceNote = `${availabilityReason} You can continue or leave once the interruption passes.`;
   } else if (liveActive) {
     presenceNote = `${availabilityReason} You are together now.`;
-  } else if (!state.config.running) {
-    presenceNote =
-      "His world is paused by its caretaker. Messages can be delivered, but time and replies will wait until it resumes.";
   } else if (communication.can_visit) {
     presenceNote = `${availabilityReason} He can sit down and talk now, or you can leave a message.`;
   } else if (communication.waiting_count && replyDue) {
@@ -1436,7 +1497,11 @@ function render(next) {
   $("visit").disabled = !communication.can_visit;
   $("end-visit").hidden = !communication.live_scene_id;
   $("send").textContent = liveActive ? "Speak ↗" : "Send ↗";
-  $("delivery-note").textContent = liveActive
+  $("delivery-note").textContent = !state.config.running
+    ? "World paused · replies resume when its caretaker restarts time."
+    : communication.status === "interrupted"
+      ? availabilityReason
+      : liveActive
     ? `You are speaking together · ${communication.live_elapsed_seconds || 0} seconds have passed in this conversation.`
     : communication.waiting_count
       ? `${communication.waiting_count} delivered message${communication.waiting_count === 1 ? "" : "s"} waiting for a reply.`
@@ -1668,6 +1733,13 @@ $("chat-form").addEventListener("submit", async (event) => {
   $("send").textContent =
     state?.communication?.status === "in_conversation" ? "Speak ↗" : "Send ↗";
 });
+
+$("messages").addEventListener("scroll", () => updateUnread(true), {passive: true});
+$("new-messages").addEventListener("click", () => {
+  $("messages").scrollTop = $("messages").scrollHeight;
+  updateUnread(true);
+});
+document.addEventListener("visibilitychange", () => updateUnread(true));
 $("outreach-toggle").addEventListener("change", async (event) => {
   const enabled = event.target.checked;
   if (await mutate("/api/outreach", { enabled }))

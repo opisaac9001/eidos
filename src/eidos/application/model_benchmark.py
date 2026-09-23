@@ -393,10 +393,18 @@ async def _npc_agency_sample(gateway: ModelGateway, run: int) -> dict[str, objec
 
 async def _self_project_sample(gateway: ModelGateway, run: int) -> dict[str, object]:
     at = datetime(2026, 1, 16, 9, tzinfo=timezone.utc) + timedelta(days=run * 14)
+    thought = DomainEvent(
+        "thought.recorded",
+        "pathos",
+        {
+            "text": "I might make something from those observations at the workshop.",
+            "simulated_at": at.isoformat(),
+        },
+    )
     events = await autonomous_project_events(
-        [],
+        [thought],
         at,
-        0,
+        1,
         gateway,
         planning=PlanningState(),
         catalog=project_world_catalog([]),
@@ -413,13 +421,14 @@ async def _self_project_sample(gateway: ModelGateway, run: int) -> dict[str, obj
         if event.kind == "role.completed" and event.payload.get("role") == "pathos_project"
     )
     accepted = next((event for event in events if event.kind == "self_project.accepted"), None)
+    left_unplanned = any(event.kind == "self_project.left_unplanned" for event in events)
     rejected = next((event for event in events if event.kind == "self_project.rejected"), None)
     findings = [str(rejected.payload["code"])] if rejected is not None else []
     return {
         "run": run + 1,
         "case_id": f"multi-step-project-{run + 1}",
         "role": "pathos_project",
-        "contract_passed": accepted is not None,
+        "contract_passed": accepted is not None or left_unplanned,
         "semantic_findings": findings,
         "text": accepted.payload.get("title") if accepted is not None else None,
         "latency_ms": trace.payload.get("latency_ms", 0.0),

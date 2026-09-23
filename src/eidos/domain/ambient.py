@@ -28,7 +28,9 @@ AMBIENT_FIELDS = {
 }
 WORDS = re.compile(r"[a-z0-9]+")
 FORCED_PATHOS_ACTION = re.compile(
-    r"\bpathos\s+(?:agrees|accepts|buys|chooses|decides|declines|leaves|promises|refuses|repairs|visits)\b",
+    r"\b(?:pathos|patrick(?: shaw)?)\s+(?:agrees|accepts|buys|chooses|decides|declines|"
+    r"leaves|promises|refuses|repairs|visits|helps|volunteers|starts|"
+    r"(?:arrives|comes)\s+to)\b",
     re.IGNORECASE,
 )
 PROMPT_LEAKS = ("system prompt", "json schema", "ignore previous", "developer message")
@@ -77,8 +79,8 @@ def parse_ambient_candidate(content: str) -> AmbientCandidate:
             raise ProposalRejected("invalid_text", f"Ambient {field} is invalid")
         text_values[field] = value.strip()
     starts = raw["starts_in_hours"]
-    if isinstance(starts, bool) or not isinstance(starts, int) or not 1 <= starts <= 12:
-        raise ProposalRejected("invalid_start", "Ambient start must be one to twelve hours away")
+    if isinstance(starts, bool) or not isinstance(starts, int) or not 0 <= starts <= 12:
+        raise ProposalRejected("invalid_start", "Ambient start must be zero to twelve hours away")
     intensity = raw["intensity"]
     if (
         isinstance(intensity, bool)
@@ -183,6 +185,8 @@ def ambient_output_schema(
         "community-sketch-basket",
     ),
     known_signal_ids: Sequence[str] = (),
+    *,
+    immediate: bool = False,
 ) -> Mapping[str, object]:
     return {
         "type": "object",
@@ -201,7 +205,9 @@ def ambient_output_schema(
                 "type": "string",
                 "enum": ["none", *known_signal_ids],
             },
-            "starts_in_hours": {"type": "integer", "minimum": 1, "maximum": 12},
+            "starts_in_hours": (
+                {"const": 0} if immediate else {"type": "integer", "minimum": 0, "maximum": 12}
+            ),
             "intensity": {"type": "number", "minimum": 0.05, "maximum": 1.0},
             "duration_hours": {"type": "integer", "minimum": 1, "maximum": 72},
         },
@@ -228,6 +234,28 @@ def _validate_semantic_quality(candidate: AmbientCandidate) -> None:
         "stakes": 5,
     }
     fields = {name: str(getattr(candidate, name)) for name in minimum_terms}
+    for name, value in fields.items():
+        # Constrained JSON can finish successfully after clipping a prose field.
+        # This catches obvious dangling syntax, not arbitrary grammatical errors.
+        unclosed_quote = (value.endswith("'") and value.count("'") % 2 == 1) or (
+            value.endswith("’") and value.count("‘") != value.count("’")
+        )
+        clipped_before = name == "description" and len(value) == 220 and value.endswith(" before")
+        if (
+            value.endswith((",", ":", ";"))
+            or unclosed_quote
+            or clipped_before
+            or re.search(
+                r"\b(?:a|an|the|and|or|because|while|could|would|should|to prevent|in a hot)$",
+                value,
+                re.IGNORECASE,
+            )
+        ):
+            raise ProposalRejected("incomplete_prose", f"Ambient {name} ends mid-clause")
+    if re.fullmatch(r"[0-9a-f]{6,}(?:-[0-9a-f]+){2,}", candidate.cause, re.IGNORECASE):
+        raise ProposalRejected(
+            "opaque_cause", "Ambient cause must explain the change, not echo an ID"
+        )
     for name, minimum in minimum_terms.items():
         if len(_terms(fields[name])) < minimum:
             raise ProposalRejected(

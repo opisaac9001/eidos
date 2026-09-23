@@ -47,6 +47,27 @@ class WorldThreadTests(unittest.TestCase):
         self.assertIn(thread.status, {"active", "resolved"})
         self.assertGreaterEqual(thread.stage, 3)
 
+    def test_causal_incident_does_not_invent_progress_or_outcomes_when_time_passes(self):
+        occurred = self.occurrence()
+        occurred = DomainEvent(
+            occurred.kind,
+            occurred.aggregate_id,
+            {
+                **occurred.payload,
+                "source": "causal-world-response",
+            },
+        )
+        opened = world_thread_events([occurred], self.start, {})
+        history = [occurred, *opened]
+        assert (
+            world_thread_events(history, self.start + timedelta(hours=2), {"pathos": "cafe"}) == []
+        )
+        expired = world_thread_events(history, self.start + timedelta(hours=4), {"pathos": "cafe"})
+        assert len(expired) == 1
+        assert expired[0].payload["outcome"] == "observation_window_ended"
+        assert expired[0].payload["visibility"] == "operator"
+        assert world_thread_events([*history, *expired], self.start + timedelta(hours=5), {}) == []
+
     def test_only_present_actors_perceive_later_developments(self):
         occurred = self.occurrence()
         opened = world_thread_events([occurred], self.start, {})

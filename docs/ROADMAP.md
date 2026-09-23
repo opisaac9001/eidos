@@ -3,6 +3,14 @@
 Updated September 6, 2026. This is a design and delivery plan, not a claim that
 the planned behavior exists. Milestones are dependency-driven, not dated promises.
 
+September 8 implementation follow-up: [Lived-day integration and verified results](LIVED_DAY_2026_09_08.md).
+This records the new activity, journey, interruption, relationship, UI and model-test
+work, along with the remaining gaps; it does not mark this entire roadmap complete.
+
+September 9 implementation follow-up: [Bounded volition and lived consequences](VOLITION_2026_09_09.md).
+This records the limited-attention choice field, explicit inaction, uncertain effort,
+missed notifications, physical meal integration, UI inspection and real-model trial.
+
 ## Destination
 
 A persistent fictional person with a life beyond chat: Pathos perceives a small
@@ -154,6 +162,12 @@ memory copies and unmarked dreams are rejected. This is not semantic validation.
 
 ## Delivery sequence
 
+The current natural-life workstream is tracked in
+[Natural life next](NATURAL_LIFE_NEXT.md), including flexible preparation around fixed
+commitments, interruption-aware effort and the remaining eight-area behavioural gates.
+Its status supersedes older authored-routine descriptions in this roadmap; it is not
+a claim that all natural-world systems are finished.
+
 | Phase | Outcome | Dependencies | Exit evidence |
 | --- | --- | --- | --- |
 | P0 — baseline complete | Persistent prototype day | None | Existing tests, replay, lab probes |
@@ -263,7 +277,10 @@ Feature families: PLAN-01–06, WORLD-01–05, SOCIAL-01–07, SELF-05, UX-03/05
   Support refusal, interruption, postponement, renegotiation, failure and abandonment.
 - Open-ended personal agency proposals grounded in needs, emotions, values, memories,
   relationships, places and possessions. Activity meaning may be novel, while execution
-  still uses typed actions and deterministic feasibility. Pathos can also propose a
+  still uses typed actions and deterministic feasibility. Capacity-limited attention
+  now feeds a private deliberation event; only its selected intention reaches a separate
+  scheduling model, and alignment validation rejects a substituted motive. Quiet choices
+  do not invoke scheduling. Pathos can also propose a
   two-to-four-step project with atomic schedule/travel/resource admission, incremental
   action-backed progress, and whole-project cleanup on a failed required step. Residents
   independently propose owner-private open-vocabulary plans after the authored opening.
@@ -548,6 +565,10 @@ boundaries and must not rely on emotional coercion.
 7. Add embeddings, speech and images only when useful and supported reliably.
 
 ## Immediate implementation queue
+
+Latest local follow-up: [Flexible mornings and actual consequences](FLEXIBLE_MORNINGS_2026_09_08.md).
+The dated reports track implementation and evidence; the older queue below remains
+historical context rather than a current server-status report.
 
 1. Capture the Dell inventory, then benchmark and pin its private inference stack.
 2. Run the reviewed seven-context real-model corpus on the Dell and calibrate per-role

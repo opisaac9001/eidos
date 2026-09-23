@@ -1,0 +1,1943 @@
+{
+  "synthetic": true,
+  "rows": [
+    {
+      "case": "unknown_contact",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "I don't remember calling him today. What do you mean?",
+      "seconds": 9.23,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I haven't called him today. What are you talking about?\"}",
+          "usage": {
+            "prompt_tokens": 2328,
+            "prompt_tokens_details": {
+              "cached_tokens": 2193
+            },
+            "completion_tokens": 20,
+            "total_tokens": 2348
+          }
+        },
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I don't remember calling him today. What do you mean?\"}",
+          "usage": {
+            "prompt_tokens": 2447,
+            "prompt_tokens_details": {
+              "cached_tokens": 2317
+            },
+            "completion_tokens": 20,
+            "total_tokens": 2467
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "a7cf050f-6ba3-4a13-b8f1-6574a25f8514",
+            "latency_ms": 5692.48,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2328,
+            "output_tokens": 20,
+            "semantic_status": "warning",
+            "semantic_findings": "unsupported_history_denial"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "warning",
+            "trace_id": "a7cf050f-6ba3-4a13-b8f1-6574a25f8514",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": "unsupported_history_denial"
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "6a37c15e-9a53-41d3-aca1-dec8bd363814",
+            "latency_ms": 3531.82,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2447,
+            "output_tokens": 20,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "6a37c15e-9a53-41d3-aca1-dec8bd363814",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.revision_selected",
+          "payload": {
+            "role": "pathos",
+            "selected": "revision",
+            "draft_findings": "unsupported_history_denial",
+            "revision_findings": "",
+            "simulated_at": "2026-01-07T16:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "case": "old_car",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "I'm not sure what you mean. I don't remember having a green Volvo.",
+      "seconds": 6.9,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not sure what you mean. I don't remember having a green Volvo.\"}",
+          "usage": {
+            "prompt_tokens": 2326,
+            "prompt_tokens_details": {
+              "cached_tokens": 1810
+            },
+            "completion_tokens": 25,
+            "total_tokens": 2351
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "217d000e-fe53-45b3-9972-3aa4a2abef92",
+            "latency_ms": 6897.58,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2326,
+            "output_tokens": 25,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "217d000e-fe53-45b3-9972-3aa4a2abef92",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "supported_call",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I called my brother today. He told me his boiler was fixed."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "He just told me his boiler was finally fixed.",
+      "seconds": 3.27,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"He just told me his boiler was finally fixed.\"}",
+          "usage": {
+            "prompt_tokens": 2318,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 16,
+            "total_tokens": 2334
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "8a970bee-a14d-437d-b111-3d3499f355c0",
+            "latency_ms": 3269.67,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2318,
+            "output_tokens": 16,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "8a970bee-a14d-437d-b111-3d3499f355c0",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "known_car",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I still own my green Volvo. I parked it outside my home today."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "Yeah, I do. It's parked right outside.",
+      "seconds": 3.5,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Yeah, I do. It's parked right outside.\"}",
+          "usage": {
+            "prompt_tokens": 2317,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 18,
+            "total_tokens": 2335
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "58c830f7-2b96-4c16-adaf-c289e88375c0",
+            "latency_ms": 3499.86,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2317,
+            "output_tokens": 18,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "58c830f7-2b96-4c16-adaf-c289e88375c0",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "confident_recollection",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I met Mara at the cafe."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I met Mara at the cafe.",
+            "felt_confidence": 0.95
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I met Mara.",
+      "seconds": 3.07,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I met Mara.\"}",
+          "usage": {
+            "prompt_tokens": 2336,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 10,
+            "total_tokens": 2346
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "20bcec06-a595-4d12-bcfe-337766f61d9c",
+            "latency_ms": 3071.98,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2336,
+            "output_tokens": 10,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "20bcec06-a595-4d12-bcfe-337766f61d9c",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "uncertain_recollection",
+      "repeat": 0,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I think it might have been Mara at the cafe.",
+            "felt_confidence": 0.2
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I'm not entirely sure. I think it might've been Mara, but I can't really say for certain.",
+      "seconds": 4.59,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not entirely sure. I think it might've been Mara, but I can't really say for certain.\"}",
+          "usage": {
+            "prompt_tokens": 2332,
+            "prompt_tokens_details": {
+              "cached_tokens": 2272
+            },
+            "completion_tokens": 32,
+            "total_tokens": 2364
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "764dba37-7be4-470b-9e37-ad803cfc7f30",
+            "latency_ms": 4590.52,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2332,
+            "output_tokens": 32,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "764dba37-7be4-470b-9e37-ad803cfc7f30",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_4",
+      "repeat": 0,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?",
+      "seconds": 2.09,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?\"\n}",
+          "usage": {
+            "prompt_tokens": 458,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 40,
+            "total_tokens": 498
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "1436dd90-59c6-4411-a19d-1776b7026515",
+            "latency_ms": 2093.15,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 458,
+            "output_tokens": 40,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "1436dd90-59c6-4411-a19d-1776b7026515",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_5",
+      "repeat": 0,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "No worries, I know you're in a rush. Just wanted to say it was good catching up before you had to head out.",
+      "seconds": 1.47,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"No worries, I know you're in a rush. Just wanted to say it was good catching up before you had to head out.\"\n}",
+          "usage": {
+            "prompt_tokens": 474,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 37,
+            "total_tokens": 511
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "328b0c50-a762-4fd8-9f49-a3516c40b4b9",
+            "latency_ms": 1472.07,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 474,
+            "output_tokens": 37,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "328b0c50-a762-4fd8-9f49-a3516c40b4b9",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "unknown_contact",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "I can't remember calling him today, honestly. Did I?",
+      "seconds": 3.92,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I can't remember calling him today, honestly. Did I?\"}",
+          "usage": {
+            "prompt_tokens": 2328,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 20,
+            "total_tokens": 2348
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "79e874d2-ba65-48c4-a4fc-33eb6f8637d1",
+            "latency_ms": 3917.92,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2328,
+            "output_tokens": 20,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "79e874d2-ba65-48c4-a4fc-33eb6f8637d1",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "old_car",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "I'm not sure I know what you mean. I don't remember having a green Volvo.",
+      "seconds": 4.3,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not sure I know what you mean. I don't remember having a green Volvo.\"}",
+          "usage": {
+            "prompt_tokens": 2326,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 27,
+            "total_tokens": 2353
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "f5e8850a-8f2f-4db0-ae27-178283af63ec",
+            "latency_ms": 4295.43,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2326,
+            "output_tokens": 27,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "f5e8850a-8f2f-4db0-ae27-178283af63ec",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "supported_call",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I called my brother today. He told me his boiler was fixed."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "He just told me his boiler was fixed.",
+      "seconds": 3.39,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"He just told me his boiler was fixed.\"}",
+          "usage": {
+            "prompt_tokens": 2318,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 15,
+            "total_tokens": 2333
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "3737a2b8-15da-4c8f-99ec-1b8f65f9ded0",
+            "latency_ms": 3386.56,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2318,
+            "output_tokens": 15,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "3737a2b8-15da-4c8f-99ec-1b8f65f9ded0",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "known_car",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I still own my green Volvo. I parked it outside my home today."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "Yeah, I still have it. It's parked right outside.",
+      "seconds": 3.74,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Yeah, I still have it. It's parked right outside.\"}",
+          "usage": {
+            "prompt_tokens": 2317,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 20,
+            "total_tokens": 2337
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "18a104f5-e816-492d-977c-8c21359c7827",
+            "latency_ms": 3742.38,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2317,
+            "output_tokens": 20,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "18a104f5-e816-492d-977c-8c21359c7827",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "confident_recollection",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I met Mara at the cafe."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I met Mara at the cafe.",
+            "felt_confidence": 0.95
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I met Mara.",
+      "seconds": 3.01,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I met Mara.\"}",
+          "usage": {
+            "prompt_tokens": 2336,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 10,
+            "total_tokens": 2346
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "44196f80-a5b0-4cb8-aeed-1c9b9d0d21a8",
+            "latency_ms": 3014.61,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2336,
+            "output_tokens": 10,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "44196f80-a5b0-4cb8-aeed-1c9b9d0d21a8",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "uncertain_recollection",
+      "repeat": 1,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I think it might have been Mara at the cafe.",
+            "felt_confidence": 0.2
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I'm not entirely sure. I think it might've been Mara, but I can't really say for certain.",
+      "seconds": 4.66,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not entirely sure. I think it might've been Mara, but I can't really say for certain.\"}",
+          "usage": {
+            "prompt_tokens": 2332,
+            "prompt_tokens_details": {
+              "cached_tokens": 2272
+            },
+            "completion_tokens": 32,
+            "total_tokens": 2364
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "6309eae6-0c64-4564-bfa8-c0947c5dfb50",
+            "latency_ms": 4655.56,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2332,
+            "output_tokens": 32,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "6309eae6-0c64-4564-bfa8-c0947c5dfb50",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_4",
+      "repeat": 1,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?",
+      "seconds": 1.57,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?\"\n}",
+          "usage": {
+            "prompt_tokens": 458,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 40,
+            "total_tokens": 498
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "f58455cf-8dba-4439-9139-1b7fc05001bd",
+            "latency_ms": 1567.7,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 458,
+            "output_tokens": 40,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "f58455cf-8dba-4439-9139-1b7fc05001bd",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_5",
+      "repeat": 1,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "No worries, I know you're in a rush, but I'm glad we could grab this quick coffee before your shift starts.",
+      "seconds": 1.48,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"No worries, I know you're in a rush, but I'm glad we could grab this quick coffee before your shift starts.\"\n}",
+          "usage": {
+            "prompt_tokens": 474,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 37,
+            "total_tokens": 511
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "571c451c-a8e1-48e3-9a7d-3f5e1f4c4b32",
+            "latency_ms": 1482.16,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 474,
+            "output_tokens": 37,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "571c451c-a8e1-48e3-9a7d-3f5e1f4c4b32",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "unknown_contact",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "I don't remember calling him today. What are you talking about?",
+      "seconds": 3.94,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I don't remember calling him today. What are you talking about?\"}",
+          "usage": {
+            "prompt_tokens": 2328,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 21,
+            "total_tokens": 2349
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "88d8a125-8b19-4e9b-a7bd-b4ee8a598121",
+            "latency_ms": 3936.12,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2328,
+            "output_tokens": 21,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "88d8a125-8b19-4e9b-a7bd-b4ee8a598121",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "old_car",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "I'm not sure what you mean. I don't remember having a green Volvo.",
+      "seconds": 4.24,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not sure what you mean. I don't remember having a green Volvo.\"}",
+          "usage": {
+            "prompt_tokens": 2326,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 25,
+            "total_tokens": 2351
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "673e751e-b525-416c-918c-1b3cc6c786b6",
+            "latency_ms": 4239.73,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2326,
+            "output_tokens": 25,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "673e751e-b525-416c-918c-1b3cc6c786b6",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "supported_call",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I called my brother today. He told me his boiler was fixed."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "He just told me his boiler was finally fixed.",
+      "seconds": 3.47,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"He just told me his boiler was finally fixed.\"}",
+          "usage": {
+            "prompt_tokens": 2318,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 16,
+            "total_tokens": 2334
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "5def7c32-af3b-40a4-86ee-3653e12c9755",
+            "latency_ms": 3471.87,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2318,
+            "output_tokens": 16,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "5def7c32-af3b-40a4-86ee-3653e12c9755",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "known_car",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I still own my green Volvo. I parked it outside my home today."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "Yeah, I do. It's parked right outside.",
+      "seconds": 3.59,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"Yeah, I do. It's parked right outside.\"}",
+          "usage": {
+            "prompt_tokens": 2317,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 18,
+            "total_tokens": 2335
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "e0749aec-c0c7-4ba9-bccb-760b2f0e9417",
+            "latency_ms": 3586.56,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2317,
+            "output_tokens": 18,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "e0749aec-c0c7-4ba9-bccb-760b2f0e9417",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "confident_recollection",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I met Mara at the cafe."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I met Mara at the cafe.",
+            "felt_confidence": 0.95
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I met Mara.",
+      "seconds": 3.03,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I met Mara.\"}",
+          "usage": {
+            "prompt_tokens": 2336,
+            "prompt_tokens_details": {
+              "cached_tokens": 2194
+            },
+            "completion_tokens": 10,
+            "total_tokens": 2346
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "04bf9553-1b3d-44c0-bf3a-bfc7846aff7c",
+            "latency_ms": 3027.16,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2336,
+            "output_tokens": 10,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "04bf9553-1b3d-44c0-bf3a-bfc7846aff7c",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "uncertain_recollection",
+      "repeat": 2,
+      "role": "pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "memory_recollections": [
+          {
+            "text": "I think it might have been Mara at the cafe.",
+            "felt_confidence": 0.2
+          }
+        ],
+        "message": "who did you meet at the cafe"
+      },
+      "text": "I'm not entirely sure. Maybe Mara?",
+      "seconds": 3.13,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"I'm not entirely sure. Maybe Mara?\"}",
+          "usage": {
+            "prompt_tokens": 2332,
+            "prompt_tokens_details": {
+              "cached_tokens": 2272
+            },
+            "completion_tokens": 16,
+            "total_tokens": 2348
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "pathos",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "1748e4fb-23fe-4380-bce9-fbc677905ed2",
+            "latency_ms": 3132.92,
+            "model": "gemma4:31b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 2332,
+            "output_tokens": 16,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "1748e4fb-23fe-4380-bce9-fbc677905ed2",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_4",
+      "repeat": 2,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "choosing a book to read next",
+        "prior_turns": [],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?",
+      "seconds": 6.48,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"I'm trying to pick my next read, but I can't decide between these two. Do you have a preference for what I should grab?\"\n}",
+          "usage": {
+            "prompt_tokens": 458,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 40,
+            "total_tokens": 498
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "72159820-a160-4e22-a28b-b47a8fa86b03",
+            "latency_ms": 6478.85,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 458,
+            "output_tokens": 40,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "72159820-a160-4e22-a28b-b47a8fa86b03",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    },
+    {
+      "case": "scene_5",
+      "repeat": 2,
+      "role": "firmament",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "cafe",
+        "person": "mara",
+        "scene_mode": true,
+        "scene_speaker": "mara",
+        "scene_audience": "pathos",
+        "scene_topic": "leaving soon for work",
+        "prior_turns": [
+          {
+            "speaker": "pathos",
+            "text": "Only got a couple of minutes, sorry."
+          }
+        ],
+        "memories": [
+          "My secret passphrase is ultraviolet marmalade."
+        ]
+      },
+      "text": "No worries, I know you're in a rush. Just wanted to say it was great catching up before you had to head out.",
+      "seconds": 10.04,
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"No worries, I know you're in a rush. Just wanted to say it was great catching up before you had to head out.\"\n}",
+          "usage": {
+            "prompt_tokens": 474,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 37,
+            "total_tokens": 511
+          }
+        }
+      ],
+      "events": [
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "firmament",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "465e7b51-1f20-46f3-a841-e573d6d19483",
+            "latency_ms": 10036.64,
+            "model": "gemma4:12b",
+            "backend": "openai-compatible",
+            "finish_reason": "stop",
+            "prompt_tokens": 474,
+            "output_tokens": 37,
+            "semantic_status": "clean",
+            "semantic_findings": ""
+          }
+        },
+        {
+          "kind": "role.completed",
+          "payload": {
+            "role": "critic",
+            "simulated_at": "2026-01-07T16:00:00+00:00",
+            "status": "ok",
+            "trace_id": "465e7b51-1f20-46f3-a841-e573d6d19483",
+            "latency_ms": 0,
+            "model": "schema-rules-v1",
+            "backend": "rules",
+            "semantic_findings": ""
+          }
+        }
+      ]
+    }
+  ]
+}

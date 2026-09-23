@@ -123,12 +123,13 @@ def npc_need_plan_events(
     *,
     allow_new_plans: bool = True,
     allowed_actor_ids: frozenset[str] | None = None,
+    authored_scenario: bool = False,
 ) -> list[DomainEvent]:
     """Let private needs form bounded goals without leaking them into Pathos's context."""
     now = datetime.fromisoformat(simulated_at)
     if now.utcoffset() is None:
         raise ValueError("NPC cognition time must be timezone-aware")
-    if now.hour != 19:
+    if authored_scenario and now.hour != 19:
         return []
     state = project_npcs(history, now)
     used_evidence = {

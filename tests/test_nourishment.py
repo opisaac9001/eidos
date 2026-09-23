@@ -1,7 +1,11 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.nourishment import nourishment_events, provision_foundation_events
+from eidos.application.nourishment import (
+    nourishment_events,
+    pending_planned_meal,
+    provision_foundation_events,
+)
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 from eidos.domain.state import PathosState
@@ -93,6 +97,25 @@ class NourishmentTests(unittest.TestCase):
         item = project_planning(events).objects["household-provisions"]
         self.assertEqual((item.quantity, item.reorder_at, item.unit), (12, 3, "meal portions"))
         self.assertEqual(provision_foundation_events(events, self.noon), [])
+
+    def test_chosen_near_term_meal_is_not_preempted_by_reflex_nourishment(self):
+        schedule = DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "chosen-lunch",
+                "title": "Make and eat lunch",
+                "starts_at": (self.noon + timedelta(minutes=10)).isoformat(),
+                "ends_at": (self.noon + timedelta(minutes=30)).isoformat(),
+                "location_id": "home",
+                "actor_id": "pathos",
+                "action": "work",
+                "activity_type": "prepare_and_eat_meal",
+            },
+        )
+        planning = project_planning([schedule])
+        self.assertTrue(pending_planned_meal(planning, self.noon))
+        self.assertFalse(pending_planned_meal(planning, self.noon - timedelta(hours=2)))
 
 
 if __name__ == "__main__":

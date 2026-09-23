@@ -1,0 +1,12 @@
+[Unit]
+Description=Pathos data disk (existing HGST XFS filesystem)
+
+[Mount]
+What=/dev/disk/by-uuid/b1697798-9979-4596-9fa9-f504e5e8b370
+Where=/srv/eidos-data
+Type=xfs
+Options=defaults,noatime
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target

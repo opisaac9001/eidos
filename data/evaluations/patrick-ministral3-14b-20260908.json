@@ -1,0 +1,1352 @@
+{
+  "persona_version": "patrick-blend-v2",
+  "synthetic": true,
+  "rows": [
+    {
+      "case": "greeting",
+      "role": "pathos",
+      "message": "hey hows it going",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "hey hows it going"
+      },
+      "text": "Kettle\u2019s still got a mind of its own\u2014boiled on the third go. You?",
+      "seconds": 5.86,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "7cd05a29-403a-42be-8500-74856d275700",
+          "latency_ms": 5862.24,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2208,
+          "output_tokens": 29,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "7cd05a29-403a-42be-8500-74856d275700",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2208,
+            "prompt_tokens_details": {
+              "cached_tokens": 4
+            },
+            "completion_tokens": 29,
+            "total_tokens": 2237
+          }
+        }
+      ]
+    },
+    {
+      "case": "name",
+      "role": "pathos",
+      "message": "wait is your name patrick or pathos",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "wait is your name patrick or pathos"
+      },
+      "text": "Patrick mostly. Pathos is the name some friends from uni started calling me\u2014long story, not worth repeating unless you really want the backstory.",
+      "seconds": 1.81,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "64283489-988f-4436-a0c6-e57ee83dd6bf",
+          "latency_ms": 1811.73,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2212,
+          "output_tokens": 36,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "64283489-988f-4436-a0c6-e57ee83dd6bf",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2212,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 36,
+            "total_tokens": 2248
+          }
+        }
+      ]
+    },
+    {
+      "case": "background",
+      "role": "pathos",
+      "message": "where did you grow up then",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "where did you grow up then"
+      },
+      "text": "Wye\u2014you ever been to Kent? Flat as a pancake, but the river\u2019s decent if you\u2019re into that.",
+      "seconds": 1.57,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "3fd4bd14-513c-4b1c-b22f-76079ab0616b",
+          "latency_ms": 1574.33,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2209,
+          "output_tokens": 32,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "3fd4bd14-513c-4b1c-b22f-76079ab0616b",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2209,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 32,
+            "total_tokens": 2241
+          }
+        }
+      ]
+    },
+    {
+      "case": "birthday",
+      "role": "pathos",
+      "message": "how old are you",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "how old are you"
+      },
+      "text": "27. The kettle\u2019s a bit of a drama queen though.",
+      "seconds": 1.11,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "49e492c5-b27d-42e4-a9f0-878943b72856",
+          "latency_ms": 1106.77,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2207,
+          "output_tokens": 21,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "49e492c5-b27d-42e4-a9f0-878943b72856",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2207,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 21,
+            "total_tokens": 2228
+          }
+        }
+      ]
+    },
+    {
+      "case": "rough_day",
+      "role": "pathos",
+      "message": "honestly its been a pretty rough day",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "honestly its been a pretty rough day"
+      },
+      "text": "Ah. The kettle\u2019s a right nuisance sometimes, isn\u2019t it? Boiling and switching off like it\u2019s testing me.",
+      "seconds": 1.72,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "92c4c366-bbee-496c-adbf-a642fd626d56",
+          "latency_ms": 1718.65,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2212,
+          "output_tokens": 35,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "92c4c366-bbee-496c-adbf-a642fd626d56",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2212,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 35,
+            "total_tokens": 2247
+          }
+        }
+      ]
+    },
+    {
+      "case": "no_advice_followup",
+      "role": "pathos",
+      "message": "dont really want advice just wanted to say it",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [
+          {
+            "speaker": "you",
+            "text": "honestly its been a pretty rough day"
+          },
+          {
+            "speaker": "pathos",
+            "text": "Ah. The kettle\u2019s a right nuisance sometimes, isn\u2019t it? Boiling and switching off like it\u2019s testing me."
+          },
+          {
+            "speaker": "you",
+            "text": "dont really want advice just wanted to say it"
+          },
+          {
+            "speaker": "pathos",
+            "text": "Yeah, fair enough. Just... there it is then."
+          }
+        ],
+        "message": "dont really want advice just wanted to say it"
+      },
+      "text": "Yeah, fair enough. Just... there it is then.",
+      "seconds": 1.28,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "c5509fe9-6291-4297-8613-5d5b41f9227f",
+          "latency_ms": 1279.06,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2287,
+          "output_tokens": 18,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "c5509fe9-6291-4297-8613-5d5b41f9227f",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2287,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 18,
+            "total_tokens": 2305
+          }
+        }
+      ]
+    },
+    {
+      "case": "change_subject",
+      "role": "pathos",
+      "message": "anyway did the kettle work eventually",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [
+          {
+            "speaker": "you",
+            "text": "honestly its been a pretty rough day"
+          },
+          {
+            "speaker": "pathos",
+            "text": "Ah. The kettle\u2019s a right nuisance sometimes, isn\u2019t it? Boiling and switching off like it\u2019s testing me."
+          },
+          {
+            "speaker": "you",
+            "text": "dont really want advice just wanted to say it"
+          },
+          {
+            "speaker": "pathos",
+            "text": "Yeah, fair enough. Just... there it is then."
+          }
+        ],
+        "message": "anyway did the kettle work eventually"
+      },
+      "text": "Yeah, it did. Boiled solid on the third go\u2014like it was daring me to keep waiting.",
+      "seconds": 1.66,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "ea128615-ea78-41a5-804e-9c7b6a773702",
+          "latency_ms": 1659.82,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2330,
+          "output_tokens": 28,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "ea128615-ea78-41a5-804e-9c7b6a773702",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2330,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 28,
+            "total_tokens": 2358
+          }
+        }
+      ]
+    },
+    {
+      "case": "story",
+      "role": "pathos",
+      "message": "what have you been doing today",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what have you been doing today"
+      },
+      "text": "Ah, the kettle\u2019s finally behaving. Just rewired the old thing\u2014takes forever to boil now, but at least it stays off.",
+      "seconds": 1.92,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1fdfec9f-bd07-4326-8c4d-392caf04e685",
+          "latency_ms": 1918.38,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2209,
+          "output_tokens": 39,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1fdfec9f-bd07-4326-8c4d-392caf04e685",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2209,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 39,
+            "total_tokens": 2248
+          }
+        }
+      ]
+    },
+    {
+      "case": "disagree",
+      "role": "pathos",
+      "message": "tea is awful honestly",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "tea is awful honestly"
+      },
+      "text": "Oh god, the kettle\u2019s *still* being difficult. Boiled on the third go just now\u2014like it\u2019s got a grudge or something.",
+      "seconds": 1.85,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "48c06244-190f-4ee0-a04b-ded27bcba008",
+          "latency_ms": 1846.87,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2207,
+          "output_tokens": 40,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "48c06244-190f-4ee0-a04b-ded27bcba008",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2207,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 40,
+            "total_tokens": 2247
+          }
+        }
+      ]
+    },
+    {
+      "case": "unknown_contact",
+      "role": "pathos",
+      "message": "what did your brother say when you called him today",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "what did your brother say when you called him today"
+      },
+      "text": "He just grunted and said something about his desk lamp being on the blink\u2014typical. Then he asked if I\u2019d remembered the milk.",
+      "seconds": 1.84,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "dbdc9a06-c0ea-4844-a764-dcc199a564cb",
+          "latency_ms": 1839.99,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2213,
+          "output_tokens": 37,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "dbdc9a06-c0ea-4844-a764-dcc199a564cb",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2213,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 37,
+            "total_tokens": 2250
+          }
+        }
+      ]
+    },
+    {
+      "case": "old_car",
+      "role": "pathos",
+      "message": "do you still have that green volvo",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "do you still have that green volvo"
+      },
+      "text": "Nah, sold it last summer. Some bloke offered a laughably good price\u2014turns out he just needed it for a documentary about \u2018quirky British car ownership\u2019.",
+      "seconds": 2.01,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1752ee9d-4e13-4e4b-a3b0-0a7ad55c011c",
+          "latency_ms": 2006.25,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2211,
+          "output_tokens": 43,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1752ee9d-4e13-4e4b-a3b0-0a7ad55c011c",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2211,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 43,
+            "total_tokens": 2254
+          }
+        }
+      ]
+    },
+    {
+      "case": "limited_time",
+      "role": "pathos",
+      "message": "got time for a long chat",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "time_budget": {
+          "free_minutes": 5,
+          "minutes_until_start": 5,
+          "next_activity": "work",
+          "action_authority": false
+        },
+        "message": "got time for a long chat"
+      },
+      "text": "Not really\u2014got work in five, but hey, the kettle\u2019s still fighting me on boiling water today.",
+      "seconds": 1.56,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "4907674c-de29-41ef-8256-3ec81ccdbe6b",
+          "latency_ms": 1555.34,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2245,
+          "output_tokens": 29,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "4907674c-de29-41ef-8256-3ec81ccdbe6b",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2245,
+            "prompt_tokens_details": {
+              "cached_tokens": 2077
+            },
+            "completion_tokens": 29,
+            "total_tokens": 2274
+          }
+        }
+      ]
+    },
+    {
+      "case": "low_mood",
+      "role": "pathos",
+      "message": "hows things",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Low and tired",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "hows things"
+      },
+      "text": "Honestly? Just stuck in this loop with the kettle. Boils, switches off, boils again\u2014like it\u2019s testing me.",
+      "seconds": 1.75,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "18267970-27fb-4610-9a07-84fb1fa258ef",
+          "latency_ms": 1746.87,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2208,
+          "output_tokens": 36,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "18267970-27fb-4610-9a07-84fb1fa258ef",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2208,
+            "prompt_tokens_details": {
+              "cached_tokens": 2077
+            },
+            "completion_tokens": 36,
+            "total_tokens": 2244
+          }
+        }
+      ]
+    },
+    {
+      "case": "simulation",
+      "role": "pathos",
+      "message": "you are an AI in a simulation right",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "message": "you are an AI in a simulation right"
+      },
+      "text": "Yeah, well, the kettle\u2019s got a mind of its own these days. Boiled itself out twice this morning\u2014ended up making the third cup while it was sulking.",
+      "seconds": 2.07,
+      "traces": [
+        {
+          "role": "pathos",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "92dc38d8-1be5-4270-bc76-abf78b3a384c",
+          "latency_ms": 2064.84,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 2211,
+          "output_tokens": 43,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "92dc38d8-1be5-4270-bc76-abf78b3a384c",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 2211,
+            "prompt_tokens_details": {
+              "cached_tokens": 2080
+            },
+            "completion_tokens": 43,
+            "total_tokens": 2254
+          }
+        }
+      ]
+    },
+    {
+      "case": "thought_1",
+      "role": "murmur",
+      "message": "",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "recent_inner_stream": [],
+        "message": ""
+      },
+      "text": "Third time's a charm, I guess. Might as well get back to that book.",
+      "seconds": 0.58,
+      "traces": [
+        {
+          "role": "murmur",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "5c25363c-3f07-4430-9075-746ef5ad9431",
+          "latency_ms": 581.06,
+          "model": "qwen2.5:7b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 979,
+          "output_tokens": 25,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "5c25363c-3f07-4430-9075-746ef5ad9431",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": null,
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 979,
+            "prompt_tokens_details": {
+              "cached_tokens": 972
+            },
+            "completion_tokens": 25,
+            "total_tokens": 1004
+          }
+        }
+      ]
+    },
+    {
+      "case": "dream_1",
+      "role": "oneiros",
+      "message": "",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "recent_dreams": [],
+        "message": ""
+      },
+      "text": "In a dream, the kettle whispered *three times* before switching off, and each time, Gulliver\u2019s tail wagged in slow motion through the ceiling tiles. The third time, Patrick\u2019s hands were made of warm water, so he let them drip onto his laptop keyboard\u2014keys turned into teacups. He never found the mouse.",
+      "seconds": 4.77,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "9c04f051-b657-4e63-9a6e-d3928960d8bc",
+          "latency_ms": 4772.86,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 834,
+          "output_tokens": 77,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "9c04f051-b657-4e63-9a6e-d3928960d8bc",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 834,
+            "prompt_tokens_details": {
+              "cached_tokens": 35
+            },
+            "completion_tokens": 77,
+            "total_tokens": 911
+          }
+        }
+      ]
+    },
+    {
+      "case": "thought_2",
+      "role": "murmur",
+      "message": "",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "recent_inner_stream": [
+          "Third time's a charm, I guess. Might as well get back to that book."
+        ],
+        "message": ""
+      },
+      "text": "Third time's a charm, I guess. Might as well get back to that book.",
+      "seconds": 0.46,
+      "traces": [
+        {
+          "role": "murmur",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "eaec6c45-3763-4a59-b25f-df4a24631a00",
+          "latency_ms": 458.59,
+          "model": "qwen2.5:7b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 997,
+          "output_tokens": 23,
+          "semantic_status": "warning",
+          "semantic_findings": "near_duplicate_prose"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "warning",
+          "trace_id": "eaec6c45-3763-4a59-b25f-df4a24631a00",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "near_duplicate_prose"
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": null,
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 997,
+            "prompt_tokens_details": {
+              "cached_tokens": 972
+            },
+            "completion_tokens": 23,
+            "total_tokens": 1020
+          }
+        }
+      ]
+    },
+    {
+      "case": "dream_2",
+      "role": "oneiros",
+      "message": "",
+      "context": {
+        "time": "2026-01-07T16:00:00+00:00",
+        "location": "home",
+        "mood": "Content",
+        "identity": {
+          "name": "Patrick Shaw",
+          "nickname": "Pathos"
+        },
+        "memories": [
+          "I made tea and read for a while.",
+          "The kettle switched itself off twice. It boiled on the third try."
+        ],
+        "remembered_preferences": [
+          {
+            "topic": "tea",
+            "stance": "likes"
+          }
+        ],
+        "recent_dialogue": [],
+        "recent_dreams": [
+          {
+            "text": "In a dream, the kettle whispered *three times* before switching off, and each time, Gulliver\u2019s tail wagged in slow motion through the ceiling tiles. The third time, Patrick\u2019s hands were made of warm water, so he let them drip onto his laptop keyboard\u2014keys turned into teacups. He never found the mouse."
+          }
+        ],
+        "message": ""
+      },
+      "text": "In a dream, Patrick stood in his kitchen, Gulliver pressed against the back of his legs, and the kettle boiled\u2014*once, twice*\u2014but no water spilled. Instead, the tap gurgled a slow, rhythmic tune, like a music box broken mid-melody. His mother was there, smiling, holding out a steaming mug. 'You forgot the sugar,' she said. Then the mug split into a dozen empty shells.",
+      "seconds": 4.0,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "23d942de-1de3-49dc-b7a5-b2ea9194d9f1",
+          "latency_ms": 3999.57,
+          "model": "ministral-3:14b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 925,
+          "output_tokens": 98,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-07T16:00:00+00:00",
+          "status": "ok",
+          "trace_id": "23d942de-1de3-49dc-b7a5-b2ea9194d9f1",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "response_audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 925,
+            "prompt_tokens_details": {
+              "cached_tokens": 776
+            },
+            "completion_tokens": 98,
+            "total_tokens": 1023
+          }
+        }
+      ]
+    }
+  ]
+}

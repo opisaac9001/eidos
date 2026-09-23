@@ -6,22 +6,25 @@ from time import perf_counter
 from typing import Mapping
 from uuid import uuid4
 
+from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected, validate_completion
-from eidos.application.semantic_quality import semantic_quality_findings
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 ROLE_MODEL_PROFILES = {
-    "pathos": ("5", 160, 0.55),
-    "murmur": ("5", 100, 0.65),
-    "firmament": ("4", 140, 0.7),
+    "pathos": ("12", 160, 0.55),
+    "murmur": ("7", 128, 0.55),
+    "firmament": ("7", 140, 0.7),
     "moira": ("3", 16, 0.2),
     "mnemosyne": ("3", 384, 0.0),
-    "reflection": ("4", 140, 0.55),
-    "oneiros": ("5", 220, 0.8),
+    "reflection": ("5", 140, 0.55),
+    "oneiros": ("6", 220, 0.8),
     "chronicler": ("3", 180, 0.2),
 }
 REPAIRABLE_PATHOS_FINDINGS = {
+    "contradicted_activity_status",
+    "premature_arrival",
+    "unsupported_history_denial",
     "assistant_like_register",
     "excessive_length",
     "factual_contradiction",
@@ -35,6 +38,9 @@ REPAIRABLE_PATHOS_FINDINGS = {
     "unsupported_current_activity",
 }
 BLOCKING_PATHOS_FINDINGS = {
+    "contradicted_activity_status",
+    "premature_arrival",
+    "unsupported_history_denial",
     "factual_contradiction",
     "forbidden_knowledge_leak",
     "identity_confusion",
@@ -242,12 +248,8 @@ async def perform_pathos_reply(
     if draft is None:
         return None
     prior_texts = _prior_role_texts("pathos", context)
-    draft_findings = semantic_quality_findings(
-        "pathos", draft, context, prior_texts=prior_texts
-    )
-    repairable = [
-        finding for finding in draft_findings if finding in REPAIRABLE_PATHOS_FINDINGS
-    ]
+    draft_findings = semantic_quality_findings("pathos", draft, context, prior_texts=prior_texts)
+    repairable = [finding for finding in draft_findings if finding in REPAIRABLE_PATHOS_FINDINGS]
     if not repairable:
         return draft
 
@@ -258,18 +260,22 @@ async def perform_pathos_reply(
         "revision_instruction": (
             "Rewrite the draft once. Keep its supported meaning, answer the same message, "
             "and remove the named problems. Add no facts, actions, or memories."
+            " If unsupported_history_denial is listed, the draft turned missing memory "
+            "into a claim that an event did not happen. Replace that denial with a short "
+            "statement that you do not remember it, not a denial or invented explanation."
+            " If contradicted_activity_status is listed, answer using the matching activity's explicit outcome. Do not claim completed work is just starting or unfinished work is done. If premature_arrival is listed, you are still travelling and have not arrived. Do not invent an explanation."
         ),
     }
     revised = await perform(gateway, "pathos", revision_context, at, pending)
     revision_findings = (
-        semantic_quality_findings(
-            "pathos", revised, context, prior_texts=prior_texts
-        )
+        semantic_quality_findings("pathos", revised, context, prior_texts=prior_texts)
         if revised is not None
         else ["revision_failed"]
     )
-    if revised is not None and _finding_score(revision_findings) < _finding_score(
-        draft_findings
+    if (
+        revised is not None
+        and not any(finding in BLOCKING_PATHOS_FINDINGS for finding in revision_findings)
+        and _finding_score(revision_findings) < _finding_score(draft_findings)
     ):
         selected = "revision"
     elif any(finding in BLOCKING_PATHOS_FINDINGS for finding in draft_findings):

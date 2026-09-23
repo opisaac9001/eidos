@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
+from eidos.application.relationship_experience import personal_relationship_context
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationship_repairs import project_relationship_repairs
@@ -219,8 +220,17 @@ async def _advance_scene(
                         scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                     ),
                     "scene_topic": topic_id.replace("-", " "),
+                    "personal_relationship_context": personal_relationship_context(
+                        combined,
+                        speaker_id,
+                        "pathos" if speaker_id == partner_id else partner_id,
+                        simulated_at,
+                    ),
                     "prior_turns": [
-                        str(event.payload["text"])
+                        {
+                            "speaker": str(event.payload["actor_id"]),
+                            "text": str(event.payload["text"]),
+                        }
                         for event in combined
                         if event.kind == "scene.turn_taken"
                         and event.payload.get("scene_id") == scene_id

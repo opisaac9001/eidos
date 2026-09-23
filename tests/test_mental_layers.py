@@ -23,6 +23,31 @@ class MentalLayerTests(unittest.TestCase):
         self.assertEqual(projected.latest["social"].focus_id, "rowan")
         self.assertEqual(mental_layer_events(events, state, at, {"rowan": "park"}), [])
 
+    def test_legacy_mind_pulse_ids_still_dedupe_by_time_and_layer(self):
+        at = datetime(2026, 1, 2, 12, tzinfo=timezone.utc)
+        legacy = DomainEvent(
+            "mind.layer_pulsed",
+            "pathos",
+            {
+                "pulse_id": f"{at.isoformat()}:attention",
+                "layer": "attention",
+                "mode": "foreground",
+                "focus_type": "place",
+                "focus_id": "park",
+                "focus_text": "Notice park",
+                "activation": 0.6,
+                "simulated_at": at.isoformat(),
+                "action_authority": False,
+            },
+        )
+        events = mental_layer_events(
+            [legacy],
+            PathosState(simulated_at=at, location_id="park", awake=True),
+            at,
+            {},
+        )
+        self.assertNotIn("attention", {event.payload["layer"] for event in events})
+
     def test_reflection_and_dream_layers_follow_distinct_states(self):
         evening = datetime(2026, 1, 2, 21, tzinfo=timezone.utc)
         awake = mental_layer_events([], PathosState(simulated_at=evening, awake=True), evening, {})

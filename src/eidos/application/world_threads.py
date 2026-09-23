@@ -65,6 +65,31 @@ def world_thread_events(
     for thread in list(state.values()):
         if thread.status != "active":
             continue
+        source = next(
+            (event for event in history if str(event.event_id) == thread.source_event_id), None
+        )
+        if source is not None and source.payload.get("source") == "causal-world-response":
+            # This is an observation window, not a pre-authored story arc.
+            # Do not manufacture progress, NPC commitments or success at a deadline.
+            if simulated_at >= datetime.fromisoformat(thread.due_at):
+                output.append(
+                    DomainEvent(
+                        "world_thread.resolved",
+                        "pathos",
+                        {
+                            "thread_id": thread.thread_id,
+                            "outcome": "observation_window_ended",
+                            "summary": "The initial observation window ended; no later outcome is established.",
+                            "simulated_at": simulated_at.isoformat(),
+                            "visibility": "operator",
+                        },
+                        causation_id=_latest_transition(
+                            [*history, *output], thread.thread_id
+                        ).event_id,
+                        correlation_id=thread.thread_id,
+                    )
+                )
+            continue
         due_at = datetime.fromisoformat(thread.due_at)
         started_at = datetime.fromisoformat(thread.started_at)
         now_history = [*history, *output]

@@ -1,0 +1,17 @@
+[Unit]
+Description=Restricted Dell to Pi Murmur inference tunnel
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=isaac
+ExecStart=/usr/bin/ssh -N -T -i /home/isaac/.ssh/pathos_murmur_worker -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/isaac/.ssh/pathos_murmur_known_hosts -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -L 127.0.0.1:11437:127.0.0.1:11434 isaac@100.70.223.24
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,288 @@
+{
+  "synthetic": true,
+  "revision": 4108,
+  "rows": [
+    {
+      "mode": "serial",
+      "repeat": 0,
+      "pair_seconds": 2.05,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.83,
+          "text": "Yeah, sometimes you just gotta vent and I'm right here listening without any unsolicited tips.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 20,
+            "total_tokens": 63
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.22,
+          "text": "A elderly woman in a floral dress is slowly walking down the main street, stopping occasionally to admire the storefronts, her weathered hands tucked into the pockets of her cardigan. A young boy in a superhero cape hurries past, clutching a newly purchased comic book, his eyes wide with excitement.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 5
+            },
+            "completion_tokens": 62,
+            "total_tokens": 120
+          }
+        }
+      ]
+    },
+    {
+      "mode": "serial",
+      "repeat": 1,
+      "pair_seconds": 1.71,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.72,
+          "text": "Totally get that, just sending you a virtual high-five and some good vibes for the rest of your evening.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 24,
+            "total_tokens": 67
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 0.99,
+          "text": "A elderly woman in a floral dress is carefully balancing a tray of freshly baked cookies, her steps slow but steady as she makes her way to the local community center. Nearby, a group of children are laughing and playing with a small dog, its fur as white as snow, in the middle of the sidewalk.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 63,
+            "total_tokens": 121
+          }
+        }
+      ]
+    },
+    {
+      "mode": "serial",
+      "repeat": 2,
+      "pair_seconds": 1.79,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.6,
+          "text": "Totally hear you, just sending a virtual hug your way and hoping things get better soon.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 20,
+            "total_tokens": 63
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.19,
+          "text": "A elderly man in a worn-out sweater is carefully threading the needle of his embroidery hoop, occasionally stopping to wipe his brow with a faded handkerchief, as he sits on a bench under the shade of a large oak tree. Nearby, a group of children laugh and chase each other around the fountain, splashing water and leaving wet footprints on the stone.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 74,
+            "total_tokens": 132
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 0,
+      "pair_seconds": 1.25,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.9,
+          "text": "Hey Patrick here, totally hear you\u2014sometimes venting is all that matters, so I'm just listening whenever you need to get it off your chest.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 32,
+            "total_tokens": 75
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.25,
+          "text": "A elderly woman in a colorful scarf is carefully navigating her way through the crowded sidewalk, her\u6b65\u4f10\u7a33\u5065\u4f46\u7565\u663e\u8fdf\u7f13\uff0c\u5076\u5c14\u505c\u4e0b\u6765\u67e5\u770b\u624b\u4e2d\u7684\u65e7\u62a5\u7eb8\uff0c\u4eff\u4f5b\u5728\u5bfb\u627e\u4eca\u5929\u7684\u7279\u522b\u62a5\u9053\u3002\u4e0d\u8fdc\u5904\uff0c\u4e00\u4e2a\u5e74\u8f7b\u7537\u5b69\u6b63\u8e72\u5728\u8857\u8fb9\uff0c\u4e13\u5fc3\u81f4\u5fd7\u5730\u4fee\u7406\u7740\u4e00\u8f86\u65e7\u81ea\u884c\u8f66\uff0c\u4ed6\u7684\u5de5\u5177\u7bb1\u6563\u843d\u5728\u4e00\u65c1\uff0c\u51e0\u53ea\u597d\u5947\u7684\u8def\u4eba\u9a7b\u8db3\u89c2\u770b\u3002",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 79,
+            "total_tokens": 137
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 1,
+      "pair_seconds": 0.88,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.55,
+          "text": "Hey, I hear you loud and clear\u2014just sending a virtual hug your way.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 18,
+            "total_tokens": 61
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 0.88,
+          "text": "A elderly man in a worn coat is pushing a vintage ice cream cart, stopping occasionally to hand out small treats to curious children gathered around the cart. Across the street, a group of teenagers are laughing and taking selfies in front of a newly painted mural depicting local landmarks.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 55,
+            "total_tokens": 113
+          }
+        }
+      ]
+    },
+    {
+      "mode": "concurrent",
+      "repeat": 2,
+      "pair_seconds": 1.06,
+      "results": [
+        {
+          "worker": "dual_p40",
+          "model": "qwen3.5:35b",
+          "seconds": 0.65,
+          "text": "Totally hear you, no advice needed\u2014just sending some good vibes your way for a better tomorrow.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 39
+            },
+            "completion_tokens": 22,
+            "total_tokens": 65
+          }
+        },
+        {
+          "worker": "rtx3060",
+          "model": "qwen2.5:7b",
+          "seconds": 1.06,
+          "text": "A elderly man in a tweed jacket pauses in front of the local bakery, his eyes twinkling as he selects a freshly baked loaf, then continues walking with a contented smile. Nearby, a group of teenagers chat animatedly outside the bookstore, their laughter mingling with the gentle hum of the town's daily bustle.",
+          "finish_reason": "stop",
+          "reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "usage": {
+            "prompt_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 57
+            },
+            "completion_tokens": 67,
+            "total_tokens": 125
+          }
+        }
+      ]
+    }
+  ]
+}

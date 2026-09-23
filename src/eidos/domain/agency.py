@@ -18,7 +18,7 @@ from eidos.domain.world import location_allows_interval
 from eidos.domain.world_catalog import WorldCatalog
 
 AGENCY_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND}
-_ACTIVITY_TYPE = re.compile(r"[a-z][a-z0-9_]{2,39}")
+_ACTIVITY_TYPE = re.compile(r"^[a-z][a-z0-9_]{2,39}$")
 _FIELDS = {
     "activity_type",
     "title",
@@ -29,10 +29,28 @@ _FIELDS = {
     "companion_id",
     "starts_in_hours",
     "duration_hours",
+    "estimate_confidence",
     "priority",
 }
 _COMPLETION_CLAIMS = re.compile(
     r"\b(?:completed|finished|succeeded|achieved|already did|turned out)\b", re.IGNORECASE
+)
+_MEAL_ACTIVITY_TYPES = frozenset(
+    {
+        "breakfast",
+        "cook_food",
+        "eat_meal",
+        "evening_meal",
+        "lunch",
+        "make_breakfast",
+        "make_dinner",
+        "make_lunch",
+        "meal",
+        "meal_preparation",
+        "prepare_and_eat_meal",
+        "prepare_food",
+        "snack",
+    }
 )
 
 
@@ -45,9 +63,10 @@ class AgencyCandidate:
     location_id: str
     resource_id: str | None
     companion_id: str | None
-    starts_in_hours: int
-    duration_hours: int
+    starts_in_hours: float
+    duration_hours: float
     priority: float
+    estimate_confidence: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,14 +92,17 @@ def agency_output_schema(
             "location_id": {"type": "string", "enum": location_ids},
             "resource_id": {"type": "string", "enum": ["none", *resource_ids]},
             "companion_id": {"type": "string", "enum": ["none", *companion_ids]},
-            "starts_in_hours": {"type": "integer", "minimum": 4, "maximum": 72},
-            "duration_hours": {"type": "integer", "minimum": 1, "maximum": 4},
+            "starts_in_hours": {"type": "number", "minimum": 0, "maximum": 72},
+            "duration_hours": {"type": "number", "minimum": 1 / 60, "maximum": 4},
+            "estimate_confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "priority": {"type": "number", "minimum": 0, "maximum": 1},
         },
     }
 
 
-def parse_agency_candidate(content: str) -> AgencyCandidate:
+def parse_agency_candidate(
+    content: str, *, completed_activity_titles: Sequence[str] = ()
+) -> AgencyCandidate:
     try:
         value = json.loads(content)
     except (TypeError, ValueError):
@@ -108,17 +130,33 @@ def parse_agency_candidate(content: str) -> AgencyCandidate:
     starts = value["starts_in_hours"]
     duration = value["duration_hours"]
     priority = value["priority"]
-    if isinstance(starts, bool) or not isinstance(starts, int) or not 4 <= starts <= 72:
-        raise ProposalRejected("invalid_start", "starts_in_hours must be an integer from 4 to 72")
-    if isinstance(duration, bool) or not isinstance(duration, int) or not 1 <= duration <= 4:
-        raise ProposalRejected("invalid_duration", "duration_hours must be an integer from 1 to 4")
+    estimate_confidence = value["estimate_confidence"]
+    if isinstance(starts, bool) or not isinstance(starts, (int, float)) or not 0 <= starts <= 72:
+        raise ProposalRejected("invalid_start", "starts_in_hours must be from 0 to 72")
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or not 1 / 60 <= duration <= 4
+    ):
+        raise ProposalRejected("invalid_duration", "duration must be from one minute to four hours")
     if (
         isinstance(priority, bool)
         or not isinstance(priority, (int, float))
         or not 0 <= priority <= 1
     ):
         raise ProposalRejected("invalid_priority", "priority must be between zero and one")
-    if _COMPLETION_CLAIMS.search(value["title"]) or _COMPLETION_CLAIMS.search(value["motivation"]):
+    if (
+        isinstance(estimate_confidence, bool)
+        or not isinstance(estimate_confidence, (int, float))
+        or not 0 <= estimate_confidence <= 1
+    ):
+        raise ProposalRejected(
+            "invalid_estimate_confidence", "estimate confidence must be between zero and one"
+        )
+    if _COMPLETION_CLAIMS.search(value["title"]) or (
+        _COMPLETION_CLAIMS.search(value["motivation"])
+        and not _grounded_past_completion(value["motivation"], completed_activity_titles)
+    ):
         raise ProposalRejected(
             "claims_outcome", "A proposal cannot claim an activity already succeeded"
         )
@@ -133,7 +171,47 @@ def parse_agency_candidate(content: str) -> AgencyCandidate:
         starts,
         duration,
         float(priority),
+        float(estimate_confidence),
     )
+
+
+def _grounded_past_completion(text: str, completed_titles: Sequence[str]) -> bool:
+    """Allow a past-tense motive only when recent execution supplies its subject."""
+    ignored = {
+        "after",
+        "already",
+        "completed",
+        "finished",
+        "having",
+        "succeeded",
+        "achieved",
+        "turned",
+        "out",
+        "work",
+        "task",
+        "session",
+        "thing",
+        "some",
+        "that",
+        "this",
+        "with",
+        "the",
+        "and",
+        "for",
+    }
+    words = {word for word in re.findall(r"[a-z0-9]+", text.casefold()) if len(word) >= 3}
+    subject = words - ignored
+    if not subject:
+        return False
+    for title in completed_titles:
+        title_words = {
+            word
+            for word in re.findall(r"[a-z0-9]+", title.casefold())
+            if len(word) >= 3 and word not in ignored
+        }
+        if subject & title_words:
+            return True
+    return False
 
 
 def resolve_agency_candidate(
@@ -148,6 +226,13 @@ def resolve_agency_candidate(
     recent_activity_signatures: Sequence[tuple[str, str, str]] = (),
 ) -> AgencyResolution:
     """Admit a novel idea only when it can become a physically coherent plan."""
+    resource_id = candidate.resource_id
+    normalized_resource = (
+        candidate.activity_type.startswith("household_")
+        and candidate.resource_id == "household-provisions"
+    )
+    if normalized_resource:
+        resource_id = None
     common = {
         "proposal_id": proposal_id,
         "activity_type": candidate.activity_type,
@@ -155,10 +240,16 @@ def resolve_agency_candidate(
         "motivation": candidate.motivation,
         "action": candidate.action.value,
         "location_id": candidate.location_id,
-        "resource_id": candidate.resource_id,
+        "resource_id": resource_id,
         "companion_id": candidate.companion_id,
+        "estimate_confidence": candidate.estimate_confidence,
         "simulated_at": simulated_at.isoformat(),
     }
+    if normalized_resource:
+        common["requested_resource_id"] = candidate.resource_id
+        common["resource_normalization"] = (
+            "Ignored household provisions because food is not chore equipment."
+        )
     proposed = DomainEvent("agency.activity_proposed", "pathos", common, correlation_id=proposal_id)
 
     def reject(code: str, explanation: str) -> AgencyResolution:
@@ -181,6 +272,16 @@ def resolve_agency_candidate(
         return reject("naive_time", "Agency planning needs timezone-aware time")
     if candidate.location_id not in catalog.places:
         return reject("unknown_location", "The proposed place does not exist")
+    if candidate.activity_type in _MEAL_ACTIVITY_TYPES:
+        if candidate.action is not ActionKind.WORK:
+            return reject("invalid_meal_action", "Preparing and eating a meal is lived work")
+        if candidate.location_id not in {"home", "cafe"}:
+            return reject("meal_unavailable", "No known meal provision exists at that place")
+        provisions = state.objects.get("household-provisions")
+        if candidate.location_id == "home" and (
+            provisions is None or provisions.quantity is None or provisions.quantity <= 0
+        ):
+            return reject("resource_unavailable", "There are no household provisions to eat")
     if candidate.companion_id is not None and candidate.companion_id not in known_companion_ids:
         return reject("unknown_companion", "The proposed companion is not known")
     candidate_signature = (
@@ -199,8 +300,8 @@ def resolve_agency_candidate(
             "overused_pattern",
             "This recent activity pattern needs time or meaningful variation before repeating.",
         )
-    resource = state.objects.get(candidate.resource_id) if candidate.resource_id else None
-    if candidate.resource_id is not None and resource is None:
+    resource = state.objects.get(resource_id) if resource_id else None
+    if resource_id is not None and resource is None:
         return reject("unknown_resource", "The proposed resource does not exist")
     if resource is not None:
         shared = resource.owner_id == resource.custodian_id == "community"
@@ -270,11 +371,13 @@ def resolve_agency_candidate(
             "actor_id": "pathos",
             "action": candidate.action.value,
             "target_id": target_id,
-            "resource_id": candidate.resource_id,
+            "resource_id": resource_id,
             "companion_id": candidate.companion_id,
             "activity_type": candidate.activity_type,
             "source_proposal_id": proposal_id,
             "intention_id": intention_id,
+            "estimated_duration_seconds": candidate.duration_hours * 3600,
+            "estimate_confidence": candidate.estimate_confidence,
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=accepted.event_id,

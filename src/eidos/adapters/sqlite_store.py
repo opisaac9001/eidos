@@ -25,6 +25,8 @@ class SQLiteEventStore:
         self.path = path
         with self._connect() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == 0:
+                connection.execute("PRAGMA auto_vacuum = FULL")
             if version not in (0, 1, 2, 3, 4):
                 raise ValueError(f"Unsupported database schema version: {version}")
             connection.execute("""

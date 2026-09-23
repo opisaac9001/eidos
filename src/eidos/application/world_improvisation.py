@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.causal_opportunities import fresh_cause, optional_schema
 from eidos.domain.ambient import (
     ambient_output_schema,
     parse_ambient_candidate,
@@ -18,6 +19,23 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
+
+
+def public_world_cause(cause: DomainEvent, location_id: str) -> dict[str, object]:
+    """Whitelist physical facts; never forward private motives or plan prose."""
+    fields = {
+        "pathos.moved": ("from_location_id", "actor_id"),
+        "npc.activity_recorded": ("actor_id", "action"),
+        "object.condition_changed": ("object_id", "condition"),
+    }.get(cause.kind, ())
+    result: dict[str, object] = {"kind": cause.kind, "location_id": location_id}
+    if cause.kind == "pathos.moved":
+        result["actor_id"] = "pathos"
+    for key in fields:
+        value = cause.payload.get(key)
+        if isinstance(value, str) and 0 < len(value) <= 100:
+            result[key] = value
+    return result
 
 
 async def improvised_world_events(
@@ -32,13 +50,23 @@ async def improvised_world_events(
     known_resources: Mapping[str, str] | None = None,
     external_signals: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
-    """Ask Moira periodically; rejection or failure means an ordinary quiet interval."""
+    """Respond to a fresh world change; elapsed days do not manufacture incidents."""
     if simulated_at.utcoffset() is None:
         raise ValueError("World improvisation time must be timezone-aware")
-    day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
-    if day < 7 or (day - 7) % 3 != 0 or simulated_at.hour != 18:
+    cause = fresh_cause(
+        history,
+        simulated_at,
+        frozenset(
+            {
+                "pathos.moved",
+                "npc.activity_recorded",
+                "object.condition_changed",
+            }
+        ),
+    )
+    if cause is None:
         return []
-    proposal_id = f"moira-open-world-{simulated_at.date().isoformat()}"
+    proposal_id = f"moira-open-world-cause-{cause.event_id}"
     if any(event.payload.get("proposal_id") == proposal_id for event in history):
         return []
     recent = [
@@ -67,19 +95,33 @@ async def improvised_world_events(
     )
     if not resources:
         return []
+    cause_location = cause.payload.get("location_id")
+    if cause.kind == "object.condition_changed" and cause_location is None:
+        cause_location = resources.get(str(cause.payload.get("object_id", "")))
+    if cause_location not in locations:
+        return []
+    locations = {str(cause_location): locations[str(cause_location)]}
+    resources = {key: value for key, value in resources.items() if value == cause_location}
+    if not resources:
+        return []
     signals = dict(external_signals or {})
     request = ModelRequest(
         capability="moira_event",
-        task_version="4",
+        task_version="6",
         temperature=0.85,
         max_output_tokens=300,
-        output_schema=ambient_output_schema(tuple(locations), tuple(resources), tuple(signals)),
+        output_schema=optional_schema(
+            ambient_output_schema(
+                tuple(locations), tuple(resources), tuple(signals), immediate=True
+            )
+        ),
         messages=(
             ModelMessage(
                 "user",
                 json.dumps(
                     {
                         "time": simulated_at.isoformat(),
+                        "world_cause": public_world_cause(cause, str(cause_location)),
                         "season": season,
                         "weather": weather,
                         "known_locations": locations,
@@ -87,7 +129,17 @@ async def improvised_world_events(
                         "recent_events": recent,
                         "external_signals": signals,
                         "permission": (
-                            "Invent new fictional material; do not claim it already happened. "
+                            'Normally return {"no_change": true}. Only propose an immediate, '
+                            "plausible development grounded in this world cause and location. "
+                            "Do not schedule a future incident or invent an unrelated causal backstory. "
+                            "Write short COMPLETE phrases within each field's character limit. "
+                            "Description: one sentence under 150 characters. Opportunity: a complete "
+                            "2-5 word action label, not the start of a sentence. Participation and "
+                            "stakes: short complete clauses under 80 characters each. Cause: explain "
+                            "the supplied physical change in plain words, never copy its event ID. "
+                            "A repaired object is repaired, not a newly broken object. Arrival alone "
+                            "does not establish a malfunction, shared obligation or hidden history. "
+                            "Actor pathos means Patrick, not the user or the operator. "
                             "External signals are attributed inspiration only, not reports about "
                             "the fictional town. Cite one signal ID if used, otherwise use none."
                         ),
@@ -106,8 +158,10 @@ async def improvised_world_events(
             {
                 "proposal_id": proposal_id,
                 "director_id": "moira",
+                "source_event_id": str(cause.event_id),
                 "simulated_at": simulated_at.isoformat(),
             },
+            causation_id=cause.event_id,
             correlation_id=proposal_id,
         )
     ]
@@ -115,7 +169,37 @@ async def improvised_world_events(
         response = await asyncio.wait_for(gateway.generate(request), timeout=50)
         if response.finish_reason != "stop":
             raise ProposalRejected("incomplete", "Moira's proposal was incomplete")
+        if json.loads(response.content) == {"no_change": True}:
+            output.append(
+                _trace_event(
+                    "moira_event",
+                    "ok",
+                    trace_id,
+                    simulated_at,
+                    started,
+                    response.resolved_model,
+                    response.backend,
+                    None,
+                )
+            )
+            output.append(
+                DomainEvent(
+                    "world_event.left_ordinary",
+                    "pathos",
+                    {
+                        "proposal_id": proposal_id,
+                        "simulated_at": simulated_at.isoformat(),
+                    },
+                    causation_id=cause.event_id,
+                    correlation_id=proposal_id,
+                )
+            )
+            return output
         candidate = parse_ambient_candidate(response.content)
+        if candidate.starts_in_hours != 0:
+            raise ProposalRejected(
+                "future_incident", "A causal response must happen now, not be scheduled"
+            )
         novelty_score = validate_ambient_candidate(
             candidate,
             known_locations=set(locations),
@@ -196,10 +280,10 @@ async def improvised_world_events(
             event_kind=WorldEventKind.AMBIENT,
             description=candidate.description,
             location_id=candidate.location_id,
-            starts_at=simulated_at + timedelta(hours=candidate.starts_in_hours),
+            starts_at=simulated_at,
             intensity=candidate.intensity,
             expected_revision=actual_revision + len(output),
-            source="model-fiction-proposal",
+            source="causal-world-response",
         ),
         history=[*history, *output],
         known_location_ids=set(locations),

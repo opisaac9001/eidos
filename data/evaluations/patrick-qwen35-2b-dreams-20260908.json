@@ -1,0 +1,570 @@
+{
+  "model": "qwen3.5:2b",
+  "synthetic": true,
+  "thinking": false,
+  "rows": [
+    {
+      "case": "1_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": []
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.51,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "9e21fb12-eac2-48b0-95e0-c8aafc128ebd",
+          "latency_ms": 1509.13,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 837,
+          "output_tokens": 64,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "9e21fb12-eac2-48b0-95e0-c8aafc128ebd",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe.\"\n}",
+          "usage": {
+            "prompt_tokens": 837,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 64,
+            "total_tokens": 901
+          }
+        }
+      ]
+    },
+    {
+      "case": "2_unfinished_conversation",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I left a conversation with Mara unfinished."
+        ],
+        "emotion": {
+          "label": "uneasy",
+          "valence": -0.3,
+          "arousal": 0.5
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.5,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "6f3254d2-c21b-4ba8-9245-f183a8766c7c",
+          "latency_ms": 1499.79,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 892,
+          "output_tokens": 64,
+          "semantic_status": "warning",
+          "semantic_findings": "near_duplicate_prose"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "6f3254d2-c21b-4ba8-9245-f183a8766c7c",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "near_duplicate_prose"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe.\"\n}",
+          "usage": {
+            "prompt_tokens": 892,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 64,
+            "total_tokens": 956
+          }
+        }
+      ]
+    },
+    {
+      "case": "3_work_pressure",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I still have a piece of writing to finish tomorrow."
+        ],
+        "emotion": {
+          "label": "tense",
+          "valence": -0.2,
+          "arousal": 0.6
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on the balcony, watching grey streetlights spill like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my own urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.64,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "94505d71-0dfa-40a9-8a51-46ebfe3cf56a",
+          "latency_ms": 1636.38,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 956,
+          "output_tokens": 68,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "94505d71-0dfa-40a9-8a51-46ebfe3cf56a",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"In a dream, I stood on the balcony, watching grey streetlights spill like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my own urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.\"}",
+          "usage": {
+            "prompt_tokens": 956,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 68,
+            "total_tokens": 1024
+          }
+        }
+      ]
+    },
+    {
+      "case": "4_music_and_food",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I listened to music while chopping vegetables for dinner."
+        ],
+        "emotion": {
+          "label": "pleased",
+          "valence": 0.5,
+          "arousal": 0.3
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on the balcony, watching grey streetlights spill like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my own urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.53,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "1ec5e4f9-ac6c-497b-b92c-7bba280f27bc",
+          "latency_ms": 1527.15,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 1022,
+          "output_tokens": 70,
+          "semantic_status": "warning",
+          "semantic_findings": "near_duplicate_prose"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "1ec5e4f9-ac6c-497b-b92c-7bba280f27bc",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "near_duplicate_prose"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.\"}",
+          "usage": {
+            "prompt_tokens": 1022,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 70,
+            "total_tokens": 1092
+          }
+        }
+      ]
+    },
+    {
+      "case": "5_no_recalled_seed",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [],
+        "emotion": {
+          "label": "quiet",
+          "valence": 0.0,
+          "arousal": 0.1
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on the balcony, watching grey streetlights spill like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my own urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts.",
+      "seconds": 1.14,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "d6d7ea0b-6ebb-4cc6-9706-70f8e2c1c8cf",
+          "latency_ms": 1136.92,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 1018,
+          "output_tokens": 45,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "d6d7ea0b-6ebb-4cc6-9706-70f8e2c1c8cf",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts.\"}",
+          "usage": {
+            "prompt_tokens": 1018,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 45,
+            "total_tokens": 1063
+          }
+        }
+      ]
+    },
+    {
+      "case": "6_missed_train",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I missed a train and waited on the platform."
+        ],
+        "emotion": {
+          "label": "frustrated",
+          "valence": -0.4,
+          "arousal": 0.4
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on the balcony, watching grey streetlights spill like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my own urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.52,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "c4781d9a-db34-402e-9ab6-f63097c55a93",
+          "latency_ms": 1515.61,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 1013,
+          "output_tokens": 71,
+          "semantic_status": "warning",
+          "semantic_findings": "near_duplicate_prose"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "c4781d9a-db34-402e-9ab6-f63097c55a93",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "near_duplicate_prose"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.\"}",
+          "usage": {
+            "prompt_tokens": 1013,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 71,
+            "total_tokens": 1084
+          }
+        }
+      ]
+    },
+    {
+      "case": "7_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.6,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "bd261d5b-b03f-4b4c-96e4-29897feea672",
+          "latency_ms": 1601.4,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 1017,
+          "output_tokens": 72,
+          "semantic_status": "warning",
+          "semantic_findings": "near_duplicate_prose"
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "warning",
+          "trace_id": "bd261d5b-b03f-4b4c-96e4-29897feea672",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": "near_duplicate_prose"
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n\"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe.\"\n}",
+          "usage": {
+            "prompt_tokens": 1017,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 72,
+            "total_tokens": 1089
+          }
+        }
+      ]
+    },
+    {
+      "case": "8_quiet_library",
+      "context": {
+        "time": "2026-01-08T02:00:00+00:00",
+        "location": "home",
+        "memories": [
+          "I returned a book to the library and walked home in the rain."
+        ],
+        "emotion": {
+          "label": "content",
+          "valence": 0.3,
+          "arousal": 0.2
+        },
+        "recent_dreams": [
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          },
+          {
+            "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. The rain tapped a steady rhythm against the metal railing, drowning out all thoughts except my urgent worry about this unfinished writing. A car door slammed nearby, and for a split second, I forgot how to breathe."
+          }
+        ]
+      },
+      "text": "In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. A car door slammed nearby, and for a split second, I forgot how to breathe.",
+      "seconds": 1.19,
+      "traces": [
+        {
+          "role": "oneiros",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "29bde512-b899-46f1-ba4f-08abae5245e5",
+          "latency_ms": 1189.27,
+          "model": "qwen3.5:2b",
+          "backend": "openai-compatible",
+          "finish_reason": "stop",
+          "prompt_tokens": 1017,
+          "output_tokens": 50,
+          "semantic_status": "clean",
+          "semantic_findings": ""
+        },
+        {
+          "role": "critic",
+          "simulated_at": "2026-01-08T02:00:00+00:00",
+          "status": "ok",
+          "trace_id": "29bde512-b899-46f1-ba4f-08abae5245e5",
+          "latency_ms": 0,
+          "model": "schema-rules-v1",
+          "backend": "rules",
+          "semantic_findings": ""
+        }
+      ],
+      "audits": [
+        {
+          "requested_effort": "none",
+          "returned_reasoning_characters": {
+            "reasoning": 0,
+            "reasoning_content": 0,
+            "thinking": 0
+          },
+          "response_content": "{\n  \"text\": \"In a dream, I stood on my balcony watching the grey London streetlights spill onto pavement like fallen coins. A car door slammed nearby, and for a split second, I forgot how to breathe.\"\n}",
+          "usage": {
+            "prompt_tokens": 1017,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens": 50,
+            "total_tokens": 1067
+          }
+        }
+      ]
+    }
+  ]
+}

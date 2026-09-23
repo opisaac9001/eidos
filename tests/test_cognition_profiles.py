@@ -81,11 +81,11 @@ class CognitionProfileTests(unittest.TestCase):
         self.assertTrue(all(0 <= request.temperature <= 1 for request in requests.values()))
         self.assertLess(requests["moira"].max_output_tokens, requests["oneiros"].max_output_tokens)
         self.assertLess(requests["chronicler"].temperature, requests["oneiros"].temperature)
-        self.assertEqual(requests["pathos"].task_version, "5")
-        self.assertEqual(requests["murmur"].task_version, "5")
-        self.assertEqual(requests["firmament"].task_version, "4")
-        self.assertEqual(requests["reflection"].task_version, "4")
-        self.assertEqual(requests["oneiros"].task_version, "5")
+        self.assertEqual(requests["pathos"].task_version, "12")
+        self.assertEqual(requests["murmur"].task_version, "7")
+        self.assertEqual(requests["firmament"].task_version, "7")
+        self.assertEqual(requests["reflection"].task_version, "5")
+        self.assertEqual(requests["oneiros"].task_version, "6")
 
     def test_standin_oneiros_uses_recent_dreams_as_a_repetition_guard(self):
         recent: list[dict[str, str]] = []
@@ -172,6 +172,35 @@ class CognitionProfileTests(unittest.TestCase):
 
         self.assertIsNone(text)
         selected = next(event for event in pending if event.kind == "role.revision_selected")
+        self.assertEqual(selected.payload["selected"], "rejected")
+
+    def test_fewer_warnings_cannot_hide_a_remaining_blocking_denial(self):
+        class PartialRepairGateway:
+            def __init__(self):
+                self.calls = 0
+
+            async def generate(self, request):
+                self.calls += 1
+                reply = (
+                    "It's good to hear from you. I haven't called him today."
+                    if self.calls == 1
+                    else "I haven't called him today."
+                )
+                return ModelResponse(json.dumps({"text": reply}), "fixture", "test", "stop")
+
+        gateway = PartialRepairGateway()
+        events = []
+        reply = asyncio.run(
+            perform_pathos_reply(
+                gateway,
+                {"message": "What did he say when you called?", "memories": []},
+                "2026-01-07T16:00:00+00:00",
+                events,
+            )
+        )
+        self.assertIsNone(reply)
+        self.assertEqual(gateway.calls, 2)
+        selected = next(e for e in events if e.kind == "role.revision_selected")
         self.assertEqual(selected.payload["selected"], "rejected")
 
 
