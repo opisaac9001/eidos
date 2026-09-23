@@ -168,6 +168,29 @@ supervised workers with lease recovery and operator cancellation, although requi
 callers still await their results.
 Role traces record status, model/backend, latency, and a trace ID.
 
+## Incremental projections
+
+A tick folds `history + pending` many times per simulated hour, so a projection that
+replays from the first event makes each day cost more than the last. Pure folds therefore
+go through `domain/folding.py`:
+
+- `IncrementalFold(initial, step)` memoizes a left fold and resumes from the longest cached
+  prefix whose events are the **identical objects**, checked by identity. Filtered,
+  reordered or speculative lists can never share state by accident; they simply fold from
+  the start. Use `key=`/`initial=` when an argument only changes the seed.
+- Fold states must be immutable. `GrowOnlyMap` (first write wins) and `PersistentMap`
+  (last write wins) give branch-safe, add-only lookups without copying: states share one
+  log and each sees only its own prefix. The activity timeline uses the same idea with
+  shared append-only lists.
+- `SQLiteEventStore` keeps decoded history in process, reads only new rows, and adopts
+  committed events, so the same objects flow into the next tick and folds resume there.
+- `EventId` caches its text, because nearly every projection keys by `str(event_id)`.
+
+A new projection should be a fold with a `step` over an immutable state, registered as a
+module-level `IncrementalFold`. Scanning `history` inside an hourly helper is acceptable
+only for small, recent windows (for example `history[-3000:]` walked backwards with an
+early exit).
+
 ## Model contract
 
 Every request includes:
