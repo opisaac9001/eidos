@@ -139,7 +139,9 @@ def _fitting_option(history: Sequence[DomainEvent], at: datetime) -> WantOption 
         if item.direction > 0:
             lived[item.value_id] = lived.get(item.value_id, 0) + 1
     ranked = [*hoped, *sorted(lived, key=lambda value: (-lived[value], value))]
-    if not ranked or sum(lived.values()) < 6:
+    first = state.evidence[0].at if state.evidence else None
+    if not ranked or sum(lived.values()) < 6 or first is None or at - first < timedelta(days=14):
+        # Wanting things for himself follows a settled couple of weeks, not his first days.
         return None
     for value_id in ranked:
         for option in OPTIONS:

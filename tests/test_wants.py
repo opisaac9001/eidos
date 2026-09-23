@@ -12,7 +12,7 @@ from eidos.domain.selfhood import value_evidence
 SATURDAY = datetime(2026, 1, 17, 11, tzinfo=timezone.utc)
 
 
-def lived_craft(days: int = 8) -> list[DomainEvent]:
+def lived_craft(days: int = 16) -> list[DomainEvent]:
     return [
         DomainEvent(
             "activity.completed",

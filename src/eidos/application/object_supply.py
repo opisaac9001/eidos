@@ -185,7 +185,8 @@ def _replenishment_choice(
         if str(source.event_id) in handled:
             # An empty larder is looked at again once a new day begins.
             if not (
-                item.quantity == 0
+                item.quantity <= max(item.reorder_at, FOOD_REORDER_AT)
+                and item.unit == "meal portions"
                 and source is stock_sources[-1]
                 and (pending is None or pending.payload.get("object_id") != object_id)
             ):
@@ -206,7 +207,11 @@ def _replenishment_choice(
             and event.payload.get("decision") == "go_without"
             and str(event.payload.get("source_stock_event_id")) == str(source.event_id)
         )
-        score = min(0.97, 0.25 + 0.55 * reliability + 0.25 * empty_days)
+        # Food he can afford is not an optional luxury; other supplies are genuinely optional.
+        base = (
+            0.6 + 0.35 * reliability if item.unit == "meal portions" else 0.25 + 0.55 * reliability
+        )
+        score = min(0.97, base + 0.25 * empty_days)
         reconsidered = str(source.event_id) in handled
         sample = _sample(
             f"replenish-{object_id}-{item.quantity}-{source.event_id}"
