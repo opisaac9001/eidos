@@ -127,6 +127,7 @@ from eidos.application.selfhood import (
     selfhood_view,
 )
 from eidos.application.semantic_memory import semantic_expectation_events
+from eidos.application.setbacks import setback_events
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
@@ -2265,6 +2266,19 @@ class Life:
                 self._household(history + pending + domestic_load)
                 pending.extend(domestic_load)
             if not self.authored_scenario:
+                friction = setback_events(
+                    history + pending,
+                    current,
+                    self._planning(history + pending),
+                    values=project_identity(history + pending).values,
+                    known_person_ids=pathos_known_person_ids(history + pending),
+                    pathos_location_id=state.location_id,
+                    ellis_location_id=_person_location(history + pending, "ellis", current),
+                )
+                if friction:
+                    self._planning(history + pending + friction)
+                    self._relationships(history + pending + friction)
+                    pending.extend(friction)
                 wants = want_events(
                     history + pending,
                     current,
@@ -4153,6 +4167,11 @@ def _in_company(
         if event.payload.get("speaker") == "pathos":
             return True
     return False
+
+
+def _person_location(history: Sequence[DomainEvent], person_id: str, now: datetime) -> str | None:
+    person = project_npcs(history, now).people.get(person_id)
+    return person.location_id if person is not None else None
 
 
 ENCOUNTER_COOLDOWN = timedelta(hours=3)

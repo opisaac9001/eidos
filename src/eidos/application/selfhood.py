@@ -823,6 +823,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             for value_id, base in STARTING_VALUES.items()
             if abs(values[value_id] - base) >= VALUE_STEP - 1e-9
         ],
+        "still_bothering_him": _still_bothering(history, simulated_at),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -831,6 +832,23 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             "never a script."
         ),
     }
+
+
+def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> list[str]:
+    """Recent setbacks, and any friction that has not been cleared, in his own words."""
+    resolved = {
+        str(event.payload.get("setback_id")) for event in events_of(history, "setback.resolved")
+    }
+    bothering = []
+    for event in events_of(history, "setback.occurred")[-6:]:
+        at = datetime.fromisoformat(str(event.payload["simulated_at"]))
+        open_friction = (
+            event.payload.get("kind") == "work_friction"
+            and str(event.payload.get("setback_id")) not in resolved
+        )
+        if open_friction or simulated_at - at <= timedelta(days=5):
+            bothering.append(str(event.payload.get("text")))
+    return bothering[-3:]
 
 
 def _saving_for(history: Sequence[DomainEvent]) -> dict[str, object] | None:

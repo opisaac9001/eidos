@@ -1684,6 +1684,14 @@ def _standin_work_reply(message: str, context: dict[str, object], cadence: str) 
     """Talk about the job he actually has, grounded in what is on his calendar."""
     if not any(cue in message for cue in _WORK_CUES):
         return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    bothering = selfhood.get("still_bothering_him", []) if isinstance(selfhood, dict) else []
+    friction = next(
+        (str(item) for item in bothering if isinstance(item, str) and "Ellis" in item), None
+    )
+    if friction:
+        return f"Bit tense, honestly. {friction} We'll sort it, I think."
     budget = context.get("time_budget")
     next_plan = budget.get("next_plan") if isinstance(budget, dict) else None
     ongoing = context.get("ongoing_activities")

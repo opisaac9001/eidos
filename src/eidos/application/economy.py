@@ -158,6 +158,7 @@ def financial_consequence_events(
 
 # The only kinds _source_consequence can turn into money.
 _SOURCE_KINDS = (
+    "setback.occurred",
     "want.purchased",
     "activity.completed",
     "activity.execution_unfinished",
@@ -168,6 +169,10 @@ _SOURCE_KINDS = (
 
 
 def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
+    if source.kind == "setback.occurred" and source.payload.get("kind") == "expense":
+        cost = source.payload.get("cost_pence")
+        if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
+            return (-cost, "unexpected_expense", str(source.payload.get("text")))
     if source.kind == "want.purchased":
         price = source.payload.get("price_pence")
         if isinstance(price, int) and not isinstance(price, bool) and price > 0:

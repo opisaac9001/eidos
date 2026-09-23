@@ -482,6 +482,15 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "showed up for someone"),)
     if kind == "apology.offered" and p.get("actor_id") == "pathos":
         return (("care", 1, "owned something I'd got wrong"),)
+    if kind == "setback.occurred":
+        setback = p.get("kind")
+        if setback == "work_friction":
+            return (("craft", -1, "got called on a rushed job"),)
+        if setback == "friendship_drift":
+            return (("care", -1, "let a friendship go quiet"),)
+        return ()
+    if kind == "setback.resolved" and p.get("outcome") == "cleared":
+        return (("care", 1, "cleared the air with someone"),)
     if kind == "want.purchased":
         value = p.get("value_id")
         if value in STARTING_VALUES:
