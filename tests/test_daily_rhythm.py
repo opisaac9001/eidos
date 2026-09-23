@@ -247,3 +247,31 @@ class TestFood:
             item.kind == "object.replenishment_decided"
             for item in self.decide(history, at(9, day=1))
         )
+
+
+class TestEmployerKeepsTheAgreedHours:
+    def test_ellis_opens_the_workshop_for_the_shift_and_closes_up_after(self) -> None:
+        from eidos.application.npc_movement import npc_movement_events
+        from eidos.domain.npcs import project_npcs
+
+        history = [identity_established_event(at(0).isoformat())]
+        history += work_rota_events(history, PlanningState(), at(6))
+
+        def ellis_after(when: datetime) -> tuple[str, list[DomainEvent]]:
+            output = npc_movement_events(history, when)
+            history.extend(output)
+            arrived = npc_movement_events(history, when + timedelta(hours=1))
+            history.extend(arrived)
+            return (
+                project_npcs(history, when + timedelta(hours=1)).people["ellis"].location_id,
+                [*output, *arrived],
+            )
+
+        location, events = ellis_after(at(9, 30))
+        assert location == "workshop"
+        assert any(
+            item.payload.get("reason") == "opening up for the agreed hours" for item in events
+        )
+        location, events = ellis_after(at(16, 30))
+        assert location == "home"
+        assert any(item.payload.get("reason") == "closing up for the day" for item in events)

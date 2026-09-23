@@ -27,6 +27,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
         )
     state = project_npcs([*history, *output], now)
     catalog = project_world_catalog(history)
+    workdays = _employer_workdays(history)
     for actor_id, person in state.people.items():
         owned = [event for event in history if event.payload.get("actor_id") == actor_id]
 
@@ -95,6 +96,50 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             )
             person = project_npcs([*history, *output], now).people[actor_id]
 
+        workday = workdays.get((actor_id, now.date().isoformat()))
+        if workday is not None and person.location_id != "in-transit":
+            place, opens, closes = workday
+            if opens <= now < closes:
+                # The employer keeps the agreed hours: the workshop is open when the rota
+                # says so, whatever else is on their mind.
+                if person.location_id != place:
+                    try:
+                        duration = route_duration(person.location_id, place, catalog.route_minutes)
+                    except ValueError:
+                        continue
+                    emit(
+                        "npc.travel_started",
+                        {
+                            "plan_id": f"workday-{now.date().isoformat()}",
+                            "origin_id": person.location_id,
+                            "destination_id": place,
+                            "depart_at": now.isoformat(),
+                            "arrive_at": (now + duration).isoformat(),
+                            "reason": "opening up for the agreed hours",
+                        },
+                    )
+                continue
+            if (
+                closes <= now < closes + timedelta(hours=1)
+                and person.location_id == place
+                and person.plan_status != "active"
+            ):
+                try:
+                    duration = route_duration(place, "home", catalog.route_minutes)
+                except ValueError:
+                    continue
+                emit(
+                    "npc.travel_started",
+                    {
+                        "plan_id": f"workday-{now.date().isoformat()}",
+                        "origin_id": place,
+                        "destination_id": "home",
+                        "depart_at": now.isoformat(),
+                        "arrive_at": (now + duration).isoformat(),
+                        "reason": "closing up for the day",
+                    },
+                )
+                continue
         if person.plan_status != "active" or person.plan_id is None:
             continue
         plan = next(
@@ -214,3 +259,34 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
         if person.plan_goal_id is not None:
             emit("npc.goal_achieved", {"goal_id": person.plan_goal_id}, completed, ends_at)
     return output
+
+
+def _employer_workdays(
+    history: Sequence[DomainEvent],
+) -> dict[tuple[str, str], tuple[str, datetime, datetime]]:
+    """(employer, date) -> (place, opens, closes) for every shift under a live agreement."""
+    employers: dict[str, str] = {}
+    for event in history:
+        if event.kind == "work.agreement_accepted":
+            employers[str(event.payload.get("agreement_id"))] = str(
+                event.payload.get("employer_id")
+            )
+        elif event.kind == "work.agreement_ended":
+            employers.pop(str(event.payload.get("agreement_id")), None)
+    days: dict[tuple[str, str], tuple[str, datetime, datetime]] = {}
+    if not employers:
+        return days
+    for event in history:
+        if event.kind != "schedule.created":
+            continue
+        employer = employers.get(str(event.payload.get("agreement_id")))
+        if employer is None:
+            continue
+        starts = datetime.fromisoformat(str(event.payload["starts_at"]))
+        ends = datetime.fromisoformat(str(event.payload.get("ends_at") or starts))
+        days[(employer, starts.date().isoformat())] = (
+            str(event.payload["location_id"]),
+            starts - timedelta(minutes=30),
+            ends + timedelta(minutes=30),
+        )
+    return days

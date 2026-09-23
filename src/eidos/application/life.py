@@ -2937,6 +2937,11 @@ class Life:
                 for person in catalog_now.people.values():
                     if npc_state_now.people[person.person_id].location_id != state.location_id:
                         continue
+                    if _met_recently(
+                        history, pending, person.person_id, state.location_id, current
+                    ):
+                        # Working alongside someone is not a fresh encounter every hour.
+                        continue
                     text = await perform(
                         self.gateway,
                         "firmament",
@@ -4091,6 +4096,30 @@ class Life:
         self._save_beliefs(committed)
         self._save_relationships(committed)
         self._save_consolidation_index(committed)
+
+
+ENCOUNTER_COOLDOWN = timedelta(hours=3)
+
+
+def _met_recently(
+    history: Sequence[DomainEvent],
+    pending: Sequence[DomainEvent],
+    person_id: str,
+    location_id: str,
+    now: datetime,
+) -> bool:
+    """Whether the same person was already met at the same place within the cooldown."""
+    for event in (*reversed(pending), *reversed(history[-3000:])):
+        if event.kind != "npc.encountered":
+            continue
+        at = datetime.fromisoformat(str(event.payload.get("simulated_at")))
+        if now - at >= ENCOUNTER_COOLDOWN:
+            return False
+        if event.payload.get("person_id") == person_id and (
+            event.payload.get("location_id") == location_id
+        ):
+            return True
+    return False
 
 
 def semantic_expectation_context(events: Sequence[DomainEvent]) -> list[dict[str, object]]:
