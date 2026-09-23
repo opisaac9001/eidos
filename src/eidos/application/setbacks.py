@@ -346,7 +346,13 @@ def _clearing_the_air(
             "setback_id": setback_id,
             "outcome": "cleared",
             "person_id": "ellis",
-            "text": "Over lunch I said sorry for the rushed job, and Ellis said he'd been tired too.",
+            "text": (
+                "Over lunch I said sorry for leaving the bench half-done, and Ellis said "
+                "he'd been stretched thin too."
+                if "half-done" in str(friction.payload.get("text"))
+                else "Over lunch I said sorry for the rushed job, and Ellis said he'd been "
+                "tired too."
+            ),
             "simulated_at": at.isoformat(),
         },
         causation_id=friction.event_id,

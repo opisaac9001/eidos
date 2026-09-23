@@ -16,6 +16,7 @@ from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
 FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.
+LONG_STINT_SECONDS = 3 * 3600
 
 
 def duration_requirement(
@@ -316,7 +317,17 @@ def activity_effort(
         "ready": began is not None
         and (
             worked + 0.001 >= required
-            or (now >= window_end and worked >= FINISH_OFF_SHARE * required and reason() is None)
+            or (
+                now >= window_end
+                and worked >= FINISH_OFF_SHARE * required
+                # Still there and free, or, on a long stint like a shift, just chatting at
+                # the bench: the chat ends and he finishes up. Away, asleep or called off
+                # to something else, it stays unfinished.
+                and (
+                    reason() is None
+                    or (reason() == "conversation" and required >= LONG_STINT_SECONDS)
+                )
+            )
         ),
         "window_ended": now >= end,
         "is_working": running

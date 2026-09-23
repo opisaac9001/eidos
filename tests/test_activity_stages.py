@@ -144,3 +144,22 @@ def test_missing_or_borrowed_resource_cannot_count_as_work():
         )
     )
     assert activity_effort(history, entry, NOW + timedelta(minutes=30))["worked_seconds"] == 300
+
+
+def test_a_chat_in_the_last_hour_of_a_long_shift_does_not_leave_it_unfinished():
+    planning, entry = plan(360)
+    history = [event("sleep.ended")]
+    history += execution_events(history, planning, NOW)
+    history.append(
+        event("scene.started", 300, scene_id="chat", initiator_id="ellis", partner_id="pathos")
+    )
+    history += execution_events(history, planning, NOW + timedelta(minutes=300))
+    end = NOW + timedelta(minutes=360)
+    assert activity_effort(history, entry, end)["ready"]
+    short_planning, short = plan(60)
+    brief = [event("sleep.ended")]
+    brief += execution_events(brief, short_planning, NOW)
+    brief.append(
+        event("scene.started", 50, scene_id="chat", initiator_id="ellis", partner_id="pathos")
+    )
+    assert not activity_effort(brief, short, NOW + timedelta(minutes=60))["ready"]
