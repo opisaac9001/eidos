@@ -10,6 +10,8 @@ from pathlib import Path
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.life import Life
+from eidos.domain.events import DomainEvent
+from eidos.domain.selfhood import STARTING_VALUES, developed_values, project_selfhood
 from eidos.ports.event_store import RevisionConflict
 from eidos.ports.model_gateway import ModelGateway
 from eidos.ports.town_signals import TownSignalSource
@@ -61,6 +63,9 @@ def main() -> None:
     commands.add_parser("resume-catch-up", help="Resume an interrupted catch-up session")
     commands.add_parser("cancel-catch-up", help="Cancel an interrupted catch-up session")
     commands.add_parser("journal", help="Read accepted autobiographical events")
+    commands.add_parser(
+        "self", help="Read his life chapters, open questions, insights and possible selves"
+    )
     backup = commands.add_parser("backup", help="Create a verified online SQLite backup")
     backup.add_argument("--output", type=Path, required=True)
     verify = commands.add_parser("verify-backup", help="Verify a SQLite backup without changing it")
@@ -238,6 +243,10 @@ def main() -> None:
         supervisor = CognitionSupervisor(jobs, gateway, revision_for)
         durable = DurableModelGateway(gateway, jobs, revision_for, supervisor=supervisor)
         simulation = Life(store, durable, mode=mode, town_signal_source=town_signal_source)
+        if args.command == "self":
+            print(_self_story(simulation.history()))
+            durable.close()
+            return
         if args.command == "journal":
             print(
                 json.dumps(
@@ -278,3 +287,38 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _self_story(history: list[DomainEvent]) -> str:
+    """A plain-text autobiography: what he has come to understand, in his own words."""
+    state = project_selfhood(history)
+    lines: list[str] = []
+    for chapter in state.chapters:
+        span = chapter.opened_at.date().isoformat()
+        span += f" - {chapter.closed_at.date().isoformat()}" if chapter.closed_at else " - now"
+        lines += [f"Chapter {chapter.number}: {chapter.title}  ({span})", f"  {chapter.summary}"]
+    open_questions = state.open_inquiries()
+    if open_questions:
+        lines.append("\nWondering about:")
+        lines += [
+            f"  - {item.question} (returned to it {len(item.revisits)}x)" for item in open_questions
+        ]
+    if state.insights:
+        lines.append("\nWhat he has come to understand:")
+        lines += [
+            f"  - {item.formed_at.date().isoformat()}: {item.text}"
+            for item in sorted(state.insights.values(), key=lambda entry: entry.formed_at)
+        ]
+    active = state.active_aspirations()
+    if active:
+        lines.append("\nWho he hopes (or fears) to become:")
+        lines += [
+            f"  - [{item.kind}] {item.text} ({item.lived} toward, {item.strayed} away)"
+            for item in active
+        ]
+    values = developed_values(STARTING_VALUES, state)
+    lines.append("\nValues (starting -> now):")
+    lines += [
+        f"  - {name}: {base:.2f} -> {values[name]:.2f}" for name, base in STARTING_VALUES.items()
+    ]
+    return "\n".join(lines) if lines else "He has not lived long enough to have a story yet."
