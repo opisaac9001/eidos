@@ -71,6 +71,12 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(value_evidence(reply)[0][:2], ("care", 1))
         self.assertEqual(value_evidence(notice), ())
 
+    def test_a_real_conversation_with_a_neighbour_counts_as_care(self) -> None:
+        talk = event("scene.started", at(1), initiator_id="pathos", partner_id="ellis")
+        overheard = event("scene.started", at(1), initiator_id="mara", partner_id="rowan")
+        self.assertEqual(value_evidence(talk)[0][:2], ("care", 1))
+        self.assertEqual(value_evidence(overheard), ())
+
     def test_one_lived_moment_is_felt_once_per_day(self) -> None:
         history = [missed(1), missed(1.1), missed(2)]
         state = project_selfhood(history)
