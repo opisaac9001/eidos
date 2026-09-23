@@ -1,8 +1,11 @@
 """Loopback-only operator server and serialized simulation worker."""
 
+import hmac
 import json
 import logging
 import mimetypes
+import os
+import secrets
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -33,8 +36,13 @@ class Runtime:
         clock: Callable[[], float] = monotonic,
         sleeper: Callable[[float], None] = sleep,
         realtime_quantum_seconds: float = 300,
+        operator_token: str | None = None,
     ) -> None:
         self.life = life
+        # Operator controls change time and expose private history; they need this token.
+        self.operator_token = (
+            operator_token or os.environ.get("EIDOS_OPERATOR_TOKEN") or secrets.token_urlsafe(18)
+        )
         self.interval = interval
         self.clock = clock
         self.sleeper = sleeper
@@ -305,6 +313,13 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 return False
             return True
 
+        def operator_request(self) -> bool:
+            supplied = self.headers.get("X-Eidos-Operator", "")
+            if not hmac.compare_digest(supplied.encode(), runtime.operator_token.encode()):
+                self.respond(403, {"error": "This control needs the operator token"})
+                return False
+            return True
+
         def respond(self, status: int, value: Any, content_type: str = "application/json") -> None:
             body = (
                 json.dumps(value, allow_nan=False).encode()
@@ -330,6 +345,8 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
             if not self.local_request():
                 return
             path = urlsplit(self.path).path
+            if path in OPERATOR_GET_PATHS and not self.operator_request():
+                return
             if path == "/api/state":
                 self.respond(200, runtime.snapshot())
             elif path == "/api/catch-up/preview":
@@ -411,6 +428,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 if not isinstance(body, dict):
                     raise ValueError("Expected a JSON object")
                 path = urlsplit(self.path).path
+                operator_path = path in OPERATOR_POST_PATHS or (
+                    path.startswith("/api/jobs/") and path.endswith("/cancel")
+                )
+                if operator_path and not self.operator_request():
+                    return
                 if path.startswith("/api/jobs/") and path.endswith("/cancel"):
                     job_store = getattr(runtime.life.gateway, "jobs", None)
                     if job_store is None:
@@ -423,7 +445,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     return
                 operation_started = runtime.clock()
                 with runtime.mutation():
-                    if self.path == "/api/control":
+                    if path == "/api/control":
                         if body.get("running") and runtime.stop.is_set():
                             raise ValueError(
                                 "Restart the local server to recover its stopped worker"
@@ -433,15 +455,15 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                             body["minutes_per_tick"],
                             body.get("clock_mode", "accelerated"),
                         )
-                    elif self.path == "/api/step":
+                    elif path == "/api/step":
                         runtime.life.advance(body.get("hours", 1))
-                    elif self.path == "/api/catch-up":
+                    elif path == "/api/catch-up":
                         runtime.life.catch_up(body.get("hours", 24))
-                    elif self.path == "/api/catch-up/resume":
+                    elif path == "/api/catch-up/resume":
                         runtime.life.resume_catch_up()
-                    elif self.path == "/api/catch-up/cancel":
+                    elif path == "/api/catch-up/cancel":
                         runtime.life.cancel_catch_up()
-                    elif self.path == "/api/chat":
+                    elif path == "/api/chat":
                         text_value = body.get("text")
                         request_id = body.get("request_id")
                         if not isinstance(text_value, str) or not isinstance(request_id, str):
@@ -454,17 +476,17 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         }
                         runtime.life.chat(text_value, request_id)
                         runtime.pace_live_reply(previous_message_ids, operation_started)
-                    elif self.path == "/api/outreach":
+                    elif path == "/api/outreach":
                         enabled = body.get("enabled")
                         if type(enabled) is not bool:
                             raise ValueError("Outreach enabled must be true or false")
                         runtime.life.configure_outreach(enabled)
-                    elif self.path == "/api/visit":
+                    elif path == "/api/visit":
                         request_id = body.get("request_id")
                         if not isinstance(request_id, str):
                             raise ValueError("Visit request ID must be a string")
                         runtime.life.request_visit(request_id)
-                    elif self.path == "/api/visit/end":
+                    elif path == "/api/visit/end":
                         request_id = body.get("request_id")
                         if not isinstance(request_id, str):
                             raise ValueError("Visit request ID must be a string")
@@ -484,6 +506,12 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 )
 
     return Handler
+
+
+OPERATOR_GET_PATHS = frozenset({"/api/events", "/api/export", "/api/catch-up/preview"})
+OPERATOR_POST_PATHS = frozenset(
+    {"/api/control", "/api/step", "/api/catch-up", "/api/catch-up/resume", "/api/catch-up/cancel"}
+)
 
 
 def event_json(event: DomainEvent) -> dict[str, Any]:
@@ -533,6 +561,10 @@ def serve(
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()
     print(f"Eidos is ready at http://127.0.0.1:{port} — {mode} mode", flush=True)
+    print(
+        f"Operator view: http://127.0.0.1:{port}/operator?token={runtime.operator_token}",
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

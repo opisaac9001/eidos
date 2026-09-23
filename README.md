@@ -280,8 +280,13 @@ wheel and use no CDN, external fonts, or frontend build pipeline.
 
 The ordinary observatory at `/` is read-only except for messages and live-visit
 requests. Local maintenance controls, private NPC state, model traces, and durable-job
-cancellation are rendered only at `/operator`. This is a presentation boundary, not
-network authorization; the server remains loopback-only until authenticated deployment.
+cancellation are rendered at `/operator`. The server enforces this for the controls that
+change time or expose private history (clock, step, catch-up, event history, export, job
+cancellation): they require the operator token. `serve` prints a ready-to-open
+`/operator?token=…` link at startup; set `EIDOS_OPERATOR_TOKEN` (on the Dell, in
+`/etc/eidos/operator.env`) to keep it stable across restarts. Private NPC state and model
+traces are still present in `/api/state` and only hidden by the page, and the server still
+binds to loopback only, so it is not yet ready for direct network exposure.
 
 ## Prototype boundaries
 

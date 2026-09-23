@@ -1,6 +1,18 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const operatorMode = window.location.pathname === "/operator";
+// The operator link carries a one-time token; keep it for this tab and tidy the address bar.
+let operatorToken = null;
+try {
+  const fromLink = new URLSearchParams(window.location.search).get("token");
+  if (fromLink) {
+    sessionStorage.setItem("eidos-operator-token", fromLink);
+    history.replaceState(null, "", window.location.pathname + window.location.hash);
+  }
+  operatorToken = sessionStorage.getItem("eidos-operator-token");
+} catch (_) {
+  /* Storage is optional; operator controls will explain that they need the token. */
+}
 const ordinaryViews = new Set([
   "observatory",
   "world",
@@ -355,13 +367,14 @@ function showError(message) {
 }
 
 async function request(path, body) {
+  const auth = operatorMode && operatorToken ? { "X-Eidos-Operator": operatorToken } : {};
   const response = await fetch(
     path,
     body === undefined
-      ? {}
+      ? { headers: auth }
       : {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...auth },
           body: JSON.stringify(body),
         },
   );

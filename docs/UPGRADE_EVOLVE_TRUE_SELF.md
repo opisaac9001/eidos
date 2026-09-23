@@ -46,6 +46,14 @@ Only ever advance the **copy**.
 
 None of this touches past messages, memories or relationships.
 
+## Operator token
+
+The operator controls (clock, step, catch-up, event history, export, job cancellation)
+now require a token. `serve` prints an `/operator?token=…` link to the journal at startup.
+To keep one stable across restarts, create `/etc/eidos/operator.env` with
+`EIDOS_OPERATOR_TOKEN=<something long and random>` (mode 600). The updated
+`eidos.service` loads it if present. Update any bookmarks that go through the SSH tunnel.
+
 ## New model capability: `pathos_selfhood`
 
 The routes file must either have a `default` route or list `pathos_selfhood`

@@ -44,11 +44,37 @@ class WebTests(unittest.TestCase):
             method,
             path,
             json.dumps(data) if data is not None else None,
-            headers or ({"Content-Type": "application/json"} if data is not None else {}),
+            headers
+            or {
+                "X-Eidos-Operator": self.runtime.operator_token,
+                **({"Content-Type": "application/json"} if data is not None else {}),
+            },
         )
         response = connection.getresponse()
         body = response.read()
         return response.status, body
+
+    def test_operator_controls_need_the_operator_token(self):
+        for method, path, data in (
+            ("POST", "/api/step", {"hours": 1}),
+            ("POST", "/api/control", {"running": True, "minutes_per_tick": 60}),
+            ("POST", "/api/catch-up", {"hours": 1}),
+            ("GET", "/api/export", None),
+            ("GET", "/api/events?limit=3", None),
+        ):
+            with self.subTest(path=path):
+                headers = (
+                    {"Content-Type": "application/json"}
+                    if data is not None
+                    else {"Accept": "application/json"}
+                )
+                status, _ = self.request(method, path, data, headers=headers)
+                self.assertEqual(status, 403)
+                wrong = {**headers, "X-Eidos-Operator": "not-the-token"}
+                status, _ = self.request(method, path, data, headers=wrong)
+                self.assertEqual(status, 403)
+        status, _ = self.request("GET", "/api/state", headers={"Accept": "application/json"})
+        self.assertEqual(status, 200)
 
     def test_live_loop_runs_pauses_and_serves_assets(self):
         self.assertEqual(self.runtime.snapshot()["identity"]["name"], "Patrick Shaw")

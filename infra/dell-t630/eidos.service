@@ -11,6 +11,8 @@ Group=isaac
 WorkingDirectory=/srv/eidos
 Environment=PYTHONUNBUFFERED=1
 Environment=EIDOS_MODEL_ROUTES_FILE=/etc/eidos/model-routes.json
+# Optional: a stable operator token (otherwise a fresh one is printed to the journal).
+EnvironmentFile=-/etc/eidos/operator.env
 ExecStart=/srv/eidos/.venv/bin/python -m eidos --database /var/lib/eidos/observatory.sqlite3 serve --port 8767
 Restart=on-failure
 RestartSec=10
