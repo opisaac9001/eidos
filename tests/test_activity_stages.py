@@ -163,3 +163,22 @@ def test_a_chat_in_the_last_hour_of_a_long_shift_does_not_leave_it_unfinished():
         event("scene.started", 50, scene_id="chat", initiator_id="ellis", partner_id="pathos")
     )
     assert not activity_effort(brief, short, NOW + timedelta(minutes=60))["ready"]
+
+
+def test_talking_with_ellis_on_a_shift_is_part_of_the_work():
+    planning, entry = plan(360)
+    entry = replace(entry, schedule_id="work-rota-2026-01-02")
+    history = [event("sleep.ended")]
+    started = replace(planning, calendar={entry.schedule_id: entry})
+    history += execution_events(history, started, NOW)
+    chat = [event("scene.started", 60, scene_id="bench", initiator_id="pathos", partner_id="ellis")]
+    assert activity_effort([*history, *chat], entry, NOW + timedelta(minutes=180))[
+        "worked_seconds"
+    ] == pytest.approx(180 * 60)
+    visitor = [
+        event("scene.started", 60, scene_id="visit", initiator_id="nina", partner_id="pathos")
+    ]
+    assert (
+        activity_effort([*history, *visitor], entry, NOW + timedelta(minutes=180))["blocked_by"]
+        == "conversation"
+    )

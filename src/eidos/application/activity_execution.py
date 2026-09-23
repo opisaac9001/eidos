@@ -10,6 +10,7 @@ from hashlib import sha256
 from typing import Callable, NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
+from eidos.application.work_rota import EMPLOYER_ID, ROTA_PREFIX
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of, events_with_prefix
 from eidos.domain.planning import CalendarEntry, PlanningState
@@ -195,6 +196,12 @@ def activity_effort(
         window_end = datetime.fromisoformat(str(first.payload["window_ends_at"]))
     location, awake = "home", False
     scenes: dict[str, bool] = {}
+    # On a shift, talking with Ellis at the bench is part of the work, not a break from it.
+    colleagues = (
+        frozenset({"pathos", EMPLOYER_ID})
+        if entry.schedule_id.startswith(ROTA_PREFIX)
+        else frozenset({"pathos"})
+    )
     companion_location = None
     occupied: set[str] = set()
     running = False
@@ -273,10 +280,11 @@ def activity_effort(
             occupied.discard(f"phone:{p['call_id']}")
         elif event.kind in {"incident.response_completed", "incident.response_abandoned"}:
             occupied.discard(str(p.get("incident_id")))
-        elif event.kind == "scene.started" and "pathos" in {
-            p.get("initiator_id"),
-            p.get("partner_id"),
-        }:
+        elif (
+            event.kind == "scene.started"
+            and "pathos" in {p.get("initiator_id"), p.get("partner_id")}
+            and not {p.get("initiator_id"), p.get("partner_id")} <= colleagues
+        ):
             scenes[str(p["scene_id"])] = True
         elif event.kind in {"scene.ended", "scene.interrupted", "scene.resumed"}:
             if str(p.get("scene_id")) in scenes:

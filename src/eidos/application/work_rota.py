@@ -22,6 +22,7 @@ SHIFT_END_HOUR = 16
 ROTA_HORIZON_DAYS = 7
 ROTA_PREFIX = "work-rota-"
 AGREEMENT_ID = "workshop-part-time-v1"
+EMPLOYER_ID = "ellis"
 HOURLY_WAGE_PENCE = 1_100
 SHIFT_WAGE_PENCE = HOURLY_WAGE_PENCE * (SHIFT_END_HOUR - SHIFT_START_HOUR)
 
@@ -65,7 +66,7 @@ def work_rota_events(
             "pathos",
             {
                 "agreement_id": AGREEMENT_ID,
-                "employer_id": "ellis",
+                "employer_id": EMPLOYER_ID,
                 "location_id": "workshop",
                 "weekdays": ",".join(str(day) for day in sorted(SHIFT_WEEKDAYS)),
                 "starts_hour": SHIFT_START_HOUR,
