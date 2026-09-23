@@ -141,7 +141,13 @@ def build_town_pack(
         graph[street["to"]].append((street["from"], float(street["distance_m"])))
     places = {item["id"]: item for item in plan["places"]}
     existing_place_ids = list(existing_places)
-    known = [place_id for place_id in existing_place_ids if place_id in places]
+    # Optional packs' places reserve map space but are never a connection, since the
+    # town must import whether or not they are installed.
+    known = [
+        place_id
+        for place_id in existing_place_ids
+        if place_id in places and place_id not in PROVIDED_ELSEWHERE
+    ]
     occupied = list(existing_places.values())
     entities: list[dict[str, Any]] = []
     for place in plan["places"]:

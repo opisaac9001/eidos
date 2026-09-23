@@ -21,14 +21,17 @@ ROOT = Path(__file__).parents[1]
 PLAN = ROOT / "world_plans" / "alderwick-v1.json"
 PACK = ROOT / "world_packs" / "alderwick-v1.json"
 CITY = ROOT / "world_packs" / "city-life-v1.json"
+CANAL = [ROOT / "world_packs" / f"canal-quarter-v{n}.json" for n in (1, 2)]
 NOW = datetime(2026, 1, 3, 11, tzinfo=timezone.utc)
 
 
 def existing_positions() -> dict[str, tuple[int, int]]:
     places = {pid: (p.x, p.y) for pid, p in seed_world_catalog().places.items()}
-    for entity in json.loads(CITY.read_text())["entities"]:
-        if entity["entity_kind"] == "place":
-            places[entity["entity_id"]] = (entity["x"], entity["y"])
+    # Canal-quarter places are optional but reserved, so either install order fits.
+    for pack in (CITY, *CANAL):
+        for entity in json.loads(pack.read_text())["entities"]:
+            if entity["entity_kind"] == "place":
+                places[entity["entity_id"]] = (entity["x"], entity["y"])
     return places
 
 
@@ -40,9 +43,9 @@ def test_committed_pack_is_exactly_what_the_blueprint_builds() -> None:
     assert "reading-room" not in ids
 
 
-def imported_world(tmp_path: Path) -> list[DomainEvent]:
+def imported_world(tmp_path: Path, *, canal: bool = False) -> list[DomainEvent]:
     store = SQLiteEventStore(tmp_path / "town.sqlite3")
-    for pack in (CITY, PACK):
+    for pack in (CITY, *(CANAL if canal else ()), PACK):
         import_world_pack(store, pack, simulated_at=NOW)
     return store.read("pathos")
 
@@ -56,6 +59,11 @@ def test_the_whole_town_imports_and_is_walkable(tmp_path: Path) -> None:
             route_duration("home", place_id, catalog.route_minutes) if place_id != "home" else None
         )
         assert minutes is None or timedelta(minutes=1) <= minutes <= timedelta(minutes=90)
+
+
+def test_the_town_also_fits_beside_the_canal_quarter(tmp_path: Path) -> None:
+    catalog = project_world_catalog(imported_world(tmp_path, canal=True))
+    assert "reading-room" in catalog.places and "hardware" in catalog.places
 
 
 def test_importing_the_town_does_not_make_him_know_it(tmp_path: Path) -> None:

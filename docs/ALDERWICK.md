@@ -1,8 +1,34 @@
 # Alderwick — a town Pathos can grow into
 
-Status: planned, not yet the live town simulation. The companion
+Status: the town's public places ship as an ordinary world pack; people, venue
+calendars and transport are still to come. The companion
 [`world_plans/alderwick-v1.json`](../world_plans/alderwick-v1.json) is a versioned
-geographic blueprint, **not** an importable world pack or Pathos prompt.
+geographic blueprint, **not** a Pathos prompt. `eidos.application.town_pack` builds
+[`world_packs/alderwick-v1.json`](../world_packs/alderwick-v1.json) from it, and a test
+keeps the committed pack identical to what the blueprint builds.
+
+What exists now:
+
+- **23 public places** (pubs, post office, launderette, hardware, clinic, footpaths...)
+  added to the 16-place city-life atlas, each joined to its nearest existing place along
+  the street graph at 75 m a minute. Private interiors (the school, Southbank housing) are
+  left out, and the reading room is reused from the canal-quarter pack when installed.
+  The pack fits beside the canal-quarter packs or without them.
+- **Registration is not knowledge.** He starts knowing home, the café, the workshop and
+  the park. He learns a place by going there, by noticing it along the way (at most one a
+  day, only next to where he actually is, with a small memory of it), or by being invited
+  there by someone. His own plans and project ideas only reach for places he knows.
+- **The map is his map.** The ordinary view shows only known places; the operator view
+  shows the whole town, with undiscovered places faded.
+
+Install it after city-life (and optionally the canal-quarter packs):
+
+```bash
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/city-life-v1.json
+PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/alderwick-v1.json
+```
+
+Back the database up first and try it on a copy, as with any world change.
 
 ## The place
 
