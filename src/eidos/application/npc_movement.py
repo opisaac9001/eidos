@@ -29,6 +29,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     state = project_npcs([*history, *output], now)
     catalog = project_world_catalog(history)
     workdays = _employer_workdays(history)
+    appointments = _appointments_with_pathos(history)
     for actor_id, person in state.people.items():
         owned = [
             event
@@ -100,6 +101,37 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 arrive_at,
             )
             person = project_npcs([*history, *output], now).people[actor_id]
+
+        meeting = next(
+            (
+                item
+                for item in appointments.get(actor_id, ())
+                if item[1] - timedelta(hours=2) < now < item[2]
+            ),
+            None,
+        )
+        if meeting is not None and person.location_id != "in-transit":
+            schedule_id, starts, ends, place = meeting
+            # Someone who agreed to meet him turns up, and stays until the time is over.
+            if person.location_id == place:
+                continue
+            try:
+                duration = route_duration(person.location_id, place, catalog.route_minutes)
+            except ValueError:
+                duration = None
+            if duration is not None and now >= starts - duration - timedelta(hours=1):
+                emit(
+                    "npc.travel_started",
+                    {
+                        "plan_id": f"meet-{schedule_id}",
+                        "origin_id": person.location_id,
+                        "destination_id": place,
+                        "depart_at": now.isoformat(),
+                        "arrive_at": (now + duration).isoformat(),
+                        "reason": "meeting Pathos as agreed",
+                    },
+                )
+                continue
 
         workday = workdays.get((actor_id, now.date().isoformat()))
         if workday is not None and person.location_id != "in-transit":
@@ -294,3 +326,47 @@ def _employer_workdays(
             ends + timedelta(minutes=30),
         )
     return days
+
+
+_CLOSED = frozenset(
+    {"schedule.cancelled", "schedule.failed", "schedule.completed", "schedule.interrupted"}
+)
+
+
+def _appointments_with_pathos(
+    history: Sequence[DomainEvent],
+) -> dict[str, list[tuple[str, datetime, datetime, str]]]:
+    """person -> (schedule, starts, ends, place) for each open time agreed with Pathos."""
+    agreed: dict[str, tuple[str, str]] = {}  # schedule -> (companion, place)
+    open_times: dict[str, tuple[datetime, datetime]] = {}
+    for event in kind_index(history).select(
+        "schedule.created", "schedule.rescheduled", "schedule.retimed", *_CLOSED
+    ):
+        payload = event.payload
+        schedule_id = str(payload.get("schedule_id"))
+        if event.kind in _CLOSED:
+            open_times.pop(schedule_id, None)
+            continue
+        if event.kind == "schedule.created":
+            companion, place = payload.get("companion_id"), payload.get("location_id")
+            if (
+                not isinstance(companion, str)
+                or payload.get("actor_id") != "pathos"
+                or not isinstance(place, str)
+            ):
+                continue
+            agreed[schedule_id] = (companion, place)
+        elif schedule_id not in agreed:
+            continue
+        starts = datetime.fromisoformat(str(payload["starts_at"]))
+        previous_end = open_times.get(schedule_id, (starts, starts))[1]
+        raw_end = payload.get("ends_at")
+        open_times[schedule_id] = (
+            starts,
+            datetime.fromisoformat(str(raw_end)) if raw_end else max(starts, previous_end),
+        )
+    meetings: dict[str, list[tuple[str, datetime, datetime, str]]] = {}
+    for schedule_id, (starts, ends) in open_times.items():
+        companion, place = agreed[schedule_id]
+        meetings.setdefault(companion, []).append((schedule_id, starts, ends, place))
+    return meetings

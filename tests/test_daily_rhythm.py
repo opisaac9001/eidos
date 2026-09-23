@@ -324,3 +324,39 @@ def test_shifts_at_the_repair_workshop_are_practice_at_repair() -> None:
     output = development_events(history, at(17).isoformat())
     assert any(item.payload.get("skill_id") == "repair" for item in output)
     assert project_development([*history, *output]).skills["repair"].level > 0
+
+
+def test_a_friend_who_agreed_to_meet_him_turns_up_and_stays() -> None:
+    from eidos.application.npc_movement import npc_movement_events
+    from eidos.domain.npcs import project_npcs
+
+    history = [identity_established_event(at(0).isoformat())]
+    history += npc_movement_events(history, at(9, day=2))
+    where = project_npcs(history, at(9, day=2)).people["mara"].location_id
+    place = "workshop" if where != "workshop" else "cafe"
+    history.append(
+        event(
+            "schedule.created",
+            at(9, day=2),
+            schedule_id="meet-mara",
+            title="Spend time with Mara",
+            starts_at=at(13, day=2).isoformat(),
+            ends_at=at(14, day=2).isoformat(),
+            location_id=place,
+            actor_id="pathos",
+            action="talk",
+            target_id="mara",
+            companion_id="mara",
+        )
+    )
+    seen = {}
+    for hour in range(10, 15):
+        history += npc_movement_events(history, at(hour, day=2))
+        history += npc_movement_events(history, at(hour, 30, day=2))
+        seen[hour] = project_npcs(history, at(hour, 30, day=2)).people["mara"].location_id
+    assert seen[13] == place
+    assert any(
+        item.payload.get("reason") == "meeting Pathos as agreed"
+        for item in history
+        if item.kind == "npc.travel_started"
+    )
