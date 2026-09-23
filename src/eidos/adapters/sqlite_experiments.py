@@ -360,7 +360,10 @@ def review_life_evidence(path: Path, offset: int = 0) -> LifeEvidenceReview:
             "npc.encountered",
             "reflection.recorded",
             "day.summarized",
-        } or (kind == "memory.recorded" and payload.get("source") == "authored-routine")
+        } or (
+            kind == "memory.recorded"
+            and payload.get("source") in {"authored-routine", "lived-activity"}
+        )
         if source_narrative:
             text = (
                 None

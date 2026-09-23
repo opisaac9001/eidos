@@ -140,6 +140,7 @@ from eidos.application.urgent_incidents import (
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.volition import volition_snapshot
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
+from eidos.application.work_rota import is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
@@ -1653,6 +1654,16 @@ class Life:
                     state = state.apply(event)
             pending.append(DomainEvent("time.advanced", "pathos", {"simulated_at": current}))
             state = state.apply(pending[-1])
+            if not self.authored_scenario and (
+                current.hour == 6
+                or not any(is_rota_shift(k) for k in self._planning(history + pending).calendar)
+            ):
+                rota = work_rota_events(
+                    history + pending, self._planning(history + pending), current
+                )
+                if rota:
+                    self._planning(history + pending + rota)
+                    pending.extend(rota)
             provisions = provision_foundation_events(history + pending, current)
             if provisions:
                 self._planning(history + pending + provisions)
@@ -2174,7 +2185,11 @@ class Life:
                         {
                             "text": remembered_description,
                             "simulated_at": at,
-                            "source": "authored-routine",
+                            # Natural lives remember what they actually did; only authored
+                            # fixture worlds still narrate from the old routine itinerary.
+                            "source": "authored-routine"
+                            if self.authored_scenario or planned_beat is None
+                            else "lived-activity",
                             "category": "experience",
                             "activity": "meal_unavailable"
                             if meal_claim and unavailable

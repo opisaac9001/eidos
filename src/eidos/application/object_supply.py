@@ -9,6 +9,12 @@ from typing import Mapping, Sequence
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 
+# A weekly shop: three meals a day for a week, bought about two days before running out.
+WEEKLY_SHOP_PORTIONS = 21
+WEEKLY_SHOP_PENCE = 4_200
+FOOD_REORDER_AT = 6
+DELIVERY_WINDOW = timedelta(hours=3)
+
 
 def object_supply_events(
     history: Sequence[DomainEvent],
@@ -159,29 +165,45 @@ def _replenishment_choice(
     *,
     available_pence: int | None,
 ) -> list[DomainEvent]:
-    handled = {
-        str(event.payload["source_stock_event_id"])
-        for event in history
-        if event.kind == "object.replenishment_decided"
+    decisions = [event for event in history if event.kind == "object.replenishment_decided"]
+    handled = {str(event.payload["source_stock_event_id"]) for event in decisions}
+    decided_today = {
+        str(event.payload.get("object_id"))
+        for event in decisions
+        if str(event.payload.get("simulated_at", ""))[:10] == simulated_at.date().isoformat()
     }
     stock_sources = [event for event in history if event.kind == "object.stock_changed"]
+    pending = _pending_order(history)
     for source in reversed(stock_sources):
-        if str(source.event_id) in handled:
-            continue
         object_id = str(source.payload["object_id"])
         item = planning.objects.get(object_id)
-        if (
-            item is None
-            or item.quantity is None
-            or item.reorder_at is None
-            or item.quantity > item.reorder_at
-        ):
+        if item is None or item.quantity is None or item.reorder_at is None:
+            continue
+        # A decision holds for the day: going without is not re-rolled every hour.
+        if object_id in decided_today:
+            continue
+        if str(source.event_id) in handled:
+            # An empty larder is looked at again once a new day begins.
+            if not (
+                item.quantity == 0
+                and source is stock_sources[-1]
+                and (pending is None or pending.payload.get("object_id") != object_id)
+            ):
+                continue
+        threshold = (
+            max(item.reorder_at, FOOD_REORDER_AT)
+            if item.unit == "meal portions"
+            else item.reorder_at
+        )
+        if item.quantity > threshold:
             continue
         reliability = max(0.0, min(1.0, float(values.get("reliability", 0.5))))
         score = 0.25 + 0.55 * reliability
         sample = _sample(f"replenish-{object_id}-{item.quantity}-{source.event_id}")
         affordable = (
-            item.unit != "meal portions" or available_pence is None or available_pence >= 2400
+            item.unit != "meal portions"
+            or available_pence is None
+            or available_pence >= WEEKLY_SHOP_PENCE
         )
         order = sample < score and affordable
         order_id = f"replenish-{source.event_id}"
@@ -219,7 +241,12 @@ def _replenishment_choice(
                 "object_id": object_id,
                 "attempt": 1,
                 "due_at": due_at.isoformat(),
-                "restock_quantity": max(item.quantity + 1, item.reorder_at * 3),
+                "restock_quantity": (
+                    item.quantity + WEEKLY_SHOP_PORTIONS
+                    if item.unit == "meal portions"
+                    else max(item.quantity + 1, item.reorder_at * 3)
+                ),
+                **({"price_pence": WEEKLY_SHOP_PENCE} if item.unit == "meal portions" else {}),
                 "simulated_at": simulated_at.isoformat(),
             },
             causation_id=decision.event_id,
@@ -255,6 +282,10 @@ def _delivery_events(
     if item is None or item.quantity is None:
         return []
     attempt = int(order.payload["attempt"])
+    due_at = datetime.fromisoformat(str(order.payload["due_at"]))
+    if location_id != item.location_id and simulated_at < due_at + DELIVERY_WINDOW:
+        # Couriers come within a window; he may still get home before it closes.
+        return []
     if location_id != item.location_id:
         missed = DomainEvent(
             "object.replenishment_missed",
@@ -291,7 +322,8 @@ def _delivery_events(
             {
                 **dict(order.payload),
                 "attempt": 2,
-                "due_at": (simulated_at + timedelta(days=1)).isoformat(),
+                # The same slot tomorrow, not a day after the window closed near bedtime.
+                "due_at": (due_at + timedelta(days=1)).isoformat(),
                 "simulated_at": simulated_at.isoformat(),
             },
             causation_id=missed.event_id,

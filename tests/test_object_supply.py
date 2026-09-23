@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from eidos.application.object_supply import object_supply_events
+from eidos.application.object_supply import DELIVERY_WINDOW, object_supply_events
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import project_planning
 
@@ -83,7 +83,9 @@ class ObjectSupplyTests(unittest.TestCase):
         )
         combined = [*history, *events]
         first_due = datetime.fromisoformat(str(first_order.payload["due_at"]))
-        missed = self.supply(combined, first_due, location="park")
+        # The courier's window is still open while he is out; nothing is decided yet.
+        self.assertEqual(self.supply(combined, first_due, location="park"), [])
+        missed = self.supply(combined, first_due + DELIVERY_WINDOW, location="park")
         self.assertEqual(
             [event.kind for event in missed],
             ["object.replenishment_missed", "object.replenishment_ordered"],
@@ -91,7 +93,7 @@ class ObjectSupplyTests(unittest.TestCase):
         combined.extend(missed)
         retry = missed[-1]
         second_due = datetime.fromisoformat(str(retry.payload["due_at"]))
-        cancelled = self.supply(combined, second_due, location="park")
+        cancelled = self.supply(combined, second_due + DELIVERY_WINDOW, location="park")
         self.assertEqual(
             [event.kind for event in cancelled],
             ["object.replenishment_missed", "object.replenishment_cancelled"],

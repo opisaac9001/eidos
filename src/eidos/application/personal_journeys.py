@@ -1,11 +1,11 @@
 """Execute accepted trips over elapsed time, never invent a past departure."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.application.activity_execution import _timeline
 from eidos.domain.events import DomainEvent
-from eidos.domain.planning import PlanningState
+from eidos.domain.planning import CalendarEntry, PlanningState
 from eidos.domain.scenes import project_scenes
 from eidos.domain.state import replay_state
 from eidos.domain.travel import route_duration
@@ -61,8 +61,17 @@ def journey_window_events(
     entries = [
         e for e in planning.calendar.values() if e.status == "scheduled" and e.actor_id == "pathos"
     ]
-    if not entries and current_journey(history) is None:
+    away = replay_state([e for _, _, e in _timeline(history, since)]).location_id not in {
+        "home",
+        "in_transit",
+    }
+    if not entries and current_journey(history) is None and not away:
         return []
+    for hour in range(since.hour, since.hour + 1 + int((now - since).total_seconds() // 3600)):
+        # Closing times and late evening are natural moments to head home.
+        at = since.replace(minute=0, second=0, microsecond=0) + timedelta(hours=hour - since.hour)
+        if since <= at <= now:
+            points.add(at)
     # Test all route-sized departure boundaries. The actual origin is checked at
     # execution; these times grant no action or presence by themselves.
     for entry in entries:
@@ -145,6 +154,7 @@ def journey_window_events(
             for s in project_scenes(visible).scenes.values()
         ):
             continue
+        departed = False
         for entry in sorted(
             entries, key=lambda e: (e.starts_at, e.commitment_id is None, e.schedule_id)
         ):
@@ -195,5 +205,96 @@ def journey_window_events(
             output.append(departure)
             if arrival <= now:
                 points.add(arrival)
+            departed = True
             break
+        if departed:
+            continue
+        reason = _homeward_reason(visible, state.location_id, entries, catalog, at)
+        if reason is None:
+            continue
+        try:
+            duration = route_duration(state.location_id, "home", catalog.route_minutes)
+        except ValueError:
+            continue
+        arrival = at + duration
+        output.append(
+            DomainEvent(
+                "pathos.travel_started",
+                "pathos",
+                {
+                    "origin_id": state.location_id,
+                    "destination_id": "home",
+                    "depart_at": at.isoformat(),
+                    "arrive_at": arrival.isoformat(),
+                    "schedule_id": None,
+                    "purpose": "return_home",
+                    "reason": reason,
+                    "simulated_at": at.isoformat(),
+                },
+                correlation_id=f"homeward-{at.isoformat()}",
+            )
+        )
+        if arrival <= now:
+            points.add(arrival)
     return output
+
+
+LINGER_LIMIT = timedelta(hours=3)
+WIND_DOWN = timedelta(hours=1)
+
+
+def _homeward_reason(
+    visible: Sequence[DomainEvent],
+    location_id: str,
+    entries: Sequence[CalendarEntry],
+    catalog: WorldCatalog,
+    at: datetime,
+) -> str | None:
+    """Why an ordinary person would head home now, or None to stay where he is.
+
+    Nothing here is a plan or an obligation: it is the unremarkable pull of home at night,
+    when a place shuts, or after hanging about somewhere with nothing left to do there.
+    """
+    if location_id in {"home", "in_transit"}:
+        return None
+    for entry in entries:
+        start = datetime.fromisoformat(entry.starts_at)
+        end = datetime.fromisoformat(entry.ends_at or entry.starts_at)
+        if start - timedelta(minutes=90) <= at < end:
+            # Something planned is under way or close; the calendar governs this hour.
+            return None
+        if entry.location_id == location_id and end <= at < end + timedelta(hours=1):
+            # Finish properly here before leaving; still-open work is wrapped up on site.
+            return None
+    try:
+        route = route_duration(location_id, "home", catalog.route_minutes)
+    except ValueError:
+        return None
+    window = next(
+        (e for e in reversed(visible) if e.kind == "sleep.window_selected"),
+        None,
+    )
+    bedtime = (
+        datetime.fromisoformat(str(window.payload["bedtime"]))
+        if window is not None and isinstance(window.payload.get("bedtime"), str)
+        else None
+    )
+    if bedtime is not None and bedtime - route - WIND_DOWN <= at < bedtime + timedelta(hours=8):
+        return "heading home for the night"
+    if at.hour >= 22 or at.hour < 5:
+        return "heading home for the night"
+    place = catalog.places.get(location_id)
+    if place is not None and not place.opens_hour <= at.hour < place.closes_hour:
+        return "the place was closing"
+    arrived = next(
+        (
+            e
+            for e in reversed(visible)
+            if e.kind == "pathos.moved" and e.payload.get("location_id") == location_id
+        ),
+        None,
+    )
+    arrived_at = arrived.payload.get("simulated_at") if arrived is not None else None
+    if isinstance(arrived_at, str) and at - datetime.fromisoformat(arrived_at) >= LINGER_LIMIT:
+        return "nothing more to do there"
+    return None

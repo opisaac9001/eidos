@@ -64,12 +64,16 @@ def project_sleep_windows(events: Sequence[DomainEvent]) -> dict[str, SleepWindo
 
 
 def sleep_window_at(events: Sequence[DomainEvent], at: datetime) -> SleepWindow | None:
-    """Return the selected window governing this hour, including its lead-in."""
+    """Return the selected window governing this hour, including its lead-in.
+
+    The wake hour itself still belongs to the window, so he wakes when he meant to rather
+    than when an hour-of-day fallback next notices (which pushed every early morning to 7).
+    """
     windows = project_sleep_windows(events)
     candidates = [
         window
         for window in windows.values()
-        if datetime.fromisoformat(window.selected_at) <= at < window.wake
+        if datetime.fromisoformat(window.selected_at) <= at <= window.wake
     ]
     return max(candidates, key=lambda item: item.selected_at, default=None)
 

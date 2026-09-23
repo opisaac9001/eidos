@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Sequence
 
+from eidos.application.work_rota import SHIFT_WAGE_PENCE, is_rota_shift, partial_shift_wage
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState
 
@@ -60,8 +61,11 @@ def financial_consequence_events(
         if consequence is None:
             continue
         amount, category, description = consequence
-        if category == "refund" and not _charged_order_was_cancelled(history, current, source):
-            continue
+        if category == "refund":
+            charged = _charged_order_was_cancelled(history, current, source)
+            if charged is None:
+                continue
+            amount = charged
         if amount < 0 and current.balance_pence < -amount:
             missed = _missed_source_payment(source, amount, category, at)
             output.append(missed)
@@ -73,7 +77,13 @@ def financial_consequence_events(
         current = current.apply(event)
         processed.add(source_id)
 
-    if at.hour == 17 and at.weekday() < 5:
+    rota_world = at.hour == 17 and any(
+        event.kind == "schedule.created" and is_rota_shift(event.payload.get("schedule_id"))
+        for event in eligible_history
+    )
+    if at.hour == 17 and at.weekday() < 5 and not rota_world:
+        # Authored-routine wages belong to worlds without a published rota; with one,
+        # only actual shift evidence pays, so a routine memory can never double-pay.
         work = next(
             (
                 event
@@ -149,6 +159,18 @@ def financial_consequence_events(
 
 
 def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
+    if (
+        source.kind == "activity.completed"
+        and source.payload.get("activity") == "work"
+        and is_rota_shift(source.payload.get("schedule_id"))
+    ):
+        return (SHIFT_WAGE_PENCE, "work_income", "Workshop shift wages")
+    if source.kind == "activity.execution_unfinished" and is_rota_shift(
+        source.payload.get("schedule_id")
+    ):
+        partial = partial_shift_wage(source.payload.get("worked_seconds"))
+        if partial is not None:
+            return (partial, "work_income", "Wages for the hours worked on a cut-short shift")
     if source.kind == "meal.eaten" and source.payload.get("provision_source") == "cafe_service":
         return (-CAFE_MEAL_PENCE, "cafe_meal", "Meal at Juniper Café")
     if (
@@ -156,7 +178,9 @@ def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
         and source.payload.get("object_id") == "household-provisions"
         and source.payload.get("attempt") == 1
     ):
-        return (-PROVISIONS_PENCE, "provisions", "Household provisions order")
+        price = source.payload.get("price_pence", PROVISIONS_PENCE)
+        amount = price if isinstance(price, int) and not isinstance(price, bool) else 0
+        return (-amount, "provisions", "Household provisions order")
     if (
         source.kind == "object.replenishment_cancelled"
         and source.payload.get("object_id") == "household-provisions"
@@ -218,7 +242,8 @@ def _same_date(event: DomainEvent, at: datetime) -> bool:
 
 def _charged_order_was_cancelled(
     history: Sequence[DomainEvent], state: FinancialState, cancellation: DomainEvent
-) -> bool:
+) -> int | None:
+    """The amount actually charged for a cancelled order, so refunds always match it."""
     order_id = cancellation.payload.get("order_id")
     order = next(
         (
@@ -230,7 +255,14 @@ def _charged_order_was_cancelled(
         ),
         None,
     )
-    return order is not None and any(
-        transaction.source_event_id == str(order.event_id) and transaction.category == "provisions"
-        for transaction in state.transactions.values()
+    if order is None:
+        return None
+    return next(
+        (
+            -transaction.amount_pence
+            for transaction in state.transactions.values()
+            if transaction.source_event_id == str(order.event_id)
+            and transaction.category == "provisions"
+        ),
+        None,
     )

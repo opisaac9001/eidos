@@ -248,7 +248,11 @@ def test_default_life_has_no_authored_itinerary_or_automatic_opening_bookings(tm
     life = Life(SQLiteEventStore(tmp_path / "natural.sqlite3"), QuietGateway())
     life.advance(24)
     history = life.history()
-    assert not any(event.kind == "schedule.created" for event in history)
+    # The only bookings a new life has are shifts under the job agreement he accepted.
+    agreements = {event.event_id for event in history if event.kind == "work.agreement_accepted"}
+    bookings = [event for event in history if event.kind == "schedule.created"]
+    assert agreements
+    assert all(event.causation_id in agreements for event in bookings)
     assert not any(
         event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine"
         for event in history

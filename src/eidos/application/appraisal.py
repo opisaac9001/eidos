@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.sleep import sleep_window_at
+from eidos.domain.sleep import SleepWindow, project_sleep_windows, sleep_window_at
 from eidos.domain.state import PathosState
 
 
@@ -101,6 +101,16 @@ def affect_episode_events(
     return output, current
 
 
+def _latest_completed_window(
+    history: Sequence[DomainEvent], simulated_at: datetime
+) -> SleepWindow | None:
+    windows = project_sleep_windows(history) if history else {}
+    latest = max(windows.values(), key=lambda item: item.wake, default=None)
+    if latest is None or not latest.wake <= simulated_at < latest.wake + timedelta(hours=18):
+        return None
+    return latest
+
+
 def sleep_and_need_events(
     state: PathosState,
     simulated_at: datetime,
@@ -112,7 +122,13 @@ def sleep_and_need_events(
     events: list[DomainEvent] = []
     current = state
     window = sleep_window_at(history, simulated_at) if history else None
-    if window is None:
+    slept = _latest_completed_window(history, simulated_at) if window is None else None
+    if slept is not None:
+        # He has already had tonight's sleep; an early riser stays up rather than being
+        # put back to bed by an hour-of-day rule until the next chosen bedtime.
+        should_be_awake = True
+        reason = f"awake after the chosen night: {slept.reason}"
+    elif window is None:
         should_be_awake = 7 <= simulated_at.hour < 23
         reason = "circadian fallback"
     else:
@@ -141,7 +157,9 @@ def sleep_and_need_events(
         }
         if current.awake
         else {
-            "rest": 0.04,
+            # A full night (about eight hours) restores about what a sixteen-hour day
+            # spends; at 0.04 he lost ground every single day and lived exhausted.
+            "rest": 0.065,
             "connection": -0.004,
             "curiosity": -0.001,
             "mastery": -0.002,
@@ -303,7 +321,10 @@ def _effect(
             )
     if event.kind == "prospective_memory.lapsed":
         return ("affect", 0.0, -0.2, 0.42, 0.7)
-    if event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine":
+    if event.kind == "memory.recorded" and event.payload.get("source") in {
+        "authored-routine",
+        "lived-activity",
+    }:
         location = event.payload.get("location_id")
         if not isinstance(location, str):
             return None

@@ -40,6 +40,8 @@ class FinancialState:
     missed_payments: dict[str, MissedPayment] = field(default_factory=dict)
 
     def apply(self, event: DomainEvent) -> FinancialState:
+        if not event.kind.startswith("finance."):
+            return self
         transactions = dict(self.transactions)
         missed = dict(self.missed_payments)
         if event.kind == "finance.account_opened":
