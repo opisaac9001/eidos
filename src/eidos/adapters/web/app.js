@@ -1016,8 +1016,10 @@ function renderSelf() {
   if (!self) return;
   const chapter = (self.chapters || []).find((item) => !item.closed_at);
   const wondering = (self.inquiries || []).find((item) => item.status === "open");
-  $("presence-self").hidden = !chapter && !wondering;
+  const unwell = self.feeling_unwell;
+  $("presence-self").hidden = !chapter && !wondering && !unwell;
   $("presence-self").innerHTML = [
+    unwell ? `<span class="presence-unwell">Under the weather: ${esc(unwell)}</span>` : "",
     chapter
       ? `<span class="presence-chapter">Chapter ${esc(chapter.number)} · ${esc(chapter.title)}</span>`
       : "",

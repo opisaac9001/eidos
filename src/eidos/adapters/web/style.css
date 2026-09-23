@@ -1843,3 +1843,9 @@ input[type="checkbox"] { accent-color: var(--amber); }
 .place.undiscovered {
   opacity: 0.35;
 }
+
+.presence-unwell {
+  display: block;
+  color: var(--muted);
+  font-style: italic;
+}
