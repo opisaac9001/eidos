@@ -113,3 +113,42 @@ def test_completed_execution_does_not_create_false_momentum():
     assert not any(
         item["kind"] == "continuation" for item in field(history=history)["attended_impulses"]
     )
+
+
+def test_a_hope_he_is_drifting_from_reaches_attention_as_a_gentle_pull():
+    hope = {
+        "aspiration_id": "aspiration-care",
+        "kind": "hoped",
+        "text": "I want to be the friend who actually picks up.",
+        "value_id": "care",
+        "value_level": 0.8,
+        "lived": 1,
+        "strayed": 4,
+    }
+    settled = {
+        "energy": 0.8,
+        "rest": 0.8,
+        "hunger": 0.1,
+        "connection": 0.8,
+        "curiosity": 0.8,
+        "mastery": 0.8,
+        "household_dishes": 0.1,
+    }
+    drifting = field(needs=settled, preparation={}, possible_selves=[hope])
+    living = field(
+        needs=settled, preparation={}, possible_selves=[{**hope, "lived": 4, "strayed": 1}]
+    )
+
+    def pull(result):
+        return next(
+            item
+            for item in result["attended_impulses"]
+            if item["impulse_id"] == "aspiration:aspiration-care"
+        )
+
+    chosen = pull(drifting)
+    assert chosen["kind"] == "aspiration"
+    assert chosen["action_authority"] is False
+    assert chosen["epistemic_status"] == "possible_self"
+    assert "picks up" in chosen["description"]
+    assert chosen["felt_pull"] > pull(living)["felt_pull"]

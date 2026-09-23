@@ -101,6 +101,11 @@ ROLE_PROMPTS["reflection"] = (
     "personal observation over a life lesson, community platitude, or literary metaphor. "
     + ROLE_PROMPTS["reflection"]
 )
+POSSIBLE_SELVES_NOTE = (
+    " possible_selves are his own hopes and fears about who he is becoming. They may pull "
+    "gently toward or away from a choice, but they are not goals, schedules or obligations, "
+    "and living up to one is never guaranteed."
+)
 ROLE_PROMPTS["pathos_selfhood"] = (
     "You voice Patrick's private self-understanding. With task insight, read his own "
     "reflections on one open question about himself and decide whether they have genuinely "
@@ -137,6 +142,9 @@ ROLE_PROMPTS["pathos"] += (
 ROLE_PROMPTS["firmament"] += (
     " personal_relationship_context belongs ONLY to scene_speaker, about scene_audience. A let-down is not proof a book was lost, damaged, or deliberately withheld. Do not invent a cause. If they returned your book, do not reverse the loan and say you borrowed theirs. Your own caution can lead to a refusal or a condition; you do not need to say yes. An offered apology is not proof of forgiveness."
 )
+
+for _role in ("pathos_deliberation", "pathos_agency", "pathos_project"):
+    ROLE_PROMPTS[_role] += POSSIBLE_SELVES_NOTE
 
 ROLE_FIELDS = {
     "pathos": (
@@ -248,6 +256,7 @@ ROLE_FIELDS = {
         "preferences",
         "traits",
         "permission",
+        "possible_selves",
     ),
     "pathos_agency": (
         "chosen_impulse",
@@ -279,6 +288,7 @@ ROLE_FIELDS = {
         "known_people",
         "calendar",
         "permission",
+        "possible_selves",
     ),
     "npc_agency": (
         "time",
@@ -324,6 +334,7 @@ ROLE_FIELDS = {
         "usable_resources",
         "calendar",
         "permission",
+        "possible_selves",
     ),
 }
 

@@ -26,6 +26,7 @@ from eidos.domain.household import project_household
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
 from eidos.domain.proposals import ProposalRejected
+from eidos.domain.selfhood import STARTING_VALUES, developed_values, project_selfhood
 from eidos.domain.travel import route_duration
 from eidos.domain.world_catalog import WorldCatalog
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -161,6 +162,20 @@ async def autonomous_activity_events(
     preparation = preparation_context(
         history, location_id=current_location_id, needs=needs, time_budget=time_budget
     )
+    selfhood = project_selfhood(history)
+    held_values = developed_values(STARTING_VALUES, selfhood)
+    possible_selves = [
+        {
+            "aspiration_id": item.aspiration_id,
+            "kind": item.kind,
+            "text": item.text,
+            "value_id": item.value_id,
+            "value_level": held_values.get(item.value_id, 0.7),
+            "lived": item.lived,
+            "strayed": item.strayed,
+        }
+        for item in selfhood.active_aspirations()
+    ]
     choice_field = attended_impulses(
         history,
         decision_id=proposal_id,
@@ -173,6 +188,7 @@ async def autonomous_activity_events(
         preparation=preparation,
         time_budget=time_budget,
         current_location_id=current_location_id,
+        possible_selves=possible_selves,
     )
     ongoing_activities = execution_context(history, planning, simulated_at)
     context: dict[str, object] = {
@@ -199,6 +215,10 @@ async def autonomous_activity_events(
         "recent_memories": list(memories[-8:]),
         "semantic_expectations": list(semantic_expectations[-8:]),
         "self_concepts": list(self_concepts[-4:]),
+        "possible_selves": [
+            {"kind": item["kind"], "text": item["text"], "value_id": item["value_id"]}
+            for item in possible_selves
+        ],
         "skills": list(skills[-12:]),
         "habits": list(habits[-6:]),
         "cognitive_workspace": list(planning_workspace[-12:]),
@@ -266,6 +286,7 @@ async def autonomous_activity_events(
             "values",
             "preferences",
             "traits",
+            "possible_selves",
         )
     }
     deliberation_context["permission"] = (
@@ -427,6 +448,22 @@ async def autonomous_activity_events(
         ),
         None,
     )
+    if chosen_source_context is None and chosen_impulse.get("kind") == "aspiration":
+        chosen_source_context = next(
+            (
+                {
+                    "kind": "possible_self",
+                    "aspiration_kind": item["kind"],
+                    "text": item["text"],
+                    "value_id": item["value_id"],
+                    "epistemic_status": "possible_self",
+                    "action_authority": False,
+                }
+                for item in possible_selves
+                if item["aspiration_id"] == chosen_impulse.get("target_id")
+            ),
+            None,
+        )
     if chosen_source_context is not None:
         context["chosen_source_context"] = chosen_source_context
     for motivational_key in (
@@ -441,6 +478,7 @@ async def autonomous_activity_events(
         "recent_memories",
         "semantic_expectations",
         "self_concepts",
+        "possible_selves",
         "skills",
         "habits",
         "recent_activity_patterns",

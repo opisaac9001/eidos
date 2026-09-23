@@ -28,6 +28,7 @@ def attended_impulses(
     preparation: Mapping[str, object],
     time_budget: Mapping[str, object],
     current_location_id: str | None,
+    possible_selves: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     """Return what reaches deliberation, not an omniscient list of all possibilities."""
     energy = _level(needs, "energy", 0.5)
@@ -190,6 +191,36 @@ def attended_impulses(
                 "epistemic_status": item.get("epistemic_status"),
                 "target_type": item.get("target_type"),
                 "target_entity_id": item.get("target_id"),
+            },
+        )
+
+    for item in possible_selves:
+        aspiration_id = item.get("aspiration_id")
+        text = item.get("text")
+        if not isinstance(aspiration_id, str) or not isinstance(text, str):
+            continue
+        held = _level(item, "value_level", 0.7)
+        # Drifting from who he hopes to be pulls harder than living up to it already.
+        lived, strayed = item.get("lived", 0), item.get("strayed", 0)
+        lagging = (
+            0.12 if isinstance(lived, int) and isinstance(strayed, int) and strayed > lived else 0.0
+        )
+        hoped = item.get("kind") == "hoped"
+        add(
+            f"aspiration:{aspiration_id}",
+            "aspiration",
+            (
+                f"Do something that fits who I want to be: {text}"
+                if hoped
+                else f"Do something that keeps me from becoming what I fear: {text}"
+            )[:180],
+            0.26 + 0.34 * held + lagging,
+            0.18 + 0.2 * (1 - energy),
+            "possible_self",
+            target_id=aspiration_id,
+            metadata={
+                "value_id": item.get("value_id"),
+                "epistemic_status": "possible_self",
             },
         )
 

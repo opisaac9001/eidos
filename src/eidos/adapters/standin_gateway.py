@@ -780,7 +780,8 @@ class StandInGateway(ModelGateway):
                         (
                             item
                             for item in impulses
-                            if isinstance(item, dict) and item.get("kind") == "thought"
+                            if isinstance(item, dict)
+                            and item.get("kind") in {"thought", "aspiration"}
                         ),
                         next(
                             (
@@ -917,6 +918,21 @@ class StandInGateway(ModelGateway):
                     1,
                     0.62,
                 )
+            elif (
+                isinstance(source_context, dict)
+                and source_context.get("kind") == "possible_self"
+                and source_context.get("action_authority") is False
+            ):
+                # Lean toward the kind of person he hopes (or fears) to be becoming.
+                agency_item = activity_palette[
+                    {
+                        "craft": 5,
+                        "curiosity": 0,
+                        "care": 4 if people else 3,
+                        "autonomy": 3,
+                        "reliability": 1,
+                    }.get(str(source_context.get("value_id")), choice % len(activity_palette))
+                ]
             elif dream_possibility is not None:
                 dream_text = str(dream_possibility.get("content", "")).casefold()
                 dream_choice = (
