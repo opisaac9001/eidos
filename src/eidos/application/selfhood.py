@@ -22,6 +22,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.selfhood import (
     ASPIRATION_FADE_AFTER,
@@ -797,12 +798,33 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             for value_id, base in STARTING_VALUES.items()
             if abs(values[value_id] - base) >= VALUE_STEP - 1e-9
         ],
+        "saving_for": _saving_for(history),
+        "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
             "This is how he currently understands himself. It can shape what he notices, "
             "admits, or hesitates over, but he rarely talks about it unprompted and it is "
             "never a script."
         ),
     }
+
+
+def _saving_for(history: Sequence[DomainEvent]) -> dict[str, object] | None:
+    from eidos.application.wants import active_want
+
+    want = active_want(history)
+    if want is None:
+        return None
+    return {"item": want.payload["item"], "why": want.payload["reason"]}
+
+
+def _recently_bought(history: Sequence[DomainEvent], simulated_at: datetime) -> list[str]:
+    bought = events_of(history, "want.purchased")
+    return [
+        str(event.payload["item"])
+        for event in bought[-3:]
+        if simulated_at - datetime.fromisoformat(str(event.payload["simulated_at"]))
+        <= timedelta(days=30)
+    ]
 
 
 def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dict[str, object]:

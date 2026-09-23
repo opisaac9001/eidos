@@ -16,6 +16,7 @@ from typing import Mapping, Sequence
 
 from eidos.application.work_rota import SHIFT_WEEKDAYS
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.selfhood import project_selfhood
 
 RESERVE_PENCE = 20_000
@@ -153,7 +154,7 @@ def _fitting_option(history: Sequence[DomainEvent], at: datetime) -> WantOption 
 def _active_want(history: Sequence[DomainEvent]) -> tuple[DomainEvent | None, datetime | None]:
     active: DomainEvent | None = None
     last_formed: datetime | None = None
-    for event in history:
+    for event in events_of(history, "want.formed", "want.purchased", "want.released"):
         if event.kind == "want.formed":
             active = event
             last_formed = datetime.fromisoformat(str(event.payload["simulated_at"]))
@@ -281,3 +282,8 @@ def wants_view(history: Sequence[DomainEvent], balance_pence: int) -> dict[str, 
         },
         "bought": owned[-6:][::-1],
     }
+
+
+def active_want(history: Sequence[DomainEvent]) -> DomainEvent | None:
+    """The want he is currently saving toward, if any."""
+    return _active_want(history)[0]

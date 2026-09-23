@@ -370,6 +370,9 @@ def _standin_pathos_text(
     work = _standin_work_reply(message, context, cadence)
     if work:
         return work
+    things = _standin_things_reply(message, context)
+    if things:
+        return things
     if any(word in message for word in ("remember", "yesterday", "today", "day")):
         openings = {
             "clipped": ("It's been a day.", "Bit full-on, honestly."),
@@ -1710,3 +1713,20 @@ def _standin_owned_activity(
     object_id = owned[(choice // 3) % len(owned)]
     kind, title, motivation, action, hours = _OWNED_USES[object_id]
     return (kind, title, motivation, action, "home", object_id, "none", 24, hours, 0.55)
+
+
+def _standin_things_reply(message: str, context: dict[str, object]) -> str | None:
+    """Talk about what he is saving for, or has bought, from his actual self-understanding."""
+    if not any(cue in message for cue in ("saving", "bought", "buy", "treat yourself")):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    if not isinstance(selfhood, dict):
+        return None
+    bought = [str(item) for item in selfhood.get("recently_bought", []) if item]
+    saving = selfhood.get("saving_for")
+    if bought:
+        return f"I finally picked up {bought[-1]}, actually. Took a while to save for it."
+    if isinstance(saving, dict) and saving.get("item"):
+        return f"Putting a bit aside for {saving['item']}. {saving.get('why', '')}".strip()
+    return "Not really. Nothing I'm after at the moment."

@@ -128,3 +128,25 @@ def test_what_he_bought_turns_up_in_what_he_chooses_to_do() -> None:
         content = json.loads(asyncio.run(StandInGateway().generate(request)).content)
         chosen.add(content.get("resource_id"))
     assert "owned-film-camera" in chosen
+
+
+def test_he_can_say_what_he_is_saving_for() -> None:
+    import asyncio
+    import json
+
+    from eidos.adapters.standin_gateway import StandInGateway
+    from eidos.application.selfhood import selfhood_context
+    from eidos.ports.model_gateway import ModelMessage, ModelRequest
+
+    history = lived_craft()
+    history.append(formed(history))
+    context = {
+        "message": "are you saving for anything?",
+        "voice": {"cadence": "steady"},
+        "identity": {"selfhood": selfhood_context(history, SATURDAY)},
+    }
+    request = ModelRequest(
+        capability="pathos", messages=(ModelMessage("user", json.dumps(context)),)
+    )
+    reply = json.loads(asyncio.run(StandInGateway().generate(request)).content)["text"]
+    assert "hand plane" in reply
