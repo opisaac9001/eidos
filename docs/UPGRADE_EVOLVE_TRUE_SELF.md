@@ -37,6 +37,12 @@ Only ever advance the **copy**.
 | Sleep | Rest recovers 0.065 an hour asleep instead of 0.04, so chronic exhaustion eases over a few nights. He wakes at the hour he chose. |
 | Self | At 20:00 on the first evening, chapter 1 ("Finding my feet") opens. Questions about himself need three weeks of lived evidence, so expect the first one after a few weeks, not immediately. |
 | Wages | Shifts pay £11 an hour for hours actually worked. The old routine-memory wage stops in worlds with a rota. |
+| Rent | Weekly housing rises from £85 to £125 (rent and bills). The existing balance is kept; the new £400 opening cushion applies only to brand-new worlds. If the live balance is low, the first week or two could miss a rent payment before shift wages build up. |
+| Energy | Sleep now restores energy and waking hours spend it. Expect higher morning energy and more initiative than the live world has shown. |
+| Company | An hour spent among people he knows (or talking with you) tops up connection instead of draining it. His long-running loneliness in the live world should lift over a few days of ordinary life. |
+| Wants | After two settled weeks, a Saturday may bring one thing he wants that fits who he is. He saves for it with a £200 cushion and buys it on a free day out. |
+| Calls and visits | Neighbours reach out far less often: each person at most every three days, one unprompted contact a day. |
+| Finishing things | Work that is at least 80% done when its time runs out is finished off if he is still there and free, so shifts with a lunch hour count as complete. |
 
 None of this touches past messages, memories or relationships.
 
