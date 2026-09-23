@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from eidos.application.causal_opportunities import fresh_cause, optional_schema
 from eidos.application.dream_planning import dream_planning_workspace, dream_project_link_events
+from eidos.application.place_discovery import known_world
 from eidos.domain.events import DomainEvent
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
@@ -76,6 +77,7 @@ async def autonomous_project_events(
         and item.quantity != 0
         and (item.custodian_id == "pathos" or item.owner_id == item.custodian_id == "community")
     }
+    catalog = known_world(history, catalog)
     places = {
         place.place_id: {
             "name": place.name,

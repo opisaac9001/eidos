@@ -9,6 +9,7 @@ invitations and his own ideas only reach for places he knows.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from hashlib import sha256
 from typing import Sequence
@@ -28,6 +29,17 @@ def known_place_ids(history: Sequence[DomainEvent], catalog: WorldCatalog) -> fr
         if isinstance(place, str):
             known.add(place)
     return frozenset(place for place in known if place in catalog.places)
+
+
+def known_world(history: Sequence[DomainEvent], catalog: WorldCatalog) -> WorldCatalog:
+    """The catalog as he knows it: only known places, with every street still walkable."""
+    known = known_place_ids(history, catalog)
+    if len(known) == len(catalog.places):
+        return catalog
+    return replace(
+        catalog,
+        places={place_id: place for place_id, place in catalog.places.items() if place_id in known},
+    )
 
 
 def place_discovery_events(

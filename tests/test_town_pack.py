@@ -8,6 +8,7 @@ from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.application.place_discovery import (
     HOME_GROUND,
     known_place_ids,
+    known_world,
     place_discovery_events,
 )
 from eidos.application.town_pack import build_town_pack
@@ -90,3 +91,21 @@ def test_he_notices_new_places_nearby_at_most_once_a_day(tmp_path: Path) -> None
     }
     assert set(found) <= near_workshop
     assert place_discovery_events(history, catalog, "home", True, NOW) == []
+
+
+def test_his_known_world_hides_unknown_places_but_keeps_the_streets(tmp_path: Path) -> None:
+    history = imported_world(tmp_path)
+    catalog = project_world_catalog(history)
+    known = known_world(history, catalog)
+    assert set(known.places) == HOME_GROUND
+    assert known.route_minutes == catalog.route_minutes
+    assert set(known.opening_hours) == HOME_GROUND
+    noticed = place_discovery_events(history, catalog, "workshop", True, NOW)
+    for day in range(1, 30):
+        if noticed:
+            break
+        noticed = place_discovery_events(
+            history, catalog, "workshop", True, NOW + timedelta(days=day)
+        )
+    place_id = noticed[0].payload["place_id"]
+    assert place_id in known_world([*history, *noticed], catalog).places
