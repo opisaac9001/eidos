@@ -890,13 +890,14 @@ class StandInGateway(ModelGateway):
                     0.34,
                 ),
                 (
-                    "shared_question_walk",
-                    "Take a question for a walk with someone",
-                    "Let an unfinished thought change through conversation and movement.",
+                    "question_walk",
+                    "Take a question for a long walk",
+                    "Let an unfinished thought change through movement and fresh air.",
                     "attend",
                     "park",
                     "none",
-                    next(iter(people), "none"),
+                    # Company needs an invitation first; offline plans stay solo.
+                    "none",
                     24,
                     1,
                     0.48,

@@ -15,6 +15,7 @@ from eidos.domain.folding import IncrementalFold, events_of, events_with_prefix
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
+FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.
 
 
 def duration_requirement(
@@ -311,7 +312,12 @@ def activity_effort(
         "estimate_confidence": estimate_confidence,
         "remaining_seconds": max(0.0, required - worked),
         "blocked_by": reason(),
-        "ready": began is not None and worked + 0.001 >= required,
+        # Nearly there when the reserved time runs out, he stays the few extra minutes.
+        "ready": began is not None
+        and (
+            worked + 0.001 >= required
+            or (now >= window_end and worked >= FINISH_OFF_SHARE * required and reason() is None)
+        ),
         "window_ended": now >= end,
         "is_working": running
         and reason() is None
