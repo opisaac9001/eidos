@@ -39,9 +39,10 @@ def test_town_geometry_is_connected_and_respects_the_river():
         a, b = junctions[start], junctions[end]
         assert street["distance_m"] == hypot(a["x"] - b["x"], a["y"] - b["y"])
         assert street["distance_m"] > 0
-        if min(a["y"], b["y"]) <= river["north_bank_y"] and max(
-            a["y"], b["y"]
-        ) >= river["south_bank_y"]:
+        if (
+            min(a["y"], b["y"]) <= river["north_bank_y"]
+            and max(a["y"], b["y"]) >= river["south_bank_y"]
+        ):
             assert street["kind"] in {"bridge", "footbridge"}
             crossings.append(street["name"])
         graph[start].add(end)

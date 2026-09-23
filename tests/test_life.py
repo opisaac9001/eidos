@@ -240,7 +240,11 @@ class LifeTests(unittest.TestCase):
         self.life.advance(8.5)
         restarted = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True)
         restarted.advance(15.5)
-        other = Life(SQLiteEventStore(Path(self.directory.name) / "other.db"), StandInGateway(), authored_scenario=True)
+        other = Life(
+            SQLiteEventStore(Path(self.directory.name) / "other.db"),
+            StandInGateway(),
+            authored_scenario=True,
+        )
         other.advance(24)
         a, b = restarted.snapshot(), other.snapshot()
         self.assertEqual(a["pathos"], b["pathos"])
@@ -253,16 +257,23 @@ class LifeTests(unittest.TestCase):
         revision = len(self.life.history())
         self.life.chat("How has your day been?", "visit-1")
         self.assertEqual(len(self.life.history()), revision)
-        delivered = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
+        delivered = Life(
+            SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
+        ).snapshot()
         self.assertEqual([m["speaker"] for m in delivered["conversations"]], ["you"])
         self.assertEqual(delivered["communication"]["waiting_count"], 1)
         self.assertTrue(delivered["communication"]["next_reply_due_at"])
         self.life.advance(1)
-        snapshot = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
+        snapshot = Life(
+            SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
+        ).snapshot()
         self.assertEqual([m["speaker"] for m in snapshot["conversations"]], ["you", "pathos"])
         self.assertEqual(snapshot["communication"]["waiting_count"], 0)
         self.assertTrue(
-            any(word in snapshot["conversations"][-1]["text"] for word in ("breakfast", "meal", "cafe"))
+            any(
+                word in snapshot["conversations"][-1]["text"]
+                for word in ("breakfast", "meal", "cafe")
+            )
         )
         self.assertGreater(len(snapshot["recalls"]), 0)
         self.assertIn("lexical_score", snapshot["recalls"][0])
@@ -702,7 +713,9 @@ class LifeTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            Life(SQLiteEventStore(self.path), AlteredMemory(), authored_scenario=True).snapshot()["memories"],
+            Life(SQLiteEventStore(self.path), AlteredMemory(), authored_scenario=True).snapshot()[
+                "memories"
+            ],
             life.snapshot()["memories"],
         )
 
@@ -778,7 +791,9 @@ class LifeTests(unittest.TestCase):
         )
         self.assertEqual(reported_memory.payload["source_event_id"], str(perceived.event_id))
         self.assertEqual(perceived.payload["owner"], "pathos")
-        replayed = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
+        replayed = Life(
+            SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
+        ).snapshot()
         self.assertEqual(replayed["commitments"], finished["commitments"])
 
     def test_self_chosen_project_advances_only_through_completed_practice(self):
@@ -928,7 +943,9 @@ class LifeTests(unittest.TestCase):
                 "dream.inspiration_dismissed",
             ],
         )
-        replay = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
+        replay = Life(
+            SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
+        ).snapshot()
         self.assertEqual(
             journal, next(item for item in replay["dreams"] if item["id"] == journal["id"])
         )
@@ -1022,5 +1039,7 @@ class LifeTests(unittest.TestCase):
                 if event.kind == "social.activity_completed"
             ),
         )
-        replay = Life(SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True).snapshot()
+        replay = Life(
+            SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
+        ).snapshot()
         self.assertEqual(replay["calendar"], snapshot["calendar"])

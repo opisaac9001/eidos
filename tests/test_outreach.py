@@ -59,11 +59,17 @@ class OutreachTests(unittest.TestCase):
                 },
             ),
         ]
-        events.append(DomainEvent("thought.recorded", "pathos", {
-            "text": "Rain made the square's paving stones shine.",
-            "source_memory_id": str(events[-1].event_id),
-            "simulated_at": self.now.isoformat(),
-        }))
+        events.append(
+            DomainEvent(
+                "thought.recorded",
+                "pathos",
+                {
+                    "text": "Rain made the square's paving stones shine.",
+                    "source_memory_id": str(events[-1].event_id),
+                    "simulated_at": self.now.isoformat(),
+                },
+            )
+        )
         if enabled:
             events.insert(
                 0,
@@ -138,8 +144,11 @@ class OutreachTests(unittest.TestCase):
     def test_different_thought_can_lead_to_another_message_same_day(self):
         history = self.history()
         first = self.run_outreach(history)
-        second_thought = DomainEvent("thought.recorded", "pathos", {
-            **dict(history[-1].payload), "text": "I wonder what they thought of that rain."})
+        second_thought = DomainEvent(
+            "thought.recorded",
+            "pathos",
+            {**dict(history[-1].payload), "text": "I wonder what they thought of that rain."},
+        )
         second = self.run_outreach(history + first + [second_thought])
         self.assertTrue(any(e.kind == "conversation.message" for e in second))
         self.assertEqual(self.run_outreach(history + first), [])
@@ -147,9 +156,12 @@ class OutreachTests(unittest.TestCase):
     def test_pathos_can_keep_thought_private_without_retrying(self):
         class PrivateGateway:
             model = "private-fixture"
+
             async def generate(self, request):
-                return ModelResponse(json.dumps({"text": "[KEEP_PRIVATE]"}),
-                                     self.model, "test", "stop")
+                return ModelResponse(
+                    json.dumps({"text": "[KEEP_PRIVATE]"}), self.model, "test", "stop"
+                )
+
         history = self.history()
         events = self.run_outreach(history, PrivateGateway())
         self.assertTrue(any(e.kind == "outreach.kept_private" for e in events))
@@ -161,18 +173,31 @@ class OutreachTests(unittest.TestCase):
         self.assertEqual(self.run_outreach(self.history(), at=self.now + timedelta(hours=1)), [])
 
     def test_recent_thought_can_send_outside_fixed_six_pm_slot(self):
-        self.assertTrue(any(e.kind == "conversation.message" for e in
-            self.run_outreach(self.history(), at=self.now.replace(hour=18, minute=15))))
+        self.assertTrue(
+            any(
+                e.kind == "conversation.message"
+                for e in self.run_outreach(self.history(), at=self.now.replace(hour=18, minute=15))
+            )
+        )
         history = self.history()
         thought = history[-1]
-        history[-1] = DomainEvent("thought.recorded", "pathos", {
-            **dict(thought.payload), "simulated_at": self.now.replace(hour=12).isoformat()})
-        self.assertTrue(any(e.kind == "conversation.message" for e in
-            self.run_outreach(history, at=self.now.replace(hour=12))))
+        history[-1] = DomainEvent(
+            "thought.recorded",
+            "pathos",
+            {**dict(thought.payload), "simulated_at": self.now.replace(hour=12).isoformat()},
+        )
+        self.assertTrue(
+            any(
+                e.kind == "conversation.message"
+                for e in self.run_outreach(history, at=self.now.replace(hour=12))
+            )
+        )
 
     def test_unrelated_memory_and_rejected_attempt_are_not_retried(self):
         history = self.history()
-        self.assertEqual(self.run_outreach([e for e in history if e.kind != "thought.recorded"]), [])
+        self.assertEqual(
+            self.run_outreach([e for e in history if e.kind != "thought.recorded"]), []
+        )
         first = self.run_outreach(history, PressureGateway())
         self.assertEqual(self.run_outreach(history + first), [])
 

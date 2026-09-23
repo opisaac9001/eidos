@@ -181,9 +181,7 @@ def mental_layer_events(
             "action_authority": False,
         }
         if layer == CognitiveLayer.PROSPECTIVE and upcoming is not None:
-            payload["anticipatory_valence"] = _anticipatory_valence(
-                upcoming[1], state
-            )
+            payload["anticipatory_valence"] = _anticipatory_valence(upcoming[1], state)
         output.append(
             DomainEvent(
                 "mind.layer_pulsed",
@@ -328,8 +326,7 @@ def _next_upcoming_plan(
             for item in planning.calendar.values()
             if item.status == "scheduled"
             and item.actor_id in {None, "pathos"}
-            and at <= datetime.fromisoformat(item.starts_at)
-            <= at + timedelta(hours=within_hours)
+            and at <= datetime.fromisoformat(item.starts_at) <= at + timedelta(hours=within_hours)
         ),
         key=lambda pair: (pair[0], pair[1].schedule_id),
     )

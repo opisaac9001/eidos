@@ -294,7 +294,10 @@ def lived_moment_description(
     clean = description.strip()
     if not clean:
         raise ValueError("Lived moment description must not be empty")
-    existing_textures = (*_MOMENT_TEXTURE, *(line for lines in _PLACE_TEXTURE.values() for line in lines))
+    existing_textures = (
+        *_MOMENT_TEXTURE,
+        *(line for lines in _PLACE_TEXTURE.values() for line in lines),
+    )
     if any(texture in clean for texture in existing_textures):
         return clean
     place_options = _PLACE_TEXTURE.get(location_id, _GENERIC_PLACE_TEXTURE)

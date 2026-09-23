@@ -3,9 +3,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.planner import plan_accepted_work
-from eidos.application.scheduled_activity import scheduled_activity_events
-from eidos.application.scheduled_activity import prospective_memory_lapse
-from eidos.domain.events import DomainEvent
+from eidos.application.scheduled_activity import prospective_memory_lapse, scheduled_activity_events
 from eidos.domain.planning import CalendarEntry, Intention, PlanningState
 from eidos.domain.social import SocialRequest
 

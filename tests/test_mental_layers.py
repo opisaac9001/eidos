@@ -198,12 +198,8 @@ class MentalLayerTests(unittest.TestCase):
             },
         )
 
-        events = mental_layer_events(
-            [schedule], PathosState(simulated_at=at, awake=True), at, {}
-        )
-        prospective = next(
-            event for event in events if event.payload["layer"] == "prospective"
-        )
+        events = mental_layer_events([schedule], PathosState(simulated_at=at, awake=True), at, {})
+        prospective = next(event for event in events if event.payload["layer"] == "prospective")
         attention = next(event for event in events if event.payload["layer"] == "attention")
 
         self.assertEqual(prospective.payload["focus_id"], "later")
@@ -218,9 +214,7 @@ class MentalLayerTests(unittest.TestCase):
             prospective.payload["anticipatory_valence"],
         )
         exposed = next(
-            item
-            for item in mind_context([schedule, *events])
-            if item["layer"] == "prospective"
+            item for item in mind_context([schedule, *events]) if item["layer"] == "prospective"
         )
         self.assertEqual(
             exposed["anticipatory_valence"], prospective.payload["anticipatory_valence"]
@@ -255,15 +249,10 @@ class MentalLayerTests(unittest.TestCase):
         )
 
         self.assertNotIn("prospective", {event.payload["layer"] for event in events})
-        prior = mental_layer_events(
-            [schedule], PathosState(simulated_at=at, awake=True), at, {}
-        )
+        prior = mental_layer_events([schedule], PathosState(simulated_at=at, awake=True), at, {})
         self.assertNotIn(
             "prospective",
-            {
-                item["layer"]
-                for item in mind_context([schedule, *prior, cancelled])
-            },
+            {item["layer"] for item in mind_context([schedule, *prior, cancelled])},
         )
 
     def test_non_prospective_anticipatory_valence_is_rejected(self):
@@ -301,9 +290,7 @@ class MentalLayerTests(unittest.TestCase):
         )
 
         events = mental_layer_events([schedule], state, at, {})
-        prospective = next(
-            event for event in events if event.payload["layer"] == "prospective"
-        )
+        prospective = next(event for event in events if event.payload["layer"] == "prospective")
 
         self.assertLess(prospective.payload["anticipatory_valence"], 0)
 

@@ -24,9 +24,12 @@ async def outreach_events(
     if simulated_at.utcoffset() is None:
         raise ValueError("Outreach time must be timezone-aware")
     config = project_outreach_config(history)
-    if (not config.enabled or not pathos_awake
-            or simulated_at.hour >= config.quiet_start_hour
-            or simulated_at.hour < config.quiet_end_hour):
+    if (
+        not config.enabled
+        or not pathos_awake
+        or simulated_at.hour >= config.quiet_start_hour
+        or simulated_at.hour < config.quiet_end_hour
+    ):
         return []
     messages = [event for event in history if event.kind == "conversation.message"]
     if not any(event.payload.get("speaker") == "you" for event in messages):
@@ -49,7 +52,8 @@ async def outreach_events(
     ):
         return []
     memories = {
-        str(event.event_id): event for event in history
+        str(event.event_id): event
+        for event in history
         if event.kind == "memory.recorded"
         and event.payload.get("owner", "pathos") == "pathos"
         and event.payload.get("source") == "user-conversation"
@@ -71,8 +75,10 @@ async def outreach_events(
     request_id = f"outreach-{source.event_id}"
     if any(
         event.kind == "outreach.considered"
-        and (event.payload.get("request_id") == request_id
-             or event.payload.get("source_thought_id") == str(source.event_id))
+        and (
+            event.payload.get("request_id") == request_id
+            or event.payload.get("source_thought_id") == str(source.event_id)
+        )
         for event in history
     ) or any(event.payload.get("request_id") == request_id for event in messages):
         return []
@@ -111,17 +117,23 @@ async def outreach_events(
             for event in messages[-12:]
         ],
     }
-    text = await perform_pathos_reply(
-        gateway, model_context, simulated_at.isoformat(), pending
-    )
+    text = await perform_pathos_reply(gateway, model_context, simulated_at.isoformat(), pending)
     if not text:
         return pending
     if "[keep_private]" in text.lower():
-        pending.append(DomainEvent("outreach.kept_private", "pathos", {
-            "request_id": request_id,
-            "source_thought_id": str(source.event_id),
-            "simulated_at": simulated_at.isoformat(),
-        }, causation_id=source.event_id, correlation_id=request_id))
+        pending.append(
+            DomainEvent(
+                "outreach.kept_private",
+                "pathos",
+                {
+                    "request_id": request_id,
+                    "source_thought_id": str(source.event_id),
+                    "simulated_at": simulated_at.isoformat(),
+                },
+                causation_id=source.event_id,
+                correlation_id=request_id,
+            )
+        )
         return pending
     lowered = text.lower()
     forbidden_pressure = (

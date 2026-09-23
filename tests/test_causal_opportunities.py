@@ -184,11 +184,11 @@ def test_explicit_choice_can_start_here_now_but_cannot_teleport():
         DomainEvent(
             "thought.recorded",
             "pathos",
-                {
-                    "text": "I want to read here now.",
-                    "importance": 1.0,
-                    "simulated_at": NOW.isoformat(),
-                },
+            {
+                "text": "I want to read here now.",
+                "importance": 1.0,
+                "simulated_at": NOW.isoformat(),
+            },
         )
     ]
     here = agency(history, ChoiceGateway(), current_location_id="home")

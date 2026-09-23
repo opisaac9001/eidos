@@ -249,7 +249,8 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(first.snapshot(), restarted.snapshot())
         restarted.advance(15)
         whole = Life(
-            SQLiteEventStore(Path(self.directory.name) / "whole.sqlite3"), StandInGateway(),
+            SQLiteEventStore(Path(self.directory.name) / "whole.sqlite3"),
+            StandInGateway(),
             authored_scenario=True,
         )
         whole.advance(24)

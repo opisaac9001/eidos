@@ -82,9 +82,7 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(appraisals[0].payload["source_kind"], "mind.layer_pulsed")
         self.assertEqual(appraisals[0].payload["desirability"], 0.22)
         self.assertEqual(state, PathosState())
-        episodes, affected = affect_episode_events(
-            [first, *appraisals], state, self.now
-        )
+        episodes, affected = affect_episode_events([first, *appraisals], state, self.now)
         self.assertGreater(affected.valence, state.valence)
         second = DomainEvent(
             "mind.layer_pulsed",
@@ -148,12 +146,8 @@ class AppraisalTests(unittest.TestCase):
             if event.kind == "appraisal.recorded"
         }
 
-        self.assertLess(
-            by_source[str(pleasant_cancelled.event_id)].payload["desirability"], 0
-        )
-        self.assertGreater(
-            by_source[str(pressured_cancelled.event_id)].payload["desirability"], 0
-        )
+        self.assertLess(by_source[str(pleasant_cancelled.event_id)].payload["desirability"], 0)
+        self.assertGreater(by_source[str(pressured_cancelled.event_id)].payload["desirability"], 0)
 
     def test_unanticipated_cancellation_has_no_assumed_emotional_meaning(self):
         cancelled = DomainEvent(
@@ -183,9 +177,7 @@ class AppraisalTests(unittest.TestCase):
         )
 
         appraisals, state = appraisal_events([lapse], PathosState(), self.now)
-        episodes, affected = affect_episode_events(
-            [lapse, *appraisals], state, self.now
-        )
+        episodes, affected = affect_episode_events([lapse, *appraisals], state, self.now)
 
         self.assertEqual(appraisals[0].payload["source_event_id"], str(lapse.event_id))
         self.assertLess(appraisals[0].payload["desirability"], 0)

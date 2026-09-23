@@ -414,9 +414,7 @@ class WebTests(unittest.TestCase):
         runtime.start()
         self.addCleanup(runtime.close)
         life.request_visit("slow-model-visit")
-        previous = {
-            str(item["id"]) for item in life.snapshot().get("conversations", [])
-        }
+        previous = {str(item["id"]) for item in life.snapshot().get("conversations", [])}
         operation_started = clock.now
         life.chat("Can we talk?", "slow-model-reply")
         reply = life.snapshot()["conversations"][-1]
