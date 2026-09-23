@@ -46,6 +46,8 @@ Only ever advance the **copy**.
 | Ordinary friction | Rarely, something breaks and costs money, Ellis cancels a shift in a quiet week, a rushed or cut-short shift leaves Ellis short with him (which he may clear over a later lunch), or he notices a friend he hasn't seen in weeks. Repeated clashes with Ellis can become a question he asks himself. |
 | Sick days | The existing wellbeing episodes (headaches, aches, feeling under the weather) now reach work: on a morning bad enough that he couldn't work through it, he rings Ellis in sick and that shift is cancelled (unpaid). Milder spells he works through. If you ask how he is while unwell, he says so. |
 | Places he knows | He starts knowing home, the café, the workshop and the park. Other places become known when he goes there, notices one next to where he is, or is invited there. His own plans and projects only use places he knows, so a world with the city-life pack will see him choose fewer outings to far places until he has found them. The ordinary map shows only known places. |
+| Meetings | Anyone who has agreed a time with him now sets off to be there and stays until it ends. Before, meetings only worked when the other person happened to be nearby, and he was blamed for the missed commitment when they weren't. |
+| Shifts | Talking with Ellis during a shift no longer pauses the work, and a chat in the last hour of a long stint no longer leaves it unfinished. Expect far fewer "left the bench half-done" clashes. |
 
 None of this touches past messages, memories or relationships.
 
