@@ -1369,6 +1369,13 @@ function render(next) {
   $("backend-model").textContent = liveModel
     ? state.model
     : "Deterministic stand-ins";
+  $("engine-connection-title").textContent = liveModel
+    ? `Model performers · ${state.model}`
+    : "Deterministic stand-ins";
+  $("engine-connection-detail").textContent = liveModel
+    ? "Roles are served by the configured model endpoint or routes file. Every proposal is still validated before it becomes part of his life."
+    : "Authored templates are running every role. Point Eidos at a model endpoint or routes file to hand the roles to real models.";
+  $("engine-connection-badge").textContent = liveModel ? "CONNECTED" : "STAND-IN";
   document.querySelector(".mobile-mode").textContent =
     `${liveModel ? "Local model" : "Stand-in"} performers · saved locally`;
   document.querySelector(".disclosure").textContent = liveModel
