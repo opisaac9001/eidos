@@ -1044,11 +1044,10 @@ class Life(LifeConversation):
                 tick.household_now,
                 protected=incident_beat is not None or planned_beat is not None,
                 already_completed_today=any(
-                    event.kind == "household.task_completed"
-                    and str(event.payload.get("simulated_at", "")).startswith(
+                    str(event.payload.get("simulated_at", "")).startswith(
                         current.date().isoformat()
                     )
-                    for event in history + pending
+                    for event in events_of(history + pending, "household.task_completed")
                 ),
             )
         need_reason = None
@@ -1057,12 +1056,11 @@ class Life(LifeConversation):
             and planned_beat is None
             and current.date() > _AUTHORED_OPENING_END
             and not any(
-                event.kind == "memory.recorded"
-                and event.payload.get("need_decision_reason")
+                event.payload.get("need_decision_reason")
                 and str(event.payload.get("simulated_at", "")).startswith(
                     current.date().isoformat()
                 )
-                for event in history + pending
+                for event in events_of(history + pending, "memory.recorded")
             )
         ):
             beat, need_reason = needs_adjusted_beat(
@@ -1335,9 +1333,8 @@ class Life(LifeConversation):
             if actor_id not in {"pathos", "user"}
         ) | frozenset(
             str(event.payload["person_id"])
-            for event in history + pending
-            if event.kind == "npc.encountered"
-            and event.payload.get("simulated_at") == current.isoformat()
+            for event in events_of(history + pending, "npc.encountered")
+            if event.payload.get("simulated_at") == current.isoformat()
             and isinstance(event.payload.get("person_id"), str)
         )
         mentally_known_person_ids = (
