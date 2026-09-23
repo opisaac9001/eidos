@@ -482,6 +482,11 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "showed up for someone"),)
     if kind == "apology.offered" and p.get("actor_id") == "pathos":
         return (("care", 1, "owned something I'd got wrong"),)
+    if kind == "want.purchased":
+        value = p.get("value_id")
+        if value in STARTING_VALUES:
+            return ((str(value), 1, "put money toward something that matters to me"),)
+        return ()
     if kind == "social.activity_completed":
         return (("care", 1, "spent real time with someone"),)
     if kind == "scene.started" and "pathos" in {p.get("initiator_id"), p.get("partner_id")}:

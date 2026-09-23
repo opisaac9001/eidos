@@ -9,11 +9,11 @@ from eidos.application.work_rota import SHIFT_WAGE_PENCE, is_rota_shift, partial
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState
 
-OPENING_BALANCE_PENCE = 12_000
+OPENING_BALANCE_PENCE = 40_000  # A modest cushion: a couple of weeks of rent and food.
 CAFE_MEAL_PENCE = 600
 PROVISIONS_PENCE = 2_400
 WORKSHOP_SHIFT_PENCE = 3_200
-WEEKLY_HOUSING_PENCE = 8_500
+WEEKLY_HOUSING_PENCE = 12_500  # Rent and bills for a small place in a market town.
 
 
 def financial_foundation_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
@@ -159,6 +159,10 @@ def financial_consequence_events(
 
 
 def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
+    if source.kind == "want.purchased":
+        price = source.payload.get("price_pence")
+        if isinstance(price, int) and not isinstance(price, bool) and price > 0:
+            return (-price, "personal_purchase", f"Bought {source.payload.get('item')}")
     if (
         source.kind == "activity.completed"
         and source.payload.get("activity") == "work"

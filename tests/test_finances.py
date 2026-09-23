@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from eidos.application.economy import (
     CAFE_MEAL_PENCE,
+    OPENING_BALANCE_PENCE,
     WEEKLY_HOUSING_PENCE,
     financial_consequence_events,
     financial_foundation_events,
@@ -39,7 +40,7 @@ class FinanceTests(unittest.TestCase):
         self.assertEqual(events[0].payload["amount_pence"], -CAFE_MEAL_PENCE)
         self.assertEqual(events[0].causation_id, meal.event_id)
         updated = project_finances([*account, meal, *events])
-        self.assertEqual(updated.balance_pence, 12_000 - CAFE_MEAL_PENCE)
+        self.assertEqual(updated.balance_pence, OPENING_BALANCE_PENCE - CAFE_MEAL_PENCE)
         self.assertEqual(
             financial_consequence_events([*account, meal, *events], updated, self.noon), []
         )
@@ -157,7 +158,9 @@ class FinanceTests(unittest.TestCase):
         )
         refunded = financial_consequence_events([*account, order, *charged, cancelled], state, at)
         self.assertEqual(refunded[0].payload["category"], "refund")
-        self.assertEqual(project_finances([*account, *charged, *refunded]).balance_pence, 12_000)
+        self.assertEqual(
+            project_finances([*account, *charged, *refunded]).balance_pence, OPENING_BALANCE_PENCE
+        )
         self.assertEqual(
             financial_consequence_events([*account, cancelled], project_finances(account), at),
             [],

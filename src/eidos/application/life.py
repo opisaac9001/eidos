@@ -139,6 +139,7 @@ from eidos.application.urgent_incidents import (
 )
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.volition import volition_snapshot
+from eidos.application.wants import want_events, wants_view
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.work_rota import is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
@@ -1204,7 +1205,10 @@ class Life:
                 "self_concepts": self_concept_context(history),
                 "established": identity.established,
             },
-            "selfhood": selfhood_view(history, state.simulated_at),
+            "selfhood": {
+                **selfhood_view(history, state.simulated_at),
+                "wanting": wants_view(history, self._finances(history).balance_pence),
+            },
             "weather": weather,
             "external_signals": list(reversed(external_signals[-30:])),
             "world_packs": list(reversed(world_packs)),
@@ -2253,6 +2257,17 @@ class Life:
             if domestic_load:
                 self._household(history + pending + domestic_load)
                 pending.extend(domestic_load)
+            if not self.authored_scenario:
+                wants = want_events(
+                    history + pending,
+                    current,
+                    balance_pence=self._finances(history + pending).balance_pence,
+                    location_id=state.location_id,
+                    awake=state.awake,
+                )
+                if wants:
+                    self._planning(history + pending + wants)
+                    pending.extend(wants)
             money = financial_consequence_events(
                 history + pending,
                 self._finances(history + pending),

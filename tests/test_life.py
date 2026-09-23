@@ -7,6 +7,7 @@ from pathlib import Path
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.economy import OPENING_BALANCE_PENCE
 from eidos.application.life import Life
 from eidos.application.memory import recall
 from eidos.application.messaging import reply_due_at
@@ -101,7 +102,8 @@ class LifeTests(unittest.TestCase):
         )
         self.assertEqual(provisions["quantity"], 9)
         self.assertEqual(snapshot["finances"]["currency"], "GBP")
-        self.assertEqual(snapshot["finances"]["balance_pence"], 15_200)
+        # Opening cushion plus one authored workshop shift's pay.
+        self.assertEqual(snapshot["finances"]["balance_pence"], OPENING_BALANCE_PENCE + 3_200)
         self.assertEqual(
             [item["category"] for item in snapshot["finances"]["transactions"]],
             ["work_income"],

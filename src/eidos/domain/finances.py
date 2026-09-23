@@ -9,7 +9,15 @@ from typing import Sequence
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold
 
-_CATEGORIES = {"opening", "work_income", "cafe_meal", "provisions", "housing", "refund"}
+_CATEGORIES = {
+    "opening",
+    "work_income",
+    "cafe_meal",
+    "provisions",
+    "housing",
+    "refund",
+    "personal_purchase",
+}
 
 
 @dataclass(frozen=True, slots=True)

@@ -1081,6 +1081,25 @@ function renderSelf() {
         )
         .join("")
     : '<li class="empty-note">Nothing has left a mark yet.</li>';
+  const wanting = self.wanting || {};
+  const goal = wanting.saving_for;
+  const pounds = (pence) => `£${(Number(pence) / 100).toFixed(0)}`;
+  $("self-wanting").innerHTML =
+    (goal
+      ? `<div class="possible hoped">
+          <div class="possible-kind">Saving for</div>
+          <p>${esc(goal.item)}</p>
+          <p class="inquiry-meta">“${esc(goal.reason)}”</p>
+          <div class="possible-track"><span style="width:${Math.round((goal.saved_pence / goal.price_pence) * 100)}%"></span></div>
+          <div class="inquiry-meta">${pounds(goal.saved_pence)} of ${pounds(goal.price_pence)} set aside, after keeping a cushion</div>
+        </div>`
+      : '<p class="empty-note">Not wanting anything in particular right now.</p>') +
+    (wanting.bought || [])
+      .map(
+        (item) =>
+          `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
+      )
+      .join("");
   const possible = (self.aspirations || []).filter((item) => item.status === "active");
   $("self-possible").innerHTML = possible.length
     ? possible
