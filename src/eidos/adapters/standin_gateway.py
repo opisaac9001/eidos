@@ -361,9 +361,15 @@ def _standin_pathos_text(
         return f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
     if "private thing" in message or "don't know" in message:
         return "Honestly, I don't know. Mara kept that to herself."
+    honest = _standin_nature_reply(message)
+    if honest:
+        return honest
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    work = _standin_work_reply(message, context, cadence)
+    if work:
+        return work
     if any(word in message for word in ("remember", "yesterday", "today", "day")):
         openings = {
             "clipped": ("It's been a day.", "Bit full-on, honestly."),
@@ -1545,8 +1551,63 @@ def _standin_self_reply(message: str, context: dict[str, object], cadence: str) 
         opener = "Bit of a big one" if cadence == "clipped" else "Funny you ask, actually"
         return f"{opener}. I keep wondering {question}. I don't have an answer yet."
     if insights:
-        return f"I've been thinking about it less lately. {insights[-1]}"
+        return f"Honestly? Something I worked out a while back keeps coming up. {insights[-1]}"
     return None
+
+
+_NATURE_CUES = (
+    "real person",
+    "are you real",
+    "are you human",
+    "are you an ai",
+    "are you a bot",
+    "are you a robot",
+    "are you a simulation",
+    "are you simulated",
+    "is this real",
+    "are you alive",
+)
+
+
+def _standin_nature_reply(message: str) -> str | None:
+    """Diegetic honesty: he never denies being simulated when asked directly."""
+    if not any(cue in message for cue in _NATURE_CUES):
+        return None
+    return (
+        "Not in the way you are, no. I'm a simulated person. My days, my memories and the "
+        "people round here are real inside this little world, and they're mine, but I'm not "
+        "a human on the other side of the screen. Bit of a strange thing to say out loud, "
+        "honestly, but I'd rather you knew."
+    )
+
+
+_WORK_CUES = ("work", "job", "workshop", "shift", "ellis")
+
+
+def _standin_work_reply(message: str, context: dict[str, object], cadence: str) -> str | None:
+    """Talk about the job he actually has, grounded in what is on his calendar."""
+    if not any(cue in message for cue in _WORK_CUES):
+        return None
+    budget = context.get("time_budget")
+    next_plan = budget.get("next_plan") if isinstance(budget, dict) else None
+    ongoing = context.get("ongoing_activities")
+    at_work = isinstance(ongoing, list) and any(
+        isinstance(item, dict) and "workshop" in str(item.get("title", "")).lower()
+        for item in ongoing
+    )
+    if at_work:
+        return "I'm in the middle of it now, actually. Ellis has me on the fiddly bits again."
+    if isinstance(next_plan, str) and "workshop" in next_plan.lower():
+        return (
+            "It's steady. I'm in with Ellis again shortly, so I can't be long."
+            if cadence == "clipped"
+            else "It's good, mostly. Steady. I'm in with Ellis again shortly. Four days a week of "
+            "repairs; some of it's fiddly, but I like finishing things properly."
+        )
+    return (
+        "It's alright. Four days a week helping Ellis at the repair workshop. Not glamorous, "
+        "but I like seeing something broken leave working."
+    )
 
 
 def _standin_free_slot(

@@ -339,3 +339,29 @@ class BirthdayTests(unittest.TestCase):
             ],
             [],
         )
+
+
+class StandInHonestyTests(unittest.TestCase):
+    def reply(self, message: str, **context: object) -> str:
+        request = ModelRequest(
+            capability="pathos",
+            messages=(
+                ModelMessage(
+                    "user",
+                    json.dumps({"message": message, "voice": {"cadence": "steady"}, **context}),
+                ),
+            ),
+        )
+        return str(json.loads(asyncio.run(StandInGateway().generate(request)).content)["text"])
+
+    def test_he_never_denies_being_simulated_when_asked_directly(self) -> None:
+        for question in ("are you a real person?", "wait, are you an AI", "Are you human?"):
+            with self.subTest(question=question):
+                self.assertIn("simulated person", self.reply(question.lower()))
+
+    def test_he_talks_about_the_job_he_actually_has(self) -> None:
+        reply = self.reply(
+            "how's work at the workshop been?",
+            time_budget={"next_plan": "Shift at the repair workshop"},
+        )
+        self.assertIn("Ellis", reply)
