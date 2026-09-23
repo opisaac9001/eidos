@@ -947,6 +947,8 @@ class StandInGateway(ModelGateway):
                     else 5
                 )
                 agency_item = activity_palette[dream_choice]
+            elif (owned := _standin_owned_activity(context, choice)) is not None:
+                agency_item = owned
             else:
                 agency_item = activity_palette[choice % len(activity_palette)]
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
@@ -1583,3 +1585,67 @@ def _standin_free_slot(
             continue
         return offset
     return None
+
+
+_OWNED_USES: dict[str, tuple[str, str, str, str, int]] = {
+    # object id: (activity type, title, motivation, action, hours)
+    "owned-film-camera": (
+        "film_camera_practice",
+        "Load the film camera and learn its settings",
+        "Slow down and look properly before taking a single frame.",
+        "learn",
+        1,
+    ),
+    "owned-hand-plane": (
+        "hand_plane_practice",
+        "Tune the block plane and practise on offcuts",
+        "Get the finishing right with my own hands.",
+        "work",
+        1,
+    ),
+    "owned-coffee-grinder": (
+        "slow_coffee",
+        "Grind beans and make a slow pot of filter coffee",
+        "A morning that is properly mine.",
+        "attend",
+        1,
+    ),
+    "owned-cookbook": (
+        "cookbook_practice",
+        "Try a new recipe from the vegetarian cookbook",
+        "Practise so I can feed people properly when they come round.",
+        "learn",
+        2,
+    ),
+    "owned-notebook": (
+        "week_in_notebook",
+        "Write out the week's plans in the new notebook",
+        "Stop letting the small things slip.",
+        "work",
+        1,
+    ),
+    "owned-record-player": (
+        "whole_record",
+        "Listen to a whole record, start to finish",
+        "Hear it the way it was meant to be heard.",
+        "attend",
+        1,
+    ),
+}
+
+
+def _standin_owned_activity(
+    context: dict[str, Any], choice: int
+) -> tuple[str, str, str, str, str, str, str, int, int, float] | None:
+    """Sometimes the things he chose to buy are what he reaches for."""
+    resources = context.get("usable_resources", {})
+    owned = [
+        object_id
+        for object_id in (resources if isinstance(resources, dict) else {})
+        if object_id in _OWNED_USES and resources[object_id].get("location_id") == "home"
+    ]
+    if not owned or choice % 3:
+        return None
+    object_id = owned[(choice // 3) % len(owned)]
+    kind, title, motivation, action, hours = _OWNED_USES[object_id]
+    return (kind, title, motivation, action, "home", object_id, "none", 24, hours, 0.55)

@@ -102,3 +102,29 @@ def test_a_want_that_stays_out_of_reach_is_let_go() -> None:
     later = SATURDAY + GIVE_UP_AFTER
     output = want_events(history, later, balance_pence=0, location_id="park", awake=True)
     assert [item.kind for item in output] == ["want.released"]
+
+
+def test_what_he_bought_turns_up_in_what_he_chooses_to_do() -> None:
+    import asyncio
+    import json
+
+    from eidos.adapters.standin_gateway import StandInGateway
+    from eidos.ports.model_gateway import ModelMessage, ModelRequest
+
+    chosen = set()
+    for hour in range(24):
+        context = {
+            "time": (SATURDAY + timedelta(hours=hour)).isoformat(),
+            "known_places": {"home": {"opens_hour": 0, "closes_hour": 24}},
+            "known_people": {},
+            "calendar": [],
+            "usable_resources": {"owned-film-camera": {"location_id": "home"}},
+        }
+        request = ModelRequest(
+            capability="pathos_agency",
+            messages=(ModelMessage("user", json.dumps(context)),),
+            output_schema={"type": "object"},
+        )
+        content = json.loads(asyncio.run(StandInGateway().generate(request)).content)
+        chosen.add(content.get("resource_id"))
+    assert "owned-film-camera" in chosen
