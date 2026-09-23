@@ -962,6 +962,8 @@ class StandInGateway(ModelGateway):
                     else 5
                 )
                 agency_item = activity_palette[dream_choice]
+            elif (unexplored := _standin_unexplored_place(places, choice)) is not None:
+                agency_item = unexplored
             elif (owned := _standin_owned_activity(context, choice)) is not None:
                 agency_item = owned
             else:
@@ -1274,21 +1276,23 @@ class StandInGateway(ModelGateway):
                 }.get(dream_motif, choice % 3)
             ]
             known_places = context["known_places"]
-            steps = [
-                {
-                    "activity_type": step[0],
-                    "title": step[1],
-                    "action": step[2],
-                    "location_id": step[3] if step[3] in known_places else "home",
-                    "resource_id": "none",
-                    "day_offset": step[4],
-                    # Morning keeps this integration fixture clear of the afternoon
-                    # follow-ups and other emergent plans already in a mature calendar.
-                    "scheduled_hour": 8,
-                    "duration_hours": 2,
-                }
-                for step in project[3]
-            ]
+            steps = []
+            for step in project[3]:
+                location_id = step[3] if step[3] in known_places else "home"
+                steps.append(
+                    {
+                        "activity_type": step[0],
+                        "title": step[1],
+                        "action": step[2],
+                        "location_id": location_id,
+                        "resource_id": "none",
+                        "day_offset": step[4],
+                        # Morning keeps clear of afternoon follow-ups in a mature calendar;
+                        # on a working morning the step moves to the day's first free gap.
+                        "scheduled_hour": _standin_step_hour(context, location_id, step[4], 2),
+                        "duration_hours": 2,
+                    }
+                )
             return ModelResponse(
                 content=json.dumps(
                     {
@@ -1725,6 +1729,64 @@ def _standin_work_reply(message: str, context: dict[str, object], cadence: str) 
         "It's alright. Four days a week helping Ellis at the repair workshop. Not glamorous, "
         "but I like seeing something broken leave working."
     )
+
+
+def _standin_unexplored_place(
+    places: dict[str, Any], choice: int
+) -> tuple[str, str, str, str, str, str, str, int, int, float] | None:
+    """Now and then, go and look at somewhere he has noticed but never been."""
+    unexplored = sorted(
+        place_id
+        for place_id, place in places.items()
+        if isinstance(place, dict) and place.get("been_there") is False
+    )
+    if not unexplored or choice % 3:
+        return None
+    place_id = unexplored[choice % len(unexplored)]
+    name = str(places[place_id].get("name", place_id))
+    return (
+        "look_around",
+        f"Go and have a proper look at {name}",
+        "I keep passing it and have never actually been in.",
+        "attend",
+        place_id,
+        "none",
+        "none",
+        24,
+        1,
+        0.46,
+    )
+
+
+def _standin_step_hour(
+    context: dict[str, Any], location_id: str, day_offset: int, duration_hours: int
+) -> int:
+    """08:00 if that is clear, otherwise the day's first open hour the calendar leaves free."""
+    try:
+        now = datetime.fromisoformat(str(context.get("time")))
+    except ValueError:
+        return 8
+    day = (now + timedelta(days=day_offset)).replace(minute=0, second=0, microsecond=0)
+    place = context.get("known_places", {}).get(location_id, {})
+    opens = int(place.get("opens_hour", 0)) if isinstance(place, dict) else 0
+    closes = int(place.get("closes_hour", 24)) if isinstance(place, dict) else 24
+    busy: list[tuple[datetime, datetime]] = []
+    for entry in context.get("calendar", []):
+        try:
+            start = datetime.fromisoformat(str(entry["starts_at"]))
+            end = datetime.fromisoformat(str(entry.get("ends_at") or entry["starts_at"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        busy.append((start - timedelta(hours=1), end + timedelta(hours=1)))
+    candidates: list[int] = [8, *range(9, 21 - duration_hours)]
+    for hour in candidates:
+        start = day.replace(hour=hour)
+        end = start + timedelta(hours=duration_hours)
+        if not opens <= hour or end.hour > closes:
+            continue
+        if not any(start < busy_end and busy_start < end for busy_start, busy_end in busy):
+            return hour
+    return 8
 
 
 def _standin_free_slot(

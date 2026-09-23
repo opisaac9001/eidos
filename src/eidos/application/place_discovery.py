@@ -34,6 +34,15 @@ def known_place_ids(history: Sequence[DomainEvent], catalog: WorldCatalog) -> fr
     return frozenset(place for place in known if place in catalog.places)
 
 
+def visited_place_ids(history: Sequence[DomainEvent]) -> frozenset[str]:
+    """Places he has actually been: his home ground, and anywhere he has arrived."""
+    return HOME_GROUND | {
+        str(event.payload["location_id"])
+        for event in events_of(history, "pathos.moved")
+        if isinstance(event.payload.get("location_id"), str)
+    }
+
+
 def known_world(history: Sequence[DomainEvent], catalog: WorldCatalog) -> WorldCatalog:
     """The catalog as he knows it: only known places, with every street still walkable."""
     known = known_place_ids(history, catalog)

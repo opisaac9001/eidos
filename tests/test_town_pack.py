@@ -123,3 +123,23 @@ def test_his_known_world_hides_unknown_places_but_keeps_the_streets(tmp_path: Pa
         )
     place_id = noticed[0].payload["place_id"]
     assert place_id in known_world([*history, *noticed], catalog).places
+
+
+def test_somewhere_noticed_but_never_visited_is_an_occasional_outing() -> None:
+    from eidos.adapters.standin_gateway import _standin_unexplored_place
+    from eidos.application.place_discovery import visited_place_ids
+
+    moved = DomainEvent(
+        "pathos.moved",
+        "pathos",
+        {"location_id": "hardware", "simulated_at": NOW.isoformat()},
+    )
+    assert visited_place_ids([moved]) == HOME_GROUND | {"hardware"}
+    places = {
+        "park": {"name": "Park", "been_there": True},
+        "crown-anchor": {"name": "Crown & Anchor", "been_there": False},
+    }
+    outings = [_standin_unexplored_place(places, choice) for choice in range(6)]
+    assert [item is not None for item in outings] == [True, False, False, True, False, False]
+    assert outings[0] is not None and outings[0][4] == "crown-anchor"
+    assert _standin_unexplored_place({"park": places["park"]}, 0) is None
