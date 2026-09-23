@@ -117,6 +117,15 @@ from eidos.application.scene_story import bounded_scene_events, continuing_scene
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.self_concept import self_concept_events
 from eidos.application.self_projects import autonomous_project_events
+from eidos.application.selfhood import (
+    inquiry_for_reflection,
+    reflection_inquiry_context,
+    selfhood_after_reflection_events,
+    selfhood_chapter_events,
+    selfhood_context,
+    selfhood_daily_events,
+    selfhood_view,
+)
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
@@ -1194,6 +1203,7 @@ class Life:
                 "self_concepts": self_concept_context(history),
                 "established": identity.established,
             },
+            "selfhood": selfhood_view(history, state.simulated_at),
             "weather": weather,
             "external_signals": list(reversed(external_signals[-30:])),
             "world_packs": list(reversed(world_packs)),
@@ -2748,6 +2758,7 @@ class Life:
                     "preferences": list(identity_now.preferences),
                     "traits": dict(traits_now.levels),
                     "self_concepts": self_concept_context(history + pending),
+                    "selfhood": selfhood_context(history + pending, current),
                 },
                 "development": {
                     "skills": {
@@ -3088,6 +3099,9 @@ class Life:
             if recovery:
                 self._planning(history + pending + recovery)
                 pending.extend(recovery)
+            daily_self = selfhood_daily_events(history + pending, current)
+            pending.extend(daily_self)
+            pending.extend(await selfhood_chapter_events(history + pending, current, self.gateway))
             for role, scheduled_hour, kind in (
                 ("reflection", 21, "reflection.recorded"),
                 ("oneiros", 23, "dream.recorded"),
@@ -3099,6 +3113,15 @@ class Life:
                         **context,
                         "cognitive_workspace": cognitive_workspace(history + pending, current),
                     }
+                    tonight_inquiry = (
+                        inquiry_for_reflection(history + pending, current)
+                        if role == "reflection"
+                        else None
+                    )
+                    if tonight_inquiry is not None:
+                        role_context["self_inquiry"] = reflection_inquiry_context(
+                            history + pending, tonight_inquiry
+                        )
                     if role == "oneiros":
                         recent_dreams = [
                             item
@@ -3171,6 +3194,16 @@ class Life:
                                         history + pending, event, current
                                     )
                                 )
+                                if tonight_inquiry is not None:
+                                    pending.extend(
+                                        await selfhood_after_reflection_events(
+                                            history + pending,
+                                            event,
+                                            tonight_inquiry,
+                                            current,
+                                            self.gateway,
+                                        )
+                                    )
                             if role == "chronicler":
                                 pending.extend(
                                     DomainEvent(
@@ -3866,6 +3899,7 @@ class Life:
                 "preferences": list(identity.preferences),
                 "traits": dict(traits.levels),
                 "self_concepts": self_concept_context(history),
+                "selfhood": selfhood_context(history, state.simulated_at),
             },
             "memories": [item.recalled_text for item in selected],
             "memory_recollections": [

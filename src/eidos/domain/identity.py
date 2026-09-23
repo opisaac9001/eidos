@@ -8,14 +8,9 @@ from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.preferences import preference_dimensions
+from eidos.domain.selfhood import STARTING_VALUES, VALUE_CEILING, VALUE_FLOOR
 
-DEFAULT_VALUES: Mapping[str, float] = {
-    "care": 0.78,
-    "curiosity": 0.84,
-    "reliability": 0.74,
-    "autonomy": 0.68,
-    "craft": 0.72,
-}
+DEFAULT_VALUES: Mapping[str, float] = STARTING_VALUES
 DEFAULT_PREFERENCES = (
     "quiet mornings",
     "repairing useful objects",
@@ -158,6 +153,20 @@ def project_identity(events: Sequence[DomainEvent]) -> IdentityState:
                 (*DEFAULT_PREFERENCES, *learned.values()),
                 True,
             )
+        elif event.kind == "self.value_shifted":
+            seen[str(event.event_id)] = event
+            # Validated by the selfhood projection; identity only carries the result so every
+            # planner and performer sees the values he now holds rather than the pack's.
+            value_id = _required(event, "value_id")
+            if value_id in identity.values:
+                shift = float(event.payload["next"]) - float(event.payload["prior"])
+                shifted = dict(identity.values)
+                shifted[value_id] = round(
+                    max(VALUE_FLOOR, min(VALUE_CEILING, shifted[value_id] + shift)), 4
+                )
+                identity = IdentityState(
+                    identity.name, shifted, identity.preferences, identity.established
+                )
         elif event.kind != "identity.established":
             seen[str(event.event_id)] = event
             continue

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0c0a09" />
     <title>Eidos · A life unfolding</title>
-    <link rel="stylesheet" href="/style.css?v=20260907-hearth" />
-    <script src="/app.js?v=20260907-hearth" defer></script>
+    <link rel="stylesheet" href="/style.css?v=20260923-becoming" />
+    <script src="/app.js?v=20260923-becoming" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -34,13 +34,17 @@
           <span aria-hidden="true">▤</span> Memories
           <span class="nav-index">04</span>
         </button>
+        <button class="nav" data-view="self">
+          <span aria-hidden="true">◐</span> Becoming
+          <span class="nav-index">05</span>
+        </button>
         <button class="nav" data-view="plans" data-operator-only hidden>
           <span aria-hidden="true">⌁</span> Plans & time
-          <span class="nav-index">05</span>
+          <span class="nav-index">06</span>
         </button>
         <button class="nav" data-view="engine" data-operator-only hidden>
           <span aria-hidden="true">⏣</span> The ensemble
-          <span class="nav-index">06</span>
+          <span class="nav-index">07</span>
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -514,6 +518,41 @@
           <summary>Why memories surfaced</summary>
           <div id="recall-traces" aria-label="Memory recall explanations"></div>
         </details>
+      </section>
+
+      <section id="view-self" class="view" hidden>
+        <p class="self-lede">
+          Nobody wrote this part. It grows only from how he has actually lived:
+          the questions he can't put down, what he comes to understand, and the
+          slow drift in what matters to him.
+        </p>
+        <div class="self-grid">
+          <section class="panel self-chapters" aria-labelledby="self-chapters-title">
+            <div class="panel-kicker">
+              <span id="self-chapters-title">CHAPTERS OF HIS LIFE</span>
+            </div>
+            <ol id="self-chapters" class="chapter-list"></ol>
+          </section>
+          <section class="panel self-values" aria-labelledby="self-values-title">
+            <div class="panel-kicker">
+              <span id="self-values-title">WHAT MATTERS TO HIM</span>
+              <span class="muted">last 3 weeks</span>
+            </div>
+            <div id="self-values"></div>
+          </section>
+          <section class="panel self-questions" aria-labelledby="self-questions-title">
+            <div class="panel-kicker">
+              <span id="self-questions-title">WHAT HE'S WONDERING ABOUT</span>
+            </div>
+            <div id="self-questions"></div>
+          </section>
+          <section class="panel self-possible" aria-labelledby="self-possible-title">
+            <div class="panel-kicker">
+              <span id="self-possible-title">WHO HE HOPES — AND FEARS — TO BECOME</span>
+            </div>
+            <div id="self-possible"></div>
+          </section>
+        </div>
       </section>
 
       <section id="view-plans" class="view" hidden>

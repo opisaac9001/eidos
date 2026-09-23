@@ -3,6 +3,7 @@
 import hashlib
 import json
 from datetime import datetime
+from typing import Any
 
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
@@ -360,6 +361,9 @@ def _standin_pathos_text(
         return f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
     if "private thing" in message or "don't know" in message:
         return "Honestly, I don't know. Mara kept that to herself."
+    self_reply = _standin_self_reply(message, context, cadence)
+    if self_reply:
+        return self_reply
     if any(word in message for word in ("remember", "yesterday", "today", "day")):
         openings = {
             "clipped": ("It's been a day.", "Bit full-on, honestly."),
@@ -533,6 +537,8 @@ class StandInGateway(ModelGateway):
                     f"{_temporal_choice(options, context.get('time'), str(person))} "
                     f"{ambient}, {ending}."
                 )
+        elif role == "reflection" and isinstance(context.get("self_inquiry"), dict):
+            text = _standin_inquiry_reflection(context["self_inquiry"], context.get("time"))
         elif role == "reflection":
             text = _temporal_choice(
                 (
@@ -742,6 +748,13 @@ class StandInGateway(ModelGateway):
             )[occurrence]
             return ModelResponse(
                 content=json.dumps(expansion),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "pathos_selfhood":
+            return ModelResponse(
+                content=json.dumps(_standin_selfhood(context, choice)),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",
@@ -1256,3 +1269,254 @@ class StandInGateway(ModelGateway):
             backend="deterministic",
             finish_reason="stop",
         )
+
+
+_STANDIN_INSIGHTS: dict[tuple[str, str], tuple[str, str, int, str, str]] = {
+    # (theme, kind): (insight, value_id, direction, possible-self kind, possible self)
+    ("reliability", "tension"): (
+        "I think I say yes to more than my days can hold, then quietly drop the smallest "
+        "thing. Keeping my word matters to me more than I'd been admitting.",
+        "reliability",
+        1,
+        "hoped",
+        "I want my small promises to be as solid as my big ones.",
+    ),
+    ("reliability", "thriving"): (
+        "Keeping to what I said I'd do has started to feel less like duty and more like how "
+        "I steady myself.",
+        "reliability",
+        1,
+        "hoped",
+        "I want people to be able to count on the small things I say.",
+    ),
+    ("reliability", "dormant"): (
+        "I've stopped planning much at all, maybe so nothing can slip. That isn't the same "
+        "as being someone people can rely on.",
+        "reliability",
+        0,
+        "feared",
+        "I don't want to become someone who never commits so he can never fail.",
+    ),
+    ("care", "tension"): (
+        "I keep meaning to be there for people and letting the moment pass. I'd rather be a "
+        "bit less comfortable and a bit more present.",
+        "care",
+        1,
+        "hoped",
+        "I want to be the friend who actually picks up.",
+    ),
+    ("care", "thriving"): (
+        "Time with other people used to be something I fitted in around things. Lately it "
+        "feels closer to the point.",
+        "care",
+        1,
+        "hoped",
+        "I'd like to be someone people are glad to see come in.",
+    ),
+    ("care", "dormant"): (
+        "I've let the people around here drift to the edge of my weeks. I don't want that to "
+        "become normal.",
+        "care",
+        1,
+        "feared",
+        "I don't want to become someone nobody quite expects to see.",
+    ),
+    ("craft", "tension"): (
+        "Leaving things half-made bothers me more than I let on. Finishing is part of the "
+        "work, not the dull end of it.",
+        "craft",
+        1,
+        "feared",
+        "I don't want to become someone surrounded by nearly finished things.",
+    ),
+    ("craft", "thriving"): (
+        "Steady work on something with my hands settles me in a way little else does. I "
+        "think it's become part of how I know I'm alright.",
+        "craft",
+        1,
+        "hoped",
+        "I want my hands to keep knowing what they're doing.",
+    ),
+    ("craft", "dormant"): (
+        "I haven't made anything in a while, and I miss it more than I expected to.",
+        "craft",
+        1,
+        "hoped",
+        "I'd like to always have one small thing on the go that I'm making properly.",
+    ),
+    ("curiosity", "tension"): (
+        "I've been letting interesting things go past because stopping felt like effort. "
+        "That's a trade I don't think I actually want.",
+        "curiosity",
+        1,
+        "hoped",
+        "I'd like to stay someone who still gets surprised by his own street.",
+    ),
+    ("curiosity", "thriving"): (
+        "I'm happiest when a day has at least one small thing in it I didn't expect to learn.",
+        "curiosity",
+        1,
+        "hoped",
+        "I want to keep following small interests wherever they lead.",
+    ),
+    ("curiosity", "dormant"): (
+        "My days got narrow without my noticing. I don't need anything grand, just the habit "
+        "of following a small interest when it shows up.",
+        "curiosity",
+        1,
+        "hoped",
+        "I'd like to stay someone who still gets surprised by his own street.",
+    ),
+    ("autonomy", "tension"): (
+        "I've been arranging my days around what I think I ought to do, and I can feel it.",
+        "autonomy",
+        1,
+        "hoped",
+        "I want to keep some of my days properly my own.",
+    ),
+    ("autonomy", "thriving"): (
+        "Some of my best hours lately were the ones I chose for no reason at all. I think I "
+        "need more of those than I let myself have.",
+        "autonomy",
+        1,
+        "hoped",
+        "I want to keep some of my days properly my own.",
+    ),
+    ("autonomy", "dormant"): (
+        "I can't remember the last thing I did purely because I wanted to. That seems worth "
+        "noticing.",
+        "autonomy",
+        1,
+        "none",
+        "",
+    ),
+    ("mood", "tension"): (
+        "I don't think the heaviness is about one thing. It gathers when I stop doing small "
+        "ordinary things for myself, and eases a little when I start again.",
+        "none",
+        0,
+        "none",
+        "",
+    ),
+}
+_STANDIN_CHAPTERS: dict[str, tuple[str, str]] = {
+    "care": ("Letting people in", "letting other people matter more to how my weeks go"),
+    "craft": ("Learning to finish things", "caring about finishing what I start"),
+    "reliability": ("Keeping my word", "noticing what my plans cost when I let them slip"),
+    "curiosity": ("Widening the circle", "letting my days get a little less narrow"),
+    "autonomy": ("Making room for myself", "claiming a few hours that are simply mine"),
+}
+
+
+def _standin_selfhood(context: dict[str, Any], choice: int) -> dict[str, object]:
+    """Deterministic, conservative self-understanding for offline worlds."""
+    if context.get("task") == "chapter":
+        candidates = [item for item in context.get("candidates", []) if isinstance(item, dict)]
+        insight_themes = [
+            str(item.get("kind")).removeprefix("insight:")
+            for item in candidates
+            if str(item.get("kind", "")).startswith("insight:")
+        ]
+        earlier = {str(item).casefold() for item in context.get("earlier_titles", [])}
+        ordered = [theme for theme in reversed(insight_themes) if theme in _STANDIN_CHAPTERS]
+        ordered += [theme for theme in _STANDIN_CHAPTERS if theme not in ordered]
+        theme = next(
+            (item for item in ordered if _STANDIN_CHAPTERS[item][0].casefold() not in earlier),
+            ordered[0],
+        )
+        title, change = _STANDIN_CHAPTERS[theme]
+        return {
+            "title": title,
+            "summary": (
+                f"Looking back, these weeks were less about any single day than about {change}. "
+                "I noticed it in small things before I could name it."
+            ),
+            "cited": [str(item["id"]) for item in candidates[:3]],
+        }
+    reflections = context.get("my_reflections", [])
+    theme = str(context.get("theme", "mood"))
+    if not isinstance(reflections, list) or len(reflections) < 2 or choice % 4 == 0:
+        return {
+            "mode": "keep_wondering",
+            "insight": "",
+            "value_id": "none",
+            "direction": 0,
+            "aspiration_kind": "none",
+            "aspiration": "",
+        }
+    kind_of_question = str(context.get("kind", "tension"))
+    insight, value_id, direction, kind, aspiration = _STANDIN_INSIGHTS.get(
+        (theme, kind_of_question),
+        _STANDIN_INSIGHTS.get((theme, "tension"), _STANDIN_INSIGHTS[("mood", "tension")]),
+    )
+    return {
+        "mode": "insight",
+        "insight": insight,
+        "value_id": value_id,
+        "direction": direction,
+        "aspiration_kind": kind,
+        "aspiration": aspiration,
+    }
+
+
+def _standin_inquiry_reflection(inquiry: dict[str, Any], time: object) -> str:
+    """Circle a private question without answering it on cue."""
+    prompted = [str(item) for item in inquiry.get("what_prompted_it", []) if item]
+    moment = prompted[-1] if prompted else "the way this week has gone"
+    earlier = inquiry.get("earlier_thoughts", [])
+    opener = _temporal_choice(
+        (
+            f"Something small keeps nagging at me. Lately I {moment}, and I'm not sure what "
+            "that says about me yet.",
+            f"I keep noticing a pattern I'd rather not look at too hard: I {moment}. "
+            "Maybe it's nothing. Maybe it isn't.",
+            f"I don't have an answer tonight. I just know I {moment}, and it sat with me "
+            "longer than it should have.",
+            f"If I'm honest, the part of today I keep returning to is that I {moment}.",
+        ),
+        time,
+        f"inquiry:{inquiry.get('question', '')}",
+    )
+    if isinstance(earlier, list) and earlier:
+        return opener + " It's not the first time I've come back to this."
+    return opener
+
+
+_SELF_CUES = (
+    "on your mind",
+    "thinking about",
+    "who are you",
+    "about yourself",
+    "changed",
+    "lately",
+    "these days",
+    "what matters",
+    "who you are",
+    "your life",
+)
+
+
+def _standin_self_reply(message: str, context: dict[str, object], cadence: str) -> str | None:
+    """Answer questions about himself from his actual self-understanding, briefly."""
+    if not any(cue in message for cue in _SELF_CUES):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    if not isinstance(selfhood, dict):
+        return None
+    wondering = [str(item) for item in selfhood.get("wondering_about", []) if item]
+    insights = [str(item) for item in selfhood.get("recent_insights", []) if item]
+    chapter = selfhood.get("chapter")
+    if ("changed" in message or "your life" in message) and isinstance(chapter, dict):
+        return (
+            f"Honestly? I think of the last while as {chapter.get('title', 'a new stretch')}"
+            f"{'' if cadence == 'clipped' else ', if that makes sense'}. "
+            + (insights[-1] if insights else "I'm still working out what it adds up to.")
+        )
+    if wondering:
+        question = wondering[0].rstrip("?").lower()
+        opener = "Bit of a big one" if cadence == "clipped" else "Funny you ask, actually"
+        return f"{opener}. I keep wondering {question}. I don't have an answer yet."
+    if insights:
+        return f"I've been thinking about it less lately. {insights[-1]}"
+    return None

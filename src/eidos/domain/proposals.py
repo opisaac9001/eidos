@@ -11,6 +11,7 @@ STRUCTURED_CAPABILITIES = {
     "npc_backstory",
     "pathos_agency",
     "pathos_deliberation",
+    "pathos_selfhood",
     "pathos_project",
 }
 

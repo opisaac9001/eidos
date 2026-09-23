@@ -101,6 +101,24 @@ ROLE_PROMPTS["reflection"] = (
     "personal observation over a life lesson, community platitude, or literary metaphor. "
     + ROLE_PROMPTS["reflection"]
 )
+ROLE_PROMPTS["pathos_selfhood"] = (
+    "You voice Patrick's private self-understanding. With task insight, read his own "
+    "reflections on one open question about himself and decide whether they have genuinely "
+    "arrived somewhere. If not, choose keep_wondering; that is common and healthy. If they "
+    "have, write one modest insight in his first-person voice: plain, specific, a little "
+    "tentative, never a slogan, therapy phrase or diagnosis. A value may matter more or less "
+    "to him than he thought, but only in the direction his supplied lived evidence supports. "
+    "A possible self is an honest hope or fear about who he is becoming, not a plan. With task "
+    "chapter, name the new chapter of his life as he would privately think of it (a short "
+    "title, not a sentence) and summarise what changed in two or three first-person sentences "
+    "using only the supplied candidates, citing their ids. Never invent events, people, "
+    "places, promises or completed actions."
+)
+ROLE_PROMPTS["reflection"] += (
+    " If self_inquiry is supplied, let the reflection turn toward that private question "
+    "honestly. He need not answer it: circling it, doubting it, or noticing one small true "
+    "thing is enough. Do not quote the question back verbatim."
+)
 ROLE_PROMPTS["pathos_agency"] = (
     "Turn Patrick's one supplied chosen_impulse into a practical proposed schedule, "
     "or defer it when it cannot be made concrete now. The motivational decision has "
@@ -180,6 +198,7 @@ ROLE_FIELDS = {
     "mnemosyne": ("experience",),
     "reflection": (
         "identity",
+        "self_inquiry",
         "memories",
         "memory_recollections",
         "dream_inspirations",
@@ -271,6 +290,22 @@ ROLE_FIELDS = {
         "permission",
     ),
     "npc_backstory": ("time", "resident", "permission"),
+    "pathos_selfhood": (
+        "task",
+        "time",
+        "question",
+        "theme",
+        "what_prompted_it",
+        "my_reflections",
+        "values",
+        "recent_lived_evidence",
+        "possible_selves",
+        "closing_chapter",
+        "earlier_titles",
+        "what_changed",
+        "candidates",
+        "permission",
+    ),
     "pathos_project": (
         "time",
         "needs",

@@ -6,6 +6,7 @@ const ordinaryViews = new Set([
   "world",
   "conversation",
   "memories",
+  "self",
 ]);
 const esc = (value) =>
   String(value ?? "").replace(
@@ -231,6 +232,7 @@ const views = {
     "CONVERSATION",
   ],
   memories: ["THE THINGS THAT STAY", "A life, remembered.", "MEMORIES"],
+  self: ["A SELF, SLOWLY WRITTEN", "Who he is becoming.", "BECOMING"],
   plans: [
     "INTENTIONS, PROMISES & TIME",
     "A future with consequences.",
@@ -966,6 +968,115 @@ async function loadMemoryArchive(reset) {
   }
 }
 
+const VALUE_NAMES = {
+  care: "Care for people",
+  curiosity: "Curiosity",
+  reliability: "Keeping his word",
+  autonomy: "A life of his own",
+  craft: "Making things well",
+};
+
+function valueSpark(trajectory) {
+  const points = trajectory.map((item) => Number(item.value));
+  if (points.length < 2) return "";
+  const low = Math.min(...points) - 0.02,
+    high = Math.max(...points) + 0.02;
+  const coords = points
+    .map((value, index) => {
+      const x = (index / (points.length - 1)) * 60;
+      const y = 16 - ((value - low) / (high - low || 1)) * 14;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return `<svg class="value-spark" viewBox="0 0 60 18" aria-hidden="true"><polyline points="${coords}" /></svg>`;
+}
+
+function renderSelf() {
+  const self = state && state.selfhood;
+  if (!self) return;
+  const chapters = self.chapters || [];
+  $("self-chapters").innerHTML = chapters.length
+    ? chapters
+        .slice()
+        .reverse()
+        .map(
+          (item) => `<li class="chapter${item.closed_at ? "" : " current"}">
+            <div class="chapter-number">Chapter ${esc(item.number)}</div>
+            <div class="chapter-title">${esc(item.title)}</div>
+            <div class="chapter-dates">${date(item.opened_at)}${item.closed_at ? ` – ${date(item.closed_at)}` : " – now"}</div>
+            <p>${esc(item.summary)}</p>
+          </li>`,
+        )
+        .join("")
+    : '<li class="empty-note">His first chapter begins once he has lived a little.</li>';
+  $("self-values").innerHTML = (self.values || [])
+    .map((item) => {
+      const shift = Number(item.current) - Number(item.starting);
+      const direction =
+        Math.abs(shift) < 0.005 ? "" : shift > 0 ? "matters more" : "matters less";
+      const lived = "●".repeat(Math.min(8, item.honoured_recently));
+      const missed = "○".repeat(Math.min(8, item.neglected_recently));
+      return `<div class="value-row">
+        <div class="value-head"><span>${esc(VALUE_NAMES[item.value_id] || words(item.value_id))}</span>
+          ${direction ? `<span class="value-shift ${shift > 0 ? "up" : "down"}">${direction}</span>` : ""}
+          ${valueSpark(item.trajectory || [])}</div>
+        <div class="value-bar" role="img" aria-label="${esc(words(item.value_id))} ${Math.round(item.current * 100)} of 100">
+          <span class="value-start" style="left:${(item.starting * 100).toFixed(1)}%"></span>
+          <span class="value-fill" style="width:${(item.current * 100).toFixed(1)}%"></span>
+        </div>
+        <div class="value-evidence" title="Lived up to it / let it slip, last three weeks">
+          <span class="lived">${lived}</span><span class="missed">${missed}</span>
+        </div>
+      </div>`;
+    })
+    .join("");
+  const inquiries = self.inquiries || [];
+  const open = inquiries.filter((item) => item.status === "open");
+  const closed = inquiries.filter((item) => item.status !== "open").slice(0, 6);
+  $("self-questions").innerHTML =
+    (open.length
+      ? open
+          .map(
+            (item) => `<div class="inquiry open">
+              <p class="inquiry-question">${esc(item.question)}</p>
+              <div class="inquiry-meta">Open since ${date(item.opened_at)} · returned to it ${item.revisits}×</div>
+            </div>`,
+          )
+          .join("")
+      : '<p class="empty-note">Nothing is nagging at him right now.</p>') +
+    (closed.length
+      ? `<div class="inquiry-history">${closed
+          .map(
+            (item) => `<div class="inquiry ${esc(item.status)}">
+              <p class="inquiry-question">${esc(item.question)}</p>
+              ${
+                item.insight
+                  ? `<blockquote class="insight">${esc(item.insight)}</blockquote>`
+                  : '<div class="inquiry-meta">Set down without an answer.</div>'
+              }
+            </div>`,
+          )
+          .join("")}</div>`
+      : "");
+  const possible = (self.aspirations || []).filter((item) => item.status === "active");
+  $("self-possible").innerHTML = possible.length
+    ? possible
+        .map((item) => {
+          const total = item.lived + item.strayed;
+          const share = total ? Math.round((item.lived / total) * 100) : 0;
+          return `<div class="possible ${esc(item.kind)}">
+            <div class="possible-kind">${item.kind === "hoped" ? "Hopes to become" : "Fears becoming"}</div>
+            <p>${esc(item.text)}</p>
+            <div class="possible-track" title="Moments that moved him toward or away from this">
+              <span style="width:${share}%"></span>
+            </div>
+            <div class="inquiry-meta">${item.lived} moments ${item.kind === "hoped" ? "toward it" : "away from it"} · ${item.strayed} the other way</div>
+          </div>`;
+        })
+        .join("")
+    : '<p class="empty-note">No clear hope or fear about himself has taken shape yet.</p>';
+}
+
 function renderEngineFeed() {
   if (!state) return;
   const filter = $("feed-filter").value;
@@ -1543,6 +1654,7 @@ function render(next) {
   if (currentView === "memories" && !archivePage && !archiveLoading)
     loadMemoryArchive(true);
   renderPlans();
+  renderSelf();
   renderEngineFeed();
   $("diagnostics").innerHTML =
     (state.diagnostics || [])
