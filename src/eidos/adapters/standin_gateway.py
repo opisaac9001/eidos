@@ -1436,6 +1436,83 @@ _STANDIN_INSIGHTS: dict[tuple[str, str], tuple[str, str, int, str, str]] = {
         "",
     ),
 }
+# Coming back to a theme later: a refinement or complication, not the same realisation.
+_STANDIN_FURTHER_INSIGHTS: dict[str, tuple[tuple[str, str, int, str, str], ...]] = {
+    "autonomy": (
+        (
+            "I used to feel I had to justify a free afternoon. Lately I just take it, and I "
+            "think I'm better company for it.",
+            "autonomy",
+            1,
+            "hoped",
+            "I want my free time to feel like mine without having to earn it.",
+        ),
+    ),
+    "reliability": (
+        (
+            "It isn't the big commitments I drop. It's the ones I agreed to while tired. I "
+            "should say no more often, and mean yes when I say it.",
+            "reliability",
+            1,
+            "hoped",
+            "I want my word to be something people don't have to double-check.",
+        ),
+    ),
+    "care": (
+        (
+            "I think I show up best when I'm not trying to be useful, just present.",
+            "care",
+            1,
+            "hoped",
+            "I'd like people to feel easier for having me around.",
+        ),
+        (
+            "I keep telling myself I'll ring back later. Later is doing a lot of work in that "
+            "sentence.",
+            "care",
+            1,
+            "feared",
+            "I don't want to be the friend who's always about to call back.",
+        ),
+    ),
+    "craft": (
+        (
+            "Some things I leave unfinished because they stopped mattering, and that's fine. "
+            "The ones that bother me are the ones I dropped because I was tired.",
+            "none",
+            0,
+            "none",
+            "",
+        ),
+        (
+            "Doing the finishing properly has become a way of respecting the thing, and "
+            "whoever it belongs to.",
+            "craft",
+            1,
+            "hoped",
+            "I want people to be able to tell I took care over it.",
+        ),
+    ),
+    "curiosity": (
+        (
+            "I learn more from staying with one small thing than from chasing lots of new ones.",
+            "curiosity",
+            1,
+            "hoped",
+            "I'd like to know a few things really well.",
+        ),
+    ),
+    "mood": (
+        (
+            "The low patches pass quicker when I let someone know about them instead of waiting "
+            "them out on my own.",
+            "none",
+            0,
+            "none",
+            "",
+        ),
+    ),
+}
 _STANDIN_CHAPTERS: dict[str, tuple[str, str]] = {
     "care": ("Letting people in", "letting other people matter more to how my weeks go"),
     "craft": ("Learning to finish things", "caring about finishing what I start"),
@@ -1482,10 +1559,25 @@ def _standin_selfhood(context: dict[str, Any], choice: int) -> dict[str, object]
             "aspiration": "",
         }
     kind_of_question = str(context.get("kind", "tension"))
-    insight, value_id, direction, kind, aspiration = _STANDIN_INSIGHTS.get(
-        (theme, kind_of_question),
-        _STANDIN_INSIGHTS.get((theme, "tension"), _STANDIN_INSIGHTS[("mood", "tension")]),
-    )
+    concluded = [str(item) for item in context.get("earlier_insights", []) if item]
+    variants = [
+        _STANDIN_INSIGHTS.get(
+            (theme, kind_of_question),
+            _STANDIN_INSIGHTS.get((theme, "tension"), _STANDIN_INSIGHTS[("mood", "tension")]),
+        ),
+        *_STANDIN_FURTHER_INSIGHTS.get(theme, ()),
+    ]
+    fresh = [item for item in variants if item[0] not in concluded]
+    if not fresh:
+        return {
+            "mode": "keep_wondering",
+            "insight": "",
+            "value_id": "none",
+            "direction": 0,
+            "aspiration_kind": "none",
+            "aspiration": "",
+        }
+    insight, value_id, direction, kind, aspiration = fresh[0]
     return {
         "mode": "insight",
         "insight": insight,

@@ -100,8 +100,13 @@ _QUESTIONS: Mapping[tuple[str, str], tuple[str, ...]] = {
     ),
     ("reliability", "thriving"): (
         "Is keeping my word starting to matter more to me than it used to?",
+        "Why does following through feel steadier than it used to?",
     ),
-    ("autonomy", "thriving"): ("Do I need more room to myself than I used to admit?",),
+    ("autonomy", "thriving"): (
+        "Do I need more room to myself than I used to admit?",
+        "Why do my own quiet hours feel so necessary lately?",
+        "Am I protecting my free time, or hiding in it?",
+    ),
     ("mood", "tension"): (
         "What has been weighing on me lately?",
         "Why has everything felt heavier than it should these past few days?",
@@ -263,7 +268,11 @@ def _maybe_open_inquiry(state: SelfhoodState, simulated_at: datetime) -> DomainE
     sources = [item.event_id for item in evidence[-5:]] or list(state.reflection_ids[-3:])
     if not sources:
         return None
-    options = _QUESTIONS[(theme, kind)]
+    asked_before = {item.question for item in state.inquiries.values()}
+    options = (
+        tuple(option for option in _QUESTIONS[(theme, kind)] if option not in asked_before)
+        or _QUESTIONS[(theme, kind)]
+    )
     date = simulated_at.date().isoformat()
     pick = int(sha256(f"{theme}:{kind}:{date}".encode()).hexdigest()[:8], 16) % len(options)
     inquiry_id = f"inquiry-{theme}-{date}"
@@ -421,10 +430,18 @@ async def _insight_events(
         "my_reflections": _reflection_texts(history, [rid for rid, _ in inquiry.revisits]),
         "values": values,
         "recent_lived_evidence": _evidence_summary(state, simulated_at),
+        "earlier_insights": [
+            item.text
+            for item in sorted(state.insights.values(), key=lambda entry: entry.formed_at)
+            if state.inquiries.get(item.inquiry_id) is not None
+            and state.inquiries[item.inquiry_id].theme == inquiry.theme
+        ][-3:],
         "possible_selves": [
             {"kind": item.kind, "text": item.text} for item in state.active_aspirations()
         ],
         "permission": (
+            "If earlier_insights exist on this theme, do not restate them: only a genuinely "
+            "further step (a refinement, a complication, a change of heart) counts. "
             "Only if the reflections have genuinely arrived somewhere, state one modest insight "
             "in Patrick's own first-person words. Otherwise keep wondering. An insight may say "
             "a value matters more or less to him than he thought, but only in line with how he "

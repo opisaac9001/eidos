@@ -309,6 +309,7 @@ ROLE_FIELDS = {
         "my_reflections",
         "values",
         "recent_lived_evidence",
+        "earlier_insights",
         "possible_selves",
         "closing_chapter",
         "earlier_titles",
