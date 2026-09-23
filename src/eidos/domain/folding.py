@@ -15,7 +15,7 @@ frozen projection state in the domain already is.
 from __future__ import annotations
 
 import operator
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Hashable, Iterator, Sequence
 from threading import Lock
 from typing import Generic, TypeVar
 
@@ -140,6 +140,98 @@ class GrowOnlyMap(Generic[K, V]):
             data = {k: item for k, item in data.items() if item[0] < self._size}
         data[key] = (self._size, value)
         return GrowOnlyMap(data, self._size + 1)
+
+
+class _MapLog(Generic[K, V]):
+    __slots__ = ("latest", "older", "writes")
+
+    def __init__(self) -> None:
+        # ``latest`` keeps keys in first-write order, exactly like a dict that is assigned
+        # to repeatedly; ``older`` holds the superseded writes of overwritten keys.
+        self.latest: dict[K, tuple[int, V]] = {}
+        self.older: dict[K, list[tuple[int, V]]] = {}
+        self.writes = 0
+
+
+class PersistentMap(Generic[K, V]):
+    """A persistent map with plain ``dict`` assignment semantics for folds.
+
+    Unlike ``GrowOnlyMap`` a later write to a key replaces its value (last write wins) while
+    the key keeps its original iteration position, matching ``d[key] = value``. Successive
+    states share one write log and each sees only the writes made before it, so the linear
+    case costs O(1) per write; extending a state after another branch already wrote copies
+    that state's visible entries first. Old states stay exact and immutable.
+    """
+
+    __slots__ = ("_log", "_size")
+
+    def __init__(self, log: _MapLog[K, V] | None = None, size: int = 0) -> None:
+        self._log: _MapLog[K, V] = _MapLog() if log is None else log
+        self._size = size
+
+    def _visible(self, key: K) -> tuple[int, V] | None:
+        item = self._log.latest.get(key)
+        if item is None:
+            return None
+        if item[0] < self._size:
+            return item
+        for entry in reversed(self._log.older.get(key, ())):
+            if entry[0] < self._size:
+                return entry
+        return None
+
+    def get(self, key: K) -> V | None:
+        item = self._visible(key)
+        return None if item is None else item[1]
+
+    def __getitem__(self, key: K) -> V:
+        item = self._visible(key)
+        if item is None:
+            raise KeyError(key)
+        return item[1]
+
+    def __contains__(self, key: object) -> bool:
+        return self._visible(key) is not None  # type: ignore[arg-type]
+
+    def items(self) -> Iterator[tuple[K, V]]:
+        """Visible entries in first-write order, as ``dict.items()`` would yield them."""
+        older = self._log.older
+        for key, item in self._log.latest.items():
+            first = older[key][0] if key in older else item
+            if first[0] >= self._size:
+                break
+            visible = self._visible(key)
+            assert visible is not None
+            yield key, visible[1]
+
+    def values(self) -> Iterator[V]:
+        return (value for _key, value in self.items())
+
+    def with_item(self, key: K, value: V) -> PersistentMap[K, V]:
+        log = self._log
+        if log.writes != self._size:
+            log = self._fork()
+        previous = log.latest.get(key)
+        if previous is not None:
+            log.older.setdefault(key, []).append(previous)
+        log.latest[key] = (self._size, value)
+        log.writes = self._size + 1
+        return PersistentMap(log, self._size + 1)
+
+    def _fork(self) -> _MapLog[K, V]:
+        log: _MapLog[K, V] = _MapLog()
+        source = self._log
+        for key, item in source.latest.items():
+            visible = [
+                entry for entry in (*source.older.get(key, ()), item) if entry[0] < self._size
+            ]
+            if not visible:
+                break
+            log.latest[key] = visible[-1]
+            if len(visible) > 1:
+                log.older[key] = visible[:-1]
+        log.writes = self._size
+        return log
 
 
 _EVENT_INDEX: IncrementalFold[GrowOnlyMap[str, DomainEvent]] = IncrementalFold(

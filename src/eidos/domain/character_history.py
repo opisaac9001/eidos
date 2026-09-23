@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from types import MappingProxyType
-from typing import Mapping, Sequence
+from typing import Mapping, NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GrowOnlyMap, IncrementalFold
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,28 +86,42 @@ class CharacterHistory:
         return CharacterHistory(facts)
 
 
-def project_character_history(events: Sequence[DomainEvent]) -> CharacterHistory:
-    state = CharacterHistory.empty()
-    prior: list[DomainEvent] = []
-    for event in events:
-        if event.kind == "npc.biography_disclosed":
-            fact_id = _required(event, "fact_id")
-            fact = state.facts.get(fact_id)
-            source_id = _required(event, "source_turn_event_id")
-            turn = next((item for item in prior if str(item.event_id) == source_id), None)
-            if fact is None or turn is None or turn.kind != "scene.turn_taken":
-                raise ValueError("Character disclosure needs a prior spoken scene turn")
-            if (
-                turn.event_id != event.causation_id
-                or turn.payload.get("actor_id") != fact.person_id
-                or turn.payload.get("audience_id") != "pathos"
-                or turn.payload.get("scene_id") != event.payload.get("scene_id")
-                or fact.text.casefold() not in str(turn.payload.get("text", "")).casefold()
-            ):
-                raise ValueError("Character disclosure does not match the cited utterance")
+class _HistoryFold(NamedTuple):
+    state: CharacterHistory
+    # Earlier events by id, first occurrence winning like the former ordered scan.
+    prior: GrowOnlyMap[str, DomainEvent]
+
+
+def _history_step(fold: _HistoryFold, event: DomainEvent) -> _HistoryFold:
+    state = fold.state
+    if event.kind == "npc.biography_disclosed":
+        fact_id = _required(event, "fact_id")
+        fact = state.facts.get(fact_id)
+        source_id = _required(event, "source_turn_event_id")
+        turn = fold.prior.get(source_id)
+        if fact is None or turn is None or turn.kind != "scene.turn_taken":
+            raise ValueError("Character disclosure needs a prior spoken scene turn")
+        if (
+            turn.event_id != event.causation_id
+            or turn.payload.get("actor_id") != fact.person_id
+            or turn.payload.get("audience_id") != "pathos"
+            or turn.payload.get("scene_id") != event.payload.get("scene_id")
+            or fact.text.casefold() not in str(turn.payload.get("text", "")).casefold()
+        ):
+            raise ValueError("Character disclosure does not match the cited utterance")
+    if event.kind in {"npc.biography_seeded", "npc.biography_disclosed"}:
+        # ``apply`` leaves the facts unchanged for every other kind.
         state = state.apply(event)
-        prior.append(event)
-    return state
+    return _HistoryFold(state, fold.prior.with_item(str(event.event_id), event))
+
+
+_HISTORY_FOLD: IncrementalFold[_HistoryFold] = IncrementalFold(
+    lambda: _HistoryFold(CharacterHistory.empty(), GrowOnlyMap()), _history_step
+)
+
+
+def project_character_history(events: Sequence[DomainEvent]) -> CharacterHistory:
+    return _HISTORY_FOLD(events).state
 
 
 def eligible_character_fact(

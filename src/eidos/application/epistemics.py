@@ -6,25 +6,29 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold
+
+_KNOWING_KINDS = frozenset({"npc.encountered", "memory.recorded", "person.introduced_to_pathos"})
+
+
+def _known_step(known: frozenset[str], event: DomainEvent) -> frozenset[str]:
+    owner = event.payload.get("owner", "pathos")
+    if owner not in {"pathos", "user"}:
+        return known
+    person_id = event.payload.get("person_id")
+    if not isinstance(person_id, str) or not person_id:
+        return known
+    if event.kind in _KNOWING_KINDS and person_id not in known:
+        return known | {person_id}
+    return known
+
+
+_KNOWN_FOLD: IncrementalFold[frozenset[str]] = IncrementalFold(frozenset, _known_step)
 
 
 def pathos_known_person_ids(history: Sequence[DomainEvent]) -> frozenset[str]:
     """Return people supported by Pathos-owned encounter or memory evidence."""
-    known: set[str] = set()
-    for event in history:
-        owner = event.payload.get("owner", "pathos")
-        if owner not in {"pathos", "user"}:
-            continue
-        person_id = event.payload.get("person_id")
-        if not isinstance(person_id, str) or not person_id:
-            continue
-        if event.kind in {
-            "npc.encountered",
-            "memory.recorded",
-            "person.introduced_to_pathos",
-        }:
-            known.add(person_id)
-    return frozenset(known)
+    return _KNOWN_FOLD(history)
 
 
 def pathos_person_introduction_event(

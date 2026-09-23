@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from types import MappingProxyType
+from typing import NamedTuple
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GrowOnlyMap, IncrementalFold, PersistentMap
 
 STRATEGIES = {
     "grounding_pause",
@@ -85,45 +87,69 @@ class RegulationState:
         return RegulationState(attempts)
 
 
+class _RegulationFold(NamedTuple):
+    state: RegulationState
+    prior: PersistentMap[str, DomainEvent]
+    # Accepted selections by their raw ``regulation_id``. ``apply`` rejects a second
+    # selection of the same (stripped) id, so each raw id names at most one selection.
+    selected: GrowOnlyMap[str, DomainEvent]
+
+
+_REGULATION_KINDS = frozenset(
+    {"emotion.regulation_selected", "emotion.regulation_practiced", "emotion.regulation_completed"}
+)
+
+
+def _regulation_step(fold: _RegulationFold, event: DomainEvent) -> _RegulationFold:
+    prior = fold.prior
+    if event.kind not in _REGULATION_KINDS:
+        # ``apply`` leaves the attempts unchanged for every other kind.
+        return fold._replace(prior=prior.with_item(str(event.event_id), event))
+    if event.kind == "emotion.regulation_selected":
+        source_id = _required(event, "source_emotion_event_id")
+        source = prior.get(source_id)
+        if (
+            source is None
+            or source.kind != "emotion.sampled"
+            or event.causation_id != source.event_id
+            or event.payload.get("trigger_sample_id") != source.payload.get("sample_id")
+        ):
+            raise ValueError("Emotional regulation needs its triggering emotion sample")
+    elif event.kind == "emotion.regulation_practiced":
+        regulation_id = _required(event, "regulation_id")
+        selected = fold.selected.get(regulation_id)
+        # The earlier scan found the selection only while it was still the event held
+        # under its id; a later event reusing that id would have replaced it.
+        if selected is not None and prior.get(str(selected.event_id)) is not selected:
+            selected = None
+        if selected is None or event.causation_id != selected.event_id:
+            raise ValueError("Emotional practice needs its selected strategy")
+    else:
+        source_id = _required(event, "source_sleep_event_id")
+        source = prior.get(source_id)
+        if (
+            source is None
+            or source.kind != "sleep.started"
+            or event.causation_id != source.event_id
+        ):
+            raise ValueError("Rest protection completes only through actual sleep")
+    state = fold.state.apply(event)
+    selections = fold.selected
+    if event.kind == "emotion.regulation_selected":
+        raw_id = event.payload.get("regulation_id")
+        assert isinstance(raw_id, str)
+        selections = selections.with_item(raw_id, event)
+    return _RegulationFold(state, prior.with_item(str(event.event_id), event), selections)
+
+
+_REGULATION_FOLD: IncrementalFold[_RegulationFold] = IncrementalFold(
+    lambda: _RegulationFold(RegulationState.empty(), PersistentMap(), GrowOnlyMap()),
+    _regulation_step,
+)
+
+
 def project_regulation(events: Sequence[DomainEvent]) -> RegulationState:
-    state = RegulationState.empty()
-    prior: dict[str, DomainEvent] = {}
-    for event in events:
-        if event.kind == "emotion.regulation_selected":
-            source_id = _required(event, "source_emotion_event_id")
-            source = prior.get(source_id)
-            if (
-                source is None
-                or source.kind != "emotion.sampled"
-                or event.causation_id != source.event_id
-                or event.payload.get("trigger_sample_id") != source.payload.get("sample_id")
-            ):
-                raise ValueError("Emotional regulation needs its triggering emotion sample")
-        elif event.kind == "emotion.regulation_practiced":
-            regulation_id = _required(event, "regulation_id")
-            selected = next(
-                (
-                    item
-                    for item in prior.values()
-                    if item.kind == "emotion.regulation_selected"
-                    and item.payload.get("regulation_id") == regulation_id
-                ),
-                None,
-            )
-            if selected is None or event.causation_id != selected.event_id:
-                raise ValueError("Emotional practice needs its selected strategy")
-        elif event.kind == "emotion.regulation_completed":
-            source_id = _required(event, "source_sleep_event_id")
-            source = prior.get(source_id)
-            if (
-                source is None
-                or source.kind != "sleep.started"
-                or event.causation_id != source.event_id
-            ):
-                raise ValueError("Rest protection completes only through actual sleep")
-        state = state.apply(event)
-        prior[str(event.event_id)] = event
-    return state
+    return _REGULATION_FOLD(events).state
 
 
 def _existing(attempts: Mapping[str, RegulationAttempt], regulation_id: str) -> RegulationAttempt:
