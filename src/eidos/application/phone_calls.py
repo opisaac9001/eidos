@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import AbstractSet, Mapping, Sequence
 
+from eidos.application.contact_pacing import contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
@@ -29,6 +30,7 @@ def phone_call_events(
     known_person_ids: AbstractSet[str] | None = None,
     instant_calls: bool = True,
     attention_absorption: float = 0.0,
+    paced: bool = False,
 ) -> list[DomainEvent]:
     """Advance existing calls, then allow one unmet connection goal to cause a call."""
     output = complete_answered_call(
@@ -65,6 +67,10 @@ def phone_call_events(
             and event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in called_goal_ids
+            and (
+                not paced
+                or contact_allowed(history, str(event.payload.get("actor_id")), event, simulated_at)
+            )
         ),
         None,
     )

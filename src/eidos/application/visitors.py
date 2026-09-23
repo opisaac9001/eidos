@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import AbstractSet, Mapping, Sequence
 
+from eidos.application.contact_pacing import contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
@@ -27,6 +28,7 @@ def visitor_events(
     social_openness: float,
     relationships: Mapping[str, Relationship],
     known_person_ids: AbstractSet[str] | None = None,
+    paced: bool = False,
 ) -> list[DomainEvent]:
     """Advance one visit lifecycle, or reserve one eligible connection goal."""
     completed = _complete_admitted_visit(
@@ -60,6 +62,10 @@ def visitor_events(
             and event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in handled_goal_ids
+            and (
+                not paced
+                or contact_allowed(history, str(event.payload.get("actor_id")), event, simulated_at)
+            )
         ),
         None,
     )

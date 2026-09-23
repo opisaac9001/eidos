@@ -2458,6 +2458,7 @@ class Life:
                     social_openness=phone_bias.social_openness,
                     relationships=self._relationships(history + pending).relationships,
                     known_person_ids=pathos_known_person_ids(history + pending),
+                    paced=not self.authored_scenario,
                 )
             )
             pending.extend(visit_output)
@@ -2512,6 +2513,7 @@ class Life:
                         relationships=self._relationships(history + pending).relationships,
                         known_person_ids=pathos_known_person_ids(history + pending),
                         instant_calls=self.authored_scenario,
+                        paced=not self.authored_scenario,
                         attention_absorption=float(
                             str(
                                 attention_state(
