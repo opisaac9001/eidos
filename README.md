@@ -89,6 +89,13 @@ revisits across days may he reach an insight in his own words. A validated insig
 nudge a value by one small bounded step and crystallise a hoped-for or feared possible
 self, which then pulls gently on what he chooses to do. Turning points become named life
 chapters. The **Becoming** view shows all of it. See [selfhood](docs/SELFHOOD.md).
+His days have an ordinary shape. He accepted a part-time arrangement with Ellis, so a
+week-ahead rota of workshop shifts books his time and pays for hours actually worked, and
+Ellis keeps those hours too. He heads home before his chosen bedtime, at closing time or
+after idle lingering, sleeps at home, and wakes refreshed; energy and company now rise and
+fall through the day and week. Groceries are a weekly shop he can afford. He comes to want
+ordinary things that fit who he is (a film camera, a block plane, a cookbook), saves for
+them with a cushion left over, and uses what he buys.
 See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
 The model benchmark now reports a seven-case reviewed coverage pass across factual
 state changes, private knowledge, dreams, relationship perspective, prompt pressure,
