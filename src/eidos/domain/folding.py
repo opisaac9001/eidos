@@ -15,7 +15,9 @@ frozen projection state in the domain already is.
 from __future__ import annotations
 
 import operator
+from bisect import bisect_left
 from collections.abc import Callable, Hashable, Iterator, Sequence
+from heapq import merge
 from threading import Lock
 from typing import Generic, TypeVar
 
@@ -242,3 +244,77 @@ _EVENT_INDEX: IncrementalFold[GrowOnlyMap[str, DomainEvent]] = IncrementalFold(
 def event_index(events: Sequence[DomainEvent]) -> GrowOnlyMap[str, DomainEvent]:
     """Events by id (first occurrence wins), maintained incrementally across ticks."""
     return _EVENT_INDEX(events)
+
+
+class _KindLog:
+    __slots__ = ("positions", "events", "folded")
+
+    def __init__(self) -> None:
+        self.positions: dict[str, list[int]] = {}
+        self.events: dict[str, list[DomainEvent]] = {}
+        self.folded = 0
+
+
+class KindIndex:
+    """Events grouped by kind, in history order, shared append-only between states.
+
+    Each state sees only events at positions below its ``size``. Extending a state after a
+    divergent branch already appended copies that state's visible prefix first, so every
+    cached state stays exact while the linear case appends in O(1).
+    """
+
+    __slots__ = ("_log", "size")
+
+    def __init__(self, log: _KindLog | None = None, size: int = 0) -> None:
+        self._log = _KindLog() if log is None else log
+        self.size = size
+
+    def with_event(self, event: DomainEvent) -> KindIndex:
+        log = self._log
+        if log.folded != self.size:
+            log = self._fork()
+        log.positions.setdefault(event.kind, []).append(self.size)
+        log.events.setdefault(event.kind, []).append(event)
+        log.folded = self.size + 1
+        return KindIndex(log, self.size + 1)
+
+    def of(self, kind: str) -> list[DomainEvent]:
+        positions = self._log.positions.get(kind)
+        if not positions:
+            return []
+        visible = bisect_left(positions, self.size)
+        return self._log.events[kind][:visible]
+
+    def positioned(self, kind: str) -> list[tuple[int, DomainEvent]]:
+        positions = self._log.positions.get(kind)
+        if not positions:
+            return []
+        visible = bisect_left(positions, self.size)
+        return list(zip(positions[:visible], self._log.events[kind][:visible]))
+
+    def _fork(self) -> _KindLog:
+        log = _KindLog()
+        for kind, positions in self._log.positions.items():
+            visible = bisect_left(positions, self.size)
+            if visible:
+                log.positions[kind] = positions[:visible]
+                log.events[kind] = self._log.events[kind][:visible]
+        log.folded = self.size
+        return log
+
+
+_KIND_INDEX: IncrementalFold[KindIndex] = IncrementalFold(
+    KindIndex, lambda index, event: index.with_event(event), capacity=8
+)
+
+
+def kind_index(events: Sequence[DomainEvent]) -> KindIndex:
+    return _KIND_INDEX(events)
+
+
+def events_of(events: Sequence[DomainEvent], *kinds: str) -> list[DomainEvent]:
+    """Events of the given kinds, in history order, without scanning the whole history."""
+    index = _KIND_INDEX(events)
+    if len(kinds) == 1:
+        return index.of(kinds[0])
+    return [event for _, event in merge(*(index.positioned(kind) for kind in kinds))]

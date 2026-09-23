@@ -204,3 +204,20 @@ class ProjectionReuseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KindIndexTests(unittest.TestCase):
+    def test_matches_a_plain_filter_across_extension_branches_and_merges(self) -> None:
+        from eidos.domain.folding import events_of
+
+        def make(kind: str, n: int) -> DomainEvent:
+            return DomainEvent(kind, "pathos", {"n": n})
+
+        base = [make("a" if i % 3 else "b", i) for i in range(30)]
+        left = base + [make("a", 100), make("c", 101)]
+        right = base + [make("b", 200)]
+        for events in (base, left, right, left + [make("b", 102)], base[:10], right):
+            with self.subTest(size=len(events)):
+                for kinds in (("a",), ("b",), ("c",), ("a", "b"), ("c", "b", "a")):
+                    expected = [event for event in events if event.kind in kinds]
+                    self.assertEqual(events_of(events, *kinds), expected)
