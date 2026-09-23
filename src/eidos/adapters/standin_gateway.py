@@ -969,9 +969,19 @@ class StandInGateway(ModelGateway):
             else:
                 agency_item = activity_palette[choice % len(activity_palette)]
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
-            slot = _standin_free_slot(context, location, int(agency_item[8]))
+            already_planned = {
+                str(entry.get("title"))
+                for entry in context.get("calendar", [])
+                if isinstance(entry, dict)
+            }
+            slot = (
+                None
+                if agency_item[1] in already_planned
+                else _standin_free_slot(context, location, int(agency_item[8]))
+            )
             if slot is None:
-                # No sensible gap in the next two days: leave the idea for another time.
+                # Already on the calendar, or no sensible gap in the next two days: leave the
+                # idea for another time.
                 return ModelResponse(
                     content=json.dumps({"no_change": True, "mode": "defer"}),
                     resolved_model="authored-stand-in-v1",
