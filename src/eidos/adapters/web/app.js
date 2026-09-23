@@ -1081,6 +1081,37 @@ function renderSelf() {
         )
         .join("")
     : '<li class="empty-note">Nothing has left a mark yet.</li>';
+  const skills = (state.skills || [])
+    .slice()
+    .sort((a, b) => b.level - a.level)
+    .slice(0, 6);
+  const rhythms = (state.habits || [])
+    .filter((item) => item.status === "active")
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, 4);
+  $("self-skills").innerHTML =
+    (skills.length
+      ? skills
+          .map(
+            (item) => `<div class="value-row">
+              <div class="value-head"><span>${esc(words(item.skill_id))}</span>
+                ${item.status === "rusty" ? '<span class="value-shift down">rusty</span>' : ""}</div>
+              <div class="value-bar" role="img" aria-label="${esc(words(item.skill_id))} ${Math.round(item.level * 100)} of 100">
+                <span class="value-fill" style="width:${(item.level * 100).toFixed(1)}%"></span>
+              </div>
+              <div class="inquiry-meta">practised ${item.practice_count}×</div>
+            </div>`,
+          )
+          .join("")
+      : '<p class="empty-note">Nothing practised enough to count as a skill yet.</p>') +
+    (rhythms.length
+      ? `<div class="inquiry-history">${rhythms
+          .map(
+            (item) =>
+              `<div class="moment toward"><span class="moment-mark" aria-hidden="true">↻</span><span class="moment-text">${esc(words(item.activity_type || item.habit_id))}</span><span class="moment-meta">${esc(words(item.location_id || ""))}${item.time_band ? ` · ${esc(item.time_band)}` : ""} · ${item.repetitions} times</span></div>`,
+          )
+          .join("")}</div>`
+      : "");
   const wanting = self.wanting || {};
   const goal = wanting.saving_for;
   const pounds = (pence) => `£${(Number(pence) / 100).toFixed(0)}`;
