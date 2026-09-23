@@ -994,6 +994,17 @@ function valueSpark(trajectory) {
 function renderSelf() {
   const self = state && state.selfhood;
   if (!self) return;
+  const chapter = (self.chapters || []).find((item) => !item.closed_at);
+  const wondering = (self.inquiries || []).find((item) => item.status === "open");
+  $("presence-self").hidden = !chapter && !wondering;
+  $("presence-self").innerHTML = [
+    chapter
+      ? `<span class="presence-chapter">Chapter ${esc(chapter.number)} · ${esc(chapter.title)}</span>`
+      : "",
+    wondering
+      ? `<span class="presence-wondering">Wondering: ${esc(wondering.question)}</span>`
+      : "",
+  ].join("");
   const chapters = self.chapters || [];
   $("self-chapters").innerHTML = chapters.length
     ? chapters

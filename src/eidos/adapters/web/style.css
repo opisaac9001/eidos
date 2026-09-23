@@ -1782,3 +1782,32 @@ input[type="checkbox"] { accent-color: var(--amber); }
     grid-template-columns: 1fr;
   }
 }
+
+.presence-self {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+.presence-self:hover,
+.presence-self:focus-visible {
+  border-color: var(--amber);
+}
+.presence-chapter {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.presence-wondering {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--muted);
+}
