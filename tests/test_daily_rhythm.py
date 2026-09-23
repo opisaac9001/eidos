@@ -123,6 +123,13 @@ class TestWorkRota:
         )
         assert work_rota_events([*self.history(), *output], planning, at(7)) == []
 
+    def test_older_lives_whose_identity_came_later_still_get_their_job(self) -> None:
+        legacy = [event("time.advanced", at(0)) for _ in range(200)]
+        history = [*legacy, identity_established_event(at(0).isoformat())]
+        kinds = [item.kind for item in work_rota_events(history, PlanningState(), at(6))]
+        assert kinds[0] == "work.agreement_accepted"
+        assert "schedule.created" in kinds
+
     def test_existing_plans_keep_their_time(self) -> None:
         entry = CalendarEntry(
             "dentist",

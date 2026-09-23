@@ -42,7 +42,7 @@ def work_rota_events(
     """Publish any shift in the coming week that is not yet on his calendar."""
     if simulated_at.utcoffset() is None:
         raise ValueError("Rota time must be timezone-aware")
-    if not any(event.kind == "identity.established" for event in history[:64]):
+    if not any(event.kind == "identity.established" for event in history):
         return []
     output: list[DomainEvent] = []
     agreement = next(
