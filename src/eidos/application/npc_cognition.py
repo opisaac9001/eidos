@@ -7,6 +7,7 @@ from typing import Mapping, Sequence
 
 from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GroupIndex, kind_index
 from eidos.domain.npcs import project_npcs
 from eidos.domain.relationships import Relationship
 from eidos.domain.world import npc_plan_profile
@@ -24,26 +25,24 @@ def npc_belief_events(
     output: list[DomainEvent] = []
     state = belief_state if belief_state is not None else project_beliefs(history)
     npc_state = project_npcs(history, now)
+    index = kind_index(history)
     used_evidence = {
         str(event.payload["evidence_event_id"])
-        for event in history
-        if event.kind
-        in {
+        for event in index.select(
             "belief.proposed",
             "belief.formed",
             "belief.revised",
             "belief.corrected",
             "belief.contested",
-        }
-        and isinstance(event.payload.get("evidence_event_id"), str)
+        )
+        if isinstance(event.payload.get("evidence_event_id"), str)
     }
-    latest_plan_at = _latest_plan_times(history)
-    for perception in history:
+    latest_plan_at = _latest_plan_times(index)
+    for perception in index.select("perception.recorded"):
         owner = perception.payload.get("owner")
         location_id = perception.payload.get("location_id")
         if (
-            perception.kind != "perception.recorded"
-            or perception.payload.get("source_kind") not in {"world_event", "world_thread"}
+            perception.payload.get("source_kind") not in {"world_event", "world_thread"}
             or not isinstance(owner, str)
             or owner == "pathos"
             or owner not in npc_state.people
@@ -132,13 +131,14 @@ def npc_need_plan_events(
     if authored_scenario and now.hour != 19:
         return []
     state = project_npcs(history, now)
+    index = kind_index(history)
     used_evidence = {
         str(event.payload["evidence_need_event_id"])
-        for event in history
-        if event.kind in {"npc.plan_created", "npc.agency_rejected"}
-        and isinstance(event.payload.get("evidence_need_event_id"), str)
+        for event in index.select("npc.plan_created", "npc.agency_rejected")
+        if isinstance(event.payload.get("evidence_need_event_id"), str)
     }
-    latest_plan_at = _latest_plan_times(history)
+    latest_plan_at = _latest_plan_times(index)
+    needs_changed = index.select("npc.needs_changed")
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
         if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
@@ -146,9 +146,8 @@ def npc_need_plan_events(
         evidence = next(
             (
                 event
-                for event in reversed(history)
-                if event.kind == "npc.needs_changed"
-                and event.payload.get("actor_id") == actor_id
+                for event in reversed(needs_changed)
+                if event.payload.get("actor_id") == actor_id
                 and event.payload.get("owner") == actor_id
                 and str(event.event_id) not in used_evidence
             ),
@@ -300,11 +299,9 @@ def npc_need_plan_events(
     return output
 
 
-def _latest_plan_times(history: Sequence[DomainEvent]) -> dict[str, datetime]:
+def _latest_plan_times(index: GroupIndex) -> dict[str, datetime]:
     latest: dict[str, datetime] = {}
-    for event in history:
-        if event.kind != "npc.plan_created":
-            continue
+    for event in index.of("npc.plan_created"):
         actor_id = event.payload.get("actor_id")
         value = event.payload.get("simulated_at")
         if not isinstance(actor_id, str) or not isinstance(value, str):

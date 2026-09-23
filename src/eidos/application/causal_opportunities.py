@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 
 
 def fresh_cause(
@@ -14,9 +15,7 @@ def fresh_cause(
     """Newest eligible cause only; never drain stale incidents into new stories."""
     if now.utcoffset() is None:
         raise ValueError("Decision time must be timezone-aware")
-    for event in reversed(history):
-        if event.kind not in kinds:
-            continue
+    for event in reversed(events_of(history, *kinds)):
         try:
             at = datetime.fromisoformat(str(event.payload.get("simulated_at")))
         except ValueError:

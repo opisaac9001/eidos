@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from eidos.application.inner_life import active_concerns
 from eidos.domain.emotions import classify_emotion, project_emotion
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, payload_candidates
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import CalendarEntry, Goal, PlanningState, project_planning
 from eidos.domain.state import PathosState
@@ -25,14 +26,17 @@ def mental_layer_events(
     """Emit bounded hourly layer activations from Pathos-accessible state."""
     if at.utcoffset() is None:
         raise ValueError("Mental layer time must be timezone-aware")
+    # Only pulses that could match this hour's ids or slot are gathered: the sets below are
+    # queried solely with _pulse_id(at, layer) and (at.isoformat(), layer.value).
     existing_ids = {
         str(event.payload["pulse_id"])
-        for event in history
+        for layer in CognitiveLayer
+        for event in payload_candidates(history, "pulse_id", _pulse_id(at, layer))
         if event.kind == "mind.layer_pulsed" and isinstance(event.payload.get("pulse_id"), str)
     }
     existing_slots = {
         (str(event.payload.get("simulated_at")), str(event.payload.get("layer")))
-        for event in history
+        for event in payload_candidates(history, "simulated_at", at.isoformat())
         if event.kind == "mind.layer_pulsed"
         and isinstance(event.payload.get("simulated_at"), str)
         and isinstance(event.payload.get("layer"), str)
@@ -237,12 +241,13 @@ def _attention_focus(
             if isinstance(raw_importance, (int, float)) and not isinstance(raw_importance, bool)
             else 0.8
         )
+        concern_id = concern.payload.get("concern_id")
         recent_focuses = sum(
             event.kind == "mind.layer_pulsed"
             and event.payload.get("layer") == CognitiveLayer.ATTENTION.value
-            and event.payload.get("focus_id") == concern.payload.get("concern_id")
+            and event.payload.get("focus_id") == concern_id
             and _within_recent_hours(event, at, 6)
-            for event in history
+            for event in payload_candidates(history, "focus_id", concern_id)
         )
         candidates.append(
             (
@@ -271,9 +276,8 @@ def _attention_focus(
     recent_encounter = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "npc.encountered"
-            and isinstance(event.payload.get("person_id"), str)
+            for event in reversed(events_of(history, "npc.encountered"))
+            if isinstance(event.payload.get("person_id"), str)
             and _within_recent_hours(event, at, 2)
         ),
         None,

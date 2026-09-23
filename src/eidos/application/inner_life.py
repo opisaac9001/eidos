@@ -8,6 +8,7 @@ from hashlib import sha256
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.state import PathosState
 
 
@@ -28,7 +29,7 @@ def active_dream_inspirations(
         raise ValueError("Dream inspiration projection requires an aware time")
     inspirations: dict[str, DreamInspiration] = {}
     dismissed: set[str] = set()
-    for event in events:
+    for event in events_of(events, "dream.inspiration_considered", "dream.inspiration_dismissed"):
         if event.kind == "dream.inspiration_considered":
             dream_id = str(event.payload["source_dream_id"])
             if dream_id in inspirations:
@@ -50,7 +51,7 @@ def active_dream_inspirations(
 
 def active_concerns(events: list[DomainEvent]) -> list[DomainEvent]:
     concerns: dict[str, DomainEvent] = {}
-    for event in events:
+    for event in events_of(events, "concern.opened", "concern.resolved", "concern.receded"):
         if event.aggregate_id != "pathos":
             continue
         if event.kind == "concern.opened":
@@ -179,23 +180,19 @@ def waking_dream_events(
 ) -> list[DomainEvent]:
     if not authored_scenario and not state.awake:
         return []
-    applied = {
-        event.payload["source_dream_id"] for event in events if event.kind == "dream.effect_applied"
-    }
+    index = kind_index(events)
+    applied = {event.payload["source_dream_id"] for event in index.select("dream.effect_applied")}
     pending_effects = [
         event
-        for event in events
-        if event.kind == "dream.effect_scheduled"
-        and event.payload["source_dream_id"] not in applied
+        for event in index.select("dream.effect_scheduled")
+        if event.payload["source_dream_id"] not in applied
     ]
     if not pending_effects:
         return []
     effect = pending_effects[-1]
     dream_id = effect.payload["source_dream_id"]
     dream = next(
-        event
-        for event in events
-        if event.kind == "dream.recorded" and str(event.event_id) == dream_id
+        event for event in index.select("dream.recorded") if str(event.event_id) == dream_id
     )
     delta = max(-0.12, min(0.12, float(effect.payload["valence_delta"])))
     waking_at = datetime.fromisoformat(simulated_at)

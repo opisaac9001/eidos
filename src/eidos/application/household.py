@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.household import HouseholdState
 from eidos.domain.routine import RoutineBeat
 
@@ -18,7 +19,7 @@ _COMPLETION = {
 
 
 def household_foundation_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
-    if any(event.kind == "household.established" for event in history):
+    if events_of(history, "household.established"):
         return []
     return [
         DomainEvent(
@@ -53,10 +54,12 @@ def household_load_events(
                 event = _load_event(current, task, amount, change_id, at, "ordinary daily use")
                 output.append(event)
                 current = current.apply(event)
-    established_index = max(
-        index for index, event in enumerate(history) if event.kind == "household.established"
-    )
-    for source in history[established_index + 1 :]:
+    index = kind_index(history)
+    established_index = max(position for position, _ in index.positioned("household.established"))
+    # Only these kinds add load (see _source_load); others would be skipped below.
+    for source in index.select(
+        "meal.eaten", "delivery.received", "finance.obligation_due", start=established_index + 1
+    ):
         source_id = str(source.event_id)
         mapping = _source_load(source)
         change_id = f"source:{source_id}"

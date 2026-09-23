@@ -17,6 +17,7 @@ from __future__ import annotations
 import operator
 from bisect import bisect_left
 from collections.abc import Callable, Hashable, Iterator, Sequence
+from datetime import datetime
 from heapq import merge
 from threading import Lock
 from typing import Generic, TypeVar
@@ -246,75 +247,169 @@ def event_index(events: Sequence[DomainEvent]) -> GrowOnlyMap[str, DomainEvent]:
     return _EVENT_INDEX(events)
 
 
-class _KindLog:
+class _GroupLog:
     __slots__ = ("positions", "events", "folded")
 
     def __init__(self) -> None:
-        self.positions: dict[str, list[int]] = {}
-        self.events: dict[str, list[DomainEvent]] = {}
+        self.positions: dict[Hashable, list[int]] = {}
+        self.events: dict[Hashable, list[DomainEvent]] = {}
         self.folded = 0
 
 
-class KindIndex:
-    """Events grouped by kind, in history order, shared append-only between states.
+class GroupIndex:
+    """Events grouped by a key, in history order, shared append-only between states.
 
     Each state sees only events at positions below its ``size``. Extending a state after a
     divergent branch already appended copies that state's visible prefix first, so every
-    cached state stays exact while the linear case appends in O(1).
+    cached state stays exact while the linear case appends in O(1). Positions are indexes
+    into the folded sequence, so callers can keep order relative to other groups.
     """
 
     __slots__ = ("_log", "size")
 
-    def __init__(self, log: _KindLog | None = None, size: int = 0) -> None:
-        self._log = _KindLog() if log is None else log
+    def __init__(self, log: _GroupLog | None = None, size: int = 0) -> None:
+        self._log = _GroupLog() if log is None else log
         self.size = size
 
-    def with_event(self, event: DomainEvent) -> KindIndex:
+    def with_event(self, key: Hashable, event: DomainEvent) -> GroupIndex:
+        """The next state; an event without a key only advances the position."""
         log = self._log
         if log.folded != self.size:
             log = self._fork()
-        log.positions.setdefault(event.kind, []).append(self.size)
-        log.events.setdefault(event.kind, []).append(event)
+        if key is not None:
+            log.positions.setdefault(key, []).append(self.size)
+            log.events.setdefault(key, []).append(event)
         log.folded = self.size + 1
-        return KindIndex(log, self.size + 1)
+        return GroupIndex(log, self.size + 1)
 
-    def of(self, kind: str) -> list[DomainEvent]:
-        positions = self._log.positions.get(kind)
+    def _bounds(self, key: Hashable, start: int) -> tuple[list[int], int, int] | None:
+        positions = self._log.positions.get(key)
         if not positions:
-            return []
+            return None
         visible = bisect_left(positions, self.size)
-        return self._log.events[kind][:visible]
+        first = bisect_left(positions, start, 0, visible) if start > 0 else 0
+        return (positions, first, visible) if first < visible else None
 
-    def positioned(self, kind: str) -> list[tuple[int, DomainEvent]]:
-        positions = self._log.positions.get(kind)
-        if not positions:
+    def has(self, key: Hashable) -> bool:
+        return self._bounds(key, 0) is not None
+
+    def keys(self) -> list[Hashable]:
+        """Every key with at least one visible event, in first-seen order."""
+        return [key for key in self._log.positions if self._bounds(key, 0) is not None]
+
+    def of(self, key: Hashable, start: int = 0) -> list[DomainEvent]:
+        """A fresh list of the key's events at positions ``start`` or later."""
+        bounds = self._bounds(key, start)
+        if bounds is None:
             return []
-        visible = bisect_left(positions, self.size)
-        return list(zip(positions[:visible], self._log.events[kind][:visible]))
+        _, first, visible = bounds
+        return self._log.events[key][first:visible]
 
-    def _fork(self) -> _KindLog:
-        log = _KindLog()
-        for kind, positions in self._log.positions.items():
+    def positioned(self, key: Hashable, start: int = 0) -> list[tuple[int, DomainEvent]]:
+        bounds = self._bounds(key, start)
+        if bounds is None:
+            return []
+        positions, first, visible = bounds
+        return list(zip(positions[first:visible], self._log.events[key][first:visible]))
+
+    def select(self, *keys: Hashable, start: int = 0) -> list[DomainEvent]:
+        """Events of any of ``keys`` (duplicates ignored), merged back into history order."""
+        unique = list(dict.fromkeys(keys))
+        if len(unique) == 1:
+            return self.of(unique[0], start)
+        return [event for _, event in self.select_positioned(*unique, start=start)]
+
+    def select_positioned(self, *keys: Hashable, start: int = 0) -> list[tuple[int, DomainEvent]]:
+        groups = [
+            group for group in (self.positioned(key, start) for key in dict.fromkeys(keys)) if group
+        ]
+        if len(groups) == 1:
+            return groups[0]
+        # Positions are unique, so the merge never compares the events themselves.
+        return list(merge(*groups))
+
+    def _fork(self) -> _GroupLog:
+        log = _GroupLog()
+        for key, positions in self._log.positions.items():
             visible = bisect_left(positions, self.size)
             if visible:
-                log.positions[kind] = positions[:visible]
-                log.events[kind] = self._log.events[kind][:visible]
+                log.positions[key] = positions[:visible]
+                log.events[key] = self._log.events[key][:visible]
         log.folded = self.size
         return log
 
 
-_KIND_INDEX: IncrementalFold[KindIndex] = IncrementalFold(
-    KindIndex, lambda index, event: index.with_event(event), capacity=8
+KindIndex = GroupIndex
+
+_KIND_INDEX: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex, lambda index, event: index.with_event(event.kind, event), capacity=8
 )
 
 
-def kind_index(events: Sequence[DomainEvent]) -> KindIndex:
+def kind_index(events: Sequence[DomainEvent]) -> GroupIndex:
+    """Events grouped by kind, maintained incrementally across ticks."""
     return _KIND_INDEX(events)
 
 
 def events_of(events: Sequence[DomainEvent], *kinds: str) -> list[DomainEvent]:
-    """Events of the given kinds, in history order, without scanning the whole history."""
+    """Events of the given kinds, in history order, without scanning the whole history.
+
+    Exactly ``[event for event in events if event.kind in kinds]``, as a fresh list.
+    """
+    return _KIND_INDEX(events).select(*kinds)
+
+
+def events_with_prefix(events: Sequence[DomainEvent], prefix: str) -> list[DomainEvent]:
+    """Exactly ``[event for event in events if event.kind.startswith(prefix)]``."""
     index = _KIND_INDEX(events)
-    if len(kinds) == 1:
-        return index.of(kinds[0])
-    return [event for _, event in merge(*(index.positioned(kind) for kind in kinds))]
+    return index.select(
+        *(kind for kind in index.keys() if isinstance(kind, str) and kind.startswith(prefix))
+    )
+
+
+# Values of these exact types never compare equal to a string, so they need no grouping.
+_NEVER_EQUAL_TO_STR: frozenset[type] = frozenset(
+    {type(None), bool, int, float, list, dict, tuple, datetime}
+)
+# Any other non-``str`` value (a ``str`` subclass or an arbitrary object) might, so such
+# events are kept together under this key and every candidate query includes them.
+_IRREGULAR = object()
+
+
+def _payload_key(field: str) -> Callable[[GroupIndex, DomainEvent], GroupIndex]:
+    def step(index: GroupIndex, event: DomainEvent) -> GroupIndex:
+        value = event.payload.get(field)
+        kind = type(value)
+        key: Hashable = (
+            value if kind is str else None if kind in _NEVER_EQUAL_TO_STR else _IRREGULAR
+        )
+        return index.with_event(key, event)
+
+    return step
+
+
+_PAYLOAD_INDEXES: dict[str, IncrementalFold[GroupIndex]] = {}
+_PAYLOAD_INDEXES_LOCK = Lock()
+
+
+def payload_candidates(
+    events: Sequence[DomainEvent], field: str, value: object
+) -> list[DomainEvent]:
+    """Events, in history order, whose ``payload.get(field)`` might equal ``value``.
+
+    For a plain ``str`` value this is every event whose payload holds exactly that string
+    plus the rare events holding a value of any type that could still compare equal to one;
+    the index behind it is maintained incrementally per field. Any other value returns every
+    event. It is a superset, so callers apply their original test to the result:
+    ``[e for e in payload_candidates(events, f, v) if e.payload.get(f) == v]`` is exactly
+    ``[e for e in events if e.payload.get(f) == v]``.
+    """
+    if type(value) is not str:
+        return list(events)
+    fold = _PAYLOAD_INDEXES.get(field)
+    if fold is None:
+        with _PAYLOAD_INDEXES_LOCK:
+            fold = _PAYLOAD_INDEXES.setdefault(
+                field, IncrementalFold(GroupIndex, _payload_key(field))
+            )
+    return fold(events).select(value, _IRREGULAR)

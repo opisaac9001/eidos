@@ -7,7 +7,7 @@ from typing import Sequence
 
 from eidos.application.inner_life import active_concerns
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import event_index
+from eidos.domain.folding import event_index, events_of, kind_index
 
 
 def concern_lifecycle_events(
@@ -64,14 +64,15 @@ def concern_lifecycle_events(
     projected_active = active_concerns([*history, *output])
     if len(projected_active) >= 6:
         return output
+    opened_concerns = events_of(history, "concern.opened")
     opened_source_ids = {
         str(event.payload.get("source_event_id"))
-        for event in history
-        if event.kind == "concern.opened" and event.aggregate_id == "pathos"
+        for event in opened_concerns
+        if event.aggregate_id == "pathos"
     }
     candidates = [
         event
-        for event in history
+        for event in events_of(history, *_SOURCE_KINDS)
         if str(event.event_id) not in opened_source_ids
         and _safe_concern_source(event, history) is not None
         and _is_recent(event, simulated_at, timedelta(hours=2))
@@ -84,9 +85,8 @@ def concern_lifecycle_events(
     }
     recent_keys = {
         str(event.payload["concern_key"])
-        for event in history
-        if event.kind == "concern.opened"
-        and event.aggregate_id == "pathos"
+        for event in opened_concerns
+        if event.aggregate_id == "pathos"
         and isinstance(event.payload.get("concern_key"), str)
         and _is_recent(event, simulated_at, timedelta(days=30))
     }
@@ -129,6 +129,17 @@ def concern_lifecycle_events(
             active_people.add(person_id)
         recent_keys.add(concern_key)
     return output
+
+
+# The only kinds _concern_source can turn into a concern; it returns None for every other.
+_SOURCE_KINDS = (
+    "commitment.missed",
+    "finance.payment_missed",
+    "relationship.repair_opened",
+    "relationship.changed",
+    "goal.blocked",
+    "schedule.failed",
+)
 
 
 def _safe_concern_source(
@@ -253,15 +264,28 @@ def _concern_source(
 def _concern_resolution(
     history: Sequence[DomainEvent], concern: DomainEvent
 ) -> tuple[DomainEvent, str, str] | None:
-    try:
-        opened_index = next(index for index, event in enumerate(history) if event is concern)
-    except StopIteration:
+    index = kind_index(history)
+    # Only concern.opened events are ever active concerns, so the first identical event in
+    # history is among that kind's events.
+    opened_index = next(
+        (position for position, event in index.positioned(concern.kind) if event is concern),
+        None,
+    )
+    if opened_index is None:
         return None
-    later = history[opened_index + 1 :]
+
+    def later(*kinds: str) -> list[DomainEvent]:
+        return index.select(*kinds, start=opened_index + 1)
+
     source_kind = concern.payload.get("source_kind")
     if source_kind == "goal.blocked":
-        evidence = _first_matching(
-            later, {"goal.achieved", "goal.abandoned"}, "goal_id", concern.payload.get("goal_id")
+        evidence = next(
+            (
+                event
+                for event in later("goal.achieved", "goal.abandoned")
+                if event.payload.get("goal_id") == concern.payload.get("goal_id")
+            ),
+            None,
         )
         if evidence:
             return evidence, "goal_reached_an_ending", "The stuck goal reached a real ending."
@@ -269,9 +293,8 @@ def _concern_resolution(
         evidence = next(
             (
                 event
-                for event in later
-                if event.kind == "reflection.reconsideration_decided"
-                and event.payload.get("target_type") == "schedule"
+                for event in later("reflection.reconsideration_decided")
+                if event.payload.get("target_type") == "schedule"
                 and event.payload.get("target_id") == concern.payload.get("schedule_id")
             ),
             None,
@@ -286,9 +309,8 @@ def _concern_resolution(
         decision = next(
             (
                 event
-                for event in later
-                if event.kind == "reflection.reconsideration_decided"
-                and event.payload.get("target_type") == "commitment"
+                for event in later("reflection.reconsideration_decided")
+                if event.payload.get("target_type") == "commitment"
                 and event.payload.get("target_id") == concern.payload.get("commitment_id")
                 and event.payload.get("decision") == "seek_repair"
             ),
@@ -298,9 +320,8 @@ def _concern_resolution(
             evidence = next(
                 (
                     event
-                    for event in later
-                    if event.kind == "follow_up.completed"
-                    and event.payload.get("source_event_id") == str(decision.event_id)
+                    for event in later("follow_up.completed")
+                    if event.payload.get("source_event_id") == str(decision.event_id)
                 ),
                 None,
             )
@@ -319,9 +340,8 @@ def _concern_resolution(
         evidence = next(
             (
                 event
-                for event in later
-                if event.kind == "finance.transaction_recorded"
-                and int(event.payload.get("balance_pence", -1)) >= required
+                for event in later("finance.transaction_recorded")
+                if int(event.payload.get("balance_pence", -1)) >= required
             ),
             None,
         )
@@ -335,9 +355,8 @@ def _concern_resolution(
         evidence = next(
             (
                 event
-                for event in later
-                if event.kind == "apology.offered"
-                and event.payload.get("target_id") == concern.payload.get("person_id")
+                for event in later("apology.offered")
+                if event.payload.get("target_id") == concern.payload.get("person_id")
             ),
             None,
         )
@@ -351,9 +370,8 @@ def _concern_resolution(
         evidence = next(
             (
                 event
-                for event in later
-                if event.kind == "relationship.repair_contacted"
-                and event.payload.get("repair_id") == concern.payload.get("repair_id")
+                for event in later("relationship.repair_contacted")
+                if event.payload.get("repair_id") == concern.payload.get("repair_id")
                 and int(event.payload.get("contact_number", 0)) >= 3
             ),
             None,
@@ -444,17 +462,8 @@ def _latest_matching(
     return next(
         (
             event
-            for event in reversed(history)
-            if event.kind == kind and event.payload.get(field) == value
+            for event in reversed(events_of(history, kind))
+            if event.payload.get(field) == value
         ),
-        None,
-    )
-
-
-def _first_matching(
-    history: Sequence[DomainEvent], kinds: set[str], field: str, value: object
-) -> DomainEvent | None:
-    return next(
-        (event for event in history if event.kind in kinds and event.payload.get(field) == value),
         None,
     )

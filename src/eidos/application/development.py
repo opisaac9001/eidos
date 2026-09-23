@@ -6,19 +6,21 @@ from typing import Sequence
 
 from eidos.domain.development import Habit, project_development
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 
 
 def development_events(history: Sequence[DomainEvent], simulated_at: str) -> list[DomainEvent]:
+    index = kind_index(history)
     processed = {
         str(event.payload["source_event_id"])
-        for event in history
-        if event.kind
-        in {"skill.practiced", "habit.formed", "habit.reinforced", "habit.reactivated"}
-        and isinstance(event.payload.get("source_event_id"), str)
+        for event in index.select(
+            "skill.practiced", "habit.formed", "habit.reinforced", "habit.reactivated"
+        )
+        if isinstance(event.payload.get("source_event_id"), str)
     }
     at = _time(simulated_at)
     output: list[DomainEvent] = []
-    for source in history:
+    for source in index.select(*_SKILL_EVIDENCE_KINDS):
         source_id = str(source.event_id)
         if source_id in processed:
             continue
@@ -89,9 +91,8 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
             )
     cafe_visits = [
         event
-        for event in history
-        if event.kind == "memory.recorded"
-        and event.payload.get("source") == "authored-routine"
+        for event in index.select("memory.recorded")
+        if event.payload.get("source") == "authored-routine"
         and (
             event.payload.get("activity") == "morning_cafe"
             or event.payload.get("text") == "Visited the cafe before work."
@@ -160,7 +161,8 @@ def behavioral_habit_events(
         ]
 
     grouped: dict[tuple[str, str, str], list[DomainEvent]] = defaultdict(list)
-    for event in history:
+    # _habit_signature is None for every other kind.
+    for event in events_of(history, "agency.activity_realized"):
         signature = _habit_signature(event)
         age = simulated_at - _event_time(event) if signature is not None else None
         if signature is not None and age is not None and timedelta(0) <= age <= timedelta(days=60):
@@ -358,6 +360,15 @@ def _habit_signature(event: DomainEvent) -> tuple[str, str, str] | None:
     at = _event_time(event)
     band = "morning" if at.hour < 12 else "afternoon" if at.hour < 18 else "evening"
     return activity_type, location_id, band
+
+
+# The only kinds _skill_evidence can return a skill for.
+_SKILL_EVIDENCE_KINDS = (
+    "action.accepted",
+    "object.repair_attempted",
+    "activity.completed",
+    "agency.activity_realized",
+)
 
 
 def _skill_evidence(event: DomainEvent) -> str | None:

@@ -11,7 +11,7 @@ from typing import Callable, NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold
+from eidos.domain.folding import IncrementalFold, events_of, events_with_prefix
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
@@ -31,9 +31,8 @@ def duration_requirement(
     source = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "schedule.created"
-            and event.payload.get("schedule_id") == entry.schedule_id
+            for event in reversed(events_of(history, "schedule.created"))
+            if event.payload.get("schedule_id") == entry.schedule_id
             and "estimate_confidence" in event.payload
         ),
         None,
@@ -177,9 +176,8 @@ def activity_effort(
     start = datetime.fromisoformat(entry.starts_at)
     starts = [
         e
-        for e in history
-        if e.kind == "activity.execution_started"
-        and e.payload.get("schedule_id") == entry.schedule_id
+        for e in events_of(history, "activity.execution_started")
+        if e.payload.get("schedule_id") == entry.schedule_id
     ]
     first = starts[0] if starts else None
     required = (
@@ -345,9 +343,8 @@ def execution_events(
         output.extend(stage_events([*history, *output], entry, effort, now))
         own = [
             e
-            for e in history
-            if e.kind.startswith("activity.execution_")
-            and e.payload.get("schedule_id") == entry.schedule_id
+            for e in events_with_prefix(history, "activity.execution_")
+            if e.payload.get("schedule_id") == entry.schedule_id
         ]
         if effort["window_ended"]:
             kind = "ready" if effort["ready"] else "unfinished"
@@ -378,9 +375,8 @@ def execution_events(
             )
             decisions = [
                 e
-                for e in history
-                if e.kind == "activity.resumption_decided"
-                and e.payload.get("pause_id") == str(pause.event_id)
+                for e in events_of(history, "activity.resumption_decided")
+                if e.payload.get("pause_id") == str(pause.event_id)
             ]
             if decisions and decisions[-1].payload.get("source_event_id") == str(cause.event_id):
                 claimed = False
@@ -518,13 +514,11 @@ def execution_context(
     observer: bool = False,
 ) -> list[dict[str, object]]:
     """Personal action evidence, not private world-director facts or perfect memories."""
-    ids = {
-        e.payload.get("schedule_id") for e in history if e.kind.startswith("activity.execution_")
-    }
+    ids = {e.payload.get("schedule_id") for e in events_with_prefix(history, "activity.execution_")}
     staged_ids = {
         e.payload.get("schedule_id")
-        for e in history
-        if e.kind == "activity.execution_started" and e.payload.get("staged_execution")
+        for e in events_of(history, "activity.execution_started")
+        if e.payload.get("staged_execution")
     }
     records = []
     for entry in [e for e in planning.calendar.values() if e.schedule_id in ids][-8:]:

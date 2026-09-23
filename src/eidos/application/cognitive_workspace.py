@@ -2,11 +2,32 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from collections.abc import Hashable
+from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
 from eidos.application.inner_life import active_concerns, active_dream_inspirations
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GroupIndex, IncrementalFold, events_of
+
+_SPECS = {
+    "thought.recorded": ("murmur", "inner_monologue", timedelta(minutes=45), 0.35),
+    "association.formed": ("murmur", "association", timedelta(hours=2), 0.45),
+    "reflection.recorded": (
+        "reflection",
+        "subjective_interpretation",
+        timedelta(days=3),
+        0.72,
+    ),
+    "reflection.reconsideration_raised": (
+        "reflection",
+        "planning_question",
+        timedelta(hours=48),
+        0.82,
+    ),
+    "dream.recalled": ("oneiros", "dream_fragment", timedelta(hours=2), 0.35),
+}
+_SIGNAL_LIFETIME = timedelta(hours=2)
 
 
 def cognitive_workspace(
@@ -19,25 +40,14 @@ def cognitive_workspace(
         raise ValueError("Cognitive workspace limit must be between one and 32")
 
     candidates: list[tuple[float, datetime, dict[str, object]]] = []
-    specs = {
-        "thought.recorded": ("murmur", "inner_monologue", timedelta(minutes=45), 0.35),
-        "association.formed": ("murmur", "association", timedelta(hours=2), 0.45),
-        "reflection.recorded": (
-            "reflection",
-            "subjective_interpretation",
-            timedelta(days=3),
-            0.72,
-        ),
-        "reflection.reconsideration_raised": (
-            "reflection",
-            "planning_question",
-            timedelta(hours=48),
-            0.82,
-        ),
-        "dream.recalled": ("oneiros", "dream_fragment", timedelta(hours=2), 0.35),
-    }
-    for event in history:
-        if event.aggregate_id != "pathos" or event.kind not in specs:
+    specs = _SPECS
+    # Everything older than the longest lifetime (or undated) is skipped below, so only the
+    # events that could fall inside it are visited, still in history order.
+    recent = _recent_timed_events(
+        history, simulated_at, max(*(spec[2] for spec in specs.values()), _SIGNAL_LIFETIME)
+    )
+    for event in recent:
+        if event.kind not in specs or event.aggregate_id != "pathos":
             continue
         if event.payload.get("owner", "pathos") != "pathos":
             continue
@@ -78,14 +88,14 @@ def cognitive_workspace(
             candidate[2]["target_id"] = event.payload.get("target_id")
         candidates.append(candidate)
 
-    for event in history:
-        if event.aggregate_id != "pathos" or event.kind != "mind.layer_pulsed":
+    for event in recent:
+        if event.kind != "mind.layer_pulsed" or event.aggregate_id != "pathos":
             continue
         created_at = _event_time(event)
         if (
             created_at is None
             or created_at > simulated_at
-            or simulated_at - created_at > timedelta(hours=2)
+            or simulated_at - created_at > _SIGNAL_LIFETIME
         ):
             continue
         content = event.payload.get("focus_text")
@@ -111,8 +121,8 @@ def cognitive_workspace(
             )
         )
 
-    pathos_history = [event for event in history if event.aggregate_id == "pathos"]
-    for concern in active_concerns(pathos_history):
+    # active_concerns already ignores events of other aggregates.
+    for concern in active_concerns(list(history)):
         created_at = _event_time(concern)
         content = concern.payload.get("text")
         if created_at is None or created_at > simulated_at or not isinstance(content, str):
@@ -132,8 +142,8 @@ def cognitive_workspace(
 
     inspiration_events = {
         str(event.payload.get("source_dream_id")): event
-        for event in history
-        if event.aggregate_id == "pathos" and event.kind == "dream.inspiration_considered"
+        for event in events_of(history, "dream.inspiration_considered")
+        if event.aggregate_id == "pathos"
     }
     for inspiration in active_dream_inspirations(history, simulated_at):
         source = inspiration_events.get(inspiration.source_dream_id)
@@ -243,10 +253,10 @@ def recent_inner_stream(history: Sequence[DomainEvent], now: datetime, limit: in
     if now.utcoffset() is None or not 1 <= limit <= 8:
         raise ValueError("Inner stream requires aware time and a bounded limit")
     selected = []
-    for event in history:
+    for event in _recent_timed_events(history, now, timedelta(minutes=30)):
         if (
-            event.aggregate_id != "pathos"
-            or event.kind != "thought.recorded"
+            event.kind != "thought.recorded"
+            or event.aggregate_id != "pathos"
             or event.payload.get("owner", "pathos") != "pathos"
         ):
             continue
@@ -259,3 +269,43 @@ def recent_inner_stream(history: Sequence[DomainEvent], now: datetime, limit: in
         ):
             selected.append((at, text))
     return [text for _, text in sorted(selected, key=lambda item: item[0])[-limit:]]
+
+
+# Every kind whose recency the helpers above test with _event_time.
+_TIMED_KINDS = frozenset({*_SPECS, "mind.layer_pulsed"})
+# An aware time's UTC offset is under a day, and datetimes sharing a tzinfo compare and
+# subtract on local fields, so two such times can disagree with UTC by under two days.
+_OFFSET_SKEW = timedelta(days=2)
+_UNDATED = object()
+
+
+def _timed_step(index: GroupIndex, event: DomainEvent) -> GroupIndex:
+    if event.kind not in _TIMED_KINDS:
+        return index.with_event(None, event)
+    created_at = _event_time(event)
+    if created_at is None:
+        return index.with_event(None, event)
+    key: Hashable
+    try:
+        key = created_at.astimezone(timezone.utc).date()
+    except OverflowError:
+        key = _UNDATED
+    return index.with_event(key, event)
+
+
+_TIMED_BY_DAY: IncrementalFold[GroupIndex] = IncrementalFold(GroupIndex, _timed_step)
+
+
+def _recent_timed_events(
+    history: Sequence[DomainEvent], now: datetime, horizon: timedelta
+) -> list[DomainEvent]:
+    """In history order, a superset of the timed-kind events with an aware time ``at``
+    for which ``timedelta(0) <= now - at <= horizon``; events without one are left out."""
+    try:
+        instant = now.astimezone(timezone.utc)
+        first = (instant - horizon - _OFFSET_SKEW).date()
+        last = (instant + _OFFSET_SKEW).date()
+    except OverflowError:
+        return events_of(history, *_TIMED_KINDS)
+    days = [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
+    return _TIMED_BY_DAY(history).select(*days, _UNDATED)

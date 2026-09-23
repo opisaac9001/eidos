@@ -221,3 +221,74 @@ class KindIndexTests(unittest.TestCase):
                 for kinds in (("a",), ("b",), ("c",), ("a", "b"), ("c", "b", "a")):
                     expected = [event for event in events if event.kind in kinds]
                     self.assertEqual(events_of(events, *kinds), expected)
+
+
+class GroupIndexTests(unittest.TestCase):
+    def test_kind_queries_match_plain_filters_across_branches(self) -> None:
+        from eidos.domain.folding import events_with_prefix, kind_index
+
+        def make(kind: str, n: int) -> DomainEvent:
+            return DomainEvent(kind, "pathos", {"n": n})
+
+        kinds = ("act.started", "act.paused", "other", "act.done")
+        base = [make(kinds[i % 4], i) for i in range(40)]
+        left = base + [make("act.late", 100), make("other", 101)]
+        right = base + [make("act.started", 200)]
+        for events in (base, left, right, left + [make("act.x", 102)], base[:7], right, []):
+            with self.subTest(size=len(events)):
+                index = kind_index(events)
+                self.assertEqual(
+                    events_with_prefix(events, "act."),
+                    [event for event in events if event.kind.startswith("act.")],
+                )
+                for start in (0, 1, 13, 39, 40, 41, 500):
+                    for selected in (("other",), ("act.done", "other"), ("other", "other")):
+                        self.assertEqual(
+                            index.select(*selected, start=start),
+                            [e for e in events[start:] if e.kind in selected],
+                        )
+                    self.assertEqual(
+                        index.positioned("act.paused", start),
+                        [
+                            (position, event)
+                            for position, event in enumerate(events)
+                            if position >= start and event.kind == "act.paused"
+                        ],
+                    )
+
+    def test_payload_candidates_keep_every_event_that_could_match(self) -> None:
+        from eidos.domain.folding import payload_candidates
+
+        class Loose(int):
+            def __eq__(self, other: object) -> bool:
+                return True
+
+            __hash__ = int.__hash__
+
+        class Label(str):
+            pass
+
+        values: list[object] = [
+            "mara",
+            "ellis",
+            None,
+            3,
+            2.5,
+            Label("mara"),
+            Loose(7),
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "mara",
+        ]
+        events = [DomainEvent("x", "pathos", {"actor_id": value}) for value in values]
+        events.append(DomainEvent("x", "pathos", {}))
+        for prefix in (events[:3], events, events[:6]):
+            for wanted in ("mara", "ellis", "rowan"):
+                with self.subTest(size=len(prefix), wanted=wanted):
+                    expected = [e for e in prefix if e.payload.get("actor_id") == wanted]
+                    candidates = payload_candidates(prefix, "actor_id", wanted)
+                    self.assertEqual(
+                        [e for e in candidates if e.payload.get("actor_id") == wanted],
+                        expected,
+                    )
+                    self.assertTrue(all(any(c is e for e in prefix) for c in candidates))
+        self.assertEqual(payload_candidates(events, "actor_id", 3), events)

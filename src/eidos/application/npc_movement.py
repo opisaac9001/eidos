@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index, payload_candidates
 from eidos.domain.npcs import project_npcs
 from eidos.domain.travel import route_duration
 from eidos.domain.world import location_allows_interval
@@ -14,7 +15,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     if now.utcoffset() is None:
         raise ValueError("NPC movement needs timezone-aware time")
     output: list[DomainEvent] = []
-    if not any(event.kind == "npc.simulation_started" for event in history):
+    if not events_of(history, "npc.simulation_started"):
         output.append(
             DomainEvent(
                 "npc.simulation_started",
@@ -29,7 +30,11 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     catalog = project_world_catalog(history)
     workdays = _employer_workdays(history)
     for actor_id, person in state.people.items():
-        owned = [event for event in history if event.payload.get("actor_id") == actor_id]
+        owned = [
+            event
+            for event in payload_candidates(history, "actor_id", actor_id)
+            if event.payload.get("actor_id") == actor_id
+        ]
 
         def emit(
             kind: str,
@@ -265,8 +270,9 @@ def _employer_workdays(
     history: Sequence[DomainEvent],
 ) -> dict[tuple[str, str], tuple[str, datetime, datetime]]:
     """(employer, date) -> (place, opens, closes) for every shift under a live agreement."""
+    index = kind_index(history)
     employers: dict[str, str] = {}
-    for event in history:
+    for event in index.select("work.agreement_accepted", "work.agreement_ended"):
         if event.kind == "work.agreement_accepted":
             employers[str(event.payload.get("agreement_id"))] = str(
                 event.payload.get("employer_id")
@@ -276,9 +282,7 @@ def _employer_workdays(
     days: dict[tuple[str, str], tuple[str, datetime, datetime]] = {}
     if not employers:
         return days
-    for event in history:
-        if event.kind != "schedule.created":
-            continue
+    for event in index.select("schedule.created"):
         employer = employers.get(str(event.payload.get("agreement_id")))
         if employer is None:
             continue

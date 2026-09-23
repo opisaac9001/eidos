@@ -8,6 +8,7 @@ from typing import Sequence
 from eidos.application.work_rota import SHIFT_WAGE_PENCE, is_rota_shift, partial_shift_wage
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState
+from eidos.domain.folding import events_of, kind_index
 
 OPENING_BALANCE_PENCE = 40_000  # A modest cushion: a couple of weeks of rent and food.
 CAFE_MEAL_PENCE = 600
@@ -17,7 +18,7 @@ WEEKLY_HOUSING_PENCE = 12_500  # Rent and bills for a small place in a market to
 
 
 def financial_foundation_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
-    if any(event.kind == "finance.account_opened" for event in history):
+    if events_of(history, "finance.account_opened"):
         return []
     return [
         DomainEvent(
@@ -43,17 +44,15 @@ def financial_consequence_events(
     output: list[DomainEvent] = []
     current = state
     processed = {transaction.source_event_id for transaction in current.transactions.values()}
+    index = kind_index(history)
     processed.update(
         str(event.payload["source_event_id"])
-        for event in history
-        if event.kind == "finance.payment_missed"
-        and isinstance(event.payload.get("source_event_id"), str)
+        for event in index.of("finance.payment_missed")
+        if isinstance(event.payload.get("source_event_id"), str)
     )
-    opened_index = max(
-        index for index, event in enumerate(history) if event.kind == "finance.account_opened"
-    )
-    eligible_history = history[opened_index + 1 :]
-    for source in eligible_history:
+    opened_index = max(position for position, _ in index.positioned("finance.account_opened"))
+    eligible = opened_index + 1
+    for source in index.select(*_SOURCE_KINDS, start=eligible):
         source_id = str(source.event_id)
         if source_id in processed:
             continue
@@ -78,8 +77,8 @@ def financial_consequence_events(
         processed.add(source_id)
 
     rota_world = at.hour == 17 and any(
-        event.kind == "schedule.created" and is_rota_shift(event.payload.get("schedule_id"))
-        for event in eligible_history
+        is_rota_shift(event.payload.get("schedule_id"))
+        for event in index.of("schedule.created", eligible)
     )
     if at.hour == 17 and at.weekday() < 5 and not rota_world:
         # Authored-routine wages belong to worlds without a published rota; with one,
@@ -87,9 +86,8 @@ def financial_consequence_events(
         work = next(
             (
                 event
-                for event in reversed(eligible_history)
-                if event.kind == "memory.recorded"
-                and event.payload.get("source") == "authored-routine"
+                for event in reversed(index.of("memory.recorded", eligible))
+                if event.payload.get("source") == "authored-routine"
                 and event.payload.get("location_id") == "workshop"
                 and _same_date(event, at)
                 and str(event.event_id) not in processed
@@ -156,6 +154,17 @@ def financial_consequence_events(
                 )
             )
     return output
+
+
+# The only kinds _source_consequence can turn into money.
+_SOURCE_KINDS = (
+    "want.purchased",
+    "activity.completed",
+    "activity.execution_unfinished",
+    "meal.eaten",
+    "object.replenishment_ordered",
+    "object.replenishment_cancelled",
+)
 
 
 def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
@@ -252,10 +261,8 @@ def _charged_order_was_cancelled(
     order = next(
         (
             event
-            for event in history
-            if event.kind == "object.replenishment_ordered"
-            and event.payload.get("order_id") == order_id
-            and event.payload.get("attempt") == 1
+            for event in events_of(history, "object.replenishment_ordered")
+            if event.payload.get("order_id") == order_id and event.payload.get("attempt") == 1
         ),
         None,
     )

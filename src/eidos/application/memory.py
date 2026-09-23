@@ -11,6 +11,7 @@ from uuid import UUID
 
 from eidos.application.memory_retention import archived_memory_ids
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.recollections import Recollection, project_recollections
 
 WORDS = re.compile(r"[a-z0-9]+")
@@ -611,8 +612,8 @@ def memory_view(
 ) -> list[dict[str, Any]]:
     """Return every Pathos-owned memory with current accessibility, without rehearsal."""
     owned_count = sum(
-        event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos"
-        for event in history
+        event.payload.get("owner", "pathos") == "pathos"
+        for event in events_of(history, "memory.recorded")
     )
     index = index or MemoryIndex.build(history)
     ranked = recall(
@@ -626,8 +627,8 @@ def memory_view(
     by_id = {str(item.event.event_id): item for item in ranked}
     views = []
     archived = archived_memory_ids(history)
-    for event in history:
-        if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
+    for event in events_of(history, "memory.recorded"):
+        if event.payload.get("owner", "pathos") != "pathos":
             continue
         item = by_id.get(str(event.event_id))
         if item is None:
@@ -671,9 +672,8 @@ def _affective_context(
     arousal = 0.35
     label = "quiet"
     tags: dict[str, tuple[float, float, str, float]] = {}
-    for event in history:
-        if event.kind not in {"emotion.sampled", "affect.changed", "memory.recorded"}:
-            continue
+    index = kind_index(history)
+    for event in index.select("emotion.sampled", "affect.changed", "memory.recorded"):
         event_time = _simulated_time(event)
         if event_time > now:
             continue
@@ -703,9 +703,7 @@ def _affective_context(
                 round(intensity, 4),
             )
     appraisals: dict[str, float] = {}
-    for event in history:
-        if event.kind != "appraisal.recorded":
-            continue
+    for event in index.select("appraisal.recorded"):
         source_id = event.payload.get("source_event_id")
         desirability = event.payload.get("desirability")
         if (
@@ -715,8 +713,8 @@ def _affective_context(
         ):
             appraisals[source_id] = max(-1.0, min(1.0, float(desirability)))
     tones: dict[str, float] = {}
-    for event in history:
-        if event.kind != "memory.recorded" or event.payload.get("owner", "pathos") != "pathos":
+    for event in index.select("memory.recorded"):
+        if event.payload.get("owner", "pathos") != "pathos":
             continue
         memory_id = str(event.event_id)
         linked_source = event.payload.get("source_event_id")

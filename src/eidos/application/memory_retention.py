@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 
 POLICY_VERSION = 1
 MINIMUM_AGE = timedelta(days=180)
@@ -16,8 +17,8 @@ MAX_ARCHIVES_PER_REVIEW = 200
 def archived_memory_ids(history: Sequence[DomainEvent]) -> set[str]:
     return {
         str(event.payload["memory_id"])
-        for event in history
-        if event.kind == "memory.archived" and isinstance(event.payload.get("memory_id"), str)
+        for event in events_of(history, "memory.archived")
+        if isinstance(event.payload.get("memory_id"), str)
     }
 
 

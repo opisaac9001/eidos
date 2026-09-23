@@ -7,6 +7,7 @@ from typing import Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.social_preferences import (
     preference_evidence,
     preference_id,
@@ -23,10 +24,10 @@ def social_preference_events(
     state = project_social_preferences(history)
     considered = {
         str(event.payload["evidence_event_id"])
-        for event in history
-        if event.kind in {"social.preference_remembered", "social.preference_revised"}
+        for event in events_of(history, "social.preference_remembered", "social.preference_revised")
     }
-    for source in history:
+    # preference_evidence is None for every other kind.
+    for source in events_of(history, "conversation.message", "perception.recorded"):
         source_id = str(source.event_id)
         evidence = preference_evidence(source)
         if evidence is None or source_id in considered:

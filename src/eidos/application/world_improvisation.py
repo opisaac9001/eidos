@@ -16,6 +16,7 @@ from eidos.domain.ambient import (
     validate_ambient_candidate,
 )
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, payload_candidates
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -67,12 +68,14 @@ async def improvised_world_events(
     if cause is None:
         return []
     proposal_id = f"moira-open-world-cause-{cause.event_id}"
-    if any(event.payload.get("proposal_id") == proposal_id for event in history):
+    if any(
+        event.payload.get("proposal_id") == proposal_id
+        for event in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     recent = [
         str(event.payload.get("description", ""))
-        for event in history
-        if event.kind == "world_event.accepted"
+        for event in events_of(history, "world_event.accepted")
     ][-12:]
     locations = dict(
         known_locations
