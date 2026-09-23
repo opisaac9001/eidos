@@ -105,7 +105,9 @@ def phone_call_events(
     )
     sample = int(sha256(call_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
     notice_sample = int(sha256(f"notice:{call_id}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
-    notice_probability = max(0.08, min(0.98, 0.94 - 0.68 * attention_absorption))
+    # Deep focus makes a buzzing phone easy to miss, but most calls still get noticed:
+    # people glance at their phones even mid-task.
+    notice_probability = max(0.08, min(0.98, 0.94 - 0.45 * attention_absorption))
     if not instant_calls and notice_sample >= notice_probability:
         notice_after = simulated_at + timedelta(minutes=5 + round(notice_sample * 35))
         output.append(
