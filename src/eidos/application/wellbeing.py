@@ -76,6 +76,8 @@ def wellbeing_events(
     digest = sha256(f"wellbeing:{at.date().isoformat()}".encode()).digest()
     kinds = ("headache", "sore_muscles", "under_the_weather", "poor_sleep_aftereffects")
     kind = kinds[digest[0] % len(kinds)]
+    if at.month in (11, 12, 1, 2) and digest[3] % 2 == 0:
+        kind = "under_the_weather"  # In the dark months a spell is more often a cold.
     severity = (0.25, 0.35, 0.45, 0.55)[digest[1] % 4]
     duration_hours = (24, 48, 72)[digest[2] % 3]
     episode_id = f"wellbeing:{at.date().isoformat()}"

@@ -21,6 +21,7 @@ from eidos.application.appraisal import (
 )
 from eidos.application.attention import attention_state
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
+from eidos.application.body import body_events
 from eidos.application.bonds import bond_events, current_bonds
 from eidos.application.catchup import (
     CatchUpPreview,
@@ -623,6 +624,7 @@ class Life(LifeConversation):
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
+            self._phase_body_over_time(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -1440,6 +1442,45 @@ class Life(LifeConversation):
         )
         self._extend_warmed(tick, failings, self._planning, self._relationships)
         for event in failings:
+            if event.kind == "needs.changed":
+                tick.state = tick.state.apply(event)
+
+    def _phase_body_over_time(self, tick: _Tick) -> None:
+        """Knocks at the bench, the morning after, fitness drifting, and the dentist."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        planning = self._planning(history + pending)
+        on_shift = None
+        if tick.state.location_id == "workshop":
+            on_shift = next(
+                (
+                    entry.schedule_id
+                    for entry in planning.calendar.values()
+                    if is_rota_shift(entry.schedule_id)
+                    and entry.status == "scheduled"
+                    and datetime.fromisoformat(entry.starts_at)
+                    <= current
+                    < datetime.fromisoformat(entry.ends_at or entry.starts_at)
+                ),
+                None,
+            )
+
+        def status_of(schedule_id: str) -> str | None:
+            entry = planning.calendar.get(schedule_id)
+            return entry.status if entry is not None else None
+
+        changes = body_events(
+            history + pending,
+            current,
+            self._world_catalog(history + pending),
+            awake=tick.state.awake,
+            rest=tick.state.rest,
+            on_shift=on_shift,
+            status_of=status_of,
+        )
+        self._extend_warmed(tick, changes, self._planning, self._world_catalog)
+        for event in changes:
             if event.kind == "needs.changed":
                 tick.state = tick.state.apply(event)
 

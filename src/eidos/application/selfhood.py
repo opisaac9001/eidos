@@ -21,6 +21,7 @@ from hashlib import sha256
 from time import perf_counter
 from uuid import uuid4
 
+from eidos.application.body import body_context, body_patterns
 from eidos.application.evening_course import course_context
 from eidos.application.family import family_context
 from eidos.application.home_move import home_context
@@ -869,11 +870,15 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
         "time_of_year": time_of_year(simulated_at),
-        "patterns_he_would_like_to_change": imperfection_context(history, simulated_at),
+        "patterns_he_would_like_to_change": [
+            *imperfection_context(history, simulated_at),
+            *body_patterns(history),
+        ],
         "work": work_context(history),
         "money": money_context(history, simulated_at),
         "home": home_context(history),
         "evening_class": course_context(history),
+        "body": body_context(history, simulated_at),
         "love_life": _love_life(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
@@ -1083,9 +1088,13 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "love_life": _love_life(history),
         "home": home_context(history),
         "evening_class": course_context(history),
+        "body": body_context(history, simulated_at),
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
-        "patterns_he_would_like_to_change": imperfection_context(history, simulated_at),
+        "patterns_he_would_like_to_change": [
+            *imperfection_context(history, simulated_at),
+            *body_patterns(history),
+        ],
         "about_you": user_knowledge_context(history, simulated_at),
         "tastes": [
             {

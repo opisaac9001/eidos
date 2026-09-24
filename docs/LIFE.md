@@ -201,6 +201,30 @@ His friends' lives go on without him, and change his weeks.
 - **How it ends:** seven or more classes and he finishes, proud of what he made. Fewer, and
   it's one more thing he started and didn't finish, which he notices.
 
+## His body over time (`application/body.py`)
+
+- **Knocks at the bench:** now and then during a shift he cuts his thumb on a chisel,
+  burns his fingers on the soldering iron, traps a finger in the vice or pulls his back
+  lifting a radiogram. That's about one or two a year, a little likelier when he's short of
+  sleep, and never two within six weeks. It stays sore for four to seven days
+  (`sore_at_the_moment`), dents his mood, and costs a few pounds in plasters or ibuprofen.
+- **Hangovers:** the morning after three hours or more at the Crown, being out at the pub,
+  music room or community hall past eleven, or a friend's leaving do, he may wake
+  hungover. The chance is about a third, or 60% after a leaving do. It costs some rest and
+  he remembers it ruefully.
+- **Fitness:** each week (`body.week`) his hours at the park, riverside, hill path, nature
+  path, dog walk and allotments, plus time walking between places, move a slow fitness
+  level toward that week's. About six hours a week keeps him fit. Crossing into fit is a
+  memory ("Walked up Westfield Hill without stopping for the first time"), and so is
+  falling out of shape ("Out of breath on the stairs").
+- **The dentist:** about nine months after he arrives (and after each check-up) he
+  remembers he should go, and "putting off booking the dentist" joins the patterns he'd
+  like to change. Weeks later (within about three months) he rings and books, which is his
+  decision and causes the booking. He goes on a weekday he isn't working. It's usually fine
+  (£27.40), sometimes a filling (£75.30). If he misses it he books again.
+- **Colds** are the existing wellbeing episodes. From November to February a spell is more
+  often "under the weather".
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.
@@ -237,7 +261,7 @@ These systems are described in their own documents:
 
 - **Self-context** (voice, reflection, dreams, planning): `family`, `people_he_says_hello_to`,
   `reading_watching_listening`, `time_of_year`, `patterns_he_would_like_to_change`, `work`, `money`,
-  `love_life`. The conversation context also gets `what_he_knows_about_you` and
+  `love_life`, `body`. The conversation context also gets `what_he_knows_about_you` and
   `things_to_ask_you_about`.
 - **The Becoming view:** panels for his people, his family, what he knows about you,
   reading, watching and listening, and work, love and what he'd change.
