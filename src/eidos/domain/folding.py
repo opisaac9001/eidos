@@ -10,6 +10,13 @@ cached prefix. A prefix is reused only when every cached event is the *identical
 the same position, so filtered, reordered or speculative sequences can never be mistaken
 for one another; they simply fold from the start. States must be immutable, which every
 frozen projection state in the domain already is.
+
+Checking a prefix event by event would itself cost time proportional to the life lived, and
+there are thousands of fold calls an hour. So every sequence is first matched once against
+a few shared logs (``_LINEAGE``): append-only lists that successive sequences extend. Cached
+folds then only remember a log and a length, and a prefix test is an identity comparison.
+Sequences passed to folds are treated as the event stream is: they may grow by appending,
+but a list is never reordered or overwritten in place once folded.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from bisect import bisect_left
 from collections.abc import Callable, Hashable, Iterator, Sequence
 from datetime import datetime
 from heapq import merge
+from itertools import islice
 from threading import Lock
 from typing import Generic, TypeVar
 
@@ -27,11 +35,137 @@ from eidos.domain.events import DomainEvent
 S = TypeVar("S")
 
 
-class _Entry(Generic[S]):
-    __slots__ = ("events", "state")
+def _same(log: list[DomainEvent], events: Sequence[DomainEvent]) -> bool:
+    """Whether two equally long sequences hold the same events.
 
-    def __init__(self, events: list[DomainEvent], state: S) -> None:
+    List equality checks identity first per element in C, ~3.5x faster than map(is_), and
+    needs no copy. An equal but distinct event is the same fact (same id and content), so it
+    folds to the same state.
+    """
+    if isinstance(events, list):
+        return log == events
+    return all(map(operator.is_, log, events))
+
+
+class _Log:
+    """An append-only list of events shared by every sequence that is a prefix of it.
+
+    ``ancestors`` records logs this one was forked from, each with the length of the
+    prefix the two share, so a fold cached against an ancestor still resumes here.
+    """
+
+    __slots__ = ("events", "ancestors")
+
+    _DEPTH = 4
+
+    def __init__(self, events: list[DomainEvent], parent: _Log | None, shared: int) -> None:
         self.events = events
+        self.ancestors: tuple[tuple[_Log, int], ...] = (
+            ()
+            if parent is None
+            else (
+                (parent, shared),
+                *((log, min(shared, length)) for log, length in parent.ancestors),
+            )[: self._DEPTH]
+        )
+
+    def covers(self, events: Sequence[DomainEvent]) -> bool:
+        """Whether ``events`` is a prefix of this log, extending the log if it continues it."""
+        log = self.events
+        known, size = len(log), len(events)
+        if size <= known:
+            if size and log[size - 1] is not events[size - 1]:
+                return False
+            return _same(log, events) if size == known else _same(log[:size], events)
+        if known and log[known - 1] is not events[known - 1]:
+            return False
+        log.extend(events[known:] if isinstance(events, list) else islice(events, known, None))
+        if _same(log, events):
+            return True
+        del log[known:]
+        return False
+
+    def shared_with(self, events: Sequence[DomainEvent]) -> int:
+        """The length of the longest prefix this log shares with ``events``."""
+        log = self.events
+        limit = min(len(log), len(events))
+        # Sequences that diverge mostly do so near their end, so look back from there.
+        length, back = limit, 1
+        while length > 0:
+            if log[length - 1] is events[length - 1] and _same(log[:length], events[:length]):
+                break
+            length, back = max(0, limit - back), back * 2
+        while length < limit and log[length] is events[length]:
+            length += 1
+        return length
+
+
+def _prefix_of(log: _Log | None, size: int, events_log: _Log | None, length: int) -> bool:
+    """Whether ``log[:size]`` is a prefix of the sequence ``events_log[:length]``."""
+    if size == 0:
+        return True
+    if size > length or events_log is None:
+        return False
+    if log is events_log:
+        return True
+    for ancestor, shared in events_log.ancestors:
+        if ancestor is log:
+            return size <= shared
+    return False
+
+
+class _Lineage:
+    """The shared logs, and which log recently seen sequences are prefixes of."""
+
+    _LOGS = 8
+    _RECENT = 8
+
+    def __init__(self) -> None:
+        self._logs: list[_Log] = []
+        # id(sequence) -> (sequence, its length then, its log); the sequence is held so its
+        # id cannot be reused. Sequences only ever grow, so an unchanged length is the same
+        # sequence and one that grew is matched again.
+        self._recent: dict[int, tuple[Sequence[DomainEvent], int, _Log]] = {}
+        self._lock = Lock()
+
+    def resolve(self, events: Sequence[DomainEvent]) -> _Log | None:
+        """A log of which ``events`` is a prefix, or None for an empty sequence."""
+        if not events:
+            return None
+        with self._lock:
+            seen = self._recent.get(id(events))
+            if seen is not None and seen[0] is events and seen[1] == len(events):
+                return seen[2]
+            match = next((log for log in self._logs if log.covers(events)), None)
+            if match is None:
+                # A new branch: fork from the most recent log it shares a prefix with.
+                parent, shared = None, 0
+                for log in self._logs:
+                    shared = log.shared_with(events)
+                    if shared:
+                        parent = log
+                        break
+                match = _Log(list(events), parent, shared)
+            else:
+                self._logs.remove(match)
+            self._logs.insert(0, match)
+            del self._logs[self._LOGS :]
+            self._recent.pop(id(events), None)
+            self._recent[id(events)] = (events, len(events), match)
+            while len(self._recent) > self._RECENT:
+                del self._recent[next(iter(self._recent))]
+            return match
+
+
+_LINEAGE = _Lineage()
+
+
+class _Entry(Generic[S]):
+    __slots__ = ("log", "size", "state")
+
+    def __init__(self, log: _Log | None, size: int, state: S) -> None:
+        self.log = log
+        self.size = size
         self.state = state
 
 
@@ -77,22 +211,13 @@ class IncrementalFold(Generic[S]):
         Sequences of different types are cached apart, so an ``EventView`` never evicts the
         history-ordered sequences it cannot share a prefix with, nor they it.
         """
+        log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
             entries = self._entries.setdefault((key, type(events)), [])
             best: _Entry[S] | None = None
             for entry in entries:
-                size = len(entry.events)
-                if size > len(events) or (best is not None and size <= len(best.events)):
-                    continue
-                if size and entry.events[size - 1] is not events[size - 1]:
-                    continue
-                # List equality checks identity first per element in C, ~3.5x faster than
-                # map(is_). An equal but distinct event is the same fact (same id and content),
-                # so it folds to the same state.
-                if (
-                    events[:size] == entry.events
-                    if isinstance(events, list)
-                    else all(map(operator.is_, entry.events, events))
+                if (best is None or entry.size > best.size) and _prefix_of(
+                    entry.log, entry.size, log, length
                 ):
                     best = entry
             if best is None:
@@ -100,16 +225,16 @@ class IncrementalFold(Generic[S]):
                 start = 0
             else:
                 state = best.state
-                start = len(best.events)
-                if start == len(events):
+                start = best.size
+                if start == length:
                     self._touch(entries, best)
                     return state
             step = self._step
-            for index in range(start, len(events)):
+            for index in range(start, length):
                 state = step(state, events[index])
             # Keep the shorter prefix too: speculative sequences (a proposal later rejected)
             # must not evict the prefix the next genuine sequence will continue from.
-            entries.insert(0, _Entry(list(events), state))
+            entries.insert(0, _Entry(log, length, state))
             del entries[self._capacity :]
             return state
 
@@ -144,30 +269,21 @@ class LinearReplay(Generic[S]):
     ) -> None:
         self._initial = initial
         self._advance = advance
-        self._events: list[DomainEvent] = []
+        self._log: _Log | None = None
+        self._size = 0
         self._state: S | None = None
         self._lock = Lock()
 
     def use(self, events: Sequence[DomainEvent], read: Callable[[S], R]) -> R:
+        log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
-            state, size = self._state, len(self._events)
-            if (
-                state is None
-                or size > len(events)
-                or (size and self._events[size - 1] is not events[size - 1])
-                or not (
-                    events[:size] == self._events
-                    if isinstance(events, list)
-                    else all(map(operator.is_, self._events, events))
-                )
-            ):
-                state, size = self._initial(), -1
+            state, start = self._state, self._size
+            if state is None or not _prefix_of(self._log, start, log, length):
+                state, start = self._initial(), 0
             # A replay that fails part way must not be continued later.
             self._state = None
-            self._advance(state, events, max(0, size))
-            if size != len(events):
-                self._events = list(events)
-            self._state = state
+            self._advance(state, events, start)
+            self._log, self._size, self._state = log, length, state
             return read(state)
 
 

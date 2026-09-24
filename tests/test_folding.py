@@ -1,4 +1,5 @@
 import unittest
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.preference_development import preference_development_events
@@ -6,7 +7,13 @@ from eidos.application.trait_development import trait_development_events
 from eidos.domain import identity as identity_module
 from eidos.domain import traits as traits_module
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import GrowOnlyMap, IncrementalFold, PersistentMap
+from eidos.domain.folding import (
+    EventView,
+    GrowOnlyMap,
+    IncrementalFold,
+    LinearReplay,
+    PersistentMap,
+)
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.traits import project_traits
 
@@ -65,6 +72,50 @@ class IncrementalFoldTests(unittest.TestCase):
         counter.fold(history + _events(1))
         self.assertEqual(counter.steps, 1)
 
+    def test_a_list_that_grew_in_place_resumes_where_it_was_folded(self) -> None:
+        counter = CountingFold()
+        events = _events(20)
+        counter.fold(events)
+        events.extend(_events(2))
+        self.assertEqual(counter.fold(events)[-2:], (0, 1))
+        self.assertEqual(counter.steps, 22)
+
+    def test_a_branch_resumes_from_the_prefix_it_shares_with_another(self) -> None:
+        counter = CountingFold()
+        history = _events(30)
+        counter.fold(history)
+        first, second = history + _events(3), history + _events(4)
+        counter.fold(first)
+        counter.steps = 0
+        self.assertEqual(counter.fold(second), (*range(30), *range(4)))
+        self.assertEqual(counter.steps, 4)
+        counter.steps = 0
+        self.assertEqual(counter.fold(first + _events(1))[-4:], (0, 1, 2, 0))
+        self.assertEqual(counter.steps, 1)
+
+    def test_shorter_prefixes_and_tuples_reuse_what_was_folded(self) -> None:
+        counter = CountingFold()
+        history = _events(12)
+        counter.fold(history[:8])
+        counter.fold(history)
+        counter.steps = 0
+        self.assertEqual(counter.fold(history[:8]), tuple(range(8)))
+        self.assertEqual(counter.steps, 0)
+        self.assertEqual(counter.fold(tuple(history[:10])), tuple(range(10)))
+        self.assertEqual(counter.fold(tuple(history)), tuple(range(12)))
+        self.assertEqual(counter.steps, 12)
+
+    def test_time_ordered_views_are_cached_apart_from_history(self) -> None:
+        counter = CountingFold()
+        history = _events(10)
+        view = EventView(reversed(history))
+        counter.fold(view)
+        for size in range(1, 11):
+            counter.fold(history[:size])
+        counter.steps = 0
+        self.assertEqual(counter.fold(EventView(view)), tuple(reversed(range(10))))
+        self.assertEqual(counter.steps, 0)
+
     def test_keys_keep_differently_seeded_folds_apart(self) -> None:
         fold: IncrementalFold[tuple[str, int]] = IncrementalFold(
             lambda: ("default", 0), lambda state, _event: (state[0], state[1] + 1)
@@ -73,6 +124,36 @@ class IncrementalFoldTests(unittest.TestCase):
         self.assertEqual(fold(history, key=1, initial=lambda: ("one", 0)), ("one", 3))
         self.assertEqual(fold(history, key=2, initial=lambda: ("two", 0)), ("two", 3))
         self.assertEqual(fold(history, key=1, initial=lambda: ("ignored", 0)), ("one", 3))
+
+
+class LinearReplayTests(unittest.TestCase):
+    def test_continues_a_growing_sequence_and_restarts_for_any_other(self) -> None:
+        advanced: list[int] = []
+
+        def advance(state: list[int], events: Sequence[DomainEvent], start: int) -> None:
+            advanced.append(len(events) - start)
+            state.extend(int(event.payload["n"]) for event in events[start:])
+
+        replay: LinearReplay[list[int]] = LinearReplay(list, advance)
+        history = _events(5)
+        self.assertEqual(replay.use(history, list), [0, 1, 2, 3, 4])
+        self.assertEqual(replay.use(history + _events(2), list), [0, 1, 2, 3, 4, 0, 1])
+        self.assertEqual(replay.use(history[:3], list), [0, 1, 2])
+        self.assertEqual(advanced, [5, 2, 3])
+
+    def test_a_failed_advance_is_replayed_from_the_start(self) -> None:
+        def advance(state: list[int], events: Sequence[DomainEvent], start: int) -> None:
+            for event in events[start:]:
+                if event.payload["n"] == 2:
+                    raise ValueError("bad event")
+                state.append(int(event.payload["n"]))
+
+        replay: LinearReplay[list[int]] = LinearReplay(list, advance)
+        history = _events(2)
+        replay.use(history, list)
+        with self.assertRaises(ValueError):
+            replay.use(history + _events(3), list)
+        self.assertEqual(replay.use(history + _events(1), list), [0, 1, 0])
 
 
 class GrowOnlyMapTests(unittest.TestCase):
