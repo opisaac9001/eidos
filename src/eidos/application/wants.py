@@ -18,6 +18,7 @@ from eidos.application.work_rota import SHIFT_WEEKDAYS
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.selfhood import project_selfhood
+from eidos.domain.tastes import project_tastes
 
 RESERVE_PENCE = 20_000
 CONSIDER_FOR = timedelta(days=3)
@@ -88,6 +89,31 @@ OPTIONS: tuple[WantOption, ...] = (
 )
 _BY_ID: Mapping[str, WantOption] = {option.want_id: option for option in OPTIONS}
 
+# Tastes that would draw him to each thing (loving the café makes good coffee at home
+# appealing), and tastes that would put him off it.
+DRAWN_BY: Mapping[str, frozenset[str]] = {
+    "film-camera": frozenset(
+        {
+            "activity:street_texture_walk",
+            "activity:question_walk",
+            "place:riverside",
+            "place:hill-path",
+            "place:nature-path",
+            "place:park",
+        }
+    ),
+    "hand-plane": frozenset({"activity:repair_sketch_study", "place:hardware", "place:workshop"}),
+    "coffee-grinder": frozenset({"place:cafe", "activity:quiet_observation"}),
+    "cookbook": frozenset({"place:market-hall", "place:grocer", "activity:recipe_annotation"}),
+    "notebook": frozenset({"activity:object_story_notes", "activity:quiet_observation"}),
+    "record-player": frozenset({"place:music-room", "place:secondhand"}),
+}
+PUT_OFF_BY: Mapping[str, frozenset[str]] = {
+    "cookbook": frozenset({"activity:recipe_annotation"}),
+    "record-player": frozenset({"place:music-room"}),
+    "film-camera": frozenset({"activity:street_texture_walk"}),
+}
+
 
 def want_events(
     history: Sequence[DomainEvent],
@@ -105,9 +131,10 @@ def want_events(
         return []
     if last_formed is not None and simulated_at - last_formed < WANT_SPACING:
         return []
-    option = _fitting_option(history, simulated_at)
-    if option is None:
+    fitting = _fitting_option(history, simulated_at)
+    if fitting is None:
         return []
+    option, reason = fitting
     return [
         DomainEvent(
             "want.formed",
@@ -118,7 +145,7 @@ def want_events(
                 "item": option.item,
                 "value_id": option.value_id,
                 "price_pence": option.price_pence,
-                "reason": option.reason,
+                "reason": reason,
                 "simulated_at": simulated_at.isoformat(),
             },
             correlation_id=f"want-{option.want_id}",
@@ -126,8 +153,9 @@ def want_events(
     ]
 
 
-def _fitting_option(history: Sequence[DomainEvent], at: datetime) -> WantOption | None:
-    """The value he has lived most lately (or hopes to live) picks the thing he wants."""
+def _fitting_option(history: Sequence[DomainEvent], at: datetime) -> tuple[WantOption, str] | None:
+    """Something he has found he loves, or else the value he has lived most lately (or hopes
+    to live), picks the thing he wants; nothing he has gone off gets a look in."""
     state = project_selfhood(history)
     owned = {
         str(event.payload.get("option_id"))
@@ -144,10 +172,23 @@ def _fitting_option(history: Sequence[DomainEvent], at: datetime) -> WantOption 
     if not ranked or sum(lived.values()) < 6 or first is None or at - first < timedelta(days=14):
         # Wanting things for himself follows a settled couple of weeks, not his first days.
         return None
+    tastes = project_tastes(history).tastes
+    loved = [taste for taste in tastes.values() if taste.stance == "likes"]
+    gone_off = {subject for subject, taste in tastes.items() if taste.stance == "dislikes"}
+    available = [
+        option
+        for option in OPTIONS
+        if option.want_id not in owned
+        and not PUT_OFF_BY.get(option.want_id, frozenset()) & gone_off
+    ]
+    for taste in sorted(loved, key=lambda item: item.since, reverse=True):
+        for option in available:
+            if taste.subject in DRAWN_BY.get(option.want_id, frozenset()):
+                return option, f"I've found I love {taste.label}. {option.reason}"
     for value_id in ranked:
-        for option in OPTIONS:
-            if option.value_id == value_id and option.want_id not in owned:
-                return option
+        for option in available:
+            if option.value_id == value_id:
+                return option, option.reason
     return None
 
 

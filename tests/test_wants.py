@@ -150,3 +150,37 @@ def test_he_can_say_what_he_is_saving_for() -> None:
     )
     reply = json.loads(asyncio.run(StandInGateway().generate(request)).content)["text"]
     assert "hand plane" in reply
+
+
+def taste(subject: str, stance: str, label: str) -> DomainEvent:
+    return DomainEvent(
+        "taste.formed",
+        "pathos",
+        {
+            "subject": subject,
+            "label": label,
+            "stance": stance,
+            "simulated_at": (SATURDAY - timedelta(days=2)).isoformat(),
+        },
+    )
+
+
+def test_what_he_has_found_he_loves_shapes_what_he_wants() -> None:
+    want = formed([*lived_craft(), taste("place:cafe", "likes", "Juniper Café")])
+    assert want.payload["option_id"] == "coffee-grinder"
+    assert want.payload["reason"].startswith("I've found I love Juniper Café.")
+
+
+def test_he_does_not_want_something_tied_to_what_he_has_gone_off() -> None:
+    cared = [
+        DomainEvent(
+            "follow_up.completed",
+            "pathos",
+            {"simulated_at": (SATURDAY - timedelta(days=day)).isoformat()},
+        )
+        for day in range(16, 0, -1)
+    ]
+    assert formed(cared).payload["option_id"] == "cookbook"
+    put_off = [*cared, taste("activity:recipe_annotation", "dislikes", "annotating recipes")]
+    output = want_events(put_off, SATURDAY, balance_pence=0, location_id="home", awake=True)
+    assert all(item.payload.get("option_id") != "cookbook" for item in output)

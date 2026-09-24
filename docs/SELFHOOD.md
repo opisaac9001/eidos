@@ -110,7 +110,10 @@ vegetarian cookbook (care), a notebook (reliability), a record player (curiosity
 sits with it for three days, saves until he can buy it and keep a £200 cushion, and picks
 it up on a free day while he is out. The purchase is charged to the ledger and becomes an
 owned object at home that his plans can use. It is recorded as a milestone memory and as
-lived evidence for its value. A want still out of reach after 60 days is let go.
+lived evidence for its value. A want still out of reach after 60 days is let go. A taste
+comes first: having found he loves the café makes the coffee grinder appealing ("I've
+found I love Juniper Café…"). Something tied to what he has gone off, such as a cookbook
+after deciding recipe annotation isn't for him, is never wanted.
 (`application/wants.py`)
 
 ### 8. Tastes
