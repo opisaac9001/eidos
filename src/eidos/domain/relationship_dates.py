@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold, PersistentMap
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +18,20 @@ class RelationshipDate:
     origin_date: str
     description: str
     anniversaries: int = 0
+
+
+# The only kinds interaction_person can name someone for.
+INTERACTION_KINDS = frozenset(
+    {
+        "social.activity_completed",
+        "phone.call_completed",
+        "phone.callback_completed",
+        "visitor.departed",
+        "incident.shared_aftermath",
+        "object.shared_use",
+        "visit.ended",
+    }
+)
 
 
 def interaction_person(event: DomainEvent) -> str | None:
@@ -35,70 +50,92 @@ def interaction_person(event: DomainEvent) -> str | None:
     return value if isinstance(value, str) and value not in {"", "pathos"} else None
 
 
-def project_relationship_dates(history: Sequence[DomainEvent]) -> dict[str, RelationshipDate]:
-    dates: dict[str, RelationshipDate] = {}
-    seen: dict[str, DomainEvent] = {}
-    remembered: set[tuple[str, int]] = set()
-    for event in history:
-        if event.kind == "relationship.milestone_recorded":
-            person_id = _required(event, "person_id")
-            source_id = _required(event, "source_event_id")
-            source = seen.get(source_id)
-            if person_id in dates:
-                raise ValueError("Only the first meaningful date is retained per relationship")
-            if source is None or interaction_person(source) != person_id:
-                raise ValueError("Relationship date must cite shared interaction evidence")
-            origin = date.fromisoformat(_required(event, "origin_date"))
-            source_time = _event_time(source)
-            if (
-                origin != source_time.date()
-                or _event_time(event) < source_time
-                or event.causation_id != source.event_id
-            ):
-                raise ValueError("Relationship date must preserve its source date and cause")
-            dates[person_id] = RelationshipDate(
+class _DatesFold(NamedTuple):
+    dates: dict[str, RelationshipDate]
+    remembered: frozenset[tuple[str, int]]
+    # Earlier events a milestone may cite, by id: every interaction, plus any later event
+    # reusing an interaction's id, so a lookup finds exactly the latest event with that id.
+    seen: PersistentMap[str, DomainEvent]
+
+
+def _dates_step(fold: _DatesFold, event: DomainEvent) -> _DatesFold:
+    dates, remembered = fold.dates, fold.remembered
+    if event.kind == "relationship.milestone_recorded":
+        person_id = _required(event, "person_id")
+        source_id = _required(event, "source_event_id")
+        source = fold.seen.get(source_id)
+        if person_id in dates:
+            raise ValueError("Only the first meaningful date is retained per relationship")
+        if source is None or interaction_person(source) != person_id:
+            raise ValueError("Relationship date must cite shared interaction evidence")
+        origin = date.fromisoformat(_required(event, "origin_date"))
+        source_time = _event_time(source)
+        if (
+            origin != source_time.date()
+            or _event_time(event) < source_time
+            or event.causation_id != source.event_id
+        ):
+            raise ValueError("Relationship date must preserve its source date and cause")
+        dates = {
+            **dates,
+            person_id: RelationshipDate(
                 person_id,
                 source_id,
                 str(event.event_id),
                 origin.isoformat(),
                 _required(event, "description"),
-            )
-        elif event.kind == "relationship.anniversary_remembered":
-            person_id = _required(event, "person_id")
-            milestone = dates.get(person_id)
-            years = event.payload.get("years")
-            if (
-                milestone is None
-                or isinstance(years, bool)
-                or not isinstance(years, int)
-                or years < 1
-                or (person_id, years) in remembered
-                or _required(event, "milestone_event_id") != milestone.milestone_event_id
-            ):
-                raise ValueError("Relationship anniversary is missing or duplicated")
-            observed_at = _event_time(event)
-            if observed_at.date() != anniversary_date(
-                date.fromisoformat(milestone.origin_date), observed_at.year
-            ):
-                raise ValueError("Relationship anniversary occurred on the wrong date")
-            if observed_at.year - date.fromisoformat(milestone.origin_date).year != years:
-                raise ValueError("Relationship anniversary year is incorrect")
-            if (
-                event.causation_id is None
-                or str(event.causation_id) != milestone.milestone_event_id
-            ):
-                raise ValueError("Relationship anniversary must cite its milestone")
-            remembered.add((person_id, years))
-            dates[person_id] = RelationshipDate(
+            ),
+        }
+    elif event.kind == "relationship.anniversary_remembered":
+        person_id = _required(event, "person_id")
+        milestone = dates.get(person_id)
+        years = event.payload.get("years")
+        if (
+            milestone is None
+            or isinstance(years, bool)
+            or not isinstance(years, int)
+            or years < 1
+            or (person_id, years) in remembered
+            or _required(event, "milestone_event_id") != milestone.milestone_event_id
+        ):
+            raise ValueError("Relationship anniversary is missing or duplicated")
+        observed_at = _event_time(event)
+        if observed_at.date() != anniversary_date(
+            date.fromisoformat(milestone.origin_date), observed_at.year
+        ):
+            raise ValueError("Relationship anniversary occurred on the wrong date")
+        if observed_at.year - date.fromisoformat(milestone.origin_date).year != years:
+            raise ValueError("Relationship anniversary year is incorrect")
+        if event.causation_id is None or str(event.causation_id) != milestone.milestone_event_id:
+            raise ValueError("Relationship anniversary must cite its milestone")
+        remembered = remembered | {(person_id, years)}
+        dates = {
+            **dates,
+            person_id: RelationshipDate(
                 milestone.person_id,
                 milestone.source_event_id,
                 milestone.milestone_event_id,
                 milestone.origin_date,
                 milestone.description,
                 max(milestone.anniversaries, years),
-            )
-        seen[str(event.event_id)] = event
-    return dates
+            ),
+        }
+    seen = fold.seen
+    event_id = str(event.event_id)
+    if event.kind in INTERACTION_KINDS or event_id in seen:
+        seen = seen.with_item(event_id, event)
+    if dates is fold.dates and seen is fold.seen:
+        return fold
+    return _DatesFold(dates, remembered, seen)
+
+
+_DATES_FOLD: IncrementalFold[_DatesFold] = IncrementalFold(
+    lambda: _DatesFold({}, frozenset(), PersistentMap()), _dates_step
+)
+
+
+def project_relationship_dates(history: Sequence[DomainEvent]) -> dict[str, RelationshipDate]:
+    return dict(_DATES_FOLD(history).dates)
 
 
 def anniversary_date(origin: date, year: int) -> date:

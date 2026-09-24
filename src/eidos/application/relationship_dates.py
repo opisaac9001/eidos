@@ -7,7 +7,9 @@ from typing import Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.relationship_dates import (
+    INTERACTION_KINDS,
     anniversary_date,
     interaction_person,
     project_relationship_dates,
@@ -21,7 +23,8 @@ def relationship_date_events(
         raise ValueError("Relationship date review must be timezone-aware")
     output: list[DomainEvent] = []
     state = project_relationship_dates(history)
-    for source in history:
+    # interaction_person is None for every other kind.
+    for source in events_of(history, *INTERACTION_KINDS):
         person_id = interaction_person(source)
         if person_id is None or person_id in state:
             continue
@@ -58,8 +61,7 @@ def relationship_date_events(
         return output
     remembered = {
         (str(event.payload.get("person_id")), event.payload.get("years"))
-        for event in history
-        if event.kind == "relationship.anniversary_remembered"
+        for event in events_of(history, "relationship.anniversary_remembered")
     }
     for person_id, relationship_date in state.items():
         origin = date.fromisoformat(relationship_date.origin_date)

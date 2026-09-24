@@ -7,7 +7,13 @@ from datetime import datetime, timedelta
 from typing import NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import GrowOnlyMap, IncrementalFold
+from eidos.domain.folding import (
+    GrowOnlyMap,
+    IncrementalFold,
+    event_index,
+    events_of,
+    payload_candidates,
+)
 from eidos.domain.state import PathosState
 
 
@@ -152,7 +158,7 @@ def emotion_sample_events(
     sample_id = f"emotion:{at.isoformat()}"
     if any(
         event.kind == "emotion.sampled" and event.payload.get("sample_id") == sample_id
-        for event in history
+        for event in payload_candidates(history, "sample_id", sample_id)
     ):
         return []
     previous = project_emotion(history)
@@ -356,16 +362,15 @@ def _recent_opposed_appraisals(
     positive = None
     negative = None
     cutoff = at - timedelta(hours=12)
-    by_id = {str(event.event_id): event for event in events}
+    # Event ids are unique in a stream, so the first event with an id is the only one.
+    by_id = event_index(events)
     carried_positive = by_id.get(previous.positive_source_event_id or "")
     carried_negative = by_id.get(previous.negative_source_event_id or "")
     if _eligible_appraisal(carried_positive, cutoff, at, positive=True) and _eligible_appraisal(
         carried_negative, cutoff, at, positive=False
     ):
         return carried_positive, carried_negative
-    for event in reversed(events):
-        if event.kind != "appraisal.recorded":
-            continue
+    for event in reversed(events_of(events, "appraisal.recorded")):
         raw_time = event.payload.get("simulated_at")
         desirability = event.payload.get("desirability")
         if (

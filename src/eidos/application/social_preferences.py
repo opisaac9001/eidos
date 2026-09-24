@@ -7,11 +7,21 @@ from typing import Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of
+from eidos.domain.folding import GroupIndex, IncrementalFold, events_of
 from eidos.domain.social_preferences import (
+    EVIDENCE_KINDS,
     preference_evidence,
     preference_id,
     project_social_preferences,
+)
+
+# Events holding a stated preference, in history order, under the key True.
+_EVIDENCE: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex,
+    lambda index, event: index.with_event(
+        True if event.kind in EVIDENCE_KINDS and preference_evidence(event) is not None else None,
+        event,
+    ),
 )
 
 
@@ -26,8 +36,8 @@ def social_preference_events(
         str(event.payload["evidence_event_id"])
         for event in events_of(history, "social.preference_remembered", "social.preference_revised")
     }
-    # preference_evidence is None for every other kind.
-    for source in events_of(history, "conversation.message", "perception.recorded"):
+    # preference_evidence is None for every other event.
+    for source in _EVIDENCE(history).of(True):
         source_id = str(source.event_id)
         evidence = preference_evidence(source)
         if evidence is None or source_id in considered:

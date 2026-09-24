@@ -6,9 +6,10 @@ import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IncrementalFold, PersistentMap
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,92 +82,128 @@ def preference_evidence(event: DomainEvent) -> PreferenceEvidence | None:
     return PreferenceEvidence(speaker, topic, stance, max(0.1, float(confidence)))
 
 
+# The only kinds preference_evidence can find evidence in.
+EVIDENCE_KINDS = frozenset({"conversation.message", "perception.recorded"})
+
+
+class _PreferencesFold(NamedTuple):
+    preferences: dict[str, RememberedPreference]
+    # Earlier events a preference may cite, by id: every possible piece of evidence, plus
+    # any later event reusing such an id, so a lookup finds the latest event with that id.
+    seen: PersistentMap[str, DomainEvent]
+
+
 def project_social_preferences(
     history: Sequence[DomainEvent],
 ) -> dict[str, RememberedPreference]:
-    preferences: dict[str, RememberedPreference] = {}
-    seen: dict[str, DomainEvent] = {}
-    for event in history:
-        if event.kind in {"social.preference_remembered", "social.preference_revised"}:
-            preference_id = _required(event, "preference_id")
-            person_id = _required(event, "person_id")
-            topic = _required(event, "topic")
-            stance = _required(event, "stance")
-            evidence_id = _required(event, "evidence_event_id")
-            evidence_event = seen.get(evidence_id)
-            evidence = preference_evidence(evidence_event) if evidence_event is not None else None
-            confidence = _confidence(event)
-            evidence_time = _event_time(evidence_event) if evidence_event is not None else None
-            if (
-                evidence_event is None
-                or evidence is None
-                or evidence.person_id != person_id
-                or evidence.topic != topic
-                or evidence.stance != stance
-                or confidence != evidence.confidence
-                or evidence_time is None
-                or event.causation_id != evidence_event.event_id
+    return dict(_PREFERENCES_FOLD(history).preferences)
+
+
+def _preferences_step(fold: _PreferencesFold, event: DomainEvent) -> _PreferencesFold:
+    preferences = fold.preferences
+    if event.kind in {
+        "social.preference_remembered",
+        "social.preference_revised",
+        "social.preference_faded",
+    }:
+        preferences = dict(preferences)
+        _apply_preference(preferences, fold.seen, event)
+    seen = fold.seen
+    event_id = str(event.event_id)
+    if event.kind in EVIDENCE_KINDS or event_id in seen:
+        seen = seen.with_item(event_id, event)
+    if preferences is fold.preferences and seen is fold.seen:
+        return fold
+    return _PreferencesFold(preferences, seen)
+
+
+def _apply_preference(
+    preferences: dict[str, RememberedPreference],
+    seen: PersistentMap[str, DomainEvent],
+    event: DomainEvent,
+) -> None:
+    if event.kind in {"social.preference_remembered", "social.preference_revised"}:
+        preference_id = _required(event, "preference_id")
+        person_id = _required(event, "person_id")
+        topic = _required(event, "topic")
+        stance = _required(event, "stance")
+        evidence_id = _required(event, "evidence_event_id")
+        evidence_event = seen.get(evidence_id)
+        evidence = preference_evidence(evidence_event) if evidence_event is not None else None
+        confidence = _confidence(event)
+        evidence_time = _event_time(evidence_event) if evidence_event is not None else None
+        if (
+            evidence_event is None
+            or evidence is None
+            or evidence.person_id != person_id
+            or evidence.topic != topic
+            or evidence.stance != stance
+            or confidence != evidence.confidence
+            or evidence_time is None
+            or event.causation_id != evidence_event.event_id
+        ):
+            raise ValueError("Remembered preference must match accessible direct evidence")
+        current = preferences.get(preference_id)
+        if event.kind == "social.preference_remembered":
+            if current is not None or any(
+                item.person_id == person_id and item.topic == topic for item in preferences.values()
             ):
-                raise ValueError("Remembered preference must match accessible direct evidence")
-            current = preferences.get(preference_id)
-            if event.kind == "social.preference_remembered":
-                if current is not None or any(
-                    item.person_id == person_id and item.topic == topic
-                    for item in preferences.values()
-                ):
-                    raise ValueError("Preference identity already exists")
-                preferences[preference_id] = RememberedPreference(
-                    preference_id,
-                    person_id,
-                    topic,
-                    stance,
-                    confidence,
-                    "held",
-                    1,
-                    1,
-                    evidence_id,
-                    evidence_time.isoformat(),
-                )
-            else:
-                if (
-                    current is None
-                    or (current.person_id, current.topic) != (person_id, topic)
-                    or event.payload.get("prior_revision") != current.revision
-                ):
-                    raise ValueError("Preference revision is stale or unknown")
-                if evidence_id == current.last_evidence_id:
-                    raise ValueError("Preference evidence cannot be reused")
-                preferences[preference_id] = replace(
-                    current,
-                    stance=stance,
-                    confidence=confidence,
-                    status="held",
-                    revision=current.revision + 1,
-                    evidence_count=current.evidence_count + 1,
-                    last_evidence_id=evidence_id,
-                    last_evidence_at=evidence_time.isoformat(),
-                )
-        elif event.kind == "social.preference_faded":
-            preference_id = _required(event, "preference_id")
-            current = preferences.get(preference_id)
+                raise ValueError("Preference identity already exists")
+            preferences[preference_id] = RememberedPreference(
+                preference_id,
+                person_id,
+                topic,
+                stance,
+                confidence,
+                "held",
+                1,
+                1,
+                evidence_id,
+                evidence_time.isoformat(),
+            )
+        else:
             if (
                 current is None
-                or current.status != "held"
+                or (current.person_id, current.topic) != (person_id, topic)
                 or event.payload.get("prior_revision") != current.revision
-                or event.causation_id is None
-                or str(event.causation_id) != current.last_evidence_id
-                or _event_time(event) - datetime.fromisoformat(current.last_evidence_at)
-                < timedelta(days=180)
             ):
-                raise ValueError("Only an old, held preference can fade")
+                raise ValueError("Preference revision is stale or unknown")
+            if evidence_id == current.last_evidence_id:
+                raise ValueError("Preference evidence cannot be reused")
             preferences[preference_id] = replace(
                 current,
-                confidence=min(current.confidence, 0.25),
-                status="uncertain",
+                stance=stance,
+                confidence=confidence,
+                status="held",
                 revision=current.revision + 1,
+                evidence_count=current.evidence_count + 1,
+                last_evidence_id=evidence_id,
+                last_evidence_at=evidence_time.isoformat(),
             )
-        seen[str(event.event_id)] = event
-    return preferences
+    elif event.kind == "social.preference_faded":
+        preference_id = _required(event, "preference_id")
+        current = preferences.get(preference_id)
+        if (
+            current is None
+            or current.status != "held"
+            or event.payload.get("prior_revision") != current.revision
+            or event.causation_id is None
+            or str(event.causation_id) != current.last_evidence_id
+            or _event_time(event) - datetime.fromisoformat(current.last_evidence_at)
+            < timedelta(days=180)
+        ):
+            raise ValueError("Only an old, held preference can fade")
+        preferences[preference_id] = replace(
+            current,
+            confidence=min(current.confidence, 0.25),
+            status="uncertain",
+            revision=current.revision + 1,
+        )
+
+
+_PREFERENCES_FOLD: IncrementalFold[_PreferencesFold] = IncrementalFold(
+    lambda: _PreferencesFold({}, PersistentMap()), _preferences_step
+)
 
 
 def preference_id(person_id: str, topic: str) -> str:

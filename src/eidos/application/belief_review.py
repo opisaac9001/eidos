@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 
 
 def relationship_belief_events(
@@ -13,13 +14,14 @@ def relationship_belief_events(
 ) -> list[DomainEvent]:
     considered = {
         str(event.payload["evidence_event_id"])
-        for event in history
-        if event.kind in {"belief.formed", "belief.revised", "belief.corrected", "belief.contested"}
+        for event in events_of(
+            history, "belief.formed", "belief.revised", "belief.corrected", "belief.contested"
+        )
     }
     output: list[DomainEvent] = []
     state = belief_state if belief_state is not None else project_beliefs(history)
-    for evidence in history:
-        if evidence.kind != "relationship.changed" or str(evidence.event_id) in considered:
+    for evidence in events_of(history, "relationship.changed"):
+        if str(evidence.event_id) in considered:
             continue
         subject_id = evidence.payload.get("evidence_actor_id")
         trust_delta = evidence.payload.get("trust_delta", 0.0)
@@ -64,19 +66,19 @@ def testimony_belief_events(
     """Review actor-owned heard claims and Pathos's direct confirmations."""
     considered = {
         str(event.payload["evidence_event_id"])
-        for event in history
-        if event.kind
-        in {
+        for event in events_of(
+            history,
             "belief.formed",
             "belief.revised",
             "belief.corrected",
             "belief.contested",
             "belief.rejected",
-        }
+        )
     }
     output: list[DomainEvent] = []
     state = belief_state if belief_state is not None else project_beliefs(history)
-    for evidence in history:
+    # Only these kinds carry a claim; every other event is passed over.
+    for evidence in events_of(history, "perception.recorded", "resource.confirmed"):
         evidence_id = str(evidence.event_id)
         if evidence_id in considered:
             continue
