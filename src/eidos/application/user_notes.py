@@ -64,9 +64,19 @@ _OUTPUT_SCHEMA = {
                     "ask_after_days": {"type": "integer", "minimum": 0, "maximum": 21},
                 },
             },
-        }
+        },
+        "running_joke": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["label", "source_quote"],
+            "properties": {
+                "label": {"type": "string", "maxLength": 60},
+                "source_quote": {"type": "string", "maxLength": 200},
+            },
+        },
     },
 }
+JOKE_GAP = timedelta(days=7)
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,10 +179,17 @@ async def user_notes_events(
     if not messages:
         return []
     known = [note.text for note in known_about_you(history, at)]
+    exchange = [
+        f"{e.payload.get('speaker')}: {e.payload['text']}"
+        for e in events_of(history, "conversation.message")
+        if str(e.payload.get("simulated_at", ""))[:10] == today
+        and isinstance(e.payload.get("text"), str)
+    ]
     context = {
         "task": "notes",
         "time": at.isoformat(),
         "todays_messages": messages[-30:],
+        "todays_exchange": exchange[-40:],
         "already_known": known[-20:],
         "permission": (
             "Thinking back over what the user told Patrick today, note up to four things about "
@@ -180,7 +197,11 @@ async def user_notes_events(
             "('You start the new job on Monday'). Only what they actually said: quote the exact "
             "words in source_quote. Skip small talk and anything already known. If something is "
             "coming up, give a natural follow_up ('how the first day went') and ask_after_days; "
-            "otherwise follow_up is empty. Return no notes if nothing stands out."
+            "otherwise follow_up is empty. Return no notes if nothing stands out. Separately, "
+            "if one moment in todays_exchange genuinely made you both laugh and could become "
+            "a running joke between you, give it a short label ('the otter thing') and quote "
+            "the exact words it started with in running_joke; otherwise leave running_joke "
+            "out."
         ),
     }
     request = ModelRequest(
@@ -209,6 +230,17 @@ async def user_notes_events(
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
         return [reviewed, _trace("failed", at, started, response, gateway, code)]
     output = [reviewed, _trace("ok", at, started, response, gateway, None)]
+    joke = _valid_joke(json.loads(response.content).get("running_joke"), exchange)
+    last_joke = [
+        e for e in events_of(history, "joke.shared") if e.payload.get("person_id") == "user"
+    ]
+    if joke and (
+        not last_joke
+        or at - datetime.fromisoformat(str(last_joke[-1].payload["simulated_at"])) >= JOKE_GAP
+    ):
+        from eidos.application.in_jokes import user_joke_event
+
+        output.append(user_joke_event(joke[0], joke[1], at, reviewed))
     seen = {text.casefold() for text in known}
     for index, raw in enumerate(proposed[:MAX_NOTES_A_DAY]):
         try:
@@ -260,6 +292,18 @@ def _valid_note(raw: object, messages: Sequence[str]) -> dict[str, object]:
         "follow_up": follow_up,
         "ask_after_days": days if follow_up else 0,
     }
+
+
+def _valid_joke(raw: object, exchange: Sequence[str]) -> tuple[str, str] | None:
+    """A running joke must be short and start from words actually said today."""
+    if not isinstance(raw, Mapping):
+        return None
+    label = " ".join(str(raw.get("label", "")).split())
+    quote = " ".join(str(raw.get("source_quote", "")).split()).strip(" .!?\"'")
+    said = " ".join(" ".join(line.split()) for line in exchange).casefold()
+    if not 3 <= len(label) <= 60 or len(quote) < 4 or quote.casefold() not in said:
+        return None
+    return label, quote
 
 
 def _trace(

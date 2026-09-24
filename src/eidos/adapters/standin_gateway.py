@@ -383,6 +383,14 @@ def _standin_pathos_text(
     )
     if follow_ups and any(message.startswith(cue) for cue in _GREETINGS):
         return f"Hey. Oh, how did {follow_ups[0]} go, by the way?"
+    raw_jokes = context.get("running_jokes_with_you", [])
+    jokes = (
+        [item for item in raw_jokes if isinstance(item, dict)]
+        if isinstance(raw_jokes, list)
+        else []
+    )
+    if jokes and any(cue in message for cue in ("remember when", "funny", "haha", "lol")):
+        return f"Ha. Not as good as {jokes[-1]['joke']}, though. I still think about that."
     wants_view = context.get("wants_your_view_on")
     if wants_view and (
         any(message.startswith(cue) for cue in _GREETINGS)
@@ -824,8 +832,14 @@ class StandInGateway(ModelGateway):
                 finish_reason="stop",
             )
         elif role == "pathos_user_notes":
+            joke = _standin_running_joke(context)
             return ModelResponse(
-                content=json.dumps({"notes": _standin_user_notes(context)}),
+                content=json.dumps(
+                    {
+                        "notes": _standin_user_notes(context),
+                        **({"running_joke": joke} if joke else {}),
+                    }
+                ),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",
@@ -2585,6 +2599,25 @@ def _standin_advice_heard(context: dict[str, Any]) -> dict[str, str]:
                 if any(sign in lowered for sign in signs):
                     return {"leans": leans, "source_quote": sentence.strip().rstrip(".!?")}
     return {"leans": "none", "source_quote": ""}
+
+
+_LAUGHS = ("haha", "lol", "😂", "🤣", "that's hilarious", "you're ridiculous")
+
+
+def _standin_running_joke(context: dict[str, Any]) -> dict[str, str] | None:
+    """If you laughed at something he said, that line might become a running joke."""
+    exchange = [str(line) for line in context.get("todays_exchange", [])]
+    for before, line in zip(exchange, exchange[1:]):
+        if not line.startswith("you:") or not any(laugh in line.casefold() for laugh in _LAUGHS):
+            continue
+        if not before.startswith("pathos:"):
+            continue
+        said = before.split(":", 1)[1].strip()
+        words = sorted(re.findall(r"[A-Za-z]{5,}", said), key=len, reverse=True)
+        if not words:
+            continue
+        return {"label": f"the {words[0].lower()} thing", "source_quote": said[:80]}
+    return None
 
 
 def _standin_user_notes(context: dict[str, Any]) -> list[dict[str, object]]:

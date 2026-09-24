@@ -90,6 +90,17 @@ less likely to reach out or ask someone out, and can talk him out of moving. It'
 among his own values. He can still go the other way, and his memory of deciding says whether
 he took your advice.
 
+## Running jokes (`application/in_jokes.py`)
+
+- **With friends:** after an evening talking with a friend (level 3+), there's sometimes a new
+  running joke: the otter question at the quiz, the kettle nobody's allowed to descale.
+  There's at most one new joke a week, and at most three per friend.
+- **Callbacks:** weeks later a joke comes back when they're together ("Rowan brought up the
+  goose standoff again"). Both the joke and the callback count as small shared moments.
+- **With you:** the evening notes role may spot a moment in your conversation that made you
+  both laugh, give it a label and quote it (`running_joke`). The conversation context
+  carries `running_jokes_with_you`, so he can call back to them.
+
 ## Books, series, music (`application/media.py`)
 
 He is usually partway through a book (a chapter before bed), a series (an episode on a free

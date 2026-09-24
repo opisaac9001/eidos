@@ -865,6 +865,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "his_people": _his_people(history, simulated_at),
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
+        "running_jokes": _running_jokes(history),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
@@ -930,6 +931,13 @@ def _friends_news(history: Sequence[DomainEvent], at: datetime) -> list[dict[str
         },
     }
     return friends_lives_context(history, at, names)
+
+
+def _running_jokes(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
+    from eidos.application.advice import advice_names
+    from eidos.application.in_jokes import running_jokes
+
+    return running_jokes(history, advice_names(history))
 
 
 def _fallings_out(history: Sequence[DomainEvent]) -> list[dict[str, str]]:

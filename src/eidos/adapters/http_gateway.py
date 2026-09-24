@@ -340,7 +340,14 @@ ROLE_FIELDS = {
         "permission",
     ),
     "npc_backstory": ("time", "resident", "permission"),
-    "pathos_user_notes": ("task", "time", "todays_messages", "already_known", "permission"),
+    "pathos_user_notes": (
+        "task",
+        "time",
+        "todays_messages",
+        "todays_exchange",
+        "already_known",
+        "permission",
+    ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "firmament_family": ("task", "time", "relative", "what_he_has_heard_lately", "permission"),
     "firmament_townsfolk": (

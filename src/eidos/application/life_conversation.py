@@ -9,6 +9,7 @@ from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.epistemics import pathos_known_person_ids
+from eidos.application.in_jokes import jokes_with_you
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.application.life_context import (
     latest_weather,
@@ -558,6 +559,7 @@ class LifeConversation(LifeProjections):
             ],
             **user_knowledge_context(history, state.simulated_at),
             **advice_context(history, state.simulated_at, advice_names(history)),
+            "running_jokes_with_you": jokes_with_you(history),
             "relationship_repairs": [
                 {
                     **vars_for(item),

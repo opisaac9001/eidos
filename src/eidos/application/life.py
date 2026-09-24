@@ -73,6 +73,8 @@ from eidos.application.household import (
     household_load_events,
 )
 from eidos.application.imperfection import imperfection_events
+from eidos.application.in_jokes import HOUR as IN_JOKE_HOUR
+from eidos.application.in_jokes import in_joke_events
 from eidos.application.inbound_invitations import (
     pathos_invitation_response_events,
     resident_invitation_events,
@@ -621,6 +623,7 @@ class Life(LifeConversation):
             self._phase_home(tick)
             self._phase_course(tick)
             self._phase_falling_out(tick)
+            self._phase_in_jokes(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1573,6 +1576,24 @@ class Life(LifeConversation):
                 in_romance_with=arc[0] if arc else None,
             ),
             self._planning,
+        )
+
+    def _phase_in_jokes(self, tick: _Tick) -> None:
+        """Evenings together that become running jokes, and old ones coming back."""
+        if self.authored_scenario or tick.current.hour != IN_JOKE_HOUR:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        self._extend_warmed(
+            tick,
+            in_joke_events(
+                history + pending,
+                current,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                },
+                names=advice_names(history + pending),
+            ),
         )
 
     def _phase_falling_out(self, tick: _Tick) -> None:

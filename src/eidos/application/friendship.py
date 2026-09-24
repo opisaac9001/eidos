@@ -77,6 +77,8 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "romance.stage": ("person_id", 0.4, True),
     "friend.life_event": ("person_id", 0.15, False),
     "friend.falling_out": ("person_id", 0.5, True),
+    "joke.shared": ("person_id", 0.15, False),
+    "joke.recalled": ("person_id", 0.1, False),
 }
 # Being there when a friend is going through something is what deep friendships are made of.
 _FRIEND_NEWS_SKIPPED = frozenset({"leaving_do_agreed", "moved_away"})
