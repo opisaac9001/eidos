@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import LinearReplay
 from eidos.domain.sleep import SleepWindow, project_sleep_windows, sleep_window_at
 from eidos.domain.state import PathosState
 
@@ -52,16 +53,18 @@ def affect_episode_events(
     history: Sequence[DomainEvent], state: PathosState, simulated_at: datetime
 ) -> tuple[list[DomainEvent], PathosState]:
     """Translate each new appraisal into one bounded, source-linked affect episode."""
-    processed = {
-        str(event.payload["appraisal_id"])
-        for event in history
-        if event.kind == "affect.episode_started"
-    }
+    return _EPISODE_INDEX.use(history, lambda index: _episodes(index, state, simulated_at))
+
+
+def _episodes(
+    index: _EpisodeIndex, state: PathosState, simulated_at: datetime
+) -> tuple[list[DomainEvent], PathosState]:
+    processed: set[str] = set()
     output: list[DomainEvent] = []
     current = state
-    for appraisal in history:
+    for appraisal in list(index.unprocessed.values()):
         appraisal_id = str(appraisal.event_id)
-        if appraisal.kind != "appraisal.recorded" or appraisal_id in processed:
+        if appraisal_id in index.processed or appraisal_id in processed:
             continue
         desirability = float(appraisal.payload["desirability"])
         novelty = float(appraisal.payload["novelty"])
@@ -70,7 +73,11 @@ def affect_episode_events(
             (0.0, 1.0)
             if already_applied
             else _episode_valence_delta(
-                [*history, *output], current, appraisal, desirability, simulated_at
+                index.episodes_like(appraisal, output),
+                current,
+                appraisal,
+                desirability,
+                simulated_at,
             )
         )
         arousal_delta = max(
@@ -114,6 +121,56 @@ def affect_episode_events(
         processed.add(appraisal_id)
         current = current.apply(changed)
     return output, current
+
+
+# Episodes whose source kind is not a plain string, which any source kind might equal.
+_IRREGULAR_KIND = object()
+
+
+class _EpisodeIndex:
+    """Appraisals still awaiting their affect episode, and past episodes by source kind.
+
+    Replayed incrementally as history grows, so each hour looks only at new appraisals.
+    """
+
+    def __init__(self) -> None:
+        self.processed: set[str] = set()
+        self.unprocessed: dict[int, DomainEvent] = {}
+        self._unprocessed_by_id: dict[str, list[int]] = {}
+        self._episodes: dict[object, list[DomainEvent]] = {}
+
+    def advance(self, history: Sequence[DomainEvent], start: int) -> None:
+        for position in range(start, len(history)):
+            event = history[position]
+            if event.kind == "affect.episode_started":
+                appraisal_id = str(event.payload["appraisal_id"])
+                self.processed.add(appraisal_id)
+                for waiting in self._unprocessed_by_id.pop(appraisal_id, ()):
+                    self.unprocessed.pop(waiting, None)
+                source_kind = event.payload.get("source_kind")
+                key = source_kind if type(source_kind) is str else _IRREGULAR_KIND
+                self._episodes.setdefault(key, []).append(event)
+            elif event.kind == "appraisal.recorded":
+                appraisal_id = str(event.event_id)
+                if appraisal_id not in self.processed:
+                    self.unprocessed[position] = event
+                    self._unprocessed_by_id.setdefault(appraisal_id, []).append(position)
+
+    def episodes_like(
+        self, appraisal: DomainEvent, output: Sequence[DomainEvent]
+    ) -> list[DomainEvent]:
+        """A superset of the episodes, past and new, sharing the appraisal's source kind."""
+        source_kind = str(appraisal.payload.get("source_kind", ""))
+        return [
+            *self._episodes.get(source_kind, ()),
+            *self._episodes.get(_IRREGULAR_KIND, ()),
+            *output,
+        ]
+
+
+_EPISODE_INDEX: LinearReplay[_EpisodeIndex] = LinearReplay(
+    _EpisodeIndex, lambda index, history, start: index.advance(history, start)
+)
 
 
 def _latest_completed_window(
@@ -205,12 +262,17 @@ def appraisal_events(
     history: Sequence[DomainEvent], state: PathosState, simulated_at: datetime
 ) -> tuple[list[DomainEvent], PathosState]:
     """Appraise each eligible source once and return updated projected state."""
-    index = _AppraisalIndex(history)
-    appraised = index.appraised
+    return _APPRAISAL_INDEX.use(history, lambda index: _appraise(index, state, simulated_at))
+
+
+def _appraise(
+    index: _AppraisalIndex, state: PathosState, simulated_at: datetime
+) -> tuple[list[DomainEvent], PathosState]:
+    appraised: set[str] = set()
     output: list[DomainEvent] = []
     current = state
-    for source, source_id in zip(history, index.ids):
-        if source_id in appraised:
+    for source, source_id in list(index.candidates.values()):
+        if source_id in index.appraised or source_id in appraised:
             continue
         effect = _effect(source, index)
         if effect is None:
@@ -254,31 +316,45 @@ def appraisal_events(
 
 
 class _AppraisalIndex:
-    """One pass over history answering every lookup appraisal needs.
+    """Every lookup appraisal needs, replayed incrementally as history grows.
 
-    Appraisal runs every simulated hour over the whole life; scanning history again for
-    each candidate made that quadratic. Lookups reflect ``history`` exactly as it was
-    passed in, matching the previous per-candidate scans.
+    Appraisal runs every simulated hour over the whole life. Rather than pass over all of
+    history each time, the index keeps its lookups up to date and remembers the events
+    that could still be appraised: those not yet appraised whose effect is their own, or
+    depends on lookups that later history can change (an anticipation, a perception, a
+    prior appraisal). Lookups reflect the whole replayed history, exactly like the single
+    pass over it they replace, and candidates stay in history order.
     """
 
-    def __init__(self, history: Sequence[DomainEvent]) -> None:
-        self.ids = [str(event.event_id) for event in history]
+    def __init__(self) -> None:
         self.appraised: set[str] = set()
         self.by_id: dict[str, DomainEvent] = {}
         self.pathos_perceived: set[str] = set()
-        self.latest_appraisal: dict[str, tuple[int, DomainEvent]] = {}
+        self.latest_appraisal: dict[object, tuple[int, DomainEvent]] = {}
         self.latest_anticipation: dict[object, DomainEvent] = {}
-        pulse_sources: set[str] = set()
-        prospective: list[tuple[str, object]] = []
-        for position, (event, event_id) in enumerate(zip(history, self.ids)):
+        self.appraised_focus: set[object] = set()
+        self._pulse_sources: set[str] = set()
+        self._pulse_focus: dict[str, list[object]] = {}
+        self.candidates: dict[int, tuple[DomainEvent, str]] = {}
+        self._candidates_by_id: dict[str, list[int]] = {}
+        self._pulse_candidates: dict[str, list[int]] = {}
+
+    def advance(self, history: Sequence[DomainEvent], start: int) -> None:
+        for position in range(start, len(history)):
+            event = history[position]
+            event_id = str(event.event_id)
             self.by_id.setdefault(event_id, event)
             payload = event.payload
             if event.kind == "appraisal.recorded":
                 source_id = payload["source_event_id"]
                 self.appraised.add(str(source_id))
+                for candidate in self._candidates_by_id.pop(str(source_id), ()):
+                    self.candidates.pop(candidate, None)
                 self.latest_appraisal[source_id] = (position, event)
                 if payload.get("source_kind") == "mind.layer_pulsed" and isinstance(source_id, str):
-                    pulse_sources.add(source_id)
+                    self._pulse_sources.add(source_id)
+                    for focus_id in self._pulse_focus.get(source_id, ()):
+                        self._appraise_focus(focus_id)
             elif event.kind == "perception.recorded":
                 if payload.get("owner") == "pathos":
                     source_id = payload.get("source_event_id")
@@ -286,17 +362,58 @@ class _AppraisalIndex:
                         self.pathos_perceived.add(source_id)
             elif event.kind == "mind.layer_pulsed" and payload.get("layer") == "prospective":
                 focus_id = payload.get("focus_id")
-                prospective.append((event_id, focus_id))
+                self._pulse_focus.setdefault(event_id, []).append(focus_id)
+                if event_id in self._pulse_sources:
+                    self._appraise_focus(focus_id)
                 tone = payload.get("anticipatory_valence")
                 if isinstance(tone, (int, float)) and not isinstance(tone, bool):
                     self.latest_anticipation[focus_id] = event
-        self.appraised_focus = {
-            focus_id for event_id, focus_id in prospective if event_id in pulse_sources
-        }
+            if event_id not in self.appraised and _may_appraise(event, self):
+                self.candidates[position] = (event, event_id)
+                self._candidates_by_id.setdefault(event_id, []).append(position)
+                if event.kind == "mind.layer_pulsed":
+                    self._pulse_candidates.setdefault(str(payload.get("focus_id")), []).append(
+                        position
+                    )
+
+    def _appraise_focus(self, focus_id: object) -> None:
+        # Anticipation of an already appraised focus is never appraised again.
+        self.appraised_focus.add(focus_id)
+        if isinstance(focus_id, str):
+            for candidate in self._pulse_candidates.pop(focus_id, ()):
+                self.candidates.pop(candidate, None)
 
     def latest_appraisal_of(self, source_ids: set[str]) -> DomainEvent | None:
         found = [self.latest_appraisal[i] for i in source_ids if i in self.latest_appraisal]
         return max(found, key=lambda item: item[0])[1] if found else None
+
+
+# Their effect depends on lookups that later history can change.
+_LOOKUP_KINDS = frozenset(
+    {"mind.layer_pulsed", "schedule.cancelled", "scene.turn_taken", "reflection.recorded"}
+)
+
+
+def _may_appraise(event: DomainEvent, index: _AppraisalIndex) -> bool:
+    """False only for an event ``_effect`` rejects now and under any longer history."""
+    if event.kind not in _LOOKUP_KINDS:
+        return _effect(event, index) is not None
+    if event.kind != "mind.layer_pulsed":
+        return True
+    # A prospective pulse is appraised on its own tone once, unless its focus already was;
+    # appraised foci only accumulate, so such a pulse never qualifies again.
+    focus_id = event.payload.get("focus_id")
+    return (
+        event.payload.get("layer") == "prospective"
+        and isinstance(focus_id, str)
+        and focus_id not in index.appraised_focus
+        and _effect(event, index) is not None
+    )
+
+
+_APPRAISAL_INDEX: LinearReplay[_AppraisalIndex] = LinearReplay(
+    _AppraisalIndex, lambda index, history, start: index.advance(history, start)
+)
 
 
 def _effect(
@@ -540,7 +657,7 @@ def _toward(value: float, target: float, step: float) -> float:
 
 
 def _episode_valence_delta(
-    history: Sequence[DomainEvent],
+    episodes: Sequence[DomainEvent],
     state: PathosState,
     appraisal: DomainEvent,
     desirability: float,
@@ -558,7 +675,7 @@ def _episode_valence_delta(
     source_kind = str(appraisal.payload.get("source_kind", ""))
     cutoff = simulated_at - timedelta(hours=24)
     repeats = 0
-    for event in history:
+    for event in episodes:
         if (
             event.kind != "affect.episode_started"
             or event.payload.get("source_kind") != source_kind
