@@ -145,3 +145,14 @@ def test_he_stops_choosing_what_he_has_decided_is_not_for_him() -> None:
 
     assert "recipe_annotation" in chosen({})
     assert "recipe_annotation" not in chosen({"recipe_annotation": "not for him"})
+
+
+def test_new_loves_are_told_in_his_own_words_when_a_chapter_is_written() -> None:
+    from eidos.application.selfhood import _chapter_candidates
+    from eidos.domain.selfhood import project_selfhood
+
+    rested = PathosState(energy=0.9, connection=0.2, valence=0.4)
+    history = live(8, state=rested)
+    candidates = _chapter_candidates(history, project_selfhood(history), START - timedelta(days=1))
+    texts = [item["text"] for item in candidates]
+    assert any("found something I love" in text and "Juniper" in text for text in texts)

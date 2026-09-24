@@ -759,14 +759,21 @@ def _chapter_candidates(
         for item in sorted(state.insights.values(), key=lambda entry: entry.formed_at)
         if item.formed_at > since
     ]
+    # New loves and new friendships are told in his own words, not as a generic label.
+    in_his_words = {
+        str(event.event_id): str(event.payload["text"])
+        for event in events_of(history, "taste.formed", "taste.revised", "bond.recognized")
+        if isinstance(event.payload.get("text"), str)
+    }
     seen: set[str] = set()
     for item in reversed(state.evidence):
         if item.at <= since or len(candidates) >= 12:
             break
-        if item.label in seen:
+        text = in_his_words.get(item.event_id, item.label)
+        if text in seen:
             continue
-        seen.add(item.label)
-        candidates.append({"id": item.event_id, "kind": item.value_id, "text": item.label})
+        seen.add(text)
+        candidates.append({"id": item.event_id, "kind": item.value_id, "text": text})
     return candidates
 
 
