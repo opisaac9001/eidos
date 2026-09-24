@@ -138,8 +138,11 @@ def away_people(history: Sequence[DomainEvent]) -> frozenset[str]:
 
 
 def busy_people(history: Sequence[DomainEvent], at: datetime) -> frozenset[str]:
-    """Friends with too much on to go out: a newborn, a family worry, or leaving."""
-    busy = set(away_people(history))
+    """Friends who won't be asking him out or coming round: moved away, a newborn, a
+    family worry, or a falling-out that hasn't been mended."""
+    from eidos.application.falling_out import estranged
+
+    busy = set(away_people(history)) | estranged(history)
     for person, life in friends_lives(history).people.items():
         if life.baby_born and at - life.baby_born < NEWBORN_BUSY:
             busy.add(person)

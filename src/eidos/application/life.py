@@ -53,6 +53,8 @@ from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.evening_course import evening_course_events
 from eidos.application.experience import experience_events
+from eidos.application.falling_out import HOUR as FALLING_OUT_HOUR
+from eidos.application.falling_out import falling_out_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
@@ -617,6 +619,7 @@ class Life(LifeConversation):
             self._phase_friends_lives(tick)
             self._phase_home(tick)
             self._phase_course(tick)
+            self._phase_falling_out(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1569,6 +1572,42 @@ class Life(LifeConversation):
                 in_romance_with=arc[0] if arc else None,
             ),
             self._planning,
+        )
+
+    def _phase_falling_out(self, tick: _Tick) -> None:
+        """Now and then it goes wrong with a friend; mostly they make up."""
+        if self.authored_scenario or tick.current.hour != FALLING_OUT_HOUR:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        let_down = frozenset(
+            str(entry.companion_id)
+            for entry in self._planning(history + pending).calendar.values()
+            if entry.companion_id
+            and entry.status in {"failed", "interrupted", "cancelled"}
+            and timedelta(0)
+            <= current - datetime.fromisoformat(entry.starts_at)
+            <= timedelta(days=2)
+        )
+        self._extend_warmed(
+            tick,
+            falling_out_events(
+                history + pending,
+                current,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                },
+                names={
+                    **townsfolk_names(history + pending),
+                    **{person.person_id: person.name for person in catalog.people.values()},
+                },
+                residents=frozenset(catalog.people),
+                unavailable=away_people(history + pending),
+                values=project_identity(history + pending).values,
+                let_down=let_down,
+            ),
+            self._relationships,
         )
 
     def _phase_course(self, tick: _Tick) -> None:

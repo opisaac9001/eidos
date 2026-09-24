@@ -864,6 +864,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         **_tastes_context(history),
         "his_people": _his_people(history, simulated_at),
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
+        "fallings_out": _fallings_out(history),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
@@ -929,6 +930,21 @@ def _friends_news(history: Sequence[DomainEvent], at: datetime) -> list[dict[str
         },
     }
     return friends_lives_context(history, at, names)
+
+
+def _fallings_out(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
+    from eidos.application.falling_out import falling_out_context
+    from eidos.domain.townsfolk import project_townsfolk
+    from eidos.domain.world_catalog import project_world_catalog
+
+    names = {
+        **project_townsfolk(history).names(),
+        **{
+            person.person_id: person.name
+            for person in project_world_catalog(history).people.values()
+        },
+    }
+    return falling_out_context(history, names)
 
 
 def _love_life(history: Sequence[DomainEvent]) -> dict[str, object] | None:

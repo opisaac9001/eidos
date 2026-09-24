@@ -511,6 +511,13 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind == "friend.falling_out":
+        return {
+            "fell_out": ("connection", -0.05, -0.45, 0.5, 0.35),
+            "no_reply": ("affect", 0.0, -0.25, 0.3, 0.5),
+            "made_up": ("connection", 0.06, 0.5, 0.35, 0.6),
+            "drifted_apart": ("affect", 0.0, -0.3, 0.2, 0.5),
+        }.get(str(event.payload.get("stage")))
     if event.kind == "course.stage":
         return {
             "enrolled": ("curiosity", 0.04, 0.25, 0.4, 0.4),

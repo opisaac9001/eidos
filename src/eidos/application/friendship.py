@@ -76,6 +76,7 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "imperfection.apologised": ("person_id", 0.3, True),
     "romance.stage": ("person_id", 0.4, True),
     "friend.life_event": ("person_id", 0.15, False),
+    "friend.falling_out": ("person_id", 0.5, True),
 }
 # Being there when a friend is going through something is what deep friendships are made of.
 _FRIEND_NEWS_SKIPPED = frozenset({"leaving_do_agreed", "moved_away"})
@@ -232,6 +233,8 @@ def _event_moments(
         if event.kind == "setback.resolved" and payload.get("outcome") != "cleared":
             return [], talk_day, talked
         if event.kind == "romance.stage" and payload.get("stage") not in {"date", "together"}:
+            return [], talk_day, talked
+        if event.kind == "friend.falling_out" and payload.get("stage") != "made_up":
             return [], talk_day, talked
         if event.kind == "friend.life_event":
             if payload.get("kind") in _FRIEND_NEWS_SKIPPED:

@@ -162,6 +162,20 @@ His friends' lives go on without him, and change his weeks.
 - **Where it shows:** `whats_going_on_with_his_friends` in his self-context, and his
   answer when you ask about his friends.
 
+## Falling out (`application/falling_out.py`)
+
+- **How it starts:** rarely, it goes wrong with a friend. It's about once in several
+  years, and much likelier just after he lets them down. The bond shows as strained.
+- **Making up:** over the next weeks he may reach out. How soon depends on how much care
+  and reliability matter to him.
+  - A close friend (level 6 and up) always comes back round.
+  - With a newer friend the first try works more often than not.
+  - If they don't reply, he leaves it three weeks before trying again.
+  - Making up counts as a deepening moment.
+- **When it doesn't mend:** after three months they "don't really speak now". That
+  friend stops inviting him or coming round, and the friendship fades with absence like
+  any unkept one.
+
 ## Moving flat (`application/home_move.py`)
 
 - **When:** after 400 days or more, with about £900 put by, he starts looking (some

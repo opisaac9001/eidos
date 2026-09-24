@@ -1971,6 +1971,9 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
     ]
     if news:
         reply += f" News, actually: {news[0]['what']}"
+    rifts = [item for item in selfhood.get("fallings_out", []) if isinstance(item, dict)]
+    if rifts:
+        reply += f" Things aren't great with {rifts[-1]['who']}, honestly. We fell out."
     return reply
 
 
