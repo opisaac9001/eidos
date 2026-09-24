@@ -25,7 +25,7 @@ from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
 # Stays, where the point is being there rather than effort put in.
-STAYS = frozenset({"christmas_at_home"})
+STAYS = frozenset({"christmas_at_home", "visiting_home"})
 FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.
 LONG_STINT_SECONDS = 3 * 3600
 

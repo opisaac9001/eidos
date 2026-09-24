@@ -107,9 +107,7 @@ def career(values, balance=100_000, days=1000) -> list[DomainEvent]:
     history = worked(days)
     for day in range(90, days):
         if (START + timedelta(days=day)).weekday() in (0, 1, 3, 4):
-            history += run(
-                history, day, values=values, balance_pence=balance, ellis_bond="closest"
-            )
+            history += run(history, day, values=values, balance_pence=balance, ellis_bond="closest")
     return history
 
 

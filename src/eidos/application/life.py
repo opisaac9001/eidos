@@ -44,12 +44,17 @@ from eidos.application.dream_planning import (
     dream_plan_outcome_events,
     dream_project_outcome_events,
 )
-from eidos.application.economy import financial_consequence_events, financial_foundation_events
+from eidos.application.economy import (
+    financial_consequence_events,
+    financial_foundation_events,
+    weekly_housing_pence,
+)
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.experience import experience_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.family_stories import family_storyline_events
+from eidos.application.family_visits import family_visit_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
@@ -1515,6 +1520,21 @@ class Life(LifeConversation):
                 self._world_catalog(history + pending),
                 awake=tick.state.awake,
                 location_id=tick.state.location_id,
+            ),
+            self._world_catalog,
+            self._planning,
+        )
+        self._extend_warmed(
+            tick,
+            family_visit_events(
+                history + pending,
+                current,
+                self._world_catalog(history + pending),
+                self._planning(history + pending),
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                balance_pence=self._finances(history + pending).balance_pence,
+                rent_pence=weekly_housing_pence(history + pending),
             ),
             self._world_catalog,
             self._planning,

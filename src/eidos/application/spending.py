@@ -100,6 +100,7 @@ def spending_events(
             for spend_id, cost, text in move_costs(history, at)
         ),
         *_christmas(history, at, awake, location_id),
+        *_trips_home(history, at),
     ]
     output: list[DomainEvent] = []
     available = balance_pence
@@ -230,6 +231,22 @@ def _for_friends(history: Sequence[DomainEvent], at: datetime) -> list[_Candidat
                     "A leaving card and a small present",
                     False,
                 )
+            )
+    return candidates
+
+
+def _trips_home(history: Sequence[DomainEvent], at: datetime) -> list[_Candidate]:
+    """The train home for a long weekend, or in a hurry when Dad was ill."""
+    candidates: list[_Candidate] = []
+    for event in reversed(events_of(history, "family.plan_agreed")):
+        raw = event.payload.get("simulated_at")
+        if not isinstance(raw, str) or datetime.fromisoformat(raw) < at - timedelta(days=2):
+            break
+        plan_id = str(event.payload.get("contact_id"))
+        if plan_id.startswith(("easter-", "summer-", "dad-scare-")):
+            urgent = plan_id.startswith("dad-scare-")
+            candidates.append(
+                (f"fare-{plan_id}", "travel", CHRISTMAS_FARE_PENCE, "Train to Wye", urgent)
             )
     return candidates
 

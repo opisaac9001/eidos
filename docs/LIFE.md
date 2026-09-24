@@ -35,6 +35,25 @@ stock), with Christmas Eve, Christmas Day and a Boxing Day walk or clock restora
 sometimes Dad's questions about his plans. Sleeping there counts as being there. Mum rings
 to check he got home.
 
+## Going home (`application/family_visits.py`)
+
+- **Easter:** agreed on Mothering Sunday, Good Friday to Easter Monday.
+- **The August bank holiday weekend:** booked about three weeks ahead.
+
+Both fall on days the workshop is shut, so no shifts are missed. If money is too tight
+for the train, he says so. Mum offers to pay; he says no, and wishes he hadn't.
+
+**Dad's heart scare.** Once, somewhere between 14 and 19 months in, Mum rings late:
+
+- Dad's in hospital with chest pains. They think he's all right.
+- Patrick rings Ellis, who tells him to go; the shifts while he's away are cancelled.
+- He takes the first train and stays three nights: the ward, then Dad home, then late
+  nights in the kitchen with Mum.
+- A fortnight later Dad is on the mend and complaining about porridge.
+
+It's the first time he has thought about his parents getting old, and he starts ringing
+more.
+
 ## What he knows about you (`application/user_notes.py`)
 
 On each evening after you talked, he may note up to four things about your life in his own

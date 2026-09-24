@@ -503,6 +503,11 @@ def _effect(
             return ("curiosity", 0.06, round(0.6 * float(liking), 3), 0.25, 0.8)
         return None
     if event.kind == "family.contact":
+        contact_id = str(event.payload.get("contact_id", ""))
+        if contact_id.startswith("dad-scare") and contact_id.endswith("-call"):
+            return ("affect", 0.0, -0.7, 0.75, 0.3)
+        if contact_id.startswith("dad-scare") and contact_id.endswith("-better"):
+            return ("affect", 0.0, 0.5, 0.3, 0.5)
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
