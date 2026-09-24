@@ -82,3 +82,19 @@ def test_he_can_say_what_he_is_reading(half_year) -> None:
     assert reply is not None
     titles = [work.title for work in WORKS]
     assert any(title in reply for title in titles)
+
+
+def test_without_a_library_he_orders_a_book_after_a_couple_of_weeks() -> None:
+    history: list[DomainEvent] = []
+    for hour in range(200 * 24):
+        at = START + timedelta(hours=hour)
+        history += media_events(
+            history,
+            at,
+            awake=8 <= at.hour <= 22,
+            location_id="home",
+            free=True,
+            known_places=frozenset({"home"}),
+        )
+    online = [e for e in history if e.kind == "media.acquired"]
+    assert online and all(e.payload["from"] == "online" for e in online)

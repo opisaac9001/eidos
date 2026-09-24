@@ -284,11 +284,24 @@ def _sunday_call(
         parts += [str(e.payload["text"]) for e in dad_news if e.kind == "family.news"]
     elif not news:
         parts.append(_fresh(history, QUIET_CALLS, call_id + "-quiet"))
-    return [
+    output = [
         *_contact(call_id, "mum", at, channel="call", incoming=True, text=" ".join(parts)),
         *news,
         *dad_news,
     ]
+    if dad_news:
+        # Dad coming on the line is speaking to Dad too; the memory is the call's.
+        output.append(
+            _contact(
+                call_id + "-dad",
+                "dad",
+                at,
+                channel="call",
+                incoming=True,
+                text="Dad came on for a bit.",
+            )[0]
+        )
+    return output
 
 
 def _ring_back(

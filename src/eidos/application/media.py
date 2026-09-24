@@ -213,8 +213,14 @@ def _owned_unstarted(history: Sequence[DomainEvent]) -> list[Work]:
 def _acquire(
     history: Sequence[DomainEvent], at: datetime, location_id: str, known_places: frozenset[str]
 ) -> list[DomainEvent]:
-    """Browsing the library or a second-hand shop, he comes away with the next book."""
-    if location_id not in (FROM_THE_LIBRARY | FROM_SECOND_HAND) or location_id not in known_places:
+    """Browsing the library or a second-hand shop, he comes away with the next book; after a
+    couple of weeks without one, he orders a second-hand copy online."""
+    online = (
+        location_id == "home" and at.hour == 20 and _book_gap(history, at) >= timedelta(days=14)
+    )
+    if not online and (
+        location_id not in (FROM_THE_LIBRARY | FROM_SECOND_HAND) or location_id not in known_places
+    ):
         return []
     if len(_owned_unstarted(history)) >= 2:
         return []
@@ -236,7 +242,13 @@ def _acquire(
     if not candidates or _roll("browse", location_id, today) >= 0.6:
         return []
     work = candidates[int(_roll("pick", today) * len(candidates))]
-    how = "Borrowed" if location_id in FROM_THE_LIBRARY else "Picked up a second-hand copy of"
+    how = (
+        "Ordered a second-hand copy of"
+        if online
+        else "Borrowed"
+        if location_id in FROM_THE_LIBRARY
+        else "Picked up a second-hand copy of"
+    )
     acquired = DomainEvent(
         "media.acquired",
         "pathos",
@@ -244,7 +256,7 @@ def _acquire(
             "media_id": work.media_id,
             "title": work.title,
             "creator": work.creator,
-            "from": location_id,
+            "from": "online" if online else location_id,
             "simulated_at": at.isoformat(),
             "owner": "pathos",
         },
@@ -254,6 +266,19 @@ def _acquire(
         acquired,
         _memory(acquired, f"{how} {work.title} by {work.creator}.", at, 0.3, location_id),
     ]
+
+
+def _book_gap(history: Sequence[DomainEvent], at: datetime) -> timedelta:
+    """How long he has been without a book to read, if he has none on the go or on the shelf."""
+    if "book" in current(history) or _owned_unstarted(history):
+        return timedelta(0)
+    ended = [
+        _time(e)
+        for e in events_of(history, "media.finished", "media.abandoned")
+        if BY_ID.get(str(e.payload.get("media_id"))) is not None
+        and BY_ID[str(e.payload["media_id"])].kind == "book"
+    ]
+    return at - ended[-1] if ended else timedelta(0)
 
 
 def _start_next(

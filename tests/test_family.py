@@ -35,7 +35,12 @@ def year() -> list[DomainEvent]:
 
 def test_mum_rings_most_sundays_and_tom_keeps_the_chat_going(year) -> None:
     contacts = [e for e in year if e.kind == "family.contact"]
-    sunday_calls = [e for e in contacts if str(e.payload["contact_id"]).startswith("mum-sunday")]
+    sunday_calls = [
+        e
+        for e in contacts
+        if str(e.payload["contact_id"]).startswith("mum-sunday") and e.payload["person_id"] == "mum"
+    ]
+    assert any(e.payload["person_id"] == "dad" for e in contacts)
     assert 30 <= len(sunday_calls) <= 45
     assert all(
         datetime.fromisoformat(e.payload["simulated_at"]).weekday() == 6 for e in sunday_calls
