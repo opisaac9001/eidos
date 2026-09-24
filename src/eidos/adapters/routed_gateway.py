@@ -29,6 +29,7 @@ CAPABILITIES = {
     "pathos_selfhood",
     "firmament_townsfolk",
     "pathos_user_notes",
+    "firmament_family",
 }
 # Newer capabilities fall back to the family they grew out of, so an existing routing file
 # keeps working after an upgrade without naming them.
@@ -36,6 +37,7 @@ FALLBACKS = {
     "firmament_townsfolk": "firmament",
     "pathos_selfhood": "reflection",
     "pathos_user_notes": "reflection",
+    "firmament_family": "firmament",
 }
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

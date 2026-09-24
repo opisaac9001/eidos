@@ -525,15 +525,14 @@ def _news(
         for e in events_of(history, "family.news")
         if e.payload.get("person_id") == person_id
     }
-    stories = NEWS[person_id]
+    stories = _stories(history, person_id)
     # Carry on an unfinished storyline if a fortnight has passed since the last step.
-    for index, story in enumerate(stories):
-        story_id = f"{person_id}-{index}"
+    for story_id, story in stories:
         done = [step for step in range(len(story)) if f"{story_id}-{step}" in heard]
         if done and len(done) < len(story):
             if at - last_heard[story_id] >= timedelta(days=14):
                 return [_heard(person_id, story_id, len(done), story[len(done)], at)]
-    fresh = [index for index in range(len(stories)) if f"{person_id}-{index}-0" not in heard]
+    fresh = [index for index, (story_id, _) in enumerate(stories) if f"{story_id}-0" not in heard]
     if not fresh or _roll(salt, "seasonal") < 0.35:
         # The things that come round every year: once a year each, in their season.
         seasonal = [
@@ -547,7 +546,27 @@ def _news(
         if not fresh:
             return []
     index = fresh[int(_roll(salt, "story") * len(fresh))]
-    return [_heard(person_id, f"{person_id}-{index}", 0, stories[index][0], at)]
+    story_id, story = stories[index]
+    return [_heard(person_id, story_id, 0, story[0], at)]
+
+
+def _stories(history: Sequence[DomainEvent], person_id: str) -> list[tuple[str, tuple[str, ...]]]:
+    """Their authored storylines, then any Firmament has written for them since."""
+    stories = [(f"{person_id}-{index}", story) for index, story in enumerate(NEWS[person_id])]
+    for event in events_of(history, "family.storyline_written"):
+        if event.payload.get("person_id") != person_id:
+            continue
+        count = int(event.payload.get("step_count", 0))
+        steps = tuple(str(event.payload[f"step_{index}"]) for index in range(1, count + 1))
+        if steps:
+            stories.append((str(event.payload["story_id"]), steps))
+    return stories
+
+
+def stories_run_out(history: Sequence[DomainEvent], person_id: str) -> bool:
+    """Everything that's been going on in their life has been heard, at least started."""
+    heard = {str(e.payload.get("news_id")) for e in events_of(history, "family.news")}
+    return all(f"{story_id}-0" in heard for story_id, _ in _stories(history, person_id))
 
 
 def _heard(person_id: str, story_id: str, step: int, text: str, at: datetime) -> DomainEvent:

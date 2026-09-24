@@ -159,3 +159,42 @@ def test_he_goes_home_for_christmas_and_is_fed_there() -> None:
         [*agreed, arrived, started, asleep], entry, datetime(2026, 12, 24, 6, tzinfo=timezone.utc)
     )
     assert effort["blocked_by"] is None
+
+
+def test_when_their_stories_run_out_firmament_writes_new_ones() -> None:
+    import asyncio
+
+    import pytest as _pytest
+
+    from eidos.adapters.standin_gateway import StandInGateway
+    from eidos.application.family_stories import _valid_steps, family_storyline_events
+    from eidos.domain.proposals import ProposalRejected
+
+    history: list[DomainEvent] = []
+    gateway = StandInGateway()
+    for hour in range(730 * 24):
+        at = START + timedelta(hours=hour)
+        history += family_events(
+            history,
+            at,
+            awake=8 <= at.hour <= 22,
+            at_home=True,
+            in_conversation=False,
+            connection=0.5,
+        )
+        if at.weekday() == 6 and at.hour == 11:
+            history += asyncio.run(family_storyline_events(history, at, gateway))
+    written = [e for e in history if e.kind == "family.storyline_written"]
+    assert written
+    year_two = [
+        e for e in history if e.kind == "family.news" and e.payload["simulated_at"] >= "2027"
+    ]
+    assert any("-w" in str(e.payload["story"]) for e in year_two)
+    for bad in (
+        ["Dad died peacefully."],
+        ["I went to see them and it was lovely."],
+        ["The weather in Wye has been grey all week."],
+    ):
+        with _pytest.raises(ProposalRejected):
+            _valid_steps(bad, "Dad")
+    assert _valid_steps(["Dad's joined a clock club."], "Dad")

@@ -49,6 +49,7 @@ from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.experience import experience_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
+from eidos.application.family_stories import family_storyline_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friendship import friendships
@@ -2337,6 +2338,8 @@ class Life(LifeConversation):
         pending.extend(daily_self)
         if not self.authored_scenario and current.hour == 19:
             self._romance(tick)
+        if not self.authored_scenario:
+            pending.extend(await family_storyline_events(history + pending, current, self.gateway))
         if not self.authored_scenario:
             self._extend_warmed(
                 tick,

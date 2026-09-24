@@ -106,6 +106,14 @@ POSSIBLE_SELVES_NOTE = (
     "gently toward or away from a choice, but they are not goals, schedules or obligations, "
     "and living up to one is never guaranteed."
 )
+ROLE_PROMPTS["firmament_family"] = (
+    "You are Firmament, keeping the ordinary lives of Patrick's family going off-screen. "
+    "Write the next small storyline in one relative's life as short steps he will hear about "
+    "over the coming weeks, in his understated British voice. Ordinary life only: hobbies, "
+    "work, the house, the grandchild, small worries that resolve. No deaths, diagnoses, "
+    "break-ups or crises, nothing about what Patrick did, and nothing that contradicts what "
+    "he has already heard."
+)
 ROLE_PROMPTS["pathos_user_notes"] = (
     "You are Patrick thinking back over what the user told him today, keeping the kind of "
     "loose mental notes a friend keeps about someone's life. Note only what they actually "
@@ -327,6 +335,7 @@ ROLE_FIELDS = {
     ),
     "npc_backstory": ("time", "resident", "permission"),
     "pathos_user_notes": ("task", "time", "todays_messages", "already_known", "permission"),
+    "firmament_family": ("task", "time", "relative", "what_he_has_heard_lately", "permission"),
     "firmament_townsfolk": (
         "task",
         "time",

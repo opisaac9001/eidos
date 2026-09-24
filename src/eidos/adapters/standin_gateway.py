@@ -798,6 +798,13 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "firmament_family":
+            return ModelResponse(
+                content=json.dumps({"steps": _standin_family_storyline(context)}),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_user_notes":
             return ModelResponse(
                 content=json.dumps({"notes": _standin_user_notes(context)}),
@@ -2505,3 +2512,59 @@ def _standin_user_notes(context: dict[str, Any]) -> list[dict[str, object]]:
             if len(notes) >= 4:
                 return notes
     return notes
+
+
+_STANDIN_STORYLINES = {
+    "Mum": (
+        (
+            "Mum's signed up for a pottery class at the community centre.",
+            "Mum's first pot is what she calls 'rustic'. She's thrilled with it.",
+            "Mum's pottery class put on a little show; she sold a bowl to a stranger.",
+        ),
+        (
+            "Mum's joined a walking group that is mostly, she admits, a cake group.",
+            "Mum's walking group did ten miles and she has not stopped mentioning it.",
+        ),
+        (
+            "Mum's decided the kitchen needs repainting and has forty sample pots.",
+            "Mum picked a colour for the kitchen. It is, Dad says, 'green'.",
+        ),
+    ),
+    "Dad": (
+        (
+            "Dad's joined a clock-repair club and is insufferable about it.",
+            "Dad won a small prize at the clock club for a carriage clock he rebuilt.",
+        ),
+        (
+            "Dad's trying to grow tomatoes to beat Mum's. It's become a whole thing.",
+            "Dad's tomatoes came in. Mum's were better. Nobody is allowed to say so.",
+        ),
+        (
+            "Dad's reading a thousand-page biography of Brunel and reporting on it weekly.",
+            "Dad finished the Brunel book and immediately started another one.",
+        ),
+    ),
+    "Tom": (
+        (
+            "Tom's decided to learn the guitar. Jess has opinions.",
+            "Tom can play three chords now and uses them relentlessly.",
+        ),
+        (
+            "Isla's got a part in the nursery nativity as 'a sheep, second from the left'.",
+            "Tom sent a video of the nativity. Isla the sheep stole the show.",
+        ),
+        (
+            "Tom's work are sending him to a conference in Manchester and he's nervous.",
+            "Tom's conference talk went fine. He's been unbearable about it since.",
+        ),
+    ),
+}
+
+
+def _standin_family_storyline(context: dict[str, Any]) -> list[str]:
+    relative = context.get("relative", {}) if isinstance(context.get("relative"), dict) else {}
+    options = _STANDIN_STORYLINES.get(str(relative.get("called")), _STANDIN_STORYLINES["Mum"])
+    heard = {str(item) for item in context.get("what_he_has_heard_lately", [])}
+    fresh = [story for story in options if story[0] not in heard]
+    choice = int(hashlib.sha256(str(context.get("time")).encode()).hexdigest()[:4], 16)
+    return list((fresh or list(options))[choice % len(fresh or options)])
