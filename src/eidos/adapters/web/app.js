@@ -1171,6 +1171,20 @@ function renderSelf() {
     love
       ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">♥</span><span class="moment-text">${esc(love.who)}<small>${esc(love.stage)}</small></span><span class="moment-meta">since ${esc(date(love.since))}</span></div>`
       : '<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">No one at the moment</span></div>',
+    self.home
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">⌂</span><span class="moment-text">Home: ${esc(self.home.now)}<small>${esc(self.home.lately)}</small></span></div>`
+      : "",
+    self.evening_class
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">✎</span><span class="moment-text">Evening class: ${esc(self.evening_class.course || "")}<small>${esc(self.evening_class.status || "")}</small></span></div>`
+      : "",
+    ...(self.whats_going_on_with_his_friends || []).map(
+      (item) =>
+        `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(item.who)}: ${esc(item.what)}</span><span class="moment-meta">${esc(date(item.when))}</span></div>`,
+    ),
+    ...(self.fallings_out || []).map(
+      (item) =>
+        `<div class="moment away"><span class="moment-mark" aria-hidden="true">~</span><span class="moment-text">${esc(item.who)}: ${esc(item.where_it_stands)}</span></div>`,
+    ),
     ...(self.patterns_he_would_like_to_change || []).map(
       (text) =>
         `<div class="moment away"><span class="moment-mark" aria-hidden="true">~</span><span class="moment-text">Would like to change: ${esc(text)}</span></div>`,
