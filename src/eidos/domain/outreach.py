@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,9 +19,7 @@ class OutreachConfig:
 
 def project_outreach_config(history: Sequence[DomainEvent]) -> OutreachConfig:
     config = OutreachConfig()
-    for event in history:
-        if event.kind != "outreach.configured":
-            continue
+    for event in events_of(history, "outreach.configured"):
         enabled = event.payload.get("enabled")
         if type(enabled) is not bool:
             raise ValueError("Outreach enabled must be true or false")

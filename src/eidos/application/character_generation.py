@@ -15,6 +15,7 @@ from eidos.domain.character_generation import (
 )
 from eidos.domain.character_history import project_character_history
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_catalog import project_world_catalog
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, ModelResponse
@@ -30,23 +31,21 @@ async def generated_character_history_events(
     facts = project_character_history(history).facts
     registrations = [
         event
-        for event in history
-        if event.kind == "world.person_registered"
-        and isinstance(event.payload.get("proposal_id"), str)
+        for event in events_of(history, "world.person_registered")
+        if isinstance(event.payload.get("proposal_id"), str)
         and str(event.payload["proposal_id"]).startswith(
             ("moira-world-expansion-", "townsfolk-promotion-")
         )
     ]
+    with_history = {fact.person_id for fact in facts.values()}
+    requests: list[DomainEvent] | None = None
     for registration in registrations:
         person_id = str(registration.payload["entity_id"])
-        if any(fact.person_id == person_id for fact in facts.values()):
+        if person_id in with_history:
             continue
-        attempts = [
-            event
-            for event in history
-            if event.kind == "npc.biography_generation_requested"
-            and event.payload.get("person_id") == person_id
-        ]
+        if requests is None:
+            requests = events_of(history, "npc.biography_generation_requested")
+        attempts = [event for event in requests if event.payload.get("person_id") == person_id]
         if len(attempts) >= 3:
             continue
         latest = attempts[-1] if attempts else None

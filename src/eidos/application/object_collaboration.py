@@ -8,8 +8,18 @@ from typing import Mapping, Sequence
 
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import IRREGULAR, GroupIndex, IncrementalFold, events_of, str_match_key
 from eidos.domain.npcs import NPCState
 from eidos.domain.relationships import Relationship
+
+# Object uses grouped by the payload time they happened at, maintained incrementally.
+_USES_BY_TIME: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex,
+    lambda index, event: index.with_event(
+        str_match_key(event.payload.get("simulated_at")) if event.kind == "object.used" else None,
+        event,
+    ),
+)
 
 
 def object_collaboration_events(
@@ -22,16 +32,17 @@ def object_collaboration_events(
     """Let one co-present neighbor independently join or decline a new-object session."""
     handled_objects = {
         str(event.payload["object_id"])
-        for event in history
-        if event.kind == "object.collaboration_decided"
+        for event in events_of(history, "object.collaboration_decided")
     }
+    now = simulated_at.isoformat()
     used = next(
         (
             event
-            for event in reversed(history)
+            # Only uses recorded at exactly this time can match.
+            for event in reversed(_USES_BY_TIME(history).select(now, IRREGULAR))
             if event.kind == "object.used"
             and str(event.payload.get("schedule_id", "")).startswith("use-introduced-")
-            and event.payload.get("simulated_at") == simulated_at.isoformat()
+            and event.payload.get("simulated_at") == now
             and str(event.payload.get("object_id")) not in handled_objects
         ),
         None,

@@ -7,6 +7,7 @@ from hashlib import sha256
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GroupIndex, IncrementalFold, events_of, kind_index
 from eidos.domain.planning import PlanningState
 
 # A weekly shop: three meals a day for a week, bought about two days before running out.
@@ -14,6 +15,24 @@ WEEKLY_SHOP_PORTIONS = 21
 WEEKLY_SHOP_PENCE = 4_200
 FOOD_REORDER_AT = 6
 DELIVERY_WINDOW = timedelta(hours=3)
+
+# Stock changes whose object id cannot be read are grouped here, so scans still reach them.
+_UNREADABLE = object()
+
+
+def _stock_object(event: DomainEvent) -> object:
+    if event.kind != "object.stock_changed":
+        return None
+    try:
+        return str(event.payload["object_id"])
+    except Exception:
+        return _UNREADABLE
+
+
+# Stock changes grouped by the object they changed, maintained incrementally.
+_STOCK_BY_OBJECT: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex, lambda index, event: index.with_event(_stock_object(event), event)
+)
 
 
 def object_supply_events(
@@ -65,8 +84,7 @@ def _consumption_choice(
 ) -> list[DomainEvent]:
     handled = {
         (str(event.payload["object_id"]), str(event.payload["decision_date"]))
-        for event in history
-        if event.kind == "object.consumption_decided"
+        for event in events_of(history, "object.consumption_decided")
     }
     item = next(
         (
@@ -89,8 +107,8 @@ def _consumption_choice(
     use = sample < score
     registration = next(
         event
-        for event in history
-        if event.kind == "object.registered" and event.payload.get("object_id") == item.object_id
+        for event in events_of(history, "object.registered")
+        if event.payload.get("object_id") == item.object_id
     )
     correlation = f"consume-{item.object_id}-{simulated_at.date().isoformat()}"
     decision = DomainEvent(
@@ -165,16 +183,24 @@ def _replenishment_choice(
     *,
     available_pence: int | None,
 ) -> list[DomainEvent]:
-    decisions = [event for event in history if event.kind == "object.replenishment_decided"]
+    decisions = events_of(history, "object.replenishment_decided")
     handled = {str(event.payload["source_stock_event_id"]) for event in decisions}
     decided_today = {
         str(event.payload.get("object_id"))
         for event in decisions
         if str(event.payload.get("simulated_at", ""))[:10] == simulated_at.date().isoformat()
     }
-    stock_sources = [event for event in history if event.kind == "object.stock_changed"]
+    stock = _STOCK_BY_OBJECT(history)
+    last_source = kind_index(history).latest("object.stock_changed")
     pending = _pending_order(history)
-    for source in reversed(stock_sources):
+    # Every source of any other object is skipped below: see ``_may_replenish``.
+    objects = [
+        key
+        for key in stock.keys()
+        if key is _UNREADABLE
+        or (isinstance(key, str) and _may_replenish(planning, key, decided_today))
+    ]
+    for _, source in reversed(stock.select_positioned(*objects)):
         object_id = str(source.payload["object_id"])
         item = planning.objects.get(object_id)
         if item is None or item.quantity is None or item.reorder_at is None:
@@ -187,7 +213,7 @@ def _replenishment_choice(
             if not (
                 item.quantity <= max(item.reorder_at, FOOD_REORDER_AT)
                 and item.unit == "meal portions"
-                and source is stock_sources[-1]
+                and source is last_source
                 and (pending is None or pending.payload.get("object_id") != object_id)
             ):
                 continue
@@ -273,16 +299,33 @@ def _replenishment_choice(
     return []
 
 
+def _may_replenish(planning: PlanningState, object_id: str, decided_today: set[str]) -> bool:
+    """Whether a stock change of this object could lead to a replenishment decision now.
+
+    Otherwise ``_replenishment_choice`` skips each of its sources, handled or not: a
+    handled source is only reconsidered at or below the same threshold.
+    """
+    item = planning.objects.get(object_id)
+    if item is None or item.quantity is None or item.reorder_at is None:
+        return False
+    if object_id in decided_today:
+        return False
+    threshold = (
+        max(item.reorder_at, FOOD_REORDER_AT) if item.unit == "meal portions" else item.reorder_at
+    )
+    return not item.quantity > threshold
+
+
 def _pending_order(history: Sequence[DomainEvent]) -> DomainEvent | None:
     terminal = {
         str(event.payload["order_id"])
-        for event in history
-        if event.kind in {"object.replenishment_received", "object.replenishment_cancelled"}
+        for event in events_of(
+            history, "object.replenishment_received", "object.replenishment_cancelled"
+        )
     }
     latest: dict[str, DomainEvent] = {}
-    for event in history:
-        if event.kind == "object.replenishment_ordered":
-            latest[str(event.payload["order_id"])] = event
+    for event in events_of(history, "object.replenishment_ordered"):
+        latest[str(event.payload["order_id"])] = event
     return next((event for key, event in latest.items() if key not in terminal), None)
 
 

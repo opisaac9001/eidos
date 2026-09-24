@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,9 +31,7 @@ def season_for(at: datetime) -> str:
 
 def project_season(events: Sequence[DomainEvent]) -> SeasonState | None:
     state = None
-    for event in events:
-        if event.kind != "world.season_changed":
-            continue
+    for event in events_of(events, "world.season_changed"):
         name = event.payload.get("season")
         since = event.payload.get("simulated_at")
         if name not in {"winter", "spring", "summer", "autumn"}:

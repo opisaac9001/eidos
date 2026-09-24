@@ -1,23 +1,47 @@
 """Remember perceived possibilities without manufacturing plans or hidden knowledge."""
 
+from collections.abc import Hashable
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import GrowOnlyMap, IncrementalFold, events_of
+
+
+class _Unnoticed(NamedTuple):
+    # Every ``source_perception_id`` noticed so far, and the pathos perceptions offering a
+    # possibility whose id is not (yet) among them, in history order.
+    sources: GrowOnlyMap[Hashable, bool]
+    perceptions: tuple[DomainEvent, ...]
+
+
+def _unnoticed_step(state: _Unnoticed, event: DomainEvent) -> _Unnoticed:
+    if event.kind == "opportunity.noticed":
+        sources = state.sources.with_item(event.payload.get("source_perception_id"), True)
+        return _Unnoticed(
+            sources,
+            tuple(item for item in state.perceptions if str(item.event_id) not in sources),
+        )
+    if event.kind != "perception.recorded" or event.payload.get("owner") != "pathos":
+        return state
+    text = event.payload.get("opportunity")
+    if str(event.event_id) in state.sources or not isinstance(text, str) or not text.strip():
+        return state
+    return _Unnoticed(state.sources, (*state.perceptions, event))
+
+
+_UNNOTICED: IncrementalFold[_Unnoticed] = IncrementalFold(
+    lambda: _Unnoticed(GrowOnlyMap(), ()), _unnoticed_step
+)
 
 
 def opportunity_events(history: Sequence[DomainEvent], now: datetime) -> list[DomainEvent]:
     if now.utcoffset() is None:
         raise ValueError("Opportunity time must be timezone-aware")
-    sources = {
-        event.payload.get("source_perception_id")
-        for event in history
-        if event.kind == "opportunity.noticed"
-    }
+    # Exactly the perceptions a scan of history against all noticed sources would keep.
+    sources: set[str] = set()
     output = []
-    for event in history:
-        if event.kind != "perception.recorded" or event.payload.get("owner") != "pathos":
-            continue
+    for event in _UNNOTICED(history).perceptions:
         source_id = str(event.event_id)
         text = event.payload.get("opportunity")
         if source_id in sources or not isinstance(text, str) or not text.strip():
@@ -67,12 +91,12 @@ def available_opportunities(
     """Read-only context; unknown/expired possibilities never become appointments."""
     closed = {
         event.payload.get("opportunity_id")
-        for event in history
-        if event.kind == "opportunity.closed" and event.payload.get("owner") == "pathos"
+        for event in events_of(history, "opportunity.closed")
+        if event.payload.get("owner") == "pathos"
     }
     result = []
-    for event in history:
-        if event.kind != "opportunity.noticed" or event.payload.get("owner") != "pathos":
+    for event in events_of(history, "opportunity.noticed"):
+        if event.payload.get("owner") != "pathos":
             continue
         if event.payload.get("opportunity_id") in closed:
             continue

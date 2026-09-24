@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta
+from itertools import chain
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import event_index, events_of, payload_candidates
 from eidos.domain.world_threads import WorldThread, project_world_threads
 
 
@@ -21,8 +23,8 @@ def world_thread_events(
     output: list[DomainEvent] = []
     state = project_world_threads(history)
     opened_sources = {thread.source_event_id for thread in state.values()}
-    for occurred in history:
-        if occurred.kind != "world_event.occurred" or str(occurred.event_id) in opened_sources:
+    for occurred in events_of(history, "world_event.occurred"):
+        if str(occurred.event_id) in opened_sources:
             continue
         occurred_at = _event_time(occurred)
         duration = occurred.payload.get("duration_hours")
@@ -65,9 +67,7 @@ def world_thread_events(
     for thread in list(state.values()):
         if thread.status != "active":
             continue
-        source = next(
-            (event for event in history if str(event.event_id) == thread.source_event_id), None
-        )
+        source = event_index(history).get(thread.source_event_id)
         if source is not None and source.payload.get("source") == "causal-world-response":
             # This is an observation window, not a pre-authored story arc.
             # Do not manufacture progress, NPC commitments or success at a deadline.
@@ -83,28 +83,25 @@ def world_thread_events(
                             "simulated_at": simulated_at.isoformat(),
                             "visibility": "operator",
                         },
-                        causation_id=_latest_transition(
-                            [*history, *output], thread.thread_id
-                        ).event_id,
+                        causation_id=_latest_transition(history, output, thread.thread_id).event_id,
                         correlation_id=thread.thread_id,
                     )
                 )
             continue
         due_at = datetime.fromisoformat(thread.due_at)
         started_at = datetime.fromisoformat(thread.started_at)
-        now_history = [*history, *output]
         if thread.stage == 1 and simulated_at >= started_at + (due_at - started_at) / 2:
             progressed = _transition(
                 "world_thread.progressed",
                 thread,
                 simulated_at,
                 f"The {thread.event_type.replace('_', ' ')} is still unfolding; its {thread.theme} theme remains visible.",
-                now_history,
+                history,
+                output,
             )
             output.extend(_with_observations(progressed, thread, actor_locations, simulated_at))
             state = project_world_threads([*history, *output])
             thread = state[thread.thread_id]
-            now_history = [*history, *output]
         if simulated_at < datetime.fromisoformat(thread.due_at):
             continue
         if thread.extension_count == 0 and _sample(thread.thread_id) < 0.34:
@@ -120,7 +117,7 @@ def world_thread_events(
                     "summary": f"The {thread.event_type.replace('_', ' ')} has prompted neighbors to continue for two more days.",
                     "simulated_at": simulated_at.isoformat(),
                 },
-                causation_id=_latest_transition(now_history, thread.thread_id).event_id,
+                causation_id=_latest_transition(history, output, thread.thread_id).event_id,
                 correlation_id=thread.thread_id,
             )
             output.extend(_with_observations(extended, thread, actor_locations, simulated_at))
@@ -140,7 +137,7 @@ def world_thread_events(
                     "summary": f"The {thread.event_type.replace('_', ' ')} {outcome}.",
                     "simulated_at": simulated_at.isoformat(),
                 },
-                causation_id=_latest_transition(now_history, thread.thread_id).event_id,
+                causation_id=_latest_transition(history, output, thread.thread_id).event_id,
                 correlation_id=thread.thread_id,
             )
             output.extend(_with_observations(resolved, thread, actor_locations, simulated_at))
@@ -153,6 +150,7 @@ def _transition(
     simulated_at: datetime,
     summary: str,
     history: Sequence[DomainEvent],
+    output: Sequence[DomainEvent],
 ) -> DomainEvent:
     return DomainEvent(
         kind,
@@ -162,7 +160,7 @@ def _transition(
             "summary": summary,
             "simulated_at": simulated_at.isoformat(),
         },
-        causation_id=_latest_transition(history, thread.thread_id).event_id,
+        causation_id=_latest_transition(history, output, thread.thread_id).event_id,
         correlation_id=thread.thread_id,
     )
 
@@ -217,10 +215,15 @@ def _with_observations(
     return output
 
 
-def _latest_transition(history: Sequence[DomainEvent], thread_id: str) -> DomainEvent:
+def _latest_transition(
+    history: Sequence[DomainEvent], output: Sequence[DomainEvent], thread_id: str
+) -> DomainEvent:
+    """The newest thread transition in ``[*history, *output]``."""
     return next(
         event
-        for event in reversed(history)
+        for event in chain(
+            reversed(output), reversed(payload_candidates(history, "thread_id", thread_id))
+        )
         if event.kind.startswith("world_thread.") and event.payload.get("thread_id") == thread_id
     )
 

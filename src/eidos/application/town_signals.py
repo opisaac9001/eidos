@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 from typing import Sequence
 from urllib.parse import urlsplit
 
+from eidos.application.causal_opportunities import instant, timeline_fold
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import payload_candidates
+from eidos.domain.folding import events_of, payload_candidates
 from eidos.ports.town_signals import TownSignal, TownSignalSource
 
 KINDS = {"weather", "daylight", "local_news"}
@@ -53,9 +54,7 @@ def town_signal_events(
             ),
         ]
     existing = {
-        str(event.payload["signal_id"])
-        for event in history
-        if event.kind == "external_signal.observed"
+        str(event.payload["signal_id"]) for event in events_of(history, "external_signal.observed")
     }
     output = [requested]
     for signal in signals:
@@ -106,14 +105,31 @@ def town_signal_events(
     return output
 
 
+def _expiry_key(event: DomainEvent) -> timedelta:
+    # Anything not certainly an aware expiry sorts above every bound, so it is still read.
+    try:
+        expires = datetime.fromisoformat(str(event.payload["expires_at"]))
+    except Exception:
+        return timedelta.max
+    return timedelta.max if expires.utcoffset() is None else instant(expires)
+
+
+_INSPIRATIONS = timeline_fold("world.signal_inspiration", _expiry_key)
+
+
 def active_town_signal_context(
     history: Sequence[DomainEvent], simulated_at: datetime
 ) -> dict[str, str]:
+    if simulated_at.utcoffset() is None:
+        inspirations = events_of(history, "world.signal_inspiration")
+    else:
+        # Stop where every earlier inspiration has already expired.
+        unexpired = instant(simulated_at) + timedelta(microseconds=1)
+        inspirations = [event for _, event in _INSPIRATIONS(history).newest_from(unexpired)][::-1]
     return {
         str(event.payload["signal_id"]): str(event.payload["text"])
-        for event in history
-        if event.kind == "world.signal_inspiration"
-        and datetime.fromisoformat(str(event.payload["expires_at"])) > simulated_at
+        for event in inspirations
+        if datetime.fromisoformat(str(event.payload["expires_at"])) > simulated_at
     }
 
 
