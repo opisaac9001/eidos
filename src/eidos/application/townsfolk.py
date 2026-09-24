@@ -170,7 +170,7 @@ async def _notice(
     catalog: WorldCatalog,
     activity: str,
 ) -> list[DomainEvent]:
-    place = catalog.places[location_id].name
+    place = _mid_sentence(catalog.places[location_id].name)
     context = {
         "task": "glimpse",
         "time": at.isoformat(),
@@ -222,7 +222,7 @@ async def _meet_again(
     location_id: str,
     catalog: WorldCatalog,
 ) -> list[DomainEvent]:
-    place = catalog.places[location_id].name
+    place = _mid_sentence(catalog.places[location_id].name)
     common = {
         "townsfolk_id": resident.townsfolk_id,
         "place_id": location_id,
@@ -230,11 +230,21 @@ async def _meet_again(
         "owner": "pathos",
     }
     if person.name is not None:
-        return _chat(person, location_id, place, at, common)
+        last_topic = next(
+            (
+                str(event.payload.get("topic"))
+                for event in reversed(events_of(history, "townsfolk.chatted"))
+                if event.payload.get("townsfolk_id") == person.townsfolk_id
+            ),
+            None,
+        )
+        return _chat(person, location_id, place, at, common, last_topic)
     attempt: list[DomainEvent] = []
+    # The more often you see someone, the likelier you are to finally say hello.
+    extra = max(0, person.sightings + 1 - INTRODUCTION_AFTER)
     ready = person.sightings + 1 >= INTRODUCTION_AFTER and roll(
         "introduce", resident.townsfolk_id, at.isoformat()
-    ) < (0.25 + 0.4 * resident.sociability)
+    ) < min(0.95, 0.25 + 0.4 * resident.sociability + 0.12 * extra)
     if ready:
         attempt = await _introduce(history, at, gateway, resident, person, place, common)
         if any(event.kind == "townsfolk.introduced" for event in attempt):
@@ -310,6 +320,7 @@ def _chat(
     place: str,
     at: datetime,
     common: Mapping[str, object],
+    last_topic: str | None = None,
 ) -> list[DomainEvent]:
     first = (person.name or "them").split(" ")[0]
     topics = (
@@ -321,7 +332,8 @@ def _chat(
         "the price of everything",
         "a dog that kept trying to join in",
     )
-    topic = topics[int(roll("topic", person.townsfolk_id, at.isoformat()) * len(topics))]
+    fresh = [item for item in topics if item != last_topic]
+    topic = fresh[int(roll("topic", person.townsfolk_id, at.isoformat()) * len(fresh))]
     chatted = DomainEvent(
         "townsfolk.chatted",
         "pathos",
@@ -414,6 +426,10 @@ def _valid_introduction(content: Mapping[str, object], taken: set[str]) -> tuple
     if any(word in first_words.casefold() for word in _RESERVED):
         raise ProposalRejected("invalid_introduction", "They don't know his name yet")
     return name, occupation[0].lower() + occupation[1:], first_words
+
+
+def _mid_sentence(name: str) -> str:
+    return "the " + name[4:] if name.startswith("The ") else name
 
 
 def _names_in_use(history: Sequence[DomainEvent]) -> set[str]:

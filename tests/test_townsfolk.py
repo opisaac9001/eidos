@@ -172,3 +172,15 @@ def test_he_can_talk_about_the_people_he_knows_around_town(cafe_life) -> None:
         "who are your friends?", {"identity": {"selfhood": {**context, "his_people": []}}}
     )
     assert hello[-1].split(",")[0] in str(reply)
+
+
+def test_small_talk_with_someone_does_not_repeat_itself(cafe_life) -> None:
+    last: dict[str, str] = {}
+    for event in cafe_life:
+        if event.kind == "townsfolk.chatted":
+            person = event.payload["townsfolk_id"]
+            assert last.get(person) != event.payload["topic"]
+            last[person] = event.payload["topic"]
+    assert "at The " not in " ".join(
+        str(e.payload.get("text")) for e in cafe_life if e.kind == "memory.recorded"
+    )
