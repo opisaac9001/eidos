@@ -7,6 +7,7 @@ from typing import Sequence
 from urllib.parse import urlsplit
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.ports.town_signals import TownSignal, TownSignalSource
 
 KINDS = {"weather", "daylight", "local_news"}
@@ -21,7 +22,10 @@ def town_signal_events(
     if source is None or simulated_at.hour != 6:
         return []
     poll_id = f"town-signals-{simulated_at.date().isoformat()}"
-    if any(event.payload.get("poll_id") == poll_id for event in history):
+    if any(
+        event.payload.get("poll_id") == poll_id
+        for event in payload_candidates(history, "poll_id", poll_id)
+    ):
         return []
     requested = DomainEvent(
         "external_signal.poll_requested",

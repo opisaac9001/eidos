@@ -13,6 +13,7 @@ from eidos.application.causal_opportunities import fresh_cause, optional_schema
 from eidos.application.dream_planning import dream_planning_workspace, dream_project_link_events
 from eidos.application.place_discovery import known_world
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
 from eidos.domain.proposals import ProposalRejected
@@ -64,7 +65,10 @@ async def autonomous_project_events(
     ):
         return []
     proposal_id = f"pathos-project-cause-{cause.event_id}"
-    if any(event.payload.get("proposal_id") == proposal_id for event in history):
+    if any(
+        event.payload.get("proposal_id") == proposal_id
+        for event in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     resources = {
         item.object_id: {

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.domain.relating import (
     RelationalMove,
     RelationalProposal,
@@ -22,7 +23,10 @@ def relational_arc_events(
         return []
     move = RelationalMove.DISAGREE if day == 5 else RelationalMove.APOLOGIZE
     proposal_id = f"rowan-bench-{move.value}"
-    if any(event.payload.get("proposal_id") == proposal_id for event in history):
+    if any(
+        event.payload.get("proposal_id") == proposal_id
+        for event in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     text = (
         "I disagreed too sharply with Rowan about replacing the weathered park bench."

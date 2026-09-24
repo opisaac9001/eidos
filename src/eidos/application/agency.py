@@ -25,6 +25,7 @@ from eidos.domain.agency import (
     resolve_agency_candidate,
 )
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.domain.household import project_household
 from eidos.domain.mind import CognitiveLayer, project_mind
 from eidos.domain.planning import PlanningState
@@ -93,7 +94,10 @@ async def autonomous_activity_events(
     if cause is None:
         return []
     proposal_id = f"pathos-agency-cause-{cause.event_id}"
-    if any(event.payload.get("proposal_id") == proposal_id for event in history):
+    if any(
+        event.payload.get("proposal_id") == proposal_id
+        for event in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     resources = {
         item.object_id: {

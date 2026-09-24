@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import event_index, payload_candidates
 from eidos.domain.proposals import ProposalRejected
 
 
@@ -129,10 +130,15 @@ def resolve_association(
     if any(
         event.kind == "association.formed"
         and event.payload.get("proposal_id") == proposal.proposal_id
-        for event in history
+        for event in payload_candidates(history, "proposal_id", proposal.proposal_id)
     ):
         return reject("duplicate_proposal", "This association already exists")
-    source = next((event for event in history if event.event_id == proposal.source_memory_id), None)
+    # The first event with an id is the one indexed under its string form.
+    source = (
+        event_index(history).get(str(proposal.source_memory_id))
+        if isinstance(proposal.source_memory_id, UUID)
+        else next((event for event in history if event.event_id == proposal.source_memory_id), None)
+    )
     if source is None or source.kind != "memory.recorded":
         return reject("missing_source", "The cited autobiographical memory does not exist")
     if source.payload.get("owner", "pathos") != proposal.actor_id:

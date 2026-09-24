@@ -36,6 +36,7 @@ from eidos.domain.development import project_development
 from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.identity import project_identity
 from eidos.domain.mind import project_mind
 from eidos.domain.npcs import NPCWorldState, project_npcs
@@ -604,7 +605,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
     known_places = known_place_ids(history, catalog)
     return {
         "revision": len(history),
-        "preview": any(event.kind == "simulation.preview_established" for event in history),
+        "preview": bool(events_of(history, "simulation.preview_established")),
         "activity_execution": execution_context(
             history, planning, state.simulated_at, observer=True
         ),

@@ -14,7 +14,7 @@ from eidos.application.work_rota import (
 )
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState
-from eidos.domain.folding import events_of, kind_index
+from eidos.domain.folding import events_of, kind_index, payload_candidates
 
 OPENING_BALANCE_PENCE = 40_000  # A modest cushion: a couple of weeks of rent and food.
 CAFE_MEAL_PENCE = 600
@@ -124,7 +124,10 @@ def financial_consequence_events(
     if (
         at.weekday() == 0
         and at.hour == 8
-        and not any(event.payload.get("obligation_id") == obligation_id for event in history)
+        and not any(
+            event.payload.get("obligation_id") == obligation_id
+            for event in payload_candidates(history, "obligation_id", obligation_id)
+        )
     ):
         due = DomainEvent(
             "finance.obligation_due",

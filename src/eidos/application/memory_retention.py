@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of
+from eidos.domain.folding import events_of, payload_candidates
 
 POLICY_VERSION = 1
 MINIMUM_AGE = timedelta(days=180)
@@ -31,7 +31,10 @@ def memory_retention_events(
     if simulated_at.day != 1 or simulated_at.hour != 1:
         return []
     review_id = f"memory-retention-v{POLICY_VERSION}-{simulated_at:%Y-%m}"
-    if any(event.payload.get("review_id") == review_id for event in history):
+    if any(
+        event.payload.get("review_id") == review_id
+        for event in payload_candidates(history, "review_id", review_id)
+    ):
         return []
 
     archived = archived_memory_ids(history)

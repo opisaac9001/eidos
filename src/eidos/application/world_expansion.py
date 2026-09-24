@@ -11,6 +11,7 @@ from typing import Sequence
 from uuid import uuid4
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_catalog import (
     parse_world_expansion_candidate,
@@ -45,7 +46,10 @@ async def expanding_world_events(
     except ValueError:
         return []
     proposal_id = f"moira-world-expansion-arrival-{arrival.event_id}"
-    if any(event.payload.get("proposal_id") == proposal_id for event in history):
+    if any(
+        event.payload.get("proposal_id") == proposal_id
+        for event in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     catalog = project_world_catalog(history)
     if pathos_location_id not in catalog.places:
