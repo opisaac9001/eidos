@@ -345,6 +345,14 @@ def _effect(
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
             "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
+    if event.kind == "imperfection.noticed":
+        return {
+            "put_off": ("affect", 0.0, -0.1, 0.15, 0.6),
+            "late_night": ("affect", 0.0, -0.15, 0.2, 0.6),
+            "snapped": ("connection", -0.03, -0.3, 0.4, 0.5),
+        }.get(str(event.payload.get("pattern")))
+    if event.kind == "imperfection.apologised":
+        return ("connection", 0.03, 0.25, 0.25, 0.8)
     if event.kind == "season.moment":
         return {
             "shortest-day": ("affect", 0.0, -0.05, 0.2, 0.2),

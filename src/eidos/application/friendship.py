@@ -71,6 +71,7 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "setback.resolved": ("person_id", 0.5, True),
     "relationship.repair_contacted": ("person_id", 0.5, True),
     "apology.offered": ("target_id", 0.3, True),
+    "imperfection.apologised": ("person_id", 0.3, True),
 }
 
 

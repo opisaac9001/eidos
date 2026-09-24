@@ -57,6 +57,7 @@ from eidos.application.household import (
     household_foundation_events,
     household_load_events,
 )
+from eidos.application.imperfection import imperfection_events
 from eidos.application.inbound_invitations import (
     pathos_invitation_response_events,
     resident_invitation_events,
@@ -595,6 +596,7 @@ class Life(LifeConversation):
             self._phase_family(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
+            self._phase_imperfection(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -1331,6 +1333,40 @@ class Life(LifeConversation):
             if not self.authored_scenario
             else []
         )
+
+    def _phase_imperfection(self, tick: _Tick) -> None:
+        """Putting things off, late nights, being short when tired, and saying sorry."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        talking_with = next(
+            (
+                person
+                for scene in project_scenes(history + pending).scenes.values()
+                if scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
+                for person in (scene.initiator_id, scene.partner_id)
+                if person not in {"pathos", "user"}
+            ),
+            None,
+        )
+        catalog = self._world_catalog(history + pending)
+        failings = imperfection_events(
+            history + pending,
+            current,
+            tick.state,
+            self._planning(history + pending),
+            traits=project_traits(history + pending).levels,
+            values=project_identity(history + pending).values,
+            talking_with=talking_with,
+            names={
+                **townsfolk_names(history + pending),
+                **{person.person_id: person.name for person in catalog.people.values()},
+            },
+        )
+        self._extend_warmed(tick, failings, self._planning, self._relationships)
+        for event in failings:
+            if event.kind == "needs.changed":
+                tick.state = tick.state.apply(event)
 
     def _phase_seasons(self, tick: _Tick) -> None:
         """The clocks, bank holidays, the turning year, and his own anniversaries."""

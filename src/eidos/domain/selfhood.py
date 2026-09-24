@@ -493,6 +493,14 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "imperfection.noticed":
+        return {
+            "put_off": (("reliability", -1, "put something off again"),),
+            "late_night": (("autonomy", -1, "lost an evening to my phone"),),
+            "snapped": (("care", -1, "was short with someone for no reason"),),
+        }.get(str(p.get("pattern")), ())
+    if kind == "imperfection.apologised":
+        return (("care", 1, "owned something I'd got wrong"),)
     if kind == "media.finished" and float(p.get("liking", 0)) >= 0.2:
         return (("curiosity", 1, "finished something I got a lot out of"),)
     if kind == "family.contact" and not p.get("missed"):

@@ -22,6 +22,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from eidos.application.family import family_context
+from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
 from eidos.application.user_notes import user_knowledge_context
@@ -862,6 +863,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
         "time_of_year": time_of_year(simulated_at),
+        "patterns_he_would_like_to_change": imperfection_context(history, simulated_at),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
