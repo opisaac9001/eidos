@@ -68,3 +68,15 @@ def test_you_become_a_friend_by_actually_talking_and_can_drift() -> None:
     assert "closest" in str(_standin_people_reply("are we friends?", context))
     stranger = {"identity": {"selfhood": {"his_people": []}}}
     assert "getting to know you" in str(_standin_people_reply("are we friends?", stranger))
+
+
+def test_closeness_is_not_redecided_every_few_days_but_a_clash_registers() -> None:
+    close = {"ellis": Relationship("ellis", 60, 0.55, 0.95, 0.0)}
+    first = review([], EVENING, close)
+    assert first[0].payload["bond"] == "close"
+    dipped = {"ellis": Relationship("ellis", 60, 0.35, 0.8, 0.0)}
+    assert review(first, EVENING + timedelta(days=7), dipped) == []
+    later = review(first, EVENING + timedelta(days=22), dipped)
+    assert later[0].payload["bond"] == "friend"
+    clash = {"ellis": Relationship("ellis", 60, 0.55, 0.95, 0.4)}
+    assert review(first, EVENING + timedelta(days=2), clash)[0].payload["bond"] == "strained"

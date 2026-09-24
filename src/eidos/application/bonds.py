@@ -10,7 +10,7 @@ that bond is measured from the days you have actually talked, not from a counter
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
@@ -23,6 +23,7 @@ CLOSE_WARMTH = 0.72
 CLOSE_TRUST = 0.45
 STRAINED_TENSION = 0.35
 SLACK = 0.06  # A bond is not lost the moment it dips below where it formed.
+SETTLE = timedelta(days=21)  # nor re-decided every few days
 USER = "user"
 RANK = {"strained": 0, "drifted": 0, "acquaintance": 1, "friend": 2, "close": 3}
 
@@ -92,6 +93,10 @@ def bond_events(
     ):
         return []
     bonds = current_bonds(history)
+    last_change = {
+        str(event.payload["person_id"]): datetime.fromisoformat(str(event.payload["simulated_at"]))
+        for event in events_of(history, "bond.recognized")
+    }
     changes: list[tuple[int, str, str, str]] = []
     for person_id in sorted(known_person_ids):
         relationship = relationships.get(person_id)
@@ -99,7 +104,9 @@ def bond_events(
             continue
         previous = bonds.get(person_id, "acquaintance")
         now = bond_level(relationship, previous)
-        if now != previous:
+        settled = person_id not in last_change or at - last_change[person_id] >= SETTLE
+        # How close someone is isn't re-decided every few days; a clash still registers.
+        if now != previous and (settled or now == "strained"):
             changes.append((_salience(previous, now), person_id, previous, now))
     previous = bonds.get(USER, "acquaintance")
     now = user_bond_level(history, at, previous)
