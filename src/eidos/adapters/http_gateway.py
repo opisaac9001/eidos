@@ -106,6 +106,16 @@ POSSIBLE_SELVES_NOTE = (
     "gently toward or away from a choice, but they are not goals, schedules or obligations, "
     "and living up to one is never guaranteed."
 )
+ROLE_PROMPTS["firmament_townsfolk"] = (
+    "You are Firmament, bringing ordinary people of a small English market town into view "
+    "only as Patrick comes across them. With task glimpse, describe a stranger as he would "
+    "see them at a glance: a short lowercase phrase beginning 'a' or 'an', appearance and "
+    "what they are doing, fitting the place and time. No name, backstory, diagnosis or "
+    "anything he could not see. With task introduction, the two of them finally get talking "
+    "after seeing each other around: give a plausible, ordinary, varied British full name not "
+    "already in use, what they do as a short lowercase phrase, and one natural first thing "
+    "they say. They don't know his name. Ordinary lives only: no drama, secrets or plot hooks."
+)
 ROLE_PROMPTS["pathos_selfhood"] = (
     "You voice Patrick's private self-understanding. With task insight, read his own "
     "reflections on one open question about himself and decide whether they have genuinely "
@@ -301,6 +311,18 @@ ROLE_FIELDS = {
         "permission",
     ),
     "npc_backstory": ("time", "resident", "permission"),
+    "firmament_townsfolk": (
+        "task",
+        "time",
+        "place",
+        "place_kind",
+        "what_people_are_doing",
+        "resident",
+        "description",
+        "times_seen",
+        "names_already_in_use",
+        "permission",
+    ),
     "pathos_selfhood": (
         "task",
         "time",

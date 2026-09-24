@@ -147,6 +147,11 @@ from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
+from eidos.application.townsfolk import (
+    townsfolk_events,
+    townsfolk_names,
+    townsfolk_promotion_events,
+)
 from eidos.application.trait_development import trait_development_events
 from eidos.application.urgent_incidents import (
     active_incident_location,
@@ -582,6 +587,7 @@ class Life(LifeConversation):
             self._phase_consequences(tick)
             await self._phase_world_story(tick)
             self._phase_perception(tick)
+            await self._phase_townsfolk(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -1310,6 +1316,38 @@ class Life(LifeConversation):
             )
             if not self.authored_scenario
             else []
+        )
+
+    async def _phase_townsfolk(self, tick: _Tick) -> None:
+        """The people of the town he happens across; a friend among them becomes a resident."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        in_conversation = any(
+            scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
+            for scene in project_scenes(history + pending).scenes.values()
+        )
+        crowd = ambient_population(catalog, current, latest_weather(history + pending)).get(
+            tick.state.location_id
+        )
+        pending.extend(
+            await townsfolk_events(
+                history + pending,
+                current,
+                self.gateway,
+                location_id=tick.state.location_id,
+                awake=tick.state.awake,
+                busy=in_conversation,
+                catalog=catalog,
+                crowd=crowd.estimated_people if crowd is not None else 0,
+                activity=crowd.activity if crowd is not None else "",
+            )
+        )
+        self._extend_warmed(
+            tick,
+            townsfolk_promotion_events(history + pending, current, catalog),
+            self._world_catalog,
         )
 
     def _phase_perception(self, tick: _Tick) -> None:
@@ -2123,8 +2161,11 @@ class Life(LifeConversation):
                     self._relationships(history + pending).relationships,
                     pathos_known_person_ids(history + pending),
                     {
-                        person.person_id: person.name
-                        for person in self._world_catalog(history + pending).people.values()
+                        **townsfolk_names(history + pending),
+                        **{
+                            person.person_id: person.name
+                            for person in self._world_catalog(history + pending).people.values()
+                        },
                     },
                 )
             )

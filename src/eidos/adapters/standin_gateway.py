@@ -779,6 +779,13 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "firmament_townsfolk":
+            return ModelResponse(
+                content=json.dumps(_standin_townsfolk(context)),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_selfhood":
             return ModelResponse(
                 content=json.dumps(_standin_selfhood(context, choice)),
@@ -2126,3 +2133,136 @@ def _standin_things_reply(message: str, context: dict[str, object]) -> str | Non
     if isinstance(saving, dict) and saving.get("item"):
         return f"Putting a bit aside for {saving['item']}. {saving.get('why', '')}".strip()
     return "Not really. Nothing I'm after at the moment."
+
+
+_TOWNSFOLK_PEOPLE = {
+    "in their twenties": ("a young man", "a young woman"),
+    "in their thirties": ("a man", "a woman"),
+    "in their forties": ("a man", "a woman"),
+    "in their fifties": ("a grey-templed man", "a woman"),
+    "in their sixties": ("an older man", "an older woman"),
+    "in their seventies": ("an older man", "an older woman"),
+    "elderly": ("an elderly man", "an elderly woman"),
+}
+_TOWNSFOLK_WEARING = (
+    "in a paint-flecked jacket",
+    "in a yellow raincoat",
+    "with a canvas tote bag",
+    "in a flat cap",
+    "with a sleeping toddler in a sling",
+    "with reading glasses pushed up on their head",
+    "in walking boots",
+    "with a bicycle helmet under one arm",
+    "in a faded football shirt",
+    "with an enormous scarf",
+)
+_TOWNSFOLK_DOING = {
+    "social": ("doing the crossword", "chatting to whoever would listen", "reading a paperback"),
+    "culture": ("browsing the shelves", "reading the notices", "taking notes in a margin"),
+    "errand": ("studying a shopping list", "waiting in the queue", "juggling too many bags"),
+    "outdoors": ("walking a scruffy terrier", "feeding the pigeons", "sitting on a bench"),
+    "making": ("waiting for a repair", "inspecting a wobbly chair", "asking about a part"),
+}
+_TOWNSFOLK_FIRST = {
+    "woman": (
+        "June",
+        "Priya",
+        "Aileen",
+        "Beth",
+        "Farah",
+        "Sian",
+        "Maureen",
+        "Hannah",
+        "Poppy",
+        "Nell",
+        "Ruth",
+        "Aisha",
+    ),
+    "man": (
+        "Graham",
+        "Tom",
+        "Marcus",
+        "Owen",
+        "Keith",
+        "Dev",
+        "Callum",
+        "Rashid",
+        "Stuart",
+        "Kwame",
+        "Alan",
+        "Jonah",
+    ),
+}
+_TOWNSFOLK_LAST = (
+    "Hollis",
+    "Pritchard",
+    "Nair",
+    "Whitlock",
+    "Barnes",
+    "Okoye",
+    "Fenwick",
+    "Doyle",
+    "Iqbal",
+    "Ashworth",
+    "Kerr",
+    "Mistry",
+    "Rowe",
+    "Bellamy",
+    "Hart",
+    "Sutton",
+    "Achebe",
+    "Lyle",
+)
+_TOWNSFOLK_WORK = (
+    "retired postmistress",
+    "bus driver",
+    "primary school teacher",
+    "part-time florist",
+    "night-shift nurse",
+    "plasterer",
+    "librarian",
+    "student at the college",
+    "semi-retired accountant",
+    "barber",
+    "delivery driver",
+    "allotment obsessive",
+    "pharmacist",
+)
+_TOWNSFOLK_OPENERS = (
+    "We keep ending up in the same places, don't we?",
+    "I was starting to think you were following me. Sorry, bad joke.",
+    "You're the one from the repair workshop, aren't you?",
+    "Is it always this busy, or is it just me?",
+    "Go on then, I'll say hello properly. I'm terrible with faces but not yours, apparently.",
+)
+
+
+def _standin_townsfolk(context: dict[str, Any]) -> dict[str, str]:
+    """Deterministic ordinary townsfolk, from the latent resident's seed."""
+    seed = int(context.get("seed", 0))
+    resident = context.get("resident", {}) if isinstance(context.get("resident"), dict) else {}
+    if context.get("task") == "introduction":
+        taken = {str(name).casefold() for name in context.get("names_already_in_use", [])}
+        description = str(context.get("description", ""))
+        firsts = _TOWNSFOLK_FIRST["woman" if "woman" in description else "man"]
+        for step in range(len(firsts) * len(_TOWNSFOLK_LAST)):
+            index = seed + step * 7
+            name = (
+                f"{firsts[index % len(firsts)]} "
+                f"{_TOWNSFOLK_LAST[(index // 3) % len(_TOWNSFOLK_LAST)]}"
+            )
+            if name.casefold() not in taken:
+                break
+        return {
+            "name": name,
+            "occupation": _TOWNSFOLK_WORK[seed % len(_TOWNSFOLK_WORK)],
+            "first_words": _TOWNSFOLK_OPENERS[seed % len(_TOWNSFOLK_OPENERS)],
+        }
+    people = _TOWNSFOLK_PEOPLE.get(str(resident.get("age")), ("a man", "a woman"))
+    doing = _TOWNSFOLK_DOING.get(str(context.get("place_kind")), ("looking at their phone",))
+    return {
+        "description": (
+            f"{people[seed % 2]} {_TOWNSFOLK_WEARING[(seed // 2) % len(_TOWNSFOLK_WEARING)]} "
+            f"{doing[(seed // 5) % len(doing)]}"
+        )
+    }

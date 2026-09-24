@@ -883,10 +883,15 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
 
 def _his_people(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
     from eidos.application.bonds import his_people
+    from eidos.domain.townsfolk import project_townsfolk
     from eidos.domain.world_catalog import project_world_catalog
 
     names = {
-        person.person_id: person.name for person in project_world_catalog(history).people.values()
+        **project_townsfolk(history).names(),
+        **{
+            person.person_id: person.name
+            for person in project_world_catalog(history).people.values()
+        },
     }
     return his_people(history, names)
 

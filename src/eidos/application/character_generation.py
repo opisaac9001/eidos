@@ -33,7 +33,9 @@ async def generated_character_history_events(
         for event in history
         if event.kind == "world.person_registered"
         and isinstance(event.payload.get("proposal_id"), str)
-        and str(event.payload["proposal_id"]).startswith("moira-world-expansion-")
+        and str(event.payload["proposal_id"]).startswith(
+            ("moira-world-expansion-", "townsfolk-promotion-")
+        )
     ]
     for registration in registrations:
         person_id = str(registration.payload["entity_id"])

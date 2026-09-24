@@ -95,7 +95,7 @@ def bond_events(
     changes: list[tuple[int, str, str, str]] = []
     for person_id in sorted(known_person_ids):
         relationship = relationships.get(person_id)
-        if relationship is None or relationship.encounters == 0:
+        if relationship is None:
             continue
         previous = bonds.get(person_id, "acquaintance")
         now = bond_level(relationship, previous)

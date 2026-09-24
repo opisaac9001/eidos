@@ -5,6 +5,7 @@ import re
 from typing import Mapping
 
 STRUCTURED_CAPABILITIES = {
+    "firmament_townsfolk",
     "moira_event",
     "moira_expansion",
     "npc_agency",
