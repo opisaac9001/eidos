@@ -27,6 +27,7 @@ from collections.abc import Callable, Hashable, Iterable, Iterator, Sequence
 from datetime import datetime
 from heapq import merge
 from itertools import islice
+from operator import itemgetter
 from threading import Lock
 from typing import Any, Generic, NoReturn, TypeVar
 
@@ -592,7 +593,22 @@ class GroupIndex:
         unique = list(dict.fromkeys(keys))
         if len(unique) == 1:
             return self.of(unique[0], start)
-        return [event for _, event in self.select_positioned(*unique, start=start)]
+        positions: list[int] = []
+        events: list[DomainEvent] = []
+        groups = 0
+        for key in unique:
+            bounds = self._bounds(key, start)
+            if bounds is None:
+                continue
+            key_positions, first, visible = bounds
+            positions += key_positions[first:visible]
+            events += self._log.events[key][first:visible]
+            groups += 1
+        if groups < 2:
+            return events
+        # Positions are unique, so ordering by them alone restores history order.
+        order = sorted(range(len(positions)), key=positions.__getitem__)
+        return list(itemgetter(*order)(events))
 
     def select_positioned(self, *keys: Hashable, start: int = 0) -> list[tuple[int, DomainEvent]]:
         groups = [
