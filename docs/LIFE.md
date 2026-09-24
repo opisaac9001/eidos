@@ -68,6 +68,28 @@ words (for example, "You start the new job on Monday").
 
 Capability: `pathos_user_notes`, which falls back to the `reflection` route.
 
+## Asking what you think (`application/advice.py`)
+
+When something in his life needs deciding, he wants your view if you're a friend (or you've
+talked on three or more days). The questions are:
+
+- whether to take on the workshop;
+- whether to move flat;
+- whether to message a friend he's fallen out with;
+- whether to say something to someone he likes.
+
+He brings it up next time you talk (`wants_your_view_on`, not repeated for three days after
+he's asked). If outreach is on and you haven't talked for a day, he messages to ask.
+
+Each evening the `pathos_advice_heard` role reads what you've said since he asked. It records
+whether you leaned for, against or were unsure, quoting your words (`advice.heard`). This
+role is routed like `reflection` unless given its own route.
+
+Your view then weighs in when he decides: it shifts the workshop decision, makes him more or
+less likely to reach out or ask someone out, and can talk him out of moving. It's one voice
+among his own values. He can still go the other way, and his memory of deciding says whether
+he took your advice.
+
 ## Books, series, music (`application/media.py`)
 
 He is usually partway through a book (a chapter before bed), a series (an episode on a free

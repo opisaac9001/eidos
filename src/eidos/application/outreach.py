@@ -77,6 +77,16 @@ async def outreach_events(
         if source is None and news is None
         else None
     )
+    advice = (
+        _advice_to_ask(history, simulated_at, messages)
+        if source is None and news is None and asking is None
+        else None
+    )
+    if advice is not None:
+        wanted, question = advice
+        return await _share_news(
+            history, simulated_at, gateway, context, messages, wanted, question, share_kind="advice"
+        )
     if source is None and news is None and asking is None:
         return []
     if news is not None:
@@ -286,6 +296,30 @@ def _follow_up_to_ask(
     return None
 
 
+def _advice_to_ask(
+    history: Sequence[DomainEvent], simulated_at: datetime, messages: Sequence[DomainEvent]
+) -> tuple[DomainEvent, str] | None:
+    """Something in his life he'd like your view on, if you haven't talked in a day or so."""
+    from eidos.application.advice import advice_names, waiting_for_your_view
+    from eidos.application.bonds import FRIENDLY, current_bonds
+
+    if current_bonds(history).get("user") not in FRIENDLY:
+        return None
+    if messages and str(messages[-1].payload.get("request_id", "")).startswith("outreach"):
+        return None
+    if messages and simulated_at - _event_time(messages[-1]) < timedelta(days=1):
+        return None  # you've been talking; he'll bring it up then
+    if any(
+        event.payload.get("kind") == "news" and simulated_at - _event_time(event) < NEWS_COOLDOWN
+        for event in events_of(history, "outreach.considered")
+    ):
+        return None
+    for wanted in waiting_for_your_view(history, advice_names(history)):
+        if simulated_at - _event_time(wanted) >= timedelta(days=1):
+            return wanted, str(wanted.payload["question"])
+    return None
+
+
 async def _share_news(
     history: Sequence[DomainEvent],
     simulated_at: datetime,
@@ -330,6 +364,14 @@ async def _share_news(
             "don't claim the user is absent or owes a reply, and don't repeat recent_dialogue."
         )
         if share_kind == "news"
+        else (
+            "Something in his life needs deciding (source_memory is the question in his words), "
+            "and he'd value the user's view as a friend. Decide whether he would actually "
+            "message to ask. If not, return exactly [KEEP_PRIVATE]. Otherwise write only a short, "
+            "natural message asking what they think, without pressure or making them responsible "
+            "for the decision."
+        )
+        if share_kind == "advice"
         else (
             "Something in the user's life was coming up (source_memory), and he has been meaning "
             "to ask how it went. Decide whether a friend would drop them a short message to "

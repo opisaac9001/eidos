@@ -7,6 +7,7 @@ from typing import Mapping
 STRUCTURED_CAPABILITIES = {
     "firmament_townsfolk",
     "pathos_user_notes",
+    "pathos_advice_heard",
     "firmament_family",
     "moira_event",
     "moira_expansion",

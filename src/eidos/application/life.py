@@ -11,6 +11,7 @@ from eidos.application.activity_execution import (
     execution_context,
     execution_events,
 )
+from eidos.application.advice import advice_heard_events, advice_names, advice_wanted_events
 from eidos.application.agency import autonomous_activity_events
 from eidos.application.ambient_population import ambient_population
 from eidos.application.appraisal import (
@@ -2540,6 +2541,11 @@ class Life(LifeConversation):
             )
         if not self.authored_scenario:
             pending.extend(await user_notes_events(history + pending, current, self.gateway))
+            names = advice_names(history + pending)
+            pending.extend(advice_wanted_events(history + pending, current, names))
+            pending.extend(
+                await advice_heard_events(history + pending, current, self.gateway, names)
+            )
         if not self.authored_scenario:
             pending.extend(
                 bond_events(

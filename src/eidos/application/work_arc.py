@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
+from eidos.application.advice import advice_note, advice_on
 from eidos.application.work_rota import (
     AGREEMENT_ID,
     EMPLOYER_ID,
@@ -80,7 +81,7 @@ def work_arc_events(
         return step in steps and at - _when(steps[step]) >= gap
 
     if "future" in steps and "answer" not in steps and waited("future", ANSWER_AFTER):
-        return _answer(at, values, balance_pence, ellis_bond)
+        return _answer(history, at, values, balance_pence, ellis_bond)
     took_it = "answer" in steps and bool(steps["answer"].payload.get("accepted"))
     if took_it and "handover_plan" not in steps and waited("answer", PLAN_AFTER):
         return _handover_plan(at)
@@ -98,14 +99,21 @@ def _when(event: DomainEvent) -> datetime:
 
 
 def _answer(
-    at: datetime, values: Mapping[str, float], balance_pence: int, ellis_bond: str | None
+    history: Sequence[DomainEvent],
+    at: datetime,
+    values: Mapping[str, float],
+    balance_pence: int,
+    ellis_bond: str | None,
 ) -> list[DomainEvent]:
-    """Whether he wants the workshop: craft, independence, Ellis, and whether he can risk it."""
+    """Whether he wants the workshop: craft, independence, Ellis, whether he can risk it, and
+    what you said when he asked you."""
+    advised = advice_on(history, "workshop")
     lean = (
         0.6 * float(values.get("craft", 0.72))
         + 0.4 * float(values.get("autonomy", 0.68))
         + (0.15 if ellis_bond == "closest" else 0.0)
         - (0.3 if balance_pence < 50_000 else 0.0)
+        + {"for": 0.12, "against": -0.12}.get(advised or "", 0.0)
     )
     accepted = lean >= 0.62
     text = (
@@ -115,6 +123,7 @@ def _answer(
         else "Told Ellis I don't think I want the workshop. Not the responsibility of it, not "
         "yet. He said he understood. I think he was disappointed, and I think I might be too."
     )
+    text += advice_note(history, "workshop", went_with=(advised == "for") == accepted)
     step = _step("answer", text, at, accepted=accepted)
     return [step, _warmth(step, at, 0.04 if accepted else 0.0), _memory(step, text, at, 0.8)]
 

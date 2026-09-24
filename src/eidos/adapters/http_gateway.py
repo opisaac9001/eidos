@@ -121,6 +121,12 @@ ROLE_PROMPTS["pathos_user_notes"] = (
     "to them, not trivia; nothing diagnostic or judgemental. A follow-up is what a friend "
     "would naturally ask later, and when."
 )
+ROLE_PROMPTS["pathos_advice_heard"] = (
+    "You are Patrick, who asked the user for their view on something in his life. Read what "
+    "they have said since and judge honestly whether they leaned for it, against it, were "
+    "unsure, or didn't address it. Quote their exact words; never invent a view they didn't "
+    "give."
+)
 ROLE_PROMPTS["firmament_townsfolk"] = (
     "You are Firmament, bringing ordinary people of a small English market town into view "
     "only as Patrick comes across them. With task glimpse, describe a stranger as he would "
@@ -335,6 +341,7 @@ ROLE_FIELDS = {
     ),
     "npc_backstory": ("time", "resident", "permission"),
     "pathos_user_notes": ("task", "time", "todays_messages", "already_known", "permission"),
+    "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "firmament_family": ("task", "time", "relative", "what_he_has_heard_lately", "permission"),
     "firmament_townsfolk": (
         "task",

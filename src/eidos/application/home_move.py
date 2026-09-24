@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Sequence
 
+from eidos.application.advice import advice_on
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -56,7 +57,7 @@ def home_move_events(
     stage = str(latest.payload["stage"]) if latest else None
     if stage == "looking":
         assert latest is not None
-        return _find(latest, at, balance_pence)
+        return _find(history, latest, at, balance_pence)
     if stage in {"found", "day_agreed"}:
         assert latest is not None
         found = next(
@@ -71,7 +72,8 @@ def home_move_events(
     opened = events_of(history, "finance.account_opened")
     if not opened or at - _time(opened[0]) < SETTLED_FOR:
         return []
-    if latest is not None and at - _time(latest) < AGAIN_AFTER:
+    wait = timedelta(days=365) if stage == "stayed_put" else AGAIN_AFTER
+    if latest is not None and at - _time(latest) < wait:
         return []
     if balance_pence < SAVED_PENCE:
         return []
@@ -95,10 +97,18 @@ def home_move_events(
     return _step(move_id, "looking", text, at, 0.5, {}, helper)
 
 
-def _find(looking: DomainEvent, at: datetime, balance_pence: int) -> list[DomainEvent]:
+def _find(
+    history: Sequence[DomainEvent], looking: DomainEvent, at: datetime, balance_pence: int
+) -> list[DomainEvent]:
     if at - _time(looking) < LOOKING_FOR:
         return []
     move_id = str(looking.payload["move_id"])
+    if advice_on(history, f"move-{move_id}") == "against":
+        text = (
+            "Decided to stay put for now. You were probably right: it's fine here, and the "
+            "damp's nothing a better extractor fan won't sort."
+        )
+        return _step(move_id, "stayed_put", text, at, 0.45, {})
     partner_id = looking.payload.get("partner_id")
     rent = SHARED_RENT_PENCE if partner_id else SOLO_RENT_PENCE
     deposit = DEPOSIT_WEEKS * rent

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.advice import advice_on
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -60,7 +61,8 @@ def falling_out_events(
         if last_try is not None and at - last_try < TRY_AGAIN_AFTER:
             if depths.get(person, 0.0) >= DURABLE or at - fell_out < GIVES_UP_AFTER:
                 continue
-        return _after(person, fell_out, attempts, at, depths, names, values)
+        advised = advice_on(history, f"rift-{person}-{fell_out.date().isoformat()}")
+        return _after(person, fell_out, attempts, at, depths, names, values, advised)
     for person in sorted(depths):
         if (
             person in NOT_FRIENDS
@@ -90,6 +92,7 @@ def _after(
     depths: Mapping[str, float],
     names: Mapping[str, str],
     values: Mapping[str, float],
+    advised: str | None = None,
 ) -> list[DomainEvent]:
     name = _first(names, person)
     close = depths.get(person, 0.0) >= DURABLE
@@ -106,6 +109,8 @@ def _after(
         + 0.06 * float(values.get("care", 0.78))
         + 0.05 * float(values.get("reliability", 0.74))
     )
+    # You told him to reach out, or to give it time; it weighs with him.
+    nerve *= {"for": 2.5, "against": 0.5}.get(advised or "", 1.0)
     if _roll("reach-out", person, at.date().isoformat()) >= nerve:
         return []
     odds = MENDS if attempts == 0 else MENDS_SECOND_TIME

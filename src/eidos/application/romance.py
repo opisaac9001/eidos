@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.advice import advice_on
 from eidos.application.latent_town import TOWN_POPULATION, latent_resident
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -337,6 +338,7 @@ def _courage(
     if at - began < timedelta(days=14):
         return []
     nerve = 0.004 + 0.045 * sociability + 0.02 * max(0.0, valence)
+    nerve *= {"for": 2.0, "against": 0.5}.get(advice_on(history, f"crush-{person}") or "", 1.0)
     if _roll("courage", person, at.date().isoformat()) >= nerve:
         return []
     if _roll("mutual", person) < 0.5:

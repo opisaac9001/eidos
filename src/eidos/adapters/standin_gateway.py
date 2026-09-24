@@ -360,6 +360,8 @@ def _standin_pathos_text(
     cadence = str(voice.get("cadence", "steady"))
     if context.get("outreach_reason"):
         news = str(context.get("source_memory", last_memory))
+        if context.get("share_kind") == "advice":
+            return f"Can I get your view on something? {news}"
         if context.get("share_kind") == "ask":
             about = news.split("He wanted to ask about ")[-1].rstrip(".")
             return f"Been meaning to ask: how did {about} go? No rush."
@@ -381,6 +383,12 @@ def _standin_pathos_text(
     )
     if follow_ups and any(message.startswith(cue) for cue in _GREETINGS):
         return f"Hey. Oh, how did {follow_ups[0]} go, by the way?"
+    wants_view = context.get("wants_your_view_on")
+    if wants_view and (
+        any(message.startswith(cue) for cue in _GREETINGS)
+        or any(cue in message for cue in ("on your mind", "what's new", "how are things"))
+    ):
+        return f"Hey. {wants_view}"
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
@@ -804,6 +812,13 @@ class StandInGateway(ModelGateway):
         elif role == "firmament_family":
             return ModelResponse(
                 content=json.dumps({"steps": _standin_family_storyline(context)}),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "pathos_advice_heard":
+            return ModelResponse(
+                content=json.dumps(_standin_advice_heard(context)),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",
@@ -2535,6 +2550,41 @@ _PERSON = (
     (r"\bme\b", "you"),
     (r"\bmyself\b", "yourself"),
 )
+
+
+_ADVICE_SIGNS = (
+    ("unsure", ("not sure", "depends", "up to you", "hard to say", "no idea")),
+    (
+        "against",
+        ("don't", "wouldn't", "not yet", "give it time", "wait", "stay put", "leave it", "no,"),
+    ),
+    (
+        "for",
+        (
+            "go for it",
+            "do it",
+            "you should",
+            "why not",
+            "take it",
+            "definitely",
+            "message them",
+            "say something",
+            "ask them",
+            "yes",
+        ),
+    ),
+)
+
+
+def _standin_advice_heard(context: dict[str, Any]) -> dict[str, str]:
+    """A crude, honest reader: the first sentence with a clear lean, quoted."""
+    for message in context.get("messages_since", []):
+        for sentence in re.split(r"(?<=[.!?])\s+", str(message)):
+            lowered = sentence.casefold()
+            for leans, signs in _ADVICE_SIGNS:
+                if any(sign in lowered for sign in signs):
+                    return {"leans": leans, "source_quote": sentence.strip().rstrip(".!?")}
+    return {"leans": "none", "source_quote": ""}
 
 
 def _standin_user_notes(context: dict[str, Any]) -> list[dict[str, object]]:

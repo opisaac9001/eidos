@@ -14,6 +14,7 @@ PERSONAL_ROLES = frozenset(
         "pathos_project",
         "pathos_selfhood",
         "pathos_user_notes",
+        "pathos_advice_heard",
     }
 )
 

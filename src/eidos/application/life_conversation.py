@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timedelta
 
 from eidos.application.activity_execution import execution_context
+from eidos.application.advice import advice_asked_events, advice_context, advice_names
 from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
@@ -556,6 +557,7 @@ class LifeConversation(LifeProjections):
                 if item.person_id == "user"
             ],
             **user_knowledge_context(history, state.simulated_at),
+            **advice_context(history, state.simulated_at, advice_names(history)),
             "relationship_repairs": [
                 {
                     **vars_for(item),
@@ -595,6 +597,9 @@ class LifeConversation(LifeProjections):
                 self._reply_events(incoming, text, reply, reply_voice, request_id, state)
             )
             pending.extend(asked_about_events(history, state.simulated_at, reply))
+            pending.extend(
+                advice_asked_events(history, state.simulated_at, reply, advice_names(history))
+            )
         else:
             pending.append(
                 DomainEvent(
