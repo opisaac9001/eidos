@@ -1,7 +1,7 @@
 """The operator read model: one JSON-ready snapshot of Pathos's whole life."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from eidos.application.activity_execution import execution_context
@@ -36,6 +36,7 @@ from eidos.domain.development import project_development
 from eidos.domain.emotional_regulation import project_regulation
 from eidos.domain.emotions import emotional_planning_bias, project_emotion
 from eidos.domain.events import DomainEvent
+from eidos.domain.finances import FinancialState
 from eidos.domain.folding import events_of
 from eidos.domain.identity import project_identity
 from eidos.domain.mind import project_mind
@@ -733,6 +734,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
             "currency": "GBP",
             "balance_pence": finances.balance_pence,
             "transactions": [vars_for(item) for item in list(finances.transactions.values())[-50:]],
+            "last_four_weeks": _money_lately(finances, state.simulated_at),
             "missed_payments": [vars_for(item) for item in finances.missed_payments.values()],
         },
         "wellbeing": {
@@ -855,3 +857,14 @@ def _townsfolk_view(history: list[DomainEvent], catalog: WorldCatalog) -> dict[s
             )
         ],
     }
+
+
+def _money_lately(finances: FinancialState, at: datetime) -> dict[str, int]:
+    """Net pence by category over the last four weeks, for a glance at where it went."""
+    since = at - timedelta(days=28)
+    totals: dict[str, int] = {}
+    for item in reversed(list(finances.transactions.values())):
+        if datetime.fromisoformat(item.simulated_at) < since:
+            break
+        totals[item.category] = totals.get(item.category, 0) + item.amount_pence
+    return totals

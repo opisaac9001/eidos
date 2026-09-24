@@ -1335,6 +1335,18 @@ function renderPlans() {
   };
   $("finance-balance").textContent =
     `${money(finances.balance_pence)} available`;
+  const lately = Object.entries(finances.last_four_weeks || {}).sort(
+    (a, b) => b[1] - a[1],
+  );
+  $("finance-lately").hidden = !lately.length;
+  $("finance-lately").textContent = lately.length
+    ? `Last four weeks: ${lately
+        .map(
+          ([category, pence]) =>
+            `${category.replaceAll("_", " ")} ${pence > 0 ? "+" : ""}${money(pence)}`,
+        )
+        .join(" · ")}`
+    : "";
   const financeItems = [
     ...[...finances.transactions]
       .reverse()
