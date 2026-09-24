@@ -493,6 +493,8 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "romance.stage" and p.get("stage") in {"seeing", "together"}:
+        return (("care", 1, "let someone in"),)
     if kind == "work.arc_step":
         step = p.get("step")
         if step == "raise":

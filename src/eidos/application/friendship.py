@@ -72,6 +72,7 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "relationship.repair_contacted": ("person_id", 0.5, True),
     "apology.offered": ("target_id", 0.3, True),
     "imperfection.apologised": ("person_id", 0.3, True),
+    "romance.stage": ("person_id", 0.4, True),
 }
 
 
@@ -194,6 +195,8 @@ def _moments(history: Sequence[DomainEvent]) -> list[tuple[datetime, str, float,
         payload = event.payload
         key, weight, deepening = _MOMENTS[event.kind]
         if event.kind == "setback.resolved" and payload.get("outcome") != "cleared":
+            continue
+        if event.kind == "romance.stage" and payload.get("stage") not in {"date", "together"}:
             continue
         person = payload.get(key)
         when = _time(payload.get("simulated_at"))

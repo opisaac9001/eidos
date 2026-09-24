@@ -345,6 +345,17 @@ def _effect(
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
             "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
+    if event.kind == "romance.stage":
+        return {
+            "drawn": ("affect", 0.0, 0.2, 0.55, 0.3),
+            "seeing": ("connection", 0.06, 0.55, 0.6, 0.5),
+            "declined": ("affect", 0.0, -0.45, 0.5, 0.3),
+            "faded": ("affect", 0.0, -0.05, 0.1, 0.5),
+            "date": ("connection", 0.08, 0.45, 0.4, 0.6),
+            "date_missed": ("affect", 0.0, -0.3, 0.3, 0.5),
+            "together": ("connection", 0.06, 0.55, 0.4, 0.6),
+            "ended": ("affect", 0.0, -0.35, 0.35, 0.4),
+        }.get(str(event.payload.get("stage")))
     if event.kind == "imperfection.noticed":
         return {
             "put_off": ("affect", 0.0, -0.1, 0.15, 0.6),

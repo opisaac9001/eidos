@@ -384,6 +384,9 @@ def _standin_pathos_text(
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    love = _standin_love_reply(message, context)
+    if love:
+        return love
     media = _standin_media_reply(message, context)
     if media:
         return media
@@ -1785,6 +1788,26 @@ def _standin_nature_reply(message: str) -> str | None:
         "a human on the other side of the screen. Bit of a strange thing to say out loud, "
         "honestly, but I'd rather you knew."
     )
+
+
+_LOVE_CUES = ("seeing anyone", "girlfriend", "boyfriend", "your partner", "dating", "love life")
+
+
+def _standin_love_reply(message: str, context: dict[str, object]) -> str | None:
+    """Honest, and a bit private, about his love life."""
+    if not any(cue in message for cue in _LOVE_CUES):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    love = selfhood.get("love_life") if isinstance(selfhood, dict) else None
+    if not isinstance(love, dict):
+        return "No one at the moment. I'm alright with that, mostly."
+    stage = str(love.get("stage", ""))
+    if stage.startswith("a crush"):
+        return "No... well. Sort of. Nothing's happened. I'm not saying more than that."
+    if stage.startswith("seeing"):
+        return f"Sort of, yeah. {love.get('who')}. Early days, so don't jinx it."
+    return f"Yeah, {love.get('who')}. It's good. It's really good, actually."
 
 
 _MEDIA_CUES = {

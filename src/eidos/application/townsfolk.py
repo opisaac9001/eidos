@@ -521,3 +521,11 @@ def _trace(
 
 def townsfolk_names(history: Sequence[DomainEvent]) -> dict[str, str]:
     return project_townsfolk(history).names()
+
+
+def latent_person(identifier: str) -> LatentResident | None:
+    """The latent resident behind a townsfolk id, if it is one."""
+    from eidos.application.latent_town import latent_resident
+
+    number = townsfolk_number(identifier)
+    return None if number is None else latent_resident(number)

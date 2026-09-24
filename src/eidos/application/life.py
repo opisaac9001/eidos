@@ -51,6 +51,7 @@ from eidos.application.experience import experience_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
+from eidos.application.friendship import friendships
 from eidos.application.household import (
     household_adjusted_beat,
     household_completion_events,
@@ -131,6 +132,7 @@ from eidos.application.renegotiations import (
 )
 from eidos.application.rescheduling import reflective_rescheduling_events
 from eidos.application.resident_social import resident_social_events
+from eidos.application.romance import romance_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.seasons import seasonal_baseline, seasonal_events
@@ -152,6 +154,7 @@ from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.townsfolk import (
+    latent_person,
     townsfolk_events,
     townsfolk_names,
     townsfolk_promotion_events,
@@ -209,6 +212,7 @@ from eidos.domain.scenes import (
 )
 from eidos.domain.seasons import season_change_events, season_for
 from eidos.domain.state import PathosState
+from eidos.domain.townsfolk import project_townsfolk
 from eidos.domain.traits import project_traits
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
 from eidos.domain.wellbeing import WellbeingEpisode
@@ -1335,6 +1339,45 @@ class Life(LifeConversation):
             else []
         )
 
+    def _romance(self, tick: _Tick) -> None:
+        """The slow, uncertain possibility of someone."""
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        townsfolk = project_townsfolk(history + pending)
+        names = {
+            **townsfolk.names(),
+            **{person.person_id: person.name for person in catalog.people.values()},
+        }
+        ages = {
+            person_id: resident.age_band
+            for person_id in townsfolk.people
+            if (resident := latent_person(person_id)) is not None
+        }
+        self._extend_warmed(
+            tick,
+            romance_events(
+                history + pending,
+                current,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                },
+                names=names,
+                ages=ages,
+                sociability=float(
+                    project_traits(history + pending).levels.get("sociability", 0.52)
+                ),
+                valence=tick.state.valence,
+                awake=tick.state.awake,
+                known_places=known_place_ids(history + pending, catalog),
+                calendar={
+                    entry.schedule_id: entry.status
+                    for entry in self._planning(history + pending).calendar.values()
+                },
+            ),
+            self._planning,
+        )
+
     def _phase_imperfection(self, tick: _Tick) -> None:
         """Putting things off, late nights, being short when tired, and saying sorry."""
         if self.authored_scenario:
@@ -2292,6 +2335,8 @@ class Life(LifeConversation):
         history, pending, current = tick.history, tick.pending, tick.current
         daily_self = selfhood_daily_events(history + pending, current)
         pending.extend(daily_self)
+        if not self.authored_scenario and current.hour == 19:
+            self._romance(tick)
         if not self.authored_scenario:
             self._extend_warmed(
                 tick,
