@@ -1007,7 +1007,12 @@ class Life(LifeConversation):
                     **reasons,
                     "location_id": beat.location_id,
                     "owner": "pathos",
-                    "importance": 0.45,
+                    # Another hour of the same thing is barely remembered; recall should
+                    # favour the moments that stood out.
+                    "importance": 0.15
+                    if not self.authored_scenario
+                    and beat.description.startswith("Stayed with the planned activity")
+                    else 0.45,
                     "confidence": 1.0,
                 },
                 causation_id=household_event.event_id
@@ -2027,20 +2032,24 @@ class Life(LifeConversation):
                 )
                 self._extend_warmed(tick, decisions, self._planning)
         if not self.authored_scenario:
-            # However an activity came to be realized, how it actually felt, and whether
-            # that settles into a taste.
-            for realized in events_of(history + pending, "agency.activity_realized")[-3:]:
-                pending.extend(
-                    experience_events(
-                        history + pending,
-                        realized,
-                        tick.state,
-                        values=project_identity(history + pending).values,
-                        traits=project_traits(history + pending).levels,
-                        weather=latest_weather(history + pending),
-                        catalog=self._world_catalog(history + pending),
-                    )
+            self._feel_realized(tick)
+
+    def _feel_realized(self, tick: _Tick) -> None:
+        """However an activity came to be realized, how it actually felt, and whether that
+        settles into a taste."""
+        history, pending = tick.history, tick.pending
+        for realized in events_of(history + pending, "agency.activity_realized")[-3:]:
+            pending.extend(
+                experience_events(
+                    history + pending,
+                    realized,
+                    tick.state,
+                    values=project_identity(history + pending).values,
+                    traits=project_traits(history + pending).levels,
+                    weather=latest_weather(history + pending),
+                    catalog=self._world_catalog(history + pending),
                 )
+            )
 
     def _phase_objects(self, tick: _Tick) -> None:
         """Things: shared use, upkeep, running out and restocking, and getting them back."""
@@ -2311,6 +2320,7 @@ class Life(LifeConversation):
         if fractional_activity:
             pending.extend(dream_plan_outcome_events(history + pending, target))
             pending.extend(dream_project_outcome_events(history + pending, target))
+        self._feel_realized(tick)
 
     def configure(
         self,

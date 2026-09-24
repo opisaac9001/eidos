@@ -126,7 +126,8 @@ def scheduled_social_events(
                 consequence(
                     "memory.recorded",
                     {
-                        "text": f"I showed up for my planned time with {target_id.title()}.",
+                        "text": "I showed up for my planned time with "
+                        f"{target_id.replace('-', ' ').title()}.",
                         "owner": "pathos",
                         "category": "encounter",
                         "source": "deterministic-consequence",
