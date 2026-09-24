@@ -7,6 +7,7 @@ from eidos.application.spending import (
     CHRISTMAS_FARE_PENCE,
     PHONE_BILL_PENCE,
     RESERVE_PENCE,
+    TIGHT_PENCE,
     money_context,
     spending_events,
     spending_view,
@@ -60,6 +61,13 @@ class SpendingTests(unittest.TestCase):
     def test_extras_wait_until_he_can_afford_them(self):
         saturday = at(1, 10, 11)
         self.assertEqual(spend([], saturday, balance=RESERVE_PENCE), [])
+
+    def test_when_money_is_tight_he_keeps_to_the_basics(self):
+        saturday = at(1, 10, 11)
+        tight = spend([], saturday, balance=TIGHT_PENCE - 1)
+        easy = spend([], saturday, balance=100_000)
+        self.assertLess(tight[0].payload["cost_pence"], easy[0].payload["cost_pence"])
+        self.assertIn("basics", tight[0].payload["text"])
 
     def test_a_visit_costs_something_at_most_once_a_day(self):
         days = [at(3, day, 20) for day in range(1, 29)]

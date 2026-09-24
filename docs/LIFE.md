@@ -107,7 +107,9 @@ Rent and food were always paid for; now the rest of an ordinary week is too.
 - **On the 3rd of each month:** the phone bill, which is owed even when money is tight.
 - **Family:** a card and present for each occasion he marks, even late; at Christmas the
   train fare once it's agreed and presents bought in town beforehand.
-- **Thrift:** he skips extras unless he'd still have £30 left.
+- **Thrift:** he skips extras unless next week's rent and £30 would be left. With less
+  than two weeks' rent put by, the weekly bits shrink to the basics and the haircut
+  waits.
 
 ## Romance (`application/romance.py`)
 

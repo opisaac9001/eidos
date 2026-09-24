@@ -23,7 +23,9 @@ from eidos.application.economy import WEEKLY_HOUSING_PENCE
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
-RESERVE_PENCE = 3_000  # He won't spend on extras below about thirty pounds.
+# He won't spend on extras unless next week's rent and thirty pounds would be left.
+RESERVE_PENCE = WEEKLY_HOUSING_PENCE + 3_000
+TIGHT_PENCE = 2 * WEEKLY_HOUSING_PENCE  # Below this, the weekly bits shrink to the basics.
 PHONE_BILL_PENCE = 1_500
 PHONE_BILL_DAY = 3
 CHRISTMAS_FARE_PENCE = 6_400
@@ -85,7 +87,7 @@ def spending_events(
     done = _recent_spends(history, at)
     candidates = [
         *_bills(at, awake),
-        *_bits(at, awake),
+        *_bits(at, awake, tight=balance_pence < TIGHT_PENCE),
         *_at_place(history, at, awake, location_id),
         *_gifts(history, at),
         *_christmas(history, at, awake, location_id),
@@ -124,16 +126,21 @@ def _bills(at: datetime, awake: bool) -> list[_Candidate]:
     return [(f"phone-{at.year}-{at.month:02d}", "bills", PHONE_BILL_PENCE, "Phone bill", True)]
 
 
-def _bits(at: datetime, awake: bool) -> list[_Candidate]:
-    """A weekly scatter of small things, and every few weeks a haircut."""
+def _bits(at: datetime, awake: bool, *, tight: bool = False) -> list[_Candidate]:
+    """A weekly scatter of small things, and every few weeks a haircut.
+
+    When money is tight it's just the basics, and the haircut can wait.
+    """
     if at.weekday() != 5 or at.hour < 11 or not awake:
         return []
     week = at.isocalendar()
     key = f"{week.year}-W{week.week:02d}"
     cost = 1_600 + round(2_000 * _roll("bits", key))
     text = BITS[int(_roll("bits-text", key) * len(BITS))]
+    if tight:
+        cost, text = cost // 2, "Just the basics this week: toothpaste and a bus fare"
     candidates: list[_Candidate] = [(f"bits-{key}", "everyday", cost, text, False)]
-    if week.week % HAIRCUT_EVERY_WEEKS == 0:
+    if week.week % HAIRCUT_EVERY_WEEKS == 0 and not tight:
         candidates.append((f"haircut-{key}", "everyday", HAIRCUT_PENCE, "A haircut", False))
     return candidates
 
