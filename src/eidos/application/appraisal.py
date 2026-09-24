@@ -472,6 +472,9 @@ def _effect(
             "date_missed": ("affect", 0.0, -0.3, 0.3, 0.5),
             "together": ("connection", 0.06, 0.55, 0.4, 0.6),
             "ended": ("affect", 0.0, -0.35, 0.35, 0.4),
+            "set_up": ("affect", 0.0, 0.15, 0.5, 0.3),
+            "no_spark": ("affect", 0.0, -0.05, 0.15, 0.5),
+            "broke_up": ("affect", 0.0, -0.6, 0.45, 0.35),
         }.get(str(event.payload.get("stage")))
     if event.kind == "imperfection.noticed":
         return {

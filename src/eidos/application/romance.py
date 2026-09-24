@@ -7,10 +7,16 @@ works up the courage to ask them for a coffee; they might say yes, or kindly say
 feel the same. If they say yes there are a few dates, real evenings out that he goes to,
 and then either it quietly doesn't work out or they become properly together.
 
+People also meet the way people do: a regular he has chatted with a few times, or a friend
+who knows someone and sets him up. A set-up is one evening that might become a second or
+might just be nice. And "together" isn't always forever; some relationships run their course
+after a few months, and that is a real loss.
+
 Nothing here is forced or explicit. Who sparks, whether it's mutual and whether it lasts
 are hidden, replay-stable facts about each pair of people; his courage depends on how he is
 (sociability, mood). His orientation is not specified in his authored background, so it is
-left open rather than assumed.
+left open rather than assumed: the people he is set up with have names that could belong to
+anyone, and all pronouns stay "they".
 """
 
 from __future__ import annotations
@@ -19,18 +25,76 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.latent_town import TOWN_POPULATION, latent_resident
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
+from eidos.domain.townsfolk import project_townsfolk
 
 NEVER = frozenset({"user", "ellis", "mum", "dad", "tom"})
-SPARK_CHANCE = 0.12
-DRAWN_AT_DEPTH = 3.0
+SPARK_CHANCE = 0.15
+DRAWN_AT_DEPTH = 2.5  # someone he has got to know
+DRAWN_AT_DEPTH_TOWNSFOLK = 0.35  # a regular: introduced and a few chats
 FADES_AFTER = timedelta(days=60)
 COOL_OFF = timedelta(days=90)
+HEARTBREAK = timedelta(days=180)
 DATES_BEFORE_DECIDING = 6
 DATE_GAP = timedelta(days=8)
 TOO_YOUNG_OR_OLD = frozenset(
-    {"in their fifties", "in their sixties", "in their seventies", "elderly"}
+    {"in their forties", "in their fifties", "in their sixties", "in their seventies", "elderly"}
+)
+CLOSERS = frozenset({"faded", "declined", "ended", "no_spark", "passed_on", "broke_up"})
+# Being set up: a friend at least this close, a Sunday evening, this often.
+MATCHMAKER_DEPTH = 5.0
+SET_UP_CHANCE = 0.1
+SET_UP_GAP = timedelta(days=240)
+QUIET_FOR = timedelta(days=150)
+SECOND_DATE = 0.45
+LONG_TERM = 0.6  # the share of relationships that last beyond the first months
+_FIRST_NAMES = (
+    "Alex",
+    "Sam",
+    "Jo",
+    "Robin",
+    "Charlie",
+    "Jamie",
+    "Frankie",
+    "Kit",
+    "Morgan",
+    "Riley",
+    "Jude",
+    "Ash",
+    "Rowan",
+    "Sasha",
+    "Remy",
+    "Toni",
+)
+_SURNAMES = (
+    "Hale",
+    "Brennan",
+    "Okafor",
+    "Lindqvist",
+    "Carver",
+    "Mistry",
+    "Doyle",
+    "Fenwick",
+    "Ashworth",
+    "Pryce",
+    "Quinlan",
+    "Moss",
+    "Adeyemi",
+    "Kowalski",
+)
+_JOBS = (
+    "a primary school teacher",
+    "a nurse at the practice",
+    "a graphic designer",
+    "works at the library",
+    "a bike mechanic",
+    "a sound engineer",
+    "a vet nurse",
+    "a baker",
+    "a surveyor",
+    "works for the council",
 )
 
 _DATE_PLACES = (
@@ -61,13 +125,15 @@ def romance_events(
         return []
     arc = current_arc(history)
     if arc is None:
-        return _drawn(history, at, depths, names, ages)
+        return _drawn(history, at, depths, names, ages) or _set_up(
+            history, at, depths, names, sociability
+        )
     person, stage, began = arc
     name = names.get(person, person.replace("-", " ").title())
     if stage == "drawn":
         return _courage(history, at, person, name, began, sociability, valence)
-    if stage in {"seeing", "together"}:
-        return _next_date(history, at, person, name, stage, known_places, calendar)
+    if stage in {"seeing", "together", "set_up"}:
+        return _next_date(history, at, person, name, stage, began, known_places, calendar)
     return []
 
 
@@ -78,9 +144,9 @@ def current_arc(history: Sequence[DomainEvent]) -> tuple[str, str, datetime] | N
         stage = str(event.payload.get("stage"))
         person = str(event.payload.get("person_id"))
         when = _time(event)
-        if stage in {"faded", "declined", "ended"}:
+        if stage in CLOSERS:
             arc = None
-        elif stage == "drawn":
+        elif stage in {"drawn", "set_up"}:
             arc = (person, stage, when)
         elif arc is not None and arc[0] == person and stage in {"seeing", "together"}:
             arc = (person, stage, when)
@@ -93,12 +159,22 @@ def romance_context(
     """What he'd say (or not) about his love life."""
     arc = current_arc(history)
     if arc is None:
-        return None
+        stages = events_of(history, "romance.stage")
+        last = stages[-1] if stages else None
+        if last is None or last.payload.get("stage") != "broke_up":
+            return None
+        person = str(last.payload["person_id"])
+        return {
+            "who": names.get(person, person.replace("-", " ").title()),
+            "stage": "broke up, and still getting used to it",
+            "since": _time(last).date().isoformat(),
+        }
     person, stage, since = arc
     return {
         "who": names.get(person, person.replace("-", " ").title()),
         "stage": {
             "drawn": "a crush he hasn't acted on",
+            "set_up": "a friend has set him up; a first date to come",
             "seeing": "seeing each other, early days",
             "together": "properly together",
         }.get(stage, stage),
@@ -121,19 +197,15 @@ def _drawn(
     names: Mapping[str, str],
     ages: Mapping[str, str],
 ) -> list[DomainEvent]:
-    ended = [
-        e
-        for e in events_of(history, "romance.stage")
-        if e.payload.get("stage") in {"faded", "declined", "ended"}
-    ]
-    if ended and at - _time(ended[-1]) < COOL_OFF:
+    if _cooling_off(history, at):
         return []
     before = {str(e.payload.get("person_id")) for e in events_of(history, "romance.stage")}
     for person in sorted(depths):
+        threshold = DRAWN_AT_DEPTH_TOWNSFOLK if person.startswith("townsfolk-") else DRAWN_AT_DEPTH
         if (
             person in NEVER
             or person in before
-            or depths[person] < DRAWN_AT_DEPTH
+            or depths[person] < threshold
             or ages.get(person) in TOO_YOUNG_OR_OLD
             or _roll("spark", person) >= SPARK_CHANCE
         ):
@@ -142,6 +214,107 @@ def _drawn(
         text = f"I think I like {name}. Properly like. Which is inconvenient."
         return _stage(person, "drawn", text, at, 0.6)
     return []
+
+
+def _cooling_off(history: Sequence[DomainEvent], at: datetime) -> bool:
+    ended = [e for e in events_of(history, "romance.stage") if e.payload.get("stage") in CLOSERS]
+    if not ended:
+        return False
+    wait = HEARTBREAK if ended[-1].payload.get("stage") == "broke_up" else COOL_OFF
+    return at - _time(ended[-1]) < wait
+
+
+def _set_up(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    depths: Mapping[str, float],
+    names: Mapping[str, str],
+    sociability: float,
+) -> list[DomainEvent]:
+    """A close friend knows someone. Sunday evenings, now and then, when things are quiet."""
+    if at.weekday() != 6 or _cooling_off(history, at):
+        return []
+    stages = events_of(history, "romance.stage")
+    if stages and at - _time(stages[-1]) < QUIET_FOR:
+        return []
+    offers = [e for e in stages if e.payload.get("stage") in {"set_up", "passed_on"}]
+    if offers and at - _time(offers[-1]) < SET_UP_GAP:
+        return []
+    friends = sorted(
+        person
+        for person, depth in depths.items()
+        if depth >= MATCHMAKER_DEPTH and person not in {"user", "mum", "dad", "tom"}
+    )
+    if not friends or _roll("set-up-week", at.date().isoformat()) >= SET_UP_CHANCE:
+        return []
+    friend = friends[int(_roll("matchmaker", at.date().isoformat()) * len(friends))]
+    friend_name = names.get(friend, friend.replace("-", " ").title()).split()[0]
+    known = project_townsfolk(history)
+    resident = next(
+        (
+            candidate
+            for step in range(200)
+            if (
+                candidate := latent_resident(
+                    1 + int(_roll("set-up-who", at.date().isoformat(), step) * TOWN_POPULATION)
+                )
+            ).age_band
+            in {"in their twenties", "in their thirties"}
+            and candidate.townsfolk_id not in known.people
+        ),
+        None,
+    )
+    if resident is None:
+        return []
+    person = resident.townsfolk_id
+    if _roll("say-yes", at.date().isoformat()) >= 0.45 + 0.4 * sociability:
+        text = (
+            f"{friend_name} wanted to set me up with a friend of theirs. Said no, as nicely as "
+            "I could. Not sure why. Not ready, maybe."
+        )
+        return _stage(person, "passed_on", text, at, 0.4, matchmaker_id=friend)
+    taken = {name.casefold() for name in names.values()}
+    taken.update(str(other.name).casefold() for other in known.people.values() if other.name)
+    options = (
+        f"{_FIRST_NAMES[int(_roll('first', person, step) * len(_FIRST_NAMES))]} "
+        f"{_SURNAMES[int(_roll('last', person, step) * len(_SURNAMES))]}"
+        for step in range(60)
+    )
+    name = next((option for option in options if option.casefold() not in taken), None)
+    if name is None:
+        return []
+    job = _JOBS[int(_roll("job", person) * len(_JOBS))]
+    common = {
+        "townsfolk_id": person,
+        "place_id": "cafe",
+        "simulated_at": at.isoformat(),
+        "owner": "pathos",
+    }
+    first = name.split()[0]
+    noticed = DomainEvent(
+        "townsfolk.noticed",
+        "pathos",
+        {**common, "description": f"a friend of {friend_name}'s, {resident.age_band}"},
+        correlation_id=f"romance-{person}",
+    )
+    introduced = DomainEvent(
+        "townsfolk.introduced",
+        "pathos",
+        {
+            **common,
+            "name": name,
+            "occupation": job,
+            "first_words": f"{friend_name} says you fix things. I've got a lamp you'd hate.",
+            "introduced_by": friend,
+        },
+        causation_id=noticed.event_id,
+        correlation_id=f"romance-{person}",
+    )
+    text = (
+        f"{friend_name} is setting me up with {first}, a friend of theirs ({job}). "
+        "I said yes before I could think of a reason not to. We're swapping messages."
+    )
+    return [noticed, introduced, *_stage(person, "set_up", text, at, 0.6, matchmaker_id=friend)]
 
 
 def _courage(
@@ -185,10 +358,11 @@ def _next_date(
     person: str,
     name: str,
     stage: str,
+    since: datetime,
     known_places: frozenset[str],
     calendar: Mapping[str, str],
 ) -> list[DomainEvent]:
-    """Remember the last date, or plan the next one for a Friday or Saturday evening."""
+    """Remember the last date, decide, or plan the next one for a Friday or Saturday."""
     mine = [e for e in events_of(history, "romance.stage") if e.payload.get("person_id") == person]
     planned = [e for e in mine if e.payload.get("stage") == "date_planned"]
     remembered = {
@@ -211,6 +385,24 @@ def _next_date(
                 return _stage(person, "date_missed", text, at, 0.55, schedule_id=schedule_id)
             return []  # still to come
     dates = [e for e in mine if e.payload.get("stage") == "date"]
+    if stage == "set_up" and dates:
+        if _roll("mutual", person) < SECOND_DATE:
+            text = (
+                f"Messaged {name} to say I'd had a really good time. They said same, and "
+                "when's the next one. So that's a second date."
+            )
+            return _stage(person, "seeing", text, at, 0.75)
+        text = (
+            f"{name} was lovely, but there wasn't a spark, on either side I think. We said "
+            "as much, kindly. Now I have to tell the matchmaker."
+        )
+        return _stage(person, "no_spark", text, at, 0.45)
+    if stage == "together" and _runs_its_course(person, since, at):
+        text = (
+            f"{name} and I broke up. We'd both felt it coming for a while, which doesn't make "
+            "it much easier. The evenings are very quiet."
+        )
+        return _stage(person, "broke_up", text, at, 0.85)
     if dates and at - _time(dates[-1]) < DATE_GAP - timedelta(days=3):
         return []
     if stage == "seeing" and len(dates) >= DATES_BEFORE_DECIDING:
@@ -294,6 +486,13 @@ def _next_date(
             correlation_id=schedule_id,
         ),
     ]
+
+
+def _runs_its_course(person: str, together_since: datetime, at: datetime) -> bool:
+    """Some relationships last; the others end three to nine months in."""
+    if _roll("long-term", person) < LONG_TERM:
+        return False
+    return at - together_since >= timedelta(days=90 + int(180 * _roll("how-long", person)))
 
 
 def _stage(

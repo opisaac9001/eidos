@@ -121,9 +121,19 @@ Rare, slow and uncertain.
   kind no.
 - **Dates** are agreed Friday or Saturday evenings out at places he knows, which he travels
   to and remembers after. After six, it becomes "properly together" or quietly ends.
+- **Where people meet:** a friend he has got to know, or a regular he has chatted with a
+  few times. And now and then, on a quiet Sunday, a close friend offers to set him up with
+  someone they know. He may say no. A set-up is one evening out, which becomes a second
+  date or doesn't.
+- **Not everything lasts:** about 40% of relationships that become "together" end three to
+  nine months in (`broke_up`). That hits hard, and he doesn't look for anyone for six
+  months.
 - **Hidden facts:** whether someone sparks, whether it's mutual and whether it lasts are
   replay-stable facts about each pair.
+- **Why this was reworked:** the spark was a fixed fact per person, and none of the authored
+  cast had it, so in the standard world romance could never happen.
 - **Orientation:** his is not specified in his authored background, so it is left open.
+  People he is set up with have names that could belong to anyone, and are "they".
 
 ## People, tastes and the town
 

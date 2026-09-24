@@ -1817,6 +1817,15 @@ def _standin_love_reply(message: str, context: dict[str, object]) -> str | None:
         return "No... well. Sort of. Nothing's happened. I'm not saying more than that."
     if stage.startswith("seeing"):
         return f"Sort of, yeah. {love.get('who')}. Early days, so don't jinx it."
+    if stage.startswith("a friend has set him up"):
+        return (
+            "I've been set up, would you believe. First date's soon. Trying not to think about it."
+        )
+    if stage.startswith("broke up"):
+        return (
+            f"Not any more. {love.get('who')} and I broke up a little while ago. "
+            "I'm alright. Mostly alright."
+        )
     return f"Yeah, {love.get('who')}. It's good. It's really good, actually."
 
 
