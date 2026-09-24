@@ -184,7 +184,7 @@ def _recognition(name: str, person_id: str, previous: str, now: str) -> str:
         return (
             "I think you've become a proper friend, honestly."
             if you
-            else f"I think {name}'s become a proper friend."
+            else f"I think {name} has become a proper friend."
         )
     if now == "strained":
         return f"Things have got a bit strained with {name}."
