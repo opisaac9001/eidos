@@ -854,6 +854,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "feeling_unwell": _feeling_unwell(history),
         **_tastes_context(history),
         "his_people": _his_people(history),
+        "people_he_says_hello_to": _around_town(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -894,6 +895,16 @@ def _his_people(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
         },
     }
     return his_people(history, names)
+
+
+def _around_town(history: Sequence[DomainEvent]) -> list[str]:
+    """Townsfolk he knows by name: the regulars he chats to, not yet close friends."""
+    from eidos.domain.townsfolk import project_townsfolk
+
+    known = sorted(project_townsfolk(history).acquaintances(), key=lambda item: item.last_seen_at)[
+        -8:
+    ]
+    return [f"{item.name}, {item.occupation}" for item in known if item.name]
 
 
 def _tastes_context(history: Sequence[DomainEvent]) -> dict[str, list[str]]:

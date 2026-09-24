@@ -158,3 +158,17 @@ def test_nobody_is_noticed_at_home_asleep_or_mid_conversation() -> None:
             )
             == []
         )
+
+
+def test_he_can_talk_about_the_people_he_knows_around_town(cafe_life) -> None:
+    from eidos.adapters.standin_gateway import _standin_people_reply
+    from eidos.application.selfhood import selfhood_context
+
+    early = [e for e in cafe_life if e.payload.get("simulated_at", "") < "2026-02-20"]
+    context = selfhood_context(early, START + timedelta(days=45))
+    hello = context["people_he_says_hello_to"]
+    assert hello and all(", " in item for item in hello)
+    reply = _standin_people_reply(
+        "who are your friends?", {"identity": {"selfhood": {**context, "his_people": []}}}
+    )
+    assert hello[-1].split(",")[0] in str(reply)

@@ -1643,6 +1643,30 @@ function render(next) {
         )
         .join("")
     : '<p class="muted">No neighborhood story is unfolding right now.</p>';
+  // Thousands live in town; only the people he has come across ever appear here.
+  const town = state.townsfolk || { population: 0, faces: [], known: [], faces_count: 0 };
+  $("townsfolk-section").hidden = !town.known.length && !town.faces.length;
+  $("townsfolk-note").textContent =
+    `${town.population.toLocaleString()} people live in town · ${town.faces_count} faces he'd recognise · ${town.known.length} he knows by name`;
+  const townBond = {
+    close: "one of his closest people",
+    friend: "a friend",
+    strained: "things are strained",
+    drifted: "drifted",
+    acquaintance: "someone he chats to",
+  };
+  $("townsfolk-known").innerHTML = town.known
+    .map(
+      (item) =>
+        `<article class="panel person-card"><div class="panel-kicker">${esc((townBond[item.bond] || item.bond).toUpperCase())}${item.resident ? " · PART OF HIS LIFE NOW" : ""}</div><h2>${esc(item.name)}</h2><p>${esc(item.occupation || "")}. ${esc(item.description[0].toUpperCase() + item.description.slice(1))}.</p><div class="person-foot"><span>Usually at ${esc(item.where)}</span><span>${item.chats} ${item.chats === 1 ? "chat" : "chats"}</span></div></article>`,
+    )
+    .join("");
+  $("townsfolk-faces").innerHTML = town.faces
+    .map(
+      (item) =>
+        `<li class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(item.description[0].toUpperCase() + item.description.slice(1))}</span><span class="moment-meta">${item.sightings > 1 ? `seen ${item.sightings} times · ` : ""}${esc(item.where)}</span></li>`,
+    )
+    .join("");
   // Ordinary viewers see his noticeboard; the operator sees the whole town's week.
   const whatsOn = (state.whats_on || []).filter((item) => operatorMode || item.known);
   $("whats-on-section").hidden = !whatsOn.length;

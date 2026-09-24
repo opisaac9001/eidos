@@ -7,12 +7,14 @@ from typing import Any
 from eidos.application.activity_execution import execution_context
 from eidos.application.ambient_population import ambient_population
 from eidos.application.attention import attention_state
+from eidos.application.bonds import current_bonds
 from eidos.application.catchup import active_catch_up
 from eidos.application.city_map import city_map
 from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.followups import project_followups
 from eidos.application.inner_life import active_dream_inspirations
+from eidos.application.latent_town import TOWN_POPULATION
 from eidos.application.life_context import mood_name, self_concept_context, vars_for
 from eidos.application.life_projections import LifeProjections
 from eidos.application.memory import memory_view
@@ -51,6 +53,7 @@ from eidos.domain.sleep import project_sleep_windows
 from eidos.domain.social import project_social
 from eidos.domain.social_preferences import project_social_preferences
 from eidos.domain.state import PathosState
+from eidos.domain.townsfolk import project_townsfolk
 from eidos.domain.traits import project_traits
 from eidos.domain.transfers import project_transfers
 from eidos.domain.world import ROLES
@@ -672,6 +675,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
             "minimum_interval_hours": outreach_config.minimum_interval_hours,
         },
         "city_map": city_map(history, catalog, state.location_id),
+        "townsfolk": _townsfolk_view(history, catalog),
         "whats_on": [
             {**item, "known": item["place_id"] in known_places}
             for item in whats_on(catalog, None, state.simulated_at, days=6)
@@ -812,4 +816,41 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
             "archived_memories": sum(item["archived"] for item in memories),
             "conversations": len(conversations),
         },
+    }
+
+
+def _townsfolk_view(history: list[DomainEvent], catalog: WorldCatalog) -> dict[str, Any]:
+    """The town's size, the faces he'd recognise, and the people he knows by name."""
+    state = project_townsfolk(history)
+    bonds = current_bonds(history)
+
+    def place(place_id: str) -> str:
+        return catalog.places[place_id].name if place_id in catalog.places else place_id
+
+    return {
+        "population": TOWN_POPULATION,
+        "faces": [
+            {
+                "description": item.description,
+                "sightings": item.sightings,
+                "last_seen": item.last_seen_at.isoformat(),
+                "where": place(item.last_place_id),
+            }
+            for item in sorted(state.faces(), key=lambda entry: entry.last_seen_at, reverse=True)
+        ][:24],
+        "faces_count": len(state.faces()),
+        "known": [
+            {
+                "name": item.name,
+                "occupation": item.occupation,
+                "description": item.description,
+                "chats": item.chats,
+                "where": place(item.places[0] if item.places else item.last_place_id),
+                "bond": bonds.get(item.townsfolk_id, "acquaintance"),
+                "resident": item.townsfolk_id in catalog.people,
+            }
+            for item in sorted(
+                state.acquaintances(), key=lambda entry: entry.last_seen_at, reverse=True
+            )
+        ],
     }

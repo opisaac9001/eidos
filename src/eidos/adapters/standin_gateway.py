@@ -1794,6 +1794,14 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
     friends = [str(item["person"]) for item in others if item.get("bond") == "friend"]
     strained = [str(item["person"]) for item in others if item.get("bond") == "strained"]
     if not close and not friends:
+        regulars = [
+            str(item).split(",")[0] for item in selfhood.get("people_he_says_hello_to", [])
+        ]
+        if regulars:
+            return (
+                f"No one I'd call close yet, honestly. There's {regulars[-1]}, who I keep "
+                "bumping into, and a few faces I nod to. It takes a while."
+            )
         return "I'm still finding my people round here, if I'm honest. It takes a while."
     reply = (
         f"{' and '.join(close)}, probably. That's the short answer."
