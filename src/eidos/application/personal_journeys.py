@@ -144,7 +144,7 @@ def journey_window_events(
     while points:
         at = min(points)
         points.remove(at)
-        visible = _timeline_events([*history, *output], at)
+        visible = _timeline_events([*history, *output] if output else history, at)
         state = replay_state(visible)
         index = _JOURNEY_KINDS(visible)
         active = _current_journey(index)

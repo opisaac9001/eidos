@@ -41,9 +41,9 @@ def mental_layer_events(
         and isinstance(event.payload.get("simulated_at"), str)
         and isinstance(event.payload.get("layer"), str)
     }
-    planning = project_planning(list(history))
+    planning = project_planning(history)
     previous_emotion = project_emotion(history)
-    concerns = active_concerns(list(history))
+    concerns = active_concerns(history)
     active_goals = [goal for goal in planning.goals.values() if goal.status == "active"]
     needs = {
         "rest": state.rest,
@@ -368,7 +368,7 @@ def _within_recent_hours(event: DomainEvent, at: datetime, hours: int) -> bool:
 
 def mind_context(history: Sequence[DomainEvent]) -> list[dict[str, object]]:
     mind = project_mind(history)
-    planning = project_planning(list(history))
+    planning = project_planning(history)
     return [
         {
             "layer": pulse.layer,

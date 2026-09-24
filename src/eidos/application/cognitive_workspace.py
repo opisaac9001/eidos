@@ -122,7 +122,7 @@ def cognitive_workspace(
         )
 
     # active_concerns already ignores events of other aggregates.
-    for concern in active_concerns(list(history)):
+    for concern in active_concerns(history):
         created_at = _event_time(concern)
         content = concern.payload.get("text")
         if created_at is None or created_at > simulated_at or not isinstance(content, str):

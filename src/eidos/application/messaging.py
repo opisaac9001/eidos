@@ -52,7 +52,7 @@ def communication_availability(
         return CommunicationAvailability(
             "interrupted" if interrupted else "occupied", "He is on a phone call.", False, False
         )
-    planning = project_planning(list(history))
+    planning = project_planning(history)
     upcoming_at, upcoming_title = _next_commitment(state, planning)
     minutes_until = (
         (upcoming_at - state.simulated_at).total_seconds() / 60 if upcoming_at is not None else None

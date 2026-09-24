@@ -36,7 +36,7 @@ def preview_catch_up(
 ) -> CatchUpPreview:
     _validate_hours(hours)
     ends_at = starts_at + timedelta(hours=hours)
-    planning = project_planning(list(history))
+    planning = project_planning(history)
     due = sum(
         item.status == "active" and starts_at < datetime.fromisoformat(item.due_at) <= ends_at
         for item in planning.commitments.values()

@@ -368,7 +368,7 @@ def _matching_resource(
     ).casefold()
     cue_terms = {word for word in cue.replace("_", " ").split() if len(word) > 3}
     candidates = []
-    for item in project_planning(list(history)).objects.values():
+    for item in project_planning(history).objects.values():
         if item.location_id != location_id or item.condition != "good":
             continue
         name_terms = {

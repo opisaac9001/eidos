@@ -109,7 +109,7 @@ def lived_activity_window(
         processed.add(at)
         crossing = [e for e in journeys if e.payload["simulated_at"] == at.isoformat()]
         output.extend(e for e in crossing if e.kind != "pathos.travel_started")
-        visible = _timeline_events([*history, *output], at)
+        visible = _timeline_events([*history, *output] if output else history, at)
         projected = project_planning(visible)
         state = _VISIBLE_STATE(visible)
         visitor_scene = next(

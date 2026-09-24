@@ -188,7 +188,7 @@ COMMUNITY_EVENT_PALETTE = (
 
 def community_resource_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
     """Register the finite physical resources used by the neighborhood rhythm."""
-    existing = project_planning(list(history)).objects
+    existing = project_planning(history).objects
     missing = [resource for resource in COMMUNITY_RESOURCES if resource[0] not in existing]
     if not missing:
         return []
@@ -237,7 +237,7 @@ def authored_community_schedule(
         for item in payload_candidates(history, "proposal_id", proposal_id)
     ):
         return []
-    resource = project_planning(list(history)).objects.get(resource_id)
+    resource = project_planning(history).objects.get(resource_id)
     if (
         resource is None
         or resource.location_id != location_id
@@ -342,7 +342,7 @@ def due_world_observations(
         }
         for event in events_of(history, "world_event.theme_linked")
     }
-    objects = project_planning(list(history)).objects
+    objects = project_planning(history).objects
     output: list[DomainEvent] = []
     for scheduled in events_of(history, "world_event.scheduled"):
         proposal_id = str(scheduled.payload["proposal_id"])

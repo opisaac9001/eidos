@@ -33,7 +33,7 @@ def recover_user_scene(
     scene = project_scenes(history).scenes.get(scene_id)
     if scene is None or scene.status != "paused":
         return []
-    planning = project_planning(list(history))
+    planning = project_planning(history)
     upcoming = min(
         (
             entry

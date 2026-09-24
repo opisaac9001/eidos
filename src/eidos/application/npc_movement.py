@@ -33,7 +33,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 },
             )
         )
-    state = project_npcs([*history, *output], now)
+    state = project_npcs([*history, *output] if output else history, now)
     catalog = project_world_catalog(history)
     workdays = _employer_workdays(history)
     appointments = _appointments_with_pathos(history)

@@ -49,7 +49,7 @@ def active_dream_inspirations(
     ]
 
 
-def active_concerns(events: list[DomainEvent]) -> list[DomainEvent]:
+def active_concerns(events: Sequence[DomainEvent]) -> list[DomainEvent]:
     concerns: dict[str, DomainEvent] = {}
     for event in events_of(events, "concern.opened", "concern.resolved", "concern.receded"):
         if event.aggregate_id != "pathos":

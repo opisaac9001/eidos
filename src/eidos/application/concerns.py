@@ -16,7 +16,7 @@ def concern_lifecycle_events(
     """Let recent lived setbacks become bounded concerns and later leave attention."""
     if simulated_at.utcoffset() is None:
         raise ValueError("Concern lifecycle time must be timezone-aware")
-    history = list(events)
+    history = events
     output: list[DomainEvent] = []
     active = active_concerns(history)
     for concern in active:
