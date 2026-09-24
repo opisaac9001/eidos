@@ -360,6 +360,9 @@ def _standin_pathos_text(
     cadence = str(voice.get("cadence", "steady"))
     if context.get("outreach_reason"):
         news = str(context.get("source_memory", last_memory))
+        if context.get("share_kind") == "ask":
+            about = news.split("He wanted to ask about ")[-1].rstrip(".")
+            return f"Been meaning to ask: how did {about} go? No rush."
         if context.get("share_kind") == "news":
             return (
                 f"Small bit of news: {news}",
@@ -372,6 +375,12 @@ def _standin_pathos_text(
     honest = _standin_nature_reply(message)
     if honest:
         return honest
+    raw_follow_ups = context.get("things_to_ask_you_about", [])
+    follow_ups = (
+        [str(item) for item in raw_follow_ups if item] if isinstance(raw_follow_ups, list) else []
+    )
+    if follow_ups and any(message.startswith(cue) for cue in _GREETINGS):
+        return f"Hey. Oh, how did {follow_ups[0]} go, by the way?"
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
@@ -779,6 +788,13 @@ class StandInGateway(ModelGateway):
             )[occurrence]
             return ModelResponse(
                 content=json.dumps(expansion),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "pathos_user_notes":
+            return ModelResponse(
+                content=json.dumps({"notes": _standin_user_notes(context)}),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",
@@ -2342,3 +2358,87 @@ def _standin_townsfolk(context: dict[str, Any]) -> dict[str, str]:
             f"{doing[(seed // 5) % len(doing)]}"
         )
     }
+
+
+_GREETINGS = ("hi", "hey", "hello", "morning", "evening", "afternoon", "yo", "how are you")
+_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _standin_days_until(lowered: str, time: str) -> int | None:
+    """Roughly when something mentioned is happening, so he can ask the day after."""
+    if "tonight" in lowered or "tomorrow" in lowered:
+        return 1
+    if "this weekend" in lowered:
+        return 3
+    if "next week" in lowered:
+        return 7
+    for index, day in enumerate(_WEEKDAYS):
+        if day in lowered:
+            try:
+                today = datetime.fromisoformat(time).weekday()
+            except ValueError:
+                return 4
+            return ((index - today) % 7 or 7) + 1
+    return None
+
+
+_TOPIC_WORDS = {
+    # Most specific first: the follow-up names the first match.
+    "work": ("interview", "promotion", "boss", "shift", "office", "job", "work"),
+    "study": ("exam", "essay", "course", "class", "uni", "college"),
+    "family": ("mum", "dad", "sister", "brother", "gran", "family", "kids", "son", "daughter"),
+    "pets": ("dog", "cat", "puppy", "kitten", "rabbit"),
+    "health": ("doctor", "dentist", "appointment", "ill", "sick", "hospital"),
+    "home": ("flat", "house", "moving", "landlord", "rent"),
+    "interests": ("guitar", "painting", "running", "football", "reading", "gaming", "cooking"),
+}
+_PERSON = (
+    (r"\bi'm\b", "you're"),
+    (r"\bi am\b", "you are"),
+    (r"\bi've\b", "you've"),
+    (r"\bi have\b", "you have"),
+    (r"\bi'll\b", "you'll"),
+    (r"\bi\b", "you"),
+    (r"\bmy\b", "your"),
+    (r"\bme\b", "you"),
+    (r"\bmyself\b", "yourself"),
+)
+
+
+def _standin_user_notes(context: dict[str, Any]) -> list[dict[str, object]]:
+    """A crude, honest note-taker: first-person sentences that mention something in a life."""
+    notes: list[dict[str, object]] = []
+    known = {str(item).casefold() for item in context.get("already_known", [])}
+    for message in context.get("todays_messages", []):
+        for sentence in re.split(r"(?<=[.!?])\s+", str(message)):
+            clean = sentence.strip()
+            lowered = clean.casefold()
+            if len(clean) < 12 or not re.match(r"^(i|i'm|i've|my)\b", lowered):
+                continue
+            topic = next(
+                (name for name, words in _TOPIC_WORDS.items() if any(w in lowered for w in words)),
+                None,
+            )
+            if topic is None:
+                continue
+            text = lowered.rstrip(".!?")
+            for pattern, replacement in _PERSON:
+                text = re.sub(pattern, replacement, text)
+            text = text[0].upper() + text[1:] + "."
+            if text.casefold() in known:
+                continue
+            days = _standin_days_until(lowered, str(context.get("time", "")))
+            notes.append(
+                {
+                    "topic": topic,
+                    "note": text[:160],
+                    "source_quote": clean.rstrip(".!?")[:200],
+                    "follow_up": f"the {next(w for w in _TOPIC_WORDS[topic] if w in lowered)}"
+                    if days is not None
+                    else "",
+                    "ask_after_days": days or 0,
+                }
+            )
+            if len(notes) >= 4:
+                return notes
+    return notes

@@ -158,6 +158,7 @@ from eidos.application.urgent_incidents import (
     active_incident_location,
     urgent_incident_events,
 )
+from eidos.application.user_notes import user_notes_events
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.wants import want_events
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
@@ -2176,6 +2177,8 @@ class Life(LifeConversation):
         history, pending, current = tick.history, tick.pending, tick.current
         daily_self = selfhood_daily_events(history + pending, current)
         pending.extend(daily_self)
+        if not self.authored_scenario:
+            pending.extend(await user_notes_events(history + pending, current, self.gateway))
         if not self.authored_scenario:
             pending.extend(
                 bond_events(

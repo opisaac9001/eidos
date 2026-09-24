@@ -1153,6 +1153,24 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // His own loose picture of your life, from what you've told him.
+  const aboutYou = self.about_you || { what_he_knows_about_you: [], things_to_ask_you_about: [] };
+  $("self-you").innerHTML =
+    (aboutYou.what_he_knows_about_you || [])
+      .slice()
+      .reverse()
+      .map(
+        (note) =>
+          `<div class="moment toward"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(note)}</span></div>`,
+      )
+      .join("") +
+      (aboutYou.things_to_ask_you_about || [])
+        .map(
+          (item) =>
+            `<div class="moment"><span class="moment-mark" aria-hidden="true">?</span><span class="moment-text">Meaning to ask how ${esc(item)} went</span></div>`,
+        )
+        .join("") ||
+    '<p class="empty-note">Nothing yet. He learns about your life from what you tell him.</p>';
   // Family is always there; what changes is how in touch he is and what he knows.
   const family = self.family || [];
   $("self-family").innerHTML = family

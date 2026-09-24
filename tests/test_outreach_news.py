@@ -79,3 +79,31 @@ def test_he_does_not_pile_on_when_his_last_message_is_unanswered() -> None:
         },
     )
     assert run([CONFIG, *talked(3), unanswered, loved()]) == []
+
+
+def test_a_close_friend_checks_in_about_something_you_mentioned() -> None:
+    note = DomainEvent(
+        "user.note_learned",
+        "pathos",
+        {
+            "note_id": "note-x",
+            "topic": "work",
+            "text": "You've got a job interview on Thursday.",
+            "follow_up": "the interview",
+            "ask_after_days": 2,
+            "simulated_at": (NOW - timedelta(days=4)).isoformat(),
+        },
+    )
+    friends = DomainEvent(
+        "bond.recognized",
+        "pathos",
+        {
+            "person_id": "user",
+            "bond": "friend",
+            "simulated_at": (NOW - timedelta(days=9)).isoformat(),
+        },
+    )
+    output = run([CONFIG, *talked(3), friends, note])
+    message = next(e for e in output if e.kind == "conversation.message")
+    assert "interview" in message.payload["text"]
+    assert run([CONFIG, *talked(3), note]) == []  # not a friend yet: no check-in

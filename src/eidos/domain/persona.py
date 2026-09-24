@@ -13,6 +13,7 @@ PERSONAL_ROLES = frozenset(
         "pathos_agency",
         "pathos_project",
         "pathos_selfhood",
+        "pathos_user_notes",
     }
 )
 

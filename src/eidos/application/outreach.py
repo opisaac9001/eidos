@@ -72,10 +72,20 @@ async def outreach_events(
         None,
     )
     news = _news_to_share(history, simulated_at, messages) if source is None else None
-    if source is None and news is None:
+    asking = (
+        _follow_up_to_ask(history, simulated_at, messages)
+        if source is None and news is None
+        else None
+    )
+    if source is None and news is None and asking is None:
         return []
     if news is not None:
         return await _share_news(history, simulated_at, gateway, context, messages, *news)
+    if asking is not None:
+        note_event, about = asking
+        return await _share_news(
+            history, simulated_at, gateway, context, messages, note_event, about, share_kind="ask"
+        )
     assert source is not None
     request_id = f"outreach-{source.event_id}"
     if any(
@@ -253,6 +263,29 @@ def _news_to_share(
     return None
 
 
+def _follow_up_to_ask(
+    history: Sequence[DomainEvent], simulated_at: datetime, messages: Sequence[DomainEvent]
+) -> tuple[DomainEvent, str] | None:
+    """Something in your life he's been meaning to ask about, a day or more after it was due."""
+    from eidos.application.bonds import FRIENDLY, current_bonds
+    from eidos.application.user_notes import things_to_ask
+
+    if current_bonds(history).get("user") not in FRIENDLY:
+        return None
+    if messages and str(messages[-1].payload.get("request_id", "")).startswith("outreach"):
+        return None
+    if any(
+        event.payload.get("kind") == "news" and simulated_at - _event_time(event) < NEWS_COOLDOWN
+        for event in events_of(history, "outreach.considered")
+    ):
+        return None
+    learned = {str(e.payload.get("note_id")): e for e in events_of(history, "user.note_learned")}
+    for note in things_to_ask(history, simulated_at):
+        if simulated_at - note.ask_from >= timedelta(days=1) and note.note_id in learned:
+            return learned[note.note_id], f"{note.text} He wanted to ask about {note.follow_up}."
+    return None
+
+
 async def _share_news(
     history: Sequence[DomainEvent],
     simulated_at: datetime,
@@ -261,8 +294,10 @@ async def _share_news(
     messages: Sequence[DomainEvent],
     news: DomainEvent,
     text_of_news: str,
+    *,
+    share_kind: str = "news",
 ) -> list[DomainEvent]:
-    request_id = f"outreach-news-{news.event_id}"
+    request_id = f"outreach-{share_kind}-{news.event_id}"
     if any(
         event.payload.get("request_id") == request_id
         for event in events_of(history, "outreach.considered")
@@ -274,6 +309,7 @@ async def _share_news(
         {
             "request_id": request_id,
             "kind": "news",
+            "share_kind": share_kind,
             "source_event_id": str(news.event_id),
             "simulated_at": simulated_at.isoformat(),
             "channel": "in_app_only",
@@ -285,13 +321,20 @@ async def _share_news(
     model_context = {
         **dict(context),
         "message": "",
-        "share_kind": "news",
+        "share_kind": share_kind,
         "outreach_reason": (
             "Something just happened in his life (source_memory). Decide whether he would "
             "actually want to tell the user about it, the way a friend shares ordinary news. "
             "If not, return exactly [KEEP_PRIVATE] as the text. Otherwise write only the short, "
             "natural message he would send. Tell it as his own news; don't ask for anything, "
             "don't claim the user is absent or owes a reply, and don't repeat recent_dialogue."
+        )
+        if share_kind == "news"
+        else (
+            "Something in the user's life was coming up (source_memory), and he has been meaning "
+            "to ask how it went. Decide whether a friend would drop them a short message to "
+            "ask. If not, return exactly [KEEP_PRIVATE]. Otherwise write only a short, warm "
+            "message asking, without pressure and without assuming how it went."
         ),
         "source_memory": text_of_news,
         "recent_dialogue": [

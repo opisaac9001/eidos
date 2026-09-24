@@ -22,6 +22,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from eidos.application.family import family_context
+from eidos.application.user_notes import user_knowledge_context
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -1015,6 +1016,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "feeling_unwell": _feeling_unwell(history),
         "his_people": _his_people(history, simulated_at),
         "family": family_context(history, simulated_at),
+        "about_you": user_knowledge_context(history, simulated_at),
         "tastes": [
             {
                 "label": item.label,

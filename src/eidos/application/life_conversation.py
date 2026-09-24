@@ -25,6 +25,7 @@ from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.user_notes import asked_about_events, user_knowledge_context
 from eidos.domain.conversation_time import reply_pacing
 from eidos.domain.emotions import emotional_planning_bias, emotional_speech_bias, project_emotion
 from eidos.domain.events import DomainEvent
@@ -554,6 +555,7 @@ class LifeConversation(LifeProjections):
                 for item in project_social_preferences(history + pending).values()
                 if item.person_id == "user"
             ],
+            **user_knowledge_context(history, state.simulated_at),
             "relationship_repairs": [
                 {
                     **vars_for(item),
@@ -592,6 +594,7 @@ class LifeConversation(LifeProjections):
             pending.extend(
                 self._reply_events(incoming, text, reply, reply_voice, request_id, state)
             )
+            pending.extend(asked_about_events(history, state.simulated_at, reply))
         else:
             pending.append(
                 DomainEvent(
