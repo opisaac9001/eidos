@@ -62,7 +62,12 @@ from eidos.application.family_visits import family_visit_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
-from eidos.application.friends_lives import away_people, busy_people, friend_life_events
+from eidos.application.friends_lives import (
+    away_people,
+    busy_people,
+    friend_life_events,
+    friends_lives,
+)
 from eidos.application.friendship import friendships
 from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
 from eidos.application.home_move import home_move_events
@@ -168,6 +173,7 @@ from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
+from eidos.application.surfacing import surfacing_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.townsfolk import (
@@ -624,6 +630,7 @@ class Life(LifeConversation):
             self._phase_course(tick)
             self._phase_falling_out(tick)
             self._phase_in_jokes(tick)
+            self._phase_surfacing(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1576,6 +1583,38 @@ class Life(LifeConversation):
                 in_romance_with=arc[0] if arc else None,
             ),
             self._planning,
+        )
+
+    def _phase_surfacing(self, tick: _Tick) -> None:
+        """A place, an anniversary or an absence brings something back."""
+        if self.authored_scenario or not tick.state.awake:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        lives = friends_lives(history + pending)
+        away = {
+            person: str(life.moving_to)
+            for person, life in lives.people.items()
+            if life.moved_away and life.moving_to
+        }
+        self._extend_warmed(
+            tick,
+            surfacing_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                place_names={place.place_id: place.name for place in catalog.places.values()},
+                names=advice_names(history + pending) if away and current.hour == 19 else {},
+                away=away,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                    if person in away
+                }
+                if away
+                else {},
+            ),
         )
 
     def _phase_in_jokes(self, tick: _Tick) -> None:

@@ -511,6 +511,13 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind == "memory.surfaced":
+        lift = event.payload.get("lift")
+        if event.payload.get("trigger") == "missing":
+            return ("connection", -0.02, -0.1, 0.2, 0.5)
+        if isinstance(lift, (int, float)) and not isinstance(lift, bool) and lift:
+            return ("affect", 0.0, float(lift), 0.2, 0.4)
+        return None
     if event.kind == "friend.falling_out":
         return {
             "fell_out": ("connection", -0.05, -0.45, 0.5, 0.35),

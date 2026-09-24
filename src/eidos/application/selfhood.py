@@ -28,6 +28,7 @@ from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
 from eidos.application.spending import money_context
+from eidos.application.surfacing import lately_on_his_mind
 from eidos.application.user_notes import user_knowledge_context
 from eidos.application.work_arc import work_context
 from eidos.domain.events import DomainEvent
@@ -866,6 +867,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
         "running_jokes": _running_jokes(history),
+        "came_back_to_him_lately": lately_on_his_mind(history, simulated_at),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),

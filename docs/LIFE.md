@@ -101,6 +101,19 @@ he took your advice.
   both laugh, give it a label and quote it (`running_joke`). The conversation context
   carries `running_jokes_with_you`, so he can call back to them.
 
+## Memories that come back (`application/surfacing.py`)
+
+He remembers when something sets it off, not only when asked. There are three triggers:
+
+- **A place:** a place where something that mattered happened (importance 0.6+, over a month
+  ago) can bring it back while he's there.
+- **An anniversary:** a year (or two, or three) to the day since something important, he
+  remembers it in the evening.
+- **Missing someone:** now and then he misses a close friend who has moved away.
+
+At most one memory comes back a day, and the same one not again for three months. The self-
+context shows what's come back to him in the last few days (`came_back_to_him_lately`).
+
 ## Books, series, music (`application/media.py`)
 
 He is usually partway through a book (a chapter before bed), a series (an episode on a free
