@@ -95,6 +95,12 @@ at.
   much craft, money and free time matter to who he has become.
 - **After a year, if Ellis is a close friend,** Ellis asks whether he'd ever think about
   taking the workshop on.
+- **A month later he answers**, depending on how much craft and independence matter to
+  him, how close he is to Ellis, and whether money is too tight to risk it.
+  - **Yes:** Ellis writes a plan on the back of an invoice. Four months later Patrick is
+    running things day to day: five days a week at £13.50 an hour. About ten months
+    after that he gets the keys (£15 an hour). Ellis still pops in.
+  - **No:** Ellis takes on an apprentice, and Patrick is the one teaching him.
 
 ## Everyday money (`application/spending.py`)
 

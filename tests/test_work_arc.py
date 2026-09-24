@@ -101,3 +101,38 @@ def test_after_a_year_and_a_real_friendship_ellis_asks_about_the_future() -> Non
     future = run(history, day, ellis_bond="close")
     assert future[0].payload["step"] == "future"
     assert "taking the workshop on" in future[0].payload["text"]
+
+
+def career(values, balance=100_000, days=1000) -> list[DomainEvent]:
+    history = worked(days)
+    for day in range(90, days):
+        if (START + timedelta(days=day)).weekday() in (0, 1, 3, 4):
+            history += run(
+                history, day, values=values, balance_pence=balance, ellis_bond="closest"
+            )
+    return history
+
+
+def steps(history) -> list[str]:
+    return [e.payload["step"] for e in history if e.kind == "work.arc_step"]
+
+
+def test_saying_yes_means_ellis_hands_the_workshop_over() -> None:
+    history = career({**VALUES, "craft": 0.9, "autonomy": 0.8})
+    assert steps(history)[:4] == ["raise", "extra_day", "future", "answer"]
+    assert steps(history)[4:] == ["handover_plan", "running", "keys"]
+    weekdays, wage = current_terms(history)
+    assert weekdays == frozenset({0, 1, 2, 3, 4}) and wage == 1_500
+    keys = next(e for e in history if e.payload.get("step") == "keys")
+    answer = next(e for e in history if e.payload.get("step") == "answer")
+    gap = datetime.fromisoformat(keys.payload["simulated_at"]) - datetime.fromisoformat(
+        answer.payload["simulated_at"]
+    )
+    assert timedelta(days=400) <= gap <= timedelta(days=500)
+
+
+def test_saying_no_means_someone_else_learns_from_him() -> None:
+    history = career({**VALUES, "craft": 0.5, "autonomy": 0.4}, balance=20_000)
+    assert "answer" in steps(history)
+    assert steps(history)[-1] == "apprentice"
+    assert "keys" not in steps(history)

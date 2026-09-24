@@ -2051,6 +2051,22 @@ def _standin_work_reply(message: str, context: dict[str, object], cadence: str) 
     )
     if friction:
         return f"Bit tense, honestly. {friction} We'll sort it, I think."
+    work = selfhood.get("work") if isinstance(selfhood, dict) else None
+    job = str(work.get("job", "")) if isinstance(work, dict) else ""
+    days = work.get("days_a_week") if isinstance(work, dict) else None
+    spoken_days = {3: "Three", 4: "Four", 5: "Five"}.get(
+        days if isinstance(days, int) else 4, "Four"
+    )
+    if job.startswith("running the repair workshop;"):
+        return (
+            "It's mine now, more or less. Ellis gave me the keys. His name's still over the "
+            "door and he still pops in to tell me I'm doing it wrong. I love it, honestly."
+        )
+    if job.startswith("running"):
+        return (
+            "Busy. I'm running the workshop day to day now while Ellis eases off. Every "
+            "problem comes to me first, which is terrifying and quite good."
+        )
     budget = context.get("time_budget")
     next_plan = budget.get("next_plan") if isinstance(budget, dict) else None
     ongoing = context.get("ongoing_activities")
@@ -2064,12 +2080,12 @@ def _standin_work_reply(message: str, context: dict[str, object], cadence: str) 
         return (
             "It's steady. I'm in with Ellis again shortly, so I can't be long."
             if cadence == "clipped"
-            else "It's good, mostly. Steady. I'm in with Ellis again shortly. Four days a week of "
-            "repairs; some of it's fiddly, but I like finishing things properly."
+            else f"It's good, mostly. Steady. I'm in with Ellis again shortly. {spoken_days} days "
+            "a week of repairs; some of it's fiddly, but I like finishing things properly."
         )
     return (
-        "It's alright. Four days a week helping Ellis at the repair workshop. Not glamorous, "
-        "but I like seeing something broken leave working."
+        f"It's alright. {spoken_days} days a week helping Ellis at the repair workshop. Not "
+        "glamorous, but I like seeing something broken leave working."
     )
 
 
