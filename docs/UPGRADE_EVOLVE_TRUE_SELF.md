@@ -56,6 +56,9 @@ Only ever advance the **copy**.
 | What he knows about you | Each evening you talked, he may note things about your life, quoting your own words (`pathos_user_notes`, routed like `reflection` unless given its own route), and asks how they went. |
 | Books, series, music | He is usually partway through a book, a series and an album, with opinions when he finishes (or gives up). |
 | Seasons | Winter darkness weighs a little, summer evenings lift. Bank holidays and Christmas close the workshop. The clocks change. Moments of the year and anniversaries of his own life are remembered. |
+| Falling short | He sometimes puts off his own plans on flat days, has late nights on his phone, and can snap at someone when exhausted (and apologise). |
+| Work | Shifts now record their wage. A raise after three months, a fifth-day offer later (taken or not), and after a year a question about the workshop's future. |
+| Romance | Rare and slow; never involving you, his boss or family. See `docs/LIFE.md`. |
 | Memories | An hour that simply continues a planned activity is now remembered with low importance, so recall surfaces moments that stood out. |
 | Shifts | Talking with Ellis during a shift no longer pauses the work, and a chat in the last hour of a long stint no longer leaves it unfinished. Expect far fewer "left the bench half-done" clashes. |
 

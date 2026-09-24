@@ -1157,6 +1157,26 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // The job and where it's going, his love life, and the habits he'd like to change.
+  const work = self.work || {};
+  const love = self.love_life;
+  const lifeRows = [
+    work.job
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Work: ${esc(work.job)}<small>${esc(work.days_a_week)} days a week · ${esc(work.hourly_wage)} an hour${work.since ? ` · since ${esc(date(work.since))}` : ""}</small></span></div>`
+      : "",
+    ...(work.where_its_going || []).map(
+      (text) =>
+        `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(text)}</span></div>`,
+    ),
+    love
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">♥</span><span class="moment-text">${esc(love.who)}<small>${esc(love.stage)}</small></span><span class="moment-meta">since ${esc(date(love.since))}</span></div>`
+      : '<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">No one at the moment</span></div>',
+    ...(self.patterns_he_would_like_to_change || []).map(
+      (text) =>
+        `<div class="moment away"><span class="moment-mark" aria-hidden="true">~</span><span class="moment-text">Would like to change: ${esc(text)}</span></div>`,
+    ),
+  ];
+  $("self-life").innerHTML = lifeRows.join("");
   // Whatever he's partway through, and what he made of the last few.
   const media = self.reading_watching_listening || { currently: [], recently_finished: [] };
   const verb = { book: "Reading", series: "Watching", album: "Listening to" };

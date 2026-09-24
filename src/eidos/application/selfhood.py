@@ -1041,6 +1041,9 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "his_people": _his_people(history, simulated_at),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
+        "work": work_context(history),
+        "love_life": _love_life(history),
+        "patterns_he_would_like_to_change": imperfection_context(history, simulated_at),
         "about_you": user_knowledge_context(history, simulated_at),
         "tastes": [
             {
