@@ -151,31 +151,63 @@ history. Loving something is lived evidence for its value. Tastes reach:
 
 ### 9. His people
 
-Relationship numbers (trust, familiarity, tension) move a little with every encounter,
-kindness and clash, but a person doesn't experience numbers. At the 20:00 review he may
-notice one change a day in who his people are (`bond.recognized`), and it leaves a memory
-in his words:
+Friendship follows the twelve-level view in
+[12 Levels of Friendship](https://sparkjoyandflow.substack.com/p/12-levels-of-friendship-and-why-it)
+(Spark Joy and Flow). Most friendships sit at level five or below, deep ones are built by
+what people go through together, and a deep friendship doesn't need constant upkeep.
+(`application/friendship.py`)
 
-- **a proper friend**: warmth (mostly familiarity, partly trust, minus tension) of 0.5 or
-  more;
-- **one of his closest people**: warmth of 0.72 or more *and* trust of 0.45 or more;
-  closeness needs trust, not just time spent together;
-- **things are strained**: tension of 0.35 or more;
-- **drifted**: warmth has fallen away.
+| Levels | Tier | What he calls them | Needs keeping up? |
+|---|---|---|---|
+| 1-3 | everyday | a familiar face, easy company, someone to chat with | fades after about two weeks apart |
+| 4-5 | real connection | a friend to hang out with, a friend who cares | fades slowly after about six weeks without contact, never below 3 |
+| 6-8 | deepening | someone he can rely on, a true friend, an effortless friend | **no**: absence never erodes it |
+| 9-12 | soul-level | someone who knows him deeply, a confidant, the first person he'd call, inseparable | **no** |
 
-A bond is not lost the moment it dips just below where it formed.
+**How depth is earned.** Depth is separate from recency. It grows from shared moments, and
+each level is harder to reach than the last:
 
-The person talking with him through the app is one of his people too. That bond is
-measured from the days you have actually talked:
+| Moment | Weight |
+|---|---|
+| a passing encounter or scene | 0.05–0.1 |
+| a follow-up, a call, shared use of something | 0.1–0.15 |
+| planned time together or a visit | 0.3 |
+| going through an incident together, clearing the air, repairing a rift | 0.5–0.6 |
 
-- **a friend**: five or more days over at least two weeks;
-- **one of his closest people**: fifteen or more days over at least six weeks, and a
-  conversation within the last fortnight;
-- **drifted**: three weeks of silence, after which he notices.
+A single day counts for at most 0.5, and after a year a real friendship also gains a little
+from the years. A friendship without any hard moments shared tops out at level five, and
+the higher levels also need time:
 
-Growing closer to someone is lived evidence of care. `his_people` reaches his
-self-context, so when asked "are we friends?" he answers only as close as he has come to
-feel. The Becoming view lists his people. (`application/bonds.py`)
+| To reach | Needs about |
+|---|---|
+| level 7 | two months |
+| level 8 | four months |
+| level 9 | six months and three moments gone through together |
+| level 10 | a year |
+| levels 11-12 | two years |
+
+**What he notices** (`application/bonds.py`), at the 20:00 review and only one thing a day:
+
+- someone has become a friend (4), someone he can count on (6), or one of his closest
+  people (9). How close someone is isn't re-decided more than every three weeks;
+- a lighter friendship has drifted ("No falling out, just life");
+- things have got strained, or feel right again. Strain is a passing state that never
+  costs levels;
+- he hasn't seen a close friend in about N weeks ("It'll be like no time has passed when
+  we do");
+- the reunion ("Picked up right where we left off").
+
+The friendship-drift setback (care −1) now only applies to real-connection friendships
+after six weeks apart; acquaintances fade without anyone minding.
+
+**You.** The person talking with him is one of his people by the same rules. Each day you
+talk is a shared moment, and a long conversation (six or more messages) counts as going
+through something together. A close friend who goes quiet for a month is still a close
+friend: he notes that it's been a while and hopes you're alright, without pressure.
+
+Growing closer is lived evidence of care. `his_people`, with each person's level, any
+strain and time apart, reaches his self-context and the Becoming view, so "are we
+friends?" is answered only as close as he has come to feel.
 
 ## What performers see
 
