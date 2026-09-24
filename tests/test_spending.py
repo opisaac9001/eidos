@@ -1,11 +1,13 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
+from eidos.adapters.standin_gateway import _standin_money_reply
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.spending import (
     CHRISTMAS_FARE_PENCE,
     PHONE_BILL_PENCE,
     RESERVE_PENCE,
+    money_context,
     spending_events,
     spending_view,
 )
@@ -125,3 +127,19 @@ class SpendingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MoneyTalkTests(unittest.TestCase):
+    def test_he_knows_how_money_feels_and_where_it_goes(self):
+        when = at(1, 10, 11)
+        account = financial_foundation_events([], when)
+        spends = spend(account, when)
+        money = financial_consequence_events([*account, *spends], project_finances(account), when)
+        context = money_context([*account, *spends, *money], when)
+        self.assertIn(context["how_it_feels"], {"tight", "careful", "comfortable"})
+        self.assertTrue(context["where_it_goes_lately"][0].startswith("bits and bobs"))
+        reply = _standin_money_reply(
+            "how's money at the moment?", {"identity": {"selfhood": {"money": context}}}
+        )
+        self.assertIn("bits and bobs", reply)
+        self.assertIsNone(_standin_money_reply("how was your day?", {}))

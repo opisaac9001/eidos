@@ -399,6 +399,9 @@ def _standin_pathos_text(
     tastes = _standin_tastes_reply(message, context)
     if tastes:
         return tastes
+    money = _standin_money_reply(message, context)
+    if money:
+        return money
     work = _standin_work_reply(message, context, cadence)
     if work:
         return work
@@ -1991,6 +1994,30 @@ def _standin_tastes_reply(message: str, context: dict[str, object]) -> str | Non
     elif not_for_him:
         reply += f" Not {not_for_him[-1]}, though. Tried it, not me."
     return reply
+
+
+_MONEY_CUES = re.compile(r"\b(money|skint|broke|afford|savings|saving up|bills|rent|cash)\b")
+
+
+def _standin_money_reply(message: str, context: dict[str, object]) -> str | None:
+    """Money as he'd put it: how it feels, and where it seems to go."""
+    if not _MONEY_CUES.search(message):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    money = selfhood.get("money") if isinstance(selfhood, dict) else None
+    if not isinstance(money, dict) or not money:
+        return "Getting by. Rent goes out, wages come in, and I try not to look too closely."
+    feels = money.get("how_it_feels")
+    opening = {
+        "tight": "Tight, honestly. I'm watching every quid until payday.",
+        "careful": "Alright, if I'm careful. There's a bit put by, not a lot.",
+        "comfortable": "Better than it's been. I've managed to put some away, which is new.",
+    }.get(str(feels), "Getting by.")
+    going = money.get("where_it_goes_lately")
+    if isinstance(going, list) and going:
+        return f"{opening} Where it goes, mostly: {going[0]}. It all adds up."
+    return opening
 
 
 _WORK_CUES = ("work", "job", "workshop", "shift", "ellis")

@@ -134,7 +134,7 @@ These systems are described in their own documents:
 ## Where it shows
 
 - **Self-context** (voice, reflection, dreams, planning): `family`, `people_he_says_hello_to`,
-  `reading_watching_listening`, `time_of_year`, `patterns_he_would_like_to_change`, `work`,
+  `reading_watching_listening`, `time_of_year`, `patterns_he_would_like_to_change`, `work`, `money`,
   `love_life`. The conversation context also gets `what_he_knows_about_you` and
   `things_to_ask_you_about`.
 - **The Becoming view:** panels for his people, his family, what he knows about you,

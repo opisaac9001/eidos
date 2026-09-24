@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 from hashlib import sha256
 from typing import Sequence
 
+from eidos.application.economy import WEEKLY_HOUSING_PENCE
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -258,3 +259,31 @@ def spending_view(history: Sequence[DomainEvent], at: datetime) -> dict[str, int
 def _roll(*parts: object) -> float:
     digest = sha256(":".join(str(part) for part in parts).encode()).digest()
     return int.from_bytes(digest[:8], "big") / 2**64
+
+
+_PLAIN = {
+    "everyday": "bits and bobs",
+    "bills": "bills",
+    "going_out": "going out",
+    "gifts": "presents",
+    "travel": "travel",
+}
+
+
+def money_context(history: Sequence[DomainEvent], at: datetime) -> dict[str, object]:
+    """How money feels to him, in his terms rather than the ledger's."""
+    latest = events_of(history, "finance.transaction_recorded")[-1:]
+    if not latest:
+        return {}
+    balance = int(latest[0].payload["balance_pence"])
+    weeks = balance / WEEKLY_HOUSING_PENCE
+    feels = "tight" if weeks < 2 else "careful" if weeks < 8 else "comfortable"
+    lately = sorted(spending_view(history, at).items(), key=lambda item: -item[1])
+    return {
+        "how_it_feels": feels,
+        "savings": f"about £{round(balance / 100, -1):.0f}",
+        "where_it_goes_lately": [
+            f"{_PLAIN.get(category, category)}, about £{pence / 100:.0f} in the last month"
+            for category, pence in lately[:3]
+        ],
+    }
