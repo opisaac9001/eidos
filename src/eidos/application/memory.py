@@ -84,6 +84,43 @@ class RecalledMemory:
     emotional_intensity: float
 
 
+_NO_IDS: frozenset[UUID] = frozenset()
+
+
+class _Postings:
+    """Memory ids by key while an index is built, refrozen only where they changed.
+
+    Extending an index hour after hour used to thaw and refreeze every term's ids.
+    Keys keep their original order and new keys follow in the order first seen.
+    """
+
+    __slots__ = ("_frozen", "_thawed")
+
+    def __init__(self, frozen: dict[str, frozenset[UUID]], thawed: dict[str, set[UUID]]) -> None:
+        self._frozen = frozen
+        self._thawed = thawed
+
+    @classmethod
+    def extending(cls, frozen: Mapping[str, frozenset[UUID]]) -> _Postings:
+        return cls(dict(frozen), {})
+
+    @classmethod
+    def thawed(cls, values: dict[str, set[UUID]]) -> _Postings:
+        return cls(dict.fromkeys(values, _NO_IDS), values)
+
+    def add(self, key: str, memory_id: UUID) -> None:
+        ids = self._thawed.get(key)
+        if ids is None:
+            ids = self._thawed[key] = set(self._frozen.get(key, _NO_IDS))
+            self._frozen.setdefault(key, _NO_IDS)
+        ids.add(memory_id)
+
+    def freeze(self) -> Mapping[str, frozenset[UUID]]:
+        for key, ids in self._thawed.items():
+            self._frozen[key] = frozenset(ids)
+        return MappingProxyType(self._frozen)
+
+
 @dataclass(frozen=True, slots=True)
 class MemoryIndex:
     """Replay-safe indexes derived only from actor-owned memory events."""
@@ -115,30 +152,28 @@ class MemoryIndex:
             raise ValueError("Materialized memory revision is outside the supplied history")
         memories: list[DomainEvent]
         term_sets: dict[UUID, frozenset[str]]
-        terms_map: dict[str, set[UUID]]
-        entities_map: dict[str, set[UUID]]
-        goals_map: dict[str, set[UUID]]
-        relationships_map: dict[str, set[UUID]]
+        terms_map: _Postings
+        entities_map: _Postings
+        goals_map: _Postings
+        relationships_map: _Postings
         accesses: dict[UUID, int]
         reminders: dict[UUID, int]
         if base_index is not None:
             memories = list(base_index.memories)
             term_sets = dict(base_index.terms_by_memory)
-            terms_map = {key: set(values) for key, values in base_index.by_term.items()}
-            entities_map = {key: set(values) for key, values in base_index.by_entity.items()}
-            goals_map = {key: set(values) for key, values in base_index.by_goal.items()}
-            relationships_map = {
-                key: set(values) for key, values in base_index.by_relationship.items()
-            }
+            terms_map = _Postings.extending(base_index.by_term)
+            entities_map = _Postings.extending(base_index.by_entity)
+            goals_map = _Postings.extending(base_index.by_goal)
+            relationships_map = _Postings.extending(base_index.by_relationship)
             accesses = dict(base_index.access_counts)
             reminders = dict(base_index.reminder_counts)
         elif materialized_state is None:
             memories = []
             term_sets = {}
-            terms_map = {}
-            entities_map = {}
-            goals_map = {}
-            relationships_map = {}
+            terms_map = _Postings.thawed({})
+            entities_map = _Postings.thawed({})
+            goals_map = _Postings.thawed({})
+            relationships_map = _Postings.thawed({})
             accesses = {}
             reminders = {}
             materialized_revision = 0
@@ -146,15 +181,20 @@ class MemoryIndex:
             (
                 memories,
                 term_sets,
-                terms_map,
-                entities_map,
-                goals_map,
-                relationships_map,
+                restored_terms,
+                restored_entities,
+                restored_goals,
+                restored_relationships,
                 accesses,
                 reminders,
             ) = cls._restore(history, materialized_state, materialized_revision)
+            terms_map = _Postings.thawed(restored_terms)
+            entities_map = _Postings.thawed(restored_entities)
+            goals_map = _Postings.thawed(restored_goals)
+            relationships_map = _Postings.thawed(restored_relationships)
 
-        known_memory_ids = {event.event_id for event in memories}
+        # Every memory has its terms recorded, so these are the known memories.
+        known_memory_ids = set(term_sets)
         for event in history[materialized_revision:]:
             if event.kind == "memory.accessed":
                 try:
@@ -181,41 +221,29 @@ class MemoryIndex:
             memory_terms = frozenset(terms(str(event.payload["text"])))
             term_sets[event.event_id] = memory_terms
             for term in memory_terms:
-                terms_map.setdefault(term, set()).add(event.event_id)
+                terms_map.add(term, event.event_id)
             for key, value in event.payload.items():
                 if (
                     key.endswith("_id")
                     and key not in {"source_event_id", "memory_id"}
                     and isinstance(value, str)
                 ):
-                    entities_map.setdefault(value, set()).add(event.event_id)
+                    entities_map.add(value, event.event_id)
             goal_id = event.payload.get("goal_id")
             if isinstance(goal_id, str):
-                goals_map.setdefault(goal_id, set()).add(event.event_id)
+                goals_map.add(goal_id, event.event_id)
             person_id = event.payload.get("person_id")
             if isinstance(person_id, str):
-                relationships_map.setdefault(person_id, set()).add(event.event_id)
+                relationships_map.add(person_id, event.event_id)
 
-        def freeze(values: dict[str, set[UUID]]) -> Mapping[str, frozenset[UUID]]:
-            return MappingProxyType({key: frozenset(ids) for key, ids in values.items()})
-
-        accesses = {
-            memory_id: count
-            for memory_id, count in accesses.items()
-            if memory_id in known_memory_ids
-        }
-        reminders = {
-            memory_id: count
-            for memory_id, count in reminders.items()
-            if memory_id in known_memory_ids
-        }
+        # Counts are only ever kept for known memories, and memories are never forgotten.
         return cls(
             tuple(memories),
             MappingProxyType(term_sets),
-            freeze(terms_map),
-            freeze(entities_map),
-            freeze(goals_map),
-            freeze(relationships_map),
+            terms_map.freeze(),
+            entities_map.freeze(),
+            goals_map.freeze(),
+            relationships_map.freeze(),
             MappingProxyType(accesses),
             MappingProxyType(reminders),
             len(history),
@@ -386,15 +414,16 @@ def recall(
     index = index or MemoryIndex.build(history)
     if index.revision != len(history):
         raise ValueError("Memory index revision does not match supplied history")
-    ranked = []
+    ranked: list[_Ranked] = []
     archived = archived_memory_ids(history)
     recollections = project_recollections(history).latest
     current_affect, emotional_tones, emotional_tags = _affective_context(
         history, now, recollections
     )
     for event in index.memories:
+        memory_id = str(event.event_id)
         importance, source_confidence = _metadata(event)
-        subjective = recollections.get(str(event.event_id))
+        subjective = recollections.get(memory_id)
         felt_confidence = subjective.confidence if subjective is not None else source_confidence
         remembered_person_id = (
             subjective.remembered_person_id
@@ -453,12 +482,9 @@ def recall(
         relationship_relevance = min(
             1.0, len(matched_relationships) / max(1, len(relationship_ids))
         )
-        emotional_tone = emotional_tones.get(str(event.event_id), 0.0)
-        encoded_valence, encoded_arousal, emotional_label, emotional_intensity = emotional_tags.get(
-            str(event.event_id), (0.0, 0.35, "quiet", 0.0)
-        )
+        emotional_tone = emotional_tones.get(memory_id, 0.0)
         mood_congruence = 0.04 * current_affect * emotional_tone
-        is_archived = str(event.event_id) in archived
+        is_archived = memory_id in archived
         has_direct_cue = bool(
             matched_terms or matched_entities or matched_goals or matched_relationships
         )
@@ -475,6 +501,69 @@ def recall(
             "mood_congruence": mood_congruence,
         }
         score = sum(components.values())
+        ranked.append(
+            _Ranked(
+                round(score, 4),
+                remembered_at,
+                memory_id,
+                event,
+                accessibility,
+                relevance,
+                matched_terms,
+                matched_entities,
+                matched_goals,
+                matched_relationships,
+                components,
+                importance,
+                age_days,
+                rehearsals,
+                reminders,
+                mood_congruence,
+                subjective,
+                felt_confidence,
+                source_confidence,
+                remembered_person_id,
+                remembered_location_id,
+            )
+        )
+    # Only the memories returned are rendered; ranking needs just the scores.
+    ranked.sort(key=lambda item: (item.score, item.remembered_at, item.memory_id), reverse=True)
+    chosen = _diversify(ranked, limit) if diverse else ranked[:limit]
+    return [item.recalled(index, emotional_tags) for item in chosen]
+
+
+class _Ranked(NamedTuple):
+    """A memory's recall score and what its RecalledMemory is rendered from."""
+
+    score: float
+    remembered_at: datetime
+    memory_id: str
+    event: DomainEvent
+    accessibility: float
+    relevance: float
+    matched_terms: tuple[str, ...]
+    matched_entities: tuple[str, ...]
+    matched_goals: tuple[str, ...]
+    matched_relationships: tuple[str, ...]
+    components: dict[str, float]
+    importance: float
+    age_days: float
+    rehearsals: int
+    reminders: int
+    mood_congruence: float
+    subjective: Recollection | None
+    felt_confidence: float
+    source_confidence: float
+    remembered_person_id: str | None
+    remembered_location_id: str | None
+
+    def recalled(self, index: MemoryIndex, emotional_tags: Mapping[str, _Tag]) -> RecalledMemory:
+        event, subjective = self.event, self.subjective
+        matched_terms, matched_entities = self.matched_terms, self.matched_entities
+        matched_goals, matched_relationships = self.matched_goals, self.matched_relationships
+        encoded_valence, encoded_arousal, emotional_label, emotional_intensity = emotional_tags.get(
+            self.memory_id, (0.0, 0.35, "quiet", 0.0)
+        )
         reasons = []
         if matched_terms:
             reasons.append(f"{len(matched_terms)} cue term{'s' if len(matched_terms) != 1 else ''}")
@@ -484,54 +573,45 @@ def recall(
             reasons.append("active goal: " + ", ".join(matched_goals))
         if matched_relationships:
             reasons.append("relationship: " + ", ".join(matched_relationships))
-        if importance >= 0.7:
+        if self.importance >= 0.7:
             reasons.append("important")
-        if age_days < 1:
+        if self.age_days < 1:
             reasons.append("recent")
-        if rehearsals:
-            reasons.append(f"recalled {rehearsals}×")
-        if reminders:
-            reasons.append(f"explicitly reminded {reminders}×")
-        if mood_congruence >= 0.005:
+        if self.rehearsals:
+            reasons.append(f"recalled {self.rehearsals}×")
+        if self.reminders:
+            reasons.append(f"explicitly reminded {self.reminders}×")
+        if self.mood_congruence >= 0.005:
             reasons.append("mood-congruent emotional tone")
-        elif mood_congruence <= -0.005:
+        elif self.mood_congruence <= -0.005:
             reasons.append("mood-incongruent emotional tone")
-        ranked.append(
-            RecalledMemory(
-                event,
-                round(accessibility, 4),
-                round(relevance, 4),
-                round(score, 4),
-                ", ".join(reasons) or "background accessibility",
-                matched_terms,
-                matched_entities,
-                matched_goals,
-                matched_relationships,
-                MappingProxyType({key: round(value, 4) for key, value in components.items()}),
-                *_render_recollection(event, accessibility, importance, subjective),
-                subjective.affective_bias if subjective is not None else 0.0,
-                subjective.blended_memory_ids if subjective is not None else (),
-                subjective.correction_evidence_id if subjective is not None else None,
-                round(felt_confidence, 4),
-                round(source_confidence, 4),
-                subjective.confidence_basis if subjective is not None else "source_encoding",
-                index.reminder_counts.get(event.event_id, 0),
-                remembered_person_id,
-                remembered_location_id,
-                remembered_at,
-                encoded_valence,
-                encoded_arousal,
-                emotional_label,
-                emotional_intensity,
-            )
+        return RecalledMemory(
+            event,
+            round(self.accessibility, 4),
+            round(self.relevance, 4),
+            self.score,
+            ", ".join(reasons) or "background accessibility",
+            matched_terms,
+            matched_entities,
+            matched_goals,
+            matched_relationships,
+            MappingProxyType({key: round(value, 4) for key, value in self.components.items()}),
+            *_render_recollection(event, self.accessibility, self.importance, subjective),
+            subjective.affective_bias if subjective is not None else 0.0,
+            subjective.blended_memory_ids if subjective is not None else (),
+            subjective.correction_evidence_id if subjective is not None else None,
+            round(self.felt_confidence, 4),
+            round(self.source_confidence, 4),
+            subjective.confidence_basis if subjective is not None else "source_encoding",
+            index.reminder_counts.get(event.event_id, 0),
+            self.remembered_person_id,
+            self.remembered_location_id,
+            self.remembered_at,
+            encoded_valence,
+            encoded_arousal,
+            emotional_label,
+            emotional_intensity,
         )
-    ranked.sort(
-        key=lambda item: (item.score, item.remembered_at, str(item.event.event_id)),
-        reverse=True,
-    )
-    if not diverse:
-        return ranked[:limit]
-    return _diversify(ranked, limit)
 
 
 def _render_recollection(
@@ -577,12 +657,12 @@ def _detail_rank(detail_level: str) -> int:
     return {"clear": 0, "partial": 1, "vague": 2}.get(detail_level, 2)
 
 
-def _diversify(ranked: list[RecalledMemory], limit: int) -> list[RecalledMemory]:
+def _diversify(ranked: list[_Ranked], limit: int) -> list[_Ranked]:
     """Prevent one repeated phrase or category from monopolizing working context."""
-    selected: list[RecalledMemory] = []
+    selected: list[_Ranked] = []
     texts: set[str] = set()
     categories: dict[str, int] = {}
-    deferred: list[RecalledMemory] = []
+    deferred: list[_Ranked] = []
     for item in ranked:
         fingerprint = " ".join(sorted(terms(str(item.event.payload["text"]))))
         if fingerprint in texts:
