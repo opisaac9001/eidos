@@ -61,6 +61,7 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "npc.encountered": ("person_id", 0.05, False),
     "townsfolk.introduced": ("townsfolk_id", 0.08, False),
     "townsfolk.chatted": ("townsfolk_id", 0.1, False),
+    "townsfolk.numbers_swapped": ("townsfolk_id", 0.4, False),
     "follow_up.completed": ("person_id", 0.1, False),
     "phone.call_completed": ("caller_id", 0.15, False),
     "phone.callback_completed": ("caller_id", 0.15, False),

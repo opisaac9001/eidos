@@ -503,6 +503,8 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind == "townsfolk.numbers_swapped":
+        return ("connection", 0.06, 0.4, 0.3, 0.6)
     if event.kind == "family.call_owed":
         return ("affect", 0.0, -0.2, 0.2, 0.7)
     if event.kind == "family.occasion" and event.payload.get("outcome") == "forgot":

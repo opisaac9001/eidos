@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
@@ -124,39 +124,101 @@ async def townsfolk_events(
 def townsfolk_promotion_events(
     history: Sequence[DomainEvent], at: datetime, catalog: WorldCatalog
 ) -> list[DomainEvent]:
-    """A townsperson who has become a real friend becomes a fully simulated resident."""
+    """A townsperson he has clicked with becomes a fully simulated resident.
+
+    Friendships with regulars don't grow from small talk alone; at some point one of you
+    suggests a pint or the quiz, and numbers are swapped. That happens after a handful of
+    chats over a few weeks with someone he clicks with (a replay-stable fact about the
+    pair), at most once a fortnight. From then on they are a resident who can invite him
+    out, which is where friendship is actually made. Someone who became a friend some other
+    way is promoted too.
+    """
     if at.hour != PROMOTION_HOUR:
         return []
     bonds = current_bonds(history)
+    swapped = events_of(history, "townsfolk.numbers_swapped")
+    recent_swap = any(
+        at - datetime.fromisoformat(str(event.payload["simulated_at"])) < SWAP_GAP
+        for event in swapped[-1:]
+    )
     for person in project_townsfolk(history).acquaintances():
-        if bonds.get(person.townsfolk_id) not in FRIENDLY:
-            continue
         if person.townsfolk_id in catalog.people or person.name is None:
+            continue
+        friendly = bonds.get(person.townsfolk_id) in FRIENDLY
+        if not friendly and (recent_swap or not _clicked(person, at)):
             continue
         haunt = person.places[0] if person.places else None  # where he first saw them
         if haunt is None or haunt not in catalog.places:
             continue
         number = townsfolk_number(person.townsfolk_id) or 0
-        return [
-            DomainEvent(
-                "world.person_registered",
-                "pathos",
-                {
-                    "proposal_id": f"townsfolk-promotion-{person.townsfolk_id}",
-                    "entity_kind": "person",
-                    "entity_id": person.townsfolk_id,
-                    "name": person.name,
-                    "purpose": person.occupation or f"a regular at {catalog.places[haunt].name}",
-                    "description": person.description[0].upper() + person.description[1:],
-                    "color": _COLOURS[number % len(_COLOURS)],
-                    "location_id": haunt,
-                    "origin": "townsfolk",
-                    "simulated_at": at.isoformat(),
-                },
-                correlation_id=f"townsfolk-promotion-{person.townsfolk_id}",
-            )
-        ]
+        promotion_id = f"townsfolk-promotion-{person.townsfolk_id}"
+        registered = DomainEvent(
+            "world.person_registered",
+            "pathos",
+            {
+                "proposal_id": promotion_id,
+                "entity_kind": "person",
+                "entity_id": person.townsfolk_id,
+                "name": person.name,
+                "purpose": person.occupation or f"a regular at {catalog.places[haunt].name}",
+                "description": person.description[0].upper() + person.description[1:],
+                "color": _COLOURS[number % len(_COLOURS)],
+                "location_id": haunt,
+                "origin": "townsfolk",
+                "simulated_at": at.isoformat(),
+            },
+            correlation_id=promotion_id,
+        )
+        if friendly:
+            return [registered]
+        first_name = person.name.split()[0]
+        place = (
+            catalog.places[person.last_place_id].name
+            if person.last_place_id in (catalog.places)
+            else "town"
+        )
+        text = SWAP_LINES[number % len(SWAP_LINES)].format(name=first_name, place=place)
+        swap = DomainEvent(
+            "townsfolk.numbers_swapped",
+            "pathos",
+            {
+                "townsfolk_id": person.townsfolk_id,
+                "person_id": person.townsfolk_id,
+                "place_id": person.last_place_id,
+                "text": text,
+                "simulated_at": at.isoformat(),
+                "owner": "pathos",
+            },
+            correlation_id=promotion_id,
+        )
+        return [swap, _memory(swap, text, at, 0.55, person_id=person.townsfolk_id), registered]
     return []
+
+
+SWAP_CHATS = 5
+SWAP_KNOWN_FOR = timedelta(days=21)
+SWAP_GAP = timedelta(days=14)
+SWAP_STALE = timedelta(days=14)
+CLICK_CHANCE = 0.45
+SWAP_LINES = (
+    "Swapped numbers with {name} today. We keep ending up talking at {place}, so we said "
+    "we should do it on purpose sometime.",
+    "{name} said we should go to the quiz as a team. Put their number in my phone before "
+    "either of us could think better of it.",
+    'Got {name}\'s number. Nothing dramatic, just "we should get a drink" and, for once, '
+    "actually meaning it.",
+)
+
+
+def _clicked(person: Townsperson, at: datetime) -> bool:
+    """Enough good chats, over long enough, recently, with someone he gets on with."""
+    return (
+        person.chats >= SWAP_CHATS
+        and person.introduced_at is not None
+        and at - person.introduced_at >= SWAP_KNOWN_FOR
+        and at - person.last_seen_at <= SWAP_STALE
+        and roll("clicked", person.townsfolk_id) < CLICK_CHANCE
+    )
 
 
 # -- one encounter --------------------------------------------------------------------

@@ -158,13 +158,18 @@ capability) proposes the rest, and rules check every proposal:
 
 - An unnamed face never counts as someone he knows.
 - A named townsperson is an acquaintance: small talk grows the relationship.
-- One who becomes a proper friend at the evening review is registered as a fully
-  simulated resident (`world.person_registered` with `origin: townsfolk`), including a
-  private history. From then on their own simulated day decides where they are.
+- Small talk alone rarely makes a friend. After about five chats over three weeks or
+  more, with someone he clicks with (a fixed fact about the pair, true for a bit under
+  half of people), they swap numbers (`townsfolk.numbers_swapped`, remembered), at most
+  once a fortnight.
+- Then they are registered as a fully simulated resident (`world.person_registered` with
+  `origin: townsfolk`), including a private history. From then on their own simulated
+  day decides where they are, and they can invite him out, which is where friendship is
+  actually made. Anyone who becomes a proper friend some other way is registered too.
 
 The simulation only ever carries the people who matter to him. In a 200-day café test,
-about 70 faces were noticed, 11 got names, and two became friends and residents after
-about eight weeks and six months.
+about 70 faces were noticed and 11 got names. Before number-swapping, only an unrealistic
+café-all-day life turned any of them into friends; a full ordinary year turned none.
 
 ## Discovery grows out of experience
 

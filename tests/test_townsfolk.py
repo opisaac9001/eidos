@@ -184,3 +184,16 @@ def test_small_talk_with_someone_does_not_repeat_itself(cafe_life) -> None:
     assert "at The " not in " ".join(
         str(e.payload.get("text")) for e in cafe_life if e.kind == "memory.recorded"
     )
+
+
+def test_regulars_he_clicks_with_swap_numbers_before_they_are_friends(cafe_life) -> None:
+    swaps = [e for e in cafe_life if e.kind == "townsfolk.numbers_swapped"]
+    assert swaps, "a regular he chats with often should eventually swap numbers"
+    registered = {e.payload["entity_id"] for e in cafe_life if e.kind == "world.person_registered"}
+    assert {e.payload["townsfolk_id"] for e in swaps} <= registered
+    remembered = {
+        e.payload.get("source_event_id") for e in cafe_life if e.kind == "memory.recorded"
+    }
+    assert all(str(e.event_id) in remembered for e in swaps)
+    times = [datetime.fromisoformat(e.payload["simulated_at"]) for e in swaps]
+    assert all(later - earlier >= timedelta(days=14) for earlier, later in zip(times, times[1:]))
