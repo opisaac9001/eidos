@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from eidos.application.family import family_context
 from eidos.application.media import media_context
+from eidos.application.seasons import time_of_year
 from eidos.application.user_notes import user_knowledge_context
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -860,6 +861,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),
+        "time_of_year": time_of_year(simulated_at),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (

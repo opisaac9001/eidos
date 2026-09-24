@@ -11,7 +11,12 @@ from eidos.domain.state import PathosState
 
 
 def baseline_affect_events(
-    state: PathosState, simulated_at: datetime, *, energy_rhythm: bool = False
+    state: PathosState,
+    simulated_at: datetime,
+    *,
+    energy_rhythm: bool = False,
+    mood_baseline: float = 0.0,
+    waking_drain: float = 0.03,
 ) -> tuple[list[DomainEvent], PathosState]:
     """Move transient affect gently toward baseline without erasing its causes.
 
@@ -20,14 +25,14 @@ def baseline_affect_events(
     """
     valence_step = 0.025 if not state.awake else 0.012 if state.valence < 0 else 0.018
     arousal_step = 0.035 if not state.awake else 0.02
-    valence = _toward(state.valence, 0.0, valence_step)
+    valence = _toward(state.valence, mood_baseline, valence_step)
     arousal = _toward(state.arousal, 0.35, arousal_step)
     energy = state.energy
     if energy_rhythm:
         energy = (
             round(min(1.0, state.energy + 0.1), 4)
             if not state.awake
-            else round(max(0.1, state.energy - 0.03), 4)
+            else round(max(0.1, state.energy - waking_drain), 4)
         )
     if valence == state.valence and arousal == state.arousal and energy == state.energy:
         return [], state
@@ -340,6 +345,19 @@ def _effect(
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
             "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
+    if event.kind == "season.moment":
+        return {
+            "shortest-day": ("affect", 0.0, -0.05, 0.2, 0.2),
+            "clocks-back": ("affect", 0.0, -0.1, 0.2, 0.2),
+            "clocks-forward": ("affect", 0.0, 0.1, 0.2, 0.2),
+            "light-evening": ("affect", 0.0, 0.3, 0.3, 0.3),
+            "first-warm-day": ("affect", 0.0, 0.3, 0.35, 0.3),
+            "longest-day": ("affect", 0.0, 0.2, 0.2, 0.3),
+            "first-frost": ("curiosity", 0.03, 0.1, 0.3, 0.3),
+            "bank-holiday": ("rest", 0.03, 0.2, 0.15, 0.6),
+        }.get(str(event.payload.get("kind")))
+    if event.kind == "life.anniversary":
+        return ("affect", 0.0, 0.2, 0.3, 0.5)
     if event.kind == "media.finished":
         liking = event.payload.get("liking")
         if isinstance(liking, (int, float)) and not isinstance(liking, bool):

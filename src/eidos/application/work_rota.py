@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Sequence
 
+from eidos.application.seasons import workshop_closed
 from eidos.domain.events import DomainEvent
 from eidos.domain.planning import PlanningState
 
@@ -83,7 +84,8 @@ def work_rota_events(
         output.append(agreement)
     for offset in range(ROTA_HORIZON_DAYS + 1):
         day = (simulated_at + timedelta(days=offset)).date()
-        if day.weekday() not in SHIFT_WEEKDAYS:
+        # The workshop shuts on bank holidays and from Christmas Eve to New Year.
+        if day.weekday() not in SHIFT_WEEKDAYS or workshop_closed(day):
             continue
         schedule_id = f"{ROTA_PREFIX}{day.isoformat()}"
         if schedule_id in planning.calendar:

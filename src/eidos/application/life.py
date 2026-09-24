@@ -132,6 +132,7 @@ from eidos.application.rescheduling import reflective_rescheduling_events
 from eidos.application.resident_social import resident_social_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
+from eidos.application.seasons import seasonal_baseline, seasonal_events
 from eidos.application.self_concept import self_concept_events
 from eidos.application.self_projects import autonomous_project_events
 from eidos.application.selfhood import (
@@ -593,6 +594,7 @@ class Life(LifeConversation):
             await self._phase_townsfolk(tick)
             self._phase_family(tick)
             self._phase_media(tick)
+            self._phase_seasons(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -811,8 +813,15 @@ class Life(LifeConversation):
             else _in_company(history + pending, tick.state, current, active_scenes),
         )
         pending.extend(need_events)
+        mood_baseline, waking_drain = (
+            (0.0, 0.03) if self.authored_scenario else seasonal_baseline(current)
+        )
         recovery, tick.state = baseline_affect_events(
-            tick.state, current, energy_rhythm=not self.authored_scenario
+            tick.state,
+            current,
+            energy_rhythm=not self.authored_scenario,
+            mood_baseline=mood_baseline,
+            waking_drain=waking_drain,
         )
         pending.extend(recovery)
         physical_events = wellbeing_events(history + pending, tick.state, current)
@@ -1322,6 +1331,34 @@ class Life(LifeConversation):
             if not self.authored_scenario
             else []
         )
+
+    def _phase_seasons(self, tick: _Tick) -> None:
+        """The clocks, bank holidays, the turning year, and his own anniversaries."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        names = {
+            **townsfolk_names(history + pending),
+            **{person.person_id: person.name for person in catalog.people.values()},
+        }
+        self._extend_warmed(
+            tick,
+            seasonal_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                outdoors=tick.state.location_id not in {"home", "in_transit"},
+                rest=tick.state.rest,
+                names=names,
+            ),
+        )
+        for event in pending[-3:]:
+            if (
+                event.kind == "needs.changed"
+                and event.payload.get("reason") == "the clocks went forward"
+            ):
+                tick.state = tick.state.apply(event)
 
     def _phase_media(self, tick: _Tick) -> None:
         """The book before bed, the series on a free evening, the album on repeat."""

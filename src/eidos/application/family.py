@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 from hashlib import sha256
 from typing import Sequence
 
+from eidos.application.seasons import _easter
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -658,17 +659,3 @@ def _roll(*parts: object) -> float:
 
 def _time(event: DomainEvent) -> datetime:
     return datetime.fromisoformat(str(event.payload["simulated_at"]))
-
-
-def _easter(year: int) -> date:
-    """Anonymous Gregorian algorithm."""
-    a, b, c = year % 19, year // 100, year % 100
-    d, e = divmod(b, 4)
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i, k = divmod(c, 4)
-    ell = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * ell) // 451
-    month, day = divmod(h + ell - 7 * m + 114, 31)
-    return date(year, month, day + 1)
