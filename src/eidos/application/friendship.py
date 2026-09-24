@@ -23,12 +23,13 @@ every replay; only the moments he notices are recorded (see ``application/bonds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Sequence
+from types import MappingProxyType
+from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of
+from eidos.domain.folding import IncrementalFold
 
 USER = "user"
 LEVEL_NAMES = {
@@ -106,7 +107,7 @@ def tier_of(level: int) -> str:
     return next(name for start, name in sorted(TIERS.items(), reverse=True) if level >= start)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class _Running:
     depth: float
     peak: float
@@ -118,26 +119,54 @@ class _Running:
     today: float = 0.0
 
 
+@dataclass(frozen=True, slots=True)
+class _Folded:
+    people: Mapping[str, _Running] = field(default_factory=dict)
+    talk_day: date | None = None
+    talked_today: int = 0
+
+
+def _step(state: _Folded, event: DomainEvent) -> _Folded:
+    moments, talk_day, talked = _event_moments(event, state.talk_day, state.talked_today)
+    if not moments and talk_day == state.talk_day and talked == state.talked_today:
+        return state
+    people = dict(state.people)
+    for when, person_id, weight, deepening in moments:
+        people[person_id] = _add(people.get(person_id), when, weight, deepening)
+    return _Folded(MappingProxyType(people), talk_day, talked)
+
+
+def _add(record: _Running | None, when: datetime, weight: float, deepening: bool) -> _Running:
+    if record is None:
+        record = _Running(1.0, 1.0, when, when)
+    depth = _faded(record.depth, record.peak, record.last, when)
+    today = record.today if record.day == when.date() else 0.0
+    gain = min(max(0.0, DAILY_CAP - today), weight * max(0.03, 1 - depth / 12) ** 2)
+    deepened = record.deepening + (1 if deepening else 0)
+    depth = min(depth + gain, _ceiling(deepened, when - record.first))
+    return _Running(
+        depth,
+        max(record.peak, depth),
+        record.first,
+        max(record.last, when),
+        deepened,
+        (when.date() - record.last.date()).days,
+        when.date(),
+        today + gain,
+    )
+
+
+# Memoised across hours: each call folds only the events since the last one.
+_FOLD: IncrementalFold[_Folded] = IncrementalFold(_Folded, _step)
+
+
 def friendships(history: Sequence[DomainEvent], at: datetime) -> dict[str, Friendship]:
     """Every friendship as it stands at ``at``: depth earned, faded only where it can fade."""
-    running: dict[str, _Running] = {}
-    for when, person_id, weight, deepening in sorted(_moments(history), key=lambda m: m[0]):
-        if when > at:
-            break
-        record = running.setdefault(person_id, _Running(1.0, 1.0, when, when))
-        depth = _faded(record.depth, record.peak, record.last, when)
-        if record.day != when.date():
-            record.day, record.today = when.date(), 0.0
-        # Each level is harder to reach than the last.
-        gain = min(max(0.0, DAILY_CAP - record.today), weight * max(0.03, 1 - depth / 12) ** 2)
-        record.deepening += 1 if deepening else 0
-        record.gap = (when.date() - record.last.date()).days
-        record.depth = min(depth + gain, _ceiling(record.deepening, when - record.first))
-        record.peak = max(record.peak, record.depth)
-        record.last = when
-        record.today += gain
+    folded = _FOLD(history)
     result: dict[str, Friendship] = {}
-    for person_id, record in running.items():
+    for person_id, record in folded.people.items():
+        if record.first > at:
+            continue
         depth = _faded(record.depth, record.peak, record.last, at)
         # The years count too, once it is a real friendship.
         years = (at - record.first).days / 365 if depth >= 4 else 0.0
@@ -189,40 +218,49 @@ def _faded(depth: float, peak: float, last: datetime, now: datetime) -> float:
     return max(floor, depth - rate * idle)
 
 
-def _moments(history: Sequence[DomainEvent]) -> list[tuple[datetime, str, float, bool]]:
-    found: list[tuple[datetime, str, float, bool]] = []
-    for event in events_of(history, *_MOMENTS):
-        payload = event.payload
+def _event_moments(
+    event: DomainEvent, talk_day: date | None, talked: int
+) -> tuple[list[tuple[datetime, str, float, bool]], date | None, int]:
+    """The shared moments one event represents, and the running count of today's talk."""
+    payload = event.payload
+    if event.kind in _MOMENTS:
         key, weight, deepening = _MOMENTS[event.kind]
         if event.kind == "setback.resolved" and payload.get("outcome") != "cleared":
-            continue
+            return [], talk_day, talked
         if event.kind == "romance.stage" and payload.get("stage") not in {"date", "together"}:
-            continue
+            return [], talk_day, talked
         person = payload.get(key)
         when = _time(payload.get("simulated_at"))
         if isinstance(person, str) and person not in {"", "pathos"} and when is not None:
-            found.append((when, person, weight, deepening))
-    for event in events_of(history, "scene.started"):
-        payload = event.payload
+            return [(when, person, weight, deepening)], talk_day, talked
+        return [], talk_day, talked
+    if event.kind == "scene.started":
         people = {payload.get("initiator_id"), payload.get("partner_id")}
         when = _time(payload.get("simulated_at"))
         if "pathos" not in people or when is None:
-            continue
-        for person in people - {"pathos", None}:
-            if isinstance(person, str) and person != USER:
-                found.append((when, person, 0.08, False))
-    # Talking with you: one moment a day you talk, more for a real conversation.
-    by_day: dict[date, list[datetime]] = {}
-    for event in events_of(history, "conversation.message"):
-        if event.payload.get("speaker") == "you":
-            when = _time(event.payload.get("simulated_at"))
-            if when is not None:
-                by_day.setdefault(when.date(), []).append(when)
-    for times in by_day.values():
-        # A long conversation is how you and he go through things together.
-        real_talk = len(times) >= 6
-        found.append((min(times), USER, 0.35 if real_talk else 0.2, real_talk))
-    return found
+            return [], talk_day, talked
+        return (
+            [
+                (when, person, 0.08, False)
+                for person in sorted(p for p in people if isinstance(p, str))
+                if person not in {"pathos", USER}
+            ],
+            talk_day,
+            talked,
+        )
+    if event.kind == "conversation.message" and payload.get("speaker") == "you":
+        when = _time(payload.get("simulated_at"))
+        if when is None:
+            return [], talk_day, talked
+        count = talked + 1 if talk_day == when.date() else 1
+        # Each day you talk is a shared moment; a long conversation (six or more messages)
+        # is how you and he go through things together.
+        if count == 1:
+            return [(when, USER, 0.2, False)], when.date(), count
+        if count == 6:
+            return [(when, USER, 0.15, True)], when.date(), count
+        return [], when.date(), count
+    return [], talk_day, talked
 
 
 def _time(value: object) -> datetime | None:

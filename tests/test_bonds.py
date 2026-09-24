@@ -75,9 +75,12 @@ def review(history, day, relationships=None, known=frozenset({"mara", "ellis"}))
 
 
 def run_reviews(history, days, relationships=None):
+    """Review each evening with only what has happened by then, as a life would."""
     noticed: list[DomainEvent] = []
     for day in days:
-        noticed += review([*history, *noticed], day, relationships)
+        cutoff = at(day, 20).isoformat()
+        lived = [e for e in history if str(e.payload.get("simulated_at", "")) <= cutoff]
+        noticed += review([*lived, *noticed], day, relationships)
     return noticed
 
 
