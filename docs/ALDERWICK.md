@@ -1,7 +1,8 @@
 # Alderwick — a town Pathos can grow into
 
 Status: the town's public places ship as an ordinary world pack with a weekly calendar
-of happenings; its people and transport are still to come. The companion
+of happenings, and its thousands of residents exist as a latent population met one at a
+time. Transport is still to come. The companion
 [`world_plans/alderwick-v1.json`](../world_plans/alderwick-v1.json) is a versioned
 geographic blueprint, **not** a Pathos prompt. `eidos.application.town_pack` builds
 [`world_packs/alderwick-v1.json`](../world_packs/alderwick-v1.json) from it, and a test
@@ -131,6 +132,39 @@ Private motives and off-screen events stay in world state. Pathos receives only
 what he observes, is told, or plausibly infers. Rumours may be mistaken; the system
 must retain who said what rather than laundering gossip into fact. A familiar
 face may precede a name; a name does not reveal their home or schedule.
+
+**As built** (`application/latent_town.py`, `application/townsfolk.py`,
+`domain/townsfolk.py`).
+
+**The latent town.** The town's 8,500 residents exist as a latent population and nothing
+about them is stored. Each is a pure function of their number: age band, district, when
+they're about, how sociable they are, which public places they frequent (by kind of
+place), and the routine they keep there (usual days, hour and length of stay, with the odd
+missed day or unplanned visit). The regulars at a place in a given hour can be worked out
+the same way on every replay.
+
+**How he meets them.** When he is out, awake and not already talking to someone, he may
+notice one of them, at most one person per place visit and two a day, more often in a
+crowd. He prefers the faces he already knows best. Firmament (the `firmament_townsfolk`
+capability) proposes the rest, and rules check every proposal:
+
+- how a stranger looks at a glance: a short "a …" phrase, no name, no numbers, nothing he
+  couldn't see;
+- when they finally get talking, after about three sightings and more readily with
+  sociable people: a new ordinary full name, what they do, and their first words. They
+  don't know his name.
+
+**From face to friend.**
+
+- An unnamed face never counts as someone he knows.
+- A named townsperson is an acquaintance: small talk grows the relationship.
+- One who becomes a proper friend at the evening review is registered as a fully
+  simulated resident (`world.person_registered` with `origin: townsfolk`), including a
+  private history. From then on their own simulated day decides where they are.
+
+The simulation only ever carries the people who matter to him. In a 200-day café test,
+about 70 faces were noticed, 11 got names, and two became friends and residents after
+about eight weeks and six months.
 
 ## Discovery grows out of experience
 
