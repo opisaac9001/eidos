@@ -487,6 +487,20 @@ class GroupIndex:
         _, first, visible = bounds
         return self._log.events[key][first:visible]
 
+    def latest(
+        self, key: Hashable, where: Callable[[DomainEvent], bool] | None = None
+    ) -> DomainEvent | None:
+        """The newest of the key's events satisfying ``where``, found without a copy."""
+        bounds = self._bounds(key, 0)
+        if bounds is None:
+            return None
+        _, first, visible = bounds
+        events = self._log.events[key]
+        for position in range(visible - 1, first - 1, -1):
+            if where is None or where(events[position]):
+                return events[position]
+        return None
+
     def positioned(self, key: Hashable, start: int = 0) -> list[tuple[int, DomainEvent]]:
         bounds = self._bounds(key, start)
         if bounds is None:
@@ -570,17 +584,22 @@ _NEVER_EQUAL_TO_STR: frozenset[type] = frozenset(
 )
 # Any other non-``str`` value (a ``str`` subclass or an arbitrary object) might, so such
 # events are kept together under this key and every candidate query includes them.
-_IRREGULAR = object()
+IRREGULAR = _IRREGULAR = object()
+
+
+def str_match_key(value: object) -> Hashable:
+    """Group key for a value that may be compared with a string.
+
+    A plain ``str`` is its own key; a value that can never equal one is None (ungrouped);
+    anything else is ``IRREGULAR``, a group every string query must also consider.
+    """
+    kind = type(value)
+    return value if kind is str else None if kind in _NEVER_EQUAL_TO_STR else _IRREGULAR
 
 
 def _payload_key(field: str) -> Callable[[GroupIndex, DomainEvent], GroupIndex]:
     def step(index: GroupIndex, event: DomainEvent) -> GroupIndex:
-        value = event.payload.get(field)
-        kind = type(value)
-        key: Hashable = (
-            value if kind is str else None if kind in _NEVER_EQUAL_TO_STR else _IRREGULAR
-        )
-        return index.with_event(key, event)
+        return index.with_event(str_match_key(event.payload.get(field)), event)
 
     return step
 

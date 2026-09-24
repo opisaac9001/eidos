@@ -6,12 +6,12 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple
 from uuid import UUID
 
 from eidos.application.memory_retention import archived_memory_ids
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of, kind_index
+from eidos.domain.folding import IncrementalFold, PersistentMap, events_of, kind_index
 from eidos.domain.recollections import Recollection, project_recollections
 
 WORDS = re.compile(r"[a-z0-9]+")
@@ -662,12 +662,147 @@ def memory_view(
     return views
 
 
+_Tag = tuple[float, float, str, float]
+
+
+class _Affect(NamedTuple):
+    """The affect and memory tags _affective_context derives, folded over all of history.
+
+    _affective_context leaves out affect and memories timed after ``now``. Events without a
+    simulated time are timed by when they were recorded, which can lie on either side of
+    it, so one fold leaves every such event out and another keeps them all. A fold answers
+    for ``now`` exactly when everything it kept is timed at or before ``now`` and everything
+    it left out after it.
+    """
+
+    keep_recorded_times: bool
+    current: float
+    arousal: float
+    label: str
+    tags: PersistentMap[str, _Tag]
+    appraisals: PersistentMap[str, float]
+    kept_until: datetime | None
+    left_out_from: datetime | None
+
+    def answers(self, now: datetime) -> bool:
+        return (self.kept_until is None or self.kept_until <= now) and (
+            self.left_out_from is None or self.left_out_from > now
+        )
+
+
+def _affect_step(state: _Affect, event: DomainEvent) -> _Affect:
+    if event.kind == "appraisal.recorded":
+        source_id = event.payload.get("source_event_id")
+        desirability = event.payload.get("desirability")
+        if (
+            isinstance(source_id, str)
+            and isinstance(desirability, (int, float))
+            and not isinstance(desirability, bool)
+        ):
+            return state._replace(
+                appraisals=state.appraisals.with_item(
+                    source_id, max(-1.0, min(1.0, float(desirability)))
+                )
+            )
+        return state
+    if event.kind not in {"emotion.sampled", "affect.changed", "memory.recorded"}:
+        return state
+    event_time = _simulated_time(event)
+    if not state.keep_recorded_times and not isinstance(
+        event.payload.get("simulated_at"), (datetime, str)
+    ):
+        earliest = state.left_out_from
+        return state._replace(
+            left_out_from=event_time if earliest is None or event_time < earliest else earliest
+        )
+    kept_until = (
+        state.kept_until
+        if state.kept_until is not None and event_time <= state.kept_until
+        else event_time
+    )
+    current, arousal, label, tags = state.current, state.arousal, state.label, state.tags
+    if event.kind in {"emotion.sampled", "affect.changed"}:
+        value = event.payload.get("valence")
+        activation = event.payload.get("arousal")
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and -1 <= value <= 1:
+            current = float(value)
+        if (
+            isinstance(activation, (int, float))
+            and not isinstance(activation, bool)
+            and 0 <= activation <= 1
+        ):
+            arousal = float(activation)
+        explicit_label = event.payload.get("label")
+        label = (
+            explicit_label
+            if isinstance(explicit_label, str) and explicit_label.strip()
+            else _emotional_label(current, arousal)
+        )
+    if event.kind == "memory.recorded" and event.payload.get("owner", "pathos") == "pathos":
+        intensity = min(1.0, max(abs(current), abs(arousal - 0.35) * 1.25))
+        tags = tags.with_item(
+            str(event.event_id),
+            (round(current, 4), round(arousal, 4), label, round(intensity, 4)),
+        )
+    return state._replace(
+        current=current, arousal=arousal, label=label, tags=tags, kept_until=kept_until
+    )
+
+
+_AFFECT_FOLD: IncrementalFold[_Affect] = IncrementalFold(
+    lambda: _Affect(False, 0.0, 0.35, "quiet", PersistentMap(), PersistentMap(), None, None),
+    _affect_step,
+)
+
+
 def _affective_context(
     history: list[DomainEvent],
     now: datetime,
     recollections: Mapping[str, Recollection],
-) -> tuple[float, dict[str, float], dict[str, tuple[float, float, str, float]]]:
+) -> tuple[float, dict[str, float], dict[str, _Tag]]:
     """Derive bounded mood congruence from recorded affect and sourced appraisals."""
+    state = _AFFECT_FOLD(history)
+    if not state.answers(now):
+        state = _AFFECT_FOLD(
+            history,
+            key=True,
+            initial=lambda: _Affect(
+                True, 0.0, 0.35, "quiet", PersistentMap(), PersistentMap(), None, None
+            ),
+        )
+        if not state.answers(now):
+            return _affective_context_at(history, now, recollections)
+    tags: dict[str, _Tag] = {}
+    tones: dict[str, float] = {}
+    for event in events_of(history, "memory.recorded"):
+        if event.payload.get("owner", "pathos") != "pathos":
+            continue
+        memory_id = str(event.event_id)
+        tag = state.tags.get(memory_id)
+        if tag is not None:
+            tags[memory_id] = tag
+        linked_source = event.payload.get("source_event_id")
+        source_tone = state.appraisals.get(memory_id)
+        if source_tone is None:
+            source_tone = 0.0
+        if isinstance(linked_source, str):
+            linked_tone = state.appraisals.get(linked_source)
+            if linked_tone is not None:
+                source_tone = linked_tone
+        if source_tone == 0.0:
+            source_tone = tags.get(memory_id, (0.0, 0.35, "quiet", 0.0))[0]
+        subjective = recollections.get(memory_id)
+        bias = subjective.affective_bias if subjective is not None else 0.0
+        tones[memory_id] = max(-1.0, min(1.0, source_tone * 0.8 + bias * 0.2))
+    return state.current, tones, tags
+
+
+def _affective_context_at(
+    history: list[DomainEvent],
+    now: datetime,
+    recollections: Mapping[str, Recollection],
+) -> tuple[float, dict[str, float], dict[str, _Tag]]:
+    """_affective_context from scratch, leaving out affect recorded after ``now``."""
     current = 0.0
     arousal = 0.35
     label = "quiet"

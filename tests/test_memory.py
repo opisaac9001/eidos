@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+from eidos.application import memory as memory_module
 from eidos.application.memory import MemoryIndex, memory_archive_page, memory_view, recall, terms
 from eidos.domain.events import DomainEvent
 
@@ -377,6 +378,47 @@ class MemoryTests(unittest.TestCase):
         self.assertEqual(
             restored.materialized_state(), MemoryIndex.build([old, new]).materialized_state()
         )
+
+    def test_affective_context_matches_a_fresh_derivation_whenever_it_is_asked(self):
+        start = datetime(2026, 1, 1, 8, tzinfo=timezone.utc)
+        history: list[DomainEvent] = []
+        for hour in range(12):
+            at = start + timedelta(hours=hour)
+            history.append(
+                DomainEvent(
+                    "affect.changed",
+                    "pathos",
+                    {"valence": round(0.1 * (hour % 5) - 0.2, 2), "simulated_at": at.isoformat()},
+                )
+            )
+            # No simulated time: timed by when it was recorded, here an hour on the clock.
+            history.append(
+                DomainEvent(
+                    "affect.changed",
+                    "pathos",
+                    {"energy": 0.5, "label": "tired" if hour % 3 else ""},
+                    occurred_at=at + timedelta(hours=5, minutes=30),
+                )
+            )
+            history.append(self.memory(f"Hour {hour} at the bench.", at))
+            history.append(
+                DomainEvent(
+                    "appraisal.recorded",
+                    "pathos",
+                    {
+                        "source_event_id": str(history[-1].event_id),
+                        "desirability": 0.1 * hour - 0.5,
+                        "simulated_at": at.isoformat(),
+                    },
+                )
+            )
+        for size in range(0, len(history) + 1, 3):
+            for hours in (-1, 3, 7, 11, 16, 20, 30):
+                now = start + timedelta(hours=hours)
+                self.assertEqual(
+                    memory_module._affective_context(history[:size], now, {}),
+                    memory_module._affective_context_at(history[:size], now, {}),
+                )
 
     def test_semantically_invalid_materialized_index_is_rejected(self):
         memory = self.memory("Mara returned the lamp.", self.now)

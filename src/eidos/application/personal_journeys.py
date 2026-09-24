@@ -1,7 +1,8 @@
 """Execute accepted trips over elapsed time, never invent a past departure."""
 
 from datetime import datetime, timedelta
-from typing import Sequence
+from threading import Lock
+from typing import Mapping, Sequence
 
 from eidos.application.activity_execution import _timeline_events, _timeline_since
 from eidos.domain.events import DomainEvent
@@ -20,6 +21,29 @@ _JOURNEY_KINDS = kind_subset_index(
     "incident.response_completed",
     "incident.response_abandoned",
 )
+
+
+# route_duration by (origin, destination) for the catalog routes last asked about, None
+# where no route connects them. A catalog's routes are an immutable mapping.
+_ROUTES: tuple[Mapping[frozenset[str], int], dict[tuple[str, str], timedelta | None]] | None = None
+_ROUTES_LOCK = Lock()
+
+
+def _route_duration(
+    origin_id: str, destination_id: str, routes: Mapping[frozenset[str], int]
+) -> timedelta | None:
+    global _ROUTES
+    with _ROUTES_LOCK:
+        if _ROUTES is None or _ROUTES[0] is not routes:
+            _ROUTES = (routes, {})
+        durations = _ROUTES[1]
+        if (origin_id, destination_id) not in durations:
+            try:
+                duration: timedelta | None = route_duration(origin_id, destination_id, routes)
+            except ValueError:
+                duration = None
+            durations[(origin_id, destination_id)] = duration
+        return durations[(origin_id, destination_id)]
 
 
 def current_journey(history: Sequence[DomainEvent]) -> DomainEvent | None:
@@ -89,10 +113,10 @@ def journey_window_events(
         if start <= now:
             points.add(max(since, start))
         for origin in catalog.places:
-            try:
-                at = start - route_duration(origin, entry.location_id, catalog.route_minutes)
-            except ValueError:
+            duration = _route_duration(origin, entry.location_id, catalog.route_minutes)
+            if duration is None:
                 continue
+            at = start - duration
             if since <= at <= now:
                 points.add(at)
     for at, _, event in _timeline_since(history, since, now):

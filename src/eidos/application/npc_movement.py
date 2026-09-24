@@ -1,10 +1,17 @@
 """Elapsed-time NPC movement and work; no stock hourly location itinerary."""
 
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Callable, Hashable, Sequence
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of, kind_index, payload_candidates
+from eidos.domain.folding import (
+    IRREGULAR,
+    GroupIndex,
+    IncrementalFold,
+    events_of,
+    kind_index,
+    str_match_key,
+)
 from eidos.domain.npcs import project_npcs
 from eidos.domain.travel import route_duration
 from eidos.domain.world import location_allows_interval
@@ -30,12 +37,9 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     catalog = project_world_catalog(history)
     workdays = _employer_workdays(history)
     appointments = _appointments_with_pathos(history)
+    own_events = _OWN_EVENTS(history)
     for actor_id, person in state.people.items():
-        owned = [
-            event
-            for event in payload_candidates(history, "actor_id", actor_id)
-            if event.payload.get("actor_id") == actor_id
-        ]
+        owned = _Owned(own_events, actor_id)
 
         def emit(
             kind: str,
@@ -60,9 +64,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             owned.append(event)
             return event
 
-        last_needs = next(
-            (event for event in reversed(owned) if event.kind == "npc.needs_changed"), None
-        )
+        last_needs = owned.latest("npc.needs_changed")
         elapsed = (
             (now - datetime.fromisoformat(str(last_needs.payload["simulated_at"]))).total_seconds()
             / 3600
@@ -82,10 +84,8 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 last_needs,
             )
 
-        journey = next(
-            (event for event in reversed(owned) if event.kind == "npc.travel_started"), None
-        )
-        arrived = {event.payload.get("journey_id") for event in owned if event.kind == "npc.moved"}
+        journey = owned.latest("npc.travel_started")
+        arrived = {event.payload.get("journey_id") for event in owned.every("npc.moved")}
         if journey is not None and str(journey.event_id) not in arrived:
             arrive_at = datetime.fromisoformat(str(journey.payload["arrive_at"]))
             if now < arrive_at:
@@ -179,25 +179,15 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 continue
         if person.plan_status != "active" or person.plan_id is None:
             continue
-        plan = next(
-            (
-                event
-                for event in reversed(owned)
-                if event.kind == "npc.plan_created"
-                and event.payload.get("plan_id") == person.plan_id
-            ),
-            None,
+        plan = owned.latest(
+            "npc.plan_created",
+            lambda event: event.payload.get("plan_id") == person.plan_id,
         )
         if plan is None:
             continue
-        work = next(
-            (
-                event
-                for event in reversed(owned)
-                if event.kind == "npc.activity_started"
-                and event.payload.get("plan_id") == person.plan_id
-            ),
-            None,
+        work = owned.latest(
+            "npc.activity_started",
+            lambda event: event.payload.get("plan_id") == person.plan_id,
         )
         completed_in_time = (
             work is not None
@@ -243,14 +233,9 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 plan,
             )
             continue
-        started = next(
-            (
-                event
-                for event in reversed(owned)
-                if event.kind == "npc.activity_started"
-                and event.payload.get("plan_id") == person.plan_id
-            ),
-            None,
+        started = owned.latest(
+            "npc.activity_started",
+            lambda event: event.payload.get("plan_id") == person.plan_id,
         )
         if started is None:
             if not location_allows_interval(
@@ -282,7 +267,8 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             started,
             ends_at,
         )
-        latest = next(event for event in reversed(owned) if event.kind == "npc.needs_changed")
+        latest = owned.latest("npc.needs_changed")
+        assert latest is not None  # emitted above when none was recorded yet
         levels = {key: float(latest.payload[key]) for key in ("energy", "connection", "purpose")}
         need = person.plan_need
         company = destination != "home" and any(
@@ -296,6 +282,72 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
         if person.plan_goal_id is not None:
             emit("npc.goal_achieved", {"goal_id": person.plan_goal_id}, completed, ends_at)
     return output
+
+
+# The kinds of an NPC's own events that movement looks back over.
+_OWN_KINDS = frozenset(
+    {
+        "npc.needs_changed",
+        "npc.travel_started",
+        "npc.moved",
+        "npc.plan_created",
+        "npc.activity_started",
+    }
+)
+
+
+def _own_key(index: GroupIndex, event: DomainEvent) -> GroupIndex:
+    key: Hashable = None
+    if event.kind in _OWN_KINDS:
+        actor = str_match_key(event.payload.get("actor_id"))
+        key = None if actor is None else (actor, event.kind)
+    return index.with_event(key, event)
+
+
+# Events grouped by (actor, kind), maintained incrementally across ticks.
+_OWN_EVENTS: IncrementalFold[GroupIndex] = IncrementalFold(GroupIndex, _own_key)
+
+
+class _Owned:
+    """An NPC's own events of the kinds movement reads, then those emitted for them now.
+
+    Exactly the events whose ``actor_id`` equals the NPC's, in history order, without
+    walking everything the NPC ever did.
+    """
+
+    def __init__(self, index: GroupIndex, actor_id: str) -> None:
+        self._index = index
+        self._actor_id = actor_id
+        self._emitted: list[DomainEvent] = []
+
+    def append(self, event: DomainEvent) -> None:
+        self._emitted.append(event)
+
+    def _recorded(self, kind: str) -> list[DomainEvent]:
+        return [
+            event
+            for event in self._index.select((self._actor_id, kind), (IRREGULAR, kind))
+            if event.payload.get("actor_id") == self._actor_id
+        ]
+
+    def every(self, kind: str) -> list[DomainEvent]:
+        return [
+            *self._recorded(kind),
+            *(event for event in self._emitted if event.kind == kind),
+        ]
+
+    def latest(
+        self, kind: str, where: Callable[[DomainEvent], bool] | None = None
+    ) -> DomainEvent | None:
+        for event in reversed(self._emitted):
+            if event.kind == kind and (where is None or where(event)):
+                return event
+        if not self._index.has((IRREGULAR, kind)):
+            return self._index.latest((self._actor_id, kind), where)
+        return next(
+            (event for event in reversed(self._recorded(kind)) if where is None or where(event)),
+            None,
+        )
 
 
 def _employer_workdays(
