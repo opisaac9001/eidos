@@ -9,6 +9,7 @@ from typing import AbstractSet, Mapping, Sequence
 from eidos.application.contact_pacing import contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
@@ -50,16 +51,14 @@ def visitor_events(
         return due
     handled_goal_ids = {
         str(event.payload["source_goal_id"])
-        for event in history
-        if event.kind in {"visitor.planned", "phone.call_received"}
-        and isinstance(event.payload.get("source_goal_id"), str)
+        for event in events_of(history, "visitor.planned", "phone.call_received")
+        if isinstance(event.payload.get("source_goal_id"), str)
     }
     goal = next(
         (
             event
-            for event in history
-            if event.kind == "npc.goal_formed"
-            and event.payload.get("motivation_need") == "connection"
+            for event in events_of(history, "npc.goal_formed")
+            if event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in handled_goal_ids
             and (
@@ -100,13 +99,11 @@ def visitor_events(
 
 def visitor_locations(history: Sequence[DomainEvent]) -> Mapping[str, str]:
     """Return admitted visitors whose departure is not yet in history."""
-    departed = {
-        str(event.payload["visit_id"]) for event in history if event.kind == "visitor.departed"
-    }
+    departed = {str(event.payload["visit_id"]) for event in events_of(history, "visitor.departed")}
     return {
         str(event.payload["visitor_id"]): str(event.payload["location_id"])
-        for event in history
-        if event.kind == "visitor.admitted" and str(event.payload["visit_id"]) not in departed
+        for event in events_of(history, "visitor.admitted")
+        if str(event.payload["visit_id"]) not in departed
     }
 
 
@@ -122,15 +119,13 @@ def _resolve_due_plan(
 ) -> list[DomainEvent]:
     resolved = {
         str(event.payload["visit_id"])
-        for event in history
-        if event.kind in {"visitor.arrived", "visitor.missed"}
+        for event in events_of(history, "visitor.arrived", "visitor.missed")
     }
     planned = next(
         (
             event
-            for event in history
-            if event.kind == "visitor.planned"
-            and str(event.payload["visit_id"]) not in resolved
+            for event in events_of(history, "visitor.planned")
+            if str(event.payload["visit_id"]) not in resolved
             and datetime.fromisoformat(str(event.payload["arrives_at"])) <= simulated_at
         ),
         None,
@@ -270,15 +265,12 @@ def _complete_admitted_visit(
     actor_locations: Mapping[str, str],
     pathos_energy: float,
 ) -> list[DomainEvent]:
-    departed = {
-        str(event.payload["visit_id"]) for event in history if event.kind == "visitor.departed"
-    }
+    departed = {str(event.payload["visit_id"]) for event in events_of(history, "visitor.departed")}
     admitted = next(
         (
             event
-            for event in history
-            if event.kind == "visitor.admitted"
-            and str(event.payload["visit_id"]) not in departed
+            for event in events_of(history, "visitor.admitted")
+            if str(event.payload["visit_id"]) not in departed
             and datetime.fromisoformat(str(event.payload["simulated_at"])) < simulated_at
         ),
         None,

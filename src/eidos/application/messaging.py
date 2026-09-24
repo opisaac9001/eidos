@@ -10,6 +10,7 @@ from typing import Sequence
 from eidos.application.deliveries import active_delivery
 from eidos.application.urgent_incidents import active_incident_location
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.routine import beats_between
 from eidos.domain.scenes import project_scenes
@@ -39,10 +40,10 @@ def communication_availability(
             False,
             True,
         )
-    closed_calls = {e.payload.get("call_id") for e in history if e.kind == "phone.call_completed"}
+    closed_calls = {e.payload.get("call_id") for e in events_of(history, "phone.call_completed")}
     if any(
-        e.kind == "phone.call_answered" and e.payload.get("call_id") not in closed_calls
-        for e in history
+        e.payload.get("call_id") not in closed_calls
+        for e in events_of(history, "phone.call_answered")
     ):
         interrupted = any(
             s.status == "paused" and {s.initiator_id, s.partner_id} == {"pathos", "user"}
@@ -93,11 +94,11 @@ def communication_availability(
     ):
         return CommunicationAvailability("occupied", "He is already with someone.", False, False)
     departed_visits = {
-        str(event.payload["visit_id"]) for event in history if event.kind == "visitor.departed"
+        str(event.payload["visit_id"]) for event in events_of(history, "visitor.departed")
     }
     if any(
-        event.kind == "visitor.admitted" and str(event.payload["visit_id"]) not in departed_visits
-        for event in history
+        str(event.payload["visit_id"]) not in departed_visits
+        for event in events_of(history, "visitor.admitted")
     ):
         return CommunicationAvailability(
             "occupied", "He has someone visiting at home.", False, False

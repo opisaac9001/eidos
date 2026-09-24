@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from itertools import chain
 from typing import Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.relationship_dates import interaction_person
+from eidos.domain.folding import event_index, events_of, kind_index
+from eidos.domain.relationship_dates import INTERACTION_KINDS, interaction_person
 from eidos.domain.relationship_repairs import project_relationship_repairs
 
 
@@ -19,12 +21,9 @@ def relationship_repair_events(
     output: list[DomainEvent] = []
     state = project_relationship_repairs(history)
     apology_ids = {item.apology_event_id for item in state.values()}
-    for index, apology in enumerate(history):
-        if (
-            apology.kind != "apology.offered"
-            or apology.payload.get("actor_id") != "pathos"
-            or str(apology.event_id) in apology_ids
-        ):
+    kinds = kind_index(history)
+    for index, apology in kinds.positioned("apology.offered"):
+        if apology.payload.get("actor_id") != "pathos" or str(apology.event_id) in apology_ids:
             continue
         person_id = apology.payload.get("target_id")
         topic_id = apology.payload.get("topic_id")
@@ -33,8 +32,8 @@ def relationship_repair_events(
         rupture = next(
             (
                 event
-                for event in reversed(history[:index])
-                if event.kind == "disagreement.expressed"
+                for position, event in reversed(kinds.positioned("disagreement.expressed"))
+                if position < index
                 and event.payload.get("actor_id") == apology.payload.get("actor_id")
                 and event.payload.get("target_id") == person_id
                 and event.payload.get("topic_id") == topic_id
@@ -72,16 +71,21 @@ def relationship_repair_events(
         state = project_relationship_repairs([*history, *output])
     used_contacts = {
         str(event.payload["source_event_id"])
-        for event in [*history, *output]
+        for event in chain(events_of(history, "relationship.repair_contacted"), output)
         if event.kind == "relationship.repair_contacted"
     }
     for repair in state.values():
         if repair.contact_count >= 3:
             continue
+        # Event ids are unique in a stream, so the indexed event is the first with that id.
+        apology_event = event_index(history).get(repair.apology_event_id)
         apology_time = _event_time(
-            next(event for event in history if str(event.event_id) == repair.apology_event_id)
+            apology_event
+            if apology_event is not None
+            else next(event for event in history if str(event.event_id) == repair.apology_event_id)
         )
-        for source in history:
+        # interaction_person is None for every other kind.
+        for source in events_of(history, *INTERACTION_KINDS):
             source_id = str(source.event_id)
             if source_id in used_contacts or interaction_person(source) != repair.person_id:
                 continue
@@ -145,7 +149,9 @@ def relationship_repair_events(
         source_id = (
             next(
                 str(event.payload["source_event_id"])
-                for event in reversed([*history, *output])
+                for event in chain(
+                    reversed(output), reversed(events_of(history, "relationship.repair_contacted"))
+                )
                 if event.kind == "relationship.repair_contacted"
                 and event.payload.get("repair_id") == repair.repair_id
             )

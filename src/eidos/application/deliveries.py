@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.scenes import (
     SceneInterruptProposal,
     project_scenes,
@@ -45,16 +46,14 @@ def delivery_events(
         return due
     handled_sources = {
         str(event.payload["source_event_id"])
-        for event in history
-        if event.kind == "delivery.scheduled"
-        and isinstance(event.payload.get("source_event_id"), str)
+        for event in events_of(history, "delivery.scheduled")
+        if isinstance(event.payload.get("source_event_id"), str)
     }
     source = next(
         (
             event
-            for event in history
-            if event.kind == "perception.recorded"
-            and event.payload.get("owner") == "pathos"
+            for event in events_of(history, "perception.recorded")
+            if event.payload.get("owner") == "pathos"
             and event.payload.get("source_kind") == "world_event"
             and str(event.event_id) not in handled_sources
             and _sample(f"delivery-source-{event.event_id}") < 0.4
@@ -92,15 +91,13 @@ def active_delivery(history: Sequence[DomainEvent]) -> str | None:
     """Return the parcel currently waiting at the door, if any."""
     completed = {
         str(event.payload["delivery_id"])
-        for event in history
-        if event.kind in {"delivery.received", "delivery.returned"}
+        for event in events_of(history, "delivery.received", "delivery.returned")
     }
     arrived = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "delivery.arrived"
-            and str(event.payload["delivery_id"]) not in completed
+            for event in reversed(events_of(history, "delivery.arrived"))
+            if str(event.payload["delivery_id"]) not in completed
         ),
         None,
     )
@@ -117,15 +114,13 @@ def _resolve_due_attempt(
 ) -> list[DomainEvent]:
     resolved = {
         (str(event.payload["delivery_id"]), int(event.payload["attempt"]))
-        for event in history
-        if event.kind in {"delivery.arrived", "delivery.missed"}
+        for event in events_of(history, "delivery.arrived", "delivery.missed")
     }
     due = next(
         (
             event
-            for event in history
-            if event.kind in {"delivery.scheduled", "delivery.redelivery_scheduled"}
-            and (str(event.payload["delivery_id"]), int(event.payload["attempt"])) not in resolved
+            for event in events_of(history, "delivery.scheduled", "delivery.redelivery_scheduled")
+            if (str(event.payload["delivery_id"]), int(event.payload["attempt"])) not in resolved
             and datetime.fromisoformat(str(event.payload["arrives_at"])) <= simulated_at
         ),
         None,
@@ -249,14 +244,13 @@ def _complete_handoff(
     pathos_energy: float,
 ) -> list[DomainEvent]:
     received = {
-        str(event.payload["delivery_id"]) for event in history if event.kind == "delivery.received"
+        str(event.payload["delivery_id"]) for event in events_of(history, "delivery.received")
     }
     arrived = next(
         (
             event
-            for event in history
-            if event.kind == "delivery.arrived"
-            and str(event.payload["delivery_id"]) not in received
+            for event in events_of(history, "delivery.arrived")
+            if str(event.payload["delivery_id"]) not in received
             and datetime.fromisoformat(str(event.payload["simulated_at"])) < simulated_at
         ),
         None,

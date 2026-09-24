@@ -9,6 +9,7 @@ from typing import AbstractSet, Mapping, Sequence
 from eidos.application.contact_pacing import contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
@@ -45,9 +46,9 @@ def phone_call_events(
     output = _notice_due_notification(history, simulated_at, pathos_awake=pathos_awake)
     if output:
         return output
-    closed = {e.payload.get("call_id") for e in history if e.kind == "phone.call_completed"}
+    closed = {e.payload.get("call_id") for e in events_of(history, "phone.call_completed")}
     if any(
-        e.kind == "phone.call_answered" and e.payload.get("call_id") not in closed for e in history
+        e.payload.get("call_id") not in closed for e in events_of(history, "phone.call_answered")
     ):
         return []
     output = _complete_due_callback(history, simulated_at, pathos_awake=pathos_awake)
@@ -55,16 +56,14 @@ def phone_call_events(
         return output
     called_goal_ids = {
         str(event.payload["source_goal_id"])
-        for event in history
-        if event.kind in {"phone.call_received", "visitor.planned"}
-        and "source_goal_id" in event.payload
+        for event in events_of(history, "phone.call_received", "visitor.planned")
+        if "source_goal_id" in event.payload
     }
     goal = next(
         (
             event
-            for event in history
-            if event.kind == "npc.goal_formed"
-            and event.payload.get("motivation_need") == "connection"
+            for event in events_of(history, "npc.goal_formed")
+            if event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in called_goal_ids
             and (
@@ -234,16 +233,13 @@ def _notice_due_notification(
     if not pathos_awake:
         return []
     noticed = {
-        str(event.payload["call_id"])
-        for event in history
-        if event.kind == "phone.notification_noticed"
+        str(event.payload["call_id"]) for event in events_of(history, "phone.notification_noticed")
     }
     missed = next(
         (
             event
-            for event in history
-            if event.kind == "phone.call_missed"
-            and str(event.payload["call_id"]) not in noticed
+            for event in events_of(history, "phone.call_missed")
+            if str(event.payload["call_id"]) not in noticed
             and datetime.fromisoformat(str(event.payload["notice_after"])) <= simulated_at
         ),
         None,
@@ -284,15 +280,13 @@ def complete_answered_call(
 ) -> list[DomainEvent]:
     completed = {
         str(event.payload["call_id"])
-        for event in history
-        if event.kind in {"phone.call_completed", "phone.callback_completed"}
+        for event in events_of(history, "phone.call_completed", "phone.callback_completed")
     }
     answered = next(
         (
             event
-            for event in history
-            if event.kind == "phone.call_answered"
-            and str(event.payload["call_id"]) not in completed
+            for event in events_of(history, "phone.call_answered")
+            if str(event.payload["call_id"]) not in completed
             and datetime.fromisoformat(str(event.payload["simulated_at"])) < simulated_at
             and (
                 not event.payload.get("ends_at")
@@ -331,16 +325,13 @@ def _complete_due_callback(
     ):
         return []
     completed = {
-        str(event.payload["call_id"])
-        for event in history
-        if event.kind == "phone.callback_completed"
+        str(event.payload["call_id"]) for event in events_of(history, "phone.callback_completed")
     }
     due = next(
         (
             event
-            for event in history
-            if event.kind == "phone.callback_scheduled"
-            and str(event.payload["call_id"]) not in completed
+            for event in events_of(history, "phone.callback_scheduled")
+            if str(event.payload["call_id"]) not in completed
             and datetime.fromisoformat(str(event.payload["due_at"])) <= simulated_at
         ),
         None,

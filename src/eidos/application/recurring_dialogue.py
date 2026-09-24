@@ -11,6 +11,7 @@ from eidos.application.followups import project_followups
 from eidos.application.relationship_experience import personal_relationship_context
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
@@ -364,10 +365,9 @@ def _observable_topics(
         if item.person_id == partner_id and item.status == "held":
             topics.append(f"remembered-{item.stance}-{item.topic}")
             break
-    for event in reversed(history):
+    for event in reversed(events_of(history, "perception.recorded")):
         if (
-            event.kind != "perception.recorded"
-            or event.payload.get("owner") != "pathos"
+            event.payload.get("owner") != "pathos"
             or event.payload.get("location_id") != location_id
         ):
             continue
@@ -399,9 +399,8 @@ def _cooldown_complete(
     previous = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "scene.started"
-            and str(event.payload.get("scene_id", "")).startswith("ordinary-")
+            for event in reversed(events_of(history, "scene.started"))
+            if str(event.payload.get("scene_id", "")).startswith("ordinary-")
             and partner_id in {event.payload.get("initiator_id"), event.payload.get("partner_id")}
         ),
         None,

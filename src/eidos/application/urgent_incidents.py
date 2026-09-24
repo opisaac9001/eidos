@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.planning import project_planning
 from eidos.domain.scenes import (
     SceneInterruptProposal,
@@ -54,15 +55,13 @@ def urgent_incident_events(
         )
     handled = {
         str(event.payload["source_perception_id"])
-        for event in history
-        if event.kind == "incident.attention_decided"
+        for event in events_of(history, "incident.attention_decided")
     }
     perception = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "perception.recorded"
-            and event.payload.get("owner") == "pathos"
+            for event in reversed(events_of(history, "perception.recorded"))
+            if event.payload.get("owner") == "pathos"
             and event.payload.get("source_kind") == "world_event"
             and str(event.event_id) not in handled
             and event.payload.get("simulated_at") == simulated_at.isoformat()
@@ -83,9 +82,8 @@ def urgent_incident_events(
     participant_ids = sorted(
         {
             str(event.payload["owner"])
-            for event in history
-            if event.kind == "perception.recorded"
-            and event.payload.get("source_event_id") == source_world_event_id
+            for event in events_of(history, "perception.recorded")
+            if event.payload.get("source_event_id") == source_world_event_id
             and event.payload.get("owner") not in {"pathos", "user"}
             and isinstance(event.payload.get("owner"), str)
             and actor_locations.get(str(event.payload["owner"])) == location_id
@@ -338,15 +336,15 @@ def _complete_response(
 def _active_response(history: Sequence[DomainEvent]) -> DomainEvent | None:
     terminal = {
         str(event.payload["incident_id"])
-        for event in history
-        if event.kind in {"incident.response_completed", "incident.response_abandoned"}
+        for event in events_of(
+            history, "incident.response_completed", "incident.response_abandoned"
+        )
     }
     return next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "incident.response_started"
-            and str(event.payload["incident_id"]) not in terminal
+            for event in reversed(events_of(history, "incident.response_started"))
+            if str(event.payload["incident_id"]) not in terminal
         ),
         None,
     )

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, payload_candidates
 from eidos.domain.planning import project_planning
 from eidos.domain.world_events import (
     WorldEventKind,
@@ -231,7 +232,10 @@ def authored_community_schedule(
     event = COMMUNITY_EVENT_PALETTE[occurrence % len(COMMUNITY_EVENT_PALETTE)]
     event_id, description, location_id, intensity, resource_id, theme, opportunity = event
     proposal_id = f"neighborhood-rhythm-{occurrence + 1}-{event_id}"
-    if any(item.payload.get("proposal_id") == proposal_id for item in history):
+    if any(
+        item.payload.get("proposal_id") == proposal_id
+        for item in payload_candidates(history, "proposal_id", proposal_id)
+    ):
         return []
     resource = project_planning(list(history)).objects.get(resource_id)
     if (
@@ -313,13 +317,11 @@ def due_world_observations(
     """Resolve due scheduled events once and reveal them only to co-present actors."""
     occurred_ids = {
         str(event.payload["proposal_id"])
-        for event in history
-        if event.kind in {"world_event.occurred", "world_event.cancelled"}
+        for event in events_of(history, "world_event.occurred", "world_event.cancelled")
     }
     resource_links = {
         str(event.payload["proposal_id"]): str(event.payload["resource_id"])
-        for event in history
-        if event.kind == "world_event.resource_linked"
+        for event in events_of(history, "world_event.resource_linked")
     }
     event_metadata = {
         str(event.payload["proposal_id"]): {
@@ -338,14 +340,11 @@ def due_world_observations(
             )
             if key in event.payload
         }
-        for event in history
-        if event.kind == "world_event.theme_linked"
+        for event in events_of(history, "world_event.theme_linked")
     }
     objects = project_planning(list(history)).objects
     output: list[DomainEvent] = []
-    for scheduled in history:
-        if scheduled.kind != "world_event.scheduled":
-            continue
+    for scheduled in events_of(history, "world_event.scheduled"):
         proposal_id = str(scheduled.payload["proposal_id"])
         starts_at = datetime.fromisoformat(str(scheduled.payload["starts_at"]))
         if proposal_id in occurred_ids or starts_at > simulated_at:

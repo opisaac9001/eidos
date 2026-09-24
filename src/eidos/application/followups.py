@@ -4,9 +4,42 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from itertools import chain
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index, payload_candidates
+
+# The kinds a follow-up can be scheduled from; an ordinary scene's end is checked apart.
+_SOURCE_KINDS = frozenset(
+    {
+        "social.activity_completed",
+        "apology.offered",
+        "visitor.departed",
+        "phone.call_completed",
+        "phone.callback_completed",
+        "incident.shared_aftermath",
+        "object.shared_use",
+        "relationship.anniversary_remembered",
+        "reflection.reconsideration_decided",
+        "bond.missed",
+    }
+)
+# The only kinds _interaction_person can name someone for.
+_INTERACTION_KINDS = frozenset(
+    {
+        "social.activity_completed",
+        "apology.offered",
+        "visitor.departed",
+        "phone.call_completed",
+        "phone.callback_completed",
+        "invitation.made",
+        "incident.shared_aftermath",
+        "object.shared_use",
+        "relationship.anniversary_remembered",
+        "scene.ended",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +54,9 @@ class FollowUp:
 
 def project_followups(history: Sequence[DomainEvent]) -> dict[str, FollowUp]:
     followups: dict[str, FollowUp] = {}
-    for event in history:
+    for event in events_of(
+        history, "follow_up.scheduled", "follow_up.ready", "follow_up.completed"
+    ):
         if event.kind == "follow_up.scheduled":
             follow_up_id = str(event.payload["follow_up_id"])
             if follow_up_id in followups:
@@ -55,19 +90,8 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
     state = project_followups(history)
     source_ids = {item.source_event_id for item in state.values()}
     output: list[DomainEvent] = []
-    for source in history:
-        if source.kind not in {
-            "social.activity_completed",
-            "apology.offered",
-            "visitor.departed",
-            "phone.call_completed",
-            "phone.callback_completed",
-            "incident.shared_aftermath",
-            "object.shared_use",
-            "relationship.anniversary_remembered",
-            "reflection.reconsideration_decided",
-            "bond.missed",
-        } and not (
+    for source in events_of(history, *_SOURCE_KINDS, "scene.ended"):
+        if source.kind not in _SOURCE_KINDS and not (
             source.kind == "scene.ended"
             and str(source.payload.get("scene_id", "")).startswith("ordinary-")
         ):
@@ -118,7 +142,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             continue
         scheduled = next(
             event
-            for event in [*history, *output]
+            for event in chain(events_of(history, "follow_up.scheduled"), output)
             if event.kind == "follow_up.scheduled"
             and event.payload.get("follow_up_id") == item.follow_up_id
         )
@@ -137,10 +161,10 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
                 correlation_id=item.follow_up_id,
             )
         )
+    index = kind_index(history)
     historical_ready = {
-        str(event.payload["follow_up_id"]): index
-        for index, event in enumerate(history)
-        if event.kind == "follow_up.ready"
+        str(event.payload["follow_up_id"]): position
+        for position, event in index.positioned("follow_up.ready")
     }
     for item in state.values():
         ready_index = historical_ready.get(item.follow_up_id)
@@ -149,7 +173,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         interaction = next(
             (
                 event
-                for event in history[ready_index + 1 :]
+                for event in index.select(*_INTERACTION_KINDS, start=ready_index + 1)
                 if _interaction_person(history, event) == item.person_id
                 and str(event.event_id) != item.source_event_id
             ),
@@ -198,7 +222,7 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
         started = next(
             (
                 candidate
-                for candidate in reversed(history)
+                for candidate in reversed(payload_candidates(history, "scene_id", scene_id))
                 if candidate.kind == "scene.started"
                 and candidate.payload.get("scene_id") == scene_id
             ),
@@ -229,7 +253,7 @@ def _follow_up_source_person(history: Sequence[DomainEvent], event: DomainEvent)
     created = next(
         (
             candidate
-            for candidate in reversed(history)
+            for candidate in reversed(payload_candidates(history, "commitment_id", commitment_id))
             if candidate.kind == "commitment.created"
             and candidate.aggregate_id == "pathos"
             and candidate.payload.get("commitment_id") == commitment_id

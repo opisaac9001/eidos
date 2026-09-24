@@ -7,6 +7,7 @@ from hashlib import sha256
 from typing import Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.npcs import NPCState
 from eidos.domain.planning import PlanningState, WorldObject, project_planning
 from eidos.domain.transfers import (
@@ -49,13 +50,12 @@ def object_recovery_events(
         return []
     handled = {
         str(event.payload["source_event_id"])
-        for event in history
-        if event.kind == "object.recovery_decided"
+        for event in events_of(history, "object.recovery_decided")
     }
     source = next(
         (
             event
-            for event in history
+            for event in events_of(history, "object.repair_failed", "object.maintenance_decided")
             if str(event.event_id) not in handled
             and (
                 event.kind == "object.repair_failed"
@@ -285,15 +285,13 @@ def _return_due_loan(
 ) -> list[DomainEvent]:
     returned = {
         str(event.payload["object_id"])
-        for event in history
-        if event.kind == "object.recovery_loan_returned"
+        for event in events_of(history, "object.recovery_loan_returned")
     }
     loan = next(
         (
             event
-            for event in history
-            if event.kind == "object.recovery_loaned"
-            and str(event.payload["object_id"]) not in returned
+            for event in events_of(history, "object.recovery_loaned")
+            if str(event.payload["object_id"]) not in returned
             and datetime.fromisoformat(str(event.payload["due_at"])) <= at
         ),
         None,
@@ -309,9 +307,8 @@ def _return_due_loan(
         or locations.get(owner_id) != item.location_id
     ):
         if any(
-            event.kind == "object.loan_return_overdue"
-            and event.payload.get("source_loan_id") == str(loan.event_id)
-            for event in history
+            event.payload.get("source_loan_id") == str(loan.event_id)
+            for event in events_of(history, "object.loan_return_overdue")
         ):
             return []
         overdue = DomainEvent(
@@ -440,13 +437,13 @@ def _return_due_loan(
 def _pending_replacement(history: Sequence[DomainEvent]) -> DomainEvent | None:
     terminal = {
         str(event.payload["replacement_id"])
-        for event in history
-        if event.kind in {"object.replacement_received", "object.replacement_cancelled"}
+        for event in events_of(
+            history, "object.replacement_received", "object.replacement_cancelled"
+        )
     }
     latest: dict[str, DomainEvent] = {}
-    for event in history:
-        if event.kind == "object.replacement_ordered":
-            latest[str(event.payload["replacement_id"])] = event
+    for event in events_of(history, "object.replacement_ordered"):
+        latest[str(event.payload["replacement_id"])] = event
     return next((event for key, event in latest.items() if key not in terminal), None)
 
 
