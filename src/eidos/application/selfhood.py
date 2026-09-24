@@ -49,6 +49,7 @@ from eidos.domain.selfhood import (
     project_selfhood,
     source_payload,
 )
+from eidos.domain.tastes import project_tastes
 from eidos.domain.wellbeing import project_wellbeing
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, ModelResponse
 
@@ -844,6 +845,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         ],
         "still_bothering_him": _still_bothering(history, simulated_at),
         "feeling_unwell": _feeling_unwell(history),
+        **_tastes_context(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -869,6 +871,18 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         if open_friction or simulated_at - at <= timedelta(days=5):
             bothering.append(str(event.payload.get("text")))
     return bothering[-3:]
+
+
+def _tastes_context(history: Sequence[DomainEvent]) -> dict[str, list[str]]:
+    """What he has found he loves, what turned out not to be for him, and changes of heart."""
+    tastes = project_tastes(history)
+    return {
+        "has_found_he_loves": [item.label for item in tastes.loves()][-6:],
+        "not_for_him": [item.label for item in tastes.not_for_him()][-4:],
+        "changed_his_mind_about": [
+            item.label for item in tastes.tastes.values() if item.changed_mind
+        ][-3:],
+    }
 
 
 def _feeling_unwell(history: Sequence[DomainEvent]) -> str | None:
@@ -963,6 +977,17 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
             for value_id, base in STARTING_VALUES.items()
         ],
         "feeling_unwell": _feeling_unwell(history),
+        "tastes": [
+            {
+                "label": item.label,
+                "stance": item.stance,
+                "since": item.since.isoformat(),
+                "changed_mind": item.changed_mind,
+            }
+            for item in sorted(
+                project_tastes(history).tastes.values(), key=lambda entry: entry.since
+            )
+        ],
         "mood_marks_recently": sum(1 for item in recent if item.value_id == "mood"),
         "recent_moments": [
             {

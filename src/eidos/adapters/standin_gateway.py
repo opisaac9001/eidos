@@ -367,6 +367,9 @@ def _standin_pathos_text(
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    tastes = _standin_tastes_reply(message, context)
+    if tastes:
+        return tastes
     work = _standin_work_reply(message, context, cadence)
     if work:
         return work
@@ -979,11 +982,17 @@ class StandInGateway(ModelGateway):
                 agency_item = activity_palette[dream_choice]
             elif (unexplored := _standin_unexplored_place(places, choice)) is not None:
                 agency_item = unexplored
+            elif (loved := _standin_loved_place(places, choice)) is not None:
+                agency_item = loved
             elif (owned := _standin_owned_activity(context, choice)) is not None:
                 agency_item = owned
             else:
                 agency_item = activity_palette[choice % len(activity_palette)]
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
+            gone_off = (
+                isinstance(places.get(location), dict)
+                and places[location].get("how_he_found_it") == "not really for him"
+            )
             already_planned = {
                 str(entry.get("title"))
                 for entry in context.get("calendar", [])
@@ -991,12 +1000,12 @@ class StandInGateway(ModelGateway):
             }
             slot = (
                 None
-                if agency_item[1] in already_planned
+                if agency_item[1] in already_planned or gone_off
                 else _standin_free_slot(context, location, int(agency_item[8]))
             )
             if slot is None:
-                # Already on the calendar, or no sensible gap in the next two days: leave the
-                # idea for another time.
+                # Already on the calendar, somewhere he has gone off, or no sensible gap in
+                # the next two days: leave the idea for another time.
                 return ModelResponse(
                     content=json.dumps({"no_change": True, "mode": "defer"}),
                     resolved_model="authored-stand-in-v1",
@@ -1719,6 +1728,44 @@ def _standin_nature_reply(message: str) -> str | None:
     )
 
 
+_TASTE_CUES = (
+    "favourite",
+    "favorite",
+    "what do you like",
+    "what do you enjoy",
+    "what do you love",
+    "into these days",
+    "for fun",
+)
+
+
+def _standin_tastes_reply(message: str, context: dict[str, object]) -> str | None:
+    """Talk about what he has found he loves, from tastes he actually earned."""
+    if not any(cue in message for cue in _TASTE_CUES):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    if not isinstance(selfhood, dict):
+        return None
+    loves = [str(item) for item in selfhood.get("has_found_he_loves", []) if item]
+    not_for_him = [str(item) for item in selfhood.get("not_for_him", []) if item]
+    changed = [str(item) for item in selfhood.get("changed_his_mind_about", []) if item]
+    if not loves:
+        return (
+            "Honestly, I'm still finding out. I keep trying things and seeing what sticks."
+            if not not_for_him
+            else f"Still working that out. I know {not_for_him[-1]} isn't for me, at least."
+        )
+    reply = f"Lately? {loves[-1][0].upper()}{loves[-1][1:]}."
+    if len(loves) > 1:
+        reply += f" And {loves[-2]}, I didn't expect that one."
+    if changed:
+        reply += f" Funny, I changed my mind about {changed[-1]}."
+    elif not_for_him:
+        reply += f" Not {not_for_him[-1]}, though. Tried it, not me."
+    return reply
+
+
 _WORK_CUES = ("work", "job", "workshop", "shift", "ellis")
 
 
@@ -1753,6 +1800,33 @@ def _standin_work_reply(message: str, context: dict[str, object], cadence: str) 
     return (
         "It's alright. Four days a week helping Ellis at the repair workshop. Not glamorous, "
         "but I like seeing something broken leave working."
+    )
+
+
+def _standin_loved_place(
+    places: dict[str, Any], choice: int
+) -> tuple[str, str, str, str, str, str, str, int, int, float] | None:
+    """Sometimes, go back to somewhere he has found he loves."""
+    loved = sorted(
+        place_id
+        for place_id, place in places.items()
+        if isinstance(place, dict) and place.get("how_he_found_it") == "somewhere he loves"
+    )
+    if not loved or choice % 4 != 2:
+        return None
+    place_id = loved[(choice // 4) % len(loved)]
+    name = str(places[place_id].get("name", place_id))
+    return (
+        "return_visit",
+        f"Go back to {name}",
+        "I liked it there last time and I've been wanting to go back.",
+        "attend",
+        place_id,
+        "none",
+        "none",
+        24,
+        2,
+        0.5,
     )
 
 

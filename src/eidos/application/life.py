@@ -46,6 +46,7 @@ from eidos.application.dream_planning import (
 from eidos.application.economy import financial_consequence_events, financial_foundation_events
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
+from eidos.application.experience import experience_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.household import (
@@ -2024,6 +2025,21 @@ class Life(LifeConversation):
                     current,
                 )
                 self._extend_warmed(tick, decisions, self._planning)
+        if not self.authored_scenario:
+            # However an activity came to be realized, how it actually felt, and whether
+            # that settles into a taste.
+            for realized in events_of(history + pending, "agency.activity_realized")[-3:]:
+                pending.extend(
+                    experience_events(
+                        history + pending,
+                        realized,
+                        tick.state,
+                        values=project_identity(history + pending).values,
+                        traits=project_traits(history + pending).levels,
+                        weather=latest_weather(history + pending),
+                        catalog=self._world_catalog(history + pending),
+                    )
+                )
 
     def _phase_objects(self, tick: _Tick) -> None:
         """Things: shared use, upkeep, running out and restocking, and getting them back."""

@@ -12,6 +12,7 @@ from uuid import uuid4
 from eidos.application.activity_execution import execution_context
 from eidos.application.causal_opportunities import fresh_cause
 from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
+from eidos.application.experience import taste_notes
 from eidos.application.opportunities import available_opportunities
 from eidos.application.place_discovery import known_place_ids, visited_place_ids
 from eidos.application.preparation import preparation_context
@@ -112,6 +113,7 @@ async def autonomous_activity_events(
     }
     known_places = known_place_ids(history, catalog)
     been = visited_place_ids(history)
+    felt = taste_notes(history, catalog)
     places = {
         place.place_id: {
             "name": place.name,
@@ -120,6 +122,7 @@ async def autonomous_activity_events(
             "closes_hour": place.closes_hour,
             # Somewhere he has only noticed or heard of is a small, real pull to go and look.
             "been_there": place.place_id in been,
+            **({"how_he_found_it": felt[place.place_id]} if place.place_id in felt else {}),
         }
         for place in catalog.places.values()
         # He can only plan around places he actually knows of.
@@ -169,7 +172,12 @@ async def autonomous_activity_events(
     # What he has noticed around him, plus the next thing on at a place he knows.
     opportunities = [
         *available_opportunities(history, simulated_at)[-3:],
-        *happening_opportunities(catalog, known_places, simulated_at)[:1],
+        *(
+            {**item, "his_feeling": felt[str(item["location_id"])]}
+            if str(item["location_id"]) in felt
+            else item
+            for item in happening_opportunities(catalog, known_places, simulated_at)[:1]
+        ),
     ]
     preparation = preparation_context(
         history, location_id=current_location_id, needs=needs, time_budget=time_budget

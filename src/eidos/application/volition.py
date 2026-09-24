@@ -172,6 +172,9 @@ def attended_impulses(
                     + 0.14 * openness
                     + 0.3 * sociability * (1 - _level(needs, "connection", 0.5))
                     + (0.08 if soon else 0.0)
+                    + {"somewhere he loves": 0.15, "not really for him": -0.25}.get(
+                        str(item.get("his_feeling")), 0.0
+                    )
                 )
             add(
                 f"opportunity:{opportunity_id}",

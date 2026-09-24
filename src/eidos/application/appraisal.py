@@ -340,6 +340,11 @@ def _effect(
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
             "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
+    if event.kind == "experience.felt":
+        enjoyment = event.payload.get("enjoyment")
+        if isinstance(enjoyment, (int, float)) and not isinstance(enjoyment, bool):
+            return ("affect", 0.0, round(0.7 * max(-1.0, min(1.0, float(enjoyment))), 3), 0.3, 0.6)
+        return None
     if event.kind == "setback.resolved":
         if event.payload.get("outcome") == "cleared":
             return ("connection", 0.05, 0.5, 0.35, 0.8)

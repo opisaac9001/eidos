@@ -1153,6 +1153,18 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // Tastes are earned by going and doing; a change of heart is kept, not hidden.
+  const tastes = self.tastes || [];
+  $("self-tastes").innerHTML = tastes.length
+    ? tastes
+        .slice()
+        .reverse()
+        .map(
+          (item) =>
+            `<div class="moment ${item.stance === "likes" ? "toward" : "away"}"><span class="moment-mark" aria-hidden="true">${item.stance === "likes" ? "●" : "○"}</span><span class="moment-text">${item.stance === "likes" ? "Loves" : "Not for him:"} ${esc(item.label)}${item.changed_mind ? " <em>(changed his mind)</em>" : ""}</span><span class="moment-meta">since ${date(item.since)}</span></div>`,
+        )
+        .join("")
+    : '<p class="empty-note">Still finding out what he enjoys. Tastes come from trying things.</p>';
   const possible = (self.aspirations || []).filter((item) => item.status === "active");
   $("self-possible").innerHTML = possible.length
     ? possible

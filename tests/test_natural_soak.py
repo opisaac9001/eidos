@@ -43,3 +43,13 @@ def test_nine_natural_days_preserve_replay_and_distinct_habit_evidence(tmp_path)
         sources = [by_id[event.payload[f"source_event_{i}"]] for i in range(1, count + 1)]
         dates = [datetime.fromisoformat(e.payload["simulated_at"]).date() for e in sources]
         assert len(set(dates)) == len(dates)
+    # Every activity he chose (not a work shift) is felt exactly once.
+    chosen = {
+        str(e.event_id)
+        for e in history
+        if e.kind == "agency.activity_realized"
+        and not str(e.payload.get("schedule_id", "")).startswith("work-rota-")
+    }
+    felt = [e.payload["source_event_id"] for e in history if e.kind == "experience.felt"]
+    assert len(felt) == len(set(felt))
+    assert set(felt) == chosen
