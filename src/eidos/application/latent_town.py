@@ -104,6 +104,32 @@ def regulars(place_id: str, category: str) -> tuple[int, ...]:
     )
 
 
+# The people you get to know first: whoever works there, or is always there.
+FIXTURES_PER_PLACE = 2
+FIXTURE_DAYS = 0.75
+FIXTURE_HOURS = {"outdoors": (10, 15)}
+NO_FIXTURES = frozenset({"home", "workshop"})  # the workshop's fixture is Ellis
+
+
+@lru_cache(maxsize=512)
+def fixtures(place_id: str) -> tuple[int, ...]:
+    """The couple of people who work at a place, or are simply always there."""
+    if place_id in NO_FIXTURES:
+        return ()
+    chosen: list[int] = []
+    salt = 0
+    while len(chosen) < FIXTURES_PER_PLACE:
+        number = int(_unit("fixture", place_id, salt) * TOWN_POPULATION)
+        if number not in chosen:
+            chosen.append(number)
+        salt += 1
+    return tuple(chosen)
+
+
+def works_here(number: int, place_id: str) -> bool:
+    return number in fixtures(place_id)
+
+
 def present_at(place_id: str, category: str, at: datetime) -> list[LatentResident]:
     """The regulars plausibly at a place this hour, the same on every replay.
 
@@ -112,7 +138,13 @@ def present_at(place_id: str, category: str, at: datetime) -> list[LatentResiden
     """
     day = at.date().isoformat()
     here: list[LatentResident] = []
+    opens, closes = FIXTURE_HOURS.get(category, (9, 17))
+    for number in fixtures(place_id):
+        if opens <= at.hour < closes and _unit("fixture-day", number, place_id, day) < FIXTURE_DAYS:
+            here.append(latent_resident(number))
     for number in regulars(place_id, category):
+        if number in fixtures(place_id):
+            continue
         usual = _unit("usual-day", number, place_id, at.weekday()) < USUAL_DAY_CHANCE
         chance = 1 - SKIPS if usual else DROPS_IN
         if _unit("visit", number, place_id, day) >= chance:

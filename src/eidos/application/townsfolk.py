@@ -28,6 +28,7 @@ from eidos.application.latent_town import (
     present_at,
     roll,
     townsfolk_number,
+    works_here,
 )
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -75,9 +76,6 @@ async def townsfolk_events(
         event.payload.get("place_id") == location_id for event in touched
     ):
         return []
-    chance = min(0.3, 0.04 + 0.015 * max(0, crowd))
-    if roll("notice", location_id, at.isoformat()) >= chance:
-        return []
     category = place_category(location_id)
     # Someone promoted to a full resident is where their own simulated day takes them.
     here = [
@@ -86,6 +84,11 @@ async def townsfolk_events(
         if resident.townsfolk_id not in catalog.people
     ]
     state = project_townsfolk(history)
+    chance = min(0.3, 0.04 + 0.015 * max(0, crowd))
+    if any(resident.townsfolk_id in state.people for resident in here):
+        chance = max(chance, 0.35)  # a face you know catches your eye
+    if roll("notice", location_id, at.isoformat()) >= chance:
+        return []
     familiar = [resident for resident in here if resident.townsfolk_id in state.people]
     strangers = [resident for resident in here if resident.townsfolk_id not in state.people]
     if familiar and (not strangers or roll("familiar", location_id, at.isoformat()) < 0.6):
@@ -174,12 +177,17 @@ async def _notice(
         "place": place,
         "place_kind": place_category(location_id),
         "what_people_are_doing": activity,
-        "resident": {"age": resident.age_band, "usually_about": resident.rhythm},
+        "resident": {
+            "age": resident.age_band,
+            "usually_about": resident.rhythm,
+            "role": "works here" if works_here(resident.number, location_id) else "visitor",
+        },
         "seed": resident.number,
         "permission": (
             "Describe how this stranger looks to Patrick at a glance, as a short lowercase "
             "noun phrase beginning 'a' or 'an': appearance and what they are doing, e.g. "
-            "'a woman in a paint-flecked jacket reading the notices'. No name, no backstory, "
+            "'a woman in a paint-flecked jacket reading the notices'. If their role is 'works "
+            "here', they are staff or always about the place. No name, no backstory, "
             "no private facts, nothing Patrick could not see."
         ),
     }
@@ -257,7 +265,11 @@ async def _introduce(
         "place": place,
         "description": person.description,
         "times_seen": person.sightings + 1,
-        "resident": {"age": resident.age_band, "district": resident.district.replace("-", " ")},
+        "resident": {
+            "age": resident.age_band,
+            "district": resident.district.replace("-", " "),
+            "role": "works here" if works_here(resident.number, person.places[0]) else "visitor",
+        },
         "names_already_in_use": taken[-60:],
         "seed": resident.number,
         "permission": (

@@ -1794,9 +1794,7 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
     friends = [str(item["person"]) for item in others if item.get("bond") == "friend"]
     strained = [str(item["person"]) for item in others if item.get("bond") == "strained"]
     if not close and not friends:
-        regulars = [
-            str(item).split(",")[0] for item in selfhood.get("people_he_says_hello_to", [])
-        ]
+        regulars = [str(item).split(",")[0] for item in selfhood.get("people_he_says_hello_to", [])]
         if regulars:
             return (
                 f"No one I'd call close yet, honestly. There's {regulars[-1]}, who I keep "
@@ -2171,6 +2169,13 @@ _TOWNSFOLK_DOING = {
     "outdoors": ("walking a scruffy terrier", "feeding the pigeons", "sitting on a bench"),
     "making": ("waiting for a repair", "inspecting a wobbly chair", "asking about a part"),
 }
+_TOWNSFOLK_WORKING = {
+    "social": ("behind the counter, steaming milk", "clearing tables with practised speed"),
+    "culture": ("stamping returns at the desk", "reshelving an armful of books"),
+    "errand": ("working the till", "restocking a shelf"),
+    "outdoors": ("on the same bench as always", "raking leaves by the gate"),
+    "making": ("sorting parts behind the counter",),
+}
 _TOWNSFOLK_FIRST = {
     "woman": (
         "June",
@@ -2222,7 +2227,7 @@ _TOWNSFOLK_LAST = (
     "Lyle",
 )
 _TOWNSFOLK_WORK = (
-    "retired postmistress",
+    "retired postal worker",
     "bus driver",
     "primary school teacher",
     "part-time florist",
@@ -2261,13 +2266,20 @@ def _standin_townsfolk(context: dict[str, Any]) -> dict[str, str]:
             )
             if name.casefold() not in taken:
                 break
+        works = resident.get("role") == "works here"
         return {
             "name": name,
-            "occupation": _TOWNSFOLK_WORK[seed % len(_TOWNSFOLK_WORK)],
+            "occupation": f"works at {context.get('place')}"
+            if works
+            else _TOWNSFOLK_WORK[seed % len(_TOWNSFOLK_WORK)],
             "first_words": _TOWNSFOLK_OPENERS[seed % len(_TOWNSFOLK_OPENERS)],
         }
     people = _TOWNSFOLK_PEOPLE.get(str(resident.get("age")), ("a man", "a woman"))
-    doing = _TOWNSFOLK_DOING.get(str(context.get("place_kind")), ("looking at their phone",))
+    doing: tuple[str, ...] = _TOWNSFOLK_DOING.get(
+        str(context.get("place_kind")), ("looking at their phone",)
+    )
+    if resident.get("role") == "works here":
+        doing = _TOWNSFOLK_WORKING.get(str(context.get("place_kind")), ("seeing to customers",))
     return {
         "description": (
             f"{people[seed % 2]} {_TOWNSFOLK_WEARING[(seed // 2) % len(_TOWNSFOLK_WEARING)]} "
