@@ -1153,6 +1153,22 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // Who his people are, as he has come to feel it; you are among them if he feels so.
+  const bondWords = {
+    close: "one of his closest people",
+    friend: "a proper friend",
+    strained: "things are strained",
+    drifted: "drifted apart lately",
+  };
+  const people = self.his_people || [];
+  $("self-people").innerHTML = people.length
+    ? people
+        .map(
+          (item) =>
+            `<div class="moment ${item.bond === "strained" || item.bond === "drifted" ? "away" : "toward"}"><span class="moment-mark" aria-hidden="true">${item.bond === "close" ? "●" : "○"}</span><span class="moment-text">${esc(item.person === "you" ? "You" : item.person)}</span><span class="moment-meta">${esc(bondWords[item.bond] || item.bond)}</span></div>`,
+        )
+        .join("")
+    : '<p class="empty-note">Nobody has become a friend yet. That takes time and turning up.</p>';
   // Tastes are earned by going and doing; a change of heart is kept, not hidden.
   const tastes = self.tastes || [];
   $("self-tastes").innerHTML = tastes.length

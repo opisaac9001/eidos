@@ -493,6 +493,10 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "bond.recognized" and p.get("bond") in {"friend", "close"}:
+        if p.get("previous") in {"acquaintance", "friend", "drifted"}:
+            return (("care", 1, "realised someone has become one of my people"),)
+        return ()
     if kind in {"taste.formed", "taste.revised"} and p.get("stance") == "likes":
         value = p.get("value_id")
         if value in STARTING_VALUES:

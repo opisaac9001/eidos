@@ -367,6 +367,9 @@ def _standin_pathos_text(
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    people = _standin_people_reply(message, context)
+    if people:
+        return people
     tastes = _standin_tastes_reply(message, context)
     if tastes:
         return tastes
@@ -1726,6 +1729,49 @@ def _standin_nature_reply(message: str) -> str | None:
         "a human on the other side of the screen. Bit of a strange thing to say out loud, "
         "honestly, but I'd rather you knew."
     )
+
+
+_US_CUES = ("are we friends", "do you like me", "what am i to you", "do you trust me")
+_PEOPLE_CUES = ("your friends", "closest", "best friend", "who do you see", "your people")
+
+
+def _standin_people_reply(message: str, context: dict[str, object]) -> str | None:
+    """Talk about his people, and about you, only as close as he has actually come to feel."""
+    about_us = any(cue in message for cue in _US_CUES)
+    if not about_us and not any(cue in message for cue in _PEOPLE_CUES):
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    if not isinstance(selfhood, dict):
+        return None
+    people = [item for item in selfhood.get("his_people", []) if isinstance(item, dict)]
+    you = next((item["bond"] for item in people if item.get("person") == "you"), None)
+    if about_us:
+        return {
+            "close": "Honestly? You're one of my closest people. I don't say that lightly.",
+            "friend": "Yeah, I'd say we're friends now. It crept up on me.",
+            "drifted": "We were, I think. It's been a while, though. I'd like it to be again.",
+        }.get(
+            str(you),
+            "I'm still getting to know you, honestly. I like talking to you, though. Ask me "
+            "again in a few weeks.",
+        )
+    others = [item for item in people if item.get("person") != "you"]
+    close = [str(item["person"]) for item in others if item.get("bond") == "close"]
+    friends = [str(item["person"]) for item in others if item.get("bond") == "friend"]
+    strained = [str(item["person"]) for item in others if item.get("bond") == "strained"]
+    if not close and not friends:
+        return "I'm still finding my people round here, if I'm honest. It takes a while."
+    reply = (
+        f"{' and '.join(close)}, probably. That's the short answer."
+        if close
+        else f"{', '.join(friends[:-1]) + ' and ' + friends[-1] if len(friends) > 1 else friends[0]}, mostly."
+    )
+    if close and friends:
+        reply += f" And {friends[0]} has become a proper friend."
+    if strained:
+        reply += f" Things are a bit strained with {strained[0]} at the moment."
+    return reply
 
 
 _TASTE_CUES = (

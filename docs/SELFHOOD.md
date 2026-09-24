@@ -146,6 +146,34 @@ history. Loving something is lived evidence for its value. Tastes reach:
 
 (`application/experience.py`, `domain/tastes.py`)
 
+### 9. His people
+
+Relationship numbers (trust, familiarity, tension) move a little with every encounter,
+kindness and clash, but a person doesn't experience numbers. At the 20:00 review he may
+notice one change a day in who his people are (`bond.recognized`), and it leaves a memory
+in his words:
+
+- **a proper friend**: warmth (mostly familiarity, partly trust, minus tension) of 0.5 or
+  more;
+- **one of his closest people**: warmth of 0.72 or more *and* trust of 0.45 or more;
+  closeness needs trust, not just time spent together;
+- **things are strained**: tension of 0.35 or more;
+- **drifted**: warmth has fallen away.
+
+A bond is not lost the moment it dips just below where it formed.
+
+The person talking with him through the app is one of his people too. That bond is
+measured from the days you have actually talked:
+
+- **a friend**: five or more days over at least two weeks;
+- **one of his closest people**: fifteen or more days over at least six weeks, and a
+  conversation within the last fortnight;
+- **drifted**: three weeks of silence, after which he notices.
+
+Growing closer to someone is lived evidence of care. `his_people` reaches his
+self-context, so when asked "are we friends?" he answers only as close as he has come to
+feel. The Becoming view lists his people. (`application/bonds.py`)
+
 ## What performers see
 
 `identity.selfhood` (voice, Murmur, reflection, dreams):

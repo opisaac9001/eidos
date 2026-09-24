@@ -21,6 +21,7 @@ from eidos.application.appraisal import (
 )
 from eidos.application.attention import attention_state
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
+from eidos.application.bonds import bond_events
 from eidos.application.catchup import (
     CatchUpPreview,
     active_catch_up,
@@ -2105,6 +2106,19 @@ class Life(LifeConversation):
         history, pending, current = tick.history, tick.pending, tick.current
         daily_self = selfhood_daily_events(history + pending, current)
         pending.extend(daily_self)
+        if not self.authored_scenario:
+            pending.extend(
+                bond_events(
+                    history + pending,
+                    current,
+                    self._relationships(history + pending).relationships,
+                    pathos_known_person_ids(history + pending),
+                    {
+                        person.person_id: person.name
+                        for person in self._world_catalog(history + pending).people.values()
+                    },
+                )
+            )
         pending.extend(await selfhood_chapter_events(history + pending, current, self.gateway))
 
     async def _phase_nightly(self, tick: _Tick, mind: _HourMind) -> None:

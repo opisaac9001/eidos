@@ -846,6 +846,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "still_bothering_him": _still_bothering(history, simulated_at),
         "feeling_unwell": _feeling_unwell(history),
         **_tastes_context(history),
+        "his_people": _his_people(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -871,6 +872,16 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         if open_friction or simulated_at - at <= timedelta(days=5):
             bothering.append(str(event.payload.get("text")))
     return bothering[-3:]
+
+
+def _his_people(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
+    from eidos.application.bonds import his_people
+    from eidos.domain.world_catalog import project_world_catalog
+
+    names = {
+        person.person_id: person.name for person in project_world_catalog(history).people.values()
+    }
+    return his_people(history, names)
 
 
 def _tastes_context(history: Sequence[DomainEvent]) -> dict[str, list[str]]:
@@ -977,6 +988,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
             for value_id, base in STARTING_VALUES.items()
         ],
         "feeling_unwell": _feeling_unwell(history),
+        "his_people": _his_people(history),
         "tastes": [
             {
                 "label": item.label,
