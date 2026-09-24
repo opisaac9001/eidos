@@ -51,6 +51,7 @@ from eidos.application.economy import (
 )
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
+from eidos.application.evening_course import evening_course_events
 from eidos.application.experience import experience_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.family_stories import family_storyline_events
@@ -223,6 +224,7 @@ from eidos.domain.scenes import (
 )
 from eidos.domain.seasons import season_change_events, season_for
 from eidos.domain.state import PathosState
+from eidos.domain.tastes import project_tastes
 from eidos.domain.townsfolk import project_townsfolk
 from eidos.domain.traits import project_traits
 from eidos.domain.travel import TravelProposal, resolve_travel, route_duration
@@ -614,6 +616,7 @@ class Life(LifeConversation):
             self._phase_family(tick)
             self._phase_friends_lives(tick)
             self._phase_home(tick)
+            self._phase_course(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1564,6 +1567,39 @@ class Life(LifeConversation):
                 residents=frozenset(catalog.people),
                 known_places=known_place_ids(history + pending, catalog),
                 in_romance_with=arc[0] if arc else None,
+            ),
+            self._planning,
+        )
+
+    def _phase_course(self, tick: _Tick) -> None:
+        """An autumn evening class: signing up, the odd skipped Tuesday, and how it ended."""
+        if self.authored_scenario or tick.current.hour not in {18, 19}:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        venue = next(
+            (place for place in ("community-hall", "library") if place in catalog.places),
+            "cafe",
+        )
+        self._extend_warmed(
+            tick,
+            evening_course_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                values=project_identity(history + pending).values,
+                balance_pence=self._finances(history + pending).balance_pence,
+                rent_pence=weekly_housing_pence(history + pending),
+                calendar={
+                    entry.schedule_id: entry.status
+                    for entry in self._planning(history + pending).calendar.values()
+                },
+                venue=venue,
+                loves_drawing=any(
+                    "draw" in taste.label.lower()
+                    for taste in project_tastes(history + pending).loves()
+                ),
+                worn_out=tick.state.rest < 0.3 or tick.state.valence < -0.3,
             ),
             self._planning,
         )

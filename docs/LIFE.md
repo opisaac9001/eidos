@@ -174,6 +174,19 @@ His friends' lives go on without him, and change his weeks.
   more, it's moving in together instead: somewhere bigger, and his half is £95.
 - **Not again** for at least three years.
 
+## An evening class (`application/evening_course.py`)
+
+- **When:** on the first Sunday of September, some years, he signs up for a community-hall
+  class. Never in his first eight months, at most every other year, and only if the £120
+  fee won't leave him short.
+- **Which class:** chosen with a lean from who he is:
+  - craft: furniture restoration;
+  - curiosity: Alderwick's history;
+  - if he has come to love drawing: life drawing.
+- **The term:** ten Tuesday evenings. On a day he's worn out or low he may skip one.
+- **How it ends:** seven or more classes and he finishes, proud of what he made. Fewer, and
+  it's one more thing he started and didn't finish, which he notices.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.

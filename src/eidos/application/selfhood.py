@@ -21,6 +21,7 @@ from hashlib import sha256
 from time import perf_counter
 from uuid import uuid4
 
+from eidos.application.evening_course import course_context
 from eidos.application.family import family_context
 from eidos.application.home_move import home_context
 from eidos.application.imperfection import imperfection_context
@@ -871,6 +872,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "work": work_context(history),
         "money": money_context(history, simulated_at),
         "home": home_context(history),
+        "evening_class": course_context(history),
         "love_life": _love_life(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
