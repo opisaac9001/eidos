@@ -15,7 +15,31 @@ family dog. Age follows the simulation date, not a permanently hardcoded 26.
 
 These are explicit character-pack facts, not newly lived events or detailed
 recollections. No invented childhood scenes, new NPC registrations, recent family
-contact or perfect autobiographical memory are implied. They are exposed with
+contact or perfect autobiographical memory are implied.
+
+## His family (patrick-blend-v3)
+
+The v3 profile names his family as authored background:
+
+- **Mum:** Helen, retired from the arts council, gardens and volunteers at a Canterbury
+  gallery.
+- **Dad:** Richard, a retired solicitor who restores old clocks in his shed and has never
+  quite understood why Patrick left the obvious career path.
+- **Brother:** Tom, in London with his partner Jess and their young daughter Isla.
+
+Gulliver the dog died some years ago. His parents still live in Wye.
+
+Contact is lived, not assumed (`application/family.py`):
+
+- Mum rings most Sunday evenings, and Dad sometimes comes on the line.
+- Tom keeps the family chat going and calls every few weeks.
+- Patrick rings home when he's missing them.
+- He can miss a call, owe one back, remember a birthday, or forget one and apologise.
+
+Their lives go on in short storylines that he hears about one step at a time (Dad's knee
+operation, Tom's house move, Mum's gallery), plus the things that come round every year.
+The models are told to mention only contact and news his family context and memories
+support. They are exposed with
 their authored provenance in the identity snapshot.
 
 ## The blend

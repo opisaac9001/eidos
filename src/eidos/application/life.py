@@ -48,6 +48,7 @@ from eidos.application.economy import financial_consequence_events, financial_fo
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.experience import experience_events
+from eidos.application.family import family_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.household import (
@@ -588,6 +589,7 @@ class Life(LifeConversation):
             await self._phase_world_story(tick)
             self._phase_perception(tick)
             await self._phase_townsfolk(tick)
+            self._phase_family(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -1316,6 +1318,27 @@ class Life(LifeConversation):
             )
             if not self.authored_scenario
             else []
+        )
+
+    def _phase_family(self, tick: _Tick) -> None:
+        """Mum's Sunday call, Tom's messages, birthdays remembered or forgotten."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        in_conversation = any(
+            scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
+            for scene in project_scenes(history + pending).scenes.values()
+        )
+        pending.extend(
+            family_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                at_home=tick.state.location_id == "home",
+                in_conversation=in_conversation,
+                connection=tick.state.connection,
+                values=dict(project_identity(history + pending).values),
+            )
         )
 
     async def _phase_townsfolk(self, tick: _Tick) -> None:

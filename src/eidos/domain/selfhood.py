@@ -493,6 +493,12 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "family.contact" and not p.get("missed"):
+        return (("care", 1, "kept in touch with family"),)
+    if kind == "family.call_owed":
+        return (("care", -1, "left a call from home unreturned"),)
+    if kind == "family.occasion" and p.get("outcome") == "forgot":
+        return (("care", -1, "forgot a family birthday"),)
     if kind == "bond.recognized" and p.get("bond") in {"friend", "close", "closest"}:
         if p.get("previous") in {"acquaintance", "friend", "close", "drifted"}:
             return (("care", 1, "realised someone has become one of my people"),)

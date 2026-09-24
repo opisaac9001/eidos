@@ -773,6 +773,8 @@ def memory_archive_page(
         "accomplishment",
         "milestone",
         "dream",
+        "family",
+        "relationship",
     }
     if category not in allowed:
         raise ValueError("Memory archive category is unknown")

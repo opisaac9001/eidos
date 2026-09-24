@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -374,6 +375,9 @@ def _standin_pathos_text(
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    family = _standin_family_reply(message, context)
+    if family:
+        return family
     people = _standin_people_reply(message, context)
     if people:
         return people
@@ -1762,6 +1766,57 @@ def _standin_nature_reply(message: str) -> str | None:
         "a human on the other side of the screen. Bit of a strange thing to say out loud, "
         "honestly, but I'd rather you knew."
     )
+
+
+_FAMILY_CUES = {
+    "Mum": ("your mum", "your mom", "your mother", "your parents"),
+    "Dad": ("your dad", "your father"),
+    "Tom": ("your brother",),
+    "family": ("your family", "family"),
+}
+
+
+def _standin_family_reply(message: str, context: dict[str, object]) -> str | None:
+    """Talk about his family from what he actually knows of their lives right now."""
+    asked = next(
+        (who for who, cues in _FAMILY_CUES.items() if any(cue in message for cue in cues)),
+        "Tom" if re.search(r"\btom\b", message) else None,
+    )
+    if asked is None:
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    family = selfhood.get("family") if isinstance(selfhood, dict) else None
+    if not isinstance(family, list) or not family:
+        return None
+    members = [item for item in family if isinstance(item, dict)]
+    if asked == "family":
+        news = [str(n) for item in members for n in item.get("latest_news", [])][-2:]
+        owed = [str(item["who"]).split(" ")[0] for item in members if item.get("owes_them_a_call")]
+        reply = "They're alright, I think. " + (
+            " ".join(news) if news else "Not much news; Mum rings on Sundays, Tom sends memes."
+        )
+        if owed:
+            reply += f" I owe {owed[0]} a call, actually."
+        return reply
+    member = next((item for item in members if str(item.get("who", "")).startswith(asked)), None)
+    if member is None:
+        return None
+    news = [str(item) for item in member.get("latest_news", [])]
+    days = member.get("last_spoke_days_ago")
+    when = (
+        "haven't spoken in a while"
+        if days is None or (isinstance(days, int) and days > 14)
+        else "spoke the other day"
+        if isinstance(days, int) and days > 1
+        else "spoke just recently"
+    )
+    reply = f"{asked}'s fine, I think. We {when}."
+    if news:
+        reply += f" {news[-1]}"
+    if member.get("owes_them_a_call"):
+        reply += f" I still owe {asked} a call, if I'm honest."
+    return reply
 
 
 _US_CUES = ("are we friends", "do you like me", "what am i to you", "do you trust me")

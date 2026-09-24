@@ -1153,6 +1153,20 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // Family is always there; what changes is how in touch he is and what he knows.
+  const family = self.family || [];
+  $("self-family").innerHTML = family
+    .map((item) => {
+      const spoke =
+        item.last_spoke_days_ago == null
+          ? "not spoken yet"
+          : item.last_spoke_days_ago === 0
+            ? "spoke today"
+            : `last spoke ${item.last_spoke_days_ago} day${item.last_spoke_days_ago === 1 ? "" : "s"} ago`;
+      const news = (item.latest_news || []).slice(-1)[0];
+      return `<div class="moment ${item.owes_them_a_call ? "away" : "toward"}"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">${esc(item.who)}${news ? `<small>${esc(news)}</small>` : ""}</span><span class="moment-meta">${esc(spoke)}${item.owes_them_a_call ? " · owes a call" : ""}</span></div>`;
+    })
+    .join("");
   // Who his people are, as he has come to feel it; you are among them if he feels so.
   const bondWords = {
     closest: "one of his closest people",
