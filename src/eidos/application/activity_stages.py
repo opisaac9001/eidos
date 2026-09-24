@@ -10,6 +10,7 @@ from typing import Sequence
 
 from eidos.domain.domestic_effort import washed_load
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import payload_candidates
 from eidos.domain.household import project_household
 from eidos.domain.planning import CalendarEntry
 
@@ -67,9 +68,10 @@ def stage_context(entry: CalendarEntry, effort: dict[str, object]) -> list[dict[
 def stage_events(
     history: Sequence[DomainEvent], entry: CalendarEntry, effort: dict[str, object], now: datetime
 ) -> list[DomainEvent]:
+    related = payload_candidates(history, "schedule_id", entry.schedule_id)
     starts = [
         e
-        for e in history
+        for e in related
         if e.kind == "activity.execution_started"
         and e.payload.get("schedule_id") == entry.schedule_id
     ]
@@ -77,7 +79,7 @@ def stage_events(
         return []
     done = {
         e.payload.get("stage_id")
-        for e in history
+        for e in related
         if e.kind == "activity.stage_completed"
         and e.payload.get("schedule_id") == entry.schedule_id
     }

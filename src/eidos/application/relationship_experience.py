@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Sequence
 
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
+
+_RECALLED = ("commitment.created", "commitment.missed", "commitment.fulfilled", "apology.offered")
 
 
 def personal_relationship_context(
@@ -15,7 +18,9 @@ def personal_relationship_context(
         return {}
     promises: dict[str, DomainEvent] = {}
     recollections = []
-    for event in history:
+    # Other kinds only reach the timestamp checks, which can raise solely for a naive ``now``.
+    events = history if now.utcoffset() is None else events_of(history, *_RECALLED)
+    for event in events:
         p = event.payload
         try:
             at = datetime.fromisoformat(str(p["simulated_at"]))

@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold
+from eidos.domain.folding import IncrementalFold, event_index
 from eidos.domain.proposals import ProposalRejected
 
 
@@ -277,7 +277,12 @@ def resolve_belief(
 
     if proposal.expected_revision != actual_revision:
         return reject("stale_revision", "The evidence context changed")
-    evidence = next((item for item in history if item.event_id == proposal.evidence_event_id), None)
+    # UUIDs are equal exactly when their canonical texts are, the index's keys.
+    evidence = (
+        event_index(history).get(str(proposal.evidence_event_id))
+        if isinstance(proposal.evidence_event_id, UUID)
+        else None
+    )
     if evidence is None:
         return reject("missing_evidence", "The cited evidence does not exist")
     if evidence.kind == "memory.consolidated":

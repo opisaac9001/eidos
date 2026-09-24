@@ -16,6 +16,7 @@ from eidos.domain.commitments import (
     resolve_renegotiation_response,
 )
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.npcs import NPCState
 from eidos.domain.planning import CalendarEntry, PlanningState
 from eidos.domain.travel import route_duration
@@ -37,16 +38,14 @@ def reflective_renegotiation_offer_events(
     negotiations = project_renegotiations(history)
     handled_decisions = {
         str(event.payload["source_decision_event_id"])
-        for event in history
-        if event.kind == "commitment.reflective_renegotiation_handled"
-        and isinstance(event.payload.get("source_decision_event_id"), str)
+        for event in events_of(history, "commitment.reflective_renegotiation_handled")
+        if isinstance(event.payload.get("source_decision_event_id"), str)
     }
     decision = next(
         (
             event
-            for event in history
-            if event.kind == "reflection.reconsideration_decided"
-            and event.aggregate_id == "pathos"
+            for event in events_of(history, "reflection.reconsideration_decided")
+            if event.aggregate_id == "pathos"
             and event.payload.get("target_type") == "commitment"
             and event.payload.get("decision") == "consider_renegotiation"
             and str(event.event_id) not in handled_decisions
@@ -58,16 +57,13 @@ def reflective_renegotiation_offer_events(
     commitment_id = decision.payload.get("target_id")
     if not isinstance(commitment_id, str):
         return [_handled(decision, simulated_at, "invalid_target")]
-    created = next(
-        (
-            event
-            for event in reversed(history)
-            if event.kind == "commitment.created"
-            and event.aggregate_id == "pathos"
+    created = kind_index(history).latest(
+        "commitment.created",
+        lambda event: (
+            event.aggregate_id == "pathos"
             and event.payload.get("commitment_id") == commitment_id
             and event.payload.get("debtor_id") == "pathos"
         ),
-        None,
     )
     commitment = planning.commitments.get(commitment_id)
     linked = [
@@ -128,9 +124,8 @@ def renegotiation_response_events(
     negotiations = project_renegotiations(history)
     handled_offers = {
         str(event.payload["offer_id"])
-        for event in history
-        if event.kind == "commitment.reflective_renegotiation_response_handled"
-        and isinstance(event.payload.get("offer_id"), str)
+        for event in events_of(history, "commitment.reflective_renegotiation_response_handled")
+        if isinstance(event.payload.get("offer_id"), str)
     }
     offer = next(
         (
@@ -245,9 +240,8 @@ def _fits(
 def _response_due(history: Sequence[DomainEvent], offer_id: str) -> datetime:
     offered = next(
         event
-        for event in history
-        if event.kind == "commitment.renegotiation_offered"
-        and event.payload.get("offer_id") == offer_id
+        for event in events_of(history, "commitment.renegotiation_offered")
+        if event.payload.get("offer_id") == offer_id
     )
     offered_at = datetime.fromisoformat(str(offered.payload["simulated_at"]))
     delay_hours = 1 + int(_sample(f"response-delay-{offer_id}") * 5)

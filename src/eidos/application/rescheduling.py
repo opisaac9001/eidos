@@ -7,6 +7,7 @@ from typing import Sequence
 
 from eidos.application.renegotiations import next_feasible_interval
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.planning import PlanningState
 from eidos.domain.rescheduling import RescheduleProposal, resolve_reschedule
 from eidos.domain.world_catalog import WorldCatalog
@@ -25,16 +26,14 @@ def reflective_rescheduling_events(
         raise ValueError("Reflective rescheduling time must be timezone-aware")
     handled = {
         str(event.payload["source_decision_event_id"])
-        for event in history
-        if event.kind == "schedule.reflective_rescheduling_handled"
-        and isinstance(event.payload.get("source_decision_event_id"), str)
+        for event in events_of(history, "schedule.reflective_rescheduling_handled")
+        if isinstance(event.payload.get("source_decision_event_id"), str)
     }
     decision = next(
         (
             event
-            for event in history
-            if event.kind == "reflection.reconsideration_decided"
-            and event.aggregate_id == "pathos"
+            for event in events_of(history, "reflection.reconsideration_decided")
+            if event.aggregate_id == "pathos"
             and event.payload.get("target_type") == "schedule"
             and event.payload.get("decision") == "seek_new_time"
             and str(event.event_id) not in handled
@@ -44,15 +43,11 @@ def reflective_rescheduling_events(
     if decision is None:
         return []
     schedule_id = decision.payload.get("target_id")
-    created = next(
-        (
-            event
-            for event in reversed(history)
-            if event.kind == "schedule.created"
-            and event.aggregate_id == "pathos"
-            and event.payload.get("schedule_id") == schedule_id
+    created = kind_index(history).latest(
+        "schedule.created",
+        lambda event: (
+            event.aggregate_id == "pathos" and event.payload.get("schedule_id") == schedule_id
         ),
-        None,
     )
     entry = planning.calendar.get(schedule_id) if isinstance(schedule_id, str) else None
     if (

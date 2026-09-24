@@ -9,7 +9,7 @@ from typing import Mapping, Sequence
 from uuid import UUID
 
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold
+from eidos.domain.folding import IncrementalFold, event_index, payload_candidates
 
 
 class ScenePrivacy(StrEnum):
@@ -260,7 +260,7 @@ def resolve_scene_turn(
     if any(
         event.kind == "scene.turn_taken"
         and event.payload.get("proposal_id") == proposal.proposal_id
-        for event in history
+        for event in payload_candidates(history, "proposal_id", proposal.proposal_id)
     ):
         return _reject(proposed, "duplicate_proposal", "This scene turn already happened")
     scene = state.scenes.get(proposal.scene_id)
@@ -423,9 +423,7 @@ def resolve_scene_end(
     if proposal.actor_id not in {scene.initiator_id, scene.partner_id}:
         return _reject(proposed, "not_participant", "Only a participant can leave the scene")
     if proposal.reason is SceneEndReason.INTERRUPTED:
-        if proposal.source_event_id is None or not any(
-            event.event_id == proposal.source_event_id for event in history
-        ):
+        if proposal.source_event_id is None or not _has_event(history, proposal.source_event_id):
             return _reject(proposed, "missing_interruption", "An interruption needs a source event")
     ended = DomainEvent(
         "scene.ended",
@@ -461,7 +459,7 @@ def resolve_scene_interruption(
         return _reject(proposed, "closed_scene", "Only an active scene can be interrupted")
     if proposal.actor_id not in {scene.initiator_id, scene.partner_id}:
         return _reject(proposed, "not_participant", "Only a participant can pause the scene")
-    if not any(event.event_id == proposal.source_event_id for event in history):
+    if not _has_event(history, proposal.source_event_id):
         return _reject(proposed, "missing_interruption", "An interruption needs a real source")
     interrupted = DomainEvent(
         "scene.interrupted",
@@ -520,6 +518,13 @@ _SCENE_FOLD: IncrementalFold[SceneState] = IncrementalFold(
 
 def project_scenes(events: Sequence[DomainEvent]) -> SceneState:
     return _SCENE_FOLD(events)
+
+
+def _has_event(history: Sequence[DomainEvent], event_id: object) -> bool:
+    # UUIDs are equal exactly when their canonical texts are, the index's keys.
+    if isinstance(event_id, UUID):
+        return str(event_id) in event_index(history)
+    return any(event.event_id == event_id for event in history)
 
 
 def _proposal_event(kind: str, proposal_id: str, scene_id: str) -> DomainEvent:

@@ -7,6 +7,9 @@ from typing import Mapping, Sequence
 
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import event_index, events_of
+
+_LINK_KINDS = ("dream.inspiration_plan_linked", "dream.inspiration_project_linked")
 
 
 def dream_planning_workspace(
@@ -18,9 +21,7 @@ def dream_planning_workspace(
     if simulated_at.utcoffset() is None:
         raise ValueError("Dream planning time must be timezone-aware")
     recent_link = any(
-        event.kind in {"dream.inspiration_plan_linked", "dream.inspiration_project_linked"}
-        and _within(event, simulated_at, days=14)
-        for event in history
+        _within(event, simulated_at, days=14) for event in events_of(history, *_LINK_KINDS)
     )
     if not recent_link:
         return list(workspace)
@@ -152,29 +153,24 @@ def dream_plan_outcome_events(
         raise ValueError("Dream plan outcome time must be timezone-aware")
     terminal_link_ids = {
         str(event.payload["source_plan_link_id"])
-        for event in history
-        if event.kind in {"dream.inspiration_plan_realized", "dream.inspiration_plan_failed"}
-        and isinstance(event.payload.get("source_plan_link_id"), str)
+        for event in events_of(
+            history, "dream.inspiration_plan_realized", "dream.inspiration_plan_failed"
+        )
+        if isinstance(event.payload.get("source_plan_link_id"), str)
     }
-    dismissed_dream_ids = {
-        str(event.payload["source_dream_id"])
-        for event in history
-        if event.kind == "dream.inspiration_dismissed"
-        and isinstance(event.payload.get("source_dream_id"), str)
-    }
+    dismissed_dream_ids = _dismissed_dream_ids(history)
     output: list[DomainEvent] = []
-    for link in history:
+    links = events_of(history, "dream.inspiration_plan_linked")
+    outcomes = (
+        events_of(history, "agency.activity_realized", "agency.activity_missed") if links else []
+    )
+    for link in links:
         link_id = str(link.event_id)
-        if link.kind != "dream.inspiration_plan_linked" or link_id in terminal_link_ids:
+        if link_id in terminal_link_ids:
             continue
         schedule_id = link.payload.get("schedule_id")
         outcome = next(
-            (
-                event
-                for event in history
-                if event.kind in {"agency.activity_realized", "agency.activity_missed"}
-                and event.payload.get("schedule_id") == schedule_id
-            ),
+            (event for event in outcomes if event.payload.get("schedule_id") == schedule_id),
             None,
         )
         if outcome is None:
@@ -230,29 +226,22 @@ def dream_project_outcome_events(
         raise ValueError("Dream project outcome time must be timezone-aware")
     terminal_link_ids = {
         str(event.payload["source_project_link_id"])
-        for event in history
-        if event.kind in {"dream.inspiration_project_realized", "dream.inspiration_project_failed"}
-        and isinstance(event.payload.get("source_project_link_id"), str)
+        for event in events_of(
+            history, "dream.inspiration_project_realized", "dream.inspiration_project_failed"
+        )
+        if isinstance(event.payload.get("source_project_link_id"), str)
     }
-    dismissed_dream_ids = {
-        str(event.payload["source_dream_id"])
-        for event in history
-        if event.kind == "dream.inspiration_dismissed"
-        and isinstance(event.payload.get("source_dream_id"), str)
-    }
+    dismissed_dream_ids = _dismissed_dream_ids(history)
     output: list[DomainEvent] = []
-    for link in history:
+    links = events_of(history, "dream.inspiration_project_linked")
+    outcomes = events_of(history, "self_project.completed", "self_project.failed") if links else []
+    for link in links:
         link_id = str(link.event_id)
-        if link.kind != "dream.inspiration_project_linked" or link_id in terminal_link_ids:
+        if link_id in terminal_link_ids:
             continue
         proposal_id = link.payload.get("proposal_id")
         outcome = next(
-            (
-                event
-                for event in history
-                if event.kind in {"self_project.completed", "self_project.failed"}
-                and event.payload.get("proposal_id") == proposal_id
-            ),
+            (event for event in outcomes if event.payload.get("proposal_id") == proposal_id),
             None,
         )
         if outcome is None:
@@ -303,6 +292,14 @@ def dream_project_outcome_events(
             )
             dismissed_dream_ids.add(source_dream_id)
     return output
+
+
+def _dismissed_dream_ids(history: Sequence[DomainEvent]) -> set[str]:
+    return {
+        str(event.payload["source_dream_id"])
+        for event in events_of(history, "dream.inspiration_dismissed")
+        if isinstance(event.payload.get("source_dream_id"), str)
+    }
 
 
 def _matches_motif(motif: str, *proposals: DomainEvent) -> bool:
@@ -356,14 +353,13 @@ def _active_workspace_inspiration(
 
 def _inspiration_already_linked(history: Sequence[DomainEvent], inspiration: DomainEvent) -> bool:
     return any(
-        event.kind in {"dream.inspiration_plan_linked", "dream.inspiration_project_linked"}
-        and event.payload.get("source_inspiration_event_id") == str(inspiration.event_id)
-        for event in history
+        event.payload.get("source_inspiration_event_id") == str(inspiration.event_id)
+        for event in events_of(history, *_LINK_KINDS)
     )
 
 
 def _event_by_id(history: Sequence[DomainEvent], event_id: str) -> DomainEvent | None:
-    return next((event for event in history if str(event.event_id) == event_id), None)
+    return event_index(history).get(event_id)
 
 
 def _within(event: DomainEvent, simulated_at: datetime, *, days: int) -> bool:
