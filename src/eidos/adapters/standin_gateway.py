@@ -384,6 +384,9 @@ def _standin_pathos_text(
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
+    media = _standin_media_reply(message, context)
+    if media:
+        return media
     family = _standin_family_reply(message, context)
     if family:
         return family
@@ -1782,6 +1785,43 @@ def _standin_nature_reply(message: str) -> str | None:
         "a human on the other side of the screen. Bit of a strange thing to say out loud, "
         "honestly, but I'd rather you knew."
     )
+
+
+_MEDIA_CUES = {
+    "book": ("reading", "a book", "read anything"),
+    "series": ("watching", "a series", "on tv", "telly", "a show"),
+    "album": ("listening to", "music", "an album"),
+}
+
+
+def _standin_media_reply(message: str, context: dict[str, object]) -> str | None:
+    """What he's into at the moment, from what he's actually partway through."""
+    asked = next(
+        (kind for kind, cues in _MEDIA_CUES.items() if any(cue in message for cue in cues)), None
+    )
+    if asked is None:
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    media = selfhood.get("reading_watching_listening") if isinstance(selfhood, dict) else None
+    if not isinstance(media, dict):
+        return None
+    now = [item for item in media.get("currently", []) if isinstance(item, dict)]
+    item = next((entry for entry in now if entry.get("kind") == asked), None)
+    done = [entry for entry in media.get("recently_finished", []) if isinstance(entry, dict)]
+    if item is None:
+        if done:
+            last = done[-1]
+            return (
+                f"Nothing on the go right now. Last thing was {last['title']}; "
+                f"{last['what_he_thought']}."
+            )
+        return "Nothing at the moment, honestly. Open to suggestions."
+    verb = {"book": "Reading", "series": "Watching", "album": "Can't stop playing"}[asked]
+    reply = f"{verb} {item['title']} by {item['by']}, about {item['how_far']} in."
+    if done:
+        reply += f" Before that, {done[-1]['title']}: {done[-1]['what_he_thought']}."
+    return reply
 
 
 _FAMILY_CUES = {

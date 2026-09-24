@@ -340,6 +340,11 @@ def _effect(
             "sick_day": ("mastery", -0.02, -0.15, 0.2, 0.5),
             "called_off": ("affect", 0.0, -0.2, 0.35, 0.1),
         }.get(str(event.payload.get("kind")))
+    if event.kind == "media.finished":
+        liking = event.payload.get("liking")
+        if isinstance(liking, (int, float)) and not isinstance(liking, bool):
+            return ("curiosity", 0.06, round(0.6 * float(liking), 3), 0.25, 0.8)
+        return None
     if event.kind == "family.contact":
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)

@@ -79,6 +79,7 @@ from eidos.application.life_context import vars_for as vars_for
 from eidos.application.life_conversation import LifeConversation
 from eidos.application.life_snapshot import build_snapshot
 from eidos.application.lived_activity_window import lived_activity_window
+from eidos.application.media import media_events
 from eidos.application.memory import (
     RecalledMemory,
     memory_archive_page,
@@ -113,7 +114,7 @@ from eidos.application.outreach import outreach_events
 from eidos.application.personal_journeys import journey_context
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
-from eidos.application.place_discovery import place_discovery_events
+from eidos.application.place_discovery import known_place_ids, place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
 from eidos.application.recollection_correction import recollection_correction_events
@@ -591,6 +592,7 @@ class Life(LifeConversation):
             self._phase_perception(tick)
             await self._phase_townsfolk(tick)
             self._phase_family(tick)
+            self._phase_media(tick)
             await self._phase_npc_agency(tick)
             self._phase_callers(tick)
             await self._phase_social(tick)
@@ -1319,6 +1321,31 @@ class Life(LifeConversation):
             )
             if not self.authored_scenario
             else []
+        )
+
+    def _phase_media(self, tick: _Tick) -> None:
+        """The book before bed, the series on a free evening, the album on repeat."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        occupied = any(
+            entry.status == "scheduled"
+            and entry.actor_id in {None, "pathos"}
+            and datetime.fromisoformat(entry.starts_at)
+            <= current
+            < datetime.fromisoformat(entry.ends_at or entry.starts_at)
+            for entry in self._planning(history + pending).calendar.values()
+        )
+        catalog = self._world_catalog(history + pending)
+        pending.extend(
+            media_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                free=not tick.pathos_busy and not occupied,
+                known_places=known_place_ids(history + pending, catalog),
+            )
         )
 
     def _phase_family(self, tick: _Tick) -> None:

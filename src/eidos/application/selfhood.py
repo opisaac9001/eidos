@@ -22,6 +22,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from eidos.application.family import family_context
+from eidos.application.media import media_context
 from eidos.application.user_notes import user_knowledge_context
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -858,6 +859,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "his_people": _his_people(history, simulated_at),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
+        "reading_watching_listening": media_context(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (
@@ -1016,6 +1018,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "feeling_unwell": _feeling_unwell(history),
         "his_people": _his_people(history, simulated_at),
         "family": family_context(history, simulated_at),
+        "reading_watching_listening": media_context(history),
         "about_you": user_knowledge_context(history, simulated_at),
         "tastes": [
             {

@@ -493,6 +493,8 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "media.finished" and float(p.get("liking", 0)) >= 0.2:
+        return (("curiosity", 1, "finished something I got a lot out of"),)
     if kind == "family.contact" and not p.get("missed"):
         return (("care", 1, "kept in touch with family"),)
     if kind == "family.call_owed":

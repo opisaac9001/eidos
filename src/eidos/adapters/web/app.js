@@ -1153,6 +1153,24 @@ function renderSelf() {
           `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">Bought ${esc(item.item)}</span><span class="moment-meta">${esc(VALUE_NAMES[item.value_id] || words(item.value_id))} · ${date(item.at)}</span></div>`,
       )
       .join("");
+  // Whatever he's partway through, and what he made of the last few.
+  const media = self.reading_watching_listening || { currently: [], recently_finished: [] };
+  const verb = { book: "Reading", series: "Watching", album: "Listening to" };
+  $("self-media").innerHTML =
+    (media.currently || [])
+      .map(
+        (item) =>
+          `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">${esc(verb[item.kind] || "")} ${esc(item.title)}<small>${esc(item.by)}</small></span><span class="moment-meta">${esc(item.how_far)}</span></div>`,
+      )
+      .join("") +
+      (media.recently_finished || [])
+        .slice()
+        .reverse()
+        .map(
+          (item) =>
+            `<div class="moment ${item.gave_up ? "away" : ""}"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(item.title)}<small>${esc(item.by)}</small></span><span class="moment-meta">${esc(item.what_he_thought)}</span></div>`,
+        )
+        .join("") || '<p class="empty-note">Nothing on the go yet.</p>';
   // His own loose picture of your life, from what you've told him.
   const aboutYou = self.about_you || { what_he_knows_about_you: [], things_to_ask_you_about: [] };
   $("self-you").innerHTML =
