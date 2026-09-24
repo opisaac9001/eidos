@@ -4,14 +4,18 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from eidos.application.activity_execution import _timeline, execution_events
+from eidos.application.activity_execution import (
+    _timeline_events,
+    _timeline_since,
+    execution_events,
+)
 from eidos.application.dream_planning import dream_plan_outcome_events, dream_project_outcome_events
 from eidos.application.personal_journeys import journey_window_events
 from eidos.application.phone_calls import complete_answered_call
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold
+from eidos.domain.folding import IncrementalFold, events_of
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.scenes import project_scenes
@@ -45,11 +49,11 @@ def lived_activity_window(
     available_pence: int = 0,
 ) -> list[DomainEvent]:
     journeys = journey_window_events(history, planning, catalog, since, now)
-    closed_calls = {e.payload.get("call_id") for e in history if e.kind == "phone.call_completed"}
+    closed_calls = {e.payload.get("call_id") for e in events_of(history, "phone.call_completed")}
     calls = [
         e
-        for e in history
-        if e.kind == "phone.call_answered" and e.payload.get("call_id") not in closed_calls
+        for e in events_of(history, "phone.call_answered")
+        if e.payload.get("call_id") not in closed_calls
     ]
     if (
         not calls
@@ -86,8 +90,8 @@ def lived_activity_window(
         "phone.call_completed",
         "object.condition_changed",
     }
-    for at, _, event in _timeline([*history, *journeys], now):
-        if since <= at and event.kind in relevant:
+    for at, _, event in _timeline_since([*history, *journeys], since, now):
+        if event.kind in relevant:
             points.add(at)
     for entry in planning.calendar.values():
         if entry.status != "scheduled":
@@ -105,7 +109,7 @@ def lived_activity_window(
         processed.add(at)
         crossing = [e for e in journeys if e.payload["simulated_at"] == at.isoformat()]
         output.extend(e for e in crossing if e.kind != "pathos.travel_started")
-        visible = [e for _, _, e in _timeline([*history, *output], at)]
+        visible = _timeline_events([*history, *output], at)
         projected = project_planning(visible)
         state = _VISIBLE_STATE(visible)
         visitor_scene = next(

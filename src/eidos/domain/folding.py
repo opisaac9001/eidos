@@ -35,6 +35,16 @@ class _Entry(Generic[S]):
         self.state = state
 
 
+class EventView(list[DomainEvent]):
+    """A list of history's events in some other order, such as by simulated time.
+
+    It is an ordinary list; its type only tells ``IncrementalFold`` to cache it apart from
+    history-ordered sequences, which it rarely shares more than a short prefix with.
+    """
+
+    __slots__ = ()
+
+
 class IncrementalFold(Generic[S]):
     """Folds ``step`` over events, reusing the longest identical cached prefix."""
 
@@ -64,9 +74,11 @@ class IncrementalFold(Generic[S]):
 
         ``key`` separates folds whose initial state differs (for example by the hour a
         seed schedule is sampled at); ``initial`` overrides the default seed for that key.
+        Sequences of different types are cached apart, so an ``EventView`` never evicts the
+        history-ordered sequences it cannot share a prefix with, nor they it.
         """
         with self._lock:
-            entries = self._entries.setdefault(key, [])
+            entries = self._entries.setdefault((key, type(events)), [])
             best: _Entry[S] | None = None
             for entry in entries:
                 size = len(entry.events)
@@ -110,6 +122,53 @@ class IncrementalFold(Generic[S]):
         if entries[0] is not entry:
             entries.remove(entry)
             entries.insert(0, entry)
+
+
+R = TypeVar("R")
+
+
+class LinearReplay(Generic[S]):
+    """One mutable replay state for a sequence that grows call after call.
+
+    Some derived data is too rich to keep as immutable fold states. ``advance(state, events,
+    start)`` brings ``state`` up to date with ``events[start:]`` in place. A call whose
+    events extend the previously replayed sequence (the identical prefix test of
+    ``IncrementalFold``) continues it; any other sequence is replayed from ``initial()``.
+    The state is only lent to ``read`` under a lock, which must not keep or modify it.
+    """
+
+    def __init__(
+        self,
+        initial: Callable[[], S],
+        advance: Callable[[S, Sequence[DomainEvent], int], None],
+    ) -> None:
+        self._initial = initial
+        self._advance = advance
+        self._events: list[DomainEvent] = []
+        self._state: S | None = None
+        self._lock = Lock()
+
+    def use(self, events: Sequence[DomainEvent], read: Callable[[S], R]) -> R:
+        with self._lock:
+            state, size = self._state, len(self._events)
+            if (
+                state is None
+                or size > len(events)
+                or (size and self._events[size - 1] is not events[size - 1])
+                or not (
+                    events[:size] == self._events
+                    if isinstance(events, list)
+                    else all(map(operator.is_, self._events, events))
+                )
+            ):
+                state, size = self._initial(), -1
+            # A replay that fails part way must not be continued later.
+            self._state = None
+            self._advance(state, events, max(0, size))
+            if size != len(events):
+                self._events = list(events)
+            self._state = state
+            return read(state)
 
 
 K = TypeVar("K", bound=Hashable)
@@ -364,6 +423,21 @@ def events_of(events: Sequence[DomainEvent], *kinds: str) -> list[DomainEvent]:
     Exactly ``[event for event in events if event.kind in kinds]``, as a fresh list.
     """
     return _KIND_INDEX(events).select(*kinds)
+
+
+def kind_subset_index(*kinds: str) -> Callable[[Sequence[DomainEvent]], GroupIndex]:
+    """A private, incrementally maintained index of just ``kinds``, grouped by kind.
+
+    Unlike ``kind_index`` its cache is its own, so sequences that are folded only now and
+    then (time-ordered views of history, say) are not evicted by the shared index's traffic,
+    and it records nothing but the kinds asked for.
+    """
+    wanted = frozenset(kinds)
+    fold: IncrementalFold[GroupIndex] = IncrementalFold(
+        GroupIndex,
+        lambda index, event: index.with_event(event.kind if event.kind in wanted else None, event),
+    )
+    return fold
 
 
 def events_with_prefix(events: Sequence[DomainEvent], prefix: str) -> list[DomainEvent]:

@@ -4,15 +4,17 @@ No completion is inferred from a booking. Work starts when observed eligible and
 only eligible elapsed intervals count. These records are not new commitments.
 """
 
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from hashlib import sha256
+from threading import Lock
 from typing import Callable, NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.application.work_rota import EMPLOYER_ID, ROTA_PREFIX
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold, events_of, events_with_prefix
+from eidos.domain.folding import EventView, IncrementalFold, events_of, events_with_prefix
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
@@ -68,10 +70,11 @@ def duration_requirement(
 class _Timeline(NamedTuple):
     """History ordered by simulated time; events without a time inherit the clock.
 
-    ``keys``/``entries`` are append-only lists shared between successive states, each of
-    which reads only its first ``size`` items. Appending in time order (the common case)
-    extends the shared list in place; a state whose lists have already grown past it (a
-    divergent branch) or an out-of-order event copies first. Old states stay valid.
+    ``keys``/``entries``/``events`` are append-only lists shared between successive states,
+    each of which reads only its first ``size`` items; ``events`` holds each entry's event.
+    Appending in time order (the common case) extends the shared lists in place; a state
+    whose lists have already grown past it (a divergent branch) or an out-of-order event
+    copies first. Old states stay valid, and a list's items never change once written.
     """
 
     seen: int
@@ -79,6 +82,7 @@ class _Timeline(NamedTuple):
     size: int
     keys: list[tuple[datetime, int]]
     entries: list[tuple[datetime, int, DomainEvent]]
+    events: list[DomainEvent]
 
 
 def _timeline_folder(
@@ -105,23 +109,25 @@ def _timeline_folder(
             return timeline._replace(seen=index + 1, clock=clock)
         key = (at, index)
         size = timeline.size
-        keys, entries = timeline.keys, timeline.entries
+        keys, entries, events = timeline.keys, timeline.entries, timeline.events
         if size and key < keys[size - 1]:
             position = bisect_right(keys, key, 0, size)
             keys = [*keys[:position], key, *keys[position:size]]
             entries = [*entries[:position], (at, index, event), *entries[position:size]]
+            events = [*events[:position], event, *events[position:size]]
         else:
             if len(keys) != size:
-                keys, entries = keys[:size], entries[:size]
+                keys, entries, events = keys[:size], entries[:size], events[:size]
             keys.append(key)
             entries.append((at, index, event))
-        return _Timeline(index + 1, clock, size + 1, keys, entries)
+            events.append(event)
+        return _Timeline(index + 1, clock, size + 1, keys, entries, events)
 
     return step
 
 
 _TIMELINE_FOLD: IncrementalFold[_Timeline] = IncrementalFold(
-    lambda: _Timeline(0, None, 0, [], []), _timeline_folder(lambda _event: True), capacity=8
+    lambda: _Timeline(0, None, 0, [], [], []), _timeline_folder(lambda _event: True), capacity=8
 )
 
 # activity_effort only changes state at these events; skipping the rest cannot change the
@@ -154,7 +160,7 @@ _EFFORT_KINDS = frozenset(
     }
 )
 _EFFORT_FOLD: IncrementalFold[_Timeline] = IncrementalFold(
-    lambda: _Timeline(0, None, 0, [], []),
+    lambda: _Timeline(0, None, 0, [], [], []),
     _timeline_folder(lambda event: event.kind in _EFFORT_KINDS or event.kind.startswith("object.")),
     capacity=8,
 )
@@ -169,6 +175,202 @@ def _timeline(
     history: Sequence[DomainEvent], now: datetime
 ) -> list[tuple[datetime, int, DomainEvent]]:
     return _visible(_TIMELINE_FOLD(history), now)
+
+
+def _timeline_since(
+    history: Sequence[DomainEvent], since: datetime, now: datetime
+) -> list[tuple[datetime, int, DomainEvent]]:
+    """The entries of ``_timeline(history, now)`` timed at or after ``since``, in order."""
+    timeline = _TIMELINE_FOLD(history)
+    visible = bisect_right(timeline.keys, (now, timeline.seen), 0, timeline.size)
+    # Positions are never negative, so this finds the first entry timed at ``since``.
+    first = bisect_left(timeline.keys, (since, -1), 0, visible)
+    return timeline.entries[first:visible]
+
+
+def _timeline_events(history: Sequence[DomainEvent], now: datetime) -> EventView:
+    """``[event for _, _, event in _timeline(history, now)]``, as a time-ordered view."""
+    timeline = _TIMELINE_FOLD(history)
+    visible = bisect_right(timeline.keys, (now, timeline.seen), 0, timeline.size)
+    return EventView(timeline.events[:visible])
+
+
+class _EffortReplay:
+    """activity_effort's running state after replaying the first ``count`` timeline entries.
+
+    The replay depends only on the entry's identity and window and on the effort timeline.
+    A timeline's ``entries`` list is append-only for as long as it is shared, so a replay
+    of one list's prefix stays exact and later calls continue it from ``count`` instead of
+    walking the whole life again.
+    """
+
+    __slots__ = (
+        "entries",
+        "count",
+        "entry",
+        "resource_id",
+        "colleagues",
+        "location",
+        "awake",
+        "scenes",
+        "active_scenes",
+        "companion_location",
+        "occupied",
+        "running",
+        "cursor",
+        "worked",
+        "began",
+        "resource",
+        "window_start",
+        "window_end",
+    )
+
+    def __init__(
+        self,
+        entries: list[tuple[datetime, int, DomainEvent]],
+        entry: CalendarEntry,
+        resource_id: str | None,
+        colleagues: frozenset[str],
+        window_start: datetime,
+        window_end: datetime,
+    ) -> None:
+        self.entries = entries
+        self.count = 0
+        self.entry = entry
+        self.resource_id = resource_id
+        self.colleagues = colleagues
+        self.location = "home"
+        self.awake = False
+        # Scenes Pathos joined, and those of them currently under way.
+        self.scenes: set[str] = set()
+        self.active_scenes: set[str] = set()
+        self.companion_location: object = None
+        self.occupied: set[str] = set()
+        self.running = False
+        self.cursor = window_start
+        self.worked = 0.0
+        self.began: str | None = None
+        self.resource: dict[str, object] | None = None
+        self.window_start = window_start
+        self.window_end = window_end
+
+    def reason(self) -> str | None:
+        entry, resource = self.entry, self.resource
+        # On a stay somewhere (Christmas at his parents'), sleeping there is being there.
+        if not self.awake and entry.activity_type not in STAYS:
+            return "asleep"
+        if self.location != entry.location_id:
+            return "elsewhere"
+        if self.resource_id and (
+            resource is None
+            or resource.get("location_id") != self.location
+            or resource.get("custodian_id") not in {"pathos", "community"}
+            or resource.get("quantity") == 0
+            or (entry.action != "repair" and resource.get("condition") == "broken")
+            or (entry.action == "repair" and resource.get("condition") != "broken")
+        ):
+            return "resource_unavailable"
+        if self.active_scenes:
+            return "conversation"
+        if self.occupied:
+            return "interruption"
+        if entry.companion_id and self.companion_location != entry.location_id:
+            return "companion_absent"
+        return None
+
+    def advance(self, stop: int) -> None:
+        entry, resource_id, colleagues = self.entry, self.resource_id, self.colleagues
+        for at, _, event in self.entries[self.count : stop]:
+            boundary = min(at, self.window_end)
+            if self.running and boundary > self.cursor and self.reason() is None:
+                self.worked += (boundary - self.cursor).total_seconds()
+            self.cursor = max(self.cursor, boundary)
+            p = event.payload
+            if event.aggregate_id != "pathos":
+                continue
+            if event.kind == "pathos.travel_started":
+                self.location = "in_transit"
+            elif event.kind == "pathos.moved":
+                self.location = str(p["location_id"])
+            elif (
+                resource_id
+                and p.get("object_id") == resource_id
+                and event.kind.startswith("object.")
+            ):
+                if event.kind == "object.registered":
+                    self.resource = dict(p)
+                elif self.resource is not None:
+                    self.resource.update(
+                        {
+                            key: p[key]
+                            for key in ("location_id", "custodian_id", "quantity", "condition")
+                            if key in p
+                        }
+                    )
+            elif p.get("schedule_id") == entry.schedule_id and event.kind in {
+                "schedule.interrupted",
+                "schedule.cancelled",
+                "schedule.failed",
+                "schedule.completed",
+            }:
+                self.running = False
+            elif p.get("schedule_id") == entry.schedule_id and event.kind == "schedule.rescheduled":
+                self.window_start = datetime.fromisoformat(str(p["starts_at"]))
+                self.window_end = datetime.fromisoformat(str(p["ends_at"]))
+                self.cursor = max(at, self.window_start)
+                self.running = False
+            elif event.kind == "sleep.started":
+                self.awake = False
+            elif event.kind == "sleep.ended":
+                self.awake = True
+            elif event.kind == "incident.response_started":
+                self.occupied.add(str(p.get("incident_id")))
+            elif event.kind == "phone.call_answered":
+                self.occupied.add(f"phone:{p['call_id']}")
+            elif event.kind == "phone.call_completed":
+                self.occupied.discard(f"phone:{p['call_id']}")
+            elif event.kind in {"incident.response_completed", "incident.response_abandoned"}:
+                self.occupied.discard(str(p.get("incident_id")))
+            elif (
+                event.kind == "scene.started"
+                and "pathos" in {p.get("initiator_id"), p.get("partner_id")}
+                and not {p.get("initiator_id"), p.get("partner_id")} <= colleagues
+            ):
+                self.scenes.add(str(p["scene_id"]))
+                self.active_scenes.add(str(p["scene_id"]))
+            elif event.kind in {"scene.ended", "scene.interrupted", "scene.resumed"}:
+                if str(p.get("scene_id")) in self.scenes:
+                    if event.kind == "scene.resumed":
+                        self.active_scenes.add(str(p["scene_id"]))
+                    else:
+                        self.active_scenes.discard(str(p["scene_id"]))
+            elif p.get("actor_id") == entry.companion_id and entry.companion_id:
+                if event.kind == "npc.moved":
+                    self.companion_location = p.get("location_id")
+                elif event.kind == "npc.travel_started":
+                    self.companion_location = None
+            elif (
+                event.kind == "activity.execution_started"
+                and p.get("schedule_id") == entry.schedule_id
+            ):
+                self.running = True
+                self.began = at.isoformat()
+                self.cursor = max(self.window_start, at)
+            elif (
+                event.kind in {"activity.execution_paused", "activity.execution_resumed"}
+                and p.get("schedule_id") == entry.schedule_id
+            ):
+                self.running = event.kind == "activity.execution_resumed"
+                self.cursor = max(self.cursor, self.window_start, at)
+                if self.running and p.get("resume_after"):
+                    self.cursor = max(self.cursor, datetime.fromisoformat(str(p["resume_after"])))
+        self.count = stop
+
+
+_EFFORT_REPLAYS: OrderedDict[tuple[object, ...], list[_EffortReplay]] = OrderedDict()
+_EFFORT_REPLAYS_LOCK = Lock()
+_EFFORT_REPLAY_CAPACITY = 64
+_EFFORT_REPLAYS_PER_ENTRY = 4
 
 
 def activity_effort(
@@ -196,123 +398,50 @@ def activity_effort(
     if first and first.payload.get("window_starts_at"):
         window_start = datetime.fromisoformat(str(first.payload["window_starts_at"]))
         window_end = datetime.fromisoformat(str(first.payload["window_ends_at"]))
-    location, awake = "home", False
-    scenes: dict[str, bool] = {}
     # On a shift, talking with Ellis at the bench is part of the work, not a break from it.
     colleagues = (
         frozenset({"pathos", EMPLOYER_ID})
         if entry.schedule_id.startswith(ROTA_PREFIX)
         else frozenset({"pathos"})
     )
-    companion_location = None
-    occupied: set[str] = set()
-    running = False
-    cursor = window_start
-    worked = 0.0
-    began = None
-    resource: dict[str, object] | None = None
     resource_id = entry.target_id if entry.action == "repair" else entry.resource_id
-
-    def reason() -> str | None:
-        # On a stay somewhere (Christmas at his parents'), sleeping there is being there.
-        if not awake and entry.activity_type not in STAYS:
-            return "asleep"
-        if location != entry.location_id:
-            return "elsewhere"
-        if resource_id and (
-            resource is None
-            or resource.get("location_id") != location
-            or resource.get("custodian_id") not in {"pathos", "community"}
-            or resource.get("quantity") == 0
-            or (entry.action != "repair" and resource.get("condition") == "broken")
-            or (entry.action == "repair" and resource.get("condition") != "broken")
-        ):
-            return "resource_unavailable"
-        if any(scenes.values()):
-            return "conversation"
-        if occupied:
-            return "interruption"
-        if entry.companion_id and companion_location != entry.location_id:
-            return "companion_absent"
-        return None
-
-    for at, _, event in _visible(_EFFORT_FOLD(history), now):
-        boundary = min(at, window_end)
-        if running and boundary > cursor and reason() is None:
-            worked += (boundary - cursor).total_seconds()
-        cursor = max(cursor, boundary)
-        p = event.payload
-        if event.aggregate_id != "pathos":
-            continue
-        if event.kind == "pathos.travel_started":
-            location = "in_transit"
-        elif event.kind == "pathos.moved":
-            location = str(p["location_id"])
-        elif resource_id and p.get("object_id") == resource_id and event.kind.startswith("object."):
-            if event.kind == "object.registered":
-                resource = dict(p)
-            elif resource is not None:
-                resource.update(
-                    {
-                        key: p[key]
-                        for key in ("location_id", "custodian_id", "quantity", "condition")
-                        if key in p
-                    }
-                )
-        elif p.get("schedule_id") == entry.schedule_id and event.kind in {
-            "schedule.interrupted",
-            "schedule.cancelled",
-            "schedule.failed",
-            "schedule.completed",
-        }:
-            running = False
-        elif p.get("schedule_id") == entry.schedule_id and event.kind == "schedule.rescheduled":
-            window_start = datetime.fromisoformat(str(p["starts_at"]))
-            window_end = datetime.fromisoformat(str(p["ends_at"]))
-            cursor = max(at, window_start)
-            running = False
-        elif event.kind == "sleep.started":
-            awake = False
-        elif event.kind == "sleep.ended":
-            awake = True
-        elif event.kind == "incident.response_started":
-            occupied.add(str(p.get("incident_id")))
-        elif event.kind == "phone.call_answered":
-            occupied.add(f"phone:{p['call_id']}")
-        elif event.kind == "phone.call_completed":
-            occupied.discard(f"phone:{p['call_id']}")
-        elif event.kind in {"incident.response_completed", "incident.response_abandoned"}:
-            occupied.discard(str(p.get("incident_id")))
-        elif (
-            event.kind == "scene.started"
-            and "pathos" in {p.get("initiator_id"), p.get("partner_id")}
-            and not {p.get("initiator_id"), p.get("partner_id")} <= colleagues
-        ):
-            scenes[str(p["scene_id"])] = True
-        elif event.kind in {"scene.ended", "scene.interrupted", "scene.resumed"}:
-            if str(p.get("scene_id")) in scenes:
-                scenes[str(p["scene_id"])] = event.kind == "scene.resumed"
-        elif p.get("actor_id") == entry.companion_id and entry.companion_id:
-            if event.kind == "npc.moved":
-                companion_location = p.get("location_id")
-            elif event.kind == "npc.travel_started":
-                companion_location = None
-        elif (
-            event.kind == "activity.execution_started" and p.get("schedule_id") == entry.schedule_id
-        ):
-            running = True
-            began = at.isoformat()
-            cursor = max(window_start, at)
-        elif (
-            event.kind in {"activity.execution_paused", "activity.execution_resumed"}
-            and p.get("schedule_id") == entry.schedule_id
-        ):
-            running = event.kind == "activity.execution_resumed"
-            cursor = max(cursor, window_start, at)
-            if running and p.get("resume_after"):
-                cursor = max(cursor, datetime.fromisoformat(str(p["resume_after"])))
+    timeline = _EFFORT_FOLD(history)
+    visible = bisect_right(timeline.keys, (now, timeline.seen), 0, timeline.size)
+    key = (
+        entry.schedule_id,
+        entry.location_id,
+        entry.action,
+        entry.activity_type,
+        entry.companion_id,
+        resource_id,
+        colleagues,
+        window_start,
+        window_end,
+    )
+    with _EFFORT_REPLAYS_LOCK:
+        # History-ordered and time-ordered sequences keep separate timelines, so an entry
+        # keeps a replay for each of the few timelines it was last asked about.
+        replays = _EFFORT_REPLAYS.pop(key, [])
+        replay = max(
+            (r for r in replays if r.entries is timeline.entries and r.count <= visible),
+            key=lambda r: r.count,
+            default=None,
+        )
+        if replay is None:
+            replay = _EffortReplay(
+                timeline.entries, entry, resource_id, colleagues, window_start, window_end
+            )
+        else:
+            replays.remove(replay)
+        replay.advance(visible)
+        _EFFORT_REPLAYS[key] = [replay, *replays[: _EFFORT_REPLAYS_PER_ENTRY - 1]]
+        while len(_EFFORT_REPLAYS) > _EFFORT_REPLAY_CAPACITY:
+            _EFFORT_REPLAYS.popitem(last=False)
+        running, cursor, worked, began = replay.running, replay.cursor, replay.worked, replay.began
+        window_start, window_end = replay.window_start, replay.window_end
+        blocked_by = replay.reason()
     boundary = min(now, window_end)
-    if running and boundary > cursor and reason() is None:
+    if running and boundary > cursor and blocked_by is None:
         worked += (boundary - cursor).total_seconds()
     return {
         "schedule_id": entry.schedule_id,
@@ -323,7 +452,7 @@ def activity_effort(
         "estimated_seconds": estimated,
         "estimate_confidence": estimate_confidence,
         "remaining_seconds": max(0.0, required - worked),
-        "blocked_by": reason(),
+        "blocked_by": blocked_by,
         # Nearly there when the reserved time runs out, he stays the few extra minutes.
         "ready": began is not None
         and (
@@ -335,14 +464,14 @@ def activity_effort(
                 # the bench: the chat ends and he finishes up. Away, asleep or called off
                 # to something else, it stays unfinished.
                 and (
-                    reason() is None
-                    or (reason() == "conversation" and required >= LONG_STINT_SECONDS)
+                    blocked_by is None
+                    or (blocked_by == "conversation" and required >= LONG_STINT_SECONDS)
                 )
             )
         ),
         "window_ended": now >= end,
         "is_working": running
-        and reason() is None
+        and blocked_by is None
         and window_start <= now < window_end
         and worked < required,
         "action_authority": False,
@@ -564,7 +693,7 @@ def execution_context(
     # memory. Only present/recent activity is supplied directly to performers.
     recent = {
         e.payload.get("schedule_id")
-        for at, _, e in _timeline(history, now)
+        for at, _, e in _timeline_since(history, now - timedelta(hours=2), now)
         if e.kind.startswith("activity.execution_") and (now - at).total_seconds() <= 3600
     }
     output = []
