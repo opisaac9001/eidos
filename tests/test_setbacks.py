@@ -133,20 +133,42 @@ def test_friction_left_alone_sets_in_after_two_weeks() -> None:
     raise AssertionError("no friction found")
 
 
-def test_he_notices_a_friend_he_has_not_seen_in_weeks() -> None:
-    met = DomainEvent(
-        "npc.encountered",
-        "pathos",
-        {"person_id": "mara", "simulated_at": MONDAY.isoformat(), "text": "Hi."},
-    )
-    history = [identity_established_event(MONDAY.isoformat()), met]
-    sunday = MONDAY + timedelta(days=13, hours=19)
-    assert run(history, sunday, known=frozenset({"mara"})) == []
-    later = MONDAY + timedelta(days=27, hours=19)
-    output = run(history, later, known=frozenset({"mara"}))
+def test_only_a_lighter_friendship_drifts_and_a_close_friend_never_does() -> None:
+    def met(person: str, day: int) -> DomainEvent:
+        return DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {
+                "person_id": person,
+                "simulated_at": (MONDAY + timedelta(days=day)).isoformat(),
+                "text": "Hi.",
+            },
+        )
+
+    def together(person: str, day: int, kind: str = "social.activity_completed") -> DomainEvent:
+        return DomainEvent(
+            kind,
+            "pathos",
+            {"person_id": person, "simulated_at": (MONDAY + timedelta(days=day)).isoformat()},
+        )
+
+    known = frozenset({"mara", "rowan", "ellis"})
+    history = [identity_established_event(MONDAY.isoformat())]
+    for day in range(0, 120, 2):
+        history += [met("mara", day), together("mara", day)]  # a real friend, lightly kept
+        history += [met("ellis", day), together("ellis", day)]  # and a deep one
+    history += [together("ellis", day, "incident.shared_aftermath") for day in (10, 40, 90)]
+    history.append(met("rowan", 5))  # someone he met once
+    sunday = MONDAY + timedelta(days=118 + 7 * 3, hours=19)
+    assert sunday.weekday() == 6
+    assert run(history, sunday, known=known) == []  # a few weeks apart is nothing
+    much_later = MONDAY + timedelta(days=118 + 7 * 8, hours=19)
+    output = run(history, much_later, known=known)
     assert output[0].payload["kind"] == "friendship_drift"
+    assert output[0].payload["person_id"] == "mara"
     assert value_evidence(output[0])[0][:2] == ("care", -1)
-    assert run([*history, *output], later + timedelta(days=7), known=frozenset({"mara"})) == []
+    history += output
+    assert run(history, much_later + timedelta(days=7), known=known) == []
 
 
 def unwell(at: datetime, severity: float) -> DomainEvent:

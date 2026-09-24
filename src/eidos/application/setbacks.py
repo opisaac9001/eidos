@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.friendship import friendships
 from eidos.application.town_calendar import called_off, occurrence_starting
 from eidos.application.work_rota import ROTA_PREFIX
 from eidos.domain.events import DomainEvent
@@ -27,7 +28,7 @@ FRICTION_CHANCE = 0.05
 FRICTION_CHANCE_AFTER_SHORT_SHIFT = 0.35
 QUIET_WEEK_CHANCE = 0.035
 SICK_DAY_SEVERITY = 0.45  # Bad enough that he would not be much use at the bench.
-DRIFT_AFTER = timedelta(days=21)
+DRIFT_AFTER = timedelta(days=45)  # the grace a real-connection friendship has
 REPAIR_WINDOW = timedelta(days=14)
 
 EXPENSES: tuple[tuple[str, str, int], ...] = (
@@ -483,10 +484,16 @@ def _friendship_drift(
                 raw = payload.get("simulated_at")
                 moment = raw if isinstance(raw, datetime) else datetime.fromisoformat(str(raw))
                 last_contact[person] = moment
+    # Only a friendship that still needs keeping up can drift. Acquaintances fade without
+    # anyone minding, and a close friend stays a close friend however long it has been.
+    depth = friendships(history, at)
     drifting = sorted(
         person
         for person, seen in last_contact.items()
-        if at - seen >= DRIFT_AFTER and not _occurred(history, f"drift-{person}-{seen.date()}")
+        if at - seen >= DRIFT_AFTER
+        and person in depth
+        and depth[person].tier == "real connection"
+        and not _occurred(history, f"drift-{person}-{seen.date()}")
     )
     if not drifting:
         return []

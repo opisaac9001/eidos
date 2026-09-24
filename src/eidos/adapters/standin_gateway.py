@@ -1781,7 +1781,8 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
     you = next((item["bond"] for item in people if item.get("person") == "you"), None)
     if about_us:
         return {
-            "close": "Honestly? You're one of my closest people. I don't say that lightly.",
+            "closest": "Honestly? You're one of my closest people. I don't say that lightly.",
+            "close": "Yeah. You're a real friend; someone I can count on.",
             "friend": "Yeah, I'd say we're friends now. It crept up on me.",
             "drifted": "We were, I think. It's been a while, though. I'd like it to be again.",
         }.get(
@@ -1790,9 +1791,9 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
             "again in a few weeks.",
         )
     others = [item for item in people if item.get("person") != "you"]
-    close = [str(item["person"]) for item in others if item.get("bond") == "close"]
+    close = [str(item["person"]) for item in others if item.get("bond") in {"close", "closest"}]
     friends = [str(item["person"]) for item in others if item.get("bond") == "friend"]
-    strained = [str(item["person"]) for item in others if item.get("bond") == "strained"]
+    strained = [str(item["person"]) for item in others if item.get("strained")]
     if not close and not friends:
         regulars = [str(item).split(",")[0] for item in selfhood.get("people_he_says_hello_to", [])]
         if regulars:

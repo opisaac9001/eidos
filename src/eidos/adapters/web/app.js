@@ -1155,18 +1155,22 @@ function renderSelf() {
       .join("");
   // Who his people are, as he has come to feel it; you are among them if he feels so.
   const bondWords = {
-    close: "one of his closest people",
-    friend: "a proper friend",
-    strained: "things are strained",
+    closest: "one of his closest people",
+    close: "a close friend",
+    friend: "a friend",
     drifted: "drifted apart lately",
   };
   const people = self.his_people || [];
   $("self-people").innerHTML = people.length
     ? people
-        .map(
-          (item) =>
-            `<div class="moment ${item.bond === "strained" || item.bond === "drifted" ? "away" : "toward"}"><span class="moment-mark" aria-hidden="true">${item.bond === "close" ? "●" : "○"}</span><span class="moment-text">${esc(item.person === "you" ? "You" : item.person)}</span><span class="moment-meta">${esc(bondWords[item.bond] || item.bond)}</span></div>`,
-        )
+        .map((item) => {
+          const notes = [
+            item.what_they_are_to_him || bondWords[item.bond] || item.bond,
+            item.strained ? "a bit strained just now" : "",
+            item.out_of_touch ? "haven't seen each other in a while" : "",
+          ].filter(Boolean);
+          return `<div class="moment ${item.strained ? "away" : "toward"}"><span class="moment-mark" aria-hidden="true">${item.bond === "closest" || item.bond === "close" ? "●" : "○"}</span><span class="moment-text">${esc(item.person === "you" ? "You" : item.person)}</span><span class="moment-meta">${esc(notes.join(" · "))}</span></div>`;
+        })
         .join("")
     : '<p class="empty-note">Nobody has become a friend yet. That takes time and turning up.</p>';
   // Tastes are earned by going and doing; a change of heart is kept, not hidden.
@@ -1649,7 +1653,8 @@ function render(next) {
   $("townsfolk-note").textContent =
     `${town.population.toLocaleString()} people live in town · ${town.faces_count} faces he'd recognise · ${town.known.length} he knows by name`;
   const townBond = {
-    close: "one of his closest people",
+    closest: "one of his closest people",
+    close: "a close friend",
     friend: "a friend",
     strained: "things are strained",
     drifted: "drifted",

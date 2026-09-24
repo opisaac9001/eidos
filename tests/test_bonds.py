@@ -1,82 +1,156 @@
-"""He notices, now and then, who has become one of his people, and that includes you."""
+"""Friendships deepen through what's shared; deep ones don't fade with time apart."""
 
 from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import _standin_people_reply
-from eidos.application.bonds import bond_events, bond_level, his_people, user_bond_level
+from eidos.application.bonds import bond_events, his_people
+from eidos.application.friendship import friendships
 from eidos.domain.events import DomainEvent
 from eidos.domain.relationships import Relationship
 from eidos.domain.selfhood import value_evidence
 
-EVENING = datetime(2026, 3, 2, 20, tzinfo=timezone.utc)
-NAMES = {"mara": "Mara Okafor", "ellis": "Ellis Grant"}
+START = datetime(2026, 1, 5, 14, tzinfo=timezone.utc)
+NAMES = {"mara": "Mara", "ellis": "Ellis"}
 
 
-def review(history, at, relationships):
-    return bond_events(history, at, relationships, frozenset(relationships), NAMES)
+def at(day: int, hour: int = 14) -> datetime:
+    return START + timedelta(days=day, hours=hour - 14)
 
 
-def test_warmth_becomes_friendship_and_trust_makes_someone_close() -> None:
-    assert bond_level(Relationship("mara", 5, 0.3, 0.3, 0.0), None) == "acquaintance"
-    assert bond_level(Relationship("mara", 20, 0.4, 0.7, 0.0), None) == "friend"
-    assert bond_level(Relationship("mara", 40, 0.4, 1.0, 0.0), None) == "friend"
-    assert bond_level(Relationship("mara", 40, 0.55, 0.95, 0.0), None) == "close"
-    assert bond_level(Relationship("mara", 40, 0.55, 0.95, 0.4), "close") == "strained"
-    # A dip just below where a bond formed does not undo it.
-    assert bond_level(Relationship("mara", 40, 0.4, 0.62, 0.0), "friend") == "friend"
-
-
-def test_he_notices_one_change_an_evening_and_it_counts_as_care() -> None:
-    relationships = {
-        "mara": Relationship("mara", 20, 0.4, 0.7, 0.0),
-        "ellis": Relationship("ellis", 60, 0.4, 0.8, 0.0),
-    }
-    first = review([], EVENING, relationships)
-    assert first[0].kind == "bond.recognized" and first[0].payload["bond"] == "friend"
-    assert value_evidence(first[0])[0][:2] == ("care", 1)
-    assert review(first, EVENING, relationships) == []
-    assert review([], EVENING.replace(hour=12), relationships) == []
-    second = review(first, EVENING + timedelta(days=1), relationships)
-    assert second[0].payload["person_id"] != first[0].payload["person_id"]
-    people = his_people([*first, *second], NAMES)
-    assert {item["person"] for item in people} == {"Mara Okafor", "Ellis Grant"}
-
-
-def talk(day: int) -> DomainEvent:
+def together(person: str, day: int) -> DomainEvent:
     return DomainEvent(
-        "conversation.message",
+        "social.activity_completed",
         "pathos",
-        {
-            "text": "Hi.",
-            "speaker": "you",
-            "simulated_at": (EVENING - timedelta(days=60 - day)).isoformat(),
-        },
+        {"activity": "conversation", "person_id": person, "simulated_at": at(day).isoformat()},
     )
 
 
-def test_you_become_a_friend_by_actually_talking_and_can_drift() -> None:
-    assert user_bond_level([talk(0), talk(1)], EVENING, None) == "acquaintance"
-    friends = [talk(day) for day in range(0, 60, 3)]
-    assert user_bond_level(friends, EVENING, None) == "close"
-    few = [talk(day) for day in (0, 5, 10, 15, 20)]
-    assert user_bond_level(few, EVENING - timedelta(days=30), None) == "friend"
-    assert user_bond_level(few, EVENING, "friend") == "drifted"
-    recognized = review(friends, EVENING, {})
-    assert recognized[0].payload["person_id"] == "user"
-    assert "closest" in recognized[0].payload["text"]
-    context = {"identity": {"selfhood": {"his_people": his_people(recognized, NAMES)}}}
-    assert "closest" in str(_standin_people_reply("are we friends?", context))
+def through_something(person: str, day: int) -> DomainEvent:
+    return DomainEvent(
+        "incident.shared_aftermath",
+        "pathos",
+        {"person_id": person, "outcome": "completed", "simulated_at": at(day).isoformat()},
+    )
+
+
+def talk(day: int, messages: int = 8) -> list[DomainEvent]:
+    return [
+        DomainEvent(
+            "conversation.message",
+            "pathos",
+            {"speaker": "you", "text": "…", "simulated_at": at(day, 10 + n % 8).isoformat()},
+        )
+        for n in range(messages)
+    ]
+
+
+def deep_friendship(person: str = "mara") -> list[DomainEvent]:
+    history = [together(person, day) for day in range(0, 200, 3)]
+    history += [through_something(person, day) for day in (20, 70, 150)]
+    return sorted(history, key=lambda e: e.payload["simulated_at"])
+
+
+def test_without_going_through_anything_together_a_friendship_stays_light() -> None:
+    history = [together("ellis", day) for day in range(0, 300, 2)]
+    ellis = friendships(history, at(300))["ellis"]
+    assert 4 <= ellis.level <= 5
+
+
+def test_a_deep_friendship_survives_a_long_silence_and_a_light_one_fades() -> None:
+    deep = friendships(deep_friendship(), at(200))["mara"]
+    assert deep.level >= 6
+    year_later = friendships(deep_friendship(), at(560))["mara"]
+    assert year_later.level >= deep.level
+    assert year_later.out_of_touch(at(560))
+    light = [together("ellis", day) for day in range(0, 120, 2)]
+    was = friendships(light, at(120))["ellis"].level
+    faded = friendships(light, at(400))["ellis"]
+    assert was >= 4 and faded.level == 3
+    acquaintance = [together("rowan", 0)]
+    assert friendships(acquaintance, at(90))["rowan"].depth <= 1.0
+
+
+def review(history, day, relationships=None, known=frozenset({"mara", "ellis"})):
+    return bond_events(history, at(day, 20), relationships or {}, known, NAMES)
+
+
+def run_reviews(history, days, relationships=None):
+    noticed: list[DomainEvent] = []
+    for day in days:
+        noticed += review([*history, *noticed], day, relationships)
+    return noticed
+
+
+def test_he_notices_friends_becoming_close_and_it_counts_as_care() -> None:
+    noticed = run_reviews(deep_friendship(), range(0, 201))
+    recognized = [e for e in noticed if e.kind == "bond.recognized"]
+    assert [e.payload["bond"] for e in recognized] == ["friend", "close"]
+    assert value_evidence(recognized[-1])[0][:2] == ("care", 1)
+    gaps = [
+        (
+            datetime.fromisoformat(b.payload["simulated_at"])
+            - datetime.fromisoformat(a.payload["simulated_at"])
+        ).days
+        for a, b in zip(recognized, recognized[1:])
+    ]
+    assert all(gap >= 21 for gap in gaps)
+    people = his_people([*deep_friendship(), *noticed], NAMES, at(200))
+    assert people[0]["person"] == "Mara" and people[0]["level"] >= 6
+
+
+def test_a_long_gap_with_a_close_friend_is_missed_warmly_and_picked_up_again() -> None:
+    history = deep_friendship()
+    history += run_reviews(history, range(0, 201))
+    later = run_reviews(history, range(201, 300))
+    missed = [e for e in later if e.kind == "bond.missed"]
+    assert len(missed) == 1 and "no time has passed" in missed[0].payload["text"]
+    assert not any(e.payload.get("bond") == "drifted" for e in later)
+    assert not any(e.kind == "memory.recorded" and "drifted" in e.payload["text"] for e in later)
+    reunion_day = 300
+    history = [*history, *later, together("mara", reunion_day)]
+    reunion = review(history, reunion_day)
+    assert reunion[0].kind == "bond.reunited"
+    assert "right where we left off" in reunion[0].payload["text"]
+
+
+def test_strain_is_a_passing_state_not_a_lost_friendship() -> None:
+    history = deep_friendship()
+    history += run_reviews(history, range(0, 201))
+    clash = {"mara": Relationship("mara", 40, 0.6, 0.9, 0.4)}
+    strained = review(history, 201, clash)
+    assert strained[0].kind == "bond.strained"
+    history += strained
+    eased = review(history, 205, {"mara": Relationship("mara", 40, 0.6, 0.9, 0.1)})
+    assert eased[0].kind == "bond.eased"
+    assert his_people([*history, *eased], NAMES, at(205))[0]["bond"] in {"close", "closest"}
+
+
+def test_you_stay_a_close_friend_through_a_quiet_month() -> None:
+    history: list[DomainEvent] = []
+    for day in range(0, 200, 2):
+        history += talk(day)
+    you = friendships(history, at(200))["user"]
+    assert you.level >= 6
+    history += run_reviews(history, range(0, 201))
+    assert any(
+        e.payload.get("person_id") == "user" and e.payload.get("bond") in {"close", "closest"}
+        for e in history
+    )
+    quiet = run_reviews(history, range(201, 260))
+    assert not any(e.payload.get("bond") == "drifted" for e in quiet)
+    missed = [e for e in quiet if e.kind == "bond.missed"]
+    assert missed and "still one of my people" in missed[0].payload["text"]
+    context = {"identity": {"selfhood": {"his_people": his_people(history, NAMES, at(230))}}}
+    reply = str(_standin_people_reply("are we friends?", context))
+    assert "count on" in reply or "closest" in reply
     stranger = {"identity": {"selfhood": {"his_people": []}}}
     assert "getting to know you" in str(_standin_people_reply("are we friends?", stranger))
 
 
-def test_closeness_is_not_redecided_every_few_days_but_a_clash_registers() -> None:
-    close = {"ellis": Relationship("ellis", 60, 0.55, 0.95, 0.0)}
-    first = review([], EVENING, close)
-    assert first[0].payload["bond"] == "close"
-    dipped = {"ellis": Relationship("ellis", 60, 0.35, 0.8, 0.0)}
-    assert review(first, EVENING + timedelta(days=7), dipped) == []
-    later = review(first, EVENING + timedelta(days=22), dipped)
-    assert later[0].payload["bond"] == "friend"
-    clash = {"ellis": Relationship("ellis", 60, 0.55, 0.95, 0.4)}
-    assert review(first, EVENING + timedelta(days=2), clash)[0].payload["bond"] == "strained"
+def test_a_lighter_friendship_can_drift_without_a_falling_out() -> None:
+    history = [together("ellis", day) for day in range(0, 120, 2)]
+    history += run_reviews(history, range(0, 121))
+    assert any(e.payload.get("bond") == "friend" for e in history)
+    later = run_reviews(history, range(121, 400))
+    drifted = [e for e in later if e.payload.get("bond") == "drifted"]
+    assert drifted and "No falling out" in drifted[0].payload["text"]

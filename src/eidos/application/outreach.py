@@ -200,7 +200,7 @@ def _news_to_share(
         for event in messages
         if event.payload.get("speaker") == "you"
     }
-    if bond not in {"friend", "close"} and len(talked_days) < 3:
+    if bond not in {"friend", "close", "closest"} and len(talked_days) < 3:
         return None
     if messages and str(messages[-1].payload.get("request_id", "")).startswith("outreach"):
         # The last word is a message he started and you haven't answered; he doesn't pile on.
@@ -245,7 +245,7 @@ def _news_to_share(
         elif (
             event.kind == "setback.occurred"
             and payload.get("kind") in {"expense", "sick_day", "called_off"}
-            and bond == "close"
+            and bond in {"close", "closest"}
         ):
             text = str(payload.get("text"))
         if text:

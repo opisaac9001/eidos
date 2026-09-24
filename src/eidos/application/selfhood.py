@@ -853,7 +853,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "still_bothering_him": _still_bothering(history, simulated_at),
         "feeling_unwell": _feeling_unwell(history),
         **_tastes_context(history),
-        "his_people": _his_people(history),
+        "his_people": _his_people(history, simulated_at),
         "people_he_says_hello_to": _around_town(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
@@ -882,7 +882,7 @@ def _still_bothering(history: Sequence[DomainEvent], simulated_at: datetime) -> 
     return bothering[-3:]
 
 
-def _his_people(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
+def _his_people(history: Sequence[DomainEvent], at: datetime) -> list[dict[str, object]]:
     from eidos.application.bonds import his_people
     from eidos.domain.townsfolk import project_townsfolk
     from eidos.domain.world_catalog import project_world_catalog
@@ -894,7 +894,7 @@ def _his_people(history: Sequence[DomainEvent]) -> list[dict[str, str]]:
             for person in project_world_catalog(history).people.values()
         },
     }
-    return his_people(history, names)
+    return his_people(history, names, at)
 
 
 def _around_town(history: Sequence[DomainEvent]) -> list[str]:
@@ -1011,7 +1011,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
             for value_id, base in STARTING_VALUES.items()
         ],
         "feeling_unwell": _feeling_unwell(history),
-        "his_people": _his_people(history),
+        "his_people": _his_people(history, simulated_at),
         "tastes": [
             {
                 "label": item.label,

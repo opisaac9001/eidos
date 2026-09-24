@@ -20,7 +20,7 @@ from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
 
-from eidos.application.bonds import current_bonds
+from eidos.application.bonds import FRIENDLY, current_bonds
 from eidos.application.experience import place_category
 from eidos.application.latent_town import (
     LatentResident,
@@ -128,7 +128,7 @@ def townsfolk_promotion_events(
         return []
     bonds = current_bonds(history)
     for person in project_townsfolk(history).acquaintances():
-        if bonds.get(person.townsfolk_id) not in {"friend", "close"}:
+        if bonds.get(person.townsfolk_id) not in FRIENDLY:
             continue
         if person.townsfolk_id in catalog.people or person.name is None:
             continue
