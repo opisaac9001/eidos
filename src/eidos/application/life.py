@@ -48,7 +48,7 @@ from eidos.application.economy import financial_consequence_events, financial_fo
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.experience import experience_events
-from eidos.application.family import family_events
+from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.household import (
@@ -1394,16 +1394,30 @@ class Life(LifeConversation):
             scene.status == "active" and "pathos" in {scene.initiator_id, scene.partner_id}
             for scene in project_scenes(history + pending).scenes.values()
         )
-        pending.extend(
-            family_events(
+        # At his parents' there's no need to ring home.
+        if tick.state.location_id != FAMILY_HOME:
+            pending.extend(
+                family_events(
+                    history + pending,
+                    current,
+                    awake=tick.state.awake,
+                    at_home=tick.state.location_id == "home",
+                    in_conversation=in_conversation,
+                    connection=tick.state.connection,
+                    values=dict(project_identity(history + pending).values),
+                )
+            )
+        self._extend_warmed(
+            tick,
+            christmas_events(
                 history + pending,
                 current,
+                self._world_catalog(history + pending),
                 awake=tick.state.awake,
-                at_home=tick.state.location_id == "home",
-                in_conversation=in_conversation,
-                connection=tick.state.connection,
-                values=dict(project_identity(history + pending).values),
-            )
+                location_id=tick.state.location_id,
+            ),
+            self._world_catalog,
+            self._planning,
         )
 
     async def _phase_townsfolk(self, tick: _Tick) -> None:

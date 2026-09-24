@@ -107,12 +107,15 @@ class PathosState:
                     raise ValueError("A meal requires experienced detail")
                 provision_source = event.payload.get("provision_source")
                 provision_id = event.payload.get("provision_object_id")
-                if provision_source not in {"household_stock", "cafe_service"}:
+                if provision_source not in {"household_stock", "cafe_service", "family_table"}:
                     raise ValueError("A meal requires a known provision source")
                 if provision_source == "household_stock" and provision_id != "household-provisions":
                     raise ValueError("A household meal requires provision evidence")
-                if provision_source == "cafe_service" and provision_id is not None:
-                    raise ValueError("A cafe meal cannot claim household stock")
+                if (
+                    provision_source in {"cafe_service", "family_table"}
+                    and provision_id is not None
+                ):
+                    raise ValueError("A cafe or family meal cannot claim household stock")
                 if location_id != self.location_id:
                     raise ValueError("A meal must occur at Pathos's current location")
                 if not isinstance(simulated_at, str):

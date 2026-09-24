@@ -23,6 +23,7 @@ from typing import Sequence
 from eidos.application.seasons import _easter
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
+from eidos.domain.world_catalog import WorldCatalog
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,6 +262,21 @@ def _sunday_call(
         if _roll(call_id, "dad on") < 0.5
         else []
     )
+    together = [
+        e
+        for e in events_of(history, "family.contact")
+        if e.payload.get("channel") == "in_person" and at - _time(e) <= timedelta(days=3)
+    ]
+    if together:
+        # Just back from a visit, the Sunday call is to check he got home.
+        return _contact(
+            call_id,
+            "mum",
+            at,
+            channel="call",
+            incoming=True,
+            text="Mum rang to check I'd got back alright, and to say the house was quiet now.",
+        )
     parts = [_fresh(history, SUNDAY_OPENERS, call_id)]
     parts += [str(e.payload["text"]) for e in news if e.kind == "family.news"]
     if dad_news:
@@ -634,7 +650,9 @@ def _last_spoke(
 def _happened(history: Sequence[DomainEvent], contact_id: str) -> bool:
     return any(
         e.payload.get("contact_id") == contact_id or e.payload.get("occasion_id") == contact_id
-        for e in events_of(history, "family.contact", "family.occasion", "family.call_owed")
+        for e in events_of(
+            history, "family.contact", "family.occasion", "family.call_owed", "family.plan_agreed"
+        )
     )
 
 
@@ -659,3 +677,169 @@ def _roll(*parts: object) -> float:
 
 def _time(event: DomainEvent) -> datetime:
     return datetime.fromisoformat(str(event.payload["simulated_at"]))
+
+
+# -- Christmas at home -----------------------------------------------------------------
+
+FAMILY_HOME = "wye-home"
+TRAIN_MINUTES = 150
+CHRISTMAS_ARRIVES = (12, 23, 19)  # month, day, hour he gets in, after the train
+CHRISTMAS_LEAVES = (12, 27, 12)
+_CHRISTMAS = {
+    (12, 24, 19): (
+        "Christmas Eve at home. Dad's clocks all chimed seven slightly out of time with each "
+        "other, like every year. Mum made too much food, like every year.",
+    ),
+    (12, 25, 14): (
+        "Christmas Day. Isla opened everything, including other people's presents. Dad fell "
+        "asleep in the film and denied it.",
+        "Christmas Day. Tom and I did the washing up and actually talked, for once.",
+    ),
+    (12, 26, 11): (
+        "Boxing Day walk along the Stour with Tom. Cold, muddy, and exactly what I needed.",
+        "Boxing Day. Helped Dad with a clock he's restoring; he let me do the fiddly bit.",
+    ),
+}
+_DADS_QUESTION = (
+    " Dad asked about my 'long-term plans' over the pudding. I changed the subject; "
+    "Mum changed it again for me."
+)
+
+
+def christmas_events(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    catalog: WorldCatalog,
+    *,
+    awake: bool,
+    location_id: str,
+) -> list[DomainEvent]:
+    """Agreeing to come home for Christmas, and Christmas itself once he's there."""
+    return _agree_christmas(history, at, catalog, awake) or _christmas_at_home(
+        history, at, awake, location_id
+    )
+
+
+def _agree_christmas(
+    history: Sequence[DomainEvent], at: datetime, catalog: WorldCatalog, awake: bool
+) -> list[DomainEvent]:
+    """Early December, Mum asks about Christmas and he books the train home."""
+    if not awake or at.month != 12 or at.day != 6 or at.hour != 19:
+        return []
+    plan_id = f"christmas-{at.year}"
+    if _happened(history, plan_id):
+        return []
+    arrives = at.replace(month=12, day=CHRISTMAS_ARRIVES[1], hour=CHRISTMAS_ARRIVES[2])
+    leaves = at.replace(month=12, day=CHRISTMAS_LEAVES[1], hour=CHRISTMAS_LEAVES[2])
+    text = (
+        "Mum asked about Christmas. Booked the train home for the 23rd, back on the 27th. "
+        "Already looking forward to it more than I'll admit."
+    )
+    agreed = DomainEvent(
+        "family.plan_agreed",
+        "pathos",
+        {
+            "contact_id": plan_id,
+            "person_id": "mum",
+            "text": text,
+            "starts_at": arrives.isoformat(),
+            "ends_at": leaves.isoformat(),
+            "simulated_at": at.isoformat(),
+            "owner": "pathos",
+        },
+        correlation_id=plan_id,
+    )
+    output = [agreed]
+    if FAMILY_HOME not in catalog.places:
+        output.append(_register_family_home(catalog, at, agreed))
+    intention_id = f"{plan_id}-intention"
+    output += [
+        DomainEvent(
+            "intention.adopted",
+            "pathos",
+            {
+                "proposal_id": plan_id,
+                "intention_id": intention_id,
+                "actor_id": "pathos",
+                "action": "attend",
+                "target_id": FAMILY_HOME,
+                "goal_id": None,
+                "priority": 0.9,
+                "motivation": "Christmas at home with Mum, Dad, Tom, Jess and Isla.",
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=agreed.event_id,
+            correlation_id=plan_id,
+        ),
+        DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": plan_id,
+                "intention_id": intention_id,
+                "title": "Christmas at Mum and Dad's",
+                "starts_at": arrives.isoformat(),
+                "ends_at": leaves.isoformat(),
+                "location_id": FAMILY_HOME,
+                "actor_id": "pathos",
+                "action": "attend",
+                "target_id": FAMILY_HOME,
+                "resource_id": None,
+                "companion_id": None,
+                "activity_type": "christmas_at_home",
+                "source": "family-plan",
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=agreed.event_id,
+            correlation_id=plan_id,
+        ),
+        _memory(text, at, "mum", 0.55, agreed),
+    ]
+    return output
+
+
+def _register_family_home(catalog: WorldCatalog, at: datetime, cause: DomainEvent) -> DomainEvent:
+    from eidos.application.town_pack import _free_spot
+
+    occupied = [(place.x, place.y) for place in catalog.places.values()]
+    x, y = _free_spot(92, 92, occupied)
+    return DomainEvent(
+        "world.place_registered",
+        "pathos",
+        {
+            "entity_id": FAMILY_HOME,
+            "entity_kind": "place",
+            "name": "Mum and Dad's, Wye",
+            "label": "Wye",
+            "description": "The house he grew up in: Dad's clocks on every wall, the good "
+            "biscuits in the tin, and his old room with the same curtains.",
+            "connected_to_id": "station" if "station" in catalog.places else "home",
+            "x": x,
+            "y": y,
+            "opens_hour": 0,
+            "closes_hour": 24,
+            "travel_minutes": TRAIN_MINUTES,
+            "purpose": "His parents' home, a train ride away.",
+            "origin": "family",
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=cause.event_id,
+        correlation_id=cause.correlation_id,
+    )
+
+
+def _christmas_at_home(
+    history: Sequence[DomainEvent], at: datetime, awake: bool, location_id: str
+) -> list[DomainEvent]:
+    if not awake or location_id != FAMILY_HOME:
+        return []
+    options = _CHRISTMAS.get((at.month, at.day, at.hour))
+    if options is None:
+        return []
+    contact_id = f"christmas-{at.date().isoformat()}"
+    if _happened(history, contact_id):
+        return []
+    text = options[int(_roll(contact_id, "which") * len(options))]
+    if at.day == 25 and _roll(contact_id, "dad") < 0.4:
+        text += _DADS_QUESTION
+    return _contact(contact_id, "mum", at, channel="in_person", incoming=True, text=text)

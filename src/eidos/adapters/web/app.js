@@ -514,7 +514,11 @@ function mapMarkup(large) {
   const icons = { home: "⌂", cafe: "◒", workshop: "◇", park: "✳" };
   // He only knows the places he has been or noticed; the operator sees the whole town.
   const undiscovered = (id) => state.city_map?.places?.[id]?.experience === "undiscovered";
-  const shown = state.locations.filter((place) => operatorMode || !undiscovered(place.id));
+  // Somewhere a train ride away (his parents') isn't part of the town map.
+  const farAway = (id) => Boolean(state.city_map?.places?.[id]?.far_away);
+  const shown = state.locations.filter(
+    (place) => !farAway(place.id) && (operatorMode || !undiscovered(place.id)),
+  );
   const routes = (state.city_map?.routes || []).map((route) => {
     const a = shown.find(p => p.id === route.from);
     const b = shown.find(p => p.id === route.to);

@@ -29,12 +29,20 @@ _DESCRIPTIONS = {
         "Paused for an unhurried bite at the café.",
         "Found a small table and ate before continuing the day.",
     ),
+    "hosted": (
+        "Mum's cooking. Second helpings were not optional.",
+        "Ate with everyone round the kitchen table, talking over each other.",
+        "Leftovers, eaten standing up in Mum's kitchen, which is the best way.",
+    ),
     "away": (
         "Stopped to eat something brought along for the day.",
         "Found a place to sit and ate a simple packed meal.",
         "Paused what he was doing long enough to eat.",
     ),
 }
+
+# Places where someone else feeds him.
+HOSTED = frozenset({"wye-home"})
 
 _MEAL_ACTIVITY_TYPES = frozenset(
     {
@@ -145,13 +153,20 @@ def nourishment_events(
     reduction = 0.27 if meal_kind == "snack" else 0.46
     hunger_after = max(0.04, state.hunger - reduction)
     energy_after = min(1.0, state.energy + (0.04 if meal_kind == "snack" else 0.07))
-    place = state.location_id if state.location_id in {"home", "cafe"} else "away"
+    hosted = state.location_id in HOSTED
+    place = (
+        "hosted"
+        if hosted
+        else state.location_id
+        if state.location_id in {"home", "cafe"}
+        else "away"
+    )
     options = _DESCRIPTIONS[place]
     sample = sha256(f"{meal_id}:{state.location_id}".encode()).digest()[0]
     description = options[sample % len(options)]
     provisions = planning.objects.get(PROVISIONS_ID)
-    uses_household_stock = state.location_id != "cafe"
-    cannot_afford_cafe = not uses_household_stock and available_pence < 600
+    uses_household_stock = state.location_id != "cafe" and not hosted
+    cannot_afford_cafe = state.location_id == "cafe" and available_pence < 600
     if cannot_afford_cafe or (
         uses_household_stock and (provisions is None or not provisions.quantity)
     ):
@@ -185,7 +200,11 @@ def nourishment_events(
             "hunger_before": state.hunger,
             "hunger_after": hunger_after,
             "energy_after": energy_after,
-            "provision_source": "household_stock" if uses_household_stock else "cafe_service",
+            "provision_source": "household_stock"
+            if uses_household_stock
+            else "family_table"
+            if hosted
+            else "cafe_service",
             "provision_object_id": PROVISIONS_ID if uses_household_stock else None,
             "reason": (
                 "he followed through on a meal he had chosen"

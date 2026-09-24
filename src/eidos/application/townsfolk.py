@@ -30,6 +30,7 @@ from eidos.application.latent_town import (
     townsfolk_number,
     works_here,
 )
+from eidos.application.place_discovery import FAR_AWAY
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -62,7 +63,7 @@ async def townsfolk_events(
     if (
         not awake
         or busy
-        or location_id in {"home", "in_transit", "in-transit"}
+        or location_id in {"home", "in_transit", "in-transit", *FAR_AWAY}
         or location_id not in catalog.places
     ):
         return []

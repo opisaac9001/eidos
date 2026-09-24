@@ -16,6 +16,8 @@ from eidos.domain.folding import IncrementalFold, events_of, events_with_prefix
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
+# Stays, where the point is being there rather than effort put in.
+STAYS = frozenset({"christmas_at_home"})
 FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.
 LONG_STINT_SECONDS = 3 * 3600
 
@@ -212,7 +214,8 @@ def activity_effort(
     resource_id = entry.target_id if entry.action == "repair" else entry.resource_id
 
     def reason() -> str | None:
-        if not awake:
+        # On a stay somewhere (Christmas at his parents'), sleeping there is being there.
+        if not awake and entry.activity_type not in STAYS:
             return "asleep"
         if location != entry.location_id:
             return "elsewhere"

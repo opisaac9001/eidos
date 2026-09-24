@@ -20,6 +20,8 @@ from eidos.domain.folding import events_of
 from eidos.domain.world_catalog import WorldCatalog
 
 HOME_GROUND = frozenset({"home", "cafe", "workshop", "park"})
+# Places outside the town (his parents' house): never part of what he knows of Alderwick.
+FAR_AWAY = frozenset({"wye-home"})
 NOTICE_CHANCE = 0.3
 
 
@@ -31,7 +33,7 @@ def known_place_ids(history: Sequence[DomainEvent], catalog: WorldCatalog) -> fr
         place = event.payload.get("location_id") or event.payload.get("place_id")
         if isinstance(place, str):
             known.add(place)
-    return frozenset(place for place in known if place in catalog.places)
+    return frozenset(place for place in known if place in catalog.places and place not in FAR_AWAY)
 
 
 def visited_place_ids(history: Sequence[DomainEvent]) -> frozenset[str]:
@@ -62,7 +64,11 @@ def place_discovery_events(
     simulated_at: datetime,
 ) -> list[DomainEvent]:
     """At most one new place a day, noticed from somewhere he actually is."""
-    if not awake or location_id in {"home", "in_transit"} or location_id not in catalog.places:
+    if (
+        not awake
+        or location_id in {"home", "in_transit"} | FAR_AWAY
+        or location_id not in catalog.places
+    ):
         return []
     today = simulated_at.date().isoformat()
     discoveries = events_of(history, "place.discovered")

@@ -96,3 +96,66 @@ def test_he_can_talk_about_his_family(year) -> None:
     assert "Dad" in str(_standin_family_reply("how's your dad doing?", context))
     assert "Tom" in str(_standin_family_reply("how is tom?", context))
     assert _standin_family_reply("what are you doing tomorrow?", context) is None
+
+
+def test_he_goes_home_for_christmas_and_is_fed_there() -> None:
+    from dataclasses import replace as _replace
+
+    from eidos.application.activity_execution import activity_effort
+    from eidos.application.family import FAMILY_HOME, christmas_events
+    from eidos.application.nourishment import nourishment_events
+    from eidos.domain.planning import project_planning
+    from eidos.domain.state import PathosState
+    from eidos.domain.world_catalog import project_world_catalog, seed_world_catalog
+
+    catalog = seed_world_catalog()
+    sixth = datetime(2026, 12, 6, 19, tzinfo=timezone.utc)
+    agreed = christmas_events([], sixth, catalog, awake=True, location_id="home")
+    kinds = [e.kind for e in agreed]
+    assert kinds[:2] == ["family.plan_agreed", "world.place_registered"]
+    assert "schedule.created" in kinds
+    assert christmas_events(agreed, sixth, catalog, awake=True, location_id="home") == []
+    catalog = project_world_catalog(agreed)
+    assert FAMILY_HOME in catalog.places
+    entry = project_planning(agreed).calendar["christmas-2026"]
+    assert entry.location_id == FAMILY_HOME and entry.starts_at.startswith("2026-12-23")
+
+    christmas_day = datetime(2026, 12, 25, 14, tzinfo=timezone.utc)
+    moment = christmas_events(agreed, christmas_day, catalog, awake=True, location_id=FAMILY_HOME)
+    assert moment and moment[0].payload["channel"] == "in_person"
+    assert value_evidence(moment[0])[0][:2] == ("care", 1)
+
+    state = _replace(
+        PathosState(), location_id=FAMILY_HOME, awake=True, hunger=0.6, simulated_at=christmas_day
+    )
+    meal = nourishment_events(
+        agreed,
+        state,
+        christmas_day.replace(hour=13),
+        project_planning(agreed),
+        0,
+        pathos_busy=False,
+    )
+    assert meal and meal[0].payload["provision_source"] == "family_table"
+    assert all(e.kind != "object.stock_changed" for e in meal)
+
+    # Sleeping at his parents' still counts as being there.
+    arrived = DomainEvent(
+        "pathos.moved",
+        "pathos",
+        {"location_id": FAMILY_HOME, "simulated_at": "2026-12-23T19:00:00+00:00"},
+    )
+    started = DomainEvent(
+        "activity.execution_started",
+        "pathos",
+        {
+            "schedule_id": "christmas-2026",
+            "required_seconds": 320400.0,
+            "simulated_at": "2026-12-23T19:00:00+00:00",
+        },
+    )
+    asleep = DomainEvent("sleep.started", "pathos", {"simulated_at": "2026-12-23T23:00:00+00:00"})
+    effort = activity_effort(
+        [*agreed, arrived, started, asleep], entry, datetime(2026, 12, 24, 6, tzinfo=timezone.utc)
+    )
+    assert effort["blocked_by"] is None

@@ -3,7 +3,7 @@
 from collections import Counter
 from typing import Sequence
 
-from eidos.application.place_discovery import known_place_ids
+from eidos.application.place_discovery import FAR_AWAY, known_place_ids
 from eidos.domain.events import DomainEvent
 from eidos.domain.world_catalog import WorldCatalog
 
@@ -32,6 +32,7 @@ def city_map(
                 else "undiscovered",
                 "visits": visits[place_id],
                 "last_visit": last_visit.get(place_id),
+                "far_away": place_id in FAR_AWAY,
             }
             for place_id in catalog.places
         },
