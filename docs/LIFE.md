@@ -114,6 +114,25 @@ He remembers when something sets it off, not only when asked. There are three tr
 At most one memory comes back a day, and the same one not again for three months. The self-
 context shows what's come back to him in the last few days (`came_back_to_him_lately`).
 
+## "Fine, yeah" (`application/masking.py`)
+
+When you ask how he is and something's weighing on him, he doesn't always say. That could
+be Dad in hospital, a falling-out, a break-up, a friend just gone, a friend's worry, or
+just a low patch he can't explain.
+
+How likely he is to be honest depends on your bond:
+
+| Your bond | Chance he's honest |
+|---|---|
+| Closest | 95% |
+| Close | 70% |
+| Friend | 40% |
+| Not yet a friend | about 1 in 8 |
+
+If he brushed it off and you're a friend, then the next time you talk on a later day, he
+owns up. Telling you, either time, deepens the friendship. The conversation context carries
+`how_he_really_is` or `owes_honesty`, and a real model is told to follow it.
+
 ## Books, series, music (`application/media.py`)
 
 He is usually partway through a book (a chapter before bed), a series (an episode on a free

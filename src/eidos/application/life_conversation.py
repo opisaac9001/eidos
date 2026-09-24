@@ -19,6 +19,7 @@ from eidos.application.life_context import (
     vars_for,
 )
 from eidos.application.life_projections import LifeProjections
+from eidos.application.masking import masking_context
 from eidos.application.memory import RecalledMemory, recall, terms
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
@@ -593,6 +594,18 @@ class LifeConversation(LifeProjections):
         }
         pending.extend(_memory_access_events(selected, at))
         pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))
+        from eidos.application.bonds import current_bonds
+
+        honesty, honesty_events = masking_context(
+            history,
+            state.simulated_at,
+            text,
+            state.valence,
+            current_bonds(history).get("user"),
+            request_id,
+        )
+        context.update(honesty)
+        pending.extend(honesty_events)
         reply = await perform_pathos_reply(self.gateway, context, at, pending)
         if reply:
             pending.extend(

@@ -511,6 +511,8 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind in {"feeling.shared", "feeling.admitted"}:
+        return ("connection", 0.04, 0.15, 0.2, 0.6)
     if event.kind == "memory.surfaced":
         lift = event.payload.get("lift")
         if event.payload.get("trigger") == "missing":

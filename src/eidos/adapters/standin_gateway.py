@@ -372,6 +372,18 @@ def _standin_pathos_text(
                 f"{news} Just wanted to tell someone.",
             )[choice % 3]
         return f"Hey, this made me think of you — {news}"
+    owed = context.get("owes_honesty")
+    if isinstance(owed, str):
+        what = owed.split("He wasn't: ", 1)[-1].split(" He wants", 1)[0]
+        return (
+            "Actually, can I say something? The other day when you asked, I said I was fine. "
+            f"I wasn't really. {what} Sorry. Should've just said."
+        )
+    really = context.get("how_he_really_is")
+    if isinstance(really, dict):
+        if str(really.get("does_he_say", "")).startswith("yes"):
+            return f"Honestly? Not brilliant. {really.get('whats_weighing_on_him')}"
+        return "Fine, yeah. Busy. You?"
     if "private thing" in message or "don't know" in message:
         return "Honestly, I don't know. Mara kept that to herself."
     honest = _standin_nature_reply(message)
