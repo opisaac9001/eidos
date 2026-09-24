@@ -29,6 +29,9 @@ CAPABILITIES = {
     "pathos_selfhood",
     "firmament_townsfolk",
 }
+# Newer capabilities fall back to the family they grew out of, so an existing routing file
+# keeps working after an upgrade without naming them.
+FALLBACKS = {"firmament_townsfolk": "firmament", "pathos_selfhood": "reflection"}
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
@@ -43,7 +46,11 @@ class RoutedModelGateway(ModelGateway):
             raise ValueError("Unknown model route capabilities: " + ", ".join(sorted(unknown)))
         if not routes and default is None:
             raise ValueError("Model routing requires at least one endpoint")
-        missing = CAPABILITIES - set(routes)
+        missing = {
+            capability
+            for capability in CAPABILITIES - set(routes)
+            if FALLBACKS.get(capability) not in routes
+        }
         if default is None and missing:
             raise ValueError(
                 "Model routing without a default is missing: " + ", ".join(sorted(missing))
@@ -55,7 +62,10 @@ class RoutedModelGateway(ModelGateway):
     async def generate(self, request: ModelRequest) -> ModelResponse:
         if request.capability not in CAPABILITIES:
             raise ValueError(f"Unknown routed model capability: {request.capability}")
-        gateway = self.routes.get(request.capability, self.default)
+        gateway = self.routes.get(
+            request.capability,
+            self.routes.get(FALLBACKS.get(request.capability, ""), self.default),
+        )
         if gateway is None:
             raise OSError(f"No model route for {request.capability}")
         return await gateway.generate(request)

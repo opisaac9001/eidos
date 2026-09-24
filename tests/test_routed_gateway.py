@@ -44,6 +44,20 @@ class RoutedGatewayTests(unittest.TestCase):
         complete = RoutedModelGateway({role: Gateway(role) for role in CAPABILITIES})
         self.assertIsNone(complete.default)
 
+    def test_newer_capabilities_fall_back_to_the_family_they_grew_out_of(self):
+        from eidos.adapters.routed_gateway import FALLBACKS
+
+        older = {role: Gateway(role) for role in CAPABILITIES - set(FALLBACKS)}
+        routed = RoutedModelGateway(older)
+        self.assertEqual(
+            asyncio.run(routed.generate(self.request("firmament_townsfolk"))).resolved_model,
+            "firmament",
+        )
+        self.assertEqual(
+            asyncio.run(routed.generate(self.request("pathos_selfhood"))).resolved_model,
+            "reflection",
+        )
+
     def test_file_loader_resolves_secret_by_environment_name_without_inline_keys(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "routes.json"
