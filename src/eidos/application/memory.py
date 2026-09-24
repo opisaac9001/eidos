@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 from types import MappingProxyType
 from typing import Any, Mapping, NamedTuple
 from uuid import UUID
@@ -52,6 +53,12 @@ STOP_WORDS = {
 
 def terms(text: str) -> set[str]:
     return {word for word in WORDS.findall(text.lower()) if word not in STOP_WORDS}
+
+
+@lru_cache(maxsize=4096)
+def _recollection_terms(text: str) -> frozenset[str]:
+    # Recall reads every recollection's terms on every call; the text rarely changes.
+    return frozenset(terms(text))
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,17 +504,15 @@ def recall(
         reinforcement = min(0.32, rehearsals * 0.04 + reminders * 0.08)
         accessibility = min(1.0, base_access + reinforcement + reactivation)
         subjective_terms = (
-            terms(subjective.text)
+            _recollection_terms(subjective.text)
             if subjective is not None
             else index.terms_by_memory[event.event_id]
         )
         matched_terms = tuple(sorted(query_terms & subjective_terms))
         remembered_entities = set(entity_ids & facts.entities)
-        remembered_entities.update(
-            value
-            for value in (remembered_person_id, remembered_location_id)
-            if value is not None and value in entity_ids
-        )
+        for value in (remembered_person_id, remembered_location_id):
+            if value is not None and value in entity_ids:
+                remembered_entities.add(value)
         matched_entities = tuple(sorted(remembered_entities))
         matched_goals = tuple(
             sorted(goal for goal in goal_ids if event.event_id in index.by_goal.get(goal, ()))
