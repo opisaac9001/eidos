@@ -96,6 +96,19 @@ at.
 - **After a year, if Ellis is a close friend,** Ellis asks whether he'd ever think about
   taking the workshop on.
 
+## Everyday money (`application/spending.py`)
+
+Rent and food were always paid for; now the rest of an ordinary week is too.
+
+- **Where he goes costs something:** most visits to a café, pub, shop, cinema or venue
+  come with a small spend, at most once a day per place, and no coffee on top of a café
+  meal.
+- **Every Saturday:** £16–36 of bits and bobs; every seventh week a haircut.
+- **On the 3rd of each month:** the phone bill, which is owed even when money is tight.
+- **Family:** a card and present for each occasion he marks, even late; at Christmas the
+  train fare once it's agreed and presents bought in town beforehand.
+- **Thrift:** he skips extras unless he'd still have £30 left.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.

@@ -181,7 +181,11 @@ _SOURCE_KINDS = (
     "meal.eaten",
     "object.replenishment_ordered",
     "object.replenishment_cancelled",
+    "spending.made",
 )
+
+
+_SPENDING = frozenset({"everyday", "bills", "going_out", "gifts", "travel"})
 
 
 def _source_consequence(
@@ -191,6 +195,10 @@ def _source_consequence(
         cost = source.payload.get("cost_pence")
         if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
             return (-cost, "unexpected_expense", str(source.payload.get("text")))
+    if source.kind == "spending.made" and source.payload.get("category") in _SPENDING:
+        cost = source.payload.get("cost_pence")
+        if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
+            return (-cost, str(source.payload["category"]), str(source.payload.get("text")))
     if source.kind == "want.purchased":
         price = source.payload.get("price_pence")
         if isinstance(price, int) and not isinstance(price, bool) and price > 0:

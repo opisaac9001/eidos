@@ -18,6 +18,11 @@ _CATEGORIES = {
     "refund",
     "personal_purchase",
     "unexpected_expense",
+    "everyday",
+    "bills",
+    "going_out",
+    "gifts",
+    "travel",
 }
 
 
@@ -99,7 +104,7 @@ class FinancialState:
                 raise ValueError("Missed payment already exists")
             amount = _integer(event, "amount_pence", 1, 100_000)
             category = _required(event, "category")
-            if category not in {"housing", "provisions", "cafe_meal", "unexpected_expense"}:
+            if category not in _CATEGORIES - {"opening", "work_income", "refund"}:
                 raise ValueError("Unknown missed-payment category")
             at = _aware_time(event, "simulated_at")
             source_id = _required(event, "source_event_id")

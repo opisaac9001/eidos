@@ -152,6 +152,7 @@ from eidos.application.setbacks import setback_events
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
+from eidos.application.spending import spending_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.townsfolk import (
@@ -1274,6 +1275,15 @@ class Life(LifeConversation):
                 awake=tick.state.awake,
             )
             self._extend_warmed(tick, wants, self._planning)
+            pending.extend(
+                spending_events(
+                    history + pending,
+                    current,
+                    awake=tick.state.awake,
+                    location_id=tick.state.location_id,
+                    balance_pence=self._finances(history + pending).balance_pence,
+                )
+            )
         money = financial_consequence_events(
             history + pending,
             self._finances(history + pending),

@@ -60,6 +60,7 @@ Only ever advance the **copy**.
 | Work | Shifts now record their wage. A raise after three months, a fifth-day offer later (taken or not), and after a year a question about the workshop's future. |
 | Romance | Rare and slow; never involving you, his boss or family. See `docs/LIFE.md`. |
 | Memories | An hour that simply continues a planned activity is now remembered with low importance, so recall surfaces moments that stood out. |
+| Everyday spending | Money now leaks out the way it does in a real week: a coffee at the café, drinks at the Crown, a cinema ticket, sandpaper at the hardware shop, weekly bits and bobs, a haircut every few weeks, a monthly phone bill, cards and presents for family occasions, and the train and presents at Christmas (`spending.made`). Expect savings of roughly £2,000–2,500 a year on part-time wages instead of £5,000. He only buys extras with £30 to spare; the phone bill is always owed. **Rollback note:** the ledger's new categories (`everyday`, `bills`, `going_out`, `gifts`, `travel`) are rejected by older code; roll back only to a copy made before the upgrade ran. |
 | Shifts | Talking with Ellis during a shift no longer pauses the work, and a chat in the last hour of a long stint no longer leaves it unfinished. Expect far fewer "left the bench half-done" clashes. |
 
 None of this touches past messages, memories or relationships.
