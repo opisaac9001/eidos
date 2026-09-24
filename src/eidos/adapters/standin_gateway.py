@@ -358,7 +358,14 @@ def _standin_pathos_text(
     voice = raw_voice if isinstance(raw_voice, dict) else {}
     cadence = str(voice.get("cadence", "steady"))
     if context.get("outreach_reason"):
-        return f"Hey, this made me think of you — {context.get('source_memory', last_memory)}"
+        news = str(context.get("source_memory", last_memory))
+        if context.get("share_kind") == "news":
+            return (
+                f"Small bit of news: {news}",
+                f"Thought you'd like to know. {news}",
+                f"{news} Just wanted to tell someone.",
+            )[choice % 3]
+        return f"Hey, this made me think of you — {news}"
     if "private thing" in message or "don't know" in message:
         return "Honestly, I don't know. Mara kept that to herself."
     honest = _standin_nature_reply(message)
