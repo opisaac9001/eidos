@@ -191,7 +191,7 @@ from eidos.domain.emotions import (
     project_emotion,
 )
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of
+from eidos.domain.folding import PendingEvents, events_of
 from eidos.domain.household import HouseholdState
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import LayerPulse, project_mind
@@ -570,7 +570,9 @@ class Life(LifeConversation):
         target = state.simulated_at + timedelta(hours=hours)
         if target <= state.simulated_at:
             raise ValueError("Advance is smaller than clock precision")
-        pending = _deferred_cognition_events(self.gateway, history, state.simulated_at.isoformat())
+        pending = PendingEvents(
+            _deferred_cognition_events(self.gateway, history, state.simulated_at.isoformat())
+        )
         deferred_requests: list[ModelRequest] = []
         if not project_identity(history).established:
             pending.append(identity_established_event(state.simulated_at.isoformat()))

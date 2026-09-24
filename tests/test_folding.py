@@ -8,10 +8,12 @@ from eidos.domain import identity as identity_module
 from eidos.domain import traits as traits_module
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
+    CombinedEvents,
     EventView,
     GrowOnlyMap,
     IncrementalFold,
     LinearReplay,
+    PendingEvents,
     PersistentMap,
 )
 from eidos.domain.identity import identity_established_event, project_identity
@@ -103,7 +105,7 @@ class IncrementalFoldTests(unittest.TestCase):
         self.assertEqual(counter.steps, 0)
         self.assertEqual(counter.fold(tuple(history[:10])), tuple(range(10)))
         self.assertEqual(counter.fold(tuple(history)), tuple(range(12)))
-        self.assertEqual(counter.steps, 12)
+        self.assertEqual(counter.steps, 2)
 
     def test_time_ordered_views_are_cached_apart_from_history(self) -> None:
         counter = CountingFold()
@@ -124,6 +126,40 @@ class IncrementalFoldTests(unittest.TestCase):
         self.assertEqual(fold(history, key=1, initial=lambda: ("one", 0)), ("one", 3))
         self.assertEqual(fold(history, key=2, initial=lambda: ("two", 0)), ("two", 3))
         self.assertEqual(fold(history, key=1, initial=lambda: ("ignored", 0)), ("one", 3))
+
+
+class PendingEventsTests(unittest.TestCase):
+    def test_history_plus_pending_is_shared_until_either_grows(self) -> None:
+        history = _events(5)
+        pending = PendingEvents(_events(2))
+        combined = history + pending
+        self.assertIsInstance(combined, CombinedEvents)
+        self.assertEqual(combined, [*history, *pending])
+        self.assertIs(history + pending, combined)
+        pending.append(_events(1)[0])
+        grown = history + pending
+        self.assertIsNot(grown, combined)
+        self.assertEqual(grown, [*history, *pending])
+        self.assertEqual(len(combined), 7)
+        self.assertIsNot(list(history) + pending, grown)
+
+    def test_the_shared_list_refuses_changes_but_copies_freely(self) -> None:
+        combined = _events(3) + PendingEvents(_events(1))
+        for change in (
+            lambda: combined.append(_events(1)[0]),
+            lambda: combined.extend(_events(1)),
+            lambda: combined.pop(),
+            lambda: combined.sort(key=str),
+            lambda: combined.__setitem__(0, _events(1)[0]),
+            lambda: combined.__iadd__(_events(1)),
+        ):
+            with self.assertRaises(TypeError):
+                change()
+        self.assertEqual(len(combined), 4)
+        extended = [*combined, *_events(1)]
+        extended.append(_events(1)[0])
+        self.assertEqual(len(extended), 6)
+        self.assertEqual(type(combined + _events(1)), list)
 
 
 class LinearReplayTests(unittest.TestCase):

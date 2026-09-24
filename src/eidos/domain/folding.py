@@ -23,12 +23,12 @@ from __future__ import annotations
 
 import operator
 from bisect import bisect_left
-from collections.abc import Callable, Hashable, Iterator, Sequence
+from collections.abc import Callable, Hashable, Iterable, Iterator, Sequence
 from datetime import datetime
 from heapq import merge
 from itertools import islice
 from threading import Lock
-from typing import Generic, TypeVar
+from typing import Any, Generic, NoReturn, TypeVar
 
 from eidos.domain.events import DomainEvent
 
@@ -179,6 +179,85 @@ class EventView(list[DomainEvent]):
     __slots__ = ()
 
 
+class CombinedEvents(list[DomainEvent]):
+    """History and the events pending with it, shared read-only between their readers."""
+
+    __slots__ = ()
+
+    def _refuse(self) -> NoReturn:
+        raise TypeError("Combined history is shared and read-only; copy it to change it")
+
+    def append(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def extend(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def insert(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def pop(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def remove(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def sort(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def reverse(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def clear(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def __setitem__(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    def __delitem__(self, *args: Any, **kwargs: Any) -> NoReturn:
+        self._refuse()
+
+    # In-place ``+=`` and ``*=`` would change the shared list too.
+    def __iadd__(self, *args: Any, **kwargs: Any) -> NoReturn:  # type: ignore[misc]
+        self._refuse()
+
+    def __imul__(self, *args: Any, **kwargs: Any) -> NoReturn:  # type: ignore[misc]
+        self._refuse()
+
+
+class PendingEvents(list[DomainEvent]):
+    """Events accepted during an advance but not yet committed; they are only appended.
+
+    ``history + pending`` is evaluated hundreds of times an hour, almost always with
+    nothing new in between, and each evaluation copied the whole life. While neither list
+    has grown, the same ``CombinedEvents`` is handed out again; it refuses modification,
+    so sharing it is safe, and folds recognise it without comparing it again.
+    """
+
+    __slots__ = ("_combined",)
+
+    def __init__(self, events: Iterable[DomainEvent] = ()) -> None:
+        super().__init__(events)
+        self._combined: tuple[list[DomainEvent], int, int, CombinedEvents] | None = None
+
+    def __radd__(self, history: object) -> list[DomainEvent]:
+        if type(history) is not list:
+            return NotImplemented
+        combined = self._combined
+        if (
+            combined is not None
+            and combined[0] is history
+            and combined[1] == len(history)
+            and combined[2] == len(self)
+            and (not self or combined[3][-1] is self[-1])
+        ):
+            return combined[3]
+        joined = CombinedEvents(history)
+        list.extend(joined, self)
+        self._combined = (history, len(history), len(self), joined)
+        return joined
+
+
 class IncrementalFold(Generic[S]):
     """Folds ``step`` over events, reusing the longest identical cached prefix."""
 
@@ -208,12 +287,12 @@ class IncrementalFold(Generic[S]):
 
         ``key`` separates folds whose initial state differs (for example by the hour a
         seed schedule is sampled at); ``initial`` overrides the default seed for that key.
-        Sequences of different types are cached apart, so an ``EventView`` never evicts the
-        history-ordered sequences it cannot share a prefix with, nor they it.
+        An ``EventView`` is cached apart, so it never evicts the history-ordered sequences
+        it cannot share a prefix with, nor they it.
         """
         log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
-            entries = self._entries.setdefault((key, type(events)), [])
+            entries = self._entries.setdefault((key, isinstance(events, EventView)), [])
             best: _Entry[S] | None = None
             for entry in entries:
                 if (best is None or entry.size > best.size) and _prefix_of(
