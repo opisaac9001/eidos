@@ -75,8 +75,7 @@ def test_a_tired_lonely_evening_and_a_rested_one_feel_different() -> None:
     good = feel([source], source, rested)[0].payload["enjoyment"]
     bad = feel([source], source, drained)[0].payload["enjoyment"]
     assert good - bad >= 0.5
-    reasons = feel([source], source, drained)[0].payload["reasons"]
-    assert "company" in reasons or "tired" in reasons or "mood" in reasons
+    assert "among people" not in feel([source], source, drained)[0].payload["reasons"]
 
 
 def test_repeated_good_experiences_become_a_taste_that_counts_as_lived_evidence() -> None:

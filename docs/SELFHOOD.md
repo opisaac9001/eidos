@@ -125,7 +125,9 @@ the rules settle how much he enjoyed it, from -1 to 1 (`experience.felt`). That 
 - the small lift of a first visit, which scales with openness;
 - a thing getting samey after four goes in a fortnight;
 - the mood he brought with him;
-- a share of plain unpredictability.
+- his temperament: a stable, hidden affinity for each place or kind of home activity.
+  Some things just suit him and some don't, consistently, and he only finds out by trying;
+- a smaller share of plain unpredictability.
 
 Notable experiences leave a memory in his words, for example "Going along to the quiz:
 loved it, honestly. It was good to be among people."

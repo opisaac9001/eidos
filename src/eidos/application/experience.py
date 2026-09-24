@@ -3,9 +3,10 @@
 After each activity he chose, the rules settle how much he enjoyed it: whether it fits
 what he values, whether he was short of company or too tired for it, the weather for
 outdoor things, the small lift of somewhere new, a thing getting samey, the mood he
-brought with him, and a share of plain unpredictability (a film can just be dull). A
+brought with him, his temperament (some things just suit him, consistently, and he only
+finds out which by trying), and a share of plain unpredictability (a film can be dull). A
 strong experience, or a few that agree, becomes a taste. Later experiences can change his
-mind. Nothing here is scripted by the model or fixed at the start: his tastes are earned.
+mind. None of it is known to him in advance or scripted by a model: his tastes are earned.
 """
 
 from __future__ import annotations
@@ -69,6 +70,8 @@ CATEGORY_VALUE = {
     "culture": "curiosity",
     "home": "autonomy",
 }
+# Outing types that only mean "go there": the taste belongs to the place, not the outing.
+GENERIC_OUTINGS = frozenset({"look_around", "return_visit", "public_happening"})
 LOVE_AT_ONCE = 0.65
 SETTLED = 0.35
 CHANGE_OF_HEART = 0.3
@@ -162,7 +165,12 @@ def experience_events(
     )
     if recent_same >= 4:
         parts.append((-0.15, "", "it's getting a bit samey"))
-    texture = (_roll(f"felt:{source_id}") - 0.5) * 0.7
+    # Temperament: some things just suit him and some don't, consistently, and he only
+    # finds out which by trying them. It belongs to the thing, not to the day.
+    affinity_key = f"place:{place_id}" if place_id != "home" else f"activity:{activity_type}"
+    affinity = (_roll(f"affinity:{affinity_key}") - 0.5) * 0.7
+    parts.append((affinity, "something about it just suits me", "it's just not my sort of thing"))
+    texture = (_roll(f"felt:{source_id}") - 0.5) * 0.4
     parts.append((texture, "it was better than I expected", "it just didn't grab me"))
 
     enjoyment = round(max(-1.0, min(1.0, sum(weight for weight, _, _ in parts))), 2)
@@ -197,7 +205,11 @@ def experience_events(
             joined = " and ".join(reasons)
             sentence += f" {joined[0].upper()}{joined[1:]}."
         output.append(_memory(felt, sentence, at, importance=0.3 + 0.3 * abs(enjoyment)))
-    subjects = [(f"activity:{activity_type}", doing[0].lower() + doing[1:], value_id)]
+    subjects = (
+        []
+        if activity_type in GENERIC_OUTINGS
+        else [(f"activity:{activity_type}", doing[0].lower() + doing[1:], value_id)]
+    )
     if place_id != "home" and place_id in catalog.places:
         name = catalog.places[place_id].name
         name = "the " + name[4:] if name.startswith("The ") else name
