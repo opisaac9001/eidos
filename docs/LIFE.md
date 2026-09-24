@@ -143,6 +143,18 @@ His friends' lives go on without him, and change his weeks.
 - **Where it shows:** `whats_going_on_with_his_friends` in his self-context, and his
   answer when you ask about his friends.
 
+## Moving flat (`application/home_move.py`)
+
+- **When:** after 400 days or more, with about £900 put by, he starts looking (some
+  Sunday evening). His flat is fine, but the damp in the bathroom is winning.
+- **Finding one:** three weeks or more later he finds a place (£140 a week) and pays a
+  four-week deposit once he can do it without going short.
+- **Moving day:** a Saturday two weeks on, with his closest available friend helping.
+  From then on the new rent is what's charged each week.
+- **With a partner:** if he has been properly together with someone for nine months or
+  more, it's moving in together instead: somewhere bigger, and his half is £95.
+- **Not again** for at least three years.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.

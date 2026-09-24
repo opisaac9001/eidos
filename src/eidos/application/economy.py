@@ -121,6 +121,7 @@ def financial_consequence_events(
 
     week = at.isocalendar()
     obligation_id = f"housing:{week.year}-W{week.week:02d}"
+    rent = weekly_housing_pence(history)
     if (
         at.weekday() == 0
         and at.hour == 8
@@ -135,18 +136,18 @@ def financial_consequence_events(
             {
                 "obligation_id": obligation_id,
                 "category": "housing",
-                "amount_pence": WEEKLY_HOUSING_PENCE,
+                "amount_pence": rent,
                 "description": "Weekly housing and household costs",
                 "simulated_at": at.isoformat(),
             },
             correlation_id=obligation_id,
         )
         output.append(due)
-        if current.balance_pence >= WEEKLY_HOUSING_PENCE:
+        if current.balance_pence >= rent:
             payment = _transaction(
                 due,
                 current,
-                -WEEKLY_HOUSING_PENCE,
+                -rent,
                 "housing",
                 "Weekly housing and household costs",
                 at,
@@ -161,7 +162,7 @@ def financial_consequence_events(
                         "obligation_id": obligation_id,
                         "source_event_id": str(due.event_id),
                         "category": "housing",
-                        "amount_pence": WEEKLY_HOUSING_PENCE,
+                        "amount_pence": rent,
                         "reason": "The household balance could not cover the weekly costs.",
                         "simulated_at": at.isoformat(),
                     },
@@ -170,6 +171,15 @@ def financial_consequence_events(
                 )
             )
     return output
+
+
+def weekly_housing_pence(history: Sequence[DomainEvent]) -> int:
+    """This week's rent and bills: the flat he lives in now."""
+    for event in reversed(events_of(history, "home.move")):
+        rent = event.payload.get("weekly_rent_pence")
+        if event.payload.get("stage") == "moved" and isinstance(rent, int):
+            return rent
+    return WEEKLY_HOUSING_PENCE
 
 
 # The only kinds _source_consequence can turn into money.
@@ -185,7 +195,7 @@ _SOURCE_KINDS = (
 )
 
 
-_SPENDING = frozenset({"everyday", "bills", "going_out", "gifts", "travel"})
+_SPENDING = frozenset({"everyday", "bills", "going_out", "gifts", "travel", "housing"})
 
 
 def _source_consequence(

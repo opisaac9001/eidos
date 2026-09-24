@@ -55,6 +55,8 @@ from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
 from eidos.application.friends_lives import away_people, busy_people, friend_life_events
 from eidos.application.friendship import friendships
+from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
+from eidos.application.home_move import home_move_events
 from eidos.application.household import (
     household_adjusted_beat,
     household_completion_events,
@@ -606,6 +608,7 @@ class Life(LifeConversation):
             await self._phase_townsfolk(tick)
             self._phase_family(tick)
             self._phase_friends_lives(tick)
+            self._phase_home(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1541,6 +1544,44 @@ class Life(LifeConversation):
                 residents=frozenset(catalog.people),
                 known_places=known_place_ids(history + pending, catalog),
                 in_romance_with=arc[0] if arc else None,
+            ),
+            self._planning,
+        )
+
+    def _phase_home(self, tick: _Tick) -> None:
+        """Looking at flats, finding one, and moving, with a friend carrying the sofa."""
+        if self.authored_scenario or tick.current.hour != HOME_MOVE_HOUR:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        names = {
+            **townsfolk_names(history + pending),
+            **{person.person_id: person.name for person in catalog.people.values()},
+        }
+        arc = current_arc(history + pending)
+        partner = (
+            (arc[0], names.get(arc[0], arc[0].replace("-", " ").title()), arc[2])
+            if arc and arc[1] == "together"
+            else None
+        )
+        unavailable = busy_people(history + pending, current)
+        known = friendships(history + pending, current)
+        helper_id = max(
+            (person for person in known if person in catalog.people and person not in unavailable),
+            key=lambda person: known[person].depth,
+            default=None,
+        )
+        self._extend_warmed(
+            tick,
+            home_move_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                balance_pence=self._finances(history + pending).balance_pence,
+                partner=partner,
+                helper=(helper_id, names.get(helper_id, helper_id.title()))
+                if helper_id is not None and known[helper_id].depth >= 4
+                else None,
             ),
             self._planning,
         )

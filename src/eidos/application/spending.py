@@ -19,13 +19,16 @@ from datetime import date, datetime, timedelta
 from hashlib import sha256
 from typing import Sequence
 
-from eidos.application.economy import WEEKLY_HOUSING_PENCE
+from eidos.application.economy import WEEKLY_HOUSING_PENCE, weekly_housing_pence
+from eidos.application.home_move import move_costs
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
-# He won't spend on extras unless next week's rent and thirty pounds would be left.
-RESERVE_PENCE = WEEKLY_HOUSING_PENCE + 3_000
-TIGHT_PENCE = 2 * WEEKLY_HOUSING_PENCE  # Below this, the weekly bits shrink to the basics.
+# He won't spend on extras unless next week's rent and thirty pounds would be left, and
+# below two weeks' rent the weekly bits shrink to the basics. (Shown at the first flat's rent.)
+CUSHION_PENCE = 3_000
+RESERVE_PENCE = WEEKLY_HOUSING_PENCE + CUSHION_PENCE
+TIGHT_PENCE = 2 * WEEKLY_HOUSING_PENCE
 PHONE_BILL_PENCE = 1_500
 PHONE_BILL_DAY = 3
 CHRISTMAS_FARE_PENCE = 6_400
@@ -85,12 +88,17 @@ def spending_events(
 ) -> list[DomainEvent]:
     """What he spends this hour, if anything."""
     done = _recent_spends(history, at)
+    rent = weekly_housing_pence(history)
     candidates = [
         *_bills(at, awake),
-        *_bits(at, awake, tight=balance_pence < TIGHT_PENCE),
+        *_bits(at, awake, tight=balance_pence < 2 * rent),
         *_at_place(history, at, awake, location_id),
         *_gifts(history, at),
         *_for_friends(history, at),
+        *(
+            (spend_id, "housing", cost, text, True)
+            for spend_id, cost, text in move_costs(history, at)
+        ),
         *_christmas(history, at, awake, location_id),
     ]
     output: list[DomainEvent] = []
@@ -98,7 +106,7 @@ def spending_events(
     for spend_id, category, cost, text, owed in candidates:
         if spend_id in done:
             continue
-        if not owed and available < cost + RESERVE_PENCE:
+        if not owed and available < cost + rent + CUSHION_PENCE:
             continue
         done.add(spend_id)
         available -= cost
@@ -310,7 +318,7 @@ def money_context(history: Sequence[DomainEvent], at: datetime) -> dict[str, obj
     if not latest:
         return {}
     balance = int(latest[0].payload["balance_pence"])
-    weeks = balance / WEEKLY_HOUSING_PENCE
+    weeks = balance / weekly_housing_pence(history)
     feels = "tight" if weeks < 2 else "careful" if weeks < 8 else "comfortable"
     lately = sorted(spending_view(history, at).items(), key=lambda item: -item[1])
     return {

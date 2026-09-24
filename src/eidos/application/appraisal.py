@@ -506,6 +506,12 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind == "home.move":
+        return {
+            "looking": ("curiosity", 0.03, 0.15, 0.3, 0.3),
+            "found": ("affect", 0.0, 0.35, 0.45, 0.5),
+            "moved": ("affect", 0.0, 0.4, 0.4, 0.6),
+        }.get(str(event.payload.get("stage")))
     if event.kind == "friend.life_event":
         return {
             "achievement": ("affect", 0.0, 0.15, 0.2, 0.4),
