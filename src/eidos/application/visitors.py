@@ -8,6 +8,7 @@ from typing import AbstractSet, Mapping, Sequence
 
 from eidos.application.contact_pacing import contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
+from eidos.application.phone_calls import connection_goal_candidates
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.relationships import Relationship
@@ -57,7 +58,7 @@ def visitor_events(
     goal = next(
         (
             event
-            for event in events_of(history, "npc.goal_formed")
+            for event in connection_goal_candidates(history, simulated_at, paced=paced)
             if event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in handled_goal_ids

@@ -10,7 +10,9 @@ from typing import Mapping, Sequence
 from uuid import uuid4
 
 from eidos.application.causal_opportunities import optional_schema
+from eidos.application.npc_cognition import evidence_ids, latest_need_evidence
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of, kind_index
 from eidos.domain.npc_agency import (
     npc_agency_output_schema,
     parse_npc_agency_candidate,
@@ -35,27 +37,16 @@ async def autonomous_npc_plan_events(
     if simulated_at.utcoffset() is None:
         raise ValueError("NPC agency time must be timezone-aware")
     state = project_npcs(history, simulated_at)
-    consumed = {
-        str(event.payload["evidence_need_event_id"])
-        for event in history
-        if event.kind
-        in {"npc.plan_created", "npc.agency_rejected", "npc.agency_generation_requested"}
-        and isinstance(event.payload.get("evidence_need_event_id"), str)
-    }
+    already_consumed = _CONSUMED_EVIDENCE(history)
+    consumed: set[str] = set()
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
         if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
             continue
-        evidence = next(
-            (
-                event
-                for event in reversed(history)
-                if event.kind == "npc.needs_changed"
-                and event.payload.get("actor_id") == actor_id
-                and event.payload.get("owner") == actor_id
-                and str(event.event_id) not in consumed
-            ),
-            None,
+        evidence = latest_need_evidence(
+            history,
+            actor_id,
+            lambda event_id: event_id in already_consumed or event_id in consumed,
         )
         if evidence is None or person.plan_status == "active":
             continue
@@ -88,14 +79,9 @@ async def autonomous_npc_plan_events(
         }
         need = min(eligible, key=lambda name: (scores[name], name))
         pressure_band = f"{need}:{int(eligible[need] * 5)}"
-        previous = next(
-            (
-                event
-                for event in reversed(history)
-                if event.kind == "npc.agency_generation_requested"
-                and event.payload.get("actor_id") == actor_id
-            ),
-            None,
+        previous = kind_index(history).latest(
+            "npc.agency_generation_requested",
+            lambda event: event.payload.get("actor_id") == actor_id,
         )
         if (
             previous is not None
@@ -351,10 +337,19 @@ def _owned_context(history: Sequence[DomainEvent], actor_id: str) -> list[dict[s
             "location_id": event.payload.get("location_id"),
             "simulated_at": event.payload.get("simulated_at"),
         }
-        for event in history
+        for event in events_of(
+            history, "perception.recorded", "npc.activity_recorded", "npc.biography_seeded"
+        )
         if event.payload.get("owner") == actor_id
-        and event.kind in {"perception.recorded", "npc.activity_recorded", "npc.biography_seeded"}
     ][-8:]
+
+
+_CONSUMED_EVIDENCE = evidence_ids(
+    "evidence_need_event_id",
+    "npc.plan_created",
+    "npc.agency_rejected",
+    "npc.agency_generation_requested",
+)
 
 
 def _latest_actor_times(history: Sequence[DomainEvent], kind: str) -> dict[str, datetime]:

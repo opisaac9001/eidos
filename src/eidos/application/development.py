@@ -2,32 +2,31 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import NamedTuple, Sequence
 
 from eidos.domain.development import Habit, project_development
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of, kind_index
+from eidos.domain.folding import GrowOnlyMap, IncrementalFold, events_of
 
 
 def development_events(history: Sequence[DomainEvent], simulated_at: str) -> list[DomainEvent]:
-    index = kind_index(history)
-    processed = {
-        str(event.payload["source_event_id"])
-        for event in index.select(
-            "skill.practiced", "habit.formed", "habit.reinforced", "habit.reactivated"
-        )
-        if isinstance(event.payload.get("source_event_id"), str)
-    }
+    evidence = _EVIDENCE(history)
+    processed_now: set[str] = set()
+
+    def processed(source_id: str) -> bool:
+        return source_id in evidence.processed or source_id in processed_now
+
     at = _time(simulated_at)
     output: list[DomainEvent] = []
-    for source in index.select(*_SKILL_EVIDENCE_KINDS):
+    for source in evidence.unprocessed:
         source_id = str(source.event_id)
-        if source_id in processed:
+        if processed(source_id):
             continue
         skill_id = _skill_evidence(source)
         if skill_id is None:
             continue
-        state = project_development([*history, *output])
+        # A fold of an equal copy of history is the same state.
+        state = project_development([*history, *output] if output else history)
         current = state.skills.get(skill_id)
         if current is None and len(state.skills) >= 12:
             continue
@@ -57,9 +56,9 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
                 correlation_id=source.correlation_id or f"skill:{skill_id}",
             )
         )
-        processed.add(source_id)
+        processed_now.add(source_id)
     if at.hour == 19:
-        state = project_development([*history, *output])
+        state = project_development([*history, *output] if output else history)
         rust_candidates = [
             skill
             for skill in state.skills.values()
@@ -89,19 +88,10 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
                     correlation_id=f"skill:{skill.skill_id}",
                 )
             )
-    cafe_visits = [
-        event
-        for event in index.select("memory.recorded")
-        if event.payload.get("source") == "authored-routine"
-        and (
-            event.payload.get("activity") == "morning_cafe"
-            or event.payload.get("text") == "Visited the cafe before work."
-        )
-    ]
-    if len(cafe_visits) >= 3:
-        source = cafe_visits[-1]
+    if evidence.cafe_visits >= 3 and evidence.last_cafe_visit is not None:
+        source = evidence.last_cafe_visit
         source_id = str(source.event_id)
-        if source_id not in processed:
+        if not processed(source_id):
             output.append(
                 DomainEvent(
                     "habit.reinforced",
@@ -117,8 +107,55 @@ def development_events(history: Sequence[DomainEvent], simulated_at: str) -> lis
                     correlation_id="habit-morning-cafe-visit",
                 )
             )
-    output.extend(behavioral_habit_events([*history, *output], at))
+    output.extend(behavioral_habit_events([*history, *output] if output else history, at))
     return output
+
+
+class _Evidence(NamedTuple):
+    # Source ids already cited by skill practice or habit events.
+    processed: GrowOnlyMap[str, bool]
+    # Skill evidence not yet processed, in history order.
+    unprocessed: tuple[DomainEvent, ...]
+    cafe_visits: int
+    last_cafe_visit: DomainEvent | None
+
+
+_PROCESSING_KINDS = frozenset(
+    {"skill.practiced", "habit.formed", "habit.reinforced", "habit.reactivated"}
+)
+
+
+def _evidence_step(state: _Evidence, event: DomainEvent) -> _Evidence:
+    kind = event.kind
+    if kind in _PROCESSING_KINDS:
+        source_id = event.payload.get("source_event_id")
+        if not isinstance(source_id, str) or source_id in state.processed:
+            return state
+        return state._replace(
+            processed=state.processed.with_item(source_id, True),
+            unprocessed=tuple(
+                source for source in state.unprocessed if str(source.event_id) != source_id
+            ),
+        )
+    if kind in _SKILL_EVIDENCE_KINDS:
+        if _skill_evidence(event) is None or str(event.event_id) in state.processed:
+            return state
+        return state._replace(unprocessed=(*state.unprocessed, event))
+    if (
+        kind == "memory.recorded"
+        and event.payload.get("source") == "authored-routine"
+        and (
+            event.payload.get("activity") == "morning_cafe"
+            or event.payload.get("text") == "Visited the cafe before work."
+        )
+    ):
+        return state._replace(cafe_visits=state.cafe_visits + 1, last_cafe_visit=event)
+    return state
+
+
+_EVIDENCE: IncrementalFold[_Evidence] = IncrementalFold(
+    lambda: _Evidence(GrowOnlyMap(), (), 0, None), _evidence_step
+)
 
 
 def behavioral_habit_events(

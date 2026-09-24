@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 from eidos.domain.beliefs import BeliefProposal, BeliefState, project_beliefs, resolve_belief
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import GroupIndex, kind_index
+from eidos.domain.folding import (
+    IRREGULAR,
+    GroupIndex,
+    GrowOnlyMap,
+    IncrementalFold,
+    kind_index,
+    str_match_key,
+)
 from eidos.domain.npcs import project_npcs
 from eidos.domain.relationships import Relationship
 from eidos.domain.world import npc_plan_profile
@@ -25,20 +32,11 @@ def npc_belief_events(
     output: list[DomainEvent] = []
     state = belief_state if belief_state is not None else project_beliefs(history)
     npc_state = project_npcs(history, now)
-    index = kind_index(history)
-    used_evidence = {
-        str(event.payload["evidence_event_id"])
-        for event in index.select(
-            "belief.proposed",
-            "belief.formed",
-            "belief.revised",
-            "belief.corrected",
-            "belief.contested",
-        )
-        if isinstance(event.payload.get("evidence_event_id"), str)
-    }
-    latest_plan_at = _latest_plan_times(index)
-    for perception in index.select("perception.recorded"):
+    used_evidence = _BELIEF_EVIDENCE(history)
+    newly_used: set[str] = set()
+    latest_plan_at = _latest_plan_times(history)
+    # Other perceptions fail the static tests below cleanly, so they are skipped unread.
+    for perception in _INTERPRETABLE_PERCEPTIONS(history).of(True):
         owner = perception.payload.get("owner")
         location_id = perception.payload.get("location_id")
         if (
@@ -48,6 +46,7 @@ def npc_belief_events(
             or owner not in npc_state.people
             or not isinstance(location_id, str)
             or str(perception.event_id) in used_evidence
+            or str(perception.event_id) in newly_used
         ):
             continue
         continuing = perception.payload.get("source_kind") == "world_thread"
@@ -69,7 +68,7 @@ def npc_belief_events(
                 expected_revision=len(history) + len(output),
             ),
             state=state,
-            history=[*history, *output],
+            history=[*history, *output] if output else history,
             actual_revision=len(history) + len(output),
             simulated_at=simulated_at,
         )
@@ -77,7 +76,7 @@ def npc_belief_events(
         for event in resolution.events:
             state = state.apply(event)
         if resolution.accepted:
-            used_evidence.add(str(perception.event_id))
+            newly_used.add(str(perception.event_id))
             formed = next(
                 (event for event in resolution.events if event.kind == "belief.formed"), None
             )
@@ -131,27 +130,17 @@ def npc_need_plan_events(
     if authored_scenario and now.hour != 19:
         return []
     state = project_npcs(history, now)
-    index = kind_index(history)
-    used_evidence = {
-        str(event.payload["evidence_need_event_id"])
-        for event in index.select("npc.plan_created", "npc.agency_rejected")
-        if isinstance(event.payload.get("evidence_need_event_id"), str)
-    }
-    latest_plan_at = _latest_plan_times(index)
-    needs_changed = index.select("npc.needs_changed")
+    used_evidence = _PLANNED_EVIDENCE(history)
+    newly_used: set[str] = set()
+    latest_plan_at = _latest_plan_times(history)
     output: list[DomainEvent] = []
     for actor_id, person in state.people.items():
         if allowed_actor_ids is not None and actor_id not in allowed_actor_ids:
             continue
-        evidence = next(
-            (
-                event
-                for event in reversed(needs_changed)
-                if event.payload.get("actor_id") == actor_id
-                and event.payload.get("owner") == actor_id
-                and str(event.event_id) not in used_evidence
-            ),
-            None,
+        evidence = latest_need_evidence(
+            history,
+            actor_id,
+            lambda event_id: event_id in used_evidence or event_id in newly_used,
         )
         if evidence is None:
             continue
@@ -295,24 +284,111 @@ def npc_need_plan_events(
         output.extend((priority, goal, plan))
         state = state.apply(goal).apply(plan)
         latest_plan_at[actor_id] = now
-        used_evidence.add(str(evidence.event_id))
+        newly_used.add(str(evidence.event_id))
     return output
 
 
-def _latest_plan_times(index: GroupIndex) -> dict[str, datetime]:
-    latest: dict[str, datetime] = {}
-    for event in index.of("npc.plan_created"):
-        actor_id = event.payload.get("actor_id")
-        value = event.payload.get("simulated_at")
-        if not isinstance(actor_id, str) or not isinstance(value, str):
-            continue
-        try:
-            at = datetime.fromisoformat(value)
-        except ValueError:
-            continue
-        if at.utcoffset() is not None and (actor_id not in latest or latest[actor_id] < at):
-            latest[actor_id] = at
+def latest_need_evidence(
+    history: Sequence[DomainEvent], actor_id: str, used: Callable[[str], bool]
+) -> DomainEvent | None:
+    """The newest need change the actor owns whose id is not ``used``.
+
+    Exactly ``next((e for e in reversed(events_of(history, "npc.needs_changed")) if
+    e.payload.get("actor_id") == actor_id and e.payload.get("owner") == actor_id and not
+    used(str(e.event_id))), None)``, looking only at the actor's own need changes.
+    """
+    needs = _NEEDS_BY_ACTOR(history)
+
+    def matches(event: DomainEvent) -> bool:
+        return (
+            event.payload.get("actor_id") == actor_id
+            and event.payload.get("owner") == actor_id
+            and not used(str(event.event_id))
+        )
+
+    if needs.has(IRREGULAR):
+        # An actor id of an unusual type might equal any string; search them all.
+        return kind_index(history).latest("npc.needs_changed", matches)
+    return needs.latest(actor_id, matches)
+
+
+_NEEDS_BY_ACTOR: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex,
+    lambda index, event: index.with_event(
+        str_match_key(event.payload.get("actor_id")) if event.kind == "npc.needs_changed" else None,
+        event,
+    ),
+)
+
+
+def evidence_ids(field: str, *kinds: str) -> IncrementalFold[GrowOnlyMap[str, bool]]:
+    """Every string ``field`` of events of ``kinds``, as a set folded incrementally."""
+    wanted = frozenset(kinds)
+
+    def step(ids: GrowOnlyMap[str, bool], event: DomainEvent) -> GrowOnlyMap[str, bool]:
+        value = event.payload.get(field) if event.kind in wanted else None
+        return ids.with_item(value, True) if isinstance(value, str) else ids
+
+    return IncrementalFold(GrowOnlyMap, step)
+
+
+_BELIEF_EVIDENCE = evidence_ids(
+    "evidence_event_id",
+    "belief.proposed",
+    "belief.formed",
+    "belief.revised",
+    "belief.corrected",
+    "belief.contested",
+)
+_PLANNED_EVIDENCE = evidence_ids(
+    "evidence_need_event_id", "npc.plan_created", "npc.agency_rejected"
+)
+
+
+def _interpretable(event: DomainEvent) -> bool:
+    """False only for events npc_belief_events's static tests skip without raising."""
+    if event.kind != "perception.recorded":
+        return False
+    try:
+        if event.payload.get("source_kind") not in {"world_event", "world_thread"}:
+            return False
+    except TypeError:
+        return True
+    owner = event.payload.get("owner")
+    return (
+        isinstance(owner, str)
+        and owner != "pathos"
+        and isinstance(event.payload.get("location_id"), str)
+    )
+
+
+_INTERPRETABLE_PERCEPTIONS: IncrementalFold[GroupIndex] = IncrementalFold(
+    GroupIndex,
+    lambda index, event: index.with_event(True if _interpretable(event) else None, event),
+)
+
+
+def _plan_time_step(latest: dict[str, datetime], event: DomainEvent) -> dict[str, datetime]:
+    if event.kind != "npc.plan_created":
+        return latest
+    actor_id = event.payload.get("actor_id")
+    value = event.payload.get("simulated_at")
+    if not isinstance(actor_id, str) or not isinstance(value, str):
+        return latest
+    try:
+        at = datetime.fromisoformat(value)
+    except ValueError:
+        return latest
+    if at.utcoffset() is not None and (actor_id not in latest or latest[actor_id] < at):
+        return {**latest, actor_id: at}
     return latest
+
+
+_PLAN_TIMES: IncrementalFold[dict[str, datetime]] = IncrementalFold(dict, _plan_time_step)
+
+
+def _latest_plan_times(history: Sequence[DomainEvent]) -> dict[str, datetime]:
+    return dict(_PLAN_TIMES(history))
 
 
 def _in_plan_cooldown(previous: datetime | None, now: datetime) -> bool:

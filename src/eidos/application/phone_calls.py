@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from bisect import bisect_left
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import AbstractSet, Mapping, Sequence
 
-from eidos.application.contact_pacing import contact_allowed
+from eidos.application.contact_pacing import FRESH_GOAL, contact_allowed
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import events_of
+from eidos.domain.folding import LinearReplay, events_of, kind_index
 from eidos.domain.relationships import Relationship
 from eidos.domain.scenes import (
     SceneInterruptProposal,
@@ -62,7 +63,7 @@ def phone_call_events(
     goal = next(
         (
             event
-            for event in events_of(history, "npc.goal_formed")
+            for event in connection_goal_candidates(history, simulated_at, paced=paced)
             if event.payload.get("motivation_need") == "connection"
             and (known_person_ids is None or event.payload.get("actor_id") in known_person_ids)
             and str(event.payload.get("goal_id")) not in called_goal_ids
@@ -364,4 +365,58 @@ def _call_completed(answered: DomainEvent, simulated_at: datetime) -> DomainEven
         },
         causation_id=answered.event_id,
         correlation_id=answered.correlation_id,
+    )
+
+
+class _ConnectionGoals:
+    def __init__(self) -> None:
+        self.goals: list[DomainEvent] = []
+        # reach[i] is the latest formation time (microseconds since the epoch) among
+        # goals[: i + 1], and infinite from the first goal whose time or actor is unusual.
+        self.reach: list[float] = []
+
+    def advance(self, history: Sequence[DomainEvent], start: int) -> None:
+        for event in kind_index(history).of("npc.goal_formed", start=start):
+            if event.payload.get("motivation_need") == "connection":
+                formed = _formed_microseconds(event)
+                self.goals.append(event)
+                self.reach.append(max(self.reach[-1], formed) if self.reach else formed)
+
+
+def _formed_microseconds(goal: DomainEvent) -> float:
+    actor_id = goal.payload.get("actor_id")
+    if actor_id is not None and type(actor_id) is not str:
+        return _UNUSUAL
+    try:
+        formed = datetime.fromisoformat(str(goal.payload.get("simulated_at")))
+    except Exception:
+        return _UNUSUAL
+    if formed.utcoffset() is None:
+        return _UNUSUAL
+    return (formed - _EPOCH) // _MICROSECOND
+
+
+_UNUSUAL = float("inf")
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_MICROSECOND = timedelta(microseconds=1)
+_CONNECTION_GOALS: LinearReplay[_ConnectionGoals] = LinearReplay(
+    _ConnectionGoals, lambda goals, history, start: goals.advance(history, start)
+)
+
+
+def connection_goal_candidates(
+    history: Sequence[DomainEvent], simulated_at: datetime, *, paced: bool
+) -> list[DomainEvent]:
+    """Connection goals, in history order, that could still prompt a contact.
+
+    A superset for callers to re-test in full. When paced, it leaves out only a prefix of
+    goals formed more than FRESH_GOAL before ``simulated_at``, with a valid aware time and a
+    string (or missing) actor: ``contact_allowed`` rejects each of those, and neither it
+    nor a known-person test can raise for them.
+    """
+    if not paced or simulated_at.utcoffset() is None:
+        return _CONNECTION_GOALS.use(history, lambda goals: list(goals.goals))
+    oldest = (simulated_at - _EPOCH) // _MICROSECOND - FRESH_GOAL // _MICROSECOND
+    return _CONNECTION_GOALS.use(
+        history, lambda goals: goals.goals[bisect_left(goals.reach, oldest) :]
     )
