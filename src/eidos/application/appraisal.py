@@ -533,6 +533,24 @@ def _effect(
             "finished": ("mastery", 0.05, 0.45, 0.3, 0.6),
             "dropped": ("affect", 0.0, -0.25, 0.2, 0.6),
         }.get(str(event.payload.get("stage")))
+    if event.kind == "body.event":
+        kind = str(event.payload.get("kind"))
+        if kind == "injury" and event.payload.get("injury") == "pulled_back":
+            return ("rest", -0.05, -0.3, 0.45, 0.35)
+        if kind == "fitness":
+            if event.payload.get("direction") == "fitter":
+                return ("affect", 0.0, 0.3, 0.3, 0.7)
+            return ("affect", 0.0, -0.2, 0.25, 0.7)
+        if kind == "dentist_visit" and event.payload.get("outcome") == "filling":
+            return ("affect", 0.0, -0.15, 0.4, 0.4)
+        return {
+            "injury": ("affect", 0.0, -0.2, 0.5, 0.4),
+            "hangover": ("affect", 0.0, -0.2, 0.2, 0.7),
+            "dentist_nag": ("affect", 0.0, -0.05, 0.1, 0.8),
+            "dentist_booked": ("affect", 0.0, 0.1, 0.2, 0.8),
+            "dentist_visit": ("affect", 0.0, 0.25, 0.25, 0.5),
+            "dentist_missed": ("affect", 0.0, -0.2, 0.3, 0.6),
+        }.get(kind)
     if event.kind == "home.move":
         return {
             "looking": ("curiosity", 0.03, 0.15, 0.3, 0.3),
