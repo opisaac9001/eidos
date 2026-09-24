@@ -1964,6 +1964,13 @@ def _standin_people_reply(message: str, context: dict[str, object]) -> str | Non
         reply += f" And {friends[0]} has become a proper friend."
     if strained:
         reply += f" Things are a bit strained with {strained[0]} at the moment."
+    news = [
+        item
+        for item in selfhood.get("whats_going_on_with_his_friends", [])
+        if isinstance(item, dict) and item.get("what")
+    ]
+    if news:
+        reply += f" News, actually: {news[0]['what']}"
     return reply
 
 

@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Callable, Hashable, Sequence
 
+from eidos.application.friends_lives import away_people
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
     IRREGULAR,
@@ -38,7 +39,26 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     workdays = _employer_workdays(history)
     appointments = _appointments_with_pathos(history)
     own_events = _OWN_EVENTS(history)
+    away = away_people(history)
     for actor_id, person in state.people.items():
+        if actor_id in away:
+            # They live somewhere else now; no more comings and goings around town.
+            if person.location_id != "home":
+                output.append(
+                    DomainEvent(
+                        "npc.moved",
+                        "pathos",
+                        {
+                            "actor_id": actor_id,
+                            "owner": actor_id,
+                            "visibility": "private",
+                            "simulated_at": now.isoformat(),
+                            "location_id": "home",
+                            "reason": "moved away",
+                        },
+                    )
+                )
+            continue
         owned = _Owned(own_events, actor_id)
 
         def emit(

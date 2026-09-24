@@ -75,7 +75,10 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "apology.offered": ("target_id", 0.3, True),
     "imperfection.apologised": ("person_id", 0.3, True),
     "romance.stage": ("person_id", 0.4, True),
+    "friend.life_event": ("person_id", 0.15, False),
 }
+# Being there when a friend is going through something is what deep friendships are made of.
+_FRIEND_NEWS_SKIPPED = frozenset({"leaving_do_agreed", "moved_away"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,6 +233,11 @@ def _event_moments(
             return [], talk_day, talked
         if event.kind == "romance.stage" and payload.get("stage") not in {"date", "together"}:
             return [], talk_day, talked
+        if event.kind == "friend.life_event":
+            if payload.get("kind") in _FRIEND_NEWS_SKIPPED:
+                return [], talk_day, talked
+            if payload.get("kind") == "checked_in":
+                weight, deepening = 0.35, True
         person = payload.get(key)
         when = _time(payload.get("simulated_at"))
         if isinstance(person, str) and person not in {"", "pathos"} and when is not None:

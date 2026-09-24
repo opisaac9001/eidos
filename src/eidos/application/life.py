@@ -52,6 +52,8 @@ from eidos.application.family import FAMILY_HOME, christmas_events, family_event
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
+from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
+from eidos.application.friends_lives import away_people, busy_people, friend_life_events
 from eidos.application.friendship import friendships
 from eidos.application.household import (
     household_adjusted_beat,
@@ -133,7 +135,7 @@ from eidos.application.renegotiations import (
 )
 from eidos.application.rescheduling import reflective_rescheduling_events
 from eidos.application.resident_social import resident_social_events
-from eidos.application.romance import romance_events
+from eidos.application.romance import current_arc, romance_events
 from eidos.application.scene_story import bounded_scene_events, continuing_scene_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.application.seasons import seasonal_baseline, seasonal_events
@@ -603,6 +605,7 @@ class Life(LifeConversation):
             self._phase_perception(tick)
             await self._phase_townsfolk(tick)
             self._phase_family(tick)
+            self._phase_friends_lives(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1374,6 +1377,7 @@ class Life(LifeConversation):
                 depths={
                     person: friendship.depth
                     for person, friendship in friendships(history + pending, current).items()
+                    if person not in away_people(history + pending)
                 },
                 names=names,
                 ages=ages,
@@ -1510,6 +1514,34 @@ class Life(LifeConversation):
                 location_id=tick.state.location_id,
             ),
             self._world_catalog,
+            self._planning,
+        )
+
+    def _phase_friends_lives(self, tick: _Tick) -> None:
+        """New jobs, new babies, worries and moves in his friends' lives."""
+        if self.authored_scenario or tick.current.hour != FRIEND_EVENT_HOUR:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        known = friendships(history + pending, current)
+        arc = current_arc(history + pending)
+        self._extend_warmed(
+            tick,
+            friend_life_events(
+                history + pending,
+                current,
+                depths={person: friendship.depth for person, friendship in known.items()},
+                first_shared={
+                    person: friendship.first_shared for person, friendship in known.items()
+                },
+                names={
+                    **townsfolk_names(history + pending),
+                    **{person.person_id: person.name for person in catalog.people.values()},
+                },
+                residents=frozenset(catalog.people),
+                known_places=known_place_ids(history + pending, catalog),
+                in_romance_with=arc[0] if arc else None,
+            ),
             self._planning,
         )
 
@@ -1693,7 +1725,8 @@ class Life(LifeConversation):
                 pathos_energy=tick.effective_energy,
                 social_openness=phone_bias.social_openness,
                 relationships=self._relationships(history + pending).relationships,
-                known_person_ids=pathos_known_person_ids(history + pending),
+                known_person_ids=pathos_known_person_ids(history + pending)
+                - busy_people(history + pending, current),
                 paced=not self.authored_scenario,
             )
         )
@@ -1818,7 +1851,8 @@ class Life(LifeConversation):
             resident_invitation_events(
                 history + pending,
                 current,
-                known_person_ids=pathos_known_person_ids(history + pending),
+                known_person_ids=pathos_known_person_ids(history + pending)
+                - busy_people(history + pending, current),
                 npc_people=project_npcs(history + pending, current).people,
                 catalog=resident_invitation_catalog,
             )
@@ -1834,7 +1868,11 @@ class Life(LifeConversation):
                 pathos_awake=tick.state.awake,
                 pathos_energy=tick.effective_energy,
                 social_openness=invitation_bias.social_openness,
-                npc_people=project_npcs(history + pending, current).people,
+                npc_people={
+                    person_id: person
+                    for person_id, person in project_npcs(history + pending, current).people.items()
+                    if person_id not in busy_people(history + pending, current)
+                },
                 planning=self._planning(history + pending),
                 catalog=invitation_catalog,
             )

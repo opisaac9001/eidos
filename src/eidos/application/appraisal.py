@@ -506,6 +506,19 @@ def _effect(
         if event.payload.get("missed"):
             return ("affect", 0.0, -0.1, 0.2, 0.3)
         return ("connection", 0.08, 0.35, 0.2, 0.6)
+    if event.kind == "friend.life_event":
+        return {
+            "achievement": ("affect", 0.0, 0.15, 0.2, 0.4),
+            "new_job": ("affect", 0.0, 0.15, 0.2, 0.4),
+            "new_partner": ("affect", 0.0, 0.1, 0.2, 0.4),
+            "expecting": ("connection", 0.03, 0.35, 0.35, 0.5),
+            "baby_born": ("connection", 0.04, 0.45, 0.4, 0.5),
+            "family_worry": ("affect", 0.0, -0.2, 0.3, 0.6),
+            "checked_in": ("connection", 0.04, 0.2, 0.15, 0.7),
+            "family_better": ("affect", 0.0, 0.2, 0.2, 0.5),
+            "moving_announced": ("connection", -0.03, -0.35, 0.35, 0.6),
+            "moved_away": ("connection", -0.05, -0.4, 0.3, 0.5),
+        }.get(str(event.payload.get("kind")))
     if event.kind == "townsfolk.numbers_swapped":
         return ("connection", 0.06, 0.4, 0.3, 0.6)
     if event.kind == "family.call_owed":

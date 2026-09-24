@@ -7,6 +7,7 @@ from hashlib import sha256
 from typing import AbstractSet, Mapping, Sequence
 
 from eidos.application.contact_pacing import contact_allowed
+from eidos.application.friends_lives import away_people
 from eidos.application.interruption_recovery import recover_user_scene
 from eidos.application.phone_calls import connection_goal_candidates
 from eidos.domain.events import DomainEvent
@@ -135,7 +136,8 @@ def _resolve_due_plan(
         return []
     visit_id = str(planned.payload["visit_id"])
     visitor_id = str(planned.payload["visitor_id"])
-    if not pathos_awake or actor_locations.get("pathos") != "home":
+    moved = visitor_id in away_people(history)
+    if moved or not pathos_awake or actor_locations.get("pathos") != "home":
         return [
             DomainEvent(
                 "visitor.missed",
@@ -143,7 +145,9 @@ def _resolve_due_plan(
                 {
                     "visit_id": visit_id,
                     "visitor_id": visitor_id,
-                    "reason": "Pathos was asleep or away when the visitor arrived.",
+                    "reason": "They had moved away before they could call round."
+                    if moved
+                    else "Pathos was asleep or away when the visitor arrived.",
                     "simulated_at": simulated_at.isoformat(),
                 },
                 causation_id=planned.event_id,

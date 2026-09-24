@@ -90,6 +90,7 @@ def spending_events(
         *_bits(at, awake, tight=balance_pence < TIGHT_PENCE),
         *_at_place(history, at, awake, location_id),
         *_gifts(history, at),
+        *_for_friends(history, at),
         *_christmas(history, at, awake, location_id),
     ]
     output: list[DomainEvent] = []
@@ -196,6 +197,32 @@ def _gifts(history: Sequence[DomainEvent], at: datetime) -> list[_Candidate]:
         cost, text = gift
         base = occasion_id.removesuffix("-late")
         candidates.append((f"gift-{base}", "gifts", cost, text, False))
+    return candidates
+
+
+def _for_friends(history: Sequence[DomainEvent], at: datetime) -> list[_Candidate]:
+    """A present for a friend's new baby; a card and a little something when one leaves."""
+    candidates: list[_Candidate] = []
+    for event in reversed(events_of(history, "friend.life_event")):
+        raw = event.payload.get("simulated_at")
+        if not isinstance(raw, str) or datetime.fromisoformat(raw) < at - timedelta(days=2):
+            break
+        kind = event.payload.get("kind")
+        person = str(event.payload.get("person_id"))
+        if kind == "baby_born":
+            candidates.append(
+                (f"baby-gift-{person}", "gifts", 2_500, "A present for a friend's new baby", False)
+            )
+        elif kind == "moving_announced":
+            candidates.append(
+                (
+                    f"leaving-gift-{person}",
+                    "gifts",
+                    1_500,
+                    "A leaving card and a small present",
+                    False,
+                )
+            )
     return candidates
 
 

@@ -111,6 +111,32 @@ Rent and food were always paid for; now the rest of an ordinary week is too.
   than two weeks' rent put by, the weekly bits shrink to the basics and the haircut
   waits.
 
+## His friends' lives (`application/friends_lives.py`)
+
+His friends' lives go on without him, and change his weeks.
+
+- **What happens:** new jobs, someone new, a baby (after a partner of nine months or
+  more, for friends who want children), a parent unwell, a half-marathon or a new dog.
+  Sometimes a friend moves to another city.
+- **How often:** about one turn every eight months per friend he's reasonably close to,
+  and never more than one piece of news a week. Nothing happens to people he barely
+  knows.
+- **What it changes:**
+  - A friend with a newborn (four months) or a family worry isn't free for invitations
+    or visits.
+  - He messages to ask how things are when a friend is worried; that deepens a
+    friendship.
+  - He buys a present for a new baby and a leaving card.
+- **Moving away:** announced about three weeks ahead. The leaving do is a Friday or
+  Saturday night at the Crown, where the friend joins him. The next day they are gone:
+  off the map for good, with no more invitations, visits or bumping into them. Phone
+  calls still happen, and a close friend stays close (friendship from level 6 never
+  fades).
+- **Facts:** whether a friend wants children is fixed per person; whether they'd move is
+  rolled per year, so any friend might eventually go.
+- **Where it shows:** `whats_going_on_with_his_friends` in his self-context, and his
+  answer when you ask about his friends.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.
