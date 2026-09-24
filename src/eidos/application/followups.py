@@ -66,6 +66,7 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             "object.shared_use",
             "relationship.anniversary_remembered",
             "reflection.reconsideration_decided",
+            "bond.missed",
         } and not (
             source.kind == "scene.ended"
             and str(source.payload.get("scene_id", "")).startswith("ordinary-")
@@ -85,6 +86,8 @@ def follow_up_events(history: Sequence[DomainEvent], simulated_at: datetime) -> 
             if source.kind == "relationship.anniversary_remembered"
             else "Follow up honestly after deciding the missed commitment needs repair."
             if source.kind == "reflection.reconsideration_decided"
+            else "It's been ages; get in touch and catch up, no guilt either way."
+            if source.kind == "bond.missed"
             else "Remember the contact and make room to reconnect."
         )
         scheduled = DomainEvent(
@@ -212,6 +215,10 @@ def _interaction_person(history: Sequence[DomainEvent], event: DomainEvent) -> s
 
 
 def _follow_up_source_person(history: Sequence[DomainEvent], event: DomainEvent) -> str | None:
+    if event.kind == "bond.missed":
+        # Missing a close friend is a reason to get in touch; you have your own channel.
+        person = event.payload.get("person_id")
+        return person if isinstance(person, str) and person not in {"pathos", "user"} else None
     if (
         event.kind != "reflection.reconsideration_decided"
         or event.payload.get("decision") != "seek_repair"

@@ -154,3 +154,29 @@ def test_a_lighter_friendship_can_drift_without_a_falling_out() -> None:
     later = run_reviews(history, range(121, 400))
     drifted = [e for e in later if e.payload.get("bond") == "drifted"]
     assert drifted and "No falling out" in drifted[0].payload["text"]
+
+
+def test_missing_a_close_friend_makes_him_want_to_get_in_touch() -> None:
+    from eidos.application.followups import follow_up_events
+
+    history = deep_friendship()
+    history += run_reviews(history, range(0, 201))
+    history += run_reviews(history, range(201, 300))
+    missed = next(e for e in history if e.kind == "bond.missed")
+    scheduled = [
+        e
+        for e in follow_up_events(history, at(300))
+        if e.kind == "follow_up.scheduled" and e.payload["source_event_id"] == str(missed.event_id)
+    ]
+    assert scheduled and scheduled[0].payload["person_id"] == "mara"
+    assert "catch up" in scheduled[0].payload["reason"]
+    you = DomainEvent(
+        "bond.missed",
+        "pathos",
+        {"person_id": "user", "text": "…", "simulated_at": at(300).isoformat()},
+    )
+    assert not [
+        e
+        for e in follow_up_events([you], at(300))
+        if e.payload.get("source_event_id") == str(you.event_id)
+    ]
