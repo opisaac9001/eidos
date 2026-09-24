@@ -12,7 +12,7 @@ from uuid import uuid4
 from eidos.application.activity_execution import execution_context
 from eidos.application.causal_opportunities import fresh_cause
 from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
-from eidos.application.experience import taste_notes
+from eidos.application.experience import activity_tastes, taste_notes
 from eidos.application.opportunities import available_opportunities
 from eidos.application.place_discovery import known_place_ids, visited_place_ids
 from eidos.application.preparation import preparation_context
@@ -254,6 +254,8 @@ async def autonomous_activity_events(
             else None
         ),
         "known_places": places,
+        # Kinds of activity he has found he loves, or that turned out not to be for him.
+        "activity_tastes": activity_tastes(history),
         "usable_resources": resources,
         "known_people": people,
         "calendar": [

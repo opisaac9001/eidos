@@ -403,3 +403,14 @@ def _memory(source: DomainEvent, text: str, at: datetime, *, importance: float) 
         causation_id=source.event_id,
         correlation_id=source.correlation_id,
     )
+
+
+def activity_tastes(history: Sequence[DomainEvent]) -> dict[str, str]:
+    """activity type -> "loves" or "not for him", for kinds of activity he has a taste about."""
+    return {
+        taste.subject.removeprefix("activity:"): (
+            "loves" if taste.stance == "likes" else "not for him"
+        )
+        for taste in project_tastes(history).tastes.values()
+        if taste.subject.startswith("activity:")
+    }

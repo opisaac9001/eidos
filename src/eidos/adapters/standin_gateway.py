@@ -991,6 +991,25 @@ class StandInGateway(ModelGateway):
                 agency_item = owned
             else:
                 agency_item = activity_palette[choice % len(activity_palette)]
+            # Whim, habit and hope rotate through ideas, but not back to something he has
+            # decided isn't for him.
+            tastes = context.get("activity_tastes", {})
+            disliked = {
+                kind
+                for kind, feeling in (tastes.items() if isinstance(tastes, dict) else ())
+                if feeling == "not for him"
+            }
+            if agency_item[0] in disliked and agency_item in activity_palette:
+                start = activity_palette.index(agency_item)
+                agency_item = next(
+                    (
+                        activity_palette[(start + step) % len(activity_palette)]
+                        for step in range(1, len(activity_palette))
+                        if activity_palette[(start + step) % len(activity_palette)][0]
+                        not in disliked
+                    ),
+                    agency_item,
+                )
             location = agency_item[4] if agency_item[4] in places else next(iter(places))
             gone_off = (
                 isinstance(places.get(location), dict)

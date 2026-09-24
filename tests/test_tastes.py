@@ -111,3 +111,37 @@ def test_a_run_of_bad_experiences_changes_his_mind() -> None:
         CATALOG.places["cafe"].name
         in selfhood_context(history, START + timedelta(days=15))["changed_his_mind_about"]
     )
+
+
+def test_he_stops_choosing_what_he_has_decided_is_not_for_him() -> None:
+    import asyncio
+    import json
+
+    from eidos.adapters.standin_gateway import StandInGateway
+    from eidos.ports.model_gateway import ModelMessage, ModelRequest
+
+    def chosen(tastes: dict[str, str]) -> set[str]:
+        kinds = set()
+        for hour in range(48):
+            context = {
+                "time": (START + timedelta(hours=hour)).isoformat(),
+                "known_places": {
+                    place: {"opens_hour": 0, "closes_hour": 24}
+                    for place in ("home", "park", "cafe", "workshop")
+                },
+                "known_people": {},
+                "calendar": [],
+                "usable_resources": {},
+                "activity_tastes": tastes,
+            }
+            request = ModelRequest(
+                capability="pathos_agency",
+                messages=(ModelMessage("user", json.dumps(context)),),
+                output_schema={"type": "object"},
+            )
+            content = json.loads(asyncio.run(StandInGateway().generate(request)).content)
+            kinds.add(content.get("activity_type"))
+        return kinds
+
+    assert "recipe_annotation" in chosen({})
+    assert "recipe_annotation" not in chosen({"recipe_annotation": "not for him"})
