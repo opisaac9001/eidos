@@ -113,6 +113,37 @@ owned object at home that his plans can use. It is recorded as a milestone memor
 lived evidence for its value. A want still out of reach after 60 days is let go.
 (`application/wants.py`)
 
+### 8. Tastes
+
+Nobody is born loving the Friday film. After each activity he chooses (not work shifts),
+the rules settle how much he enjoyed it, from -1 to 1 (`experience.felt`). That depends on:
+
+- how well it fits the value that kind of place speaks to: outdoors is autonomy, making is
+  craft, social places are care, culture is curiosity;
+- whether he was short of company, and sociable enough to want it, or too tired for it;
+- the weather, for outdoor things;
+- the small lift of a first visit, which scales with openness;
+- a thing getting samey after four goes in a fortnight;
+- the mood he brought with him;
+- a share of plain unpredictability.
+
+Notable experiences leave a memory in his words, for example "Going along to the quiz:
+loved it, honestly. It was good to be among people."
+
+One experience at 0.65 or more, or at least two that average 0.35 or more (up to the last
+five count), becomes a taste (`taste.formed`) about that place or kind of activity:
+something he loves, or something that isn't for him. If the next two or three experiences
+go the other way, he changes his mind (`taste.revised`), and both stances stay in his
+history. Loving something is lived evidence for its value. Tastes reach:
+
+- his self-context: `has_found_he_loves`, `not_for_him`, `changed_his_mind_about`;
+- his choices: a known place carries `how_he_found_it`, a happening at a loved venue pulls
+  harder, and one at a place he has gone off pulls less;
+- his voice;
+- the Becoming view.
+
+(`application/experience.py`, `domain/tastes.py`)
+
 ## What performers see
 
 `identity.selfhood` (voice, Murmur, reflection, dreams):
