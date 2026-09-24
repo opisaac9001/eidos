@@ -15,7 +15,7 @@ from eidos.application.phone_calls import complete_answered_call
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.scheduled_activity import scheduled_activity_events
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import IncrementalFold, events_of
+from eidos.domain.folding import EventView, IncrementalFold, events_of
 from eidos.domain.npcs import project_npcs
 from eidos.domain.planning import PlanningState, project_planning
 from eidos.domain.scenes import project_scenes
@@ -131,10 +131,12 @@ def lived_activity_window(
             pathos_energy=state.energy,
         )
         output.extend(ended_calls)
-        visible.extend(ended_calls)
+        if ended_calls:
+            visible = EventView([*visible, *ended_calls])
         execution = execution_events(visible, projected, at)
         output.extend(execution)
-        visible.extend(execution)
+        if execution:
+            visible = EventView([*visible, *execution])
         for event in execution:
             if event.kind not in {"activity.execution_started", "activity.execution_resumed"}:
                 continue

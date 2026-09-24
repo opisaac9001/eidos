@@ -14,7 +14,13 @@ from typing import Callable, NamedTuple, Sequence
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.application.work_rota import EMPLOYER_ID, ROTA_PREFIX
 from eidos.domain.events import DomainEvent
-from eidos.domain.folding import EventView, IncrementalFold, events_of, events_with_prefix
+from eidos.domain.folding import (
+    CombinedEvents,
+    EventView,
+    IncrementalFold,
+    events_of,
+    events_with_prefix,
+)
 from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
@@ -188,11 +194,33 @@ def _timeline_since(
     return timeline.entries[first:visible]
 
 
+class _SharedView(EventView, CombinedEvents):
+    """A time-ordered view handed to every caller asking for it; it refuses changes."""
+
+    __slots__ = ()
+
+
+# Recent views by (timeline events list, length). A list's first items never change, so a
+# view of the same list and length is the same view.
+_VIEWS: dict[tuple[int, int], tuple[list[DomainEvent], EventView]] = {}
+_VIEWS_LOCK = Lock()
+
+
 def _timeline_events(history: Sequence[DomainEvent], now: datetime) -> EventView:
-    """``[event for _, _, event in _timeline(history, now)]``, as a time-ordered view."""
+    """``[event for _, _, event in _timeline(history, now)]``, as a shared time-ordered view."""
     timeline = _TIMELINE_FOLD(history)
     visible = bisect_right(timeline.keys, (now, timeline.seen), 0, timeline.size)
-    return EventView(timeline.events[:visible])
+    key = (id(timeline.events), visible)
+    with _VIEWS_LOCK:
+        cached = _VIEWS.get(key)
+        if cached is not None and cached[0] is timeline.events:
+            return cached[1]
+        view = _SharedView(timeline.events[:visible])
+        _VIEWS.pop(key, None)
+        _VIEWS[key] = (timeline.events, view)
+        while len(_VIEWS) > 4:
+            del _VIEWS[next(iter(_VIEWS))]
+        return view
 
 
 class _EffortReplay:

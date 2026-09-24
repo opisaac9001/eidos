@@ -391,6 +391,47 @@ def _string_metadata(event: DomainEvent, key: str) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+class _Facts(NamedTuple):
+    """What recall reads from a memory's own record, the same on every call."""
+
+    event: DomainEvent
+    memory_id: str
+    importance: float
+    source_confidence: float
+    person_id: str | None
+    location_id: str | None
+    # Entity ids in the payload besides its person, place and provenance.
+    entities: frozenset[str]
+
+
+_FACTS: dict[UUID, _Facts] = {}
+
+
+def _facts(event: DomainEvent) -> _Facts:
+    facts = _FACTS.get(event.event_id)
+    if facts is None or facts.event is not event:
+        importance, source_confidence = _metadata(event)
+        facts = _Facts(
+            event,
+            str(event.event_id),
+            importance,
+            source_confidence,
+            _string_metadata(event, "person_id"),
+            _string_metadata(event, "location_id"),
+            frozenset(
+                value
+                for key, value in event.payload.items()
+                if key.endswith("_id")
+                and key not in {"source_event_id", "memory_id", "person_id", "location_id"}
+                and isinstance(value, str)
+            ),
+        )
+        if len(_FACTS) >= 250_000:
+            _FACTS.clear()
+        _FACTS[event.event_id] = facts
+    return facts
+
+
 def recall(
     history: list[DomainEvent],
     query: str,
@@ -421,19 +462,23 @@ def recall(
         history, now, recollections
     )
     for event in index.memories:
-        memory_id = str(event.event_id)
-        importance, source_confidence = _metadata(event)
+        facts = _facts(event)
+        memory_id, importance, source_confidence = (
+            facts.memory_id,
+            facts.importance,
+            facts.source_confidence,
+        )
         subjective = recollections.get(memory_id)
         felt_confidence = subjective.confidence if subjective is not None else source_confidence
         remembered_person_id = (
             subjective.remembered_person_id
             if subjective is not None and subjective.remembered_person_id is not None
-            else _string_metadata(event, "person_id")
+            else facts.person_id
         )
         remembered_location_id = (
             subjective.remembered_location_id
             if subjective is not None and subjective.remembered_location_id is not None
-            else _string_metadata(event, "location_id")
+            else facts.location_id
         )
         remembered_at = (
             subjective.remembered_at
@@ -454,20 +499,16 @@ def recall(
         subjective_terms = (
             terms(subjective.text)
             if subjective is not None
-            else set(index.terms_by_memory[event.event_id])
+            else index.terms_by_memory[event.event_id]
         )
         matched_terms = tuple(sorted(query_terms & subjective_terms))
-        remembered_entities = {
-            value
-            for key, value in event.payload.items()
-            if key.endswith("_id")
-            and key not in {"source_event_id", "memory_id", "person_id", "location_id"}
-            and isinstance(value, str)
-        }
+        remembered_entities = set(entity_ids & facts.entities)
         remembered_entities.update(
-            value for value in (remembered_person_id, remembered_location_id) if value is not None
+            value
+            for value in (remembered_person_id, remembered_location_id)
+            if value is not None and value in entity_ids
         )
-        matched_entities = tuple(sorted(entity_ids & remembered_entities))
+        matched_entities = tuple(sorted(remembered_entities))
         matched_goals = tuple(
             sorted(goal for goal in goal_ids if event.event_id in index.by_goal.get(goal, ()))
         )
