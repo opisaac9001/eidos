@@ -162,10 +162,8 @@ async def _advance(
         claim = _shareable_belief(combined, scene_id, speaker_id, audience_id)
         text: str | None
         if claim is not None:
-            text = (
-                "I could be mistaken, but I think "
-                f"{claim.subject_id.replace('-', ' ')} "
-                f"{claim.predicate.replace('_', ' ')}: {claim.object_value}."
+            text = _belief_in_words(
+                claim.subject_id, claim.predicate, claim.object_value, actor_names
             )
         else:
             text = await perform(
@@ -345,3 +343,19 @@ def _topic(history: Sequence[DomainEvent], location_id: str) -> str:
 def _privacy(scene_id: str) -> ScenePrivacy:
     value = int(hashlib.sha256(scene_id.encode()).hexdigest()[:8], 16)
     return ScenePrivacy.PUBLIC if value % 4 == 0 else ScenePrivacy.PRIVATE
+
+
+def _belief_in_words(
+    subject_id: str, predicate: str, value: object, names: Mapping[str, str]
+) -> str:
+    """Say a belief the way a person would, hedged, not as a database row."""
+    subject = names.get(subject_id) or (
+        "Pathos" if subject_id == "pathos" else subject_id.replace("-", " ")
+    )
+    if predicate == "community_activity":
+        return f"I could be mistaken, but I think {value} at the {subject} these days."
+    if predicate == "commitment_reliability":
+        return f"I could be mistaken, but {subject} seems {value} about keeping their word."
+    if predicate == "usually_at":
+        return f"I could be mistaken, but I think {subject} is usually at the {value}."
+    return f"I could be mistaken, but I think {subject}'s {predicate.replace('_', ' ')} is {value}."

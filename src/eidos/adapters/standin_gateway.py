@@ -341,11 +341,11 @@ def _standin_scene_text(context: dict[str, object]) -> str:
             "For now, that's where I've landed.",
         )
     )
-    afterthought = _temporal_choice(
-        afterthoughts,
-        context.get("time"),
-        f"scene-after:{speaker}:{audience}:{person}:{topic}:{turn}",
-    )
+    salt = f"scene-after:{speaker}:{audience}:{person}:{topic}:{turn}"
+    # People don't tack a reflective coda onto every line; most lines just end.
+    if hashlib.sha256(f"{context.get('time')}:{salt}".encode()).digest()[0] % 3:
+        return line
+    afterthought = _temporal_choice(afterthoughts, context.get("time"), salt)
     return f"{line} {afterthought}"
 
 
