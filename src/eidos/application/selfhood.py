@@ -28,6 +28,7 @@ from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
 from eidos.application.spending import money_context
+from eidos.application.town_issues import town_issues_context
 from eidos.application.user_notes import user_knowledge_context
 from eidos.application.work_arc import work_context
 from eidos.domain.events import DomainEvent
@@ -874,6 +875,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "money": money_context(history, simulated_at),
         "home": home_context(history),
         "evening_class": course_context(history),
+        "views_on_the_town": town_issues_context(history, simulated_at),
         "love_life": _love_life(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),

@@ -201,6 +201,31 @@ His friends' lives go on without him, and change his weeks.
 - **How it ends:** seven or more classes and he finishes, proud of what he made. Fewer, and
   it's one more thing he started and didn't finish, which he notices.
 
+## Views on the town (`application/town_issues.py`)
+
+Ordinary local rows that he has a view on.
+
+- **The issues:** five authored ones: flats in the old mill, cutting the 12 bus, a coffee
+  chain on Market Row, a 20mph zone through the old town, and cutting the library's hours.
+  Each has a case for and against, and each side speaks to some of his values.
+- **When:** the first comes up after about three to five months in town, then roughly one
+  every four to six months, never two at once. He hears about it from the post office
+  noticeboard, the Advertiser or someone at the café (`town.issue`, stage `raised`).
+- **His view:** a lean worked out from his current values, plus a little replay-stable
+  noise. It is for, against or torn, and held with some strength (`opinion.formed`).
+- **The public meeting:** a Wednesday evening at the council rooms three to five weeks
+  later. If he cares enough and is curious enough, he decides to go
+  (`town.meeting_planned`, which the booking cites). If he goes and the room leans the
+  other way, he may come out less sure, or on the other side (`opinion.changed`).
+- **Ellis:** has a fixed view on each issue and is usually against things. Over a lunch
+  at the workshop they may talk it over (`opinion.discussed`). Ellis can wear him down.
+- **The outcome:** six to twelve weeks after the meeting the council decides
+  (`town.issue`, stage `decided`). He is pleased or disappointed, as much as he cared
+  (`opinion.outcome`, which moves his mood). If he was torn, he is unbothered.
+- **Where it shows:** `views_on_the_town` in his self-context lists the live issue and
+  those decided in the last six months, with his view in his own words. The stand-in
+  answers questions about the town, the council or a named issue from it.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.
@@ -237,7 +262,7 @@ These systems are described in their own documents:
 
 - **Self-context** (voice, reflection, dreams, planning): `family`, `people_he_says_hello_to`,
   `reading_watching_listening`, `time_of_year`, `patterns_he_would_like_to_change`, `work`, `money`,
-  `love_life`. The conversation context also gets `what_he_knows_about_you` and
+  `love_life`, `views_on_the_town`. The conversation context also gets `what_he_knows_about_you` and
   `things_to_ask_you_about`.
 - **The Becoming view:** panels for his people, his family, what he knows about you,
   reading, watching and listening, and work, love and what he'd change.

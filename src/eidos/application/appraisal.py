@@ -524,6 +524,15 @@ def _effect(
             "finished": ("mastery", 0.05, 0.45, 0.3, 0.6),
             "dropped": ("affect", 0.0, -0.25, 0.2, 0.6),
         }.get(str(event.payload.get("stage")))
+    if event.kind == "opinion.outcome":
+        strength = event.payload.get("strength")
+        if isinstance(strength, bool) or not isinstance(strength, (int, float)):
+            return None
+        felt = round(0.1 + 0.3 * float(strength), 3)
+        return {
+            "pleased": ("affect", 0.0, felt, 0.3, 0.4),
+            "disappointed": ("affect", 0.0, -felt, 0.35, 0.2),
+        }.get(str(event.payload.get("feeling")))
     if event.kind == "home.move":
         return {
             "looking": ("curiosity", 0.03, 0.15, 0.3, 0.3),

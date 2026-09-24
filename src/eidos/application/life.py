@@ -166,6 +166,10 @@ from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.town_issues import HOURS as TOWN_ISSUE_HOURS
+from eidos.application.town_issues import REVIEW_HOUR as TOWN_MEETING_REVIEW_HOUR
+from eidos.application.town_issues import TALK_HOUR as TOWN_TALK_HOUR
+from eidos.application.town_issues import town_issue_events
 from eidos.application.town_signals import active_town_signal_context, town_signal_events
 from eidos.application.townsfolk import (
     latent_person,
@@ -620,6 +624,7 @@ class Life(LifeConversation):
             self._phase_home(tick)
             self._phase_course(tick)
             self._phase_falling_out(tick)
+            self._phase_town_issues(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1639,6 +1644,41 @@ class Life(LifeConversation):
                     for taste in project_tastes(history + pending).loves()
                 ),
                 worn_out=tick.state.rest < 0.3 or tick.state.valence < -0.3,
+            ),
+            self._planning,
+        )
+
+    def _phase_town_issues(self, tick: _Tick) -> None:
+        """The town's rows: hearing about one, a view, the meeting, and the council's say."""
+        if self.authored_scenario or tick.current.hour not in TOWN_ISSUE_HOURS:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        visible = history + pending
+        catalog = self._world_catalog(visible)
+        with_ellis = (
+            current.hour == TOWN_TALK_HOUR
+            and tick.state.location_id == "workshop"
+            and _person_location(visible, "ellis", current) == "workshop"
+        )
+        calendar = (
+            {
+                entry.schedule_id: entry.status
+                for entry in self._planning(visible).calendar.values()
+                if entry.schedule_id.startswith("town-meeting-")
+            }
+            if current.hour == TOWN_MEETING_REVIEW_HOUR
+            else {}
+        )
+        self._extend_warmed(
+            tick,
+            town_issue_events(
+                visible,
+                current,
+                awake=tick.state.awake,
+                values=project_identity(visible).values,
+                calendar=calendar,
+                venue="council-office" if "council-office" in catalog.places else None,
+                with_ellis=with_ellis,
             ),
             self._planning,
         )

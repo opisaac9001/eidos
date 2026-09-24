@@ -399,6 +399,9 @@ def _standin_pathos_text(
     tastes = _standin_tastes_reply(message, context)
     if tastes:
         return tastes
+    town = _standin_town_reply(message, context)
+    if town:
+        return town
     money = _standin_money_reply(message, context)
     if money:
         return money
@@ -2037,6 +2040,49 @@ def _standin_money_reply(message: str, context: dict[str, object]) -> str | None
     if isinstance(going, list) and going:
         return f"{opening} Where it goes, mostly: {going[0]}. It all adds up."
     return opening
+
+
+_TOWN_CUES = re.compile(
+    r"\b(council|councillors?|the town|alderwick|local news|any news|the news|in the news|"
+    r"public meeting|planning|petition|politics)\b"
+)
+_TOWN_STOPWORDS = frozenset(
+    {"the", "old", "town", "through", "cutting", "market", "row", "hours", "chain"}
+)
+
+
+def _standin_town_reply(message: str, context: dict[str, object]) -> str | None:
+    """His view on whatever the town is arguing about, from his own self-context."""
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    raw = selfhood.get("views_on_the_town") if isinstance(selfhood, dict) else None
+    issues = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+    words = set(re.findall(r"[a-z0-9]+", message))
+    named = next(
+        (
+            item
+            for item in reversed(issues)
+            if words
+            & {
+                word
+                for word in re.findall(r"[a-z0-9]+", str(item.get("issue", "")).lower())
+                if len(word) >= 3 and word not in _TOWN_STOPWORDS
+            }
+        ),
+        None,
+    )
+    asked = _TOWN_CUES.search(message) is not None
+    if named is None and not asked:
+        return None
+    if not issues:
+        return "Nothing much, as far as I know. I'm not one for council business."
+    issue = named or issues[-1]
+    view = str(issue.get("his_view", "")).strip()
+    where = str(issue.get("where_it_stands", ""))
+    if where.startswith("decided: "):
+        return f"{where.removeprefix('decided: ')} {view}".strip()
+    title = str(issue.get("issue", "the latest thing")).lower()
+    return f"The big thing at the moment is {title}. {view}".strip()
 
 
 _WORK_CUES = ("work", "job", "workshop", "shift", "ellis")
