@@ -26,6 +26,7 @@ from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
 from eidos.application.user_notes import user_knowledge_context
+from eidos.application.work_arc import work_context
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -864,6 +865,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "reading_watching_listening": media_context(history),
         "time_of_year": time_of_year(simulated_at),
         "patterns_he_would_like_to_change": imperfection_context(history, simulated_at),
+        "work": work_context(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
         "instruction": (

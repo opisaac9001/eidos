@@ -493,6 +493,19 @@ def value_evidence(event: DomainEvent) -> tuple[tuple[str, int, str], ...]:
         return (("care", 1, "cleared the air with someone"),)
     if kind == "place.discovered":
         return (("curiosity", 1, "noticed somewhere new"),)
+    if kind == "work.arc_step":
+        step = p.get("step")
+        if step == "raise":
+            return (("craft", 1, "was told I'd earned it"),)
+        if step == "extra_day":
+            return (
+                (("reliability", 1, "said yes to more at work"),)
+                if p.get("accepted")
+                else (("autonomy", 1, "kept my free days for myself"),)
+            )
+        if step == "future":
+            return (("craft", 1, "was trusted with the workshop's future"),)
+        return ()
     if kind == "imperfection.noticed":
         return {
             "put_off": (("reliability", -1, "put something off again"),),

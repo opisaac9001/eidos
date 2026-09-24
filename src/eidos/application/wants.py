@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
-from eidos.application.work_rota import SHIFT_WEEKDAYS
+from eidos.application.work_rota import current_terms
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.selfhood import project_selfhood
@@ -126,7 +126,9 @@ def want_events(
     """At most one want is alive at a time; this advances its whole lifecycle."""
     active, last_formed = _active_want(history)
     if active is not None:
-        return _pursue(active, simulated_at, balance_pence, location_id, awake)
+        return _pursue(
+            active, simulated_at, balance_pence, location_id, awake, current_terms(history)[0]
+        )
     if simulated_at.hour != 11 or simulated_at.weekday() != 5:
         return []
     if last_formed is not None and simulated_at - last_formed < WANT_SPACING:
@@ -211,6 +213,7 @@ def _pursue(
     balance_pence: int,
     location_id: str,
     awake: bool,
+    working_days: frozenset[int],
 ) -> list[DomainEvent]:
     formed = datetime.fromisoformat(str(want.payload["simulated_at"]))
     price = int(want.payload["price_pence"])
@@ -231,7 +234,7 @@ def _pursue(
                 correlation_id=want.correlation_id,
             )
         ]
-    free_day = at.weekday() not in SHIFT_WEEKDAYS
+    free_day = at.weekday() not in working_days
     out_and_about = awake and location_id not in {"home", "in_transit", "workshop"}
     if (
         at - formed < CONSIDER_FOR

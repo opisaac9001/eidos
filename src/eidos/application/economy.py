@@ -5,7 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Sequence
 
-from eidos.application.work_rota import SHIFT_WAGE_PENCE, is_rota_shift, partial_shift_wage
+from eidos.application.work_rota import (
+    HOURLY_WAGE_PENCE,
+    SHIFT_END_HOUR,
+    SHIFT_START_HOUR,
+    is_rota_shift,
+    partial_shift_wage,
+)
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState
 from eidos.domain.folding import events_of, kind_index
@@ -52,11 +58,18 @@ def financial_consequence_events(
     )
     opened_index = max(position for position, _ in index.positioned("finance.account_opened"))
     eligible = opened_index + 1
+    wages = {
+        str(event.payload.get("schedule_id")): int(event.payload["hourly_wage_pence"])
+        for event in index.of("schedule.created")
+        if isinstance(event.payload.get("hourly_wage_pence"), int)
+    }
     for source in index.select(*_SOURCE_KINDS, start=eligible):
         source_id = str(source.event_id)
         if source_id in processed:
             continue
-        consequence = _source_consequence(source)
+        consequence = _source_consequence(
+            source, wages.get(str(source.payload.get("schedule_id")), HOURLY_WAGE_PENCE)
+        )
         if consequence is None:
             continue
         amount, category, description = consequence
@@ -168,7 +181,9 @@ _SOURCE_KINDS = (
 )
 
 
-def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
+def _source_consequence(
+    source: DomainEvent, hourly_wage_pence: int = HOURLY_WAGE_PENCE
+) -> tuple[int, str, str] | None:
     if source.kind == "setback.occurred" and source.payload.get("kind") == "expense":
         cost = source.payload.get("cost_pence")
         if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
@@ -182,11 +197,15 @@ def _source_consequence(source: DomainEvent) -> tuple[int, str, str] | None:
         and source.payload.get("activity") == "work"
         and is_rota_shift(source.payload.get("schedule_id"))
     ):
-        return (SHIFT_WAGE_PENCE, "work_income", "Workshop shift wages")
+        return (
+            hourly_wage_pence * (SHIFT_END_HOUR - SHIFT_START_HOUR),
+            "work_income",
+            "Workshop shift wages",
+        )
     if source.kind == "activity.execution_unfinished" and is_rota_shift(
         source.payload.get("schedule_id")
     ):
-        partial = partial_shift_wage(source.payload.get("worked_seconds"))
+        partial = partial_shift_wage(source.payload.get("worked_seconds"), hourly_wage_pence)
         if partial is not None:
             return (partial, "work_income", "Wages for the hours worked on a cut-short shift")
     if source.kind == "meal.eaten" and source.payload.get("provision_source") == "cafe_service":

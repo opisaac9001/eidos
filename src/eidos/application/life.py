@@ -21,7 +21,7 @@ from eidos.application.appraisal import (
 )
 from eidos.application.attention import attention_state
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
-from eidos.application.bonds import bond_events
+from eidos.application.bonds import bond_events, current_bonds
 from eidos.application.catchup import (
     CatchUpPreview,
     active_catch_up,
@@ -165,6 +165,7 @@ from eidos.application.user_notes import user_notes_events
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.wants import want_events
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
+from eidos.application.work_arc import work_arc_events
 from eidos.application.work_rota import is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import planned_activity_beat
@@ -2291,6 +2292,18 @@ class Life(LifeConversation):
         history, pending, current = tick.history, tick.pending, tick.current
         daily_self = selfhood_daily_events(history + pending, current)
         pending.extend(daily_self)
+        if not self.authored_scenario:
+            self._extend_warmed(
+                tick,
+                work_arc_events(
+                    history + pending,
+                    current,
+                    values=project_identity(history + pending).values,
+                    balance_pence=self._finances(history + pending).balance_pence,
+                    ellis_bond=current_bonds(history + pending).get("ellis"),
+                ),
+                self._relationships,
+            )
         if not self.authored_scenario:
             pending.extend(await user_notes_events(history + pending, current, self.gateway))
         if not self.authored_scenario:

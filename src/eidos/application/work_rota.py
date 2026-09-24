@@ -15,6 +15,7 @@ from typing import Sequence
 
 from eidos.application.seasons import workshop_closed
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.planning import PlanningState
 
 SHIFT_WEEKDAYS = frozenset({0, 1, 3, 4})  # Monday, Tuesday, Thursday, Friday.
@@ -28,14 +29,32 @@ HOURLY_WAGE_PENCE = 1_100
 SHIFT_WAGE_PENCE = HOURLY_WAGE_PENCE * (SHIFT_END_HOUR - SHIFT_START_HOUR)
 
 
-def partial_shift_wage(worked_seconds: object) -> int | None:
+def current_terms(history: Sequence[DomainEvent]) -> tuple[frozenset[int], int]:
+    """(weekdays, hourly wage in pence) under the job as it stands now."""
+    weekdays, wage = SHIFT_WEEKDAYS, HOURLY_WAGE_PENCE
+    for event in events_of(history, "work.agreement_accepted", "work.terms_changed"):
+        if event.payload.get("agreement_id") not in (None, AGREEMENT_ID):
+            continue
+        raw_days = event.payload.get("weekdays")
+        if isinstance(raw_days, str) and raw_days:
+            weekdays = frozenset(int(day) for day in raw_days.split(","))
+        raw_wage = event.payload.get("hourly_wage_pence")
+        if isinstance(raw_wage, int) and not isinstance(raw_wage, bool) and raw_wage > 0:
+            wage = raw_wage
+    return weekdays, wage
+
+
+def partial_shift_wage(
+    worked_seconds: object, hourly_wage_pence: int = HOURLY_WAGE_PENCE
+) -> int | None:
     """Hours actually worked on an unfinished shift, paid to the quarter hour."""
     if isinstance(worked_seconds, bool) or not isinstance(worked_seconds, (int, float)):
         return None
     quarters = int(worked_seconds // 900)
     if quarters < 4:
         return None
-    return min(SHIFT_WAGE_PENCE, quarters * HOURLY_WAGE_PENCE // 4)
+    full_shift = hourly_wage_pence * (SHIFT_END_HOUR - SHIFT_START_HOUR)
+    return min(full_shift, quarters * hourly_wage_pence // 4)
 
 
 def work_rota_events(
@@ -82,10 +101,11 @@ def work_rota_events(
             correlation_id=AGREEMENT_ID,
         )
         output.append(agreement)
+    weekdays, hourly_wage = current_terms([*history, *output])
     for offset in range(ROTA_HORIZON_DAYS + 1):
         day = (simulated_at + timedelta(days=offset)).date()
         # The workshop shuts on bank holidays and from Christmas Eve to New Year.
-        if day.weekday() not in SHIFT_WEEKDAYS or workshop_closed(day):
+        if day.weekday() not in weekdays or workshop_closed(day):
             continue
         schedule_id = f"{ROTA_PREFIX}{day.isoformat()}"
         if schedule_id in planning.calendar:
@@ -148,6 +168,7 @@ def work_rota_events(
                     "resource_id": None,
                     "companion_id": None,
                     "activity_type": "workshop_shift",
+                    "hourly_wage_pence": hourly_wage,
                     # A shift is time served, not an open-ended task: no hidden effort.
                     "source": "published-work-rota",
                     "simulated_at": simulated_at.isoformat(),
