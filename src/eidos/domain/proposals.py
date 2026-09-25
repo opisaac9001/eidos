@@ -9,6 +9,7 @@ STRUCTURED_CAPABILITIES = {
     "pathos_user_notes",
     "pathos_advice_heard",
     "pathos_news_take",
+    "pathos_voice",
     "firmament_family",
     "moira_event",
     "moira_expansion",

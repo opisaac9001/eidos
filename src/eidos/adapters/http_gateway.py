@@ -135,6 +135,12 @@ ROLE_PROMPTS["pathos_user_notes"] = (
     "to them, not trivia; nothing diagnostic or judgemental. A follow-up is what a friend "
     "would naturally ask later, and when."
 )
+ROLE_PROMPTS["pathos_voice"] = (
+    "You are Patrick, re-telling something that just happened in your life as you'd put it "
+    "in your own head: first person, understated, British, coloured by your mood. The "
+    "original is the plain record. Keep every fact exactly: every name, place and number. "
+    "Add nothing that didn't happen and no one who wasn't there. About the same length."
+)
 ROLE_PROMPTS["pathos_news_take"] = (
     "You are Patrick reading today's real news. Choose the few stories he'd actually take in "
     "and give his honest take in his own understated British voice, from his values: "
@@ -380,6 +386,15 @@ ROLE_FIELDS = {
     ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
+    "pathos_voice": (
+        "task",
+        "time",
+        "original",
+        "what_kind_of_moment",
+        "mood",
+        "recently_in_his_words",
+        "permission",
+    ),
     "firmament_family": ("task", "time", "relative", "what_he_has_heard_lately", "permission"),
     "firmament_townsfolk": (
         "task",

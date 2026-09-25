@@ -205,6 +205,7 @@ from eidos.application.urgent_incidents import (
 )
 from eidos.application.user_notes import user_notes_events
 from eidos.application.visitors import visitor_events, visitor_locations
+from eidos.application.voicing import voice_pending
 from eidos.application.wants import want_events
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.work_arc import work_arc_events
@@ -632,6 +633,7 @@ class Life(LifeConversation):
             times.append(hour)
             hour += timedelta(hours=1)
         for current in times:
+            hour_starts = len(pending)
             tick = _Tick(history, pending, state, current, beats.get(current), deferred_requests)
             self._phase_clock(tick)
             self._phase_foundations(tick)
@@ -678,6 +680,7 @@ class Life(LifeConversation):
             await self._phase_nightly(tick, mind)
             await self._phase_outreach(tick, mind)
             self._phase_affect_and_memory(tick)
+            await self._phase_voicing(tick, hour_starts)
             state = tick.state
         if not self.authored_scenario:
             tick = _Tick(history, pending, state, target, None, deferred_requests)
@@ -1885,6 +1888,29 @@ class Life(LifeConversation):
                     "life": "repairs things at a workshop in a small English market town",
                 },
                 live=self.news_follows_real_time,
+            )
+        )
+
+    async def _phase_voicing(self, tick: _Tick, hour_starts: int) -> None:
+        """With a real model, this hour's narrated memories are re-told in his own words."""
+        if self.authored_scenario or str(getattr(self.gateway, "model", "")).startswith(
+            "authored-stand-in"
+        ):
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        recent = [
+            str(event.payload["text"])
+            for event in events_of(history, "memory.recorded")[-60:]
+            if event.payload.get("authored_text")
+        ]
+        pending.extend(
+            await voice_pending(
+                pending,
+                hour_starts,
+                current,
+                self.gateway,
+                mood=mood_name(tick.state.energy, tick.state.valence, tick.state.arousal),
+                recent=recent,
             )
         )
 
