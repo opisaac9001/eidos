@@ -2,6 +2,9 @@
 
 import asyncio
 import json
+import re
+import time
+from collections.abc import Callable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -430,7 +433,22 @@ ROLE_FIELDS = {
 }
 
 
+STRUCTURED_MODES = ("json_schema", "json_object", "prompt")
+RETRY_STATUSES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+FINISHED = frozenset({"stop", "end_turn", "eos", "completed", "STOP", "stop_sequence"})
+
+
 class HTTPModelGateway(ModelGateway):
+    """One OpenAI-compatible chat-completions endpoint: a local server or a paid service.
+
+    ``structured`` is how JSON is requested: ``json_schema`` (strict structured output),
+    ``json_object`` (JSON mode plus the schema in the prompt), ``prompt`` (the schema in the
+    prompt only, with the JSON extracted from the reply), or ``auto``, which starts strict
+    and steps down the first time a provider rejects it. Rate limits and outages are
+    retried with backoff. ``max_tokens`` overrides the per-role output ceiling, which
+    reasoning ("thinking") models need because their thinking counts against it.
+    """
+
     def __init__(
         self,
         base_url: str,
@@ -439,6 +457,12 @@ class HTTPModelGateway(ModelGateway):
         timeout: float = 45,
         *,
         reasoning_effort: str | None = None,
+        structured: str = "json_schema",
+        max_tokens: int | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        retries: int = 2,
+        provider: str = "openai-compatible",
+        on_usage: Callable[[ModelResponse], None] | None = None,
     ):
         parsed = urlsplit(base_url)
         if (
@@ -461,6 +485,17 @@ class HTTPModelGateway(ModelGateway):
         if reasoning_effort not in {None, "none", "low", "medium", "high", "max"}:
             raise ValueError("Unsupported reasoning effort")
         self.reasoning_effort = reasoning_effort
+        if structured not in {*STRUCTURED_MODES, "auto"}:
+            raise ValueError("Unsupported structured-output mode")
+        self.structured = structured
+        self._mode = "json_schema" if structured == "auto" else structured
+        if max_tokens is not None and not 64 <= max_tokens <= 64_000:
+            raise ValueError("max_tokens must be between 64 and 64000")
+        self.max_tokens = max_tokens
+        self.extra_headers = dict(extra_headers or {})
+        self.retries = max(0, min(5, retries))
+        self.provider = provider
+        self.on_usage = on_usage
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
         return await asyncio.to_thread(self._generate, request)
@@ -581,7 +616,8 @@ class HTTPModelGateway(ModelGateway):
             "model": self.model,
             "messages": [{"role": "system", "content": system}]
             + [{"role": "user", "content": json.dumps(context)}],
-            "max_tokens": min(
+            "max_tokens": self.max_tokens
+            or min(
                 request.max_output_tokens,
                 640 if request.capability == "pathos_project" else 384,
             ),
@@ -597,49 +633,190 @@ class HTTPModelGateway(ModelGateway):
             ),
             "stream": False,
         }
-        if request.output_schema:
-            # The default stays unchanged for existing routes. Evaluation callers
-            # may explicitly disable a thinking model's hidden reasoning budget.
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "eidos_proposal",
-                    # Persisted jobs expose an immutable MappingProxyType;
-                    # the HTTP boundary needs a plain JSON object.
-                    "schema": dict(request.output_schema),
-                    "strict": True,
-                },
-            }
         if self.reasoning_effort is not None:
             payload["reasoning_effort"] = self.reasoning_effort
-        headers = {"Content-Type": "application/json"}
+        schema = dict(request.output_schema) if request.output_schema else None
+        while True:
+            attempt = dict(payload)
+            if schema is not None:
+                attempt.update(self._structured(schema, system, attempt["messages"][-1]))  # type: ignore[index]
+            try:
+                response = self._send(attempt)
+            except _Unsupported:
+                if self.structured != "auto" or self._mode == STRUCTURED_MODES[-1]:
+                    raise OSError(
+                        f"{self.provider} rejected structured output for {self.model}"
+                    ) from None
+                # Step down once and remember it for this endpoint.
+                self._mode = STRUCTURED_MODES[STRUCTURED_MODES.index(self._mode) + 1]
+                continue
+            if schema is not None and self._mode != "json_schema":
+                response = _with_content(response, _extract_json(response.content))
+            if self.on_usage is not None:
+                self.on_usage(response)
+            return response
+
+    def _structured(
+        self, schema: dict[str, object], system: str, user: object
+    ) -> dict[str, object]:
+        """The request fields for asking for JSON in the current mode."""
+        if self._mode == "json_schema":
+            # Persisted jobs expose an immutable MappingProxyType; the HTTP boundary
+            # needs a plain JSON object.
+            return {
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "eidos_proposal", "schema": schema, "strict": True},
+                }
+            }
+        instruction = (
+            " Reply with only one JSON object that conforms to this JSON schema, with no "
+            "other text: " + json.dumps(schema, separators=(",", ":"))
+        )
+        fields: dict[str, object] = {
+            "messages": [{"role": "system", "content": system + instruction}, user]
+        }
+        if self._mode == "json_object":
+            fields["response_format"] = {"type": "json_object"}
+        return fields
+
+    def _send(self, payload: dict[str, object]) -> ModelResponse:
+        """POST one completion, retrying rate limits and outages with backoff."""
+        headers = {"Content-Type": "application/json", **self.extra_headers}
         if self.api_key:
             headers["Authorization"] = "Bearer " + self.api_key
-        query = Request(
-            self.base_url + "/chat/completions", data=json.dumps(payload).encode(), headers=headers
-        )
+        body = json.dumps(payload).encode()
+        for attempt in range(self.retries + 1):
+            query = Request(self.base_url + "/chat/completions", data=body, headers=headers)
+            try:
+                with urlopen(query, timeout=self.timeout) as response:
+                    raw = response.read(2_000_001)
+                break
+            except HTTPError as error:
+                detail = _error_detail(error)
+                if (
+                    error.code in {400, 422}
+                    and "response_format" in payload
+                    and re.search(
+                        r"response_format|json_schema|structured|schema|not supported",
+                        detail,
+                        re.IGNORECASE,
+                    )
+                ):
+                    raise _Unsupported(detail) from None
+                if error.code in RETRY_STATUSES and attempt < self.retries:
+                    time.sleep(_backoff(attempt, error.headers.get("Retry-After")))
+                    continue
+                raise OSError(
+                    f"{self.provider} returned HTTP {error.code}"
+                    + (f": {detail}" if detail else "")
+                ) from None
+            except (URLError, TimeoutError, ConnectionError):
+                if attempt < self.retries:
+                    time.sleep(_backoff(attempt, None))
+                    continue
+                raise OSError(f"{self.provider} is unavailable") from None
+        if len(raw) > 2_000_000:
+            raise ValueError("Model response exceeds size limit")
         try:
-            with urlopen(query, timeout=self.timeout) as response:
-                raw = response.read(2_000_001)
-            if len(raw) > 2_000_000:
-                raise ValueError("Model response exceeds size limit")
             result = json.loads(raw)
+            if isinstance(result, dict) and result.get("error"):
+                raise OSError(f"{self.provider} error: {str(result['error'])[:200]}")
             choice = result["choices"][0]
-            content = choice["message"]["content"]
-            if not isinstance(content, str) or choice.get("finish_reason") != "stop":
+            content = choice["message"].get("content")
+            finish = choice.get("finish_reason")
+            if finish == "length" or (content is None and choice["message"].get("reasoning")):
+                raise ValueError(
+                    "Model ran out of room before answering (raise max_tokens for thinking models)"
+                )
+            if not isinstance(content, str) or (finish is not None and finish not in FINISHED):
                 raise ValueError("Model did not finish a complete text response")
             usage = result.get("usage") or {}
             return ModelResponse(
                 content=content,
                 resolved_model=result.get("model", self.model),
-                backend="openai-compatible",
-                finish_reason=choice["finish_reason"],
+                backend=self.provider,
+                finish_reason=str(finish or "stop"),
                 prompt_tokens=usage.get("prompt_tokens"),
                 output_tokens=usage.get("completion_tokens"),
             )
-        except HTTPError as error:
-            raise OSError(f"Model endpoint returned HTTP {error.code}") from None
-        except URLError:
-            raise OSError("Model endpoint is unavailable") from None
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError):
+        except (KeyError, IndexError, TypeError, AttributeError, json.JSONDecodeError):
             raise ValueError("Model endpoint returned an invalid completion envelope") from None
+
+
+class _Unsupported(Exception):
+    """The provider rejected the structured-output request format."""
+
+
+def _error_detail(error: HTTPError) -> str:
+    """A short, credential-free reason from a provider's error body."""
+    try:
+        raw = error.read(4_000).decode("utf-8", "replace")
+    except Exception:
+        return ""
+    try:
+        parsed = json.loads(raw)
+        message = parsed.get("error", parsed) if isinstance(parsed, dict) else parsed
+        if isinstance(message, dict):
+            message = message.get("message", message)
+        text = str(message)
+    except ValueError:
+        text = raw
+    return re.sub(r"(sk|key|Bearer)[-_ ][A-Za-z0-9_\-]{8,}", "[redacted]", " ".join(text.split()))[
+        :240
+    ]
+
+
+def _backoff(attempt: int, retry_after: str | None) -> float:
+    if retry_after:
+        try:
+            return max(0.5, min(30.0, float(retry_after)))
+        except ValueError:
+            pass
+    return float(min(20.0, 1.5 * 2.0**attempt))
+
+
+def _extract_json(content: str) -> str:
+    """The JSON object in a reply that may have code fences or chatter around it."""
+    text = content.strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1).strip()
+    try:
+        json.loads(text)
+        return text
+    except ValueError:
+        pass
+    start = text.find("{")
+    while start != -1:
+        depth, in_string, escaped = 0, False, False
+        for index in range(start, len(text)):
+            char = text[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+            elif char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start : index + 1]
+                    try:
+                        json.loads(candidate)
+                        return candidate
+                    except ValueError:
+                        break
+        start = text.find("{", start + 1)
+    return content
+
+
+def _with_content(response: ModelResponse, content: str) -> ModelResponse:
+    from dataclasses import replace
+
+    return replace(response, content=content)

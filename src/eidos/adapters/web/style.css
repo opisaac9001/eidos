@@ -1850,3 +1850,27 @@ input[type="checkbox"] { accent-color: var(--amber); }
   color: var(--muted);
   font-style: italic;
 }
+
+/* The Models page */
+.models-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px; }
+#view-models > .panel { margin-bottom: 20px; }
+.models-list { display: grid; gap: 10px; margin: 14px 0 18px; }
+.models-item { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; }
+.models-item strong { font-weight: 600; }
+.models-item small { color: var(--muted); overflow-wrap: anywhere; }
+.models-item .models-item-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+.models-form { display: grid; gap: 10px; }
+.models-form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.models-form input { border: 1px solid var(--line); border-radius: 4px; background: #1d1818; color: var(--text, #eee); padding: 9px 10px; font-size: 13px; }
+.models-inline { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.models-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.roles-table { display: grid; gap: 10px; margin: 14px 0; }
+.roles-row { display: grid; grid-template-columns: minmax(180px, 2fr) 1fr 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.roles-row small { display: block; color: var(--muted); }
+.models-actions { display: flex; justify-content: flex-end; margin-bottom: 40px; }
+.models-ok { color: #9fcf8f; }
+.models-bad { color: #e39a86; }
+@media (max-width: 640px) {
+  .roles-row { grid-template-columns: 1fr; }
+}
+

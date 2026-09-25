@@ -251,6 +251,7 @@ const views = {
     "PLANS & TIME",
   ],
   engine: ["BEHIND THE EXPERIENCE", "An ensemble of minds.", "THE ENSEMBLE"],
+  models: ["WHAT HE RUNS ON", "Choose his minds.", "MODELS"],
 };
 let state = null,
   currentView = "observatory",
@@ -346,6 +347,7 @@ function showView(view, focusHeading = false) {
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
   updateUnread(true);
+  if (view === "models") loadModels();
   if (view === "memories") {
     selectArchiveTab(archiveTab);
     if (archiveTab === "memories") loadMemoryArchive(true);
@@ -2219,3 +2221,233 @@ async function poll() {
 }
 showView(location.hash.slice(1));
 poll();
+
+// -- The Models page: providers, models, who plays what, and the budget ------------------
+
+let modelsStatus = null;
+let modelsDraft = null;
+const remoteModels = new Map();
+
+async function loadModels() {
+  try {
+    modelsStatus = await request("/api/models");
+    modelsDraft = structuredClone(modelsStatus.settings);
+    renderModels();
+  } catch (error) {
+    $("models-error").hidden = false;
+    $("models-error").textContent = error.message;
+  }
+}
+
+async function saveModels(message = "Saved. He'll use these from his next thought.") {
+  try {
+    modelsStatus = await request("/api/models", { settings: modelsDraft });
+    modelsDraft = structuredClone(modelsStatus.settings);
+    renderModels();
+    toast(message);
+  } catch (error) {
+    toast(error.message);
+    await loadModels();
+  }
+}
+
+function modelOptions(selected) {
+  return [
+    `<option value="">—</option>`,
+    ...Object.keys(modelsDraft.models).map(
+      (id) =>
+        `<option value="${esc(id)}"${id === selected ? " selected" : ""}>${esc(id)}</option>`,
+    ),
+  ].join("");
+}
+
+function roleRow(key, label, detail) {
+  const chain = modelsDraft.roles[key] || [];
+  return `<div class="roles-row"><span>${esc(label)}${detail ? `<small>${esc(detail)}</small>` : ""}</span><select data-role="${esc(key)}" data-slot="0" aria-label="${esc(label)}: first choice">${modelOptions(chain[0])}</select><select data-role="${esc(key)}" data-slot="1" aria-label="${esc(label)}: backup">${modelOptions(chain[1])}</select></div>`;
+}
+
+function renderModels() {
+  const status = modelsStatus;
+  const usage = status.usage_today || {};
+  $("models-summary").innerHTML = [
+    status.mode === "configured-models"
+      ? "Running on your models"
+      : "Offline stand-ins: add a model to begin",
+    `Settings: ${status.path}`,
+    `Today: ${usage.requests || 0} paid calls · $${Number(usage.usd || 0).toFixed(2)}`,
+  ]
+    .map((text) => `<span>${esc(text)}</span>`)
+    .join("");
+  $("models-error").hidden = !status.error;
+  $("models-error").textContent = status.error ? `Your settings file has a problem: ${status.error}` : "";
+  const kinds = status.provider_kinds;
+  if (!$("provider-kind").options.length)
+    $("provider-kind").innerHTML = kinds
+      .map((kind) => `<option value="${esc(kind.kind)}">${esc(kind.label)}</option>`)
+      .join("");
+  const kindOf = Object.fromEntries(kinds.map((kind) => [kind.kind, kind]));
+  const providers = Object.entries(modelsDraft.providers);
+  $("providers-list").innerHTML =
+    providers
+      .map(([id, provider]) => {
+        const kind = kindOf[provider.kind] || { label: provider.kind, needs_key: false };
+        const key = provider.key_saved
+          ? `key ${provider.key_saved}`
+          : provider.api_key_env
+            ? `key from $${provider.api_key_env}${provider.key_from_env ? "" : " (not set!)"}`
+            : kind.needs_key
+              ? "needs a key"
+              : "no key needed";
+        return `<div class="models-item"><strong>${esc(id)}</strong><small>${esc(kind.label)} · ${esc(provider.base_url || kind.base_url || "")} · ${esc(key)}</small><div class="models-item-actions"><button class="text-button" data-remove-provider="${esc(id)}">Remove</button></div></div>`;
+      })
+      .join("") || `<p class="context-note">No providers yet.</p>`;
+  $("model-provider").innerHTML = providers
+    .map(([id]) => `<option value="${esc(id)}">${esc(id)}</option>`)
+    .join("");
+  $("models-list").innerHTML =
+    Object.entries(modelsDraft.models)
+      .map(([id, model]) => {
+        const price =
+          model.price_in != null ? ` · $${model.price_in} / $${model.price_out} per M` : "";
+        return `<div class="models-item"><strong>${esc(id)}</strong><small>${esc(model.provider)} · ${esc(model.model)}${model.max_tokens ? ` · ${model.max_tokens} tokens` : ""}${esc(price)}</small><div class="models-item-actions"><button class="text-button" data-test-model="${esc(id)}">Test</button><button class="text-button" data-remove-model="${esc(id)}">Remove</button></div><small id="test-${esc(id)}"></small></div>`;
+      })
+      .join("") || `<p class="context-note">No models yet. Add a provider first.</p>`;
+  $("roles-table").innerHTML = [
+    roleRow("default", "Everything else (default)", "Used by any role without its own choice."),
+    ...status.groups.map((group) => roleRow(group.id, group.label, group.roles.join(", "))),
+  ].join("");
+  $("roles-detail").innerHTML = Object.keys(status.roles)
+    .map((role) => roleRow(role, role, `now: ${(status.roles[role] || []).join(" → ") || "nothing"}`))
+    .join("");
+  $("budget-usd").value = modelsDraft.budget.daily_usd ?? "";
+  $("budget-requests").value = modelsDraft.budget.daily_requests ?? "";
+}
+
+function collectRoles() {
+  const roles = {};
+  document.querySelectorAll("#view-models select[data-role]").forEach((select) => {
+    const chain = (roles[select.dataset.role] ||= []);
+    if (select.value) chain[Number(select.dataset.slot)] = select.value;
+  });
+  modelsDraft.roles = Object.fromEntries(
+    Object.entries(roles)
+      .map(([role, chain]) => [role, [...new Set(chain.filter(Boolean))]])
+      .filter(([, chain]) => chain.length),
+  );
+  const usd = $("budget-usd").value;
+  const requests = $("budget-requests").value;
+  modelsDraft.budget = {
+    ...(usd !== "" ? { daily_usd: Number(usd) } : {}),
+    ...(requests !== "" ? { daily_requests: Number(requests) } : {}),
+  };
+}
+
+$("provider-kind")?.addEventListener("change", () => {
+  const kind = modelsStatus?.provider_kinds.find((item) => item.kind === $("provider-kind").value);
+  if (!kind) return;
+  $("provider-url").placeholder = kind.base_url || "https://…/v1";
+  $("provider-key").placeholder = kind.needs_key ? kind.key_hint || "required" : "not needed";
+  if (!$("provider-id").value) $("provider-id").value = kind.kind;
+});
+
+$("provider-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = $("provider-id").value.trim().toLowerCase();
+  const provider = { kind: $("provider-kind").value };
+  if ($("provider-url").value.trim()) provider.base_url = $("provider-url").value.trim();
+  if ($("provider-key").value.trim()) provider.api_key = $("provider-key").value.trim();
+  if ($("provider-env").value.trim()) provider.api_key_env = $("provider-env").value.trim();
+  collectRoles();
+  modelsDraft.providers[id] = provider;
+  $("provider-key").value = "";
+  await saveModels(`Added ${id}.`);
+  $("provider-form").reset();
+});
+
+$("model-browse")?.addEventListener("click", async () => {
+  const provider = $("model-provider").value;
+  if (!provider) return toast("Add a provider first.");
+  try {
+    const result = await request("/api/models/remote", { provider_id: provider });
+    if (result.error) toast(`Couldn't list models: ${result.error}`);
+    remoteModels.clear();
+    result.models.forEach((model) => remoteModels.set(model.id, model));
+    $("model-options").innerHTML = result.models
+      .map((model) => `<option value="${esc(model.id)}">${esc(model.name || "")}</option>`)
+      .join("");
+    toast(`${result.models.length} models available.`);
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
+$("model-name")?.addEventListener("change", () => {
+  const known = remoteModels.get($("model-name").value);
+  if (known && known.price_in != null) {
+    $("model-price-in").value = known.price_in;
+    $("model-price-out").value = known.price_out;
+  }
+  // Suggest a short name without typing it in for them.
+  $("model-id").placeholder =
+    $("model-name").value.split("/").pop().toLowerCase().replace(/[^a-z0-9_.-]/g, "-").slice(0, 40) ||
+    "e.g. qwen14";
+});
+
+$("model-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const suggested = $("model-id").placeholder.startsWith("e.g.") ? "" : $("model-id").placeholder;
+  const id = ($("model-id").value.trim() || suggested).toLowerCase();
+  if (!id) return toast("Give the model a short name.");
+  const model = { provider: $("model-provider").value, model: $("model-name").value.trim() };
+  if ($("model-max").value) model.max_tokens = Number($("model-max").value);
+  if ($("model-price-in").value !== "") model.price_in = Number($("model-price-in").value);
+  if ($("model-price-out").value !== "") model.price_out = Number($("model-price-out").value);
+  collectRoles();
+  modelsDraft.models[id] = model;
+  if (!Object.keys(modelsDraft.roles).length) modelsDraft.roles = { default: [id] };
+  await saveModels(`Added ${id}.`);
+  $("model-form").reset();
+});
+
+$("view-models")?.addEventListener("click", async (event) => {
+  const test = event.target.closest("[data-test-model]");
+  const removeModel = event.target.closest("[data-remove-model]");
+  const removeProvider = event.target.closest("[data-remove-provider]");
+  if (test) {
+    const id = test.dataset.testModel;
+    $(`test-${id}`).textContent = "Testing…";
+    try {
+      const result = await request("/api/models/test", { model_id: id });
+      $(`test-${id}`).className = result.ok ? "models-ok" : "models-bad";
+      $(`test-${id}`).textContent = `${result.ok ? "Works" : "Failed"} · ${result.seconds}s · ${result.detail}`;
+    } catch (error) {
+      $(`test-${id}`).textContent = error.message;
+    }
+  } else if (removeModel) {
+    collectRoles();
+    const id = removeModel.dataset.removeModel;
+    delete modelsDraft.models[id];
+    for (const role of Object.keys(modelsDraft.roles)) {
+      modelsDraft.roles[role] = modelsDraft.roles[role].filter((item) => item !== id);
+      if (!modelsDraft.roles[role].length) delete modelsDraft.roles[role];
+    }
+    await saveModels(`Removed ${id}.`);
+  } else if (removeProvider) {
+    collectRoles();
+    const id = removeProvider.dataset.removeProvider;
+    const gone = Object.keys(modelsDraft.models).filter((model) => modelsDraft.models[model].provider === id);
+    delete modelsDraft.providers[id];
+    gone.forEach((model) => delete modelsDraft.models[model]);
+    for (const role of Object.keys(modelsDraft.roles)) {
+      modelsDraft.roles[role] = modelsDraft.roles[role].filter((item) => !gone.includes(item));
+      if (!modelsDraft.roles[role].length) delete modelsDraft.roles[role];
+    }
+    await saveModels(`Removed ${id}.`);
+  }
+});
+
+$("models-save")?.addEventListener("click", async () => {
+  collectRoles();
+  await saveModels();
+});
+

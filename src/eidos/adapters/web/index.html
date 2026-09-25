@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0c0a09" />
     <title>Eidos · A life unfolding</title>
-    <link rel="stylesheet" href="/style.css?v=20260924-money1" />
-    <script src="/app.js?v=20260924-human1" defer></script>
+    <link rel="stylesheet" href="/style.css?v=20260925-models1" />
+    <script src="/app.js?v=20260925-models1" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -45,6 +45,10 @@
         <button class="nav" data-view="engine" data-operator-only hidden>
           <span aria-hidden="true">⏣</span> The ensemble
           <span class="nav-index">07</span>
+        </button>
+        <button class="nav" data-view="models" data-operator-only hidden>
+          <span aria-hidden="true">⚙</span> Models
+          <span class="nav-index">08</span>
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -725,6 +729,67 @@
           </select>
         </div>
         <div id="engine-feed" class="panel feed expanded"></div>
+      </section>
+      <section id="view-models" class="view" hidden>
+        <div class="engine-intro">
+          <h2>The models he runs on.</h2>
+          <p>
+            Add local servers or paid services, choose which models play which
+            parts of his life, and keep an eye on the cost. Keys are kept in a
+            private file on this machine, never in his history.
+          </p>
+          <div class="engine-summary" id="models-summary"></div>
+          <p class="context-note" id="models-error" hidden></p>
+        </div>
+        <div class="models-grid">
+          <section class="panel" aria-labelledby="providers-title">
+            <div class="panel-kicker"><span id="providers-title">PROVIDERS</span></div>
+            <div id="providers-list" class="models-list"></div>
+            <form id="provider-form" class="models-form">
+              <label>Kind <select id="provider-kind"></select></label>
+              <label>Name <input id="provider-id" placeholder="e.g. openrouter" required /></label>
+              <label>Base URL <input id="provider-url" placeholder="(default)" /></label>
+              <label>API key <input id="provider-key" type="password" autocomplete="off" /></label>
+              <label>…or key from environment variable
+                <input id="provider-env" placeholder="e.g. OPENROUTER_API_KEY" /></label>
+              <button class="button" type="submit">Add provider</button>
+            </form>
+          </section>
+          <section class="panel" aria-labelledby="models-title">
+            <div class="panel-kicker"><span id="models-title">MODELS</span></div>
+            <div id="models-list" class="models-list"></div>
+            <form id="model-form" class="models-form">
+              <label>Provider <select id="model-provider"></select></label>
+              <label>Model <input id="model-name" list="model-options" placeholder="e.g. qwen2.5:14b" required /></label>
+              <datalist id="model-options"></datalist>
+              <button class="text-button" type="button" id="model-browse">List this provider's models</button>
+              <label>Short name <input id="model-id" placeholder="e.g. qwen14" /></label>
+              <label>Max output tokens (for thinking models) <input id="model-max" type="number" min="64" max="64000" /></label>
+              <label>$ per million tokens in / out
+                <span class="models-pair"><input id="model-price-in" type="number" step="0.01" min="0" /><input id="model-price-out" type="number" step="0.01" min="0" /></span></label>
+              <button class="button" type="submit">Add model</button>
+            </form>
+          </section>
+        </div>
+        <section class="panel" aria-labelledby="roles-title">
+          <div class="panel-kicker"><span id="roles-title">WHO PLAYS WHAT</span><span>first choice, then backup</span></div>
+          <div id="roles-table" class="roles-table"></div>
+          <details>
+            <summary>Assign individual roles</summary>
+            <div id="roles-detail" class="roles-table"></div>
+          </details>
+        </section>
+        <section class="panel" aria-labelledby="budget-title">
+          <div class="panel-kicker"><span id="budget-title">DAILY BUDGET FOR PAID SERVICES</span></div>
+          <div class="models-form models-inline">
+            <label>Spend at most ($/day) <input id="budget-usd" type="number" step="0.1" min="0" /></label>
+            <label>Paid calls at most (/day) <input id="budget-requests" type="number" min="0" /></label>
+          </div>
+          <p class="context-note" id="usage-today"></p>
+        </section>
+        <div class="models-actions">
+          <button class="button primary" id="models-save" type="button">Save and use these models</button>
+        </div>
       </section>
       <footer>
         FIRMAMENT / LOCAL EDITION

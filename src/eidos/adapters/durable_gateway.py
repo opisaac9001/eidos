@@ -30,7 +30,11 @@ class DurableModelGateway(ModelGateway):
         self.revision_for = revision_for
         self.worker_id = worker_id
         self.supervisor = supervisor
-        self.model = getattr(inner, "model", "authored-stand-in-v1")
+
+    @property
+    def model(self) -> str:
+        """The model behind this queue now (it can change when settings change)."""
+        return str(getattr(self.inner, "model", "authored-stand-in-v1"))
 
     @staticmethod
     def _key(request: ModelRequest, context: dict[str, object]) -> str:

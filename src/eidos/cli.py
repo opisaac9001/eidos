@@ -59,6 +59,35 @@ def _news_source_from_env() -> NewsSource | None:
     return RssNewsAdapter(pairs)
 
 
+def _models_command(args: argparse.Namespace) -> None:
+    """eidos models status | test [model_id] | remote <provider_id>."""
+    from eidos.adapters.model_settings import (
+        ConfiguredGateway,
+        check_model,
+        default_path,
+        list_models,
+    )
+
+    configured = ConfiguredGateway(default_path(os.environ), os.environ)
+    if args.action == "status":
+        print(json.dumps(configured.status(), indent=2))
+        return
+    if args.action == "remote":
+        providers = configured.settings().get("providers", {})
+        if args.target not in providers:
+            raise ValueError("Name a provider id from your models file")
+        for entry in list_models(providers[args.target], os.environ):
+            print(entry["id"], entry.get("price_in", ""), entry.get("price_out", ""))
+        return
+    targets = [args.target] if args.target else sorted(configured.entries())
+    for model_id in targets:
+        model = configured.entries().get(model_id)
+        if model is None:
+            raise ValueError(f"No model {model_id!r} in {configured.path}")
+        result = asyncio.run(check_model(model.gateway))
+        print(model_id, json.dumps(result))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Eidos persistent simulation")
     parser.add_argument("--database", type=Path, default=Path("data/eidos.sqlite3"))
@@ -114,6 +143,11 @@ def main() -> None:
     )
     inventory.add_argument("--output", type=Path)
     inventory.add_argument("--ca-file", type=Path)
+    models = commands.add_parser(
+        "models", help="Show or test the configured model providers (see docs/MODELS.md)"
+    )
+    models.add_argument("action", choices=("status", "test", "remote"))
+    models.add_argument("target", nargs="?", help="a model id (test) or provider id (remote)")
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
@@ -202,6 +236,9 @@ def main() -> None:
             return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"
+        if args.command == "models":
+            _models_command(args)
+            return
         if args.routes_file is not None:
             if args.base_url or args.model:
                 raise ValueError("Choose either a routes file or one base URL/model pair")
@@ -218,6 +255,17 @@ def main() -> None:
                 args.base_url, args.model, os.environ.get("EIDOS_MODEL_API_KEY")
             )
             mode = "local-model"
+        else:
+            from eidos.adapters.model_settings import (
+                ConfiguredGateway,
+                SwitchingGateway,
+                default_path,
+            )
+
+            switching = SwitchingGateway(
+                ConfiguredGateway(default_path(os.environ), os.environ), gateway
+            )
+            gateway, mode = switching, switching.mode()
         if args.command == "probe-model":
             if mode == "stand-in":
                 raise ValueError("probe-model requires a model endpoint and model name")

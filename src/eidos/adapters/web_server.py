@@ -41,6 +41,8 @@ class Runtime:
     ) -> None:
         self.life = life
         # Operator controls change time and expose private history; they need this token.
+        # The switchable model setup behind the Models page, when this server has one.
+        self.models: Any = None
         self.operator_token = (
             operator_token or os.environ.get("EIDOS_OPERATOR_TOKEN") or secrets.token_urlsafe(18)
         )
@@ -410,6 +412,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 self.respond(
                     200, asset.read_bytes(), mimetypes.guess_type(asset)[0] or "text/plain"
                 )
+            elif path == "/api/models":
+                if runtime.models is None:
+                    self.respond(404, {"error": "This server runs a fixed model setup"})
+                else:
+                    self.respond(200, _models_status(runtime.models))
             elif path == "/health":
                 self.respond(200, {"status": "ok", "mode": runtime.life.mode})
             else:
@@ -422,7 +429,8 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
                     raise ValueError("Send application/json")
                 size = int(self.headers.get("Content-Length", "0"))
-                if not 0 < size <= 12000:
+                limit = 200_000 if urlsplit(self.path).path in MODEL_PATHS else 12000
+                if not 0 < size <= limit:
                     raise ValueError("Invalid request size")
                 self.connection.settimeout(5)
                 body = json.loads(self.rfile.read(size))
@@ -443,6 +451,12 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
 
                     job_store.cancel(UUID(job_id))
                     self.respond(200, runtime.snapshot())
+                    return
+                if path in MODEL_PATHS:
+                    # Model settings and tests never touch his world, so they run outside it.
+                    if runtime.models is None:
+                        raise ValueError("This server runs a fixed model setup")
+                    self.respond(200, _models_action(runtime, path, body))
                     return
                 operation_started = runtime.clock()
                 with runtime.mutation():
@@ -509,10 +523,74 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-OPERATOR_GET_PATHS = frozenset({"/api/events", "/api/export", "/api/catch-up/preview"})
-OPERATOR_POST_PATHS = frozenset(
-    {"/api/control", "/api/step", "/api/catch-up", "/api/catch-up/resume", "/api/catch-up/cancel"}
+OPERATOR_GET_PATHS = frozenset(
+    {"/api/events", "/api/export", "/api/catch-up/preview", "/api/models"}
 )
+OPERATOR_POST_PATHS = frozenset(
+    {
+        "/api/control",
+        "/api/step",
+        "/api/catch-up",
+        "/api/catch-up/resume",
+        "/api/catch-up/cancel",
+        "/api/models",
+        "/api/models/test",
+        "/api/models/remote",
+    }
+)
+MODEL_PATHS = frozenset({"/api/models", "/api/models/test", "/api/models/remote"})
+
+
+def _models_status(models: Any) -> dict[str, Any]:
+    from eidos.adapters.providers import GROUP_LABELS, PROVIDERS, ROLE_GROUPS
+
+    return {
+        **models.configured.status(),
+        "mode": models.mode(),
+        "provider_kinds": [
+            {
+                "kind": kind.kind,
+                "label": kind.label,
+                "base_url": kind.base_url,
+                "needs_key": kind.needs_key,
+                "local": kind.local,
+                "key_hint": kind.key_hint,
+            }
+            for kind in PROVIDERS.values()
+        ],
+        "groups": [
+            {"id": group, "label": GROUP_LABELS[group], "roles": list(roles)}
+            for group, roles in ROLE_GROUPS.items()
+        ],
+    }
+
+
+def _models_action(runtime: Any, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    import asyncio
+    import os
+
+    from eidos.adapters.model_settings import check_model, list_models
+
+    models = runtime.models
+    if path == "/api/models":
+        models.configured.save(body.get("settings"))
+        runtime.life.mode = models.mode()
+        return _models_status(models)
+    if path == "/api/models/test":
+        model_id = str(body.get("model_id", ""))
+        entry = models.configured.entries().get(model_id)
+        if entry is None:
+            raise ValueError("Save the model first, then test it")
+        return asyncio.run(check_model(entry.gateway))
+    provider_id = str(body.get("provider_id", ""))
+    providers = models.configured.settings().get("providers", {})
+    provider = providers.get(provider_id)
+    if provider is None:
+        raise ValueError("Save the provider first, then list its models")
+    try:
+        return {"models": list_models(provider, os.environ)}
+    except Exception as error:  # a provider's own error, shown to the operator
+        return {"models": [], "error": str(error)[:200]}
 
 
 def event_json(event: DomainEvent) -> dict[str, Any]:
@@ -565,8 +643,11 @@ def serve(
         town_signal_source=town_signal_source,
         news_source=news_source,
     )
+    from eidos.adapters.model_settings import SwitchingGateway
+
     life.news_follows_real_time = True
     runtime = Runtime(life)
+    runtime.models = inner if isinstance(inner, SwitchingGateway) else None
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()
     print(f"Eidos is ready at http://127.0.0.1:{port} — {mode} mode", flush=True)
