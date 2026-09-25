@@ -229,8 +229,9 @@ His friends' lives go on without him, and change his weeks.
 
 ## Falling out (`application/falling_out.py`)
 
-- **How it starts:** rarely, it goes wrong with a friend. It's about once in several
-  years, and much likelier just after he lets them down. The bond shows as strained.
+- **How it starts:** rarely, it goes wrong with a friend he has known at least three
+  months. It's about once in several years, a little likelier just after he lets them
+  down, and never twice within six months. The bond shows as strained.
 - **Making up:** over the next weeks he may reach out. How soon depends on how much care
   and reliability matter to him.
   - A close friend (level 6 and up) always comes back round.

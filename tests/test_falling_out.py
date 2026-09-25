@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from eidos.application.falling_out import (
+    AFTER_LETTING_DOWN,
     _roll,
     estranged,
     falling_out_context,
@@ -40,7 +41,8 @@ def first_fall(person="mara") -> int:
     return next(
         day
         for day in range(3000)
-        if _roll("fall-out", person, (START + timedelta(days=day)).date().isoformat()) < 0.25
+        if _roll("fall-out", person, (START + timedelta(days=day)).date().isoformat())
+        < AFTER_LETTING_DOWN
     )
 
 
@@ -74,3 +76,35 @@ def test_with_newer_friends_it_sometimes_never_mends() -> None:
         outcomes.add(stages(history)[-1])
     assert outcomes <= {"made_up", "drifted_apart", "no_reply", "fell_out"}
     assert {"made_up", "drifted_apart"} <= outcomes
+
+
+def test_falling_outs_stay_rare() -> None:
+    history = []
+    friends = [f"friend-{n}" for n in range(8)]
+    for day in range(365):
+        at = START + timedelta(days=day)
+        history += falling_out_events(
+            history,
+            at,
+            depths={person: 4.0 for person in friends},
+            names={},
+            residents=frozenset(friends),
+            unavailable=frozenset(),
+            values=VALUES,
+            let_down=frozenset(friends),  # he lets everyone down all the time
+            first_shared={person: START - timedelta(days=200) for person in friends},
+        )
+    rifts = [e for e in history if e.payload.get("stage") == "fell_out"]
+    assert 1 <= len(rifts) <= 3  # the six-month gap is the ceiling
+    new_friend = falling_out_events(
+        [],
+        START,
+        depths={"mara": 4.0},
+        names={},
+        residents=frozenset({"mara"}),
+        unavailable=frozenset(),
+        values=VALUES,
+        let_down=frozenset({"mara"}),
+        first_shared={"mara": START - timedelta(days=20)},
+    )
+    assert new_friend == []

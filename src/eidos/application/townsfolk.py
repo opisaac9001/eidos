@@ -177,6 +177,8 @@ def townsfolk_promotion_events(
             if person.last_place_id in (catalog.places)
             else "town"
         )
+        if place.startswith("The "):
+            place = "the " + place[4:]  # mid-sentence
         text = SWAP_LINES[number % len(SWAP_LINES)].format(name=first_name, place=place)
         swap = DomainEvent(
             "townsfolk.numbers_swapped",

@@ -1715,6 +1715,10 @@ class Life(LifeConversation):
                 unavailable=away_people(history + pending),
                 values=project_identity(history + pending).values,
                 let_down=let_down,
+                first_shared={
+                    person: friendship.first_shared
+                    for person, friendship in friendships(history + pending, current).items()
+                },
             ),
             self._relationships,
         )

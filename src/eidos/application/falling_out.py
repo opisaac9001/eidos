@@ -25,7 +25,9 @@ from eidos.domain.folding import events_of
 KIND = "friend.falling_out"
 NOT_FRIENDS = frozenset({"user", "pathos", "ellis", "mum", "dad", "tom"})
 DAILY_CHANCE = 0.0005  # per friend: a falling-out once in several years
-AFTER_LETTING_DOWN = 0.25  # much likelier just after he let them down
+AFTER_LETTING_DOWN = 0.05  # likelier just after he let them down
+QUIET_BETWEEN = timedelta(days=180)  # never two falling-outs within six months
+KNOWN_FOR = timedelta(days=90)  # you need history with someone to fall out properly
 MIN_DEPTH = 3.0
 DURABLE = 6.0
 GIVES_UP_AFTER = timedelta(days=90)
@@ -52,10 +54,12 @@ def falling_out_events(
     unavailable: frozenset[str],
     values: Mapping[str, float],
     let_down: frozenset[str] = frozenset(),
+    first_shared: Mapping[str, datetime] | None = None,
 ) -> list[DomainEvent]:
     """A falling-out, an attempt to make up, or the quiet acceptance that it's over."""
     if at.hour != HOUR:
         return []
+    first_shared = first_shared or {}
     open_rifts = _open(history)
     for person, (fell_out, attempts, last_try) in sorted(open_rifts.items()):
         if last_try is not None and at - last_try < TRY_AGAIN_AFTER:
@@ -63,12 +67,16 @@ def falling_out_events(
                 continue
         advised = advice_on(history, f"rift-{person}-{fell_out.date().isoformat()}")
         return _after(person, fell_out, attempts, at, depths, names, values, advised)
+    rifts = [e for e in events_of(history, KIND) if e.payload.get("stage") == "fell_out"]
+    if rifts and at - _time(rifts[-1]) < QUIET_BETWEEN:
+        return []
     for person in sorted(depths):
         if (
             person in NOT_FRIENDS
             or person not in residents
             or person in unavailable
             or depths[person] < MIN_DEPTH
+            or (person in first_shared and at - first_shared[person] < KNOWN_FOR)
         ):
             continue
         chance = AFTER_LETTING_DOWN if person in let_down else DAILY_CHANCE
