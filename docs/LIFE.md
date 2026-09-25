@@ -114,9 +114,9 @@ He remembers when something sets it off, not only when asked. There are three tr
   can come back.
 
 Only moments from his own story come back (family, friends, love, work, home; not routine or
-passing faces): at most one a day and two a week, and the same one not again for three
-months. The self-context shows what's come back to him in the last few days
-(`came_back_to_him_lately`).
+passing faces): at most one a day and two a week, and the same one not again for a
+year, preferring ones that haven't come back before. The self-context shows what's come
+back to him in the last few days (`came_back_to_him_lately`).
 
 ## "Fine, yeah" (`application/masking.py`)
 

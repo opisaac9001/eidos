@@ -32,7 +32,7 @@ WITH_SOMEONE_CHANCE = 0.12  # per friend, after an evening together
 MIN_IMPORTANCE = 0.6
 ANNIVERSARY_IMPORTANCE = 0.7
 OLDER_THAN = timedelta(days=30)
-NOT_AGAIN_FOR = timedelta(days=90)
+NOT_AGAIN_FOR = timedelta(days=365)
 MISSING_GAP = timedelta(days=21)
 QUIET_PLACES = frozenset({"home", "in_transit", "in-transit", "workshop"})
 PER_WEEK = 2
@@ -111,7 +111,10 @@ def _with_someone(
         ]
         if not shared:
             continue
-        memory = shared[int(_roll("shared", person, at.date().isoformat()) * len(shared))]
+        # Something that hasn't come back before, if there is one.
+        ever = {str(e.payload.get("source_memory_id")) for e in surfaced}
+        fresh = [e for e in shared if str(e.event_id) not in ever] or shared
+        memory = fresh[int(_roll("shared", person, at.date().isoformat()) * len(fresh))]
         name = names.get(person, person.replace("-", " ").title()).split()[0]
         text = f"Talking with {name} tonight brought something back: {_gist(memory)}"
         return _surface(memory, "together", text, at, lift=0.1)
