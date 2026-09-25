@@ -163,3 +163,51 @@ def test_someone_who_moved_away_stays_off_the_map() -> None:
         e for e in history if e.kind == "npc.travel_started" and e.payload["actor_id"] == "rowan"
     ]
     assert rowan_moves == []
+
+
+def test_a_close_friend_gets_engaged_then_married_and_he_is_there() -> None:
+    from eidos.application.friends_lives import _roll as roll
+
+    person = next(f"friend-{n}" for n in range(50) if roll("marries", f"friend-{n}") < 0.6)
+    partner = DomainEvent(
+        "friend.life_event",
+        "pathos",
+        {
+            "person_id": person,
+            "kind": "new_partner",
+            "text": "…",
+            "simulated_at": (START - timedelta(days=600)).isoformat(),
+            "owner": "pathos",
+        },
+    )
+    history: list[DomainEvent] = [partner]
+    venue_on_the_day: dict[str, str] = {}
+    for day in range(365 * 5):
+        at = START + timedelta(days=day)
+        invited = [
+            e
+            for e in history
+            if e.kind == "friend.life_event" and e.payload["kind"] == "wedding_invited"
+        ]
+        where = (
+            invited[0].payload["venue"]
+            if invited and at.date().isoformat() == invited[0].payload["wedding_on"]
+            else "home"
+        )
+        history += friend_life_events(
+            history,
+            at,
+            depths={person: 6.0},
+            first_shared={person: START - timedelta(days=700)},
+            names={person: "Jo"},
+            residents=frozenset({person}),
+            known_places=frozenset({"community-hall"}),
+            location_id=where,
+        )
+    kinds = [e.payload["kind"] for e in history if e.kind == "friend.life_event"]
+    assert "engaged" in kinds
+    assert kinds.index("engaged") < kinds.index("wedding_invited") < kinds.index("married")
+    married = next(e for e in history if e.payload.get("kind") == "married")
+    assert married.payload["attended"] is True
+    booking = next(e for e in history if e.kind == "schedule.created")
+    assert datetime.fromisoformat(booking.payload["starts_at"]).weekday() == 5

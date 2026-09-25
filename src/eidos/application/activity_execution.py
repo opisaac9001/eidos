@@ -25,7 +25,7 @@ from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
 # Stays, where the point is being there rather than effort put in.
-STAYS = frozenset({"christmas_at_home", "visiting_home", "on_holiday"})
+STAYS = frozenset({"christmas_at_home", "visiting_home", "on_holiday", "visiting_a_friend"})
 # Activities that are sociable by nature: a conversation at the venue is part of them.
 SOCIABLE = frozenset(
     {
@@ -35,6 +35,7 @@ SOCIABLE = frozenset(
         "christmas_at_home",
         "moving_house",
         "on_holiday",
+        "visiting_a_friend",
     }
 )
 _HERE = "*anyone-here*"

@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.bookings import book
 from eidos.application.pronouns import in_his_words
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
@@ -78,6 +79,9 @@ class FriendLife:
     leaving_do: str | None = None
     moved_away: datetime | None = None
     worry_since: datetime | None = None
+    engaged_since: datetime | None = None
+    wedding_on: str | None = None
+    wedding_venue: str | None = None
     last_achievement: datetime | None = None
     last_event: datetime | None = None
     kinds: tuple[str, ...] = ()
@@ -118,6 +122,11 @@ def _step(state: FriendsLives, event: DomainEvent) -> FriendsLives:
         changes["worry_since"] = at
     elif kind == "family_better":
         changes["worry_since"] = None
+    elif kind == "engaged":
+        changes["engaged_since"] = at
+    elif kind in {"wedding_invited", "wedding_announced"}:
+        changes["wedding_on"] = str(payload.get("wedding_on"))
+        changes["wedding_venue"] = payload.get("venue")
     people = {**state.people, person: replace(life, **changes)}  # type: ignore[arg-type]
     last_move = at if kind == "moving_announced" else state.last_move
     news = kind not in {"leaving_do_agreed", "checked_in"}
@@ -165,12 +174,13 @@ def friend_life_events(
     residents: frozenset[str],
     known_places: frozenset[str],
     in_romance_with: str | None = None,
+    location_id: str = "",
 ) -> list[DomainEvent]:
     """This evening's turn in a friend's life, or the next step of one already under way."""
     if at.hour != EVENT_HOUR:
         return []
     lives = friends_lives(history)
-    follow_on = _follow_on(history, lives, at, names, known_places)
+    follow_on = _follow_on(history, lives, at, names, known_places, depths, location_id)
     if follow_on:
         return follow_on
     if lives.last_event and at - lives.last_event < WEEKLY_LIMIT:
@@ -213,6 +223,13 @@ def _what_happens(
     if life.worry_since is None and "family_worry" not in life.kinds:
         options.append("family_worry")
     if (
+        life.partner_since
+        and life.engaged_since is None
+        and at - life.partner_since >= ENGAGED_AFTER
+        and _roll("marries", person) < MARRIES
+    ):
+        options += ["engaged", "engaged"]
+    if (
         _roll("will-move", person, at.year) < WILL_MOVE
         and not dating_him
         and (lives.last_move is None or at - lives.last_move >= MOVE_GAP)
@@ -232,11 +249,16 @@ def _follow_on(
     at: datetime,
     names: Mapping[str, str],
     known_places: frozenset[str],
+    depths: Mapping[str, float] | None = None,
+    location_id: str = "",
 ) -> list[DomainEvent]:
-    """What follows on its own: a birth, a leaving do, the move, a worry easing."""
+    """What follows on its own: a birth, a wedding, a leaving do, the move, a worry easing."""
     for person, life in sorted(lives.people.items()):
         if life.moved_away:
             continue
+        wedding = _wedding(person, life, at, names, known_places, depths or {}, location_id)
+        if wedding:
+            return wedding
         if life.expecting_since and not life.baby_born and at - life.expecting_since >= BABY_AFTER:
             return _turn(person, "baby_born", at, names, life)
         if life.worry_since and at - life.worry_since >= WORRY_LASTS + timedelta(
@@ -289,6 +311,10 @@ def _turn(
         )
     elif kind == "family_better":
         text = f"Things are better for {name}'s family. They sounded like themselves again."
+    elif kind == "engaged":
+        text = (
+            f"{name}'s engaged! They rang to tell me before it went on the group chat. I'm made up."
+        )
     elif kind == "moving_announced":
         city = CITIES[int(_roll("city", person) * len(CITIES))]
         extra["moving_to"] = city
@@ -319,6 +345,112 @@ def _turn(
         correlation_id=f"friend-life-{person}",
     )
     return [event, _memory(event, text, at, IMPORTANCE.get(kind, 0.5))]
+
+
+ENGAGED_AFTER = timedelta(days=540)
+MARRIES = 0.6
+WEDDING_AFTER = timedelta(days=280)
+INVITED_FROM = 4.0
+WEDDING_GIFT_PENCE = 4_000
+
+
+def _wedding(
+    person: str,
+    life: FriendLife,
+    at: datetime,
+    names: Mapping[str, str],
+    known_places: frozenset[str],
+    depths: Mapping[str, float],
+    location_id: str,
+) -> list[DomainEvent]:
+    """About ten months after the engagement, the invitation; then the day itself."""
+    name = names.get(person, person.replace("-", " ").title()).split()[0]
+    if life.engaged_since and life.wedding_on is None and at - life.engaged_since >= WEDDING_AFTER:
+        day = next(
+            (at + timedelta(days=offset)).date()
+            for offset in range(28, 35)
+            if (at + timedelta(days=offset)).weekday() == 5
+        )
+        invited = depths.get(person, 0.0) >= INVITED_FROM
+        venue = next(
+            (p for p in ("community-hall", "crown-anchor", "cafe") if p in known_places), "park"
+        )
+        text = (
+            f"The invitation came: {name}'s wedding, {day.strftime('%-d %B')}. I'm "
+            "genuinely touched to be asked. Need a suit that fits."
+            if invited
+            else f"{name}'s getting married next month. Small do, family mostly."
+        )
+        event = DomainEvent(
+            KIND,
+            "pathos",
+            {
+                "person_id": person,
+                "kind": "wedding_invited" if invited else "wedding_announced",
+                "wedding_on": day.isoformat(),
+                "venue": venue,
+                "text": in_his_words(text, person),
+                "simulated_at": at.isoformat(),
+                "owner": "pathos",
+            },
+            correlation_id=f"friend-life-{person}",
+        )
+        output = [event, _memory(event, str(event.payload["text"]), at, 0.6)]
+        if invited:
+            starts = datetime(day.year, day.month, day.day, 12, tzinfo=at.tzinfo)
+            output += book(
+                event,
+                schedule_id=f"wedding-{person}-{day.isoformat()}",
+                title=f"{name}'s wedding",
+                starts=starts,
+                ends=starts + timedelta(hours=11),
+                place_id=venue,
+                activity_type="an_evening_out",
+                source="friend_life",
+                motivation=f"{name}'s wedding.",
+                at=at,
+                priority=0.95,
+            )
+        return output
+    if life.wedding_on and at.date().isoformat() == life.wedding_on and "married" not in life.kinds:
+        was_there = location_id == life.wedding_venue
+        text = (
+            f"{name}'s wedding. Cried at the vows, danced like a dad, and ate far too much "
+            "cake. One of the best days I can remember."
+            if was_there
+            else f"{name} got married today. Looked so happy in the photos."
+        )
+        event = DomainEvent(
+            KIND,
+            "pathos",
+            {
+                "person_id": person,
+                "kind": "married",
+                "attended": was_there,
+                "text": in_his_words(text, person),
+                "simulated_at": at.isoformat(),
+                "owner": "pathos",
+            },
+            correlation_id=f"friend-life-{person}",
+        )
+        return [event, _memory(event, str(event.payload["text"]), at, 0.8 if was_there else 0.5)]
+    return []
+
+
+def wedding_gifts(history: Sequence[DomainEvent], at: datetime) -> list[tuple[str, int, str]]:
+    output: list[tuple[str, int, str]] = []
+    for event in reversed(events_of(history, KIND)[-10:]):
+        if at - datetime.fromisoformat(str(event.payload["simulated_at"])) > timedelta(days=2):
+            break
+        if event.payload.get("kind") == "wedding_invited":
+            output.append(
+                (
+                    f"wedding-gift-{event.payload['person_id']}",
+                    WEDDING_GIFT_PENCE,
+                    "A wedding present",
+                )
+            )
+    return output
 
 
 IMPORTANCE = {

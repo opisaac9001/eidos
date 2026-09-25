@@ -231,6 +231,47 @@ His friends' lives go on without him, and change his weeks.
 - **Where it shows:** `whats_going_on_with_his_friends` in his self-context, and his
   answer when you ask about his friends.
 
+## The year with friends (`application/social_calendar.py`)
+
+- **Friends' birthdays:** once someone is a real friend (level 4 and up) he knows their
+  birthday, a fixed fact about them. On the day he messages; for a close friend there's a
+  card and a pint. Sometimes it slips his mind and two days later he sends something
+  sheepish.
+- **His birthday (27 October):** with two or more friends free, a week before, they decide
+  it's drinks at the Crown on the night, and messages come in all day.
+- **Bonfire night:** fireworks on the rec on the Saturday nearest the fifth, with a friend
+  if one's free, sometimes alone.
+- **New Year's Eve:** the Crown with friends, or a quiet night in.
+
+Each plan (`calendar.plan`) causes its booking, and he remembers the evening if he was there.
+
+## Friends far away (`application/far_friends.py`)
+
+- **Calls:** friends who've moved away ring or get rung on Sunday evenings
+  (`friend.kept_in_touch`). With a close friend that's every few weeks. With a newer one it
+  gets rarer as the months pass. Each call is a small shared moment, so close friendships
+  hold at a distance.
+- **A visit:** two to nine months after a close friend moves, if he can afford the train,
+  he goes to stay for a weekend in their new city (`visiting_a_friend`). He remembers
+  Saturday night and the hungover breakfast.
+
+## A friend's wedding (`application/friends_lives.py`)
+
+- **Engagement:** a friend with a partner of eighteen months or more may get engaged.
+- **Invitation:** about ten months later the invitation comes. If they're close (level 4
+  and up) he's invited: a Saturday booked at the community hall and a £40 present.
+- **The day:** he remembers the wedding if he was there, or the photos if he wasn't.
+
+## Lying awake (`application/sleep_trouble.py`)
+
+At two in the morning, if he's asleep:
+- **Worry:** if something's weighing on him (the same things he'd hide behind "fine"), or
+  money's tight, he may wake and not get back off.
+- **Excitement:** the night before something big (a wedding, moving day, a trip, a date),
+  he may lie awake for better reasons.
+- **Effect:** it costs rest the next day, happens at most twice a week, and his self-context
+  counts `restless_nights_this_week`.
+
 ## Falling out (`application/falling_out.py`)
 
 - **How it starts:** rarely, it goes wrong with a friend he has known at least three

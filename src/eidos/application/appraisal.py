@@ -527,6 +527,24 @@ def _effect(
             "made_up": ("connection", 0.06, 0.5, 0.35, 0.6),
             "drifted_apart": ("affect", 0.0, -0.3, 0.2, 0.5),
         }.get(str(event.payload.get("stage")))
+    if event.kind == "sleep.restless":
+        return {
+            "worried": ("affect", 0.0, -0.1, 0.35, 0.6),
+            "excited": ("affect", 0.0, 0.05, 0.45, 0.4),
+        }.get(str(event.payload.get("why")))
+    if event.kind == "friend.kept_in_touch":
+        return ("connection", 0.05, 0.3, 0.2, 0.6)
+    if event.kind == "friend.visit_planned":
+        return ("affect", 0.0, 0.25, 0.35, 0.4)
+    if event.kind == "friend.birthday" and event.payload.get("outcome") == "forgot":
+        return ("affect", 0.0, -0.15, 0.2, 0.6)
+    if event.kind == "calendar.plan":
+        occasion = str(event.payload.get("occasion"))
+        if occasion.endswith("_remembered"):
+            return ("connection", 0.06, 0.4, 0.35, 0.5)
+        if occasion == "new_year_quiet":
+            return ("affect", 0.0, -0.05, 0.1, 0.5)
+        return ("affect", 0.0, 0.15, 0.3, 0.3)
     if event.kind == "holiday.stage":
         return {
             "booked": ("affect", 0.0, 0.3, 0.4, 0.4),
@@ -602,6 +620,9 @@ def _effect(
             "family_better": ("affect", 0.0, 0.2, 0.2, 0.5),
             "moving_announced": ("connection", -0.03, -0.35, 0.35, 0.6),
             "moved_away": ("connection", -0.05, -0.4, 0.3, 0.5),
+            "engaged": ("affect", 0.0, 0.3, 0.35, 0.4),
+            "wedding_invited": ("affect", 0.0, 0.25, 0.3, 0.4),
+            "married": ("connection", 0.06, 0.45, 0.4, 0.5),
         }.get(str(event.payload.get("kind")))
     if event.kind == "townsfolk.numbers_swapped":
         return ("connection", 0.06, 0.4, 0.3, 0.6)

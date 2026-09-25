@@ -79,6 +79,8 @@ _MOMENTS: dict[str, tuple[str, float, bool]] = {
     "friend.falling_out": ("person_id", 0.5, True),
     "joke.shared": ("person_id", 0.15, False),
     "joke.recalled": ("person_id", 0.1, False),
+    "friend.birthday": ("person_id", 0.15, False),
+    "friend.kept_in_touch": ("person_id", 0.2, False),
     # Telling someone how you really are.
     "feeling.shared": ("person_id", 0.3, True),
     "feeling.admitted": ("person_id", 0.3, True),

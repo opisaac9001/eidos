@@ -60,6 +60,7 @@ from eidos.application.falling_out import falling_out_events
 from eidos.application.family import FAMILY_HOME, christmas_events, family_events
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
+from eidos.application.far_friends import far_friend_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
@@ -173,8 +174,11 @@ from eidos.application.selfhood import (
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.setbacks import setback_events
 from eidos.application.sleep_schedule import sleep_window_events
+from eidos.application.sleep_trouble import HOUR as SLEEP_TROUBLE_HOUR
+from eidos.application.sleep_trouble import sleep_trouble_events
 from eidos.application.small_touches import small_touches_due, small_touches_events
 from eidos.application.social_activity import scheduled_social_events
+from eidos.application.social_calendar import social_calendar_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
 from eidos.application.surfacing import surfacing_events
@@ -317,6 +321,9 @@ class _HourMind:
     focused_concern: str | None
     concerns_now: list[DomainEvent]
     catalog: WorldCatalog
+
+
+SOCIAL_CALENDAR_HOURS = frozenset({0, 10, 13, 18, 20, 22})
 
 
 class Life(LifeConversation):
@@ -636,6 +643,9 @@ class Life(LifeConversation):
             self._phase_friends_lives(tick)
             self._phase_home(tick)
             self._phase_holiday(tick)
+            self._phase_social_calendar(tick)
+            self._phase_far_friends(tick)
+            self._phase_sleep_trouble(tick)
             self._phase_course(tick)
             self._phase_falling_out(tick)
             self._phase_in_jokes(tick)
@@ -1632,6 +1642,7 @@ class Life(LifeConversation):
                 residents=frozenset(catalog.people),
                 known_places=known_place_ids(history + pending, catalog),
                 in_romance_with=arc[0] if arc else None,
+                location_id=tick.state.location_id,
             ),
             self._planning,
         )
@@ -1841,6 +1852,101 @@ class Life(LifeConversation):
                 worn_out=tick.state.rest < 0.3 or tick.state.valence < -0.3,
                 feeder=feeder,
             ),
+        )
+
+    def _phase_sleep_trouble(self, tick: _Tick) -> None:
+        """Lying awake: worry, money, or the night before something big."""
+        if self.authored_scenario or tick.state.awake or tick.current.hour != SLEEP_TROUBLE_HOUR:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        rent = weekly_housing_pence(history + pending)
+        today = current.date().isoformat()
+        restless = sleep_trouble_events(
+            history + pending,
+            current,
+            asleep=not tick.state.awake,
+            rest=tick.state.rest,
+            valence=tick.state.valence,
+            money_tight=self._finances(history + pending).balance_pence < 2 * rent,
+            tomorrow=[
+                (entry.title, entry.activity_type or "")
+                for entry in self._planning(history + pending).calendar.values()
+                if entry.status == "scheduled" and entry.starts_at[:10] == today
+            ],
+        )
+        self._extend_warmed(tick, restless)
+        for event in restless:
+            if event.kind == "needs.changed":
+                tick.state = tick.state.apply(event)
+
+    def _phase_far_friends(self, tick: _Tick) -> None:
+        """Calls with friends who have moved away, and a weekend visit."""
+        if self.authored_scenario or not tick.state.awake:
+            return
+        current = tick.current
+        visiting = tick.state.location_id.startswith("city-")
+        if not visiting and not (current.weekday() == 6 and current.hour in {18, 19}):
+            return
+        history, pending = tick.history, tick.pending
+        lives = friends_lives(history + pending)
+        away = {
+            person: (str(life.moving_to), life.moved_away)
+            for person, life in lives.people.items()
+            if life.moved_away is not None and life.moving_to
+        }
+        if not away:
+            return
+        self._extend_warmed(
+            tick,
+            far_friend_events(
+                history + pending,
+                current,
+                self._world_catalog(history + pending),
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                away=away,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                    if person in away
+                },
+                names=advice_names(history + pending),
+                balance_pence=self._finances(history + pending).balance_pence,
+                rent_pence=weekly_housing_pence(history + pending),
+            ),
+            self._world_catalog,
+            self._planning,
+        )
+
+    def _phase_social_calendar(self, tick: _Tick) -> None:
+        """Friends' birthdays and his, bonfire night and New Year's Eve."""
+        if (
+            self.authored_scenario
+            or not tick.state.awake
+            or tick.current.hour not in SOCIAL_CALENDAR_HOURS
+        ):
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        catalog = self._world_catalog(history + pending)
+        self._extend_warmed(
+            tick,
+            social_calendar_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                depths={
+                    person: friendship.depth
+                    for person, friendship in friendships(history + pending, current).items()
+                },
+                names=advice_names(history + pending),
+                residents=frozenset(catalog.people),
+                unavailable=busy_people(history + pending, current),
+                away=away_people(history + pending),
+                care=float(project_identity(history + pending).values.get("care", 0.78)),
+                places=frozenset(catalog.places),
+            ),
+            self._planning,
         )
 
     def _phase_holiday(self, tick: _Tick) -> None:

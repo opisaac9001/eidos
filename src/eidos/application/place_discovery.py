@@ -15,6 +15,7 @@ from datetime import datetime
 from hashlib import sha256
 from typing import Sequence
 
+from eidos.application.friends_lives import CITIES
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.world_catalog import WorldCatalog
@@ -28,6 +29,8 @@ FAR_AWAY = frozenset(
         "holiday-pembrokeshire",
         "holiday-norfolk",
         "holiday-lisbon",
+        # Friends' new cities, when he visits.
+        *(f"city-{city.lower()}" for city in CITIES),
     }
 )
 NOTICE_CHANCE = 0.3

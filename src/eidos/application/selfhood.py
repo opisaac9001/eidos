@@ -29,6 +29,7 @@ from eidos.application.home_move import home_context
 from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
+from eidos.application.sleep_trouble import restless_lately
 from eidos.application.small_touches import at_home_context, usual_context
 from eidos.application.spending import money_context
 from eidos.application.surfacing import lately_on_his_mind
@@ -872,6 +873,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "fallings_out": _fallings_out(history),
         "running_jokes": _running_jokes(history),
         "came_back_to_him_lately": lately_on_his_mind(history, simulated_at),
+        "restless_nights_this_week": restless_lately(history, simulated_at),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),

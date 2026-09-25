@@ -22,9 +22,12 @@ from typing import Sequence
 from eidos.application.body import body_costs
 from eidos.application.economy import WEEKLY_HOUSING_PENCE, weekly_housing_pence
 from eidos.application.evening_course import course_fee
+from eidos.application.far_friends import visit_fares
+from eidos.application.friends_lives import wedding_gifts
 from eidos.application.holiday import holiday_costs
 from eidos.application.home_move import move_costs
 from eidos.application.small_touches import small_touches_costs
+from eidos.application.social_calendar import friend_birthday_gifts
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -118,6 +121,18 @@ def spending_events(
         *(
             (spend_id, "travel", cost, text, True)
             for spend_id, cost, text in holiday_costs(history, at)
+        ),
+        *(
+            (spend_id, "gifts", cost, text, False)
+            for spend_id, cost, text in friend_birthday_gifts(history, at)
+        ),
+        *(
+            (spend_id, "travel", cost, text, True)
+            for spend_id, cost, text in visit_fares(history, at)
+        ),
+        *(
+            (spend_id, "gifts", cost, text, False)
+            for spend_id, cost, text in wedding_gifts(history, at)
         ),
         *_christmas(history, at, awake, location_id),
         *_trips_home(history, at),
