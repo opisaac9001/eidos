@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Sequence
 from urllib.parse import urlsplit
@@ -153,3 +154,38 @@ def _validate(signal: TownSignal) -> None:
     parsed = urlsplit(signal.source_url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("Town signal attribution URL must be credential-free HTTPS")
+
+
+# WMO weather codes, as the four kinds of weather the world knows.
+_WEATHER_CODES = (
+    (range(0, 2), "Clear"),
+    (range(2, 4), "Cloudy"),
+    (range(45, 49), "Cloudy"),
+    (range(51, 68), "Light rain"),
+    (range(71, 78), "Cloudy"),
+    (range(80, 83), "Light rain"),
+    (range(85, 87), "Cloudy"),
+    (range(95, 100), "Light rain"),
+)
+_CODE = re.compile(r"Weather code (\d+)")
+_WIND_AFTER = 12.0  # fall back to "Breezy" for an unknown code
+
+
+def real_weather(
+    history: Sequence[DomainEvent], at: datetime, now: datetime, *, live: bool = False
+) -> str | None:
+    """Today's real weather where the town is, if his world runs live or his day is today."""
+    if not live and abs(at - now) > timedelta(days=1):
+        return None
+    for event in reversed(events_of(history, "external_signal.observed")[-20:]):
+        if event.payload.get("signal_kind") != "weather":
+            continue
+        observed = datetime.fromisoformat(str(event.payload["external_observed_at"]))
+        if abs(observed - now) > timedelta(hours=12):
+            return None
+        match = _CODE.search(str(event.payload.get("summary", "")))
+        if match is None:
+            return None
+        code = int(match.group(1))
+        return next((name for codes, name in _WEATHER_CODES if code in codes), "Breezy")
+    return None

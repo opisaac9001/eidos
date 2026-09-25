@@ -14,6 +14,7 @@ from eidos.domain.events import DomainEvent
 from eidos.domain.selfhood import STARTING_VALUES, developed_values, project_selfhood
 from eidos.ports.event_store import RevisionConflict
 from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.news import NewsSource
 from eidos.ports.town_signals import TownSignalSource
 
 
@@ -37,6 +38,25 @@ def _town_source_from_env() -> TownSignalSource | None:
         float(str(values["longitude"])),
         news_feed_url=os.environ.get("EIDOS_TOWN_NEWS_RSS_URL"),
     )
+
+
+def _news_source_from_env() -> NewsSource | None:
+    """EIDOS_NEWS=on reads the BBC's feeds; EIDOS_NEWS_FEEDS="section=https://...,..." others."""
+    feeds = os.environ.get("EIDOS_NEWS_FEEDS", "").strip()
+    switch = os.environ.get("EIDOS_NEWS", "").strip().casefold()
+    if not feeds and switch not in {"1", "on", "true", "yes", "bbc"}:
+        return None
+    from eidos.adapters.news_feeds import DEFAULT_FEEDS, RssNewsAdapter
+
+    if not feeds:
+        return RssNewsAdapter(DEFAULT_FEEDS)
+    pairs = []
+    for item in feeds.split(","):
+        section, _, url = item.strip().partition("=")
+        if not url:
+            raise ValueError("EIDOS_NEWS_FEEDS entries look like section=https://...")
+        pairs.append((section.strip(), url.strip()))
+    return RssNewsAdapter(pairs)
 
 
 def main() -> None:
@@ -219,6 +239,7 @@ def main() -> None:
                 raise SystemExit(1)
             return
         town_signal_source = _town_source_from_env()
+        news_source = _news_source_from_env()
         if args.command == "serve":
             from eidos.adapters.web_server import serve
 
@@ -228,6 +249,7 @@ def main() -> None:
                 gateway=gateway,
                 mode=mode,
                 town_signal_source=town_signal_source,
+                news_source=news_source,
             )
             return
         from eidos.adapters.durable_gateway import DurableModelGateway
@@ -242,7 +264,13 @@ def main() -> None:
 
         supervisor = CognitionSupervisor(jobs, gateway, revision_for)
         durable = DurableModelGateway(gateway, jobs, revision_for, supervisor=supervisor)
-        simulation = Life(store, durable, mode=mode, town_signal_source=town_signal_source)
+        simulation = Life(
+            store,
+            durable,
+            mode=mode,
+            town_signal_source=town_signal_source,
+            news_source=news_source,
+        )
         if args.command == "self":
             print(_self_story(simulation.history()))
             durable.close()

@@ -181,7 +181,6 @@ def test_a_close_friend_gets_engaged_then_married_and_he_is_there() -> None:
         },
     )
     history: list[DomainEvent] = [partner]
-    venue_on_the_day: dict[str, str] = {}
     for day in range(365 * 5):
         at = START + timedelta(days=day)
         invited = [

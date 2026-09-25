@@ -28,6 +28,7 @@ from eidos.application.holiday import holiday_costs
 from eidos.application.home_move import move_costs
 from eidos.application.small_touches import small_touches_costs
 from eidos.application.social_calendar import friend_birthday_gifts
+from eidos.application.world_news import price_pressure
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -98,7 +99,13 @@ def spending_events(
     rent = weekly_housing_pence(history)
     candidates = [
         *_bills(at, awake),
-        *_bits(at, awake, tight=balance_pence < 2 * rent, comfortable=balance_pence >= 16 * rent),
+        *_bits(
+            at,
+            awake,
+            tight=balance_pence < 2 * rent,
+            comfortable=balance_pence >= 16 * rent,
+            pressure=price_pressure(history, at),
+        ),
         *_at_place(history, at, awake, location_id),
         *_gifts(history, at),
         *_for_friends(history, at),
@@ -181,7 +188,12 @@ TREATS = (
 
 
 def _bits(
-    at: datetime, awake: bool, *, tight: bool = False, comfortable: bool = False
+    at: datetime,
+    awake: bool,
+    *,
+    tight: bool = False,
+    comfortable: bool = False,
+    pressure: float = 1.0,
 ) -> list[_Candidate]:
     """A weekly scatter of small things, and every few weeks a haircut.
 
@@ -191,7 +203,7 @@ def _bits(
         return []
     week = at.isocalendar()
     key = f"{week.year}-W{week.week:02d}"
-    cost = 1_600 + round(2_000 * _roll("bits", key))
+    cost = round((1_600 + round(2_000 * _roll("bits", key))) * pressure)
     text = BITS[int(_roll("bits-text", key) * len(BITS))]
     if tight:
         cost, text = cost // 2, "Just the basics this week: toothpaste and a bus fare"

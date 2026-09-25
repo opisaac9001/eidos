@@ -36,6 +36,7 @@ from eidos.application.surfacing import lately_on_his_mind
 from eidos.application.town_issues import town_issues_context
 from eidos.application.user_notes import user_knowledge_context
 from eidos.application.work_arc import work_context
+from eidos.application.world_news import news_on_his_mind
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -874,6 +875,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "running_jokes": _running_jokes(history),
         "came_back_to_him_lately": lately_on_his_mind(history, simulated_at),
         "restless_nights_this_week": restless_lately(history, simulated_at),
+        "news_on_his_mind": news_on_his_mind(history, simulated_at),
         "people_he_says_hello_to": _around_town(history),
         "family": family_context(history, simulated_at),
         "reading_watching_listening": media_context(history),

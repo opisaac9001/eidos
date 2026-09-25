@@ -8,6 +8,32 @@ models voice what the rules establish rather than inventing it.
 
 Everything here applies to natural lives. Authored fixture worlds are unchanged.
 
+## The real world's news (`application/world_news.py`, `adapters/news_feeds.py`)
+
+Opt in with `EIDOS_NEWS=on` (the BBC's feeds) or `EIDOS_NEWS_FEEDS`.
+
+**Hearing it.** At 07:00 and 18:00 he reads what's new (`news.heard`; real reports, with
+source and link). The `pathos_news_take` role (routed like `reflection` unless given its
+own route) picks up to three stories he'd take in. For each it gives his take in his own
+voice, a feeling, how much it matters to him, and whether it touches his life (`news.take`).
+
+**Rules that keep it honest.** A take must be about a story he was shown. He can't claim
+to have been involved, and feelings are bounded.
+
+**What it changes.**
+- **Mood:** stories that matter move it a little, and important ones become memories.
+- **Spending:** a price rise he took to heart makes his weekly bits cost 10% more for a
+  month.
+- **What's on his mind:** stories that touch his life appear there (`news_on_his_mind`).
+- **Conversation:** the context carries `in_the_news` (headline, what was reported, his
+  take). He can discuss real events, knows only what was reported, and says so if you
+  mention something he hasn't seen.
+- **Weather:** with the town signal configured, the real weather over the town becomes his
+  weather.
+
+**When.** A live world (the web server) gets today's news and weather whatever its
+calendar says. A fast simulation only gets them if its date is within a few days of today.
+
 ## His family (`application/family.py`)
 
 Mum (Helen), Dad (Richard) and his older brother Tom, with Jess and Isla, live in Kent and

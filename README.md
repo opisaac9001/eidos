@@ -262,9 +262,26 @@ export EIDOS_TOWN_NEWS_RSS_URL=https://example.org/local-news.xml
 ```
 
 These attributed, expiring reports are visible in the observatory and may inspire a
-Moira proposal. They never directly change Eidos's weather, memories, actions, or the
+Moira proposal. When his world runs live (the web server) or his simulated day is today,
+the real weather over that town becomes his weather; otherwise they never change the
 fictional world's facts. Omit all four variables for a fully offline world; the RSS
 variable is optional.
+
+Patrick can also follow the real news. With `EIDOS_NEWS=on` he reads the BBC's public RSS
+feeds (front page, UK, world, business, science, culture, sport) at breakfast and in the
+evening:
+
+```bash
+export EIDOS_NEWS=on
+# or choose feeds yourself:
+export EIDOS_NEWS_FEEDS="top=https://feeds.bbci.co.uk/news/rss.xml,world=https://www.theguardian.com/world/rss"
+```
+
+He takes in a few stories and forms his own take (the `pathos_news_take` role). Stories that
+matter move his mood a little, price rises nudge up his spending, and he can discuss real
+events in conversation, knowing only what was reported. News reaches a live world
+whatever its calendar says, but a fast simulation only if its date is within a few days of
+today. See `docs/LIFE.md`.
 
 ## Verify
 

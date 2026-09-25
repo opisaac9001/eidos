@@ -527,6 +527,12 @@ def _effect(
             "made_up": ("connection", 0.06, 0.5, 0.35, 0.6),
             "drifted_apart": ("affect", 0.0, -0.3, 0.2, 0.5),
         }.get(str(event.payload.get("stage")))
+    if event.kind == "news.take":
+        feeling, salience = event.payload.get("feeling"), event.payload.get("salience")
+        if not isinstance(feeling, (int, float)) or not isinstance(salience, (int, float)):
+            return None
+        felt = round(0.4 * float(feeling) * float(salience), 3)
+        return ("affect", 0.0, felt, round(0.2 + 0.3 * float(salience), 3), 0.5) if felt else None
     if event.kind == "sleep.restless":
         return {
             "worried": ("affect", 0.0, -0.1, 0.35, 0.6),

@@ -3,7 +3,7 @@
 import asyncio
 import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Sequence
 from uuid import UUID, uuid4
 
@@ -187,7 +187,11 @@ from eidos.application.town_issues import HOURS as TOWN_ISSUE_HOURS
 from eidos.application.town_issues import REVIEW_HOUR as TOWN_MEETING_REVIEW_HOUR
 from eidos.application.town_issues import TALK_HOUR as TOWN_TALK_HOUR
 from eidos.application.town_issues import town_issue_events
-from eidos.application.town_signals import active_town_signal_context, town_signal_events
+from eidos.application.town_signals import (
+    active_town_signal_context,
+    real_weather,
+    town_signal_events,
+)
 from eidos.application.townsfolk import (
     latent_person,
     townsfolk_events,
@@ -208,6 +212,8 @@ from eidos.application.work_rota import is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
+from eidos.application.world_news import HOURS as NEWS_HOURS
+from eidos.application.world_news import news_events
 from eidos.application.world_perception import (
     authored_community_schedule,
     community_resource_events,
@@ -646,6 +652,7 @@ class Life(LifeConversation):
             self._phase_social_calendar(tick)
             self._phase_far_friends(tick)
             self._phase_sleep_trouble(tick)
+            await self._phase_news(tick)
             self._phase_course(tick)
             self._phase_falling_out(tick)
             self._phase_in_jokes(tick)
@@ -1854,6 +1861,33 @@ class Life(LifeConversation):
             ),
         )
 
+    async def _phase_news(self, tick: _Tick) -> None:
+        """The real world's headlines, morning and evening, and what he makes of them."""
+        if (
+            self.authored_scenario
+            or self.news_source is None
+            or not tick.state.awake
+            or tick.current.hour not in NEWS_HOURS
+        ):
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        identity = project_identity(history + pending)
+        pending.extend(
+            await news_events(
+                history + pending,
+                current,
+                self.news_source,
+                self.gateway,
+                awake=tick.state.awake,
+                identity={
+                    "values": dict(identity.values),
+                    "mood": mood_name(tick.state.energy, tick.state.valence, tick.state.arousal),
+                    "life": "repairs things at a workshop in a small English market town",
+                },
+                live=self.news_follows_real_time,
+            )
+        )
+
     def _phase_sleep_trouble(self, tick: _Tick) -> None:
         """Lying awake: worry, money, or the night before something big."""
         if self.authored_scenario or tick.state.awake or tick.current.hour != SLEEP_TROUBLE_HOUR:
@@ -2586,7 +2620,17 @@ class Life(LifeConversation):
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
         if current.hour not in (6, 12, 18):
             return
-        text = await perform(self.gateway, "moira", mind.context, at, pending)
+        # When his day is today, the real sky over the town is his sky.
+        text = (
+            real_weather(
+                history + pending,
+                current,
+                datetime.now(timezone.utc),
+                live=self.news_follows_real_time,
+            )
+            if self.town_signal_source is not None
+            else None
+        ) or await perform(self.gateway, "moira", mind.context, at, pending)
         if text:
             proposal = WorldEventProposal(
                 proposal_id=f"weather-{at}",

@@ -8,6 +8,7 @@ STRUCTURED_CAPABILITIES = {
     "firmament_townsfolk",
     "pathos_user_notes",
     "pathos_advice_heard",
+    "pathos_news_take",
     "firmament_family",
     "moira_event",
     "moira_expansion",

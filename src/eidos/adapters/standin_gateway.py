@@ -395,6 +395,9 @@ def _standin_pathos_text(
     )
     if follow_ups and any(message.startswith(cue) for cue in _GREETINGS):
         return f"Hey. Oh, how did {follow_ups[0]} go, by the way?"
+    news_reply = _standin_news_reply(message, context)
+    if news_reply:
+        return news_reply
     raw_jokes = context.get("running_jokes_with_you", [])
     jokes = (
         [item for item in raw_jokes if isinstance(item, dict)]
@@ -838,6 +841,13 @@ class StandInGateway(ModelGateway):
         elif role == "firmament_family":
             return ModelResponse(
                 content=json.dumps({"steps": _standin_family_storyline(context)}),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
+        elif role == "pathos_news_take":
+            return ModelResponse(
+                content=json.dumps({"takes": _standin_news_takes(context)}),
                 resolved_model="authored-stand-in-v1",
                 backend="deterministic",
                 finish_reason="stop",
@@ -2696,6 +2706,71 @@ _PERSON = (
 )
 
 
+_NEWS_MOODS = (
+    (
+        ("dies", "died", "killed", "dead", "war", "attack", "crash", "flood"),
+        -0.6,
+        "Grim. I read it twice and then put the phone down for a bit.",
+    ),
+    (
+        ("price", "prices", "bills", "inflation", "rent", "cost of living", "energy"),
+        -0.3,
+        "Everything costs more again. I'll notice that at the till, won't I.",
+    ),
+    (
+        ("strike", "strikes", "rail", "trains"),
+        -0.2,
+        "Hope the trains are running when I next need one.",
+    ),
+    (
+        ("cure", "breakthrough", "test", "discovery", "record", "wins", "won"),
+        0.4,
+        "Good news, for once. Made me want to tell someone.",
+    ),
+)
+_TOUCHES = {
+    "price": "prices",
+    "prices": "prices",
+    "bills": "prices",
+    "rent": "prices",
+    "energy": "prices",
+    "strike": "travel",
+    "rail": "travel",
+    "trains": "travel",
+    "heatwave": "weather",
+    "storm": "weather",
+    "nhs": "health",
+    "hospital": "health",
+}
+
+
+def _standin_news_takes(context: dict[str, Any]) -> list[dict[str, object]]:
+    """A crude, honest reader: a reaction to the first few stories, from the words in them."""
+    takes: list[dict[str, object]] = []
+    for story in context.get("stories", [])[:3]:
+        if not isinstance(story, dict):
+            continue
+        words = f"{story.get('headline', '')} {story.get('summary', '')}".casefold()
+        feeling, take = 0.0, "Huh. Didn't know that. I'll keep half an eye on it."
+        for cues, mood, text in _NEWS_MOODS:
+            if any(re.search(rf"\b{re.escape(cue)}\b", words) for cue in cues):
+                feeling, take = mood, text
+                break
+        touches = next(
+            (area for cue, area in _TOUCHES.items() if re.search(rf"\b{cue}\b", words)), "none"
+        )
+        takes.append(
+            {
+                "story_id": str(story.get("story_id")),
+                "take": take,
+                "feeling": feeling,
+                "salience": 0.7 if feeling else 0.4,
+                "touches_his_life": touches,
+            }
+        )
+    return takes
+
+
 _ADVICE_SIGNS = (
     ("unsure", ("not sure", "depends", "up to you", "hard to say", "no idea")),
     (
@@ -2718,6 +2793,26 @@ _ADVICE_SIGNS = (
         ),
     ),
 )
+
+
+_NEWS_CUES = ("the news", "did you see", "did you hear", "have you seen", "what do you think about")
+
+
+def _standin_news_reply(message: str, context: dict[str, object]) -> str | None:
+    """Talk about a real story he's seen, or admit he hasn't seen it."""
+    raw = context.get("in_the_news")
+    stories = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+    words = set(re.findall(r"[a-z]{5,}", message))
+    for story in stories:
+        headline_words = set(re.findall(r"[a-z]{5,}", str(story.get("headline", "")).casefold()))
+        if len(words & headline_words) >= 2:
+            return f"Yeah, I saw that: {story['headline']}. {story['his_take']}"
+    if any(cue in message for cue in _NEWS_CUES):
+        if stories and "news" in message:
+            story = stories[0]
+            return f"Did you see {story['headline']}? {story['his_take']}"
+        return "I haven't seen that, actually. What happened?"
+    return None
 
 
 def _standin_advice_heard(context: dict[str, Any]) -> dict[str, str]:

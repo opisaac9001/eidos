@@ -21,6 +21,7 @@ from eidos.ports.event_store import (
     StateCheckpointStore,
 )
 from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.news import NewsSource
 from eidos.ports.town_signals import TownSignalSource
 
 
@@ -40,11 +41,15 @@ class LifeProjections:
         town_signal_source: TownSignalSource | None = None,
         *,
         authored_scenario: bool = False,
+        news_source: NewsSource | None = None,
     ) -> None:
         self.store = store
         self.gateway = gateway
         self.mode = mode
         self.town_signal_source = town_signal_source
+        self.news_source = news_source
+        # Set by the live runtime: his time runs on the wall clock, so today's news is his.
+        self.news_follows_real_time = False
         self.authored_scenario = authored_scenario
         self._memory_cache: tuple[int, str, MemoryIndex] | None = None
         self._world_catalog_cache: tuple[int, str, WorldCatalog] | None = None

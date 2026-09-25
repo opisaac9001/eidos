@@ -29,6 +29,7 @@ from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.user_notes import asked_about_events, user_knowledge_context
+from eidos.application.world_news import news_context
 from eidos.domain.conversation_time import reply_pacing
 from eidos.domain.emotions import emotional_planning_bias, emotional_speech_bias, project_emotion
 from eidos.domain.events import DomainEvent
@@ -561,6 +562,7 @@ class LifeConversation(LifeProjections):
             **user_knowledge_context(history, state.simulated_at),
             **advice_context(history, state.simulated_at, advice_names(history)),
             "running_jokes_with_you": jokes_with_you(history),
+            **news_context(history, state.simulated_at),
             "relationship_repairs": [
                 {
                     **vars_for(item),
