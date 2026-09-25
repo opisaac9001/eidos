@@ -28,6 +28,7 @@ from eidos.application.home_move import home_context
 from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
 from eidos.application.seasons import time_of_year
+from eidos.application.small_touches import at_home_context, usual_context
 from eidos.application.spending import money_context
 from eidos.application.surfacing import lately_on_his_mind
 from eidos.application.town_issues import town_issues_context
@@ -884,6 +885,8 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "evening_class": course_context(history),
         "body": body_context(history, simulated_at),
         "views_on_the_town": town_issues_context(history, simulated_at),
+        "at_home": at_home_context(history),
+        "his_usual": usual_context(history, simulated_at),
         "love_life": _love_life(history),
         "saving_for": _saving_for(history),
         "recently_bought": _recently_bought(history, simulated_at),
@@ -1101,6 +1104,8 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "home": home_context(history),
         "evening_class": course_context(history),
         "body": body_context(history, simulated_at),
+        "at_home": at_home_context(history),
+        "his_usual": usual_context(history, simulated_at),
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
         "patterns_he_would_like_to_change": [

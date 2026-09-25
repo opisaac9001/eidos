@@ -560,6 +560,24 @@ def _effect(
             "pleased": ("affect", 0.0, felt, 0.3, 0.4),
             "disappointed": ("affect", 0.0, -felt, 0.35, 0.2),
         }.get(str(event.payload.get("feeling")))
+    if event.kind == "pet.event":
+        return {
+            "adopted": ("connection", 0.06, 0.55, 0.5, 0.6),
+            "moment": ("connection", 0.02, 0.25, 0.15, 0.6),
+            "vet": ("affect", 0.0, -0.15, 0.3, 0.4),
+        }.get(str(event.payload.get("kind")))
+    if event.kind == "plant.event":
+        return {
+            "bought": ("affect", 0.0, 0.1, 0.2, 0.7),
+            "died": ("affect", 0.0, -0.1, 0.2, 0.5),
+            "thriving": ("mastery", 0.03, 0.35, 0.3, 0.7),
+        }.get(str(event.payload.get("stage")))
+    if event.kind == "habit.regular":
+        return {
+            "known": ("connection", 0.04, 0.35, 0.3, 0.6),
+            "welcomed_back": ("connection", 0.03, 0.3, 0.3, 0.6),
+            "forgotten": ("affect", 0.0, -0.05, 0.2, 0.5),
+        }.get(str(event.payload.get("stage")))
     if event.kind == "home.move":
         return {
             "looking": ("curiosity", 0.03, 0.15, 0.3, 0.3),

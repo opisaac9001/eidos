@@ -171,6 +171,7 @@ from eidos.application.selfhood import (
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.setbacks import setback_events
 from eidos.application.sleep_schedule import sleep_window_events
+from eidos.application.small_touches import small_touches_due, small_touches_events
 from eidos.application.social_activity import scheduled_social_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
@@ -637,6 +638,7 @@ class Life(LifeConversation):
             self._phase_in_jokes(tick)
             self._phase_surfacing(tick)
             self._phase_town_issues(tick)
+            self._phase_small_touches(tick)
             self._phase_media(tick)
             self._phase_seasons(tick)
             self._phase_imperfection(tick)
@@ -1783,6 +1785,50 @@ class Life(LifeConversation):
                 with_ellis=with_ellis,
             ),
             self._planning,
+        )
+
+    def _phase_small_touches(self, tick: _Tick) -> None:
+        """A cat, the houseplants he keeps killing, and his usual at the café."""
+        if self.authored_scenario or not small_touches_due(
+            tick.current, awake=tick.state.awake, location_id=tick.state.location_id
+        ):
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        feeder = None
+        if tick.state.location_id == FAMILY_HOME:
+            catalog = self._world_catalog(history + pending)
+            unavailable = busy_people(history + pending, current)
+            known = friendships(history + pending, current)
+            closest = max(
+                (
+                    person
+                    for person in known
+                    if person in catalog.people
+                    and person not in unavailable
+                    and person not in {"user", "mum", "dad", "tom", "jess", "isla"}
+                ),
+                key=lambda person: known[person].depth,
+                default=None,
+            )
+            if closest is not None and known[closest].depth >= 4:
+                feeder = {
+                    **townsfolk_names(history + pending),
+                    **{person.person_id: person.name for person in catalog.people.values()},
+                }.get(closest, closest.replace("-", " ").title())
+        self._extend_warmed(
+            tick,
+            small_touches_events(
+                history + pending,
+                current,
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                connection=tick.state.connection,
+                care=float(project_identity(history + pending).values.get("care", 0.78)),
+                balance_pence=self._finances(history + pending).balance_pence,
+                rent_pence=weekly_housing_pence(history + pending),
+                worn_out=tick.state.rest < 0.3 or tick.state.valence < -0.3,
+                feeder=feeder,
+            ),
         )
 
     def _phase_home(self, tick: _Tick) -> None:

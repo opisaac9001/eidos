@@ -409,6 +409,9 @@ def _standin_pathos_text(
         or any(cue in message for cue in ("on your mind", "what's new", "how are things"))
     ):
         return f"Hey. {wants_view}"
+    home = _standin_home_reply(message, context)
+    if home:
+        return home
     self_reply = _standin_self_reply(message, context, cadence)
     if self_reply:
         return self_reply
@@ -2124,6 +2127,75 @@ def _standin_town_reply(message: str, context: dict[str, object]) -> str | None:
         return f"{where.removeprefix('decided: ')} {view}".strip()
     title = str(issue.get("issue", "the latest thing")).lower()
     return f"The big thing at the moment is {title}. {view}".strip()
+
+
+_HOME_CUES = re.compile(
+    r"\b(pets?|cats?|kitten|(house)?plants?|your (flat|place|home|house)|the usual)\b"
+)
+
+
+def _standin_home_reply(message: str, context: dict[str, object]) -> str | None:
+    """His cat, his plants and his café order, from what is actually true at home."""
+    if not _HOME_CUES.search(message) or "you" not in message:
+        return None
+    identity = context.get("identity")
+    selfhood = identity.get("selfhood") if isinstance(identity, dict) else None
+    if not isinstance(selfhood, dict):
+        return None
+    if "usual" in message:
+        usual = selfhood.get("his_usual")
+        if isinstance(usual, str) and usual:
+            order = usual.split(", at ")[0]
+            return f"Ha, yes. {order[0].upper()}{order[1:]}. Mara doesn't even ask now."
+        return "Not yet. I keep ordering something different, so they've no chance."
+    at_home = selfhood.get("at_home")
+    cat = at_home.get("cat") if isinstance(at_home, dict) else None
+    plants = at_home.get("plants") if isinstance(at_home, dict) else None
+    if "plant" in message:
+        if isinstance(plants, dict):
+            return _plants_reply(plants)
+        return "Not at the moment. Probably for the best, for the plants' sake."
+    about_home = re.search(r"\b(flat|place|home|house)\b", message) is not None
+    if isinstance(cat, dict) and cat.get("name"):
+        pronoun = "He's" if cat.get("pronoun") == "he" else "She's"
+        reply = (
+            f"There's {cat['name']}, {cat.get('what_they_look_like', 'a cat')} from the rescue. "
+            f"{pronoun} {cat.get('what_they_are_like', 'good company')}."
+        )
+        lately = cat.get("lately")
+        if isinstance(lately, str) and lately and "rescue" not in lately:
+            reply += f" {lately}"
+        return reply
+    if about_home:
+        home = selfhood.get("home")
+        if isinstance(home, dict) and home.get("now") not in {None, "the flat he started in"}:
+            reply = f"It's {home['now']}. It's starting to feel like mine."
+        else:
+            reply = "It's fine. Small, a bit damp in the bathroom, but it's mine."
+        if isinstance(plants, dict) and plants.get("thriving"):
+            reply += " And there's a plant I haven't killed, which is a first."
+        return reply
+    return "No pets. I'd like a cat one day, if I ever get a landlord who says yes."
+
+
+def _plants_reply(plants: dict[str, object]) -> str:
+    raw = plants.get("thriving")
+    thriving = [str(item) for item in raw if item] if isinstance(raw, list) else []
+    trial = plants.get("touch_and_go")
+    killed = plants.get("killed_so_far")
+    parts: list[str] = []
+    if isinstance(killed, int) and killed:
+        parts.append(
+            f"Don't ask. I've killed {killed} so far. I'm a menace."
+            if killed > 1
+            else "I've killed one already."
+        )
+    if thriving:
+        lead = "But the" if parts else "The"
+        parts.append(f"{lead} {thriving[-1]} is thriving, somehow, and I'm very proud of it.")
+    if trial:
+        parts.append(f"There's a new {trial} on the windowsill. Touch and go.")
+    return " ".join(parts) if parts else "I've got a plant. It's alive, for now."
 
 
 _WORK_CUES = ("work", "job", "workshop", "shift", "ellis")

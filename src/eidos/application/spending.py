@@ -23,6 +23,7 @@ from eidos.application.body import body_costs
 from eidos.application.economy import WEEKLY_HOUSING_PENCE, weekly_housing_pence
 from eidos.application.evening_course import course_fee
 from eidos.application.home_move import move_costs
+from eidos.application.small_touches import small_touches_costs
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -108,6 +109,10 @@ def spending_events(
         *(
             (spend_id, "everyday", cost, text, True)
             for spend_id, cost, text in body_costs(history, at)
+        ),
+        *(
+            (spend_id, "everyday", cost, text, True)
+            for spend_id, cost, text in small_touches_costs(history, at, awake=awake)
         ),
         *_christmas(history, at, awake, location_id),
         *_trips_home(history, at),

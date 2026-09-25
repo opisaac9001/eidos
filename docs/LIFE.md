@@ -315,6 +315,38 @@ Ordinary local rows that he has a view on.
   those decided in the last six months, with his view in his own words. The stand-in
   answers questions about the town, the council or a named issue from it.
 
+## Small touches of home and habit (`application/small_touches.py`)
+
+- **A cat (`pet.event`):**
+  - **When:** two weeks after he moves flat, or after 18 months settled if he never
+    moves (not while a move is under way). On a Sunday he may go to the rescue "just to
+    look".
+  - **How likely:** likelier the lonelier he is and the more care matters to him. He
+    needs the £85 fee plus two weeks' rent in the bank. Only ever one cat.
+  - **The cat:** its name, looks, temperament and he/she are replay-stable facts, rolled
+    from its id.
+  - **Cat moments:** on an evening at home, about one every couple of weeks (a 5am
+    wake-up, sitting on his book, a leaf by his pillow). Each lifts connection a little.
+  - **Costs:** food and litter every Saturday (£8.50), and a vet's bill about twice a year.
+    Both are everyday spending.
+  - **Trips to Wye:** a friend (or the neighbour downstairs) feeds the cat, and he mentions
+    it once.
+- **Houseplants (`plant.event`):**
+  - **Buying:** a plant now and then, and very likely in the first weeks after a move.
+  - **Dying:** each week he's worn out or has been away, it's likelier to die ("Another
+    one. I'm a menace."). After a death he waits two months before buying another.
+  - **Thriving:** a plant that lasts ten weeks thrives and stays, a small point of pride.
+  - **How often:** about two to four plant events a year.
+- **The usual (`habit.regular`):**
+  - **Being known:** a visit is a day he arrives at Juniper Café. After ten visits Mara
+    says "The usual?" once. From then on his order (a fixed drink and a fixed
+    scone-or-cake) is in his self-context.
+  - **After months away:** if he stays away 100 days or more, on his return Mara either
+    asks where he's been or has forgotten. If she has forgotten, he earns the usual again
+    over ten more visits.
+- **Where it shows:** `at_home` (cat and plants) and `his_usual` in his self-context. The
+  stand-in answers questions about pets, plants, his flat and his usual from them.
+
 ## Romance (`application/romance.py`)
 
 Rare, slow and uncertain.
@@ -356,5 +388,6 @@ These systems are described in their own documents:
   `came_back_to_him_lately`. The conversation context also gets `what_he_knows_about_you`,
   `things_to_ask_you_about`, `wants_your_view_on`, `what_you_advised_lately`,
   `running_jokes_with_you`, and `how_he_really_is` or `owes_honesty` when they apply.
+  Home life shows as `at_home` (cat, plants) and `his_usual` (his café order).
 - **The Becoming view:** panels for his people, his family, what he knows about you,
   reading, watching and listening, and work, love and what he'd change.
