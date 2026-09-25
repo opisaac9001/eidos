@@ -1177,6 +1177,40 @@ function renderSelf() {
     self.evening_class
       ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">✎</span><span class="moment-text">Evening class: ${esc(self.evening_class.course || "")}<small>${esc(self.evening_class.status || "")}</small></span></div>`
       : "",
+    ...(() => {
+      const body = self.body || {};
+      return [
+        body.sore_at_the_moment &&
+          `<div class="moment away"><span class="moment-mark" aria-hidden="true">+</span><span class="moment-text">Sore: ${esc(body.sore_at_the_moment)}</span></div>`,
+        body.hungover &&
+          `<div class="moment away"><span class="moment-mark" aria-hidden="true">~</span><span class="moment-text">Hungover, a bit</span></div>`,
+        body.fitness &&
+          `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">Fitness: ${esc(body.fitness)}</span></div>`,
+        body.dentist &&
+          `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">Dentist: ${esc(body.dentist)}</span></div>`,
+      ].filter(Boolean);
+    })(),
+    self.at_home && self.at_home.cat
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">●</span><span class="moment-text">${esc(self.at_home.cat.name)}, the cat<small>${esc(self.at_home.cat.what_they_are_like)} · ${esc(self.at_home.cat.lately)}</small></span></div>`
+      : "",
+    self.at_home && self.at_home.plants
+      ? `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">Houseplants<small>${esc((self.at_home.plants.thriving || []).join(", ") || "none thriving")} · ${esc(self.at_home.plants.killed_so_far)} lost so far</small></span></div>`
+      : "",
+    self.his_usual
+      ? `<div class="moment toward"><span class="moment-mark" aria-hidden="true">☕</span><span class="moment-text">His usual: ${esc(self.his_usual)}</span></div>`
+      : "",
+    ...(self.views_on_the_town || []).map(
+      (item) =>
+        `<div class="moment"><span class="moment-mark" aria-hidden="true">?</span><span class="moment-text">${esc(item.issue)}<small>${esc(item.his_view || "")}</small></span></div>`,
+    ),
+    ...(self.running_jokes || []).slice(-4).map(
+      (item) =>
+        `<div class="moment toward"><span class="moment-mark" aria-hidden="true">☺</span><span class="moment-text">Running joke with ${esc(item.with)}: ${esc(item.joke)}</span></div>`,
+    ),
+    ...(self.came_back_to_him_lately || []).map(
+      (text) =>
+        `<div class="moment"><span class="moment-mark" aria-hidden="true">↺</span><span class="moment-text">${esc(text)}</span></div>`,
+    ),
     ...(self.whats_going_on_with_his_friends || []).map(
       (item) =>
         `<div class="moment"><span class="moment-mark" aria-hidden="true">○</span><span class="moment-text">${esc(item.who)}: ${esc(item.what)}</span><span class="moment-meta">${esc(date(item.when))}</span></div>`,

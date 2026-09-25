@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 
+from eidos.application.pronouns import in_his_words
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
 
@@ -303,6 +304,7 @@ def _turn(
         extra["moving_to"] = life.moving_to
     else:
         raise ValueError(kind)
+    text = in_his_words(text, person)
     event = DomainEvent(
         KIND,
         "pathos",

@@ -1108,6 +1108,9 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "his_usual": usual_context(history, simulated_at),
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
+        "views_on_the_town": town_issues_context(history, simulated_at),
+        "running_jokes": _running_jokes(history),
+        "came_back_to_him_lately": lately_on_his_mind(history, simulated_at),
         "patterns_he_would_like_to_change": [
             *imperfection_context(history, simulated_at),
             *body_patterns(history),
