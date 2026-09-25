@@ -551,6 +551,15 @@ def _effect(
             "dentist_visit": ("affect", 0.0, 0.25, 0.25, 0.5),
             "dentist_missed": ("affect", 0.0, -0.2, 0.3, 0.6),
         }.get(kind)
+    if event.kind == "opinion.outcome":
+        strength = event.payload.get("strength")
+        if isinstance(strength, bool) or not isinstance(strength, (int, float)):
+            return None
+        felt = round(0.1 + 0.3 * float(strength), 3)
+        return {
+            "pleased": ("affect", 0.0, felt, 0.3, 0.4),
+            "disappointed": ("affect", 0.0, -felt, 0.35, 0.2),
+        }.get(str(event.payload.get("feeling")))
     if event.kind == "home.move":
         return {
             "looking": ("curiosity", 0.03, 0.15, 0.3, 0.3),
