@@ -145,7 +145,7 @@ def _book(
     )
     back = datetime(friday.year, friday.month, friday.day, 18, tzinfo=at.tzinfo)
     who = f" with {company[1].split()[0]}" if company else ""
-    text = f"Booked a week away{who} for the workshop shutdown: {name.lower()}. " + (
+    text = f"Booked a week away{who} for the workshop shutdown: {name[:1].lower() + name[1:]}. " + (
         "Split the cost, which helped." if company else "Just me. I think I'll like it."
     )
     booked = _stage(

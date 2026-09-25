@@ -148,3 +148,18 @@ def test_no_dates_booked_while_he_is_home_with_his_family() -> None:
     )
     assert _going_home([plan], datetime(2026, 12, 25, 20, tzinfo=timezone.utc))
     assert not _going_home([plan], datetime(2026, 12, 18, 20, tzinfo=timezone.utc))
+
+
+def test_arriving_late_to_a_date_is_not_standing_them_up() -> None:
+    from eidos.application.romance import _mostly_there
+
+    def unfinished(worked):
+        return DomainEvent(
+            "activity.execution_unfinished",
+            "pathos",
+            {"schedule_id": "romance-date-x", "worked_seconds": worked, "required_seconds": 9000},
+        )
+
+    assert _mostly_there([unfinished(7080)], "romance-date-x")
+    assert not _mostly_there([unfinished(1680)], "romance-date-x")
+    assert not _mostly_there([], "romance-date-x")

@@ -380,6 +380,12 @@ def _next_date(
             if status == "completed":
                 text = f"Last night with {name}: {last.payload['what']}."
                 return _stage(person, "date", text, at, 0.65, schedule_id=schedule_id)
+            if status in {"failed", "interrupted"} and _mostly_there(history, schedule_id):
+                text = (
+                    f"Got there late last night and flustered, but {name} had waited. "
+                    f"{str(last.payload['what'])[:1].upper()}{str(last.payload['what'])[1:]}."
+                )
+                return _stage(person, "date", text, at, 0.6, schedule_id=schedule_id)
             if status in {"failed", "interrupted", "cancelled"}:
                 text = (
                     f"Had to let {name} down last night. Felt awful; said I'd make it up to them."
@@ -489,6 +495,16 @@ def _next_date(
             correlation_id=schedule_id,
         ),
     ]
+
+
+def _mostly_there(history: Sequence[DomainEvent], schedule_id: str) -> bool:
+    """Whether he was there for most of it: arriving late isn't standing someone up."""
+    for event in reversed(events_of(history, "activity.execution_unfinished")[-30:]):
+        if event.payload.get("schedule_id") == schedule_id:
+            worked = float(event.payload.get("worked_seconds") or 0.0)
+            required = float(event.payload.get("required_seconds") or 1.0)
+            return worked / required >= 0.6
+    return False
 
 
 def _going_home(history: Sequence[DomainEvent], when: datetime) -> bool:
