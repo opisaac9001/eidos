@@ -139,13 +139,14 @@ class _Lineage:
                 return seen[2]
             match = next((log for log in self._logs if log.covers(events)), None)
             if match is None:
-                # A new branch: fork from the most recent log it shares a prefix with.
+                # A new branch: fork from the log it shares the longest prefix with. (The
+                # first log sharing anything may be an unrelated ordering of the same events,
+                # such as history beside a time-ordered view, that agrees on only a few.)
                 parent, shared = None, 0
                 for log in self._logs:
-                    shared = log.shared_with(events)
-                    if shared:
-                        parent = log
-                        break
+                    length = log.shared_with(events)
+                    if length > shared:
+                        parent, shared = log, length
                 match = _Log(list(events), parent, shared)
             else:
                 self._logs.remove(match)
@@ -260,7 +261,16 @@ class PendingEvents(list[DomainEvent]):
 
 
 class IncrementalFold(Generic[S]):
-    """Folds ``step`` over events, reusing the longest identical cached prefix."""
+    """Folds ``step`` over events, reusing the longest identical cached prefix.
+
+    Besides the recent heads it keeps a checkpoint every ``CHECKPOINT_EVERY`` events. A
+    sequence that differs from a cached one only near its end (a time-ordered view in which
+    a late event was slotted in before the last few) then resumes from the checkpoint before
+    the difference instead of folding the whole life again.
+    """
+
+    CHECKPOINT_EVERY = 4096
+    CHECKPOINTS = 2
 
     def __init__(
         self,
@@ -275,6 +285,7 @@ class IncrementalFold(Generic[S]):
         self._step = step
         self._capacity = capacity
         self._entries: dict[Hashable, list[_Entry[S]]] = {}
+        self._checkpoints: dict[Hashable, list[_Entry[S]]] = {}
         self._lock = Lock()
 
     def __call__(
@@ -293,9 +304,11 @@ class IncrementalFold(Generic[S]):
         """
         log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
-            entries = self._entries.setdefault((key, isinstance(events, EventView)), [])
+            slot = (key, isinstance(events, EventView))
+            entries = self._entries.setdefault(slot, [])
+            checkpoints = self._checkpoints.setdefault(slot, [])
             best: _Entry[S] | None = None
-            for entry in entries:
+            for entry in (*entries, *checkpoints):
                 if (best is None or entry.size > best.size) and _prefix_of(
                     entry.log, entry.size, log, length
                 ):
@@ -310,8 +323,13 @@ class IncrementalFold(Generic[S]):
                     self._touch(entries, best)
                     return state
             step = self._step
+            every = self.CHECKPOINT_EVERY
             for index in range(start, length):
                 state = step(state, events[index])
+                if (index + 1) % every == 0 and length - (index + 1) < every:
+                    # The last checkpoint before the head, kept for late insertions.
+                    checkpoints.insert(0, _Entry(log, index + 1, state))
+                    del checkpoints[self.CHECKPOINTS :]
             # Keep the shorter prefix too: speculative sequences (a proposal later rejected)
             # must not evict the prefix the next genuine sequence will continue from.
             entries.insert(0, _Entry(log, length, state))
@@ -321,6 +339,7 @@ class IncrementalFold(Generic[S]):
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+            self._checkpoints.clear()
 
     @staticmethod
     def _touch(entries: list[_Entry[S]], entry: _Entry[S]) -> None:
