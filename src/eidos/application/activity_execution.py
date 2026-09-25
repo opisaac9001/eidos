@@ -26,6 +26,11 @@ from eidos.domain.planning import CalendarEntry, PlanningState
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
 # Stays, where the point is being there rather than effort put in.
 STAYS = frozenset({"christmas_at_home", "visiting_home"})
+# Activities that are sociable by nature: a conversation at the venue is part of them.
+SOCIABLE = frozenset(
+    {"an_evening_out", "an_evening_class", "visiting_home", "christmas_at_home", "moving_house"}
+)
+_HERE = "*anyone-here*"
 FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.
 LONG_STINT_SECONDS = 3 * 3600
 
@@ -363,8 +368,8 @@ class _EffortReplay:
                 event.kind == "scene.started"
                 and "pathos" in {p.get("initiator_id"), p.get("partner_id")}
                 and not {p.get("initiator_id"), p.get("partner_id")} <= colleagues
-                # On a shift, whoever drops into the workshop is talked to over the bench.
-                and not (EMPLOYER_ID in colleagues and p.get("location_id") == entry.location_id)
+                # Whoever drops in is talked to over the bench, or across the table.
+                and not (_HERE in colleagues and p.get("location_id") == entry.location_id)
             ):
                 self.scenes.add(str(p["scene_id"]))
                 self.active_scenes.add(str(p["scene_id"]))
@@ -428,10 +433,13 @@ def activity_effort(
     if first and first.payload.get("window_starts_at"):
         window_start = datetime.fromisoformat(str(first.payload["window_starts_at"]))
         window_end = datetime.fromisoformat(str(first.payload["window_ends_at"]))
-    # On a shift, talking with Ellis at the bench is part of the work, not a break from it.
+    # On a shift, talking with Ellis at the bench is part of the work, not a break from it;
+    # and on a shift or an evening out, whoever else is there is talked to as part of it.
     colleagues = (
-        frozenset({"pathos", EMPLOYER_ID})
+        frozenset({"pathos", EMPLOYER_ID, _HERE})
         if entry.schedule_id.startswith(ROTA_PREFIX)
+        else frozenset({"pathos", _HERE})
+        if entry.activity_type in SOCIABLE or entry.companion_id
         else frozenset({"pathos"})
     )
     resource_id = entry.target_id if entry.action == "repair" else entry.resource_id

@@ -204,3 +204,24 @@ def test_someone_dropping_into_the_workshop_is_talked_to_over_the_bench():
     effort = activity_effort([*history, *drop_in], entry, NOW + timedelta(minutes=180))
     assert effort["blocked_by"] is None
     assert effort["worked_seconds"] == pytest.approx(180 * 60)
+
+
+def test_on_an_evening_out_whoever_is_there_is_part_of_the_evening():
+    planning, entry = plan(150)
+    entry = replace(entry, schedule_id="romance-date-x", activity_type="an_evening_out")
+    history = [event("sleep.ended")]
+    history += execution_events(
+        history, replace(planning, calendar={entry.schedule_id: entry}), NOW
+    )
+    mara = [
+        event(
+            "scene.started",
+            0,
+            scene_id="hello",
+            initiator_id="pathos",
+            partner_id="mara",
+            location_id=entry.location_id,
+        )
+    ]
+    effort = activity_effort([*history, *mara], entry, NOW + timedelta(minutes=120))
+    assert effort["blocked_by"] is None

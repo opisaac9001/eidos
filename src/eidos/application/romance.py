@@ -99,11 +99,11 @@ _JOBS = (
 )
 
 _DATE_PLACES = (
-    ("cafe", "a long coffee at Juniper Café that turned into lunch"),
+    ("cafe", "a coffee at Juniper Café just before Mara closed up, then a long walk home"),
     ("crown-anchor", "the quiz at the Crown; we came second to last and didn't care"),
     ("riverside", "a walk along the river until it got dark"),
     ("cinema", "a film at the Regent, and a longer talk about it after"),
-    ("market-hall", "wandering the market and pretending to need things"),
+    ("music-room", "a band at the music room, too loud to talk, which was somehow fine"),
     ("park", "sitting in the park far longer than we meant to"),
 )
 
@@ -423,6 +423,7 @@ def _next_date(
             at + timedelta(days=offset)
             for offset in range(1, 8)
             if (at + timedelta(days=offset)).weekday() in (4, 5)
+            and not _going_home(history, (at + timedelta(days=offset)).replace(hour=20))
         ),
         None,
     )
@@ -488,6 +489,16 @@ def _next_date(
             correlation_id=schedule_id,
         ),
     ]
+
+
+def _going_home(history: Sequence[DomainEvent], when: datetime) -> bool:
+    """Whether he'll be at his parents' then (Christmas, a long weekend, Dad)."""
+    for event in events_of(history, "family.plan_agreed"):
+        starts, ends = event.payload.get("starts_at"), event.payload.get("ends_at")
+        if isinstance(starts, str) and isinstance(ends, str):
+            if datetime.fromisoformat(starts) <= when <= datetime.fromisoformat(ends):
+                return True
+    return False
 
 
 def _runs_its_course(person: str, together_since: datetime, at: datetime) -> bool:

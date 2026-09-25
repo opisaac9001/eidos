@@ -131,3 +131,20 @@ def test_not_every_relationship_lasts() -> None:
             couples += 1
             assert ("broke_up" in stages) == (_roll("long-term", person) >= LONG_TERM)
     assert couples
+
+
+def test_no_dates_booked_while_he_is_home_with_his_family() -> None:
+    from eidos.application.romance import _going_home
+
+    plan = DomainEvent(
+        "family.plan_agreed",
+        "pathos",
+        {
+            "contact_id": "christmas-2026",
+            "starts_at": "2026-12-23T19:00:00+00:00",
+            "ends_at": "2026-12-27T12:00:00+00:00",
+            "simulated_at": "2026-12-06T19:00:00+00:00",
+        },
+    )
+    assert _going_home([plan], datetime(2026, 12, 25, 20, tzinfo=timezone.utc))
+    assert not _going_home([plan], datetime(2026, 12, 18, 20, tzinfo=timezone.utc))
