@@ -1,456 +1,280 @@
 # Eidos
 
-Eidos is a local-first simulation of a persistent digital person named Pathos.
-Pathos has a continuing inner life, memory, mood, relationships, a schedule, and
-a world that changes even when nobody is chatting with him.
+**A persistent simulated person whose life goes on whether or not you're talking to him.**
 
-This branch is a ground-up rebuild. The original implementation remains
-available on the repository's `main` branch and is treated as design history,
-not as a dependency.
+Eidos simulates Patrick "Pathos" Shaw, a young man who repairs things at a workshop in
+Alderwick, a small English market town. He sleeps, works shifts, pays rent, makes friends,
+falls out with some of them, goes home to his parents for Christmas, gets set up on dates,
+reads the real news over breakfast, and slowly works out who he is. You can talk to him.
+Everything else keeps happening anyway.
 
-## What makes this rebuild different
+![The Observatory: Patrick's day at a glance](docs/screenshots/observatory.png)
 
-- The simulation owns truth. Language models may propose thoughts and actions,
-  but they cannot mutate state directly.
-- Pathos is independent of any model vendor, model name, or serving engine.
-- One typed model gateway connects Eidos to local or hosted inference.
-- The application begins as a modular monolith. Components split into services
-  only when deployment or scaling provides a concrete reason.
-- Every meaningful change is recorded as an event so behavior can be inspected,
-  replayed, and tested.
-- The fictional world and operational reality remain explicitly separated.
+Eidos is local-first and model-agnostic. It runs fully offline with deterministic
+stand-ins, or with any OpenAI-compatible model server (Ollama, LM Studio, vLLM, a hosted
+API). Language models only ever *propose*; the simulation's rules decide what actually
+happens, and every change is an event you can inspect and replay.
 
-## Repository map
+---
 
-```text
-docs/               Product vision, architecture, decisions, and roadmap
-infra/dell-t630/     Deployment contract for the local AI host
-src/eidos/domain/    Deterministic simulation concepts and rules
-src/eidos/ports/     Interfaces to models, storage, clocks, and external tools
-src/eidos/application/ Simulation use cases
-src/eidos/adapters/  SQLite, stand-in performers, HTTP server, and browser assets
-tests/               Executable architecture and domain expectations
-```
+## Contents
 
-## Current milestone
+- [What his life is like](#what-his-life-is-like)
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [Using real language models](#using-real-language-models)
+- [Connecting him to the real world](#connecting-him-to-the-real-world)
+- [How it works](#how-it-works)
+- [Working with worlds](#working-with-worlds)
+- [Development](#development)
+- [Documentation](#documentation)
+- [Status and boundaries](#status-and-boundaries)
 
-The local prototype has six connected views: Observatory, World, Conversation,
-Memory Archive, Plans & Time, and Ensemble. A background clock runs routines,
-Pathos encounters, resident-to-resident conversations, thoughts, weather, memory formation, reflection, dreams, projects,
-scheduled activities, and a factual daybook. All eight narrative performers plus
-Moira's two structured world proposers plus structured Pathos activity, multi-step
-project, resident agency, and private resident-history generation can use
-deterministic stand-ins or a real compatible model endpoint. The continuity critic
-performs schema and factual-memory source checks,
-not general contradiction detection. Stand-ins remain the offline default.
-The resident world uses video-game-like cognitive levels of detail. Persistent people
-continue cheaply in the background, gain local simulation when routes bring them near
-Pathos, and gain focused generative cognition through co-presence, attention, or an
-active scene. A catalog entry is not knowledge: Pathos can plan around and recall a
-person only after direct encounter or Pathos-owned memory evidence. Newly generated
-people materialize at their first meeting rather than being silently authored offscreen.
-Pathos can experience rare, bounded bouts of ordinary physical discomfort. These are
-explicitly non-clinical, recover within one to three simulated days, and can change
-his attention, mood, pace, plans, willingness to host a visit and response time. The
-Observatory shows the active condition and reduced physical capacity when present.
-The home also accumulates bounded dishes, laundry, tidying and paperwork from actual
-living. These loads can attract attention and occasionally replace free time with a
-completed household task, while plans and the authored opening remain protected.
-Live visits now consume five to fifteen simulated minutes per accepted exchange.
-Approaching routines or appointments appear as visible time pressure; crossing their
-time can make Pathos leave or expose the conversation to the same calls, visitors,
-deliveries, and incidents as the rest of his life. Queued texts wait while he is busy.
-Repeated voluntary choices can now form a small number of learned preferences only
-after evidence spans at least a simulated week. Those preferences influence later
-activity and project proposals, appear in the Observatory, and fade only after long
-behavioral disuse; generated prose cannot rewrite personality directly.
-Behavioral traits move even more slowly: five resolved outcomes across at least a
-month can nudge one tendency by one percentage point, with hard drift and cadence
-limits. Conversation, activity, and project performers receive the resulting identity
-context, while replay verifies every cited source.
-Repeated encounters on distinct remembered days can also become a fallible semantic
-expectation, such as expecting someone at a familiar place. The expectation keeps its
-episodic sources and revisions, follows Pathos's subjective memory when attribution
-drifts, and may influence what he says or plans without becoming proof that the person
-is actually there.
-Repeated successes and failures can similarly form a cautious autobiographical view
-of his recent follow-through. That self-view is evidence-bound, confidence-weighted,
-revisable, and distinct from both his stable values and slow behavioral traits.
-Repeated voluntary activities can also become contextual rhythms tied to an activity,
-place, and part of day. These habits are soft influences rather than appointments:
-they strengthen only from new lived repetitions, lapse after prolonged disuse, and can
-return without forcing Pathos to repeat the same routine. Recent voluntary choices are
-also shown to the agency model, and an extremely overused activity/place/company pattern
-is rejected until time or meaningful variation makes it fresh again.
-Patrick also develops a self of his own. Sustained tension between what he values and
-how he actually lives, a value he has stopped living, or one he is thriving in, opens a
-private question about himself. Evening reflections return to it, and only after several
-revisits across days may he reach an insight in his own words. A validated insight can
-nudge a value by one small bounded step and crystallise a hoped-for or feared possible
-self, which then pulls gently on what he chooses to do. Turning points become named life
-chapters. The **Becoming** view shows all of it. See [selfhood](docs/SELFHOOD.md).
-His days have an ordinary shape. He accepted a part-time arrangement with Ellis, so a
-week-ahead rota of workshop shifts books his time and pays for hours actually worked, and
-Ellis keeps those hours too. He heads home before his chosen bedtime, at closing time or
-after idle lingering, sleeps at home, and wakes refreshed; energy and company now rise and
-fall through the day and week. Groceries are a weekly shop he can afford. He comes to want
-ordinary things that fit who he is (a film camera, a block plane, a cookbook), saves for
-them with a cushion left over, and uses what he buys.
-See [local model testing](docs/LOCAL_MODELS.md) for setup and known limitations.
-The model benchmark now reports a seven-case reviewed coverage pass across factual
-state changes, private knowledge, dreams, relationship perspective, prompt pressure,
-future commitments, structured activities, resident plans, and multi-step projects.
-Accepted neighborhood events now remain as replayable world threads: they progress,
-sometimes continue for two more days, and resolve instead of disappearing after one
-feed item. Only co-present actors perceive later stages, and the World view shows the
-operator what is still unfolding without making Pathos omniscient.
-After the user has started a relationship, they may opt in to occasional messages
-initiated by Pathos. Outreach stays inside the local app, is grounded in one real
-Pathos-owned memory, waits while he owes a reply or is in a live visit, observes
-22:00–08:00 quiet hours and a 72-hour minimum interval, and can be disabled instantly.
-Generated absence, guilt, or dependency pressure is rejected rather than delivered.
-The first completed meaningful interaction with each person also establishes a
-source-linked private date. Its annual return becomes a factual memory and may make
-room for an ordinary, consent-respecting NPC follow-up; dates involving the user never
-create external contact.
-Pathos also retains explicit first-person likes and dislikes from the user and
-structured NPC self-reports. Corrections remain in the event history, stale preferences
-become visibly uncertain, and held place preferences can shape later invitations.
-Apologies now open durable relationship-repair attempts rather than standing in for
-forgiveness. Later direct contact can soften Pathos's tension in three small capped
-steps without restoring trust automatically; inactivity makes the attempt dormant,
-and both the UI and dialogue context keep the other person's response unknown.
-SQLite stores atomic event batches and rebuilds
-state on restart. See the
-[creative direction](docs/CREATIVE_DIRECTION.md), [roadmap](docs/ROADMAP.md),
-and [architecture](docs/ARCHITECTURE.md).
+## What his life is like
 
-## Planning the complete experience
+Patrick isn't a chatbot with a backstory. He is a simulation that runs hour by hour, and
+his personality is the sum of what he has lived. After a simulated year or two he has:
 
-The [master roadmap](docs/ROADMAP.md) sets the dependency order and acceptance
-milestones. The [feature inventory](docs/FEATURES.md) separates implemented,
-partial, planned and optional capabilities. The
-[system interaction specification](docs/SYSTEM_INTERACTIONS.md) explains how
-memories, emotion, relationships, plans, dreams and world events influence one
-another without confusing character beliefs with historical truth.
+**A town and the people in it**
+- A real map of Alderwick: the café, the Crown & Anchor, the market, the river, the
+  workshop. Places are discovered by going to them.
+- About 8,500 townspeople who exist latently and are met one at a time: a face he keeps
+  seeing becomes a name, then a regular he chats to, and sometimes someone he swaps
+  numbers with.
+- Weekly happenings (quiz night, the repair café, film club, the Saturday market), and
+  local rows he forms opinions about, like the old mill flats or cutting the 12 bus.
 
-## Development
+**Friendships that behave like friendships**
+- Depth from 1 to 12, following "12 Levels of Friendship". Close friends stay close through
+  months of silence; newer friendships fade if they aren't kept up.
+- Friends have lives of their own: new jobs, partners, babies, parents who fall ill,
+  weddings he's invited to, and moves to other cities. After that they're a phone call and
+  an occasional weekend visit away.
+- Birthdays remembered (or forgotten and apologised for), running jokes that come back
+  weeks later, falling-outs that are usually mended.
 
-Create and verify a consistent backup while the world database is in use:
+**Family, love and home**
+- His mum rings on Sundays, and his brother Tom posts in the family chat. He goes home to
+  Wye for Easter, the August bank holiday and Christmas. Once, Dad has a heart scare.
+- Romance is rare, slow and uncertain: crushes that fade unspoken, a friend setting him up,
+  dates, and relationships that last or don't. His orientation is left open.
+- He moves flat when he can afford to, sometimes gets a cat, and keeps killing houseplants.
+
+**Work, money and the body**
+- A part-time job with Ellis that can become running the workshop. The rota books his
+  shifts and pays for hours actually worked.
+- A real ledger: rent, food, the coffee at the café, a round at the Crown, the phone bill,
+  presents, a week away in August. He gets careful when money is tight.
+- Tiredness, colds, small injuries at the bench, hangovers, fitness that follows how much
+  he walks, a dentist appointment he keeps putting off, and nights lying awake worrying.
+
+**An inner life**
+- Emotion sampled every hour, memories with fallible recall, dreams, evening reflections,
+  habits and tastes learned from experience, and values that drift slowly with how he
+  lives.
+- Questions about himself that he returns to until he reaches an insight, and named
+  chapters of his life ("Letting people in", "Learning to finish things").
+- Memories that come back on their own: a place, an anniversary, a friend who moved away.
+
+**You, in his life**
+- He remembers things about your life (only what you actually said) and asks how they went.
+- When something big needs deciding (the workshop, moving flat, someone he likes), he asks
+  what you think, and your view weighs in without deciding for him.
+- He can say he's "fine" when he isn't, and own up next time. How honest he is depends on
+  how close you are.
+- If you let him, he messages you first now and then, within quiet hours and never with
+  guilt or pressure.
+
+The full catalogue is in [docs/LIFE.md](docs/LIFE.md), [docs/SELFHOOD.md](docs/SELFHOOD.md)
+and [docs/FEATURES.md](docs/FEATURES.md).
+
+## Screenshots
+
+| | |
+|---|---|
+| ![World view: the map of Alderwick](docs/screenshots/world.png) | ![Becoming: who he is turning into](docs/screenshots/becoming.png) |
+| **World.** Where everyone is, what's on this week, and the townsfolk he knows. | **Becoming.** His values, open questions, chapters, people, family, work, love and home. |
+| ![Conversation with Patrick](docs/screenshots/conversation.png) | ![Memory archive](docs/screenshots/memories.png) |
+| **Conversation.** Messages he answers when he's free, or a live visit. | **Memories.** What he remembers, how sure he is, and what has faded. |
+
+The operator view (`/operator`) adds plans and time, the engine, private resident state
+and model traces:
+
+![Operator: plans and time](docs/screenshots/plans.png)
+
+## Quick start
+
+Python 3.12 or newer.
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 backup --output backups/eidos.sqlite3
-PYTHONPATH=src .venv/bin/python -m eidos verify-backup --input backups/eidos.sqlite3
-```
-
-Backup creation refuses to overwrite an existing file. A verified backup can be
-opened directly with `--database` to prove that the event history replays before
-it is promoted during a recovery.
-
-Fork a named experiment before changing a model route or prompt, run that database
-independently, and compare both lives from their shared history anchor:
-
-```bash
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 experiment-create --output experiments/warmer-reflection.sqlite3 --name "Warmer reflection" --purpose "Compare relationship continuity" --profile reflection-v2
-PYTHONPATH=src .venv/bin/python -m eidos experiment-inspect --input experiments/warmer-reflection.sqlite3
-PYTHONPATH=src .venv/bin/python -m eidos --database experiments/warmer-reflection.sqlite3 advance --hours 24
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 experiment-compare --input experiments/warmer-reflection.sqlite3
-```
-
-An experiment carries the complete accepted life and its disposable projections,
-but starts with an empty cognition queue so it cannot inherit unfinished or cached
-model work. Provenance includes a checksummed fork anchor. Comparison reports what
-each life added plus an evidence review of social variety, emotion, agency, dreams,
-world events, model failures and exact narrative repetition. It deliberately avoids
-a misleading single "human-ness" score and never merges or rewrites the canonical
-database.
-
-Import the bundled first world-pack release when you want Eidos's canonical world
-to gain a reading room, Imani Cole, and a community radio:
-
-```bash
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/canal-quarter-v1.json
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 world-pack-import --input world_packs/canal-quarter-v2.json
-```
-
-World packs are strict, additive JSON releases. Places must be declared before pack
-entities that live there. Every entity passes the ordinary collision, route, opening
-hours and provenance rules; one invalid entity rejects the whole pack. Reimporting an
-unchanged release is safe, while rewriting or skipping a published version is refused.
-Schema-v2 releases may also add resident-private biography. These facts remain visible
-only in the local operator lens until familiarity makes one eligible during the
-resident's actual conversation turn; only the spoken turn becomes Pathos's memory.
-People invented by Moira receive the same kind of three-stage private history from a
-separate schema-checked model proposal. Invalid history remains an audited quiet gap,
-with at most three daily attempts, rather than becoming an improvised fact.
-Residents can also pass an owned belief through an actual scene turn. The listener
-stores discounted testimony rather than world truth; private speech reaches only its
-audience, while public speech reaches only actors projected at that place.
-Emotion samples can retain opposed recent appraisals as a source-linked secondary
-feeling instead of collapsing everything to one label. Mixed feeling slows initiative
-and risk slightly. Bounded coping attempts may lower arousal or protect sleep, but do
-not manufacture happiness or erase sadness.
-Hunger now accumulates as bodily pressure across waking and sleep. Breakfast, lunch,
-an evening meal, or an occasional urgent snack happens only while Pathos is awake and
-unoccupied; conversations and incidents can delay eating within a flexible window.
-Meals reduce hunger, restore bounded energy, inform somatic attention and leave
-replayable evidence rather than relying on routine narration alone. Meals away from
-the café consume an owned, finite household provision; low stock enters the existing
-replenishment and missed-delivery lifecycle. Café service is identified explicitly,
-and a replayable GBP household ledger now charges it. Actual weekday workshop evidence
-earns bounded income; provision orders cost money, failed deliveries refund only a
-prior charge, and weekly housing costs are paid or explicitly missed without overdraft.
-The available margin informs later agency proposals, while model narration itself
-still cannot spend money.
-
-Downtime is never simulated automatically. To preview and explicitly run a bounded
-catch-up (maximum seven days), resume one interrupted between atomic chunks, or
-cancel it at its last committed checkpoint:
-
-```bash
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 catch-up --hours 48
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 resume-catch-up
-PYTHONPATH=src .venv/bin/python -m eidos --database data/observatory.sqlite3 cancel-catch-up
-```
-
-Python 3.12 or newer is required. With mise installed:
-
-```bash
-mise trust
-mise exec -- python -m venv .venv
-.venv/bin/python -m pip install -e .
+git clone https://github.com/opisaac9001/eidos.git
+cd eidos
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
 PYTHONPATH=src .venv/bin/eidos serve
 ```
 
-Open **http://127.0.0.1:8765**. A new browser world starts at 08:00 on its first
-day, paused. Click **Resume world**, choose a speed, or step one hour. One clock
-tick occurs every three seconds and advances 5, 15, or 60 simulated minutes.
+Open **http://127.0.0.1:8765**. A new world starts at 08:00 on 1 January 2026, paused.
+Click **Resume world**, choose a speed, or step an hour. `serve` also prints an
+`/operator?token=…` link for the operator view; set `EIDOS_OPERATOR_TOKEN` to keep it stable.
 
-The browser can close while the server continues running. Stopping the server
-stops the clock; starting it again restores history and pauses for explicit
-resume. No offline catch-up occurs. Press Ctrl+C in the terminal to stop.
+On macOS you can instead run `./run.command`, which serves `data/observatory.sqlite3` (set
+`EIDOS_DATABASE` to choose another file, `--port` to change the port).
 
-Alternatively, run `./run.command` from the repository. It uses the existing
-virtual environment and loads source directly, including on Macs that hide
-editable-install path files. It restores `data/observatory.sqlite3` by default;
-set `EIDOS_DATABASE` to select another file. Override the port with
-`./run.command --port 8766`.
-
-The command line and browser share one application engine:
+To add the town of Alderwick to a fresh world, import its world packs:
 
 ```bash
-PYTHONPATH=src .venv/bin/eidos status
-PYTHONPATH=src .venv/bin/eidos advance --hours 24
-PYTHONPATH=src .venv/bin/eidos journal
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 world-pack-import --input world_packs/city-life-v1.json
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 world-pack-import --input world_packs/alderwick-v1.json
 ```
 
-Commands default to `data/eidos.sqlite3`. Use `eidos --database PATH ...` to
-create independent worlds. Manual advances are bounded to 24 hours. The seed
-calendar begins January 1, 2026, UTC. The preview built during development uses
-`data/observatory.sqlite3`; run it again with
-`PYTHONPATH=src .venv/bin/eidos --database data/observatory.sqlite3 serve`.
+The command line uses the same engine as the browser:
 
-An optional real-town inspiration layer can be enabled with a British town name and
-coordinates. It reads current weather and daylight from Open-Meteo once each simulated
-morning. An optional credential-free HTTPS RSS feed adds local headlines:
+```bash
+PYTHONPATH=src .venv/bin/eidos status             # where he is, how he is
+PYTHONPATH=src .venv/bin/eidos advance --hours 24 # live a day (at most 24 hours at a time)
+PYTHONPATH=src .venv/bin/eidos journal            # his autobiographical record
+```
+
+## Using real language models
+
+Offline, Eidos uses deterministic stand-ins (written templates), which are fine for
+exploring the simulation but not for talking to him properly. For that, point it at any
+OpenAI-compatible chat-completions server that supports JSON-schema responses:
+
+```bash
+export EIDOS_MODEL_BASE_URL=http://127.0.0.1:11434/v1   # Ollama; LM Studio is :1234/v1
+export EIDOS_MODEL_NAME=your-model
+PYTHONPATH=src .venv/bin/eidos probe-model              # tests every role he uses
+PYTHONPATH=src .venv/bin/eidos serve
+```
+
+`EIDOS_MODEL_API_KEY` supplies a key for an authenticated endpoint. To use different
+models for different roles (a strong model for conversation, a cheaper one for background
+work), point `EIDOS_MODEL_ROUTES_FILE` at a JSON routing file. See
+[docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+
+Models play named roles: his voice and inner monologue, the world director (Moira), dreams,
+reflection, his daily agency and projects, residents' private plans, what he learns about
+you, his take on the news, and more. Every structured proposal is schema-checked and
+validated against the world before anything happens; a rejected proposal leaves a visible
+trace, never a silent fallback.
+
+## Connecting him to the real world
+
+Both options are opt-in; without them the world is fully offline.
+
+**Real news.** He reads the real headlines at breakfast and in the evening, forms his own
+take, and can discuss them. Stories that matter move his mood, price rises nudge his
+spending, and he says so if you mention something he hasn't seen.
+
+```bash
+export EIDOS_NEWS=on    # the BBC's public feeds (front page, UK, world, business, science, culture, sport)
+# or your own:
+export EIDOS_NEWS_FEEDS="top=https://feeds.bbci.co.uk/news/rss.xml,world=https://www.theguardian.com/world/rss"
+```
+
+**A real town's weather.** Current weather and daylight for a British town (from
+Open-Meteo), plus an optional local news feed. When his world runs live, the real sky over
+that town becomes his weather.
 
 ```bash
 export EIDOS_TOWN_NAME=Frome
 export EIDOS_TOWN_LATITUDE=51.2308
 export EIDOS_TOWN_LONGITUDE=-2.3201
-export EIDOS_TOWN_NEWS_RSS_URL=https://example.org/local-news.xml
+export EIDOS_TOWN_NEWS_RSS_URL=https://example.org/local-news.xml   # optional
 ```
 
-These attributed, expiring reports are visible in the observatory and may inspire a
-Moira proposal. When his world runs live (the web server) or his simulated day is today,
-the real weather over that town becomes his weather; otherwise they never change the
-fictional world's facts. Omit all four variables for a fully offline world; the RSS
-variable is optional.
+A world running live on the web server hears today's news whatever its calendar says. A
+fast simulation only does if its date is within a few days of today.
 
-Patrick can also follow the real news. With `EIDOS_NEWS=on` he reads the BBC's public RSS
-feeds (front page, UK, world, business, science, culture, sport) at breakfast and in the
-evening:
+## How it works
 
-```bash
-export EIDOS_NEWS=on
-# or choose feeds yourself:
-export EIDOS_NEWS_FEEDS="top=https://feeds.bbci.co.uk/news/rss.xml,world=https://www.theguardian.com/world/rss"
+- **The simulation owns truth.** Language models propose thoughts, speech, plans and world
+  events. Deterministic rules check consent, custody, money, schedules, opening hours,
+  travel time and plausibility before anything becomes real.
+- **Everything is an event.** Every change is appended to an event log in SQLite. State is
+  a replayable fold of that history, so any moment can be inspected, replayed or forked.
+- **One life, many systems.** Hour by hour the engine runs the clock, the world, his body,
+  his agency, work and money, friends and family, perception, conversation, memory,
+  emotion and reflection. Each is a small module with its own tests.
+- **Knowledge is earned.** A person in the world catalogue isn't someone he knows until he
+  has met them. What residents say is testimony, not truth, and his memories can drift.
+- **Model-agnostic.** One typed gateway connects every role to local or hosted inference.
+
+```text
+src/eidos/domain/       rules and state: events, folds, validation
+src/eidos/application/  his life: one module per system (friendship, romance, spending, ...)
+src/eidos/adapters/     SQLite, model gateways, stand-ins, feeds, the web server and UI
+src/eidos/ports/        interfaces to models, storage and the outside world
+world_packs/            the town of Alderwick and other additive world releases
+docs/                   design, architecture, decisions and the life catalogue
+tests/                  about 1,100 tests: domain rules, systems, and multi-day lives
 ```
 
-He takes in a few stories and forms his own take (the `pathos_news_take` role). Stories that
-matter move his mood a little, price rises nudge up his spending, and he can discuss real
-events in conversation, knowing only what was reported. News reaches a live world
-whatever its calendar says, but a fast simulation only if its date is within a few days of
-today. See `docs/LIFE.md`.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/SYSTEM_INTERACTIONS.md](docs/SYSTEM_INTERACTIONS.md).
 
-## Verify
+## Working with worlds
 
 ```bash
-.venv/bin/python -m pip install -e '.[dev]'
+# A verified online backup, and checking one
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 backup --output backups/eidos.sqlite3
+PYTHONPATH=src .venv/bin/eidos verify-backup --input backups/eidos.sqlite3
+
+# Fork a world to try a different model or prompt, then compare the two lives
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 experiment-create --output experiments/try.sqlite3 --name "Try" --purpose "Compare" --profile reflection-v2
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 experiment-compare --input experiments/try.sqlite3
+
+# Catch up after downtime, explicitly (at most seven days)
+PYTHONPATH=src .venv/bin/eidos --database data/eidos.sqlite3 catch-up --hours 48
+```
+
+Downtime is never simulated automatically. When the server stops, his clock stops, and
+restarting restores his history paused. World packs are strict, additive JSON releases,
+and an invalid entity rejects the whole pack.
+
+## Development
+
+```bash
 .venv/bin/python -m pytest -q
+.venv/bin/python -m mypy src
 .venv/bin/ruff check src tests
 .venv/bin/ruff format --check src tests
 ```
 
-No Node runtime is needed to serve the UI. The browser assets ship in the Python
-wheel and use no CDN, external fonts, or frontend build pipeline.
+The UI ships inside the Python package. There's no Node runtime, build step, CDN or
+external font. Changes to event handling follow a replay contract: validation for existing
+event kinds is never tightened, so old histories always replay. See
+[docs/UPGRADE_EVOLVE_TRUE_SELF.md](docs/UPGRADE_EVOLVE_TRUE_SELF.md) for what each release
+changes and how to roll back.
 
-The ordinary observatory at `/` is read-only except for messages and live-visit
-requests. Local maintenance controls, private NPC state, model traces, and durable-job
-cancellation are rendered at `/operator`. The server enforces this for the controls that
-change time or expose private history (clock, step, catch-up, event history, export, job
-cancellation): they require the operator token. `serve` prints a ready-to-open
-`/operator?token=…` link at startup; set `EIDOS_OPERATOR_TOKEN` (on the Dell, in
-`/etc/eidos/operator.env`) to keep it stable across restarts. Private NPC state and model
-traces are still present in `/api/state` and only hidden by the page, and the server still
-binds to loopback only, so it is not yet ready for direct network exposure.
+## Documentation
 
-## Prototype boundaries
+| Document | What's in it |
+|---|---|
+| [LIFE.md](docs/LIFE.md) | Everything in his life, system by system |
+| [SELFHOOD.md](docs/SELFHOOD.md) | Values, questions, insights, chapters, tastes, friendship depth |
+| [PATRICK_SHAW.md](docs/PATRICK_SHAW.md) | Who Patrick is: his background and voice |
+| [ALDERWICK.md](docs/ALDERWICK.md) | The town, its districts and its latent population |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Events, folds, ports and the gateway |
+| [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | Running with real models and routing roles |
+| [OUTREACH.md](docs/OUTREACH.md) | When and how he messages you first |
+| [CREATIVE_DIRECTION.md](docs/CREATIVE_DIRECTION.md) | Tone, taste and what the world should feel like |
+| [ROADMAP.md](docs/ROADMAP.md), [FEATURES.md](docs/FEATURES.md) | What's built, partial and planned |
+| [UPGRADE_EVOLVE_TRUE_SELF.md](docs/UPGRADE_EVOLVE_TRUE_SELF.md) | Upgrade notes and rollback limits |
 
-- The application runs locally; real inference has been tested on the small lab
-  server. Dell deployment remains pending.
-- Offline chat uses templates; model mode uses the configured HTTP endpoint and
-  recent memories. The lab model's semantic reliability is limited. Failure,
-  source-archive recovery and stand-in states are visible.
-- Local inference can use one endpoint/model or an untracked strict routing file that
-  assigns Pathos, Murmur, Firmament, weather, memory, reflection, dreams, daybook,
-  Pathos's activity agency, private resident plans and histories, and Moira's two world-building capabilities independently. Inline secrets and incomplete
-  no-default route maps are rejected; routing never bypasses validation or provenance.
-- The browser is functional. Messages now enter a persistent inbox and show as
-  delivered until a replay-stable, availability-aware response time arrives; sleep
-  and existing scenes can defer a reply. When Pathos is available, the user can begin
-  a private live visit with immediate alternating replies, leave voluntarily, or be
-  interrupted when his next scheduled departure, an answered phone call, or a visitor
-  at the door arrives.
-  Connection-goal-sourced calls can be answered or declined; declined calls create a
-  durable callback that waits for a free waking interval. Connection goals can also
-  produce next-day visits: Pathos may miss, defer, or admit the visitor based on his
-  location, energy, emotion, and relationship with them. An admitted visitor is
-  physically present, blocks new visits, and leaves before a paused user conversation
-  may resume. Public events Pathos actually witnesses can also cause a later
-  neighborhood parcel. Deliveries have two attempts, can be missed or returned, and
-  become physical owned objects only after a completed door handoff. Simulation
-  controls remain operator-facing. Higher-intensity or plainly hazardous public
-  incidents that Pathos directly witnesses can demand a separate respond/decline
-  choice, displace routine and appointments for a bounded interval, interrupt a live
-  visit, and leave a source-linked memory and emotional aftermath. Co-present people
-  share that aftermath, which can change the relationship and create a later follow-up;
-  a suitable undamaged object is used only when it already exists at the incident site.
-- NPC movement, needs, private activity, public-event perception, private beliefs,
-  relationship metrics, and private goals formed from each neighbor's own perceived
-  events or changing needs persist by replay. After the authored opening, residents
-  propose open-vocabulary private plans from only their own needs, identity, perceptions,
-  and public places; rejected proposals remain private audited failures. Pathos completes a causal promise/repair
-  story and a resource-backed personal
-  project. Pathos can also originate open-vocabulary ordinary activities from current
-  needs, emotion, values, memories, people, places, objects, and free time. The model
-  supplies meaning, not authority: the planner checks
-  consent, custody, terms, resources, schedules, open hours, travel buffers,
-  abandonment, and renegotiation. Accepted ideas remain intentions and calendar entries
-  until the normal action path completes them; unavailable companions can make them fail.
-  He can also originate a two-to-four-step project spanning several days. Every step is
-  scheduled atomically, advances one bounded share of the goal only after real execution,
-  and a blocked required step explicitly fails and closes the remaining project plan.
-- A typed social-scene lifecycle enforces co-presence, alternating turns, topic state,
-  a hard turn budget, voluntary exits, sourced interruptions, and observer-owned
-  memories. Integrated two- and four-turn scenes request performer-generated dialogue;
-  the longer exchange pauses for a sourced world incident and resumes a day later with
-  its topic and turn order intact. Both use explicit audited authored fallbacks when
-  generation fails.
-- A calm sixteen-week neighborhood pack rotates seed swaps, repair tables, shared tea,
-  sketch walks, reading, nature, mending, cooking, play, reuse, and neighborhood care
-  with explicit lead time and cooldowns. Only co-present residents
-  perceive each occurrence, which gives Mara, Ellis, and Rowan distinct evidence for
-  their own private plans during the month soak. Each event requires a persistent
-  physical community resource at the right place and is cancelled if it becomes
-  unavailable. Existing four-resource worlds receive only the twelve missing objects
-  during the version-two upgrade.
-- Moira also proposes open-ended event types every few days rather than selecting from
-  that pack. Each proposal must name a currently usable, non-depleted object at the same
-  known place and supply cause, lead time, duration, participation, stakes, theme, and
-  opportunity metadata. Cross-field novelty is scored against recent events. Passing
-  proposals enter the ordinary scheduled-event lifecycle; invalid output produces a
-  visible quiet interval, and later resource loss cancels rather than invents the event.
-  If the optional British-town adapter is configured, Moira can explicitly link one
-  source-attributed, expiring weather/daylight/news signal as inspiration. The report
-  remains non-authoritative external context; only the separately validated scheduled
-  fiction can later occur through ordinary perception.
-- The seed cast and map are no longer hard ceilings. Rare Moira expansion proposals
-  can register a new person, useful object, or connected place after strict identity,
-  collision, location, route, hours, and layout checks. Existing databases project
-  the original world unchanged; accepted additions are ordinary replayable events.
-  Pathos independently weighs whether a newly introduced useful object fits his
-  curiosity, capability, and values. If it does, he schedules two feasible visits,
-  must physically reach the shared object while it remains usable, and learns through
-  ordinary validated actions; he may also decline, or explicitly abandon the project
-  when access fails. A neighbor who is genuinely co-present may independently join or
-  decline that practical activity. Joining creates shared relationship evidence and a
-  later follow-up; merely being named in narration does not. Two completed uses expose
-  physical wear, make the object temporarily unusable, and create a feasible inspection
-  and maintenance choice. Eidos may retire it rather than silently committing to repair.
-  If he tries, he must remain at the site through the repair interval, and the attempt
-  can still fail against his present mastery; only success makes the object usable again.
-  After retirement or failed repair, he may live without it, seek a compatible loan,
-  or order a replacement. Loans require owner/object/Pathos co-presence, independent
-  owner consent, Pathos's acceptance, custody tracking, and eventual co-present return.
-  Replacements have two fallible handoffs and arrive under a new identity while the
-  original remains broken or retired. A loan becomes useful only if two real sessions
-  fit before its return date; otherwise Eidos explicitly skips the project. Late returns
-  create remembered trust and tension consequences once, but remain returnable later.
-  Received replacements enter the same pursue-or-decline project choice as new objects.
-- Delivered seeds, repair materials, drawing paper, and tea are finite stocks rather
-  than decorative names. Pathos may use or save one when awake and co-located with it.
-  Low stock produces an explicit order-or-go-without choice; an order has a delayed
-  physical handoff, one retry, and can be received or cancelled after two misses. The
-  observatory shows remaining quantities, and depleted resources cannot satisfy plans.
-- After the authored six-day acceptance story, replay-stable weekday and weekend
-  palettes combine dozens of ordinary activities instead of repeating one daily
-  script. Emotional initiative and social openness can bend optional outings toward
-  restorative solitude or company while leaving obligations intact.
-- The simulation calendar records season transitions as replayable world facts and
-  exposes the current season beside weather; it does not depend on generated prose.
-- Every simulated hour samples a named, persistent emotional state and advances
-  somatic awareness, affect, attention, and association. Emotional valence, arousal,
-  intensity, and duration bias social capacity and planning style without bypassing
-  feasibility or consent. Prolonged low mood is represented as a lived pattern, never
-  as an automatic clinical diagnosis. Awake
-  conditions also activate deliberative and social layers; evening reflection and
-  sleeping dream layers have distinct cadences. These replayable pulses guide model
-  context but have no authority to become memories or actions by themselves.
-- Memories have provenance, importance, diversified term/entity/goal/relationship
-  recall, replay-derived emotional encoding, accessibility/detail fading, capped
-  rehearsal, and source-linked consolidation. Mood-congruent recall, bounded
-  subjective drift, and source-linked blending make recollection intentionally
-  fallible without editing historical facts. Repeated source confusion can make a
-  blended, inaccurate recollection feel vivid and highly certain; that felt certainty
-  guides Pathos's speech, thought, activities, and plans while source confidence stays
-  visible only to the operator. Explicit user reminders are retained as causal events
-  and strengthen accessibility within a separate cap without duplicating the original
-  experience or repairing subjective drift.
-  A highly certain familiarity-based false memory does not collapse after one
-  contradiction: the first direct conflict is recorded as resistance, and independent
-  direct corroboration is required before the subjective recollection is corrected.
-  Similar traces may also exchange their remembered person, place, or date. Perceived
-  age, recall, and model context follow Pathos's subjective words, time, and attribution,
-  while the original terms, timestamp, and entity links stay available only in the
-  operator audit.
-  Newer direct structured evidence can correct a drifted claim while preserving both
-  the mistaken version and its correction trail. The recall maps are maintained as a
-  versioned, checksummed, event-anchored projection that can be discarded and rebuilt
-  safely. Existing databases migrate in place without rewriting events. Vector retrieval remains
-  optional and unimplemented. A monthly bounded retention review moves cold ordinary
-  memories out of background context after 180 simulated days while preserving every
-  source event; important/recently accessed memories stay active, direct cues can
-  resurface the cold archive, and the archive remains visible to the operator.
-- The server is loopback-only. Authentication and hardened LAN deployment belong
-  to the server installation phase.
-- Full-history replay passes restart-spanning seven-day acceptance and thirty-day
-  offline soak gates. Event history has stable revision pagination and a checksummed,
-  event-anchored core-state checkpoint; memory retention also has a deterministic
-  two-year policy soak. Longer deployments still need broader materialized indexes and
-  physical event-log retention policy. Verified online backups and supervised
-  durable model workers are implemented.
-- Export history downloads the entire event log, including conversations.
+## Status and boundaries
 
-Original code: `git show main:eidos/README.md`. The rebuild does not import the
-legacy packages. Both histories are available locally; no push is needed to run.
+- **It's a prototype for one person's machine.** The server binds to loopback only.
+  Private resident state and model traces are hidden in the ordinary view but still
+  present in `/api/state`, so don't expose it to a network.
+- **The stand-ins are templates.** Conversation quality depends on the model you connect,
+  and smaller models struggle with some structured roles (they're rejected safely).
+- **Long lives get slower.** A simulated day costs well under a second early on and several
+  seconds after a couple of simulated years. Live, in real time, that doesn't matter; long
+  fast-forward runs take a while.
+- **Export includes everything.** The full event log, including conversations, is in any
+  export or backup.
+
+The original 2025 implementation of Eidos is preserved on the `legacy-2025` branch and tag.
