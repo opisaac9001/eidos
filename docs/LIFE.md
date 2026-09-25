@@ -110,6 +110,8 @@ He remembers when something sets it off, not only when asked. There are three tr
 - **An anniversary:** a year (or two, or three) to the day since something important, he
   remembers it in the evening.
 - **Missing someone:** now and then he misses a close friend who has moved away.
+- **An evening with someone:** after time with a friend, something the two of them share
+  can come back.
 
 Only moments from his own story come back (family, friends, love, work, home; not routine or
 passing faces): at most one a day and two a week, and the same one not again for three
@@ -243,6 +245,26 @@ His friends' lives go on without him, and change his weeks.
 - **When it doesn't mend:** after three months they "don't really speak now". That
   friend stops inviting him or coming round, and the friendship fades with absence like
   any unkept one.
+
+## A week away (`application/holiday.py`)
+
+Ellis shuts the workshop Monday to Friday of the first full week of August, so there are no
+shifts that week.
+
+On the second Sunday in May, Patrick books a week away for the shutdown if he can afford it
+and still keep £400 behind him:
+- **Who with:** whoever he's properly together with; otherwise, more often than not, his
+  closest friend; otherwise on his own.
+- **Where:** a cottage near Coniston, a caravan in Pembrokeshire, a B&B in
+  Wells-next-the-Sea, or a flat in Lisbon.
+- **Cost:** about £520 alone, or £340 when shared.
+- **The week:** a stay away (`on_holiday`) with three moments he remembers.
+
+If money's tight he stays home and notices he didn't go.
+
+When there's money put by (sixteen weeks' rent or more), he's a little less careful. The
+weekly bits and bobs cost a quarter more, and once a month there's a treat: boots, a
+record, a takeaway and a film.
 
 ## Moving flat (`application/home_move.py`)
 

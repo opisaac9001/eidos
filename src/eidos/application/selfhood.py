@@ -24,6 +24,7 @@ from uuid import uuid4
 from eidos.application.body import body_context, body_patterns
 from eidos.application.evening_course import course_context
 from eidos.application.family import family_context
+from eidos.application.holiday import holiday_context
 from eidos.application.home_move import home_context
 from eidos.application.imperfection import imperfection_context
 from eidos.application.media import media_context
@@ -883,6 +884,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "money": money_context(history, simulated_at),
         "home": home_context(history),
         "evening_class": course_context(history),
+        "holiday": holiday_context(history, simulated_at),
         "body": body_context(history, simulated_at),
         "views_on_the_town": town_issues_context(history, simulated_at),
         "at_home": at_home_context(history),
@@ -1103,6 +1105,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "love_life": _love_life(history),
         "home": home_context(history),
         "evening_class": course_context(history),
+        "holiday": holiday_context(history, simulated_at),
         "body": body_context(history, simulated_at),
         "at_home": at_home_context(history),
         "his_usual": usual_context(history, simulated_at),

@@ -91,3 +91,35 @@ def test_routine_moments_do_not_come_back() -> None:
     )
     later = THEN + timedelta(days=60)
     assert run([routine], later.replace(hour=12), 24 * 10, location_id="crown-anchor") == []
+
+
+def test_an_evening_with_a_friend_brings_back_something_you_share() -> None:
+    shared = DomainEvent(
+        "memory.recorded",
+        "pathos",
+        {
+            "text": "Rowan and I got the tide wrong and had to wade back.",
+            "simulated_at": THEN.isoformat(),
+            "importance": 0.6,
+            "owner": "pathos",
+            "source": "lived-joke",
+            "person_id": "rowan",
+        },
+    )
+    output = []
+    for day in range(60, 200):
+        at = (THEN + timedelta(days=day)).replace(hour=22)
+        output += surfacing_events(
+            [shared, *output],
+            at,
+            awake=True,
+            location_id="home",
+            place_names={},
+            names={"rowan": "Rowan Price"},
+            away={},
+            depths={},
+            together=["rowan"],
+        )
+    together = [e for e in output if e.kind == "memory.surfaced"]
+    assert together and together[0].payload["trigger"] == "together"
+    assert together[0].payload["text"].startswith("Talking with Rowan")

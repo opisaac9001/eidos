@@ -96,6 +96,11 @@ def in_joke_events(
     return []
 
 
+def together_today(history: Sequence[DomainEvent], at: datetime) -> dict[str, str]:
+    """person -> where, for everyone he spent time talking with on ``at``'s day."""
+    return _together_today(history, at.date().isoformat())
+
+
 def _together_today(history: Sequence[DomainEvent], today: str) -> dict[str, str]:
     """person -> where, for everyone he spent time talking with today."""
     together: dict[str, str] = {}

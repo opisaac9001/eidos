@@ -70,6 +70,8 @@ from eidos.application.friends_lives import (
     friends_lives,
 )
 from eidos.application.friendship import friendships
+from eidos.application.holiday import PLACES as HOLIDAY_PLACES
+from eidos.application.holiday import holiday_events
 from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
 from eidos.application.home_move import home_move_events
 from eidos.application.household import (
@@ -80,7 +82,7 @@ from eidos.application.household import (
 )
 from eidos.application.imperfection import imperfection_events
 from eidos.application.in_jokes import HOUR as IN_JOKE_HOUR
-from eidos.application.in_jokes import in_joke_events
+from eidos.application.in_jokes import in_joke_events, together_today
 from eidos.application.inbound_invitations import (
     pathos_invitation_response_events,
     resident_invitation_events,
@@ -633,6 +635,7 @@ class Life(LifeConversation):
             self._phase_family(tick)
             self._phase_friends_lives(tick)
             self._phase_home(tick)
+            self._phase_holiday(tick)
             self._phase_course(tick)
             self._phase_falling_out(tick)
             self._phase_in_jokes(tick)
@@ -1653,7 +1656,9 @@ class Life(LifeConversation):
                 awake=tick.state.awake,
                 location_id=tick.state.location_id,
                 place_names={place.place_id: place.name for place in catalog.places.values()},
-                names=advice_names(history + pending) if away and current.hour == 19 else {},
+                names=advice_names(history + pending)
+                if (away and current.hour == 19) or current.hour == 22
+                else {},
                 away=away,
                 depths={
                     person: friendship.depth
@@ -1662,6 +1667,9 @@ class Life(LifeConversation):
                 }
                 if away
                 else {},
+                together=sorted(set(together_today(history + pending, current)) - {"user"})
+                if current.hour == 22
+                else (),
             ),
         )
 
@@ -1833,6 +1841,52 @@ class Life(LifeConversation):
                 worn_out=tick.state.rest < 0.3 or tick.state.valence < -0.3,
                 feeder=feeder,
             ),
+        )
+
+    def _phase_holiday(self, tick: _Tick) -> None:
+        """Booking a week away in May, and living it in August."""
+        if self.authored_scenario or not tick.state.awake:
+            return
+        current = tick.current
+        booking = current.month == 5 and current.weekday() == 6 and current.hour == 19
+        if not booking and tick.state.location_id not in HOLIDAY_PLACES:
+            return
+        history, pending = tick.history, tick.pending
+        catalog = self._world_catalog(history + pending)
+        names = advice_names(history + pending)
+        partner = friend = None
+        if booking:
+            arc = current_arc(history + pending)
+            if arc and arc[1] == "together":
+                partner = (arc[0], names.get(arc[0], arc[0].replace("-", " ").title()))
+            unavailable = busy_people(history + pending, current)
+            known = friendships(history + pending, current)
+            closest = max(
+                (
+                    person
+                    for person in known
+                    if person in catalog.people and person not in unavailable
+                ),
+                key=lambda person: known[person].depth,
+                default=None,
+            )
+            if closest is not None and known[closest].depth >= 6:
+                friend = (closest, names.get(closest, closest.title()))
+        self._extend_warmed(
+            tick,
+            holiday_events(
+                history + pending,
+                current,
+                catalog,
+                awake=tick.state.awake,
+                location_id=tick.state.location_id,
+                balance_pence=self._finances(history + pending).balance_pence,
+                rent_pence=weekly_housing_pence(history + pending),
+                partner=partner,
+                friend=friend,
+            ),
+            self._world_catalog,
+            self._planning,
         )
 
     def _phase_home(self, tick: _Tick) -> None:

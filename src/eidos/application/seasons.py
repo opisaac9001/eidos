@@ -91,9 +91,20 @@ def bank_holidays(year: int) -> dict[date, str]:
     return days
 
 
+def summer_shutdown(year: int) -> tuple[date, date]:
+    """Ellis shuts up shop Monday to Friday of the first full week of August."""
+    monday = next(date(year, 8, day) for day in range(1, 8) if date(year, 8, day).weekday() == 0)
+    return monday, monday + timedelta(days=4)
+
+
 def workshop_closed(day: date) -> bool:
-    """Bank holidays, and Christmas Eve to New Year."""
-    return day in bank_holidays(day.year) or (day.month == 12 and day.day >= 24)
+    """Bank holidays, Christmas Eve to New Year, and the August shutdown week."""
+    first, last = summer_shutdown(day.year)
+    return (
+        day in bank_holidays(day.year)
+        or (day.month == 12 and day.day >= 24)
+        or first <= day <= last
+    )
 
 
 def seasonal_events(

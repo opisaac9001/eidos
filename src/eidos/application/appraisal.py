@@ -527,6 +527,12 @@ def _effect(
             "made_up": ("connection", 0.06, 0.5, 0.35, 0.6),
             "drifted_apart": ("affect", 0.0, -0.3, 0.2, 0.5),
         }.get(str(event.payload.get("stage")))
+    if event.kind == "holiday.stage":
+        return {
+            "booked": ("affect", 0.0, 0.3, 0.4, 0.4),
+            "moment": ("affect", 0.0, 0.4, 0.3, 0.5),
+            "skipped": ("affect", 0.0, -0.15, 0.2, 0.6),
+        }.get(str(event.payload.get("stage")))
     if event.kind == "course.stage":
         return {
             "enrolled": ("curiosity", 0.04, 0.25, 0.4, 0.4),

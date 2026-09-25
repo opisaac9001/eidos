@@ -22,6 +22,7 @@ from typing import Sequence
 from eidos.application.body import body_costs
 from eidos.application.economy import WEEKLY_HOUSING_PENCE, weekly_housing_pence
 from eidos.application.evening_course import course_fee
+from eidos.application.holiday import holiday_costs
 from eidos.application.home_move import move_costs
 from eidos.application.small_touches import small_touches_costs
 from eidos.domain.events import DomainEvent
@@ -94,7 +95,7 @@ def spending_events(
     rent = weekly_housing_pence(history)
     candidates = [
         *_bills(at, awake),
-        *_bits(at, awake, tight=balance_pence < 2 * rent),
+        *_bits(at, awake, tight=balance_pence < 2 * rent, comfortable=balance_pence >= 16 * rent),
         *_at_place(history, at, awake, location_id),
         *_gifts(history, at),
         *_for_friends(history, at),
@@ -113,6 +114,10 @@ def spending_events(
         *(
             (spend_id, "everyday", cost, text, True)
             for spend_id, cost, text in small_touches_costs(history, at, awake=awake)
+        ),
+        *(
+            (spend_id, "travel", cost, text, True)
+            for spend_id, cost, text in holiday_costs(history, at)
         ),
         *_christmas(history, at, awake, location_id),
         *_trips_home(history, at),
@@ -151,7 +156,18 @@ def _bills(at: datetime, awake: bool) -> list[_Candidate]:
     return [(f"phone-{at.year}-{at.month:02d}", "bills", PHONE_BILL_PENCE, "Phone bill", True)]
 
 
-def _bits(at: datetime, awake: bool, *, tight: bool = False) -> list[_Candidate]:
+TREATS = (
+    "Treated myself to a proper pair of boots. My old ones were more hole than boot.",
+    "Bought a record I've wanted for years. Played it three times in a row.",
+    "Takeaway and a film on a Saturday night, and I didn't feel guilty about it.",
+    "New shirt. A good one. Ellis noticed, which was mortifying.",
+    "Bought a decent set of chisels. Felt like a grown-up.",
+)
+
+
+def _bits(
+    at: datetime, awake: bool, *, tight: bool = False, comfortable: bool = False
+) -> list[_Candidate]:
     """A weekly scatter of small things, and every few weeks a haircut.
 
     When money is tight it's just the basics, and the haircut can wait.
@@ -164,7 +180,15 @@ def _bits(at: datetime, awake: bool, *, tight: bool = False) -> list[_Candidate]
     text = BITS[int(_roll("bits-text", key) * len(BITS))]
     if tight:
         cost, text = cost // 2, "Just the basics this week: toothpaste and a bus fare"
+    elif comfortable:
+        cost = round(cost * 1.25)  # a bit less careful when there's money put by
     candidates: list[_Candidate] = [(f"bits-{key}", "everyday", cost, text, False)]
+    if comfortable and at.day <= 7:
+        treat = TREATS[int(_roll("treat", at.year, at.month) * len(TREATS))]
+        cost_of_treat = 2_500 + round(4_500 * _roll("treat-cost", at.year, at.month))
+        candidates.append(
+            (f"treat-{at.year}-{at.month:02d}", "everyday", cost_of_treat, treat, False)
+        )
     if week.week % HAIRCUT_EVERY_WEEKS == 0 and not tight:
         candidates.append((f"haircut-{key}", "everyday", HAIRCUT_PENCE, "A haircut", False))
     return candidates

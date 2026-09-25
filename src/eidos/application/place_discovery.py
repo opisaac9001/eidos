@@ -21,7 +21,15 @@ from eidos.domain.world_catalog import WorldCatalog
 
 HOME_GROUND = frozenset({"home", "cafe", "workshop", "park"})
 # Places outside the town (his parents' house): never part of what he knows of Alderwick.
-FAR_AWAY = frozenset({"wye-home"})
+FAR_AWAY = frozenset(
+    {
+        "wye-home",
+        "holiday-lakes",
+        "holiday-pembrokeshire",
+        "holiday-norfolk",
+        "holiday-lisbon",
+    }
+)
 NOTICE_CHANCE = 0.3
 
 

@@ -25,10 +25,17 @@ from eidos.domain.planning import CalendarEntry, PlanningState
 
 EXECUTABLE = frozenset({"work", "learn", "attend", "repair"})
 # Stays, where the point is being there rather than effort put in.
-STAYS = frozenset({"christmas_at_home", "visiting_home"})
+STAYS = frozenset({"christmas_at_home", "visiting_home", "on_holiday"})
 # Activities that are sociable by nature: a conversation at the venue is part of them.
 SOCIABLE = frozenset(
-    {"an_evening_out", "an_evening_class", "visiting_home", "christmas_at_home", "moving_house"}
+    {
+        "an_evening_out",
+        "an_evening_class",
+        "visiting_home",
+        "christmas_at_home",
+        "moving_house",
+        "on_holiday",
+    }
 )
 _HERE = "*anyone-here*"
 FINISH_OFF_SHARE = 0.8  # A lunch hour inside a six-hour shift still completes it.

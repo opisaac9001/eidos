@@ -28,6 +28,7 @@ KIND = "memory.surfaced"
 SOURCE = "lived-surfaced"
 PLACE_CHANCE = 0.12  # per hour he's somewhere a memory lives
 MISSING_CHANCE = 0.05  # per evening, for a close friend who has moved away
+WITH_SOMEONE_CHANCE = 0.12  # per friend, after an evening together
 MIN_IMPORTANCE = 0.6
 ANNIVERSARY_IMPORTANCE = 0.7
 OLDER_THAN = timedelta(days=30)
@@ -48,6 +49,7 @@ STORY_SOURCES = frozenset(
         "lived-joke",
         "lived-body",
         "lived-season",
+        "lived-holiday",
         "lived-town-issue",
         "user-conversation",
     }
@@ -64,8 +66,10 @@ def surfacing_events(
     names: Mapping[str, str],
     away: Mapping[str, str],
     depths: Mapping[str, float],
+    together: Sequence[str] = (),
 ) -> list[DomainEvent]:
-    """Something from before, come back for a moment. ``away`` maps friend -> city."""
+    """Something from before, come back for a moment. ``away`` maps friend -> city;
+    ``together`` is who he spent time with today."""
     if not awake:
         return []
     today = at.date().isoformat()
@@ -78,8 +82,40 @@ def surfacing_events(
     return (
         _anniversary(history, at, surfaced)
         or _missing(history, at, surfaced, names, away, depths)
+        or _with_someone(history, at, surfaced, names, together)
         or _place(history, at, surfaced, location_id, place_names)
     )
+
+
+def _with_someone(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    surfaced: Sequence[DomainEvent],
+    names: Mapping[str, str],
+    together: Sequence[str],
+) -> list[DomainEvent]:
+    """An evening with a friend brings back something the two of them share."""
+    if at.hour != 22 or not together:
+        return []
+    recent = _recent_sources(surfaced, at)
+    for person in sorted(together):
+        if _roll("together", person, at.date().isoformat()) >= WITH_SOMEONE_CHANCE:
+            continue
+        shared = [
+            e
+            for e in _memories(history)
+            if e.payload.get("person_id") == person
+            and float(e.payload.get("importance", 0.0)) >= 0.5
+            and at - _time(e) >= OLDER_THAN
+            and str(e.event_id) not in recent
+        ]
+        if not shared:
+            continue
+        memory = shared[int(_roll("shared", person, at.date().isoformat()) * len(shared))]
+        name = names.get(person, person.replace("-", " ").title()).split()[0]
+        text = f"Talking with {name} tonight brought something back: {_gist(memory)}"
+        return _surface(memory, "together", text, at, lift=0.1)
+    return []
 
 
 def _recent_sources(surfaced: Sequence[DomainEvent], at: datetime) -> set[str]:
