@@ -23,6 +23,13 @@ from eidos.domain.folding import events_of
 KIND = "sleep.restless"
 HOUR = 2
 WORRIED_CHANCE = 0.35
+MONEY_CHANCE = 0.12  # money worry is a low hum, not a nightly event
+WORRIES = (
+    "Woke at three and couldn't get back off. {what} The same thought going round and round "
+    "until the birds started.",
+    "Lay awake for hours. {what} Kept turning the pillow over like that would help.",
+    "Couldn't switch my head off. {what} Gave up at five and made tea.",
+)
 EXCITED_CHANCE = 0.5
 PER_WEEK = 2
 REST_COST = 0.12
@@ -61,18 +68,16 @@ def sleep_trouble_events(
     )
     if big is not None and _roll("excited", night) < EXCITED_CHANCE:
         text = (
-            f"Couldn't sleep for thinking about tomorrow: {big.lower()}. Lay there like a kid "
-            "on Christmas Eve."
+            f"Couldn't sleep for thinking about tomorrow: {big[:1].lower() + big[1:]}. Lay there "
+            "like a kid on Christmas Eve."
         )
         return _restless("excited", text, at, rest)
     weighing = what_is_weighing(history, at, valence)
+    chance = WORRIED_CHANCE
     if weighing is None and money_tight:
-        weighing = "Money. Going over the numbers again, as if they'd change."
-    if weighing is not None and _roll("worried", night) < WORRIED_CHANCE:
-        text = (
-            f"Woke at three and couldn't get back off. {weighing} The same thought going "
-            "round and round until the birds started."
-        )
+        weighing, chance = "Money. Going over the numbers again, as if they'd change.", MONEY_CHANCE
+    if weighing is not None and _roll("worried", night) < chance:
+        text = WORRIES[int(_roll("how", night) * len(WORRIES))].format(what=weighing)
         return _restless("worried", text, at, rest)
     return []
 

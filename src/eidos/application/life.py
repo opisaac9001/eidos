@@ -1901,7 +1901,7 @@ class Life(LifeConversation):
             asleep=not tick.state.awake,
             rest=tick.state.rest,
             valence=tick.state.valence,
-            money_tight=self._finances(history + pending).balance_pence < 2 * rent,
+            money_tight=self._finances(history + pending).balance_pence < rent,
             tomorrow=[
                 (entry.title, entry.activity_type or "")
                 for entry in self._planning(history + pending).calendar.values()

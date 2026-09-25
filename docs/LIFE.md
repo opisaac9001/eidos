@@ -291,8 +291,9 @@ Each plan (`calendar.plan`) causes its booking, and he remembers the evening if 
 ## Lying awake (`application/sleep_trouble.py`)
 
 At two in the morning, if he's asleep:
-- **Worry:** if something's weighing on him (the same things he'd hide behind "fine"), or
-  money's tight, he may wake and not get back off.
+- **Worry:** if something's weighing on him (the same things he'd hide behind "fine"), he may
+  wake and not get back off. Money keeps him up now and then when he's down to less than a
+  week's rent.
 - **Excitement:** the night before something big (a wedding, moving day, a trip, a date),
   he may lie awake for better reasons.
 - **Effect:** it costs rest the next day, happens at most twice a week, and his self-context
