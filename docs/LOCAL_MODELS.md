@@ -1,5 +1,9 @@
 # Local model testing
 
+> For everyday setup (the Models page, providers, backups and budgets), see
+> [MODELS.md](MODELS.md). This page covers the older single-endpoint and routing-file setup,
+> and the model trials.
+
 Eidos can run eight narrative performers and five structured proposal roles through
 an OpenAI-compatible chat completion endpoint supporting JSON-schema responses. They
 are logical roles in one application, not separately deployed services. The continuity

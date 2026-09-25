@@ -138,27 +138,34 @@ PYTHONPATH=src .venv/bin/eidos journal            # his autobiographical record
 
 ## Using real language models
 
-Offline, Eidos uses deterministic stand-ins (written templates), which are fine for
-exploring the simulation but not for talking to him properly. For that, point it at any
-OpenAI-compatible chat-completions server that supports JSON-schema responses:
+Offline, Eidos uses deterministic stand-ins (written templates). They're fine for
+watching the simulation, but not for talking to him properly. Add real models from the
+operator view's **Models** page: local servers (Ollama, LM Studio, vLLM), paid services
+(OpenRouter, OpenAI, Anthropic, Gemini, Groq, Mistral, DeepSeek, Together), or any
+OpenAI-compatible URL.
+
+- **Test before you rely on it:** each model can be tested with one real request.
+- **Roles and backups:** give each part of his life (his voice, inner life, choices, the
+  world) a first choice and a backup.
+- **A daily budget** caps what paid services can spend.
+
+Changes apply without a restart. With a real model, even the rule-written moments of his life
+are re-told in his own words, keeping every fact.
+
+Settings live in `~/.config/eidos/models.json` (or `EIDOS_MODELS_FILE`), outside the repo
+and the database, and can be edited by hand. From the command line:
 
 ```bash
-export EIDOS_MODEL_BASE_URL=http://127.0.0.1:11434/v1   # Ollama; LM Studio is :1234/v1
-export EIDOS_MODEL_NAME=your-model
-PYTHONPATH=src .venv/bin/eidos probe-model              # tests every role he uses
-PYTHONPATH=src .venv/bin/eidos serve
+PYTHONPATH=src .venv/bin/eidos models status   # what each role will use, today's usage
+PYTHONPATH=src .venv/bin/eidos models test     # one small real request per model
+PYTHONPATH=src .venv/bin/eidos probe-model     # every role, once
 ```
 
-`EIDOS_MODEL_API_KEY` supplies a key for an authenticated endpoint. To use different
-models for different roles (a strong model for conversation, a cheaper one for background
-work), point `EIDOS_MODEL_ROUTES_FILE` at a JSON routing file. See
-[docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
-
-Models play named roles: his voice and inner monologue, the world director (Moira), dreams,
-reflection, his daily agency and projects, residents' private plans, what he learns about
-you, his take on the news, and more. Every structured proposal is schema-checked and
-validated against the world before anything happens; a rejected proposal leaves a visible
-trace, never a silent fallback.
+If a model fails, is out of budget or answers badly, the role's backup takes over. If none
+can answer, that step of his life is skipped visibly, never faked. The full guide is
+[docs/MODELS.md](docs/MODELS.md). The older single-endpoint variables
+(`EIDOS_MODEL_BASE_URL`, `EIDOS_MODEL_NAME`) and routing file (`EIDOS_MODEL_ROUTES_FILE`)
+still work; see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
 
 ## Connecting him to the real world
 
@@ -258,7 +265,8 @@ changes and how to roll back.
 | [PATRICK_SHAW.md](docs/PATRICK_SHAW.md) | Who Patrick is: his background and voice |
 | [ALDERWICK.md](docs/ALDERWICK.md) | The town, its districts and its latent population |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Events, folds, ports and the gateway |
-| [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | Running with real models and routing roles |
+| [MODELS.md](docs/MODELS.md) | Adding providers and models, roles, backups and budgets |
+| [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | Older setup: one endpoint or a routing file; model trials |
 | [OUTREACH.md](docs/OUTREACH.md) | When and how he messages you first |
 | [CREATIVE_DIRECTION.md](docs/CREATIVE_DIRECTION.md) | Tone, taste and what the world should feel like |
 | [ROADMAP.md](docs/ROADMAP.md), [FEATURES.md](docs/FEATURES.md) | What's built, partial and planned |
@@ -269,8 +277,9 @@ changes and how to roll back.
 - **It's a prototype for one person's machine.** The server binds to loopback only.
   Private resident state and model traces are hidden in the ordinary view but still
   present in `/api/state`, so don't expose it to a network.
-- **The stand-ins are templates.** Conversation quality depends on the model you connect,
-  and smaller models struggle with some structured roles (they're rejected safely).
+- **The stand-ins are templates.** Conversation quality depends on the models you connect;
+  small models (around 1.5B) are too weak for his thoughts, and 14B and up do noticeably
+  better for conversation and the structured roles. Bad answers are rejected safely.
 - **Long lives get slower.** A simulated day costs well under a second early on and several
   seconds after a couple of simulated years. Live, in real time, that doesn't matter; long
   fast-forward runs take a while.

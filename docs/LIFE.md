@@ -8,6 +8,19 @@ models voice what the rules establish rather than inventing it.
 
 Everything here applies to natural lives. Authored fixture worlds are unchanged.
 
+## In his own words (`application/voicing.py`)
+
+With a real model running, the rule-written moments of his life (friends' news, family
+calls, dates, holidays, the workshop and so on) are re-told each hour by the `pathos_voice`
+role: same facts, his words, coloured by his mood.
+
+- **Keeping the facts:** every name, place and number must survive, no new ones may
+  appear, and the length stays close. Anything else is dropped and the authored line
+  stands.
+- **Nothing lost:** the original is kept as `authored_text`, and the source event is
+  updated to match.
+- **Limits:** at most four re-tellings an hour. Offline, nothing changes.
+
 ## The real world's news (`application/world_news.py`, `adapters/news_feeds.py`)
 
 Opt in with `EIDOS_NEWS=on` (the BBC's feeds) or `EIDOS_NEWS_FEEDS`.
