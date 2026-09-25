@@ -17,6 +17,7 @@ def memory(text: str, at: datetime, importance: float, place: str | None = None)
             "simulated_at": at.isoformat(),
             "importance": importance,
             "owner": "pathos",
+            "source": "lived-friend-life",
             **({"location_id": place} if place else {}),
         },
     )
@@ -81,3 +82,12 @@ def test_missing_a_close_friend_who_moved_away() -> None:
     assert missed and all("Leeds" in e.payload["text"] for e in missed)
     times = [datetime.fromisoformat(e.payload["simulated_at"]) for e in missed]
     assert all(b - a >= timedelta(days=21) for a, b in zip(times, times[1:]))
+
+
+def test_routine_moments_do_not_come_back() -> None:
+    routine = memory("Stayed with the planned activity: work.", THEN, 0.9, "crown-anchor")
+    routine = DomainEvent(
+        "memory.recorded", "pathos", {**routine.payload, "source": "lived-activity"}
+    )
+    later = THEN + timedelta(days=60)
+    assert run([routine], later.replace(hour=12), 24 * 10, location_id="crown-anchor") == []

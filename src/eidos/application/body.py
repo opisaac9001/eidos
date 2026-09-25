@@ -547,7 +547,7 @@ def _book(
     day = _appointment_day(history, at.date())
     starts = datetime(day.year, day.month, day.day, APPOINTMENT_HOUR, tzinfo=at.tzinfo)
     if day.weekday() in current_terms(history)[0]:
-        starts = starts.replace(hour=16, minute=30)  # after the shift
+        starts = starts.replace(hour=17, minute=0)  # after the shift, with time to get there
     ends = starts + timedelta(minutes=APPOINTMENT_MINUTES)
     schedule_id = f"dentist-{day.isoformat()}"
     when = starts.strftime("%A %-d %B at %-H:%M")

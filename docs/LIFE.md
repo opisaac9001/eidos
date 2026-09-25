@@ -95,7 +95,7 @@ he took your advice.
 - **With friends:** after an evening talking with a friend (level 3+), there's sometimes a new
   running joke: the otter question at the quiz, the kettle nobody's allowed to descale.
   There's at most one new joke a week, and at most three per friend.
-- **Callbacks:** weeks later a joke comes back when they're together ("Rowan brought up the
+- **Callbacks:** now and then (not the same joke within two months) a joke comes back when they're together ("Rowan brought up the
   goose standoff again"). Both the joke and the callback count as small shared moments.
 - **With you:** the evening notes role may spot a moment in your conversation that made you
   both laugh, give it a label and quote it (`running_joke`). The conversation context
@@ -111,8 +111,10 @@ He remembers when something sets it off, not only when asked. There are three tr
   remembers it in the evening.
 - **Missing someone:** now and then he misses a close friend who has moved away.
 
-At most one memory comes back a day, and the same one not again for three months. The self-
-context shows what's come back to him in the last few days (`came_back_to_him_lately`).
+Only moments from his own story come back (family, friends, love, work, home; not routine or
+passing faces): at most one a day and two a week, and the same one not again for three
+months. The self-context shows what's come back to him in the last few days
+(`came_back_to_him_lately`).
 
 ## "Fine, yeah" (`application/masking.py`)
 

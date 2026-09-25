@@ -25,11 +25,11 @@ KIND = "joke.shared"
 CALLBACK = "joke.recalled"
 HOUR = 22
 COIN_CHANCE = 0.08  # an evening together that becomes a running joke
-CALLBACK_CHANCE = 0.25
+CALLBACK_CHANCE = 0.1
 MAX_PER_FRIEND = 3
 COIN_GAP = timedelta(days=7)  # across everyone
 CALLBACK_AFTER = timedelta(days=14)
-CALLBACK_GAP = timedelta(days=30)
+CALLBACK_GAP = timedelta(days=60)
 MIN_DEPTH = 3.0
 
 JOKES = {

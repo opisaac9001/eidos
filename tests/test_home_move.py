@@ -72,3 +72,33 @@ def test_properly_together_means_moving_in_together() -> None:
     assert moved.payload["partner_id"] == "townsfolk-12"
     assert weekly_housing_pence(history) == SHARED_RENT_PENCE
     assert "together" in moved.payload["text"]
+
+
+def test_if_he_is_away_on_moving_day_the_move_waits_a_week() -> None:
+    history: list[DomainEvent] = financial_foundation_events([], OPENED)
+    moving_day = None
+    for day in range(380, 780):
+        at = (OPENED + timedelta(days=day)).replace(hour=19)
+        booked = [e for e in history if e.kind == "schedule.created"]
+        away = (
+            bool(booked)
+            and at.date() == datetime.fromisoformat(booked[0].payload["starts_at"]).date()
+        )
+        if away:
+            moving_day = at.date()
+        history += home_move_events(
+            history,
+            at,
+            awake=True,
+            balance_pence=150_000,
+            partner=None,
+            helper=None,
+            away=away,
+        )
+    assert moving_day is not None
+    cancelled = [e for e in history if e.kind == "schedule.cancelled"]
+    assert len(cancelled) == 1
+    moved = next(e for e in history if e.payload.get("stage") == "moved")
+    assert datetime.fromisoformat(moved.payload["simulated_at"]).date() == moving_day + timedelta(
+        days=7
+    )

@@ -34,6 +34,24 @@ OLDER_THAN = timedelta(days=30)
 NOT_AGAIN_FOR = timedelta(days=90)
 MISSING_GAP = timedelta(days=21)
 QUIET_PLACES = frozenset({"home", "in_transit", "in-transit", "workshop"})
+PER_WEEK = 2
+# Only the moments of his own story come back: not routine, not passing faces.
+STORY_SOURCES = frozenset(
+    {
+        "lived-family",
+        "lived-romance",
+        "lived-friend-life",
+        "lived-falling-out",
+        "lived-home",
+        "lived-course",
+        "lived-work",
+        "lived-joke",
+        "lived-body",
+        "lived-season",
+        "lived-town-issue",
+        "user-conversation",
+    }
+)
 
 
 def surfacing_events(
@@ -54,6 +72,9 @@ def surfacing_events(
     surfaced = events_of(history, KIND)
     if surfaced and str(surfaced[-1].payload.get("simulated_at", ""))[:10] == today:
         return []
+    week = at.isocalendar()[:2]
+    if sum(1 for e in surfaced[-PER_WEEK:] if _time(e).isocalendar()[:2] == week) >= PER_WEEK:
+        return []
     return (
         _anniversary(history, at, surfaced)
         or _missing(history, at, surfaced, names, away, depths)
@@ -72,7 +93,7 @@ def _memories(history: Sequence[DomainEvent]) -> list[DomainEvent]:
         e
         for e in events_of(history, "memory.recorded")
         if e.payload.get("owner", "pathos") == "pathos"
-        and e.payload.get("source") != SOURCE
+        and e.payload.get("source") in STORY_SOURCES
         and isinstance(e.payload.get("text"), str)
         and isinstance(e.payload.get("simulated_at"), str)
     ]

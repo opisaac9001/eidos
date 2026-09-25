@@ -48,6 +48,7 @@ def home_move_events(
     balance_pence: int,
     partner: tuple[str, str, datetime] | None,
     helper: tuple[str, str] | None,
+    away: bool = False,
 ) -> list[DomainEvent]:
     """Start looking, find somewhere, or move. ``partner`` is (id, name, together since)."""
     if not awake or at.hour != HOUR:
@@ -66,7 +67,7 @@ def home_move_events(
             if e.payload.get("stage") == "found"
             and e.payload.get("move_id") == latest.payload.get("move_id")
         )
-        return _moving_day(history, found, at)
+        return _moving_day(history, found, at, away)
     if at.weekday() != 6:
         return []
     opened = events_of(history, "finance.account_opened")
@@ -131,21 +132,23 @@ def _find(
 
 
 def _moving_day(
-    history: Sequence[DomainEvent], found: DomainEvent, at: datetime
+    history: Sequence[DomainEvent], found: DomainEvent, at: datetime, away: bool = False
 ) -> list[DomainEvent]:
-    """Book the Saturday two weeks on, then move on the day."""
+    """Book the Saturday two weeks on, then move on the day (a week later if he's away)."""
     move_id = str(found.payload["move_id"])
-    schedule_id = f"{move_id}-moving-day"
-    booked = any(
-        e.payload.get("schedule_id") == schedule_id for e in events_of(history, "schedule.created")
-    )
-    if not booked:
+    agreed = [
+        e
+        for e in events_of(history, KIND)
+        if e.payload.get("move_id") == move_id and e.payload.get("stage") == "day_agreed"
+    ]
+    if not agreed:
         day = next(
             _time(found) + timedelta(days=offset)
             for offset in range(14, 21)
             if (_time(found) + timedelta(days=offset)).weekday() == 5
         )
-        return _book(found, day, schedule_id, at)
+        return _book(found, day, f"{move_id}-moving-day", at)
+    schedule_id = str(agreed[-1].payload["schedule_id"])
     starts = datetime.fromisoformat(
         next(
             str(e.payload["starts_at"])
@@ -155,6 +158,28 @@ def _moving_day(
     )
     if at.date() != starts.date():
         return []
+    if away:
+        # Something took him away (Dad in hospital, say): the move waits a week.
+        return [
+            DomainEvent(
+                "schedule.cancelled",
+                "pathos",
+                {
+                    "schedule_id": schedule_id,
+                    "reason": "He was away; moving day moved back a week.",
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=agreed[-1].event_id,
+                correlation_id=schedule_id,
+            ),
+            *_book(
+                found,
+                starts + timedelta(days=7),
+                f"{move_id}-moving-day-{len(agreed) + 1}",
+                at,
+                "Had to push moving day back a week. The landlord was nice about it.",
+            ),
+        ]
     rent = int(found.payload["weekly_rent_pence"])
     partner_id = found.payload.get("partner_id")
     helper = found.payload.get("helper_name")
@@ -172,7 +197,9 @@ def _moving_day(
     return _step(move_id, "moved", text, at, 0.8, extra)
 
 
-def _book(found: DomainEvent, day: datetime, schedule_id: str, at: datetime) -> list[DomainEvent]:
+def _book(
+    found: DomainEvent, day: datetime, schedule_id: str, at: datetime, text: str | None = None
+) -> list[DomainEvent]:
     starts = day.replace(hour=9, minute=0, second=0, microsecond=0)
     ends = starts.replace(hour=16)
     helper_id = _helper_id(found)
@@ -184,7 +211,7 @@ def _book(found: DomainEvent, day: datetime, schedule_id: str, at: datetime) -> 
             "move_id": found.payload["move_id"],
             "stage": "day_agreed",
             "schedule_id": schedule_id,
-            "text": f"Moving day is {starts.strftime('%A the %-d')}. Van's booked.",
+            "text": text or f"Moving day is {starts.strftime('%A the %-d')}. Van's booked.",
             "simulated_at": at.isoformat(),
             "owner": "pathos",
         },

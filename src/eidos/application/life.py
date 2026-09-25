@@ -1869,6 +1869,7 @@ class Life(LifeConversation):
                 helper=(helper_id, names.get(helper_id, helper_id.title()))
                 if helper_id is not None and known[helper_id].depth >= 4
                 else None,
+                away=tick.state.location_id == FAMILY_HOME,
             ),
             self._planning,
         )

@@ -182,3 +182,25 @@ def test_talking_with_ellis_on_a_shift_is_part_of_the_work():
         activity_effort([*history, *visitor], entry, NOW + timedelta(minutes=180))["blocked_by"]
         == "conversation"
     )
+
+
+def test_someone_dropping_into_the_workshop_is_talked_to_over_the_bench():
+    planning, entry = plan(360)
+    entry = replace(entry, schedule_id="work-rota-2026-01-02")
+    history = [event("sleep.ended")]
+    history += execution_events(
+        history, replace(planning, calendar={entry.schedule_id: entry}), NOW
+    )
+    drop_in = [
+        event(
+            "scene.started",
+            60,
+            scene_id="customer",
+            initiator_id="townsfolk-8103",
+            partner_id="pathos",
+            location_id=entry.location_id,
+        )
+    ]
+    effort = activity_effort([*history, *drop_in], entry, NOW + timedelta(minutes=180))
+    assert effort["blocked_by"] is None
+    assert effort["worked_seconds"] == pytest.approx(180 * 60)

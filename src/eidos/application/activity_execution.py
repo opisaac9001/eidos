@@ -363,6 +363,8 @@ class _EffortReplay:
                 event.kind == "scene.started"
                 and "pathos" in {p.get("initiator_id"), p.get("partner_id")}
                 and not {p.get("initiator_id"), p.get("partner_id")} <= colleagues
+                # On a shift, whoever drops into the workshop is talked to over the bench.
+                and not (EMPLOYER_ID in colleagues and p.get("location_id") == entry.location_id)
             ):
                 self.scenes.add(str(p["scene_id"]))
                 self.active_scenes.add(str(p["scene_id"]))
