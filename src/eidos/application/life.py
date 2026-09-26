@@ -374,11 +374,19 @@ class Life(LifeConversation):
             raise ValueError("Advance must be greater than zero and at most 24 hours")
         asyncio.run(self._advance(hours))
 
-    def pulse_inner_stream(self) -> bool:
-        """Run one idempotent waking quarter-hour of stream-of-consciousness cognition."""
-        return asyncio.run(self._pulse_inner_stream())
+    def pulse_inner_stream(
+        self, stream_thought: str | None = None, stream_model: str | None = None
+    ) -> bool:
+        """Run one idempotent waking quarter-hour of stream-of-consciousness cognition.
 
-    async def _pulse_inner_stream(self) -> bool:
+        When the always-running inner stream has had a thought worth keeping this quarter
+        hour, it is recorded as the quarter hour's thought instead of asking for a new one.
+        """
+        return asyncio.run(self._pulse_inner_stream(stream_thought, stream_model))
+
+    async def _pulse_inner_stream(
+        self, stream_thought: str | None = None, stream_model: str | None = None
+    ) -> bool:
         history = self.history()
         state = self._project_state(history)
         if not state.awake:
@@ -419,42 +427,47 @@ class Life(LifeConversation):
             correlation_id=pulse_id,
         )
         pending = [marker]
-        text = await perform(
-            self.gateway,
-            "murmur",
-            {
-                "time": state.simulated_at.isoformat(),
-                "location": location_name,
-                "journey": journey_context(history, state.simulated_at, catalog),
-                "memories": [item.recalled_text for item in selected],
-                "memory_recollections": [
-                    {
-                        "text": item.recalled_text,
-                        "felt_confidence": item.felt_confidence,
-                        "detail_level": item.detail_level,
-                        "emotional_tone": item.emotional_label,
-                    }
-                    for item in selected
-                ],
-                "recent_inner_stream": recent_stream,
-                "time_budget": personal_time_budget(
-                    self._planning(history), catalog, state.simulated_at, state.location_id
-                ),
-                "ongoing_activities": execution_context(
-                    history, self._planning(history), state.simulated_at
-                ),
-                "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
-                "stream_pulse_id": pulse_id,
-                "mind_layers": mind_context(history),
-                "emotion": {
-                    "label": emotion.label,
-                    "intensity": emotion.intensity,
-                    "pattern": emotion.pattern,
+        kept_from_stream = bool(stream_thought and stream_thought.strip())
+        text: str | None
+        if kept_from_stream:
+            text = " ".join(str(stream_thought).split())
+        else:
+            text = await perform(
+                self.gateway,
+                "murmur",
+                {
+                    "time": state.simulated_at.isoformat(),
+                    "location": location_name,
+                    "journey": journey_context(history, state.simulated_at, catalog),
+                    "memories": [item.recalled_text for item in selected],
+                    "memory_recollections": [
+                        {
+                            "text": item.recalled_text,
+                            "felt_confidence": item.felt_confidence,
+                            "detail_level": item.detail_level,
+                            "emotional_tone": item.emotional_label,
+                        }
+                        for item in selected
+                    ],
+                    "recent_inner_stream": recent_stream,
+                    "time_budget": personal_time_budget(
+                        self._planning(history), catalog, state.simulated_at, state.location_id
+                    ),
+                    "ongoing_activities": execution_context(
+                        history, self._planning(history), state.simulated_at
+                    ),
+                    "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
+                    "stream_pulse_id": pulse_id,
+                    "mind_layers": mind_context(history),
+                    "emotion": {
+                        "label": emotion.label,
+                        "intensity": emotion.intensity,
+                        "pattern": emotion.pattern,
+                    },
                 },
-            },
-            state.simulated_at.isoformat(),
-            pending,
-        )
+                state.simulated_at.isoformat(),
+                pending,
+            )
         if text is not None:
             source = selected[0].event if selected else None
             pending.append(
@@ -469,6 +482,11 @@ class Life(LifeConversation):
                         "factual": False,
                         "role": "murmur",
                         "stream_pulse_id": pulse_id,
+                        **(
+                            {"kept_from_stream": True, "model": stream_model or "unknown"}
+                            if kept_from_stream
+                            else {}
+                        ),
                     },
                     causation_id=source.event_id if source is not None else marker.event_id,
                     correlation_id=pulse_id,

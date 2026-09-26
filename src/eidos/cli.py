@@ -150,6 +150,11 @@ def main() -> None:
     models.add_argument("target", nargs="?", help="a model id (test) or provider id (remote)")
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
+    web.add_argument(
+        "--no-stream",
+        action="store_true",
+        help="Don't run his inner monologue continuously in the background",
+    )
     args = parser.parse_args()
     try:
         if args.command == "inventory-server":
@@ -298,6 +303,7 @@ def main() -> None:
                 mode=mode,
                 town_signal_source=town_signal_source,
                 news_source=news_source,
+                stream=not args.no_stream and os.environ.get("EIDOS_STREAM", "on") != "off",
             )
             return
         from eidos.adapters.durable_gateway import DurableModelGateway

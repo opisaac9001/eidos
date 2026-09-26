@@ -369,6 +369,50 @@ select {
   max-width: 550px;
   flex: 1;
 }
+.presence blockquote.fresh {
+  animation: thought-arrives 1.2s ease-out;
+}
+@keyframes thought-arrives {
+  from {
+    opacity: 0.25;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.presence blockquote:has(+ .stream-trail) {
+  flex: none;
+}
+.stream-trail {
+  flex: 1;
+  list-style: none;
+  margin: -12px 0 20px;
+  padding: 0;
+  max-width: 550px;
+  font: 14px/1.45 var(--serif);
+  color: #9d8f88;
+}
+.stream-trail li {
+  margin: 4px 0;
+}
+.stream-trail li:nth-child(2) {
+  opacity: 0.7;
+}
+.stream-trail li:nth-child(3) {
+  opacity: 0.45;
+}
+.stream-status {
+  margin-left: 6px;
+  text-transform: none;
+  letter-spacing: 0.3px;
+}
+.models-form .models-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .presence-bottom {
   display: flex;
   justify-content: space-between;
@@ -1506,6 +1550,9 @@ hr {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .presence blockquote.fresh {
+    animation: none;
+  }
   * {
     scroll-behavior: auto !important;
     transition: none !important;

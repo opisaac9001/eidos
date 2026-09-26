@@ -69,6 +69,9 @@ his personality is the sum of what he has lived. After a simulated year or two h
   he walks, a dentist appointment he keeps putting off, and nights lying awake worrying.
 
 **An inner life**
+- An inner monologue that never stops while he's awake: passing thoughts one after another,
+  each following on from the last and drifting to whatever is around him or on his mind.
+  Most are forgotten; the one that mattered is kept each quarter hour.
 - Emotion sampled every hour, memories with fallible recall, dreams, evening reflections,
   habits and tastes learned from experience, and values that drift slowly with how he
   lives.
@@ -150,7 +153,8 @@ OpenAI-compatible URL.
 - **A daily budget** caps what paid services can spend.
 
 Changes apply without a restart. With a real model, even the rule-written moments of his life
-are re-told in his own words, keeping every fact.
+are re-told in his own words, keeping every fact, and his inner monologue runs continuously
+in the background. A small model on a Raspberry Pi is enough for that.
 
 Settings live in `~/.config/eidos/models.json` (or `EIDOS_MODELS_FILE`), outside the repo
 and the database, and can be edited by hand. From the command line:

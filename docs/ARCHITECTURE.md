@@ -27,7 +27,11 @@ through a durable gateway decorator with supervised background workers. Optional
 Murmur associations submit after the authoritative tick and are revalidated and
 reconciled idempotently later. The real-time waking inner stream uses separate
 quarter-hour pulse identities and retains only a bounded recent tail for continuity;
-other callers still await their requested result.
+other callers still await their requested result. Beneath the pulses, the server runs an
+always-on monologue (`application/inner_stream.py`): a background thread that reads the
+cached snapshot, calls `murmur` directly (outside the durable queue), and keeps fleeting
+thoughts in a rolling `inner_stream` table rather than the event log. Each pulse records
+the most salient of them as its `thought.recorded` (`kept_from_stream`).
 Explainable term/entity/goal/relationship recall is implemented; vector retrieval and
 outside tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and

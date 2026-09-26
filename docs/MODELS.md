@@ -175,6 +175,44 @@ model. Limiting the model to two threads kept one such Pi at 4.9 V and under 68 
 repeated tests. Give his inner life a backup model on another machine, so a Pi reset only
 means the next thought comes from the backup.
 
+## His inner monologue, always running
+
+While the world is running and Patrick is awake, `eidos serve` keeps his inner monologue
+going in the background:
+- The next passing thought starts as soon as the last one is done, after a short gap.
+- Each thought follows on from the few before it, and his mind drifts to something:
+  - around him: where he is, what he's doing, who's there, what's next;
+  - inside him: how he feels, hunger or tiredness, a memory;
+  - further off: someone he cares about, the news, money, what he wants, or just the
+    light, a sound, or growing up in Wye.
+- It uses the `murmur` role, so it runs on whatever you give **His inner life** (a model
+  with `compact: true` gets the short request).
+
+Stream thoughts are fleeting. They're kept in their own rolling table beside the world (the
+last 5,000), not in his history. At each quarter hour, the one that mattered most (someone
+he cares about or a memory over the room around him, with some substance and recent) is
+written into his history as that quarter hour's thought, so no extra model call is needed
+for it. The Observatory shows the newest thought, with the last few fading beneath it.
+
+The stream pauses while he's asleep or the world is paused. It never changes his world;
+it only reads it.
+
+```json
+"stream": {"enabled": true, "gap_seconds": 20}
+```
+
+- `gap_seconds` is the pause between thoughts (5–3600, default 20). It's also on the
+  Models page, under **His inner monologue**.
+- A longer gap means fewer calls: 20 seconds on a 10–15 second model is roughly two
+  thoughts a minute.
+- On the written stand-ins the stream runs at most once every 90 seconds.
+- `eidos serve --no-stream` (or `EIDOS_STREAM=off`) turns it off; the quarter-hour pulse
+  then asks the model itself, as before.
+
+On the Raspberry Pi above (`murmur-qwen3-5-2b`, two threads, 20-second gap), 20 stream
+thoughts ran at 11–18 seconds each; the supply stayed at 4.9 V or above and the Pi at
+64 °C or below.
+
 ## Choosing where to spend
 
 A sensible mix:

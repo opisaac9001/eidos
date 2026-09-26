@@ -1576,6 +1576,40 @@ function renderEmotionHistory() {
     : '<p class="context-note">No source-linked emotional influence has been recorded yet.</p>';
 }
 
+// His inner monologue runs all the time; the newest passing thought leads, the last few trail.
+const STREAM_STATES = {
+  thinking: "thinking…",
+  resting: "between thoughts",
+  asleep: "asleep",
+  paused: "world paused",
+  failing: "stream interrupted",
+  off: "stream off",
+  starting: "starting",
+};
+function renderStream() {
+  const stream = state.inner_stream || { thoughts: [] };
+  const fresh = (stream.thoughts || []).filter((item) => item.seconds_ago < 1800);
+  const latest = fresh.length
+    ? fresh[0].text
+    : state.feed.find((item) => item.kind === "thought.recorded")?.text;
+  const quote = latest ? `“${latest}”` : "The day is just beginning.";
+  const node = $("latest-thought");
+  if (node.textContent !== quote) {
+    node.textContent = quote;
+    node.classList.remove("fresh");
+    void node.offsetWidth;
+    node.classList.add("fresh");
+  }
+  const trail = fresh
+    .slice(1, 4)
+    .map((item) => `<li>${esc(item.text)}</li>`)
+    .join("");
+  if ($("stream-trail").innerHTML !== trail) $("stream-trail").innerHTML = trail;
+  const label = stream.enabled ? STREAM_STATES[stream.state] || "" : "";
+  $("stream-status").textContent = label ? ` · ${label}` : "";
+  $("stream-status").title = stream.last_error || "";
+}
+
 function render(next) {
   if (state && next.revision < state.revision) return;
   syncServerPacing(next);
@@ -1653,6 +1687,7 @@ function render(next) {
     : "Memory index unavailable";
   if (state.runtime.error) showError(state.runtime.error);
   setBusy(busy);
+  renderStream();
   if (!changed) return;
   $("presence-mood").textContent = state.emotion?.secondary_label
     ? `${state.emotion.label} with ${state.emotion.secondary_label}`
@@ -1660,10 +1695,6 @@ function render(next) {
   const physical = state.wellbeing?.active;
   $("presence-location").textContent =
     `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}${physical ? ` · ${physical.kind.replaceAll("_", " ")}` : ""}`;
-  const thought = state.feed.find((item) => item.kind === "thought.recorded");
-  $("latest-thought").textContent = thought
-    ? `“${thought.text}”`
-    : "The day is just beginning.";
   renderAheadInMind();
   const inspiration = state.dream_inspirations?.[0];
   $("dream-inspiration").hidden = !inspiration;
@@ -2321,6 +2352,9 @@ function renderModels() {
     .join("");
   $("budget-usd").value = modelsDraft.budget.daily_usd ?? "";
   $("budget-requests").value = modelsDraft.budget.daily_requests ?? "";
+  const stream = modelsDraft.stream || {};
+  $("stream-enabled").checked = stream.enabled !== false;
+  $("stream-gap").value = stream.gap_seconds ?? "";
 }
 
 function collectRoles() {
@@ -2339,6 +2373,11 @@ function collectRoles() {
   modelsDraft.budget = {
     ...(usd !== "" ? { daily_usd: Number(usd) } : {}),
     ...(requests !== "" ? { daily_requests: Number(requests) } : {}),
+  };
+  const gap = $("stream-gap").value;
+  modelsDraft.stream = {
+    enabled: $("stream-enabled").checked,
+    ...(gap !== "" ? { gap_seconds: Number(gap) } : {}),
   };
 }
 

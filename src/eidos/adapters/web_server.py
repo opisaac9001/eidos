@@ -61,6 +61,15 @@ class Runtime:
         self.last_wall_tick = self.clock()
         self.realtime_suppressed_until = self.last_wall_tick
         self.live_reply_speech: dict[str, float] = {}
+        # His always-running inner monologue, when this server has one.
+        self.stream: Any = None
+
+    def stream_view(self) -> tuple[dict[str, Any] | None, bool]:
+        """What the inner stream sees: the latest snapshot, and whether time is running."""
+        snapshot = self.cached
+        if snapshot is None or self.error is not None or self.stop.is_set():
+            return snapshot, False
+        return snapshot, bool(snapshot.get("config", {}).get("running"))
 
     def start(self) -> None:
         with self.lock:
@@ -78,6 +87,8 @@ class Runtime:
             self.last_wall_tick = self.clock()
         self.thread = threading.Thread(target=self._loop, name="eidos-chronos", daemon=True)
         self.thread.start()
+        if self.stream is not None:
+            self.stream.start()
 
     def _loop(self) -> None:
         while not self.stop.wait(self.interval):
@@ -125,6 +136,8 @@ class Runtime:
 
     def close(self) -> None:
         self.stop.set()
+        if self.stream is not None:
+            self.stream.close()
         if self.thread:
             self.thread.join(timeout=30)
         with self.lock:
@@ -183,7 +196,10 @@ class Runtime:
                 remaining -= step
                 simulated_at += timedelta(seconds=step)
                 if abs(step - until_boundary) <= 0.000001:
-                    self.life.pulse_inner_stream()
+                    if self.stream is not None:
+                        self.stream.keep_for_pulse(self.life.pulse_inner_stream)
+                    else:
+                        self.life.pulse_inner_stream()
         except Exception:
             # Completed slices are already durable; retain only wall time that was
             # not committed so a recoverable failure cannot silently lose it.
@@ -287,6 +303,9 @@ class Runtime:
                 ],
                 "supervisor": supervisor.snapshot() if supervisor else None,
             },
+            "inner_stream": self.stream.view_for_page()
+            if self.stream is not None
+            else {"enabled": False, "state": "off", "thoughts": []},
             "runtime": {
                 "ticks": self.ticks,
                 "interval_seconds": self.interval,
@@ -593,6 +612,23 @@ def _models_action(runtime: Any, path: str, body: dict[str, Any]) -> dict[str, A
         return {"models": [], "error": str(error)[:200]}
 
 
+def _inner_stream(database: Path, gateway: ModelGateway, runtime: Runtime) -> Any:
+    """His inner monologue, running in the background on the models' inner-life role."""
+    from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+    from eidos.application.inner_stream import DEFAULT_GAP_SECONDS, InnerStream, StreamSettings
+
+    def settings() -> StreamSettings:
+        chosen: dict[str, Any] = {}
+        if runtime.models is not None:
+            chosen = runtime.models.configured.stream_settings()
+        return StreamSettings(
+            enabled=bool(chosen.get("enabled", True)),
+            gap_seconds=float(chosen.get("gap_seconds", DEFAULT_GAP_SECONDS)),
+        )
+
+    return InnerStream(SQLiteInnerStream(database), gateway, runtime.stream_view, settings)
+
+
 def event_json(event: DomainEvent) -> dict[str, Any]:
     return {
         "id": str(event.event_id),
@@ -615,6 +651,7 @@ def serve(
     mode: str = "stand-in",
     town_signal_source: TownSignalSource | None = None,
     news_source: NewsSource | None = None,
+    stream: bool = True,
 ) -> None:
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
@@ -648,6 +685,8 @@ def serve(
     life.news_follows_real_time = True
     runtime = Runtime(life)
     runtime.models = inner if isinstance(inner, SwitchingGateway) else None
+    if stream:
+        runtime.stream = _inner_stream(database, inner, runtime)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()
     print(f"Eidos is ready at http://127.0.0.1:{port} — {mode} mode", flush=True)

@@ -91,9 +91,12 @@ def validate(raw: object, environment: Mapping[str, str]) -> dict[str, Any]:
         "models",
         "roles",
         "budget",
+        "stream",
         "version",
     }:
-        raise SettingsError("Settings contain only providers, models, roles, budget and version")
+        raise SettingsError(
+            "Settings contain only providers, models, roles, budget, stream and version"
+        )
     providers = raw.get("providers", {})
     models = raw.get("models", {})
     roles = raw.get("roles", {})
@@ -133,13 +136,26 @@ def validate(raw: object, environment: Mapping[str, str]) -> dict[str, Any]:
             value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)))
         ):
             raise SettingsError("budget takes daily_usd and daily_requests numbers")
-    return {
+    stream = raw.get("stream", {})
+    if not isinstance(stream, dict) or set(stream) - {"enabled", "gap_seconds"}:
+        raise SettingsError("stream takes enabled and gap_seconds")
+    if "enabled" in stream and not isinstance(stream["enabled"], bool):
+        raise SettingsError("stream enabled must be true or false")
+    gap = stream.get("gap_seconds")
+    if gap is not None and (
+        isinstance(gap, bool) or not isinstance(gap, (int, float)) or not 5 <= gap <= 3600
+    ):
+        raise SettingsError("stream gap_seconds must be between 5 and 3600")
+    checked = {
         "version": 1,
         "providers": providers,
         "models": models,
         "roles": roles,
         "budget": budget,
     }
+    if stream:
+        checked["stream"] = stream
+    return checked
 
 
 class Usage:
@@ -237,6 +253,11 @@ class ConfiguredGateway(ModelGateway):
         self._build(checked)  # fail now, not at the next model call
         _write_private(self.path, checked)
         self.reload()
+
+    def stream_settings(self) -> dict[str, Any]:
+        """How his always-running inner stream should run: on or off, and its pace."""
+        self._refresh()
+        return dict(self._settings.get("stream", {}))
 
     def entries(self) -> dict[str, ModelEntry]:
         self._refresh()

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0c0a09" />
     <title>Eidos · A life unfolding</title>
-    <link rel="stylesheet" href="/style.css?v=20260925-models1" />
-    <script src="/app.js?v=20260925-models1" defer></script>
+    <link rel="stylesheet" href="/style.css?v=20260926-stream1" />
+    <script src="/app.js?v=20260926-stream1" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -118,6 +118,7 @@
             <blockquote id="latest-thought">
               The day is just beginning.
             </blockquote>
+            <ol id="stream-trail" class="stream-trail" aria-label="Thoughts just before"></ol>
             <p id="dream-inspiration" class="context-note" hidden></p>
             <button
               id="presence-self"
@@ -128,7 +129,8 @@
             ></button>
             <div class="presence-bottom">
               <span
-                >INNER MONOLOGUE <span class="small-tag">STAND-IN</span></span
+                >INNER MONOLOGUE <span class="small-tag">STAND-IN</span
+                ><span id="stream-status" class="stream-status"></span></span
               ><button class="text-button" data-view="conversation">
                 Say hello ↗
               </button>
@@ -786,6 +788,19 @@
             <label>Paid calls at most (/day) <input id="budget-requests" type="number" min="0" /></label>
           </div>
           <p class="context-note" id="usage-today"></p>
+        </section>
+        <section class="panel" aria-labelledby="stream-title">
+          <div class="panel-kicker"><span id="stream-title">HIS INNER MONOLOGUE</span><span>uses the inner-life models</span></div>
+          <div class="models-form models-inline">
+            <label class="models-check"><input id="stream-enabled" type="checkbox" checked /> Always running while he's awake</label>
+            <label>Seconds between thoughts <input id="stream-gap" type="number" min="5" max="3600" step="1" placeholder="20" /></label>
+          </div>
+          <p class="context-note">
+            While the world runs, his passing thoughts keep coming one after another, each
+            following on from the last. Most are forgotten; the one that mattered most each
+            quarter hour is kept in his history. A longer gap means fewer calls, which helps a
+            small machine like a Raspberry Pi stay cool.
+          </p>
         </section>
         <div class="models-actions">
           <button class="button primary" id="models-save" type="button">Save and use these models</button>

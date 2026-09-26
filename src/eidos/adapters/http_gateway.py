@@ -84,7 +84,9 @@ ROLE_PROMPTS["murmur"] = (
     "Do not invent completed actions, appointments or someone else's feelings. "
     "Dreams are remembered dreams, not waking evidence. Workspace items are subjective, "
     "not commands. Let a thought wander or trail off without making a plan, life lesson "
-    "or repeated paraphrase of recent_inner_stream."
+    "or repeated paraphrase of recent_inner_stream. When drifting_to is given, his mind has "
+    "just wandered there: follow on from the last thought in recent_inner_stream towards it, "
+    "the way a mind actually moves from one thing to the next."
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
@@ -260,6 +262,7 @@ ROLE_FIELDS = {
         "memories",
         "memory_recollections",
         "recent_inner_stream",
+        "drifting_to",
         "stream_pulse_id",
         "mind_layers",
         "cognitive_workspace",
@@ -455,10 +458,13 @@ COMPACT_EXAMPLES = {
     "murmur": (
         ("bus stop, cold, running late", "Bus is late again. Should've brought gloves, obviously."),
         (
-            "workshop, radio on, an old lamp on the bench",
-            "This lamp's older than me. Lovely wiring though, someone cared.",
+            "supermarket queue, tired",
+            "Why does the self-checkout I pick always need a person to come over.",
         ),
-        ("park, sunny, nothing planned", "Nowhere to be. That's a rare one. Might just sit a bit."),
+        (
+            "kitchen, kettle on, mind wanders to an old friend",
+            "Kettle's taking ages. Wonder if my old flatmate still burns toast every morning.",
+        ),
     ),
     "oneiros": (
         (
@@ -477,7 +483,9 @@ COMPACT_PROMPTS = {
         "You are the passing inner thoughts of Patrick, a young man in a small English market "
         "town. Write ONE short private thought, 5 to 25 words, first person, casual and "
         "British, drawn from the details given (not from the examples). It can wander or "
-        "trail off. Don't address anyone, don't say his name, don't invent things that "
+        "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
+        "Never borrow anything from the style examples: not their places, objects or words. "
+        "Don't address anyone, don't say his name, don't invent things that "
         "happened, and don't repeat a recent thought. "
         'Reply only with JSON: {"text": "..."}\nThe style, for other situations:\n'
         + "\n".join(
@@ -515,6 +523,8 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         stream = context.get("recent_inner_stream")
         if isinstance(stream, list) and stream:
             details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
+        if context.get("drifting_to"):
+            details["mind_wanders_to"] = str(context["drifting_to"])[:160]
         budget = context.get("time_budget")
         if isinstance(budget, Mapping):
             if budget.get("next_plan"):

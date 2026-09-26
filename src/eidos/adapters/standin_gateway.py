@@ -93,7 +93,8 @@ def _standin_dream_text(context: dict[str, object], location: object, last_memor
 def _standin_murmur_text(context: dict[str, object], location: object, last_memory: object) -> str:
     raw_layers = context.get("mind_layers", [])
     layers = raw_layers if isinstance(raw_layers, list) else []
-    attention = next(
+    # The always-running stream says where his mind has just wandered.
+    attention = context.get("drifting_to") or next(
         (
             layer.get("focus_text")
             for layer in layers
@@ -108,6 +109,8 @@ def _standin_murmur_text(context: dict[str, object], location: object, last_memo
     memory = _short_fragment(last_memory)
     focus = _short_fragment(attention, 10).casefold()
     moment = context.get("time")
+    if context.get("drifting_to"):
+        moment = f"{moment}|{context['drifting_to']}"
     prefix = _temporal_choice(
         (
             "Right now,",
