@@ -45,7 +45,15 @@ from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,40}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 PROVIDER_FIELDS = {"kind", "base_url", "api_key", "api_key_env", "structured", "timeout", "label"}
-MODEL_FIELDS = {"provider", "model", "max_tokens", "price_in", "price_out", "reasoning_effort"}
+MODEL_FIELDS = {
+    "provider",
+    "model",
+    "max_tokens",
+    "price_in",
+    "price_out",
+    "reasoning_effort",
+    "compact",
+}
 
 
 def default_path(environment: Mapping[str, str] = os.environ) -> Path:
@@ -280,6 +288,7 @@ class ConfiguredGateway(ModelGateway):
                 extra_headers=kind.headers,
                 provider=provider.get("label") or kind.label,
                 on_usage=record,
+                compact=bool(spec.get("compact", False)),
             )
             entries[model_id] = ModelEntry(
                 model_id, provider_id, kind.local, gateway, price_in, price_out

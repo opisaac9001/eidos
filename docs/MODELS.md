@@ -98,7 +98,11 @@ is kept beside it in `usage.json`. You can edit the file by hand:
   - `max_tokens` raises the output ceiling; thinking models need it because their
     reasoning counts.
   - `price_in` and `price_out` are dollars per million tokens, used for the budget.
-  - `reasoning_effort` is optional.
+  - `reasoning_effort` is optional (`"none"` turns off thinking on models like Qwen 3.5).
+  - `compact: true` gives the model a short, example-led version of the thought and dream
+    requests, with only the essential details and tight output limits. Use it for small
+    local models (around 1–4B) on his inner life; see "A Raspberry Pi for his inner
+    life" below.
 - **`roles`:** keys are a role name (e.g. `pathos`, `oneiros`), a group name (`voice`,
   `inner`, `narration`, `life`, `world`) or `default`. A role's own entry wins over its
   group's, and a group's over the default. Each value is a list of models to try in order.
@@ -138,6 +142,38 @@ file.
   - Conversation and the structured roles do noticeably better at 14B and up, or on a
     strong hosted model.
   - A 1.5B model is too small for his thoughts.
+
+## A Raspberry Pi for his inner life
+
+His passing thoughts and dreams are frequent and short, which suits a small model on a
+low-power machine like a Raspberry Pi 5 (8 GB).
+
+What works, as of 26 September 2026:
+- **Model:** `qwen3.5:2b` through a variant limited to two CPU threads and a 2,048-token
+  context (below).
+- **Settings:** `"compact": true` and `"reasoning_effort": "none"`.
+- **Results:** it passed 5 of 5 real thought and dream requests, each 10–18 seconds warm.
+  `qwen2.5:1.5b` is too small: its thoughts were confused even with compact prompts.
+
+```bash
+# on the Pi
+printf "FROM qwen3.5:2b\nPARAMETER num_thread 2\nPARAMETER num_ctx 2048\n" > murmur.Modelfile
+ollama create murmur-qwen3-5-2b -f murmur.Modelfile
+```
+
+```json
+"models": {
+  "pi-mind": {"provider": "pi", "model": "murmur-qwen3-5-2b", "compact": true, "reasoning_effort": "none"},
+  "dell-7b": {"provider": "dell-world", "model": "qwen2.5:7b"}
+},
+"roles": {"inner": ["pi-mind", "dell-7b"]}
+```
+
+**Power matters.** A Pi 5 wants a USB-PD supply that can deliver 5 A (the official 27 W
+supply). On a weaker supply it runs fine idle but can reset when all four cores run a
+model. Limiting the model to two threads kept one such Pi at 4.9 V and under 68 °C across
+repeated tests. Give his inner life a backup model on another machine, so a Pi reset only
+means the next thought comes from the backup.
 
 ## Choosing where to spend
 

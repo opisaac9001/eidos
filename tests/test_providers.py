@@ -215,3 +215,54 @@ def test_settings_are_checked_before_they_are_used() -> None:
         validate({"providers": {}, "models": {"m": {"provider": "nowhere", "model": "m"}}}, {})
     with pytest.raises(SettingsError):
         validate({"roles": {"not-a-role": []}}, {})
+
+
+def murmur_request() -> ModelRequest:
+    from eidos.application.cognition import request_for
+
+    return request_for(
+        "murmur",
+        {
+            "time": "2026-09-08T22:00:00+00:00",
+            "location": "kitchen",
+            "memories": ["I made tea.", "Ellis said the lamp was tidy work.", "Rain again."],
+            "emotion": {"label": "tired"},
+            "time_budget": {"next_plan": "Work at the workshop", "free_minutes": 12},
+            "cognitive_workspace": [{"text": "something long and abstract"}],
+        },
+    )
+
+
+def test_small_models_get_a_short_example_led_request() -> None:
+    provider = FakeProvider(
+        [(200, completion('{"text": "Twelve minutes and no idea where my keys are."}'))]
+    )
+    try:
+        gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)
+        asyncio.run(gateway.generate(murmur_request()))
+        sent = provider.requests[0]
+        system, details = sent["messages"][0]["content"], json.loads(sent["messages"][1]["content"])
+        assert system.startswith("You are the passing inner thoughts of Patrick")
+        assert "Bus is late again" in system  # style examples from other situations
+        assert details == {
+            "where": "kitchen",
+            "hour": "22:00",
+            "feeling": "tired",
+            "on_his_mind": ["Ellis said the lamp was tidy work.", "Rain again."],
+            "next": "Work at the workshop",
+            "free_minutes": 12,
+        }
+        assert sent["max_tokens"] == 80
+    finally:
+        provider.close()
+
+
+def test_a_copied_style_example_is_not_a_thought() -> None:
+    copied = '{"text": "Bus is late again. Should\'ve brought gloves, obviously."}'
+    provider = FakeProvider([(200, completion(copied))])
+    try:
+        gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)
+        with pytest.raises(ValueError, match="copied a style example"):
+            asyncio.run(gateway.generate(murmur_request()))
+    finally:
+        provider.close()

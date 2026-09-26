@@ -448,6 +448,93 @@ ROLE_FIELDS = {
 }
 
 
+# The compact profile, for small local models (around 1-4B): a short, concrete request with
+# examples, and only the context that matters. Long abstract instructions make small
+# models copy labels ("Patrick's thoughts") or ramble until they run out of room.
+COMPACT_EXAMPLES = {
+    "murmur": (
+        ("bus stop, cold, running late", "Bus is late again. Should've brought gloves, obviously."),
+        (
+            "workshop, radio on, an old lamp on the bench",
+            "This lamp's older than me. Lovely wiring though, someone cared.",
+        ),
+        ("park, sunny, nothing planned", "Nowhere to be. That's a rare one. Might just sit a bit."),
+    ),
+    "oneiros": (
+        (
+            "the bus, worried about money",
+            "In a dream the bus kept stopping at my old school and the driver wanted paying in "
+            "buttons.",
+        ),
+        (
+            "the allotments, content",
+            "In a dream the allotment grew teacups instead of beans, and nobody thought it odd.",
+        ),
+    ),
+}
+COMPACT_PROMPTS = {
+    "murmur": (
+        "You are the passing inner thoughts of Patrick, a young man in a small English market "
+        "town. Write ONE short private thought, 5 to 25 words, first person, casual and "
+        "British, drawn from the details given (not from the examples). It can wander or "
+        "trail off. Don't address anyone, don't say his name, don't invent things that "
+        "happened, and don't repeat a recent thought. "
+        'Reply only with JSON: {"text": "..."}\nThe style, for other situations:\n'
+        + "\n".join(
+            f'details: {when} -> {{"text": "{said}"}}' for when, said in COMPACT_EXAMPLES["murmur"]
+        )
+    ),
+    "oneiros": (
+        "Write Patrick's dream: one to three short sentences that begin with 'In a dream'. "
+        "Dreams can be ordinary or strange, loosely built from the details given (not from "
+        "the examples), with no moral or explanation. Don't reuse a recent dream's image. "
+        'Reply only with JSON: {"text": "In a dream, ..."}\nThe style, for other situations:\n'
+        + "\n".join(
+            f'details: {when} -> {{"text": "{said}"}}' for when, said in COMPACT_EXAMPLES["oneiros"]
+        )
+    ),
+}
+COMPACT_TOKENS = {"murmur": 80, "oneiros": 140}
+
+
+def compact_context(capability: str, context: Mapping[str, object]) -> dict[str, object]:
+    """The few details a small model needs for a thought or a dream."""
+    details: dict[str, object] = {}
+    if context.get("location"):
+        details["where"] = context["location"]
+    time = context.get("time")
+    if isinstance(time, str) and len(time) >= 16:
+        details["hour"] = time[11:16]
+    emotion = context.get("emotion")
+    if isinstance(emotion, Mapping) and emotion.get("label"):
+        details["feeling"] = emotion["label"]
+    memories = context.get("memories")
+    if isinstance(memories, list) and memories:
+        details["on_his_mind"] = [str(m)[:160] for m in memories[-2:]]
+    if capability == "murmur":
+        stream = context.get("recent_inner_stream")
+        if isinstance(stream, list) and stream:
+            details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
+        budget = context.get("time_budget")
+        if isinstance(budget, Mapping):
+            if budget.get("next_plan"):
+                details["next"] = budget["next_plan"]
+            if budget.get("free_minutes") is not None:
+                details["free_minutes"] = budget["free_minutes"]
+        ongoing = context.get("ongoing_activities")
+        if isinstance(ongoing, list) and ongoing:
+            details["doing"] = [
+                str(item.get("title")) for item in ongoing[:2] if isinstance(item, Mapping)
+            ]
+    dreams = context.get("recent_dreams")
+    if isinstance(dreams, list) and dreams:
+        details["recent_dreams"] = [
+            str(item.get("text") if isinstance(item, Mapping) else item)[:120]
+            for item in dreams[-2:]
+        ]
+    return details
+
+
 STRUCTURED_MODES = ("json_schema", "json_object", "prompt")
 RETRY_STATUSES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 FINISHED = frozenset({"stop", "end_turn", "eos", "completed", "STOP", "stop_sequence"})
@@ -478,6 +565,7 @@ class HTTPModelGateway(ModelGateway):
         retries: int = 2,
         provider: str = "openai-compatible",
         on_usage: Callable[[ModelResponse], None] | None = None,
+        compact: bool = False,
     ):
         parsed = urlsplit(base_url)
         if (
@@ -511,6 +599,7 @@ class HTTPModelGateway(ModelGateway):
         self.retries = max(0, min(5, retries))
         self.provider = provider
         self.on_usage = on_usage
+        self.compact = compact
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
         return await asyncio.to_thread(self._generate, request)
@@ -627,11 +716,17 @@ class HTTPModelGateway(ModelGateway):
                 "Do not paraphrase its central image. Another mundane thread or an unfinished "
                 "fragment is enough; no need to upgrade it into a clever story."
             )
+        if self.compact and request.capability in COMPACT_PROMPTS:
+            # Small models: a short, example-led request with only the essentials.
+            system = COMPACT_PROMPTS[request.capability]
+            context = compact_context(request.capability, context)
         payload: dict[str, object] = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}]
             + [{"role": "user", "content": json.dumps(context)}],
-            "max_tokens": self.max_tokens
+            "max_tokens": COMPACT_TOKENS[request.capability]
+            if self.compact and request.capability in COMPACT_TOKENS
+            else self.max_tokens
             or min(
                 request.max_output_tokens,
                 640 if request.capability == "pathos_project" else 384,
@@ -667,6 +762,8 @@ class HTTPModelGateway(ModelGateway):
                 continue
             if schema is not None and self._mode != "json_schema":
                 response = _with_content(response, _extract_json(response.content))
+            if self.compact and request.capability in COMPACT_EXAMPLES:
+                _refuse_copied_example(request.capability, response.content)
             if self.on_usage is not None:
                 self.on_usage(response)
             return response
@@ -835,3 +932,15 @@ def _with_content(response: ModelResponse, content: str) -> ModelResponse:
     from dataclasses import replace
 
     return replace(response, content=content)
+
+
+def _refuse_copied_example(capability: str, content: str) -> None:
+    """A small model that hands back one of the style examples hasn't thought anything."""
+    try:
+        text = str(json.loads(content).get("text", ""))
+    except (ValueError, AttributeError):
+        return
+    said = " ".join(re.findall(r"[a-z']+", text.casefold()))
+    for _, example in COMPACT_EXAMPLES[capability]:
+        if said == " ".join(re.findall(r"[a-z']+", example.casefold())):
+            raise ValueError("Model copied a style example instead of thinking")

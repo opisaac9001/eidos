@@ -1,4 +1,36 @@
-# Pi 5 Murmur worker — commissioning incomplete
+# Pi 5 Murmur worker
+
+## 26 September 2026: a working setup, on a weak supply
+
+The Pi's supply negotiates only **900 mA** (`/proc/device-tree/chosen/power/max_current`);
+a Pi 5 wants 5 A. At idle that's fine (about 4.98 V). With all four cores running a model it
+reset, which is what happened when `qwen2.5:3b` loaded. The fix is the official 27 W USB-C
+supply (5.1 V 5 A) or another USB-PD supply that offers 5 A. Until then, run models
+limited to two threads:
+
+```bash
+printf "FROM qwen3.5:2b\nPARAMETER num_thread 2\nPARAMETER num_ctx 2048\n" > ~/eidos-models/murmur-qwen3-5-2b.Modelfile
+ollama create murmur-qwen3-5-2b -f ~/eidos-models/murmur-qwen3-5-2b.Modelfile
+```
+
+With Eidos's compact prompt profile (`"compact": true`, `"reasoning_effort": "none"`), the
+same five thought and dream cases gave these results, with the supply never below 4.90 V,
+no throttle flags and a peak of 67.5 °C:
+
+| Model (2 threads) | Passed | Seconds (warm) | Notes |
+|---|---|---|---|
+| `qwen2.5:1.5b` | 4/5 | 3–21 | Muddled thoughts; one dream ran out of room |
+| `qwen3.5:2b` | 5/5 | 10–18 (44 cold) | Sounds like him; one small invented detail |
+
+Installed on the Pi: `qwen2.5:1.5b`, `qwen2.5:3b`, `qwen3.5:2b`, `qwen3.5:4b`, plus the two
+2-thread variants `murmur-qwen2-5-1-5b` and `murmur-qwen3-5-2b`. The 3B/4B models haven't
+been tested; don't run them at four threads on this supply.
+
+The live world still routes Murmur to the Dell. To use the Pi, point his `inner` roles at
+`murmur-qwen3-5-2b` through the Dell's tunnel (`127.0.0.1:11437`), with the Dell's
+`qwen2.5:7b` as backup (see `docs/MODELS.md`).
+
+## Earlier notes (7–8 September)
 
 The 8GB Pi `pathos-murmur` has Raspberry Pi OS Lite 64-bit (Trixie),
 Tailscale, Ollama 0.33.3, and the downloaded `qwen2.5:1.5b` model.
