@@ -159,3 +159,30 @@ def test_the_runtime_hands_a_ripe_impulse_to_his_life(tmp_path) -> None:
     finally:
         runtime.stream = None
         runtime.close()
+
+
+def test_friends_at_their_own_homes_are_not_in_his_flat(tmp_path, monkeypatch) -> None:
+    import eidos.application.life as life_module
+
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(18)  # evening, at home
+    monkeypatch.setattr(life_module, "_npc_locations", lambda history, at: {"rowan": "home"})
+    seen = {}
+
+    async def spy(history, at, gateway, **kwargs):
+        seen.update(kwargs)
+        return []
+
+    monkeypatch.setattr(life_module, "reach_out_events", spy)
+    catalog = life._world_catalog(life.history())
+    person = next(iter(catalog.people.values()))
+    life.act_on_impulse(
+        {
+            "kind": "contact",
+            "target": person.person_id,
+            "target_name": person.name,
+            "strength": 2.8,
+            "thoughts": (f"Should text {person.name}.",),
+        }
+    )
+    assert "rowan" not in seen["with_him"]

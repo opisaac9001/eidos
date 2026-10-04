@@ -579,10 +579,11 @@ class Life(LifeConversation):
             catalog = self._world_catalog(history)
             person = catalog.people.get(str(impulse.get("target", "")))
             if person is not None:
+                # Residents "at home" are in their own homes, which share the id of his flat.
                 with_him = {
                     person_id
                     for person_id, place in _npc_locations(history, at).items()
-                    if place == state.location_id
+                    if place == state.location_id and place != "home"
                 }
                 pending.extend(
                     await reach_out_events(
