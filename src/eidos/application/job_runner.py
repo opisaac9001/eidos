@@ -28,11 +28,22 @@ class CognitionJobRunner:
         self.worker_id = worker_id
         self.now = now
 
+    def _stale(self, job: CognitionJob) -> bool:
+        """Whether the world moved on from the job's context.
+
+        Deferred work (an association, a passing thought) is checked against the world as it
+        is when the result is applied, so it only needs to arrive before its deadline. A slow
+        local model on a live world almost never finished before something else happened.
+        """
+        if job.context.get("deferred_kind") is not None:
+            return False
+        return self.revision_for(job.aggregate_id) != job.expected_revision
+
     def run_once(self) -> CognitionJob | None:
         claimed = self.jobs.claim_next(self.worker_id, self.now(), timedelta(seconds=60))
         if claimed is None:
             return None
-        if self.revision_for(claimed.aggregate_id) != claimed.expected_revision:
+        if self._stale(claimed):
             return self.jobs.fail(claimed.job_id, self.worker_id, "stale_context")
         if claimed.deadline_at is not None and self.now() >= claimed.deadline_at:
             self.jobs.expire_deadlines(self.now())
@@ -60,7 +71,7 @@ class CognitionJobRunner:
             if claimed.deadline_at is not None and self.now() >= claimed.deadline_at:
                 self.jobs.expire_deadlines(self.now())
                 return self.jobs.get_job(claimed.job_id)
-            if self.revision_for(claimed.aggregate_id) != claimed.expected_revision:
+            if self._stale(claimed):
                 return self.jobs.fail(claimed.job_id, self.worker_id, "stale_context")
             return self.jobs.complete(
                 claimed.job_id,

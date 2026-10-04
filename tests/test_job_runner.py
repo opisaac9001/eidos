@@ -42,12 +42,12 @@ class RunnerTests(unittest.TestCase):
         self.now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         self.revision = 7
 
-    def enqueue(self, attempts=2, deadline=None):
+    def enqueue(self, attempts=2, deadline=None, context=None):
         return self.jobs.enqueue(
             CognitionJob(
                 capability="murmur",
                 aggregate_id="pathos",
-                context={"location": "home", "memories": []},
+                context=context or {"location": "home", "memories": []},
                 expected_revision=7,
                 simulated_at=self.now.isoformat(),
                 max_attempts=attempts,
@@ -69,6 +69,16 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(completed.job_id, job.job_id)
         self.assertEqual(completed.status, "completed")
         self.assertEqual(completed.result, "A bounded thought.")
+
+    def test_deferred_work_completes_though_the_world_moved_on(self):
+        # It is revalidated against the world when it is applied, not here.
+        job = self.enqueue(
+            context={"location": "home", "memories": [], "deferred_kind": "inner_thought"}
+        )
+        self.revision = 9
+        completed = self.runner(Gateway()).run_once()
+        self.assertEqual(completed.job_id, job.job_id)
+        self.assertEqual(completed.status, "completed")
 
     def test_stale_before_or_after_inference_never_completes(self):
         before = self.enqueue()
