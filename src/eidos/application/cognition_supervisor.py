@@ -11,6 +11,8 @@ from eidos.application.job_runner import CognitionJobRunner
 from eidos.ports.job_store import JobStore
 from eidos.ports.model_gateway import ModelGateway
 
+IDLE_POLL_LIMIT = 0.5
+
 
 class CognitionSupervisor:
     def __init__(
@@ -58,6 +60,10 @@ class CognitionSupervisor:
     def _work(self, worker_id: str) -> None:
         runner = CognitionJobRunner(self.jobs, self.gateway, self.revision_for, worker_id)
         next_recovery = 0.0
+        # An idle queue is polled less and less often, up to IDLE_POLL_LIMIT; finding work
+        # resets it. Each poll is a write transaction, and two workers polling every 20 ms
+        # kept a live server busy doing nothing.
+        idle_wait = self.poll_interval
         while not self.stop_event.is_set():
             try:
                 result = runner.run_once()
@@ -66,8 +72,10 @@ class CognitionSupervisor:
                         self.jobs.expire_deadlines(datetime.now(timezone.utc))
                         self.jobs.recover_expired(datetime.now(timezone.utc))
                         next_recovery = time.monotonic() + 1
-                    self.stop_event.wait(self.poll_interval)
+                    self.stop_event.wait(idle_wait)
+                    idle_wait = min(max(self.poll_interval, IDLE_POLL_LIMIT), idle_wait * 2)
                 else:
+                    idle_wait = self.poll_interval
                     with self._lock:
                         self.completed_runs += 1
                         self.last_error = None
