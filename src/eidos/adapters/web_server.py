@@ -84,6 +84,20 @@ class Runtime:
             self._snapshot_key = key
         return self._snapshot
 
+    def _act_on_impulses(self) -> None:
+        """Let his life weigh whatever his thoughts have been reaching for."""
+        from dataclasses import asdict
+
+        ripe = self.stream.impulses.take_ripe()
+        for impulse in ripe:
+            try:
+                outcome = self.life.act_on_impulse(asdict(impulse))
+                logger.info("Impulse %s (%s): %s", impulse.kind, impulse.target_name, outcome)
+            except Exception:
+                logger.exception("Weighing an impulse failed")
+        if ripe:
+            self.cached = self.life_snapshot()
+
     def stream_view(self) -> tuple[dict[str, Any] | None, bool]:
         """What the inner stream sees: the latest snapshot, and whether time is running."""
         snapshot = self.cached
@@ -132,6 +146,8 @@ class Runtime:
                 }
                 try:
                     config = self.life_snapshot()["config"]
+                    if config["running"] and self.stream is not None:
+                        self._act_on_impulses()
                     if config["running"]:
                         if config.get("clock_mode", "realtime") == "realtime":
                             self._accrue_realtime(wall_now)

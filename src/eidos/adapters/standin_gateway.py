@@ -848,6 +848,17 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "pathos_text":
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "text": f"Hey {context.get('to', 'you')}, been thinking about you. How are things?"
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_voice":
             # Offline, his life keeps its authored words.
             return ModelResponse(

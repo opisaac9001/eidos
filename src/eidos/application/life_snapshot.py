@@ -23,6 +23,7 @@ from eidos.application.messaging import communication_availability
 from eidos.application.npc_simulation import npc_detail_tier
 from eidos.application.personal_journeys import journey_context
 from eidos.application.place_discovery import known_place_ids
+from eidos.application.reaching_out import texts_view
 from eidos.application.selfhood import selfhood_view
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_calendar import whats_on
@@ -669,6 +670,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "social_preferences": [vars_for(item) for item in social_preferences.values()],
         "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
         "season": season.name if season is not None else season_for(state.simulated_at),
+        "texts": texts_view(history),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,

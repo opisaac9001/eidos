@@ -1606,6 +1606,26 @@ function renderStream() {
     .map((item) => `<li>${esc(item.text)}</li>`)
     .join("");
   if ($("stream-trail").innerHTML !== trail) $("stream-trail").innerHTML = trail;
+  const PULLS = {
+    contact: (about) => `getting in touch with ${about}`,
+    plan: (about) => `getting on with ${about.toLowerCase()}`,
+    food: () => "something to eat or drink",
+    rest: () => "a rest",
+    out: () => "getting out for a bit",
+    later: () => "sorting something out",
+    you: () => "messaging you",
+  };
+  const pulls = (stream.pulling_at_him || [])
+    .filter((item) => item.pull >= 0.8)
+    .map((item) => (PULLS[item.kind] || (() => item.about))(item.about));
+  const pullText = pulls.length ? `On his mind to do: ${pulls.join(", ")}` : "";
+  $("stream-pulls").hidden = !pullText;
+  if ($("stream-pulls").textContent !== pullText) $("stream-pulls").textContent = pullText;
+  const texts = (state.texts || []).slice(0, 2)
+    .map((item) => `<li><span>To ${esc(item.to)}:</span> “${esc(item.he_wrote)}”${item.they_replied ? `<br /><span>${esc(item.to)}:</span> “${esc(item.they_replied)}”` : ""}</li>`)
+    .join("");
+  $("his-texts").hidden = !texts;
+  if ($("his-texts").innerHTML !== texts) $("his-texts").innerHTML = texts;
   const label = stream.enabled ? STREAM_STATES[stream.state] || "" : "";
   $("stream-status").textContent = label ? ` · ${label}` : "";
   $("stream-status").title = stream.last_error || "";

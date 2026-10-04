@@ -516,6 +516,159 @@ def is_stand_in(gateway: ModelGateway) -> bool:
     return str(getattr(gateway, "model", "authored-stand-in")).startswith("authored-stand-in")
 
 
+# -- from thought to impulse -----------------------------------------------------------------
+#
+# A real person's passing thoughts are how they end up doing things: think about Rowan's
+# mum three times and you text Rowan; keep noticing you're hungry and you make something.
+# Each kept thought is read for what it reaches towards. The pull builds when the same thing
+# comes back and fades when it doesn't; once it's strong enough, it becomes an impulse his
+# life weighs (see ``Life.act_on_impulse``), which may act on it, plan it, or let it go.
+
+PULL_HALF_LIFE_SECONDS = 20 * 60
+PULL_TO_ACT = 2.5
+SETTLE_SECONDS = 90 * 60
+_DESIRE = re.compile(
+    r"\b(should|need to|want to|wanna|might|could|gonna|going to|ought|must|have to|got to|"
+    r"i'll|let's|maybe i|time to|hope i|tempted|fancy)\b",
+    re.IGNORECASE,
+)
+_WORRY = re.compile(
+    r"\b(sick|ill|unwell|worried|worry|gutted|miss|missing|quiet lately|haven't heard|"
+    r"sad|struggling|alright|okay|ok)\b",
+    re.IGNORECASE,
+)
+_CONTACT = re.compile(
+    r"\b(text|ring|call|message|check on|check in|catch up|see how|ask (?:him|her|them)|"
+    r"drop (?:him|her|them))\b",
+    re.IGNORECASE,
+)
+_PULLS: dict[str, re.Pattern[str]] = {
+    "food": re.compile(
+        r"\b(hungry|starving|peckish|eat|dinner|lunch|breakfast|supper|snack|toast|"
+        r"sandwich|cook|fridge|brew|kettle|cuppa)\b",
+        re.IGNORECASE,
+    ),
+    "rest": re.compile(
+        r"\b(tired|knackered|exhausted|sleepy|nap|lie down|early night|shattered)\b",
+        re.IGNORECASE,
+    ),
+    "out": re.compile(
+        r"\b(walk|stroll|fresh air|get out|head out|pop out|pop down|the park|the river|"
+        r"the pub|the crown|the market)\b",
+        re.IGNORECASE,
+    ),
+    "later": re.compile(
+        r"\b(tomorrow|this weekend|next week|one day|at some point|book (?:a|the|in)|"
+        r"sort (?:it|that|out)|finally (?:get|do|ring|book))\b",
+        re.IGNORECASE,
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Impulse:
+    """Something his thoughts keep reaching for, strong enough now to weigh."""
+
+    key: str
+    kind: str  # contact, plan, food, rest, out, later, you
+    target: str
+    target_name: str
+    strength: float
+    thoughts: tuple[str, ...]
+
+
+def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, str, str, float]]:
+    """(key, kind, target, target_name, weight) for each thing this thought reaches towards."""
+    found: list[tuple[str, str, str, str, float]] = []
+    desire = 0.5 if _DESIRE.search(thought) else 0.0
+    pathos = snapshot.get("pathos") or {}
+    here = pathos.get("location_id")
+    for person in snapshot.get("people") or []:
+        if not isinstance(person, Mapping) or not person.get("name") or not person.get("id"):
+            continue
+        name = str(person["name"])
+        first = name.split()[0]
+        if not re.search(rf"\b{re.escape(first)}\b", thought):
+            continue
+        if here and person.get("location_id") == here:
+            continue  # he's with them; no need to reach out
+        weight = 1.0 + desire
+        weight += 0.5 if _CONTACT.search(thought) else 0.0
+        weight += 0.3 if _WORRY.search(thought) else 0.0
+        found.append((f"contact:{person['id']}", "contact", str(person["id"]), name, weight))
+    budget = snapshot.get("time_budget") or {}
+    plan = str(budget.get("next_plan") or "") if isinstance(budget, Mapping) else ""
+    plan_words = {word for word in _words(plan) if len(word) >= 4 and word not in _COMMON} - {
+        "shift",
+        "work",
+        "with",
+        "planned",
+    }
+    if plan and plan_words & _words(thought):
+        found.append(("plan:" + plan, "plan", plan, plan, 1.0 + desire))
+    for kind, pattern in _PULLS.items():
+        if pattern.search(thought):
+            found.append((kind, kind, kind, kind, 0.8 + desire))
+    if re.search(r"\b(the app|on the app|my app friend|that chat)\b", thought, re.IGNORECASE):
+        found.append(("you", "you", "you", "you", 1.0 + desire))
+    return found
+
+
+class ImpulseTracker:
+    """The pull of what his thoughts keep returning to, rising and fading over minutes."""
+
+    def __init__(self, clock: Callable[[], float]) -> None:
+        self.clock = clock
+        self._pull: dict[str, tuple[float, float, Impulse]] = {}
+        self._settled: dict[str, float] = {}
+        self._ripe: list[Impulse] = []
+        self._lock = threading.Lock()
+
+    def notice(self, thought: str, snapshot: Mapping[str, Any]) -> None:
+        now = self.clock()
+        with self._lock:
+            for key, kind, target, name, weight in pulls_in(thought, snapshot):
+                if now - self._settled.get(key, -1e12) < SETTLE_SECONDS:
+                    continue
+                value, then, held = self._pull.get(
+                    key, (0.0, now, Impulse(key, kind, target, name, 0.0, ()))
+                )
+                value = value * 0.5 ** ((now - then) / PULL_HALF_LIFE_SECONDS)
+                if value < 0.2:
+                    # Faded; whatever he thought about it before is gone.
+                    value, held = 0.0, Impulse(key, kind, target, name, 0.0, ())
+                value += weight
+                impulse = Impulse(
+                    key, kind, target, name, round(value, 2), (*held.thoughts, thought)[-3:]
+                )
+                if value >= PULL_TO_ACT:
+                    self._ripe.append(impulse)
+                    self._pull.pop(key, None)
+                    self._settled[key] = now
+                else:
+                    self._pull[key] = (value, now, impulse)
+
+    def take_ripe(self) -> list[Impulse]:
+        with self._lock:
+            ripe, self._ripe = self._ripe, []
+            return ripe
+
+    def view(self) -> list[dict[str, object]]:
+        now = self.clock()
+        with self._lock:
+            return sorted(
+                (
+                    {
+                        "kind": impulse.kind,
+                        "about": impulse.target_name,
+                        "pull": round(value * 0.5 ** ((now - then) / PULL_HALF_LIFE_SECONDS), 2),
+                    }
+                    for value, then, impulse in self._pull.values()
+                ),
+                key=lambda item: -float(str(item["pull"])),
+            )[:6]
+
+
 class InnerStream:
     """Produces his passing thoughts one after another, in the background.
 
@@ -553,6 +706,7 @@ class InnerStream:
         self.rejections = 0
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
+        self.impulses = ImpulseTracker(self.wall_clock)
 
     # The thread -----------------------------------------------------------------------
 
@@ -676,6 +830,7 @@ class InnerStream:
             )
             if kept.id is not None and kept.id % 100 == 0:
                 self.store.prune(KEEP)
+        self.impulses.notice(kept.text, snapshot)
         return kept
 
     # For the quarter-hour pulse ---------------------------------------------------------
@@ -706,6 +861,7 @@ class InnerStream:
             "last_error": self.last_error,
             "kept_since_start": self.kept,
             "turned_away_since_start": self.rejections,
+            "pulling_at_him": self.impulses.view(),
             "thoughts": [
                 {
                     "text": thought.text,

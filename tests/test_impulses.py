@@ -1,0 +1,161 @@
+"""From thought to impulse to action: his passing thoughts can lead him to do things."""
+
+import asyncio
+from datetime import datetime, timedelta, timezone
+
+from eidos.adapters.sqlite_store import SQLiteEventStore
+from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.inner_stream import PULL_TO_ACT, ImpulseTracker, pulls_in
+from eidos.application.life import Life
+from eidos.application.reaching_out import (
+    REACHED,
+    REPLIED,
+    reach_out_events,
+    reply_events,
+    texts_view,
+    why_not,
+)
+
+
+def snapshot() -> dict:
+    return {
+        "pathos": {"location_id": "home", "awake": True},
+        "people": [
+            {"id": "rowan", "name": "Rowan", "location_id": "park"},
+            {"id": "ellis", "name": "Ellis", "location_id": "home"},
+        ],
+        "time_budget": {"next_plan": "Tune the block plane and practise on offcuts"},
+    }
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_a_thought_reaches_for_people_plans_and_needs() -> None:
+    kinds = {
+        kind for _, kind, *_ in pulls_in("Rowan's mum sounds ill. Should text him.", snapshot())
+    }
+    assert kinds == {"contact"}
+    assert {kind for _, kind, *_ in pulls_in("Might get that plane running.", snapshot())} == {
+        "plan"
+    }
+    assert {kind for _, kind, *_ in pulls_in("Starving. Toast?", snapshot())} == {"food"}
+    # Someone he's with needs no reaching out to.
+    assert pulls_in("Ellis is quiet today.", snapshot()) == []
+
+
+def test_a_pull_grows_when_a_thought_comes_back_and_fades_when_it_doesnt() -> None:
+    clock = Clock()
+    tracker = ImpulseTracker(clock)
+    tracker.notice("Rowan's been quiet lately.", snapshot())
+    assert tracker.take_ripe() == []
+    clock.now += 3 * 3600  # hours later, the first thought has all but faded
+    tracker.notice("Wonder how Rowan's doing.", snapshot())
+    assert tracker.take_ripe() == []
+    clock.now += 60
+    tracker.notice("Rowan's mum is ill. Should text him.", snapshot())
+    ripe = tracker.take_ripe()
+    assert [impulse.kind for impulse in ripe] == ["contact"]
+    assert ripe[0].strength >= PULL_TO_ACT and len(ripe[0].thoughts) == 2
+    # Once weighed, the same pull settles for a while.
+    for _ in range(3):
+        tracker.notice("Should text Rowan.", snapshot())
+    assert tracker.take_ripe() == []
+
+
+def test_he_texts_like_a_person_not_at_night_and_not_twice_a_day() -> None:
+    at = datetime(2026, 8, 24, 18, 0, tzinfo=timezone.utc)
+    assert why_not([], at.replace(hour=23), "rowan") is not None
+    assert why_not([], at, "rowan", with_him={"rowan"}) is not None
+    sent = asyncio.run(
+        reach_out_events(
+            [],
+            at,
+            StandInGateway(),
+            person_id="rowan",
+            person_name="Rowan",
+            who_they_are="illustrator",
+            on_his_mind=["Rowan's mum sounds ill."],
+            mood="quiet",
+        )
+    )
+    assert [event.kind for event in sent if event.kind == REACHED] == [REACHED]
+    assert why_not(sent, at + timedelta(hours=2), "rowan") == "already texted them today"
+
+
+def test_their_reply_comes_later_in_their_own_words() -> None:
+    at = datetime(2026, 8, 24, 18, 0, tzinfo=timezone.utc)
+    history = []
+    for attempt in range(6):  # some people don't reply; find one who does
+        history = asyncio.run(
+            reach_out_events(
+                [],
+                at,
+                StandInGateway(),
+                person_id="rowan",
+                person_name="Rowan",
+                who_they_are="illustrator",
+                on_his_mind=["Rowan's mum sounds ill."],
+                mood="quiet",
+            )
+        )
+        if next(e for e in history if e.kind == REACHED).payload["reply_due_at"]:
+            break
+    assert asyncio.run(reply_events(history, at + timedelta(minutes=5), StandInGateway())) == []
+    later = asyncio.run(reply_events(history, at + timedelta(hours=3), StandInGateway()))
+    assert any(event.kind == REPLIED for event in later)
+    view = texts_view(history + later)
+    assert view[0]["to"] == "Rowan" and view[0]["they_replied"]
+
+
+def test_his_life_weighs_an_impulse_and_records_what_came_of_it(tmp_path) -> None:
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(10)
+    outcome = life.act_on_impulse(
+        {
+            "kind": "food",
+            "target": "food",
+            "target_name": "food",
+            "strength": 2.6,
+            "thoughts": ("Starving. Should make some toast.",),
+        }
+    )
+    assert outcome in {"acted", "let go"}
+    kinds = [event.kind for event in life.history()]
+    assert "impulse.felt" in kinds and "impulse.resolved" in kinds
+    thought = next(
+        e
+        for e in reversed(life.history())
+        if e.kind == "thought.recorded" and e.payload.get("source") == "impulse"
+    )
+    assert thought.payload["text"] == "Starving. Should make some toast."
+
+
+def test_the_runtime_hands_a_ripe_impulse_to_his_life(tmp_path) -> None:
+    from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+    from eidos.adapters.web_server import Runtime
+    from eidos.application.inner_stream import Impulse, InnerStream
+
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(10)
+    runtime = Runtime(life, interval=60)
+    runtime.start()
+    try:
+        runtime.stream = InnerStream(
+            SQLiteInnerStream(tmp_path / "world.sqlite3"), StandInGateway(), runtime.stream_view
+        )
+        runtime.stream.impulses._ripe.append(
+            Impulse("rest", "rest", "rest", "rest", 2.7, ("Knackered. Might lie down.",))
+        )
+        with runtime.lock:
+            runtime._act_on_impulses()
+        assert any(event.kind == "impulse.resolved" for event in life.history())
+        assert runtime.stream.impulses.take_ripe() == []
+    finally:
+        runtime.stream = None
+        runtime.close()

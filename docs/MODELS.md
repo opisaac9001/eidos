@@ -212,6 +212,22 @@ he cares about or a memory over the room around him, with some substance and rec
 written into his history as that quarter hour's thought, so no extra model call is needed
 for it. The Observatory shows the newest thought, with the last few fading beneath it.
 
+**From thought to action.** His passing thoughts are how he ends up doing things, as for
+anyone:
+- Each thought is read for what it reaches towards: someone to get in touch with, his next
+  plan, food, rest, getting out, something to sort out later, or you.
+- The pull builds when the same thing keeps coming back and fades when it doesn't. A
+  passing "might make tea" usually comes to nothing; thinking about Rowan's ill mum several
+  times in half an hour gets him texting Rowan.
+- A strong pull goes to his own decision-making, through the same rules as any choice. He
+  may do it now, plan it for later, or let it go.
+- A text to a friend is written in his words (the `pathos_text` role, part of his voice).
+  They answer a while later in theirs, and the reply becomes something he thinks about. He
+  doesn't text at night, texts the same person at most once a day, and texts only a few
+  people a day; now and then someone doesn't reply.
+
+The Observatory shows what's currently pulling at him and his latest texts.
+
 The stream pauses while he's asleep or the world is paused. It never changes his world;
 it only reads it.
 

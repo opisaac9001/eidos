@@ -144,6 +144,12 @@ ROLE_PROMPTS["pathos_voice"] = (
     "original is the plain record. Keep every fact exactly: every name, place and number. "
     "Add nothing that didn't happen and no one who wasn't there. About the same length."
 )
+ROLE_PROMPTS["pathos_text"] = (
+    "You are Patrick, texting a friend or someone in his life he's been thinking about. "
+    "Write the actual text he sends: short, casual, British, warm without gushing, the way "
+    "a thirty-ish man texts. Draw only on what's on his mind and who they are; never invent "
+    "news, events or plans. No greeting card phrases, no sign-off."
+)
 ROLE_PROMPTS["pathos_news_take"] = (
     "You are Patrick reading today's real news. Choose the few stories he'd actually take in "
     "and give his honest take in his own understated British voice, from his values: "
@@ -392,6 +398,7 @@ ROLE_FIELDS = {
     ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
+    "pathos_text": ("task", "time", "to", "who_they_are", "on_his_mind", "mood", "permission"),
     "pathos_voice": (
         "task",
         "time",

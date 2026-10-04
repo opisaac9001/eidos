@@ -91,7 +91,7 @@ PROVIDERS: dict[str, ProviderKind] = {
 # every role's name. A role's own assignment wins over its group's, and the group's over
 # the default.
 ROLE_GROUPS: dict[str, tuple[str, ...]] = {
-    "voice": ("pathos",),
+    "voice": ("pathos", "pathos_text"),
     "inner": (
         "murmur",
         "reflection",
@@ -120,7 +120,7 @@ ROLE_GROUPS: dict[str, tuple[str, ...]] = {
     ),
 }
 GROUP_LABELS = {
-    "voice": "His voice (conversation, messages)",
+    "voice": "His voice (conversation, messages, texting friends)",
     "inner": "His inner life (thoughts, reflection, dreams, selfhood)",
     "narration": "Narrating his life in his words",
     "life": "His choices and what he learns (plans, notes about you, advice, news)",

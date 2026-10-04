@@ -4,7 +4,7 @@ import asyncio
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from uuid import UUID, uuid4
 
 from eidos.application.activity_execution import (
@@ -144,6 +144,7 @@ from eidos.application.phone_calls import phone_call_events
 from eidos.application.place_discovery import known_place_ids, place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
+from eidos.application.reaching_out import reach_out_events, reply_events
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
@@ -507,8 +508,163 @@ class Life(LifeConversation):
                     },
                 )
             )
+        # Friends' replies to his texts arrive in their own time.
+        pending.extend(await reply_events(history + pending, state.simulated_at, self.gateway))
         self.store.append("pathos", pending, len(history))
         return text is not None
+
+    def act_on_impulse(self, impulse: Mapping[str, object]) -> str:
+        """Weigh something his thoughts keep reaching for, and maybe act on it.
+
+        The inner stream notices the pull (see ``ImpulseTracker``); here his life decides,
+        through the same rules as any other choice. A friend gets a text in his own words;
+        anything else goes to his agency, which may do it now, plan it, or let it go.
+        Returns what came of it.
+        """
+        return asyncio.run(self._act_on_impulse(impulse))
+
+    async def _act_on_impulse(self, impulse: Mapping[str, object]) -> str:
+        history = self.history()
+        state = self._project_state(history)
+        at = state.simulated_at
+        if not state.awake:
+            return "asleep"
+        busy = state.location_id == "in_transit" or any(
+            scene.status in {"active", "paused"}
+            and "pathos" in {scene.initiator_id, scene.partner_id}
+            for scene in project_scenes(history).scenes.values()
+        )
+        kind = str(impulse.get("kind", ""))
+        raw_thoughts = impulse.get("thoughts", ())
+        thoughts = (
+            [str(text) for text in raw_thoughts][-3:]
+            if isinstance(raw_thoughts, (list, tuple))
+            else []
+        )
+        if not thoughts:
+            return "nothing"
+        impulse_id = str(uuid4())
+        felt = DomainEvent(
+            "impulse.felt",
+            "pathos",
+            {
+                "impulse_id": impulse_id,
+                "kind": kind,
+                "target": str(impulse.get("target", "")),
+                "about": str(impulse.get("target_name", "")),
+                "strength": float(str(impulse.get("strength", 0) or 0)),
+                "from_thoughts": " / ".join(thoughts),
+                "simulated_at": at.isoformat(),
+                "action_authority": False,
+            },
+            correlation_id=impulse_id,
+        )
+        thought = DomainEvent(
+            "thought.recorded",
+            "pathos",
+            {
+                "text": thoughts[-1],
+                "simulated_at": at.isoformat(),
+                "source": "impulse",
+                "factual": False,
+                "role": "murmur",
+                "impulse_id": impulse_id,
+            },
+            causation_id=felt.event_id,
+            correlation_id=impulse_id,
+        )
+        pending: list[DomainEvent] = [felt, thought]
+        emotion = project_emotion(history)
+        if kind == "contact":
+            catalog = self._world_catalog(history)
+            person = catalog.people.get(str(impulse.get("target", "")))
+            if person is not None:
+                with_him = {
+                    person_id
+                    for person_id, place in _npc_locations(history, at).items()
+                    if place == state.location_id
+                }
+                pending.extend(
+                    await reach_out_events(
+                        history + pending,
+                        at,
+                        self.gateway,
+                        person_id=person.person_id,
+                        person_name=person.name,
+                        who_they_are=person.occupation or person.description,
+                        on_his_mind=thoughts,
+                        mood=emotion.label,
+                        with_him=with_him,
+                        cause=felt,
+                    )
+                )
+        elif kind == "you":
+            pending.extend(
+                await outreach_events(
+                    history + pending,
+                    at,
+                    self.gateway,
+                    pathos_awake=True,
+                    context={
+                        "time": at.isoformat(),
+                        "memories": thoughts,
+                        "emotion": {"label": emotion.label, "intensity": emotion.intensity},
+                    },
+                )
+            )
+        elif not busy:
+            agency_history = history + pending
+            identity = project_identity(agency_history)
+            pending.extend(
+                await autonomous_activity_events(
+                    agency_history,
+                    at,
+                    len(agency_history),
+                    self.gateway,
+                    planning=self._planning(agency_history),
+                    catalog=self._world_catalog(agency_history),
+                    needs={
+                        "rest": state.rest,
+                        "connection": state.connection,
+                        "curiosity": state.curiosity,
+                        "mastery": state.mastery,
+                        "energy": state.energy,
+                        "hunger": state.hunger,
+                        "financial_margin": min(
+                            1.0, self._finances(agency_history).balance_pence / 20_000
+                        ),
+                        "physical_capacity": 1.0,
+                    },
+                    emotion=_emotion_brief(emotion),
+                    values=identity.values,
+                    preferences=identity.preferences,
+                    traits=project_traits(agency_history).levels,
+                    memories=[],
+                    workspace=cognitive_workspace(agency_history, at),
+                    known_person_ids=pathos_known_person_ids(agency_history),
+                    current_location_id=state.location_id,
+                )
+            )
+        acted = any(
+            event.kind in {"schedule.created", "contact.reached_out", "conversation.message"}
+            for event in pending
+        )
+        outcome = "acted" if acted else "let go"
+        pending.append(
+            DomainEvent(
+                "impulse.resolved",
+                "pathos",
+                {
+                    "impulse_id": impulse_id,
+                    "outcome": outcome,
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=felt.event_id,
+                correlation_id=impulse_id,
+            )
+        )
+        self.store.append("pathos", pending, len(history))
+        return outcome
 
     def preview_catch_up(self, hours: float) -> CatchUpPreview:
         history = self.history()

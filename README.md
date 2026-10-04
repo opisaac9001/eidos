@@ -71,7 +71,9 @@ his personality is the sum of what he has lived. After a simulated year or two h
 **An inner life**
 - An inner monologue that never stops while he's awake: passing thoughts one after another,
   each following on from the last and drifting to whatever is around him or on his mind.
-  Most are forgotten; the one that mattered is kept each quarter hour.
+  Most are forgotten; the one that mattered is kept each quarter hour. What keeps coming
+  back turns into doing: he makes the food he's been thinking about, gets on with the plan,
+  or texts the friend he's worried about, who replies in their own time.
 - Emotion sampled every hour, memories with fallible recall, dreams, evening reflections,
   habits and tastes learned from experience, and values that drift slowly with how he
   lives.
