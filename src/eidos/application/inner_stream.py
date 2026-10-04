@@ -18,6 +18,7 @@ The stream only reads his world (from the live snapshot); it never changes it.
 from __future__ import annotations
 
 import asyncio
+import json
 import random
 import re
 import threading
@@ -271,11 +272,17 @@ def stream_context(
     """The murmur request for the next thought in the stream."""
     pathos = snapshot.get("pathos") or {}
     emotion = snapshot.get("emotion") or {}
-    memories = [
-        text
-        for text in (_text_of(item) for item in (snapshot.get("memories") or [])[:3])
-        if text is not None
-    ]
+    # With somewhere for his mind to go, that is the focus; extra memories only give a small
+    # model names and scenes to wander into.
+    memories = (
+        []
+        if cue is not None
+        else [
+            text
+            for text in (_text_of(item) for item in (snapshot.get("memories") or [])[:3])
+            if text is not None
+        ]
+    )
     context: dict[str, object] = {
         "time": str(snapshot.get("time", "")),
         "location": str(pathos.get("location") or ""),
@@ -332,6 +339,38 @@ _WORDS = re.compile(r"[a-z']+")
 
 def _words(text: str) -> set[str]:
     return set(_WORDS.findall(text.casefold()))
+
+
+# His family by name, from his authored background; "Mum" and "Dad" are never a slip.
+FAMILY_NAMES = ("Helen", "Richard", "Tom", "Jess", "Isla", "Gulliver")
+
+
+def known_names(snapshot: Mapping[str, Any]) -> set[str]:
+    """Everyone in his life a thought could name."""
+    names = set(FAMILY_NAMES)
+    for key in ("people", "townsfolk"):
+        for person in snapshot.get(key) or []:
+            if isinstance(person, Mapping) and isinstance(person.get("name"), str):
+                names.update(part for part in person["name"].split() if part[:1].isupper())
+    return {name for name in names if len(name) > 1}
+
+
+def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str | None:
+    """A person named in a thought who wasn't in front of his mind for it.
+
+    Small models carry names over from his previous thoughts and invent what those people
+    are doing. A passing thought may name only who is in what it was given this time: where
+    he is, what he's doing, what's next, where his mind went, and anything remembered.
+    """
+    given = dict(context)
+    given.pop("recent_inner_stream", None)
+    allowed = json.dumps(given, ensure_ascii=False)
+    for name in names:
+        if re.search(rf"\b{re.escape(name)}\b", text) and not re.search(
+            rf"\b{re.escape(name)}\b", allowed
+        ):
+            return name
+    return None
 
 
 def near_repeat(text: str, earlier: Sequence[str]) -> bool:
@@ -467,13 +506,8 @@ class InnerStream:
         at = _simulated_now(snapshot)
         pending: list[DomainEvent] = []
         started = perf_counter()
-        text = await perform(
-            self.gateway,
-            "murmur",
-            stream_context(snapshot, recent_texts[-3:], cue),
-            at,
-            pending,
-        )
+        context = stream_context(snapshot, recent_texts[-3:], cue)
+        text = await perform(self.gateway, "murmur", context, at, pending)
         trace = next(
             (
                 event.payload
@@ -488,6 +522,10 @@ class InnerStream:
             return None
         if near_repeat(text, recent_texts[-4:]):
             self.last_error = f"repeated itself, skipped: {text[:80]}"
+            return None
+        stray = stray_name(text, context, known_names(snapshot))
+        if stray is not None:
+            self.last_error = f"brought in {stray} from nowhere, skipped: {text[:80]}"
             return None
         with self._lock:
             kept = self.store.add(

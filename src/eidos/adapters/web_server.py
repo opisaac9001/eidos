@@ -69,7 +69,18 @@ class Runtime:
         snapshot = self.cached
         if snapshot is None or self.error is not None or self.stop.is_set():
             return snapshot, False
-        return snapshot, bool(snapshot.get("config", {}).get("running"))
+        config = snapshot.get("config", {})
+        if config.get("running") and config.get("clock_mode", "realtime") == "realtime":
+            # The snapshot is only refreshed when time is committed; his clock keeps moving.
+            elapsed = self.realtime_pending_seconds + max(
+                0.0, self.clock() - max(self.last_wall_tick, self.realtime_suppressed_until)
+            )
+            try:
+                now = datetime.fromisoformat(str(snapshot["time"])) + timedelta(seconds=elapsed)
+                snapshot = {**snapshot, "time": now.isoformat()}
+            except (KeyError, ValueError):
+                pass
+        return snapshot, bool(config.get("running"))
 
     def start(self) -> None:
         with self.lock:

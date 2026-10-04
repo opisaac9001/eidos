@@ -485,6 +485,8 @@ COMPACT_PROMPTS = {
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
+        "Fit the time_of_day. Name only people in this moment's details, never someone "
+        "only in recent_thoughts. "
         "Don't address anyone, don't say his name, don't invent things that "
         "happened, and don't repeat a recent thought. "
         'Reply only with JSON: {"text": "..."}\nThe style, for other situations:\n'
@@ -505,6 +507,22 @@ COMPACT_PROMPTS = {
 COMPACT_TOKENS = {"murmur": 80, "oneiros": 140}
 
 
+def part_of_day(hour: int) -> str:
+    """Small models follow words better than clock times."""
+    for until, words in (
+        (5, "the middle of the night"),
+        (9, "early morning"),
+        (12, "morning"),
+        (14, "around lunchtime"),
+        (17, "afternoon"),
+        (20, "evening"),
+        (23, "late evening"),
+    ):
+        if hour < until:
+            return words
+    return "the middle of the night"
+
+
 def compact_context(capability: str, context: Mapping[str, object]) -> dict[str, object]:
     """The few details a small model needs for a thought or a dream."""
     details: dict[str, object] = {}
@@ -513,6 +531,8 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
     time = context.get("time")
     if isinstance(time, str) and len(time) >= 16:
         details["hour"] = time[11:16]
+        if time[11:13].isdigit():
+            details["time_of_day"] = part_of_day(int(time[11:13]))
     emotion = context.get("emotion")
     if isinstance(emotion, Mapping) and emotion.get("label"):
         details["feeling"] = emotion["label"]

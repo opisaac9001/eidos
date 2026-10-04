@@ -2,6 +2,7 @@
 
 import json
 import random
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -231,3 +232,50 @@ def test_small_models_are_told_where_his_mind_is_wandering() -> None:
     details = compact_context("murmur", context)
     assert details["mind_wanders_to"] == "owes Dad a call"
     assert details["recent_thoughts"] == ["Rain again."]
+
+
+def test_a_thought_names_only_people_in_front_of_his_mind() -> None:
+    from eidos.application.inner_stream import known_names, stray_name
+
+    names = known_names(snapshot())
+    assert {"Ellis", "Mara", "Tom"} <= names
+    context = stream_context(snapshot(), ["Ellis's kitchen is so small."], Cue("money", "£420"))
+    assert stray_name("Ellis's money is all I've got.", context, names) == "Ellis"
+    assert stray_name("Four hundred quid. Rent's soon.", context, names) is None
+    # Tea with Mara is his next plan, so she is on his mind.
+    assert stray_name("Tea with Mara soon. Hands are filthy.", context, names) is None
+    here = stream_context(snapshot(), [], Cue("person", "Ellis is here"))
+    assert stray_name("Ellis is humming again.", here, names) is None
+
+
+def test_small_models_get_the_time_of_day_in_words() -> None:
+    from eidos.adapters.http_gateway import compact_context
+
+    details = compact_context("murmur", {"time": "2026-01-08T07:42:00+00:00"})
+    assert details["time_of_day"] == "early morning"
+
+
+def test_the_stream_sees_his_clock_moving_between_commits(tmp_path) -> None:
+    class Clock:
+        now = 300.0
+
+        def __call__(self) -> float:
+            return self.now
+
+    clock = Clock()
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(7)
+    runtime = Runtime(life, interval=60, clock=clock)
+    runtime.start()
+    try:
+        with runtime.mutation():
+            life.configure(True, 15, "realtime")
+        committed = runtime.cached["time"]
+        clock.now += 120
+        seen, running = runtime.stream_view()
+        assert running
+        assert datetime.fromisoformat(seen["time"]) - datetime.fromisoformat(committed) == (
+            timedelta(seconds=120)
+        )
+    finally:
+        runtime.close()

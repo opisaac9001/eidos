@@ -247,6 +247,7 @@ def test_small_models_get_a_short_example_led_request() -> None:
         assert details == {
             "where": "kitchen",
             "hour": "22:00",
+            "time_of_day": "late evening",
             "feeling": "tired",
             "on_his_mind": ["Ellis said the lamp was tidy work.", "Rain again."],
             "next": "Work at the workshop",
