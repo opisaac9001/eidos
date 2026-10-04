@@ -289,3 +289,17 @@ def test_his_mind_drifts_to_his_own_memories_not_residents() -> None:
     ]
     memories = [cue.text for cue in cues(world) if cue.kind == "memory"]
     assert memories == ["Mum rang about the garden."]
+
+
+def test_a_rejected_thought_doesnt_slow_the_stream_like_an_outage(tmp_path) -> None:
+    class Looping(Thinker):
+        async def generate(self, request: ModelRequest) -> ModelResponse:
+            return ModelResponse(json.dumps({"text": "Same again, same again."}), "m", "t", "stop")
+
+    stream = InnerStream(
+        SQLiteInnerStream(tmp_path / "world.sqlite3"), Looping(), lambda: (snapshot(), True)
+    )
+    assert stream.step() == 20  # the first is kept
+    for _ in range(4):
+        assert stream.step() == 20  # repeats are dropped without backing off
+    assert stream.failures == 0 and stream.state == "resting"

@@ -444,6 +444,7 @@ class InnerStream:
         self.state = "starting"
         self.last_error: str | None = None
         self.failures = 0
+        self.rejected = False
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
 
@@ -485,8 +486,13 @@ class InnerStream:
             self.state = "asleep"
             return IDLE_POLL_SECONDS
         self.state = "thinking"
+        self.rejected = False
         thought = asyncio.run(self.think(snapshot))
         gap = max(settings.gap_seconds, STAND_IN_GAP_SECONDS if is_stand_in(self.gateway) else 0)
+        if thought is None and self.rejected:
+            # The model answered; the thought just wasn't a good one. Think again as usual.
+            self.state = "resting"
+            return gap
         if thought is None:
             self.failures += 1
             self.state = "failing"
@@ -531,10 +537,12 @@ class InnerStream:
             return None
         if near_repeat(text, recent_texts[-4:]):
             self.last_error = f"repeated itself, skipped: {text[:80]}"
+            self.rejected = True
             return None
         stray = stray_name(text, context, known_names(snapshot))
         if stray is not None:
             self.last_error = f"brought in {stray} from nowhere, skipped: {text[:80]}"
+            self.rejected = True
             return None
         with self._lock:
             kept = self.store.add(
