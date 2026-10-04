@@ -311,3 +311,9 @@ def test_a_rejected_thought_doesnt_slow_the_stream_like_an_outage(tmp_path) -> N
     for _ in range(4):
         assert stream.step() == 20  # repeats are dropped without backing off
     assert stream.failures == 0 and stream.state == "resting"
+
+
+def test_his_mood_colours_the_stream_only_when_his_mind_turns_to_it() -> None:
+    assert "emotion" not in stream_context(snapshot(), [], Cue("here", "The workshop"))
+    feeling = stream_context(snapshot(), [], Cue("feeling", "content"))
+    assert feeling["emotion"]["label"] == "content"

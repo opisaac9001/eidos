@@ -297,12 +297,14 @@ def stream_context(
         "location": str(pathos.get("location") or ""),
         "memories": [_short(text, 200) for text in memories],
         "recent_inner_stream": list(recent),
-        "emotion": {
+    }
+    if cue is None or cue.kind == "feeling":
+        # Given his mood every time, a small model made every thought about it ("too quiet").
+        context["emotion"] = {
             "label": emotion.get("label", "quiet"),
             "intensity": emotion.get("intensity", 0.3),
             "pattern": emotion.get("pattern", "transient"),
-        },
-    }
+        }
     budget = snapshot.get("time_budget")
     if isinstance(budget, Mapping):
         context["time_budget"] = {
