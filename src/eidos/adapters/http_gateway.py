@@ -607,8 +607,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             if budget.get("next_plan"):
                 # Named as his, or a small model hands his plans to whoever else is mentioned.
                 details["my_next_plan"] = budget["next_plan"]
-            if budget.get("free_minutes") is not None:
-                details["my_free_minutes"] = budget["free_minutes"]
+            free = budget.get("free_minutes")
+            if isinstance(free, (int, float)) and free >= 1:
+                details["my_free_minutes"] = round(free)
         ongoing = context.get("ongoing_activities")
         if isinstance(ongoing, list) and ongoing:
             details["what_im_doing"] = [

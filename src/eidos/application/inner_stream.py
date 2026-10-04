@@ -134,12 +134,23 @@ def _short(text: str, limit: int = 160) -> str:
     return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
 
+# Bookkeeping, not memories a mind drifts back to: plan status lines, a narrator's account
+# of an encounter ("...offering Pathos a cup..."), and his own outgoing messages.
+_NOT_EVOCATIVE = re.compile(
+    r"^(?:started the planned|stayed with the planned|i completed the planned|"
+    r"i showed up for my planned|completed the planned|you sent a message|i sent a message)"
+    r"|\bpathos\b",
+    re.IGNORECASE,
+)
+
+
 def _his_memories(snapshot: Mapping[str, Any]) -> list[object]:
-    """His own memories; the snapshot's list also carries what residents remember."""
+    """His own memories worth drifting to; the snapshot's list also carries residents'."""
     return [
         memory
         for memory in snapshot.get("memories") or []
-        if not isinstance(memory, Mapping) or memory.get("owner", "pathos") == "pathos"
+        if (not isinstance(memory, Mapping) or memory.get("owner", "pathos") == "pathos")
+        and not _NOT_EVOCATIVE.search(_text_of(memory) or "")
     ]
 
 

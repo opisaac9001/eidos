@@ -377,3 +377,15 @@ def test_someone_his_mind_went_to_a_few_thoughts_ago_is_still_on_it(tmp_path) ->
         "Wonder if Rowan's happy.",
         "Rowan's seeing someone, I reckon.",
     ]
+
+
+def test_bookkeeping_is_not_a_memory_his_mind_drifts_to() -> None:
+    world = snapshot()
+    world["memories"] = [
+        {"text": "Started the planned activity: Tune the block plane.", "owner": "pathos"},
+        {"text": "Beth Pritchard smiles, offering Pathos a cup of coffee.", "owner": "pathos"},
+        {"text": "You sent a message: How are you?", "owner": "pathos"},
+        {"text": "Rowan told me their mum's not been well.", "owner": "pathos"},
+    ]
+    memories = [cue.text for cue in cues(world) if cue.kind == "memory"]
+    assert memories == ["Rowan told me their mum's not been well."]
