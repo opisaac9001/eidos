@@ -565,6 +565,28 @@ _PULLS: dict[str, re.Pattern[str]] = {
 }
 
 
+_WARM = re.compile(
+    r"\b(lovely|nice|glad|good|warm|peaceful|content|happy|love|loved|proud|fun|laugh|"
+    r"laughing|cosy|cozy|relief|relieved|grateful|enjoy|enjoyed|pleased|smile|smiling|"
+    r"brilliant|great|sweet|calm|perfect|chuffed|excited|hope|hoping)\b",
+    re.IGNORECASE,
+)
+_HEAVY = re.compile(
+    r"\b(worried|worry|worrying|sad|gutted|tired|knackered|annoyed|ugh|stuck|awful|"
+    r"lonely|miss|missing|anxious|stress|stressed|hate|rubbish|sick|ill|weird|cold|"
+    r"heavy|tense|guilty|dread|grim|fed up|skint|broke|exhausted|unnerving|biting)\b",
+    re.IGNORECASE,
+)
+
+
+def felt_tone(text: str) -> float:
+    """How a passing thought feels, from -1 (heavy) to 1 (warm); 0 when it's neutral."""
+    warm, heavy = len(_WARM.findall(text)), len(_HEAVY.findall(text))
+    if not warm and not heavy:
+        return 0.0
+    return round((warm - heavy) / (warm + heavy) * min(1.0, (warm + heavy) / 2), 2)
+
+
 @dataclass(frozen=True, slots=True)
 class Impulse:
     """Something his thoughts keep reaching for, strong enough now to weigh."""
@@ -836,15 +858,24 @@ class InnerStream:
     # For the quarter-hour pulse ---------------------------------------------------------
 
     def keep_for_pulse(
-        self, pulse: Callable[[str | None, str | None], bool], window_seconds: float = 900
+        self,
+        pulse: Callable[[str | None, str | None, float | None], bool],
+        window_seconds: float = 900,
     ) -> bool:
         """Offer the quarter hour's most telling thought to the pulse that records one.
 
         With nothing from the stream this quarter hour, the pulse thinks for itself. A
         thought is marked as kept only once the pulse has recorded it.
         """
-        chosen = pick_for_pulse(self.store.since(self.wall_clock() - window_seconds))
-        recorded = pulse(chosen.text if chosen else None, chosen.model if chosen else None)
+        thoughts = self.store.since(self.wall_clock() - window_seconds)
+        chosen = pick_for_pulse(thoughts)
+        # How the quarter hour felt, from everything that went through his mind in it.
+        tone = (
+            round(sum(felt_tone(thought.text) for thought in thoughts) / len(thoughts), 3)
+            if thoughts
+            else None
+        )
+        recorded = pulse(chosen.text if chosen else None, chosen.model if chosen else None, tone)
         if recorded and chosen is not None and chosen.id is not None:
             self.store.mark_promoted(chosen.id)
         return recorded

@@ -389,3 +389,22 @@ def test_bookkeeping_is_not_a_memory_his_mind_drifts_to() -> None:
     ]
     memories = [cue.text for cue in cues(world) if cue.kind == "memory"]
     assert memories == ["Rowan told me their mum's not been well."]
+
+
+def test_a_passing_thought_has_a_felt_tone() -> None:
+    from eidos.application.inner_stream import felt_tone
+
+    assert felt_tone("Rowan's mum sounds awful. Worried about him.") < 0
+    assert felt_tone("Lovely evening. Glad I finished the plane.") > 0
+    assert felt_tone("The bus is at ten past.") == 0.0
+
+
+def test_how_his_thoughts_felt_moves_his_mood_at_the_quarter_hour(tmp_path) -> None:
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(10)
+    before = life._project_state(life.history()).valence
+    assert life.pulse_inner_stream("Worried sick about Rowan's mum. Awful.", "m", -0.8)
+    after = life._project_state(life.history()).valence
+    assert after < before
+    episode = next(e for e in reversed(life.history()) if e.kind == "affect.episode_started")
+    assert episode.payload["source_kind"] == "thought.recorded"

@@ -95,6 +95,7 @@ from eidos.application.inner_life import (
     record_dream_events,
     waking_dream_events,
 )
+from eidos.application.inner_stream import felt_tone
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.life_context import latest_weather
 from eidos.application.life_context import mood_name as mood_name
@@ -376,17 +377,23 @@ class Life(LifeConversation):
         asyncio.run(self._advance(hours))
 
     def pulse_inner_stream(
-        self, stream_thought: str | None = None, stream_model: str | None = None
+        self,
+        stream_thought: str | None = None,
+        stream_model: str | None = None,
+        stream_tone: float | None = None,
     ) -> bool:
         """Run one idempotent waking quarter-hour of stream-of-consciousness cognition.
 
         When the always-running inner stream has had a thought worth keeping this quarter
         hour, it is recorded as the quarter hour's thought instead of asking for a new one.
         """
-        return asyncio.run(self._pulse_inner_stream(stream_thought, stream_model))
+        return asyncio.run(self._pulse_inner_stream(stream_thought, stream_model, stream_tone))
 
     async def _pulse_inner_stream(
-        self, stream_thought: str | None = None, stream_model: str | None = None
+        self,
+        stream_thought: str | None = None,
+        stream_model: str | None = None,
+        stream_tone: float | None = None,
     ) -> bool:
         history = self.history()
         state = self._project_state(history)
@@ -488,6 +495,7 @@ class Life(LifeConversation):
                             if kept_from_stream
                             else {}
                         ),
+                        **({"felt_tone": stream_tone} if stream_tone is not None else {}),
                     },
                     causation_id=source.event_id if source is not None else marker.event_id,
                     correlation_id=pulse_id,
@@ -510,6 +518,12 @@ class Life(LifeConversation):
             )
         # Friends' replies to his texts arrive in their own time.
         pending.extend(await reply_events(history + pending, state.simulated_at, self.gateway))
+        # How this quarter hour felt (his thoughts, any reply) moves his feelings now, not on
+        # the hour.
+        felt, felt_state = appraisal_events(history + pending, state, state.simulated_at)
+        pending.extend(felt)
+        episodes, _ = affect_episode_events(history + pending, felt_state, state.simulated_at)
+        pending.extend(episodes)
         self.store.append("pathos", pending, len(history))
         return text is not None
 
@@ -564,6 +578,7 @@ class Life(LifeConversation):
             "pathos",
             {
                 "text": thoughts[-1],
+                "felt_tone": felt_tone(" ".join(thoughts)),
                 "simulated_at": at.isoformat(),
                 "source": "impulse",
                 "factual": False,

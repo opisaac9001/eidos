@@ -24,7 +24,8 @@ def baseline_affect_events(
     With ``energy_rhythm``, sleep also restores energy and waking hours slowly spend it, so a
     night's rest actually leaves him refreshed and an evening actually finds him tired.
     """
-    valence_step = 0.025 if not state.awake else 0.012 if state.valence < 0 else 0.018
+    # Awake, a feeling lasts a few hours rather than one; a night's sleep resets more.
+    valence_step = 0.05 if not state.awake else 0.011 if state.valence < 0 else 0.015
     arousal_step = 0.035 if not state.awake else 0.02
     valence = _toward(state.valence, mood_baseline, valence_step)
     arousal = _toward(state.arousal, 0.35, arousal_step)
@@ -736,6 +737,15 @@ def _effect(
         return ("affect", 0.0, -0.15, 0.5, 0.8)
     if event.kind == "apology.offered":
         return ("connection", 0.04, 0.55, 0.35, 0.85)
+    if event.kind == "thought.recorded" and event.payload.get("source") in {
+        "continuous-inner-stream",
+        "impulse",
+    }:
+        tone = event.payload.get("felt_tone")
+        if isinstance(tone, (int, float)) and not isinstance(tone, bool) and abs(tone) >= 0.05:
+            # Four quarter hours an hour: each counts for a little, together for a lot.
+            return ("affect", 0.0, round(max(-0.3, min(0.3, 0.35 * float(tone))), 3), 0.15, 0.6)
+        return None
     if event.kind == "dream.effect_applied":
         return ("affect", 0.0, float(event.payload.get("valence_delta", 0)), 0.65, 0.15)
     if event.kind == "reflection.recorded":
@@ -777,6 +787,11 @@ def _pathos_experienced_scene_turn(event: DomainEvent, index: _AppraisalIndex) -
     return str(event.event_id) in index.pathos_perceived
 
 
+# A good moment can lift him nearly as much as a bad one can lower him (0.16); at 0.06 the
+# hourly drift back to neutral erased nearly every good thing within an hour or two.
+POSITIVE_CAP = 0.11
+
+
 def _toward(value: float, target: float, step: float) -> float:
     if value < target:
         return min(target, value + step)
@@ -802,6 +817,10 @@ def _episode_valence_delta(
         return max(-0.16, desirability * 0.16 * saturation), 1.0
 
     source_kind = str(appraisal.payload.get("source_kind", ""))
+    if source_kind == "thought.recorded":
+        # His own warm thoughts don't wear thin the way a repeated treat does.
+        saturation = max(0.1, 1.0 - max(0.0, state.valence) * 1.5)
+        return min(POSITIVE_CAP, desirability * POSITIVE_CAP * saturation), round(saturation, 4)
     cutoff = simulated_at - timedelta(hours=24)
     repeats = 0
     for event in episodes:
@@ -822,4 +841,4 @@ def _episode_valence_delta(
     repetition = max(0.2, 1.0 / (1.0 + repeats * 0.45))
     saturation = max(0.15, 1.0 - max(0.0, state.valence) * 0.85)
     adaptation = round(repetition * saturation, 4)
-    return min(0.06, desirability * 0.06 * adaptation), adaptation
+    return min(POSITIVE_CAP, desirability * POSITIVE_CAP * adaptation), adaptation

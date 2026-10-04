@@ -311,7 +311,7 @@ class AppraisalTests(unittest.TestCase):
         self.assertEqual(len(deltas), 3)
         self.assertGreater(deltas[0], deltas[1])
         self.assertGreater(deltas[1], deltas[2])
-        self.assertLess(affected.valence, sum([0.024] * 3))
+        self.assertLess(affected.valence, deltas[0] * 3)
 
     def test_perceived_world_trouble_can_outweigh_routine_positive_affect(self):
         troubling = DomainEvent(
