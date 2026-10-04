@@ -305,6 +305,18 @@ def stream_context(
             "intensity": emotion.get("intensity", 0.3),
             "pattern": emotion.get("pattern", "transient"),
         }
+    here = pathos.get("location_id")
+    with_him = [
+        str(person["name"])
+        for person in snapshot.get("people") or []
+        if isinstance(person, Mapping)
+        and person.get("name")
+        and here
+        and person.get("location_id") == here
+    ]
+    if with_him:
+        # Whoever is in the room with him is fair to think about.
+        context["with_him"] = with_him[:4]
     budget = snapshot.get("time_budget")
     if isinstance(budget, Mapping):
         context["time_budget"] = {
@@ -457,6 +469,9 @@ class InnerStream:
         self.last_error: str | None = None
         self.failures = 0
         self.rejected = False
+        # Thoughts kept and turned away since the stream started; turned away is wasted work.
+        self.kept = 0
+        self.rejections = 0
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
 
@@ -503,8 +518,11 @@ class InnerStream:
         gap = max(settings.gap_seconds, STAND_IN_GAP_SECONDS if is_stand_in(self.gateway) else 0)
         if thought is None and self.rejected:
             # The model answered; the thought just wasn't a good one. Think again as usual.
+            self.rejections += 1
             self.state = "resting"
             return gap
+        if thought is not None:
+            self.kept += 1
         if thought is None:
             self.failures += 1
             self.state = "failing"
@@ -598,6 +616,8 @@ class InnerStream:
             "gap_seconds": settings.gap_seconds,
             "stand_in": is_stand_in(self.gateway),
             "last_error": self.last_error,
+            "kept_since_start": self.kept,
+            "turned_away_since_start": self.rejections,
             "thoughts": [
                 {
                     "text": thought.text,

@@ -247,8 +247,8 @@ def test_a_thought_names_only_people_in_front_of_his_mind() -> None:
 
     names = known_names(snapshot())
     assert {"Ellis", "Mara", "Tom"} <= names
-    context = stream_context(snapshot(), ["Ellis's kitchen is so small."], Cue("money", "£420"))
-    assert stray_name("Ellis's money is all I've got.", context, names) == "Ellis"
+    context = stream_context(snapshot(), ["Tom's kitchen is so small."], Cue("money", "£420"))
+    assert stray_name("Tom's money is all I've got.", context, names) == "Tom"
     assert stray_name("Four hundred quid. Rent's soon.", context, names) is None
     # Tea with Mara is his next plan, so she is on his mind.
     assert stray_name("Tea with Mara soon. Hands are filthy.", context, names) is None
@@ -317,3 +317,11 @@ def test_his_mood_colours_the_stream_only_when_his_mind_turns_to_it() -> None:
     assert "emotion" not in stream_context(snapshot(), [], Cue("here", "The workshop"))
     feeling = stream_context(snapshot(), [], Cue("feeling", "content"))
     assert feeling["emotion"]["label"] == "content"
+
+
+def test_whoever_is_with_him_is_fair_to_think_about() -> None:
+    from eidos.application.inner_stream import known_names, stray_name
+
+    context = stream_context(snapshot(), ["Betty's smile again."], Cue("here", "The workshop"))
+    assert context["with_him"] == ["Ellis"]
+    assert stray_name("Ellis has a new wrench, shiny.", context, known_names(snapshot())) is None

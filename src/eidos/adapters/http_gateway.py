@@ -263,6 +263,7 @@ ROLE_FIELDS = {
         "memory_recollections",
         "recent_inner_stream",
         "drifting_to",
+        "with_him",
         "stream_pulse_id",
         "mind_layers",
         "cognitive_workspace",
@@ -593,6 +594,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
+        with_him = context.get("with_him")
+        if isinstance(with_him, list) and with_him:
+            details["with_him"] = [str(name) for name in with_him][:4]
         budget = context.get("time_budget")
         if isinstance(budget, Mapping):
             if budget.get("next_plan"):
