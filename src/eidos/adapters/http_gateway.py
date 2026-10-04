@@ -70,6 +70,10 @@ ROLE_PROMPTS["pathos"] = (
     "day, prescribe a bright side, or invent reassuring details about theirs. "
     + ROLE_PROMPTS["pathos"]
     + LIFE_WITH_YOU
+    + " just_been_thinking is what was going through your head a moment ago, pulling_at_him "
+    "what you've been meaning to do, texts_lately your recent texts with friends. Let them "
+    "colour you the way a real mind does (you might mention one if it fits, or be a bit "
+    "distracted by it), but never recite them or report them like a list."
 )
 ROLE_PROMPTS["murmur"] = (
     "Write Pathos's next private waking thought, not a message to anyone. "
@@ -245,6 +249,9 @@ ROLE_FIELDS = {
         "what_you_advised_lately",
         "running_jokes_with_you",
         "how_he_really_is",
+        "just_been_thinking",
+        "pulling_at_him",
+        "texts_lately",
         "owes_honesty",
         "share_kind",
         "in_the_news",

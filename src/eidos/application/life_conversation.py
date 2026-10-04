@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import datetime, timedelta
+from typing import Callable, Mapping, Sequence
 
 from eidos.application.activity_execution import execution_context
 from eidos.application.advice import advice_asked_events, advice_context, advice_names
@@ -24,6 +25,7 @@ from eidos.application.memory import RecalledMemory, recall, terms
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.personal_journeys import journey_context
+from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
@@ -70,6 +72,32 @@ def _is_explicit_memory_reminder(text: str) -> bool:
 
 class LifeConversation(LifeProjections):
     """Visits, inbox messages and live turns; the replies are composed from his whole life."""
+
+    # What's going through his mind right now, from the always-running stream when a
+    # server runs one: {"thoughts": [...], "pulling_at_him": [...]}.
+    live_mind: Callable[[], Mapping[str, object]] | None = None
+
+    def _his_mind_just_now(self, history: Sequence[DomainEvent], at: datetime) -> dict[str, object]:
+        """What he was just thinking, what's pulling at him, and his recent texts."""
+        live: Mapping[str, object] = {}
+        if self.live_mind is not None:
+            try:
+                live = self.live_mind()
+            except Exception:  # a stream hiccup must never cost him his reply
+                live = {}
+        thoughts = live.get("thoughts")
+        context: dict[str, object] = {
+            "just_been_thinking": list(thoughts)[-4:]
+            if isinstance(thoughts, (list, tuple)) and thoughts
+            else recent_inner_stream(history, at),
+        }
+        pulls = live.get("pulling_at_him")
+        if isinstance(pulls, (list, tuple)) and pulls:
+            context["pulling_at_him"] = list(pulls)[:4]
+        texts = texts_view(history, limit=3)
+        if texts:
+            context["texts_lately"] = texts
+        return context
 
     async def _advance(self, hours: float) -> None:
         """Advance simulated time; implemented by ``Life`` (live turns take real seconds)."""
@@ -593,6 +621,7 @@ class LifeConversation(LifeProjections):
             "mind_layers": mind_context(history),
             "recent_inner_stream": recent_inner_stream(history, state.simulated_at),
             "cognitive_workspace": cognitive_workspace(history, state.simulated_at),
+            **self._his_mind_just_now(history, state.simulated_at),
         }
         pending.extend(_memory_access_events(selected, at))
         pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))

@@ -186,3 +186,34 @@ def test_friends_at_their_own_homes_are_not_in_his_flat(tmp_path, monkeypatch) -
         }
     )
     assert "rowan" not in seen["with_him"]
+
+
+def test_when_you_talk_to_him_he_speaks_from_what_was_just_on_his_mind(tmp_path) -> None:
+    import json
+
+    from eidos.adapters.http_gateway import ROLE_FIELDS, HTTPModelGateway
+
+    class Capturing(StandInGateway):
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            self.requests.append(request)
+            return await super().generate(request)
+
+    gateway = Capturing()
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), gateway)
+    life.advance(10)
+    life.live_mind = lambda: {
+        "thoughts": ["Rowan's mum sounds awful.", "Should text him tonight."],
+        "pulling_at_him": ["contact: Rowan"],
+    }
+    life.request_visit("visit")
+    life.chat("What's on your mind?", "turn")
+    request = next(r for r in reversed(gateway.requests) if r.capability == "pathos")
+    context = json.loads(request.messages[0].content)
+    assert context["just_been_thinking"][-1] == "Should text him tonight."
+    assert context["pulling_at_him"] == ["contact: Rowan"]
+    # ...and a real model is actually sent them.
+    assert {"just_been_thinking", "pulling_at_him", "texts_lately"} <= set(ROLE_FIELDS["pathos"])
+    assert HTTPModelGateway  # imported for the field list above

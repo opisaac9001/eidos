@@ -682,13 +682,31 @@ def _inner_stream(database: Path, gateway: ModelGateway, runtime: Runtime) -> An
             for job in jobs.list_jobs(20)
         )
 
-    return InnerStream(
+    stream = InnerStream(
         SQLiteInnerStream(database),
         gateway,
         runtime.stream_view,
         settings,
         yield_to=his_life_needs_the_model,
     )
+
+    def live_mind() -> dict[str, object]:
+        now = stream.wall_clock()
+        return {
+            "thoughts": [
+                thought.text
+                for thought in reversed(stream.store.recent(4))
+                if now - thought.wall_at <= 15 * 60
+            ],
+            "pulling_at_him": [
+                f"{item['kind']}: {item['about']}"
+                for item in stream.impulses.view()
+                if float(str(item["pull"])) >= 0.8
+            ],
+        }
+
+    runtime.life.live_mind = live_mind
+    return stream
 
 
 def event_json(event: DomainEvent) -> dict[str, Any]:
