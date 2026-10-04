@@ -180,6 +180,10 @@ model. Limiting the model to two threads kept one such Pi at 4.9 V and under 68 
 repeated tests. Give his inner life a backup model on another machine, so a Pi reset only
 means the next thought comes from the backup.
 
+Set the Pi provider's `timeout` to about 45 seconds. Each step of his life gives its
+models 50 seconds in all. If the Pi is busy with one thought when another is asked for, a
+shorter timeout leaves the backup time to answer instead of the step being skipped.
+
 Give the Pi only his passing thoughts and dreams (the `murmur` and `oneiros` roles), and
 use the same model for both, so it never has to hold two models in memory. Reflection,
 selfhood and deliberation need full-size requests, which belong on a bigger machine.
