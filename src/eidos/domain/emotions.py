@@ -151,18 +151,26 @@ def emotional_speech_bias(
 
 
 def emotion_sample_events(
-    history: Sequence[DomainEvent], state: PathosState, at: datetime
+    history: Sequence[DomainEvent],
+    state: PathosState,
+    at: datetime,
+    *,
+    whole_hour: bool = True,
 ) -> list[DomainEvent]:
+    """Name how he feels now. Between hours (``whole_hour`` False) the sample keeps his
+    feelings current without counting another hour towards how long he has been low."""
     if at.utcoffset() is None:
         raise ValueError("Emotion sampling time must be timezone-aware")
-    sample_id = f"emotion:{at.isoformat()}"
+    sample_id = f"emotion:{at.isoformat()}" + ("" if whole_hour else ":felt")
     if any(
         event.kind == "emotion.sampled" and event.payload.get("sample_id") == sample_id
         for event in payload_candidates(history, "sample_id", sample_id)
     ):
         return []
     previous = project_emotion(history)
-    low_hours = previous.sustained_low_hours + 1 if state.valence <= -0.35 else 0
+    low_hours = (
+        previous.sustained_low_hours + (1 if whole_hour else 0) if state.valence <= -0.35 else 0
+    )
     label = classify_emotion(state.valence, state.arousal, low_hours)
     intensity = _clamp(max(abs(state.valence), abs(state.arousal - 0.35) * 1.25))
     pattern = "prolonged" if low_hours >= 72 else "sustained" if low_hours >= 24 else "transient"

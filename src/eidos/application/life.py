@@ -522,8 +522,17 @@ class Life(LifeConversation):
         # the hour.
         felt, felt_state = appraisal_events(history + pending, state, state.simulated_at)
         pending.extend(felt)
-        episodes, _ = affect_episode_events(history + pending, felt_state, state.simulated_at)
+        episodes, felt_state = affect_episode_events(
+            history + pending, felt_state, state.simulated_at
+        )
         pending.extend(episodes)
+        if episodes:
+            # ...and he knows it: the named emotion follows, not an hour later.
+            pending.extend(
+                emotion_sample_events(
+                    history + pending, felt_state, state.simulated_at, whole_hour=False
+                )
+            )
         self.store.append("pathos", pending, len(history))
         return text is not None
 

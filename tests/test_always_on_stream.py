@@ -408,3 +408,11 @@ def test_how_his_thoughts_felt_moves_his_mood_at_the_quarter_hour(tmp_path) -> N
     assert after < before
     episode = next(e for e in reversed(life.history()) if e.kind == "affect.episode_started")
     assert episode.payload["source_kind"] == "thought.recorded"
+
+
+def test_his_named_emotion_follows_his_feelings_within_the_quarter_hour(tmp_path) -> None:
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(10)
+    life.pulse_inner_stream("Worried sick. Awful, stuck, gutted.", "m", -0.9)
+    snapshot = life.snapshot()
+    assert snapshot["emotion"]["valence"] == snapshot["pathos"]["valence"]
