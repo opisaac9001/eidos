@@ -643,7 +643,10 @@ class InnerStream:
             self.last_error = f"repeated itself, skipped: {text[:80]}"
             self.rejected = True
             return None
-        stray = stray_name(text, context, known_names(snapshot))
+        # Where his mind was pointed in the last several thoughts is still on it.
+        stray = stray_name(
+            text, {**context, "lately_on_his_mind": list(self._tried)}, known_names(snapshot)
+        )
         if stray is not None:
             self.last_error = f"brought in {stray} from nowhere, skipped: {text[:80]}"
             self.rejected = True

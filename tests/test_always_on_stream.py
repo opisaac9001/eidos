@@ -357,3 +357,23 @@ def test_the_stream_steps_aside_while_his_life_needs_the_same_model(tmp_path) ->
     busy[0] = False
     stream.step()
     assert len(gateway.requests) == 1
+
+
+def test_someone_his_mind_went_to_a_few_thoughts_ago_is_still_on_it(tmp_path) -> None:
+    class Rowan(Thinker):
+        def __init__(self) -> None:
+            super().__init__()
+            self.lines = iter(["Rowan's seeing someone, I reckon.", "Wonder if Rowan's happy."])
+
+    world = snapshot()
+    world["people"] = [*world["people"], {"name": "Rowan", "location_id": "park"}]
+    stream = InnerStream(
+        SQLiteInnerStream(tmp_path / "world.sqlite3"), Rowan(), lambda: (world, True)
+    )
+    stream._tried.append("Rowan's seeing someone")
+    stream.step()
+    stream.step()
+    assert [t.text for t in stream.store.recent(2)] == [
+        "Wonder if Rowan's happy.",
+        "Rowan's seeing someone, I reckon.",
+    ]
