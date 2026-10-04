@@ -141,6 +141,10 @@ def test_a_looping_thought_is_not_kept() -> None:
         "Tea with Mara soon, should wash my hands.", ["tea with mara soon should wash my hands"]
     )
     assert not near_repeat("Dad. Must ring him.", ["Tea with Mara soon, should wash my hands."])
+    assert near_repeat(
+        "Beth's new job in Bristol. Still too cold to leave coffee on the table, though.",
+        ["Bear's asleep in that tree. Still too cold to leave coffee on the table, though."],
+    )
 
 
 def test_the_quarter_hour_keeps_the_thought_that_mattered_most() -> None:

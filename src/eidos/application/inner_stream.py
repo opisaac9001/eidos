@@ -387,9 +387,15 @@ def near_repeat(text: str, earlier: Sequence[str]) -> bool:
     words = _words(text)
     if not words:
         return True
+    said = _WORDS.findall(text.casefold())
     for other in earlier:
         theirs = _words(other)
         if theirs and len(words & theirs) / len(words | theirs) >= 0.7:
+            return True
+        # A recycled clause is a loop too ("...still too cold to leave coffee on the table").
+        before = _WORDS.findall(other.casefold())
+        phrases = {tuple(before[i : i + 5]) for i in range(len(before) - 4)}
+        if any(tuple(said[i : i + 5]) in phrases for i in range(len(said) - 4)):
             return True
     return False
 
