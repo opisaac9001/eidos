@@ -581,7 +581,7 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         details["where"] = context["location"]
     time = context.get("time")
     if isinstance(time, str) and len(time) >= 16:
-        details["hour"] = time[11:16]
+        # Words, not the clock: given "16:58", a small model wrote "16:58 feels early".
         if time[11:13].isdigit():
             details["time_of_day"] = part_of_day(int(time[11:13]))
     emotion = context.get("emotion")
@@ -605,12 +605,13 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         budget = context.get("time_budget")
         if isinstance(budget, Mapping):
             if budget.get("next_plan"):
-                details["next"] = budget["next_plan"]
+                # Named as his, or a small model hands his plans to whoever else is mentioned.
+                details["my_next_plan"] = budget["next_plan"]
             if budget.get("free_minutes") is not None:
-                details["free_minutes"] = budget["free_minutes"]
+                details["my_free_minutes"] = budget["free_minutes"]
         ongoing = context.get("ongoing_activities")
         if isinstance(ongoing, list) and ongoing:
-            details["doing"] = [
+            details["what_im_doing"] = [
                 str(item.get("title")) for item in ongoing[:2] if isinstance(item, Mapping)
             ]
     dreams = context.get("recent_dreams")
