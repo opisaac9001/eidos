@@ -325,3 +325,19 @@ def test_whoever_is_with_him_is_fair_to_think_about() -> None:
     context = stream_context(snapshot(), ["Betty's smile again."], Cue("here", "The workshop"))
     assert context["with_him"] == ["Ellis"]
     assert stray_name("Ellis has a new wrench, shiny.", context, known_names(snapshot())) is None
+
+
+def test_a_worn_out_motif_is_named_so_the_model_can_leave_it() -> None:
+    from eidos.adapters.http_gateway import compact_context
+    from eidos.application.inner_stream import worn_out
+
+    recent = [
+        "Oil smell's thick. Wonder if Beth knows Ellis is asking about Monday.",
+        "Oil's thick in here. Beth might be telling Ellis about Monday.",
+        "Oil smell's heavy. Beth and Ellis busy.",
+    ]
+    tired = worn_out(recent, {"Beth", "Ellis"})
+    assert "oil" in tired and "thick" in tired and "monday" in tired
+    assert "beth" not in tired and "ellis" not in tired  # people aren't motifs
+    context = {**stream_context(snapshot(), recent, Cue("here", "The workshop")), "worn_out": tired}
+    assert compact_context("murmur", context)["avoid_words"] == tired

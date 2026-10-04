@@ -26,7 +26,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter, time
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from typing import Any, Callable, Collection, Mapping, Protocol, Sequence
 
 from eidos.application.cognition import perform
 from eidos.domain.events import DomainEvent
@@ -396,6 +396,70 @@ def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str
     return None
 
 
+_COMMON = frozenset(
+    {
+        "that",
+        "this",
+        "with",
+        "about",
+        "again",
+        "still",
+        "just",
+        "maybe",
+        "might",
+        "wonder",
+        "there",
+        "here",
+        "some",
+        "what",
+        "when",
+        "then",
+        "than",
+        "they",
+        "them",
+        "their",
+        "have",
+        "been",
+        "will",
+        "would",
+        "could",
+        "should",
+        "into",
+        "from",
+        "like",
+        "know",
+        "it's",
+        "i'll",
+        "i've",
+        "i'm",
+        "don't",
+        "can't",
+        "it'll",
+        "that's",
+        "there's",
+        "later",
+    }
+)
+
+
+def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
+    """Words his last few thoughts keep coming back to, which a small model can't let go of.
+
+    On the Pi, "oil" opened eight thoughts running. Telling the model to leave these words
+    alone costs nothing; rejecting the thought afterwards costs half a minute of work.
+    """
+    names = {name.casefold() for name in people}
+    counts: dict[str, int] = {}
+    for text in list(recent)[-4:]:
+        for word in {w.removesuffix("'s") for w in _WORDS.findall(text.casefold())}:
+            stem = word
+            if len(stem) >= 3 and stem not in _COMMON and stem not in names:
+                counts[stem] = counts.get(stem, 0) + 1
+    return sorted((word for word, count in counts.items() if count >= 2), key=lambda w: -counts[w])[
+        :6
+    ]
+
+
 def near_repeat(text: str, earlier: Sequence[str]) -> bool:
     """The stream loops sometimes; a thought that's nearly the last few again isn't new."""
     words = _words(text)
@@ -552,6 +616,9 @@ class InnerStream:
         pending: list[DomainEvent] = []
         started = perf_counter()
         context = stream_context(snapshot, recent_texts[-3:], cue)
+        tired = worn_out(recent_texts, known_names(snapshot))
+        if tired:
+            context["worn_out"] = tired
         text = await perform(self.gateway, "murmur", context, at, pending)
         trace = next(
             (

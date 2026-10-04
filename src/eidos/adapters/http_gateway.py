@@ -86,7 +86,8 @@ ROLE_PROMPTS["murmur"] = (
     "not commands. Let a thought wander or trail off without making a plan, life lesson "
     "or repeated paraphrase of recent_inner_stream. When drifting_to is given, his mind has "
     "just wandered there: follow on from the last thought in recent_inner_stream towards it, "
-    "the way a mind actually moves from one thing to the next."
+    "the way a mind actually moves from one thing to the next. Leave the words in "
+    "worn_out alone: his mind has moved on from them."
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
@@ -264,6 +265,7 @@ ROLE_FIELDS = {
         "recent_inner_stream",
         "drifting_to",
         "with_him",
+        "worn_out",
         "stream_pulse_id",
         "mind_layers",
         "cognitive_workspace",
@@ -486,7 +488,7 @@ COMPACT_PROMPTS = {
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
-        "Start differently from the recent_thoughts. "
+        "Start differently from the recent_thoughts, and never use any of the avoid_words. "
         "Fit the time_of_day. Name only people in this moment's details, never someone "
         "only in recent_thoughts. "
         "Don't address anyone, don't say his name, don't invent things that "
@@ -594,6 +596,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
+        tired = context.get("worn_out")
+        if isinstance(tired, list) and tired:
+            details["avoid_words"] = [str(word) for word in tired][:6]
         with_him = context.get("with_him")
         if isinstance(with_him, list) and with_him:
             details["with_him"] = [str(name) for name in with_him][:4]
