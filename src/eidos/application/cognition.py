@@ -172,6 +172,8 @@ async def perform(
                     "error_code": code,
                     "simulated_at": at,
                     "trace_id": trace,
+                    # Why, in the provider's words (keys already removed by the gateway).
+                    "detail": str(error)[:300],
                 },
             )
         )
