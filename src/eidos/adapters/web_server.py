@@ -657,7 +657,22 @@ def _inner_stream(database: Path, gateway: ModelGateway, runtime: Runtime) -> An
             gap_seconds=float(chosen.get("gap_seconds", DEFAULT_GAP_SECONDS)),
         )
 
-    return InnerStream(SQLiteInnerStream(database), gateway, runtime.stream_view, settings)
+    def his_life_needs_the_model() -> bool:
+        jobs = getattr(runtime.life.gateway, "jobs", None)
+        if jobs is None:
+            return False
+        return any(
+            job.status in {"queued", "running"} and job.capability in {"murmur", "oneiros"}
+            for job in jobs.list_jobs(20)
+        )
+
+    return InnerStream(
+        SQLiteInnerStream(database),
+        gateway,
+        runtime.stream_view,
+        settings,
+        yield_to=his_life_needs_the_model,
+    )
 
 
 def event_json(event: DomainEvent) -> dict[str, Any]:

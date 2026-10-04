@@ -341,3 +341,19 @@ def test_a_worn_out_motif_is_named_so_the_model_can_leave_it() -> None:
     assert "beth" not in tired and "ellis" not in tired  # people aren't motifs
     context = {**stream_context(snapshot(), recent, Cue("here", "The workshop")), "worn_out": tired}
     assert compact_context("murmur", context)["avoid_words"] == tired
+
+
+def test_the_stream_steps_aside_while_his_life_needs_the_same_model(tmp_path) -> None:
+    gateway = Thinker()
+    busy = [True]
+    stream = InnerStream(
+        SQLiteInnerStream(tmp_path / "world.sqlite3"),
+        gateway,
+        lambda: (snapshot(), True),
+        yield_to=lambda: busy[0],
+    )
+    stream.step()
+    assert stream.state == "making way" and gateway.requests == []
+    busy[0] = False
+    stream.step()
+    assert len(gateway.requests) == 1

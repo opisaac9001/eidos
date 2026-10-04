@@ -1585,6 +1585,7 @@ const STREAM_STATES = {
   failing: "stream interrupted",
   off: "stream off",
   starting: "starting",
+  "making way": "making way for a deeper thought",
 };
 function renderStream() {
   const stream = state.inner_stream || { thoughts: [] };

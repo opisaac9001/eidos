@@ -520,9 +520,13 @@ class InnerStream:
         settings: Callable[[], StreamSettings] = StreamSettings,
         wall_clock: Callable[[], float] | None = None,
         rng: random.Random | None = None,
+        yield_to: Callable[[], bool] = lambda: False,
     ) -> None:
         self.store = store
         self.gateway = gateway
+        # True while his life itself is waiting on the same model (an hourly thought or a
+        # dream); the stream steps aside rather than make it miss its deadline.
+        self.yield_to = yield_to
         self.view = view
         self.settings = settings
         self.wall_clock = wall_clock or time
@@ -575,6 +579,9 @@ class InnerStream:
             return IDLE_POLL_SECONDS
         if not (snapshot.get("pathos") or {}).get("awake"):
             self.state = "asleep"
+            return IDLE_POLL_SECONDS
+        if self.yield_to():
+            self.state = "making way"
             return IDLE_POLL_SECONDS
         self.state = "thinking"
         self.rejected = False
