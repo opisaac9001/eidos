@@ -388,6 +388,10 @@ def near_repeat(text: str, earlier: Sequence[str]) -> bool:
     if not words:
         return True
     said = _WORDS.findall(text.casefold())
+    for other in list(earlier)[-3:]:
+        # The same opening again and again ("Morning air's quiet. ...") reads as a tic.
+        if len(said) >= 3 and _WORDS.findall(other.casefold())[:3] == said[:3]:
+            return True
     for other in earlier:
         theirs = _words(other)
         if theirs and len(words & theirs) / len(words | theirs) >= 0.7:

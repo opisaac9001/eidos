@@ -485,6 +485,7 @@ COMPACT_PROMPTS = {
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
+        "Start differently from the recent_thoughts. "
         "Fit the time_of_day. Name only people in this moment's details, never someone "
         "only in recent_thoughts. "
         "Don't address anyone, don't say his name, don't invent things that "
