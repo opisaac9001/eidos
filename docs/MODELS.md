@@ -148,25 +148,30 @@ file.
 His passing thoughts and dreams are frequent and short, which suits a small model on a
 low-power machine like a Raspberry Pi 5 (8 GB).
 
-What works, as of 26 September 2026:
-- **Model:** `qwen3.5:2b` through a variant limited to two CPU threads and a 2,048-token
+What works, as of 4 October 2026:
+- **Model:** `qwen3.5:4b` through a variant limited to two CPU threads and a 2,048-token
   context (below).
 - **Settings:** `"compact": true` and `"reasoning_effort": "none"`.
-- **Results:** it passed 5 of 5 real thought and dream requests, each 10–18 seconds warm.
-  `qwen2.5:1.5b` is too small: its thoughts were confused even with compact prompts.
+- **Results:** each thought takes about 33 seconds warm. The 4B stays with what's in front of
+  his mind ("Heading to the workshop. It's quiet out here, just clouds and the road ahead.").
+- **Smaller models:**
+  - `qwen3.5:2b` is twice as fast (about 15 seconds), but running all night in a long life
+    it mixed people up ("My mum's migraine…" when it was a friend's mum), invented scenes,
+    and borrowed phrases from the style examples.
+  - `qwen2.5:1.5b` is too small.
 
 ```bash
 # on the Pi
-printf "FROM qwen3.5:2b\nPARAMETER num_thread 2\nPARAMETER num_ctx 2048\n" > murmur.Modelfile
-ollama create murmur-qwen3-5-2b -f murmur.Modelfile
+printf "FROM qwen3.5:4b\nPARAMETER num_thread 2\nPARAMETER num_ctx 2048\n" > murmur.Modelfile
+ollama create murmur-qwen3-5-4b -f murmur.Modelfile
 ```
 
 ```json
 "models": {
-  "pi-mind": {"provider": "pi", "model": "murmur-qwen3-5-2b", "compact": true, "reasoning_effort": "none"},
+  "pi-mind": {"provider": "pi", "model": "murmur-qwen3-5-4b", "compact": true, "reasoning_effort": "none"},
   "dell-7b": {"provider": "dell-world", "model": "qwen2.5:7b"}
 },
-"roles": {"inner": ["pi-mind", "dell-7b"]}
+"roles": {"murmur": ["pi-mind", "dell-7b"], "oneiros": ["pi-mind", "dell-7b"]}
 ```
 
 **Power matters.** A Pi 5 wants a USB-PD supply that can deliver 5 A (the official 27 W
@@ -174,6 +179,15 @@ supply). On a weaker supply it runs fine idle but can reset when all four cores 
 model. Limiting the model to two threads kept one such Pi at 4.9 V and under 68 °C across
 repeated tests. Give his inner life a backup model on another machine, so a Pi reset only
 means the next thought comes from the backup.
+
+Give the Pi only his passing thoughts and dreams (the `murmur` and `oneiros` roles), and
+use the same model for both, so it never has to hold two models in memory. Reflection,
+selfhood and deliberation need full-size requests, which belong on a bigger machine.
+
+**Context windows.** A long life's conversation request is large. Eidos fits it to about
+3,500 tokens of context, but the instructions add about 3,000 more. Give local models at
+least an 8,192-token window (Ollama's `num_ctx`). Ollama cuts an over-long request without
+an error, and the part it cuts is the start, where he is told who he is.
 
 ## His inner monologue, always running
 
@@ -209,9 +223,9 @@ it only reads it.
 - `eidos serve --no-stream` (or `EIDOS_STREAM=off`) turns it off; the quarter-hour pulse
   then asks the model itself, as before.
 
-On the Raspberry Pi above (`murmur-qwen3-5-2b`, two threads, 20-second gap), 20 stream
-thoughts ran at 11–18 seconds each; the supply stayed at 4.9 V or above and the Pi at
-64 °C or below.
+On the Raspberry Pi above (two threads, 20-second gap) that is about one thought a
+minute with the 4B, or two with the 2B. Across a night of running, the supply stayed at
+4.88 V or above and the Pi at 68 °C or below.
 
 ## Choosing where to spend
 
