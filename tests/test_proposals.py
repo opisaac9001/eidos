@@ -36,3 +36,19 @@ class ProposalTests(unittest.TestCase):
     def test_fiction_is_allowed_within_its_boundary(self):
         text = "In a dream, the sky becomes a clock."
         self.assertEqual(validate_proposal("oneiros", json.dumps({"text": text}), {}), text)
+
+
+class JsonDebrisTests(unittest.TestCase):
+    def test_a_brace_left_inside_the_text_is_dropped(self):
+        text = validate_proposal(
+            "firmament",
+            '{"text": "Hannah still loves her craft, even if not daily anymore.}"}',
+            {"scene_mode": True},
+        )
+        self.assertEqual(text, "Hannah still loves her craft, even if not daily anymore.")
+
+    def test_balanced_punctuation_is_kept(self):
+        text = validate_proposal(
+            "murmur", '{"text": "Mara said \\"later\\" and meant it {sort of}"}', {}
+        )
+        self.assertEqual(text, 'Mara said "later" and meant it {sort of}')

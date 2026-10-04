@@ -48,6 +48,18 @@ def validate_completion(
     return validate_proposal(role, content, context)
 
 
+def _without_json_debris(text: str) -> str:
+    """Drop a closing brace or quote a model left inside its own text ("...anymore.}")."""
+    cleaned = text.rstrip()
+    while cleaned and (
+        (cleaned[-1] == "}" and "{" not in cleaned)
+        or (cleaned[-1] == "]" and "[" not in cleaned)
+        or (cleaned[-1] == '"' and cleaned.count('"') % 2 == 1)
+    ):
+        cleaned = cleaned[:-1].rstrip()
+    return cleaned or text
+
+
 def validate_proposal(role: str, content: str, context: Mapping[str, object]) -> str:
     try:
         proposal = json.loads(content)
@@ -58,6 +70,7 @@ def validate_proposal(role: str, content: str, context: Mapping[str, object]) ->
     text = proposal["text"]
     if not isinstance(text, str) or not text.strip() or len(text) > 8000:
         raise ProposalRejected("invalid_text", "Text must contain 1–8000 characters")
+    text = _without_json_debris(text)
     if role == "moira" and text not in {"Clear", "Cloudy", "Light rain", "Breezy"}:
         raise ProposalRejected("invalid_weather", "Weather is outside the world's vocabulary")
     if role == "mnemosyne" and text != context.get("experience"):
