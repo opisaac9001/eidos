@@ -76,7 +76,7 @@ def validate_proposal(role: str, content: str, context: Mapping[str, object]) ->
     if role == "mnemosyne" and text != context.get("experience"):
         raise ProposalRejected("source_mismatch", "Memory changed its source experience")
     if role == "firmament":
-        if len(re.findall(r"\w+", text)) < 5 or text.rstrip().endswith(":"):
+        if len(re.findall(r"\w+", text)) < 5 or text.rstrip().endswith((":", ",", ";")):
             raise ProposalRejected("empty_scene", "Encounter was an unfinished fragment")
         if context.get("scene_mode") is True:
             return text
