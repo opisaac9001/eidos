@@ -217,3 +217,16 @@ def test_when_you_talk_to_him_he_speaks_from_what_was_just_on_his_mind(tmp_path)
     # ...and a real model is actually sent them.
     assert {"just_been_thinking", "pulling_at_him", "texts_lately"} <= set(ROLE_FIELDS["pathos"])
     assert HTTPModelGateway  # imported for the field list above
+
+
+def test_he_knows_when_things_are_in_plain_words() -> None:
+    from eidos.application.time_budget import when_in_words
+
+    night = datetime(2026, 8, 24, 23, 0, tzinfo=timezone.utc)
+    assert when_in_words(night.replace(hour=23, minute=40), night) == "in 40 minutes"
+    assert when_in_words(datetime(2026, 8, 25, 10, 0, tzinfo=timezone.utc), night) == (
+        "tomorrow morning at 10:00"
+    )
+    assert when_in_words(datetime(2026, 8, 27, 10, 0, tzinfo=timezone.utc), night) == (
+        "on Thursday at 10:00"
+    )

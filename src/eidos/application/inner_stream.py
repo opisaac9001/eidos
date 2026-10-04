@@ -177,13 +177,10 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
             found.append(Cue("doing", str(item["title"])))
     budget = snapshot.get("time_budget") or {}
     if isinstance(budget, Mapping) and budget.get("next_plan"):
-        minutes = budget.get("minutes_until_start")
-        when = (
-            f" in {round(float(minutes))} minutes"
-            if isinstance(minutes, (int, float)) and 0 <= minutes <= 240
-            else " later"
+        when = budget.get("when")
+        found.append(
+            Cue("next", f"{budget['next_plan']}, {when}" if when else str(budget["next_plan"]))
         )
-        found.append(Cue("next", f"{budget['next_plan']}{when}"))
     needs = pathos.get("needs") or {}
     energy = pathos.get("energy")
     if isinstance(needs, Mapping) and float(needs.get("hunger", 0) or 0) > 0.6:
@@ -331,7 +328,7 @@ def stream_context(
     budget = snapshot.get("time_budget")
     if isinstance(budget, Mapping):
         context["time_budget"] = {
-            key: budget[key] for key in ("next_plan", "free_minutes") if key in budget
+            key: budget[key] for key in ("next_plan", "when", "free_minutes") if key in budget
         }
     doing = [
         {"title": item["title"]}

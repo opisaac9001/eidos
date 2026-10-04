@@ -35,6 +35,7 @@ def personal_time_budget(
         travel = None
     return {
         "next_plan": entry.title,
+        "when": when_in_words(datetime.fromisoformat(entry.starts_at), now),
         "schedule_id": entry.schedule_id,
         "starts_at": entry.starts_at,
         "location_id": entry.location_id,
@@ -46,3 +47,41 @@ def personal_time_budget(
         "action_authority": False,
         "meaning": "A constraint, not an instruction. Preparation, a shorter activity, waiting, or doing nothing are choices. No routine has been performed or booked.",
     }
+
+
+def when_in_words(starts: datetime, now: datetime) -> str:
+    """When something is, as a person would say it: models misread raw times and minutes.
+
+    Given 23:00 and a shift starting at 10:00 the next day, the models had him thinking it
+    was about to start.
+    """
+    minutes = (starts - now).total_seconds() / 60
+    clock = starts.strftime("%H:%M")
+    if minutes < 0:
+        return "already started"
+    if minutes < 90:
+        return f"in {max(1, round(minutes))} minutes"
+    days = (starts.date() - now.date()).days
+    if days == 0:
+        part = (
+            "this morning"
+            if starts.hour < 12
+            else "this afternoon"
+            if starts.hour < 17
+            else "this evening"
+            if starts.hour < 21
+            else "tonight"
+        )
+        return f"{part} at {clock}"
+    if days == 1:
+        part = (
+            "tomorrow morning"
+            if starts.hour < 12
+            else "tomorrow afternoon"
+            if starts.hour < 17
+            else "tomorrow evening"
+        )
+        return f"{part} at {clock}"
+    if days < 7:
+        return f"on {starts.strftime('%A')} at {clock}"
+    return f"on {starts.strftime('%-d %B')}"

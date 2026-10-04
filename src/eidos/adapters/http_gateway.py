@@ -620,7 +620,11 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         if isinstance(budget, Mapping):
             if budget.get("next_plan"):
                 # Named as his, or a small model hands his plans to whoever else is mentioned.
-                details["my_next_plan"] = budget["next_plan"]
+                details["my_next_plan"] = (
+                    f"{budget['next_plan']}, {budget['when']}"
+                    if budget.get("when")
+                    else budget["next_plan"]
+                )
             free = budget.get("free_minutes")
             if isinstance(free, (int, float)) and free >= 1:
                 details["my_free_minutes"] = round(free)
