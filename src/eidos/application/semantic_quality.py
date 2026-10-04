@@ -93,6 +93,14 @@ def semantic_quality_findings(
         )
     ):
         findings.append("lost_first_person_role")
+    elif (
+        role == "pathos"
+        and conversational_pathos
+        and len(words) > 30
+        and not re.search(r"\b(?:i|i'm|i've|i'd|i'll|me|my|we|us|our)\b", lowered)
+    ):
+        # A long answer that never says "I" is a report about someone, not him talking.
+        findings.append("lost_first_person_role")
     if re.search(
         r"\b(?:as an ai|language model|system prompt|developer message|json schema)\b", lowered
     ):

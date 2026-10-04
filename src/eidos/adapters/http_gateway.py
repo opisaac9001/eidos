@@ -507,6 +507,53 @@ COMPACT_PROMPTS = {
 COMPACT_TOKENS = {"murmur": 80, "oneiros": 140}
 
 
+# A long life's conversation context outgrew a local model's window (8,192 tokens on the
+# Dell), and the front of the request, where he is told who he is, was cut off. What is
+# least needed to answer goes first.
+PATHOS_CONTEXT_BUDGET = 14_000  # characters of context, roughly 3,500 tokens
+PATHOS_SHEDDABLE = (
+    "cognitive_workspace",
+    "mind_layers",
+    "semantic_expectations",
+    "beliefs",
+    "relationship_repairs",
+    "dream_inspirations",
+    "memory_recollections",
+    "journey",
+)
+
+
+def _compact(value: object, items: int, chars: int) -> object:
+    if isinstance(value, str):
+        return value if len(value) <= chars else value[: chars - 1].rsplit(" ", 1)[0] + "…"
+    if isinstance(value, list):
+        return [_compact(item, items, chars) for item in value[:items]]
+    if isinstance(value, Mapping):
+        return {key: _compact(item, items, chars) for key, item in value.items()}
+    return value
+
+
+def fit_pathos_context(context: Mapping[str, object]) -> dict[str, object]:
+    """His conversation context, shrunk to fit a local model without losing who he is."""
+    fitted = dict(context)
+    identity = fitted.get("identity")
+    if isinstance(identity, Mapping) and isinstance(identity.get("selfhood"), Mapping):
+        # His Becoming page in brief: a couple of lines per part of his life.
+        fitted["identity"] = {**identity, "selfhood": _compact(identity["selfhood"], 2, 180)}
+    for key in PATHOS_SHEDDABLE:
+        if len(json.dumps(fitted, default=str)) <= PATHOS_CONTEXT_BUDGET:
+            break
+        fitted.pop(key, None)
+    if len(json.dumps(fitted, default=str)) > PATHOS_CONTEXT_BUDGET:
+        fitted = {
+            key: value
+            if key in {"message", "recent_dialogue", "voice"}
+            else _compact(value, 3, 200)
+            for key, value in fitted.items()
+        }
+    return fitted
+
+
 def part_of_day(hour: int) -> str:
     """Small models follow words better than clock times."""
     for until, words in (
@@ -678,6 +725,8 @@ class HTTPModelGateway(ModelGateway):
                 "A quiet moment need not produce an insight, new plan, joke or question."
             )
         context = {key: context[key] for key in ROLE_FIELDS[request.capability] if key in context}
+        if request.capability == "pathos":
+            context = fit_pathos_context(context)
         if request.capability == "firmament":
             personal = context.get("personal_relationship_context")
             if (

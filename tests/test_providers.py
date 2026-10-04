@@ -278,3 +278,40 @@ def test_a_phrase_lifted_from_a_style_example_is_not_a_thought() -> None:
             asyncio.run(gateway.generate(murmur_request()))
     finally:
         provider.close()
+
+
+def test_a_long_lifes_conversation_context_fits_a_local_model() -> None:
+    from eidos.adapters.http_gateway import PATHOS_CONTEXT_BUDGET, fit_pathos_context
+
+    context = {
+        "message": "Morning Patrick! How's your Monday shaping up?",
+        "recent_dialogue": [{"speaker": "you", "text": "Hey"}],
+        "identity": {
+            "name": "Patrick Shaw",
+            "selfhood": {
+                f"part_{n}": [f"a long line about his life {n} " * 8] * 10 for n in range(30)
+            },
+        },
+        "cognitive_workspace": [{"content": "attention " * 40}] * 30,
+        "memories": ["Beth's moving to Bristol."],
+    }
+    fitted = fit_pathos_context(context)
+    assert len(json.dumps(fitted)) <= PATHOS_CONTEXT_BUDGET
+    assert fitted["message"] == context["message"]
+    assert fitted["identity"]["name"] == "Patrick Shaw"
+    assert fitted["memories"] == ["Beth's moving to Bristol."]
+    assert "cognitive_workspace" not in fitted
+
+
+def test_a_report_about_someone_is_not_him_talking() -> None:
+    from eidos.application.semantic_quality import semantic_quality_findings
+
+    report = (
+        "It seems that Ellis has been reflecting a lot recently, particularly about giving "
+        "themselves permission not to do anything. They are also planning to make a small "
+        "atlas of neighbourhood sounds and are looking ahead to a shift at the workshop."
+    )
+    context = {"message": "How's your Monday shaping up?"}
+    assert "lost_first_person_role" in semantic_quality_findings("pathos", report, context)
+    reply = "Morning! Just got up and having a quiet start. How about you?"
+    assert "lost_first_person_role" not in semantic_quality_findings("pathos", reply, context)

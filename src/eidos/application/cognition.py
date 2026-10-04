@@ -22,6 +22,7 @@ ROLE_MODEL_PROFILES = {
     "chronicler": ("3", 180, 0.2),
 }
 REPAIRABLE_PATHOS_FINDINGS = {
+    "lost_first_person_role",
     "contradicted_activity_status",
     "premature_arrival",
     "unsupported_history_denial",
@@ -38,6 +39,7 @@ REPAIRABLE_PATHOS_FINDINGS = {
     "unsupported_current_activity",
 }
 BLOCKING_PATHOS_FINDINGS = {
+    "lost_first_person_role",
     "contradicted_activity_status",
     "premature_arrival",
     "unsupported_history_denial",
