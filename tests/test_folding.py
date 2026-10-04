@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from eidos.application.preference_development import preference_development_events
 from eidos.application.trait_development import trait_development_events
+from eidos.domain import folding
 from eidos.domain import identity as identity_module
 from eidos.domain import traits as traits_module
 from eidos.domain.events import DomainEvent
@@ -18,6 +19,20 @@ from eidos.domain.folding import (
 )
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.traits import project_traits
+
+
+def setUpModule() -> None:
+    # These tests exercise the cache with short sequences; long lives skip it below SMALL.
+    global _SMALL
+    _SMALL = folding.SMALL
+    folding.SMALL = 0
+
+
+def tearDownModule() -> None:
+    folding.SMALL = _SMALL
+
+
+_SMALL = 0
 
 
 def _events(count: int) -> list[DomainEvent]:
@@ -35,6 +50,20 @@ class CountingFold:
 
 
 class IncrementalFoldTests(unittest.TestCase):
+    def test_short_sequences_never_evict_a_long_lifes_prefix(self) -> None:
+        folding.SMALL = 100
+        try:
+            counter = CountingFold()
+            life = _events(400)
+            counter.fold(life)
+            for size in range(1, 60):  # a snapshot folds thousands of these
+                counter.fold(_events(size))
+            counter.steps = 0
+            self.assertEqual(counter.fold(list(life)), tuple(range(400)))
+            self.assertEqual(counter.steps, 0)
+        finally:
+            folding.SMALL = 0
+
     def test_extending_the_same_prefix_only_folds_new_events(self) -> None:
         counter = CountingFold()
         history = _events(50)

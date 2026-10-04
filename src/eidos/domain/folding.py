@@ -160,6 +160,10 @@ class _Lineage:
 
 
 _LINEAGE = _Lineage()
+# Sequences shorter than this (one kind of event picked out of a life, say) are folded
+# directly. A snapshot of a long life folds thousands of them, and letting them into the
+# lineage evicted the life itself, so every snapshot refolded everything.
+SMALL = 128
 
 
 class _Entry(Generic[S]):
@@ -302,6 +306,13 @@ class IncrementalFold(Generic[S]):
         An ``EventView`` is cached apart, so it never evicts the history-ordered sequences
         it cannot share a prefix with, nor they it.
         """
+        if len(events) < SMALL:
+            # Folding a handful of events costs less than caching them, and caching them
+            # would push his whole life's prefix out of the lineage and these entries.
+            state = (initial or self._initial)()
+            for event in events:
+                state = self._step(state, event)
+            return state
         log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
             slot = (key, isinstance(events, EventView))
@@ -374,6 +385,10 @@ class LinearReplay(Generic[S]):
         self._lock = Lock()
 
     def use(self, events: Sequence[DomainEvent], read: Callable[[S], R]) -> R:
+        if len(events) < SMALL:
+            small = self._initial()
+            self._advance(small, events, 0)
+            return read(small)
         log, length = _LINEAGE.resolve(events), len(events)
         with self._lock:
             state, start = self._state, self._size

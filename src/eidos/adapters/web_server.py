@@ -63,6 +63,26 @@ class Runtime:
         self.live_reply_speech: dict[str, float] = {}
         # His always-running inner monologue, when this server has one.
         self.stream: Any = None
+        self._snapshot: dict[str, Any] | None = None
+        self._snapshot_key: tuple[object, ...] | None = None
+
+    def life_snapshot(self) -> dict[str, Any]:
+        """His snapshot, rebuilt only when his history has changed.
+
+        A long life takes a while to snapshot, and the clock loop, every page poll and every
+        operation asked for one; nearly always nothing had happened in between.
+        """
+        history = self.life.history()
+        key = (
+            len(history),
+            history[-1].event_id if history else None,
+            self.life.mode,
+            getattr(self.life.gateway, "model", None),
+        )
+        if key != self._snapshot_key or self._snapshot is None:
+            self._snapshot = self.life.snapshot()
+            self._snapshot_key = key
+        return self._snapshot
 
     def stream_view(self) -> tuple[dict[str, Any] | None, bool]:
         """What the inner stream sees: the latest snapshot, and whether time is running."""
@@ -85,7 +105,7 @@ class Runtime:
     def start(self) -> None:
         with self.lock:
             self.life.bootstrap()
-            config = self.life.snapshot()["config"]
+            config = self.life_snapshot()["config"]
             # Resume is explicit: downtime never creates an unbounded catch-up burst.
             if config["running"]:
                 self.life.configure(
@@ -93,7 +113,7 @@ class Runtime:
                     config["minutes_per_tick"],
                     config.get("clock_mode", "realtime"),
                 )
-            self.cached = self.life.snapshot()
+            self.cached = self.life_snapshot()
             self.realtime_pending_seconds = 0.0
             self.last_wall_tick = self.clock()
         self.thread = threading.Thread(target=self._loop, name="eidos-chronos", daemon=True)
@@ -111,7 +131,7 @@ class Runtime:
                     "minutes_per_tick": 15,
                 }
                 try:
-                    config = self.life.snapshot()["config"]
+                    config = self.life_snapshot()["config"]
                     if config["running"]:
                         if config.get("clock_mode", "realtime") == "realtime":
                             self._accrue_realtime(wall_now)
@@ -126,7 +146,7 @@ class Runtime:
                             self.life.advance(config["minutes_per_tick"] / 60)
                         self.ticks += 1
                         self.error = None
-                        self.cached = self.life.snapshot()
+                        self.cached = self.life_snapshot()
                     else:
                         self.realtime_pending_seconds = 0.0
                         self.last_wall_tick = wall_now
@@ -152,7 +172,7 @@ class Runtime:
         if self.thread:
             self.thread.join(timeout=30)
         with self.lock:
-            config = self.life.snapshot()["config"]
+            config = self.life_snapshot()["config"]
             wall_now = self.clock()
             self._accrue_realtime(wall_now)
             if (
@@ -163,7 +183,7 @@ class Runtime:
             ):
                 self._commit_realtime_pending()
                 self.ticks += 1
-                self.cached = self.life.snapshot()
+                self.cached = self.life_snapshot()
         close_gateway = getattr(self.life.gateway, "close", None)
         if callable(close_gateway):
             close_gateway()
@@ -173,7 +193,7 @@ class Runtime:
         with self.lock:
             self.working = True
             try:
-                config = self.life.snapshot()["config"]
+                config = self.life_snapshot()["config"]
                 if config["running"] and config.get("clock_mode", "realtime") == "realtime":
                     self._accrue_realtime(self.clock())
                     if self.realtime_pending_seconds > 0:
@@ -181,7 +201,7 @@ class Runtime:
                 yield
             finally:
                 self.working = False
-                self.cached = self.life.snapshot()
+                self.cached = self.life_snapshot()
 
     def _accrue_realtime(self, wall_now: float) -> None:
         self.realtime_pending_seconds += max(
@@ -193,7 +213,7 @@ class Runtime:
         """Commit exact wall time and pulse Murmur at crossed quarter hours."""
         remaining = self.realtime_pending_seconds
         self.realtime_pending_seconds = 0.0
-        simulated_at = datetime.fromisoformat(self.life.snapshot()["time"])
+        simulated_at = datetime.fromisoformat(self.life_snapshot()["time"])
         try:
             while remaining > 0.000001:
                 seconds_into_quarter = (
@@ -219,7 +239,7 @@ class Runtime:
 
     def pace_live_reply(self, previous_message_ids: set[str], started_at: float) -> float:
         """Hold listening/thought, then expose speech on a shared wall-clock timeline."""
-        conversations = self.life.snapshot().get("conversations", [])
+        conversations = self.life_snapshot().get("conversations", [])
         new_replies = [
             item
             for item in conversations
@@ -261,7 +281,7 @@ class Runtime:
     def snapshot(self) -> dict[str, Any]:
         if self.lock.acquire(blocking=False):
             try:
-                self.cached = self.life.snapshot()
+                self.cached = self.life_snapshot()
             finally:
                 self.lock.release()
         if self.cached is None:
@@ -517,7 +537,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                             raise ValueError("Pathos is still speaking")
                         previous_message_ids = {
                             str(item["id"])
-                            for item in runtime.life.snapshot().get("conversations", [])
+                            for item in runtime.life_snapshot().get("conversations", [])
                         }
                         runtime.life.chat(text_value, request_id)
                         runtime.pace_live_reply(previous_message_ids, operation_started)
