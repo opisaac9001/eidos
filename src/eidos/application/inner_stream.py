@@ -134,6 +134,15 @@ def _short(text: str, limit: int = 160) -> str:
     return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
 
+def _his_memories(snapshot: Mapping[str, Any]) -> list[object]:
+    """His own memories; the snapshot's list also carries what residents remember."""
+    return [
+        memory
+        for memory in snapshot.get("memories") or []
+        if not isinstance(memory, Mapping) or memory.get("owner", "pathos") == "pathos"
+    ]
+
+
 def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     """Everything in his present his mind could wander to, as short plain cues."""
     found: list[Cue] = []
@@ -188,7 +197,7 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
             and person.get("name")
         ):
             found.append(Cue("person", f"{person['name']} is here"))
-    for memory in (snapshot.get("memories") or [])[:6]:
+    for memory in _his_memories(snapshot)[:6]:
         text = _text_of(memory)
         if text and not (isinstance(memory, Mapping) and memory.get("source") == "real-news"):
             found.append(Cue("memory", _short(text)))
@@ -279,7 +288,7 @@ def stream_context(
         if cue is not None
         else [
             text
-            for text in (_text_of(item) for item in (snapshot.get("memories") or [])[:3])
+            for text in (_text_of(item) for item in _his_memories(snapshot)[:3])
             if text is not None
         ]
     )

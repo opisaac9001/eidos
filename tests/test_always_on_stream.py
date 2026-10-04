@@ -279,3 +279,13 @@ def test_the_stream_sees_his_clock_moving_between_commits(tmp_path) -> None:
         )
     finally:
         runtime.close()
+
+
+def test_his_mind_drifts_to_his_own_memories_not_residents() -> None:
+    world = snapshot()
+    world["memories"] = [
+        {"text": "Hannah Fenwick notices something out of place.", "owner": "hannah-fenwick"},
+        {"text": "Mum rang about the garden.", "owner": "pathos"},
+    ]
+    memories = [cue.text for cue in cues(world) if cue.kind == "memory"]
+    assert memories == ["Mum rang about the garden."]
