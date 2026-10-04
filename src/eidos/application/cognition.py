@@ -21,6 +21,8 @@ ROLE_MODEL_PROFILES = {
     "oneiros": ("6", 220, 0.8),
     "chronicler": ("3", 180, 0.2),
 }
+# A dream is long and comes while nothing else is waiting on the model; give it time.
+ROLE_TIMEOUTS = {"oneiros": 120}
 REPAIRABLE_PATHOS_FINDINGS = {
     "lost_first_person_role",
     "contradicted_activity_status",
@@ -95,7 +97,7 @@ async def perform(
     try:
         response = await asyncio.wait_for(
             gateway.generate(request_for(role, context)),
-            timeout=50,
+            timeout=ROLE_TIMEOUTS.get(role, 50),
         )
         text = validate_completion(role, response.content, response.finish_reason, context)
         semantic_findings = semantic_quality_findings(

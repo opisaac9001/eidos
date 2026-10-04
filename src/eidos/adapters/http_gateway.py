@@ -522,7 +522,7 @@ COMPACT_PROMPTS = {
         )
     ),
 }
-COMPACT_TOKENS = {"murmur": 80, "oneiros": 140}
+COMPACT_TOKENS = {"murmur": 80, "oneiros": 110}
 
 
 # A long life's conversation context outgrew a local model's window (8,192 tokens on the

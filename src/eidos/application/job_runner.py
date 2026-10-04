@@ -12,6 +12,10 @@ from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.job_store import JobConflict, JobStore
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
+# Long enough for a slow local model's longest answer (a dream on a Raspberry Pi), so a
+# job isn't handed to another worker while the first is still on it.
+JOB_LEASE = timedelta(seconds=180)
+
 
 class CognitionJobRunner:
     def __init__(
@@ -40,7 +44,7 @@ class CognitionJobRunner:
         return self.revision_for(job.aggregate_id) != job.expected_revision
 
     def run_once(self) -> CognitionJob | None:
-        claimed = self.jobs.claim_next(self.worker_id, self.now(), timedelta(seconds=60))
+        claimed = self.jobs.claim_next(self.worker_id, self.now(), JOB_LEASE)
         if claimed is None:
             return None
         if self._stale(claimed):

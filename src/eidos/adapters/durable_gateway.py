@@ -99,7 +99,14 @@ class DurableModelGateway(ModelGateway):
                 job_id=UUID(str(request.correlation_id)),
                 created_at=now,
                 available_at=now,
-                deadline_at=now + timedelta(seconds=60 if request.capability == "pathos" else 120),
+                deadline_at=now
+                + timedelta(
+                    seconds=60
+                    if request.capability == "pathos"
+                    else 180
+                    if request.capability == "oneiros"
+                    else 120
+                ),
             )
         )
 

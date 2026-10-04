@@ -44,6 +44,7 @@ class LifeTests(unittest.TestCase):
 
     def test_whole_day_exercises_every_role_and_keeps_dreams_out_of_facts(self):
         self.life.advance(24)
+        self.life.advance(5)  # through the first night's dream, in the small hours
         snapshot = self.life.snapshot()
         self.assertTrue(snapshot["identity"]["established"])
         self.assertGreater(snapshot["identity"]["values"]["curiosity"], 0.8)
@@ -52,12 +53,12 @@ class LifeTests(unittest.TestCase):
         )
         for role in snapshot["roles"]:
             self.assertGreater(role["calls"], 0) if role["id"] != "pathos" else None
-        self.assertEqual(snapshot["time"], "2026-01-02T00:00:00+00:00")
+        self.assertEqual(snapshot["time"], "2026-01-02T05:00:00+00:00")
         self.assertGreater(snapshot["pathos"]["needs"]["connection"], 0.5)
-        self.assertEqual(snapshot["mind"]["pulse_counts"]["somatic"], 24)
-        self.assertEqual(snapshot["mind"]["pulse_counts"]["attention"], 24)
-        self.assertEqual(snapshot["mind"]["pulse_counts"]["associative"], 24)
-        self.assertEqual(snapshot["mind"]["pulse_counts"]["affective"], 24)
+        self.assertEqual(snapshot["mind"]["pulse_counts"]["somatic"], 29)
+        self.assertEqual(snapshot["mind"]["pulse_counts"]["attention"], 29)
+        self.assertEqual(snapshot["mind"]["pulse_counts"]["associative"], 29)
+        self.assertEqual(snapshot["mind"]["pulse_counts"]["affective"], 29)
         self.assertTrue(
             {
                 "somatic",
@@ -72,7 +73,7 @@ class LifeTests(unittest.TestCase):
             <= {item["layer"] for item in snapshot["mind"]["layers"]}
         )
         self.assertTrue(snapshot["emotion"]["label"])
-        self.assertEqual(len(snapshot["emotion_history"]["samples"]), 24)
+        self.assertEqual(len(snapshot["emotion_history"]["samples"]), 29)
         self.assertTrue(snapshot["emotion_history"]["influences"])
         self.assertTrue(
             all(
@@ -819,7 +820,9 @@ class LifeTests(unittest.TestCase):
         )
 
     def test_unresolved_concern_seeds_dream_and_bounded_waking_recall(self):
+        # He dreams in the small hours of the first night, before waking at six.
         self.life.advance(24)
+        self.life.advance(5)
         before_waking = self.life.snapshot()
         dream = next(e for e in self.life.history() if e.kind == "dream.recorded")
         self.assertTrue(dream.payload["fiction"])
@@ -832,9 +835,12 @@ class LifeTests(unittest.TestCase):
         recalled = [memory for memory in after_waking["memories"] if memory["category"] == "dream"]
         self.assertEqual(len(recalled), 1)
         self.assertEqual(recalled[0]["source_event_id"], str(dream.event_id))
-        self.assertLess(after_waking["pathos"]["valence"], before_waking["pathos"]["valence"])
         applied = [e for e in self.life.history() if e.kind == "dream.effect_applied"]
         self.assertEqual(len(applied), 1)
+        # The worried dream weighs on him when he wakes and recalls it (the rest of his
+        # morning then moves his feelings in its own right).
+        self.assertLess(float(applied[0].payload["valence_delta"]), 0)
+        self.assertIsNotNone(before_waking)
         journal_dream = next(
             item for item in after_waking["dreams"] if item["id"] == str(dream.event_id)
         )
@@ -1045,3 +1051,32 @@ class LifeTests(unittest.TestCase):
             SQLiteEventStore(self.path), StandInGateway(), authored_scenario=True
         ).snapshot()
         self.assertEqual(replay["calendar"], snapshot["calendar"])
+
+
+def test_the_nights_dream_is_made_of_the_day(tmp_path) -> None:
+    import json as _json
+
+    from eidos.adapters.standin_gateway import StandInGateway as _StandIn
+
+    class Capturing(_StandIn):
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            self.requests.append(request)
+            return await super().generate(request)
+
+    gateway = Capturing()
+    life = Life(SQLiteEventStore(tmp_path / "life.sqlite3"), gateway, authored_scenario=True)
+    life.advance(24)
+    life.advance(5)
+    dream_request = next(r for r in gateway.requests if r.capability == "oneiros")
+    context = _json.loads(dream_request.messages[-1].content)
+    day = [
+        e.payload["text"]
+        for e in life.history()
+        if e.kind == "memory.recorded"
+        and e.payload.get("category") != "dream"
+        and str(e.payload.get("simulated_at", "")).startswith("2026-01-01")
+    ]
+    assert any(memory in day for memory in context["memories"])

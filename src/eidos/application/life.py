@@ -286,6 +286,10 @@ _CALLER_INTERRUPTIONS = frozenset(
 )
 
 
+# The small hours: asleep on any ordinary night, and near enough to waking to be recalled.
+DREAM_HOUR = 4
+
+
 @dataclass
 class _Tick:
     """One simulated hour in progress, threaded through the phases of ``Life._advance``.
@@ -3186,14 +3190,22 @@ class Life(LifeConversation):
         pending.extend(await selfhood_chapter_events(history + pending, current, self.gateway))
 
     async def _phase_nightly(self, tick: _Tick, mind: _HourMind) -> None:
-        """Evening reflection at 21:00; the night's dream and the day's summary at 23:00."""
+        """Evening reflection at 21:00 and the day's summary at 23:00; he dreams in the small
+        hours, while he's actually asleep (and the model that dreams isn't busy thinking his
+        waking thoughts), close enough to waking that it may stay with him."""
         for role, scheduled_hour, kind in (
             ("reflection", 21, "reflection.recorded"),
-            ("oneiros", 23, "dream.recorded"),
+            ("oneiros", DREAM_HOUR, "dream.recorded"),
             ("chronicler", 23, "day.summarized"),
         ):
-            if tick.current.hour == scheduled_hour:
-                await self._nightly_role(tick, mind, role, kind)
+            if tick.current.hour != scheduled_hour:
+                continue
+            if role == "oneiros" and (
+                tick.state.awake
+                or not _went_to_sleep_tonight(tick.history + tick.pending, tick.current)
+            ):
+                continue
+            await self._nightly_role(tick, mind, role, kind)
 
     async def _nightly_role(self, tick: _Tick, mind: _HourMind, role: str, kind: str) -> None:
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
@@ -3224,6 +3236,18 @@ class Life(LifeConversation):
                 for item in recent_dreams
             ]
             role_context["recent_dreams"] = recent_dream_context
+            # Dreams are made of the day: what mattered in it comes first.
+            residue = _day_residue(history + pending, current)
+            if residue:
+                raw_memories = role_context.get("memories")
+                recalled = (
+                    [str(m) for m in raw_memories]
+                    if isinstance(raw_memories, (list, tuple))
+                    else []
+                )
+                role_context["memories"] = [*residue, *[m for m in recalled if m not in residue]][
+                    :5
+                ]
         if role == "chronicler":
             role_sources = [
                 item for item in selected_context if item.event.payload.get("category") != "dream"
@@ -3693,3 +3717,41 @@ def _deferred_cognition_events(
         )
         settled.add(job_id)
     return output
+
+
+def _went_to_sleep_tonight(history: Sequence[DomainEvent], at: datetime) -> bool:
+    """Whether he fell asleep after a day, within the last twelve hours: dreams need one."""
+    for event in reversed(history[-4000:]):
+        if event.kind == "sleep.started":
+            try:
+                return at - datetime.fromisoformat(str(event.payload["simulated_at"])) <= timedelta(
+                    hours=12
+                )
+            except (KeyError, ValueError):
+                return False
+    return False
+
+
+def _day_residue(history: Sequence[DomainEvent], at: datetime, limit: int = 3) -> list[str]:
+    """What mattered most in the day just lived, for the night's dream to work over."""
+    since = at - timedelta(hours=20)
+    found: list[tuple[float, str, str]] = []
+    for event in reversed(history[-6000:]):
+        if event.kind != "memory.recorded":
+            continue
+        payload = event.payload
+        try:
+            when = datetime.fromisoformat(str(payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if when < since:
+            break
+        if payload.get("owner", "pathos") != "pathos" or payload.get("category") == "dream":
+            continue
+        text = payload.get("text")
+        if isinstance(text, str) and text.strip():
+            importance = payload.get("importance")
+            weight = float(importance) if isinstance(importance, (int, float)) else 0.3
+            found.append((weight, str(payload.get("simulated_at")), text.strip()))
+    found.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [text for _, _, text in found[:limit]]
