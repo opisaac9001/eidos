@@ -21,7 +21,7 @@ ISO week's activity is summed into a ``body.week`` that moves a slow fitness lev
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Callable, Sequence
 from uuid import UUID
@@ -356,7 +356,7 @@ def _movements(
     while first > 0:
         first -= 1
         event = moves[first]
-        if event.kind == "pathos.moved" and _time(event) < start:
+        if event.kind == "pathos.moved" and _move_time(event) < start:
             break
     stays: list[tuple[str, datetime, datetime]] = []
     walking = timedelta()
@@ -368,7 +368,7 @@ def _movements(
             stays.append((place, max(since, start), min(until, end)))
 
     for event in moves[first:]:
-        when = _time(event)
+        when = _move_time(event)
         if when >= end:
             break
         if event.kind == "pathos.travel_started":
@@ -812,6 +812,15 @@ def _parse(raw: object) -> datetime | None:
         except ValueError:
             return None
     return None
+
+
+# The earliest lives recorded moves without a time; they all happened before any week
+# this module looks at.
+_LONG_AGO = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _move_time(event: DomainEvent) -> datetime:
+    return _parse(event.payload.get("simulated_at")) or _LONG_AGO
 
 
 def _time(event: DomainEvent) -> datetime:

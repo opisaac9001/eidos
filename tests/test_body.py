@@ -326,3 +326,20 @@ def test_it_shows_in_how_he_understands_himself(a_year_and_a_bit) -> None:
     context = selfhood_context(a_year_and_a_bit[: a_year_and_a_bit.index(nag) + 1], at)
     assert "putting off booking the dentist" in context["patterns_he_would_like_to_change"]
     assert "body" in context
+
+
+def test_the_earliest_lives_moves_without_a_time_still_count_as_long_ago() -> None:
+    from eidos.application.body import _movements
+
+    start = datetime(2026, 1, 12, tzinfo=timezone.utc)
+    history = [
+        DomainEvent("pathos.moved", "pathos", {"location_id": "home"}),
+        DomainEvent(
+            "pathos.moved",
+            "pathos",
+            {"location_id": "cafe", "simulated_at": (start + timedelta(hours=9)).isoformat()},
+        ),
+    ]
+    stays, walking = _movements(history, start, start + timedelta(days=1))
+    assert [place for place, _, _ in stays] == ["home", "cafe"]
+    assert walking == timedelta()
