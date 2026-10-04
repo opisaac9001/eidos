@@ -970,7 +970,12 @@ def _refuse_copied_example(capability: str, content: str) -> None:
         text = str(json.loads(content).get("text", ""))
     except (ValueError, AttributeError):
         return
-    said = " ".join(re.findall(r"[a-z']+", text.casefold()))
+    said = re.findall(r"[a-z']+", text.casefold())
     for _, example in COMPACT_EXAMPLES[capability]:
-        if said == " ".join(re.findall(r"[a-z']+", example.casefold())):
+        words = re.findall(r"[a-z']+", example.casefold())
+        if said == words:
             raise ValueError("Model copied a style example instead of thinking")
+        # Lifting a phrase is copying too ("my old flatmate still burns toast").
+        phrases = {tuple(words[i : i + 4]) for i in range(len(words) - 3)}
+        if any(tuple(said[i : i + 4]) in phrases for i in range(len(said) - 3)):
+            raise ValueError("Model borrowed a phrase from a style example")

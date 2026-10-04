@@ -267,3 +267,14 @@ def test_a_copied_style_example_is_not_a_thought() -> None:
             asyncio.run(gateway.generate(murmur_request()))
     finally:
         provider.close()
+
+
+def test_a_phrase_lifted_from_a_style_example_is_not_a_thought() -> None:
+    lifted = '{"text": "Rowan never rings. Wonder if my old flatmate still burns toast."}'
+    provider = FakeProvider([(200, completion(lifted))])
+    try:
+        gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)
+        with pytest.raises(ValueError, match="borrowed a phrase"):
+            asyncio.run(gateway.generate(murmur_request()))
+    finally:
+        provider.close()
