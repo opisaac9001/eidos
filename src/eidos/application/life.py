@@ -4,6 +4,7 @@ import asyncio
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from uuid import UUID, uuid4
 
@@ -3210,7 +3211,7 @@ class Life(LifeConversation):
     async def _nightly_role(self, tick: _Tick, mind: _HourMind, role: str, kind: str) -> None:
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
         selected_context = mind.selected_context
-        role_sources = selected_context
+        role_sources: Sequence[Any] = selected_context
         role_context = {
             **mind.context,
             "cognitive_workspace": cognitive_workspace(history + pending, current),
@@ -3249,9 +3250,21 @@ class Life(LifeConversation):
                     :5
                 ]
         if role == "chronicler":
-            role_sources = [
-                item for item in selected_context if item.event.payload.get("category") != "dream"
-            ]
+            # Going over the day means the things that mattered in it, in order; what
+            # recall happens to surface at bedtime missed nearly all of it.
+            day = _day_memories(history + pending, current)
+            role_sources = (
+                [
+                    SimpleNamespace(event=event, recalled_text=str(event.payload["text"]))
+                    for event in day
+                ]
+                if day
+                else [
+                    item
+                    for item in selected_context
+                    if item.event.payload.get("category") != "dream"
+                ]
+            )
             role_context = {
                 **mind.context,
                 "memories": [item.recalled_text for item in role_sources],
@@ -3755,3 +3768,36 @@ def _day_residue(history: Sequence[DomainEvent], at: datetime, limit: int = 3) -
             found.append((weight, str(payload.get("simulated_at")), text.strip()))
     found.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [text for _, _, text in found[:limit]]
+
+
+def _day_memories(
+    history: Sequence[DomainEvent], at: datetime, limit: int = 8
+) -> list[DomainEvent]:
+    """The day's most important memories of his own, in the order they happened."""
+    since = at - timedelta(hours=18)
+    found: list[tuple[float, int, DomainEvent]] = []
+    for position in range(len(history) - 1, max(-1, len(history) - 6000), -1):
+        event = history[position]
+        if event.kind != "memory.recorded":
+            continue
+        payload = event.payload
+        try:
+            when = datetime.fromisoformat(str(payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if when < since:
+            break
+        text = payload.get("text")
+        if (
+            payload.get("owner", "pathos") != "pathos"
+            or payload.get("category") == "dream"
+            or not isinstance(text, str)
+            or not text.strip()
+        ):
+            continue
+        importance = payload.get("importance")
+        found.append(
+            (float(importance) if isinstance(importance, (int, float)) else 0.3, position, event)
+        )
+    kept = sorted(found, key=lambda item: (item[0], item[1]), reverse=True)[:limit]
+    return [event for _, _, event in sorted(kept, key=lambda item: item[1])]
