@@ -230,3 +230,29 @@ def test_he_knows_when_things_are_in_plain_words() -> None:
     assert when_in_words(datetime(2026, 8, 27, 10, 0, tzinfo=timezone.utc), night) == (
         "on Thursday at 10:00"
     )
+
+
+def test_someone_who_turns_up_between_the_hours_is_noticed(tmp_path, monkeypatch) -> None:
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    import eidos.application.life as life_module
+
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
+    life.advance(10)
+    history = life.history()
+    state = replace(life._project_state(history), location_id="cafe", awake=True)
+    person = next(iter(life._world_catalog(history).people.values()))
+    monkeypatch.setattr(
+        life_module,
+        "project_npcs",
+        lambda events, at: SimpleNamespace(
+            people={person.person_id: SimpleNamespace(location_id="cafe")}
+        ),
+    )
+    monkeypatch.setattr(life_module, "_met_recently", lambda *args: False)
+    pending = []
+    asyncio.run(life._notice_arrivals(history, state, pending))
+    met = [event for event in pending if event.kind == "npc.encountered"]
+    assert [event.payload["person_id"] for event in met] == [person.person_id]
+    assert any(event.kind == "memory.recorded" for event in pending)

@@ -523,6 +523,7 @@ class Life(LifeConversation):
             )
         # Friends' replies to his texts arrive in their own time.
         pending.extend(await reply_events(history + pending, state.simulated_at, self.gateway))
+        await self._notice_arrivals(history, state, pending)
         # How this quarter hour felt (his thoughts, any reply) moves his feelings now, not on
         # the hour.
         felt, felt_state = appraisal_events(history + pending, state, state.simulated_at)
@@ -2962,70 +2963,103 @@ class Life(LifeConversation):
             if _met_recently(history, pending, person.person_id, tick.state.location_id, current):
                 # Working alongside someone is not a fresh encounter every hour.
                 continue
-            # Shown so a new moment isn't told in the same words as the last few.
-            recent_encounters = [
-                str(event.payload.get("text", ""))
-                for event in events_of(history + pending, "npc.encountered")[-5:]
-            ]
-            text = await perform(
-                self.gateway,
-                "firmament",
-                {**mind.context, "person": person.name, "recent_encounters": recent_encounters},
-                at,
-                pending,
-            )
-            if text:
-                encounter = DomainEvent(
-                    "npc.encountered",
+            await self._meet(history, pending, person, tick.state.location_id, at, mind.context)
+
+    async def _meet(
+        self,
+        history: Sequence[DomainEvent],
+        pending: list[DomainEvent],
+        person: Any,
+        location_id: str,
+        at: str,
+        context: Mapping[str, object],
+    ) -> None:
+        """He notices someone where he is: the moment, and his memory of it."""
+        # Shown so a new moment isn't told in the same words as the last few.
+        recent_encounters = [
+            str(event.payload.get("text", ""))
+            for event in events_of([*history, *pending], "npc.encountered")[-5:]
+        ]
+        text = await perform(
+            self.gateway,
+            "firmament",
+            {**context, "person": person.name, "recent_encounters": recent_encounters},
+            at,
+            pending,
+        )
+        if not text:
+            return
+        encounter = DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {
+                "person_id": person.person_id,
+                "text": text,
+                "simulated_at": at,
+                "location_id": location_id,
+                "source": self.mode,
+                "role": "firmament",
+            },
+        )
+        pending.append(encounter)
+        memory = await perform(
+            self.gateway, "mnemosyne", {**context, "experience": text}, at, pending
+        )
+        recovered = memory is None
+        if recovered:
+            memory = text
+            pending.append(
+                DomainEvent(
+                    "memory.recovered",
                     "pathos",
                     {
-                        "person_id": person.person_id,
-                        "text": text,
+                        "text": "Archived the accepted encounter verbatim after the memory performer failed.",
                         "simulated_at": at,
-                        "location_id": tick.state.location_id,
-                        "source": self.mode,
-                        "role": "firmament",
+                        "source_event_id": str(encounter.event_id),
+                        "source": "source-archive",
                     },
                 )
-                pending.append(encounter)
-                memory = await perform(
-                    self.gateway, "mnemosyne", {**mind.context, "experience": text}, at, pending
+            )
+        if memory:
+            pending.append(
+                DomainEvent(
+                    "memory.recorded",
+                    "pathos",
+                    {
+                        "text": memory,
+                        "simulated_at": at,
+                        "category": "encounter",
+                        "source": "source-archive" if recovered else self.mode,
+                        "source_event_id": str(encounter.event_id),
+                        "location_id": location_id,
+                        "person_id": person.person_id,
+                        "role": "source-archive" if recovered else "mnemosyne",
+                        "owner": "pathos",
+                        "importance": 0.75,
+                        "confidence": 1.0,
+                    },
                 )
-                recovered = memory is None
-                if recovered:
-                    memory = text
-                    pending.append(
-                        DomainEvent(
-                            "memory.recovered",
-                            "pathos",
-                            {
-                                "text": "Archived the accepted encounter verbatim after the memory performer failed.",
-                                "simulated_at": at,
-                                "source_event_id": str(encounter.event_id),
-                                "source": "source-archive",
-                            },
-                        )
-                    )
-                if memory:
-                    pending.append(
-                        DomainEvent(
-                            "memory.recorded",
-                            "pathos",
-                            {
-                                "text": memory,
-                                "simulated_at": at,
-                                "category": "encounter",
-                                "source": "source-archive" if recovered else self.mode,
-                                "source_event_id": str(encounter.event_id),
-                                "location_id": tick.state.location_id,
-                                "person_id": person.person_id,
-                                "role": "source-archive" if recovered else "mnemosyne",
-                                "owner": "pathos",
-                                "importance": 0.75,
-                                "confidence": 1.0,
-                            },
-                        )
-                    )
+            )
+
+    async def _notice_arrivals(
+        self, history: list[DomainEvent], state: PathosState, pending: list[DomainEvent]
+    ) -> None:
+        """Between the hours: someone who has just turned up where he is gets noticed now."""
+        if not state.awake or state.location_id in {"home", "in_transit"}:
+            return
+        catalog = self._world_catalog(history)
+        everyone = project_npcs([*history, *pending], state.simulated_at)
+        at = state.simulated_at.isoformat()
+        context = {"time": at, "location": catalog.location_name(state.location_id)}
+        for person in catalog.people.values():
+            here = everyone.people.get(person.person_id)
+            if here is None or here.location_id != state.location_id:
+                continue
+            if _met_recently(
+                history, pending, person.person_id, state.location_id, state.simulated_at
+            ):
+                continue
+            await self._meet(history, pending, person, state.location_id, at, context)
 
     def _phase_activities(self, tick: _Tick) -> None:
         """Scheduled social plans and activities happen, with what they lead to."""
