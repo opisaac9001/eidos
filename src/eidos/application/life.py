@@ -2962,10 +2962,15 @@ class Life(LifeConversation):
             if _met_recently(history, pending, person.person_id, tick.state.location_id, current):
                 # Working alongside someone is not a fresh encounter every hour.
                 continue
+            # Shown so a new moment isn't told in the same words as the last few.
+            recent_encounters = [
+                str(event.payload.get("text", ""))
+                for event in events_of(history + pending, "npc.encountered")[-5:]
+            ]
             text = await perform(
                 self.gateway,
                 "firmament",
-                {**mind.context, "person": person.name},
+                {**mind.context, "person": person.name, "recent_encounters": recent_encounters},
                 at,
                 pending,
             )
