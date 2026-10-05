@@ -304,3 +304,22 @@ def test_a_friends_reply_fits_what_is_really_going_on_in_their_life() -> None:
     context = json.loads(reply_request.messages[-1].content)
     their_life = context["personal_relationship_context"]["what_is_going_on_in_their_life"]
     assert their_life == ["Rowan's mum has been in and out of hospital."]
+
+
+def test_seeing_someone_every_day_stands_out_less() -> None:
+    from eidos.application.life import _encounter_importance
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
+
+    def met(days_ago: float) -> DomainEvent:
+        when = (at - timedelta(days=days_ago)).isoformat()
+        return DomainEvent(
+            "npc.encountered", "pathos", {"person_id": "ellis", "simulated_at": when}
+        )
+
+    assert _encounter_importance([], "ellis", at.isoformat()) == 0.75
+    assert _encounter_importance([met(30)], "ellis", at.isoformat()) == 0.75
+    assert _encounter_importance([met(2)], "ellis", at.isoformat()) == 0.55
+    daily = [met(day) for day in (5, 4, 3, 2, 1)]
+    assert _encounter_importance(daily, "ellis", at.isoformat()) == 0.35

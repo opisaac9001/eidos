@@ -3035,7 +3035,9 @@ class Life(LifeConversation):
                         "person_id": person.person_id,
                         "role": "source-archive" if recovered else "mnemosyne",
                         "owner": "pathos",
-                        "importance": 0.75,
+                        "importance": _encounter_importance(
+                            [*history, *pending], person.person_id, at
+                        ),
                         "confidence": 1.0,
                     },
                 )
@@ -3840,3 +3842,26 @@ def _day_memories(
         )
     kept = sorted(found, key=lambda item: (item[0], item[1]), reverse=True)[:limit]
     return [event for _, _, event in sorted(kept, key=lambda item: item[1])]
+
+
+def _encounter_importance(history: Sequence[DomainEvent], person_id: str, at: str) -> float:
+    """Seeing someone stands out less the more often he's seen them lately.
+
+    Every encounter used to count 0.75, so his boss dropping by the workshop weighed as much
+    as anything else in a day, and the day's summary was made of hellos.
+    """
+    now = datetime.fromisoformat(at)
+    since = now - timedelta(days=14)
+    lately = 0
+    for event in reversed(events_of(history, "npc.encountered")):
+        if event.payload.get("person_id") != person_id:
+            continue
+        try:
+            when = datetime.fromisoformat(str(event.payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if when < since:
+            break
+        if when < now:
+            lately += 1
+    return 0.75 if lately == 0 else 0.55 if lately <= 3 else 0.35
