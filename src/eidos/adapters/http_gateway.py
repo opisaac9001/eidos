@@ -613,7 +613,8 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         details["feeling"] = emotion["label"]
     memories = context.get("memories")
     if isinstance(memories, list) and memories:
-        details["on_his_mind"] = [str(m)[:160] for m in memories[-2:]]
+        # The most relevant come first (a dream's day residue, recall's best matches).
+        details["on_his_mind"] = [str(m)[:160] for m in memories[:2]]
     if capability == "murmur":
         stream = context.get("recent_inner_stream")
         if isinstance(stream, list) and stream:
@@ -1053,15 +1054,20 @@ def _with_content(response: ModelResponse, content: str) -> ModelResponse:
     return replace(response, content=content)
 
 
+def _without_required_opening(words: list[str]) -> list[str]:
+    """Every dream must begin "In a dream"; sharing that with an example isn't copying."""
+    return words[3:] if words[:3] == ["in", "a", "dream"] else words
+
+
 def _refuse_copied_example(capability: str, content: str) -> None:
     """A small model that hands back one of the style examples hasn't thought anything."""
     try:
         text = str(json.loads(content).get("text", ""))
     except (ValueError, AttributeError):
         return
-    said = re.findall(r"[a-z']+", text.casefold())
+    said = _without_required_opening(re.findall(r"[a-z']+", text.casefold()))
     for _, example in COMPACT_EXAMPLES[capability]:
-        words = re.findall(r"[a-z']+", example.casefold())
+        words = _without_required_opening(re.findall(r"[a-z']+", example.casefold()))
         if said == words:
             raise ValueError("Model copied a style example instead of thinking")
         # Lifting a phrase is copying too ("my old flatmate still burns toast").

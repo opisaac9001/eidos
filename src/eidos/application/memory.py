@@ -690,12 +690,15 @@ def _render_recollection(
     if detail_level == "partial":
         first_detail = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
         return f"I remember {first_detail.lower()}, though some details are hazy.", "partial"
+    # A faint memory keeps a human hint (a name, a place), never an internal id such as
+    # "pathos-project-cause-...-goal" or "townsfolk-1855".
     links = [
         str(event.payload[key])
-        for key in ("person_id", "goal_id", "location_id")
+        for key in ("person_id", "location_id")
         if isinstance(event.payload.get(key), str)
+        and re.fullmatch(r"[a-z]+", str(event.payload[key]))
     ]
-    cue = ", ".join(links[:2]) or category
+    cue = ", ".join(link if link == "home" else link.title() for link in links[:2]) or category
     return f"I have a faint {category} memory connected to {cue}; the details are unclear.", "vague"
 
 

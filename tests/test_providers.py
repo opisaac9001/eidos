@@ -248,7 +248,7 @@ def test_small_models_get_a_short_example_led_request() -> None:
             "where": "kitchen",
             "time_of_day": "late evening",
             "feeling": "tired",
-            "on_his_mind": ["Ellis said the lamp was tidy work.", "Rain again."],
+            "on_his_mind": ["I made tea.", "Ellis said the lamp was tidy work."],
             "my_next_plan": "Work at the workshop",
             "my_free_minutes": 12,
         }
@@ -314,3 +314,18 @@ def test_a_report_about_someone_is_not_him_talking() -> None:
     assert "lost_first_person_role" in semantic_quality_findings("pathos", report, context)
     reply = "Morning! Just got up and having a quiet start. How about you?"
     assert "lost_first_person_role" not in semantic_quality_findings("pathos", reply, context)
+
+
+def test_a_dream_may_open_the_way_every_dream_must() -> None:
+    dream = '{"text": "In a dream the workshop was full of clocks that all told different news."}'
+    provider = FakeProvider([(200, completion(dream))])
+    try:
+        gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)
+        from eidos.application.cognition import request_for
+
+        response = asyncio.run(
+            gateway.generate(request_for("oneiros", {"time": "2026-08-25T04:00:00+00:00"}))
+        )
+        assert "clocks" in response.content
+    finally:
+        provider.close()
