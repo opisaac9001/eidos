@@ -279,6 +279,7 @@ ROLE_FIELDS = {
         "drifting_to",
         "with_him",
         "who_is_who",
+        "alone",
         "worn_out",
         "stream_pulse_id",
         "mind_layers",
@@ -632,6 +633,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         with_him = context.get("with_him")
         if isinstance(with_him, list) and with_him:
             details["with_him"] = [str(name) for name in with_him][:4]
+        elif context.get("alone"):
+            # Said plainly, or a small model puts friends in the room with him.
+            details["with_him"] = "nobody; he's on his own"
         budget = context.get("time_budget")
         if isinstance(budget, Mapping):
             if budget.get("next_plan"):

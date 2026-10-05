@@ -429,3 +429,26 @@ def test_the_stream_knows_who_people_are_to_him() -> None:
     context = stream_context(world, ["Ellis should be home soon."], Cue("here", "The flat"))
     assert context["who_is_who"] == {"Ellis": "repair artist"}
     assert compact_context("murmur", context)["who_is_who"] == {"Ellis": "repair artist"}
+
+
+def test_the_stream_knows_when_he_is_alone_and_where_his_family_is() -> None:
+    from eidos.adapters.http_gateway import compact_context
+
+    world = snapshot()
+    world["people"] = []
+    world["selfhood"] = {
+        "family": [{"who": "Mum (Helen Shaw)", "relation": "mother", "about": "Gardens in Wye."}]
+    }
+    context = stream_context(world, ["Mum's packing for work."], Cue("here", "The flat"))
+    assert "doesn't live with him" in context["who_is_who"]["Mum"]
+    assert compact_context("murmur", context)["with_him"] == "nobody; he's on his own"
+
+
+def test_explaining_who_someone_is_doesnt_put_them_on_his_mind() -> None:
+    from eidos.application.inner_stream import known_names, stray_name
+
+    world = snapshot()
+    world["people"] = [{"name": "Rowan", "location_id": "park", "occupation": "Illustrator"}]
+    context = stream_context(world, ["Rowan's quiet lately."], Cue("money", "£420"))
+    assert "Rowan" in context["who_is_who"]
+    assert stray_name("Rowan's still quiet.", context, known_names(world)) == "Rowan"

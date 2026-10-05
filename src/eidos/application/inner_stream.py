@@ -357,8 +357,22 @@ def stream_context(
         and person.get("occupation")
         and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
     }
+    # His family, when they come up: "Rowan's mum" became "Mum's packing for work" in a flat
+    # he lives in alone.
+    selfhood = snapshot.get("selfhood") or {}
+    for member in (selfhood.get("family") or []) if isinstance(selfhood, Mapping) else []:
+        if not isinstance(member, Mapping) or not member.get("who"):
+            continue
+        label = str(member["who"]).split(" (")[0]
+        if re.search(rf"\b{re.escape(label)}\b", involved, re.IGNORECASE):
+            who[label] = (
+                f"{member.get('who')}; {str(member.get('about', ''))[:90]}; doesn't live with him"
+            )
     if who:
         context["who_is_who"] = dict(list(who.items())[:4])
+    if not with_him:
+        context["with_him"] = []
+        context["alone"] = True
     return context
 
 
@@ -408,6 +422,8 @@ def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str
     """
     given = dict(context)
     given.pop("recent_inner_stream", None)
+    # Who's who explains names; it doesn't put anyone in front of his mind.
+    given.pop("who_is_who", None)
     allowed = json.dumps(given, ensure_ascii=False)
     for name in names:
         if re.search(rf"\b{re.escape(name)}\b", text) and not re.search(
