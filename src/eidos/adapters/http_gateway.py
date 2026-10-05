@@ -278,6 +278,7 @@ ROLE_FIELDS = {
         "recent_inner_stream",
         "drifting_to",
         "with_him",
+        "who_is_who",
         "worn_out",
         "stream_pulse_id",
         "mind_layers",
@@ -622,6 +623,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
+        who = context.get("who_is_who")
+        if isinstance(who, Mapping) and who:
+            details["who_is_who"] = {str(k): str(v) for k, v in list(who.items())[:4]}
         tired = context.get("worn_out")
         if isinstance(tired, list) and tired:
             details["avoid_words"] = [str(word) for word in tired][:6]

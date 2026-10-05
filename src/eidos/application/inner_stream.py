@@ -346,6 +346,19 @@ def stream_context(
         ]
     if cue is not None:
         context["drifting_to"] = cue.text
+    # Who people are to him, for anyone this thought might involve: without it a small model
+    # had his boss coming home to his flat.
+    involved = " ".join([cue.text if cue else "", *recent, *with_him])
+    who = {
+        str(person["name"]): str(person.get("occupation") or "").lower()
+        for person in snapshot.get("people") or []
+        if isinstance(person, Mapping)
+        and person.get("name")
+        and person.get("occupation")
+        and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
+    }
+    if who:
+        context["who_is_who"] = dict(list(who.items())[:4])
     return context
 
 

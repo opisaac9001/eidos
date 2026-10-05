@@ -416,3 +416,16 @@ def test_his_named_emotion_follows_his_feelings_within_the_quarter_hour(tmp_path
     life.pulse_inner_stream("Worried sick. Awful, stuck, gutted.", "m", -0.9)
     snapshot = life.snapshot()
     assert snapshot["emotion"]["valence"] == snapshot["pathos"]["valence"]
+
+
+def test_the_stream_knows_who_people_are_to_him() -> None:
+    from eidos.adapters.http_gateway import compact_context
+
+    world = snapshot()
+    world["people"] = [
+        {"name": "Ellis", "location_id": "cafe", "occupation": "Repair artist"},
+        {"name": "Mara", "location_id": "cafe", "occupation": "Café owner"},
+    ]
+    context = stream_context(world, ["Ellis should be home soon."], Cue("here", "The flat"))
+    assert context["who_is_who"] == {"Ellis": "repair artist"}
+    assert compact_context("murmur", context)["who_is_who"] == {"Ellis": "repair artist"}
