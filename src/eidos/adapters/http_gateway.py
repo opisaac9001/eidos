@@ -107,7 +107,7 @@ ROLE_PROMPTS["firmament"] += (
     "an opinion or ask a question without inventing an earlier recommendation. "
 )
 ROLE_PROMPTS["oneiros"] = (
-    "Write one brief dream experienced by Pathos. Begin the text with 'In a dream'. "
+    "Write one brief dream experienced by Pathos, told in the first person as he'd remember it ('In a dream, I...'), never as a narrator describing him. Build it mostly from the supplied memories of his day (their people, places and things), changed the way dreams change them. Begin the text with 'In a dream'. "
     "Use a small scene or fragment, usually 25–65 words, rather than explaining symbolism. "
     "Memories, concerns and emotion can mix, change scale, swap identities or become impossible. "
     "A dream may also be ordinary, funny, awkward, repetitive or unresolved; surreal spectacle "
@@ -523,7 +523,8 @@ COMPACT_PROMPTS = {
         )
     ),
     "oneiros": (
-        "Write Patrick's dream: one to three short sentences that begin with 'In a dream'. "
+        "Write Patrick's dream as he'd remember it, in the first person (I, me): one to three "
+        "short sentences that begin with 'In a dream'. "
         "Dreams can be ordinary or strange, loosely built from the details given (not from "
         "the examples), with no moral or explanation. Don't reuse a recent dream's image. "
         'Reply only with JSON: {"text": "In a dream, ..."}\nThe style, for other situations:\n'
