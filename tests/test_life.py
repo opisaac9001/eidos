@@ -1080,3 +1080,11 @@ def test_the_nights_dream_is_made_of_the_day(tmp_path) -> None:
         and str(e.payload.get("simulated_at", "")).startswith("2026-01-01")
     ]
     assert any(memory in day for memory in context["memories"])
+
+
+def test_ordinary_dreams_are_remembered_more_often_than_not() -> None:
+    from eidos.application.life import _dream_recalled
+
+    recalled = sum(_dream_recalled(f"dream-{n}") for n in range(400))
+    assert 200 < recalled < 290  # about 60%, and stable on replay
+    assert _dream_recalled("dream-7") == _dream_recalled("dream-7")

@@ -1,6 +1,7 @@
 """The hour-by-hour life of Pathos. Role output is validated before becoming history."""
 
 import asyncio
+import hashlib
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -3376,21 +3377,29 @@ class Life(LifeConversation):
                     )
                     for position, item in enumerate(role_sources, 1)
                 )
-        if role == "oneiros" and mind.concerns_now:
-            pending.append(
-                DomainEvent(
-                    "dream.effect_scheduled",
-                    "pathos",
-                    {
-                        "source_dream_id": str(event.event_id),
-                        "simulated_at": at,
-                        "valence_delta": -0.05,
-                        "reason": "unresolved concern carried into sleep",
-                    },
-                    causation_id=event.event_id,
-                    correlation_id=event.correlation_id,
+        if role == "oneiros":
+            # A worry carried into sleep stays with him on waking; any other dream is
+            # remembered more often than not, and only then colours how he wakes.
+            remembered = bool(mind.concerns_now) or _dream_recalled(str(event.event_id))
+            if remembered:
+                pending.append(
+                    DomainEvent(
+                        "dream.effect_scheduled",
+                        "pathos",
+                        {
+                            "source_dream_id": str(event.event_id),
+                            "simulated_at": at,
+                            "valence_delta": -0.05
+                            if mind.concerns_now
+                            else round(0.04 * felt_tone(str(event.payload.get("text", ""))), 3),
+                            "reason": "unresolved concern carried into sleep"
+                            if mind.concerns_now
+                            else "a dream that stayed with him",
+                        },
+                        causation_id=event.event_id,
+                        correlation_id=event.correlation_id,
+                    )
                 )
-            )
 
     async def _phase_outreach(self, tick: _Tick, mind: _HourMind) -> None:
         """He may decide to get in touch with the user."""
@@ -3865,3 +3874,12 @@ def _encounter_importance(history: Sequence[DomainEvent], person_id: str, at: st
         if when < now:
             lately += 1
     return 0.75 if lately == 0 else 0.55 if lately <= 3 else 0.35
+
+
+DREAM_RECALL = 0.6
+
+
+def _dream_recalled(dream_id: str) -> bool:
+    """Whether an ordinary dream is still with him when he wakes (replay-stable)."""
+    digest = hashlib.sha256(f"dream-recall:{dream_id}".encode()).digest()
+    return int.from_bytes(digest[:6], "big") / float(1 << 48) < DREAM_RECALL
