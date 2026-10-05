@@ -256,3 +256,51 @@ def test_someone_who_turns_up_between_the_hours_is_noticed(tmp_path, monkeypatch
     met = [event for event in pending if event.kind == "npc.encountered"]
     assert [event.payload["person_id"] for event in met] == [person.person_id]
     assert any(event.kind == "memory.recorded" for event in pending)
+
+
+def test_a_friends_reply_fits_what_is_really_going_on_in_their_life() -> None:
+    import json
+
+    from eidos.domain.events import DomainEvent
+
+    class Capturing(StandInGateway):
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            self.requests.append(request)
+            return await super().generate(request)
+
+    at = datetime(2026, 8, 24, 18, 0, tzinfo=timezone.utc)
+    news = DomainEvent(
+        "friend.life_event",
+        "pathos",
+        {
+            "person_id": "rowan",
+            "kind": "parent_ill",
+            "text": "Rowan's mum has been in and out of hospital.",
+            "simulated_at": (at - timedelta(days=3)).isoformat(),
+        },
+    )
+    gateway = Capturing()
+    history = [news]
+    while True:
+        sent = asyncio.run(
+            reach_out_events(
+                history,
+                at,
+                gateway,
+                person_id="rowan",
+                person_name="Rowan",
+                who_they_are="illustrator",
+                on_his_mind=["Rowan's mum sounds awful."],
+                mood="worried",
+            )
+        )
+        if next(e for e in sent if e.kind == REACHED).payload["reply_due_at"]:
+            break
+    asyncio.run(reply_events([news, *sent], at + timedelta(hours=3), gateway))
+    reply_request = next(r for r in gateway.requests if r.capability == "firmament")
+    context = json.loads(reply_request.messages[-1].content)
+    their_life = context["personal_relationship_context"]["what_is_going_on_in_their_life"]
+    assert their_life == ["Rowan's mum has been in and out of hospital."]

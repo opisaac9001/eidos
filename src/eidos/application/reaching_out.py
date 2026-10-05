@@ -28,6 +28,7 @@ from uuid import uuid4
 
 from eidos.application.bookings import remember
 from eidos.application.cognition import perform
+from eidos.application.friends_lives import friends_lives_context
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -111,6 +112,11 @@ async def reach_out_events(
         "to": person_name,
         "who_they_are": who_they_are,
         "on_his_mind": [str(thought) for thought in on_his_mind][-3:],
+        "what_he_knows_of_their_life": [
+            item["what"]
+            for item in friends_lives_context(history, at, {person_id: person_name})
+            if item["who"] == person_name
+        ][:3],
         "mood": mood,
         "permission": (
             f"Patrick has been thinking about {person_name} and decides to text them. Write "
@@ -198,6 +204,13 @@ async def reply_events(
         if datetime.fromisoformat(due_raw) > at:
             continue
         pending: list[DomainEvent] = []
+        person_id = str(sent.payload.get("person_id") or "")
+        # What's really going on in their life, so the reply fits it and invents nothing.
+        their_life = [
+            item["what"]
+            for item in friends_lives_context(history, at, {person_id: name})
+            if item["who"] == name
+        ][:3]
         reply = await perform(
             gateway,
             "firmament",
@@ -210,6 +223,14 @@ async def reply_events(
                 "scene_audience": "Pathos",
                 "scene_topic": f"replying to his text: {sent.payload.get('text', '')}",
                 "prior_turns": [{"speaker": "Pathos", "text": sent.payload.get("text", "")}],
+                "personal_relationship_context": {
+                    "what_is_going_on_in_their_life": their_life,
+                    "instruction": (
+                        f"Reply as {name} would by text: short and natural. What's going on in "
+                        "their life is true; they may mention it, but invent no news, plans or "
+                        "changes beyond it."
+                    ),
+                },
             },
             at.isoformat(),
             pending,

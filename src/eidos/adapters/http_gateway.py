@@ -406,7 +406,16 @@ ROLE_FIELDS = {
     ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
-    "pathos_text": ("task", "time", "to", "who_they_are", "on_his_mind", "mood", "permission"),
+    "pathos_text": (
+        "task",
+        "time",
+        "to",
+        "who_they_are",
+        "on_his_mind",
+        "what_he_knows_of_their_life",
+        "mood",
+        "permission",
+    ),
     "pathos_voice": (
         "task",
         "time",
