@@ -219,3 +219,30 @@ Every response records the resolved model, serving backend, latency, token
 usage, finish reason, and parse outcome.
 
 No character or simulation state is stored only in a model's context window.
+
+## A lived day (2026-10-06)
+
+Several small modules replace meters and timetables with causes, each rule-based in code
+with models only wording what the rules decide:
+
+- `application/alertness.py`: a two-process body clock (sleep pressure, sleep debt, the
+  day's rhythm) that waking energy follows; bodily sensations with causes, once a day each.
+- `application/sleep_schedule.py` `body_clock`: the minute he drops off and wakes (alarm,
+  snoozing, lie-ins, waking early when worried); the real-time server stops at those minutes.
+- `application/concerns.py` and `application/open_loops.py`: what's weighing on him or coming
+  up, and what he means to do, as described above.
+- `application/time_feel.py`: how the week and season feel, from his rota, the month and
+  his balance.
+- `application/happenings.py`: small things that happen because of his situation.
+- `application/gossip.py`: news held by residents with source, strength and version,
+  spreading between residents who are together and drifting in the retelling; Patrick hears
+  it second-hand. Residents recall their recent moments with him.
+- `application/group_chat.py`: his close friends' group chat, read when he's free.
+- `application/life_lately.py`: a nightly first-person "my life lately" written while he
+  sleeps (`pathos_life_summary`, on his inner-life models).
+- `application/believability.py`: `GET /api/believability` and `eidos believability`
+  measure the last week against human base rates (mind-wandering, thinking ahead,
+  intentions slipping, sameness of days, sleep regularity, company, range of feeling).
+- Residents keep an ordinary day of their own (`npc_movement.their_place_now`) and go home
+  to rest when worn out; the news, friends' news and reflection move by an hour or two a day
+  (`application/day_rhythm.py`).
