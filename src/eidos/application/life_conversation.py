@@ -20,6 +20,7 @@ from eidos.application.life_context import (
     semantic_expectation_context,
     vars_for,
 )
+from eidos.application.life_lately import life_lately
 from eidos.application.life_projections import LifeProjections
 from eidos.application.masking import masking_context
 from eidos.application.memory import RecalledMemory, recall, terms
@@ -109,6 +110,9 @@ class LifeConversation(LifeProjections):
         ]
         if weighing:
             context["on_his_mind_lately"] = weighing
+        lately = life_lately(history)
+        if lately:
+            context["my_life_lately"] = lately
         week = time_feel_now(list(history), at)
         if week:
             context["how_the_day_feels"] = week

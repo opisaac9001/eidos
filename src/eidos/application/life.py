@@ -119,6 +119,7 @@ from eidos.application.life_context import (
 )
 from eidos.application.life_context import vars_for as vars_for
 from eidos.application.life_conversation import LifeConversation
+from eidos.application.life_lately import life_lately_events
 from eidos.application.life_snapshot import build_snapshot
 from eidos.application.lived_activity_window import lived_activity_window
 from eidos.application.media import media_events
@@ -3491,10 +3492,26 @@ class Life(LifeConversation):
             )
         pending.extend(await selfhood_chapter_events(history + pending, current, self.gateway))
 
+    async def _consolidate(self, tick: _Tick) -> None:
+        """In the small hours his sense of his own life is brought up to date."""
+        history = tick.history + tick.pending
+        catalog = self._world_catalog(history)
+        tick.pending.extend(
+            await life_lately_events(
+                history,
+                tick.current,
+                self.gateway,
+                asleep=not tick.state.awake,
+                names={pid: person.name for pid, person in catalog.people.items()},
+            )
+        )
+
     async def _phase_nightly(self, tick: _Tick, mind: _HourMind) -> None:
         """Evening reflection at 21:00 and the day's summary at 23:00; he dreams in the small
         hours, while he's actually asleep (and the model that dreams isn't busy thinking his
         waking thoughts), close enough to waking that it may stay with him."""
+        if not self.authored_scenario:
+            await self._consolidate(tick)
         day = tick.current.date()
         for role, scheduled_hour, kind in (
             # Thinking back over the day before bed, at about nine, never always at nine.

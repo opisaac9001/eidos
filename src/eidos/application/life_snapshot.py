@@ -18,6 +18,7 @@ from eidos.application.group_chat import phone_view
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.application.latent_town import TOWN_POPULATION
 from eidos.application.life_context import mood_name, self_concept_context, vars_for
+from eidos.application.life_lately import life_lately
 from eidos.application.life_projections import LifeProjections
 from eidos.application.memory import memory_view
 from eidos.application.mental_layers import mind_context
@@ -679,6 +680,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "body_now": body_now(history, state.simulated_at),
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
+        "life_lately": life_lately(history),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,

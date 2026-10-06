@@ -95,6 +95,7 @@ ROLE_GROUPS: dict[str, tuple[str, ...]] = {
     "inner": (
         "murmur",
         "reflection",
+        "pathos_life_summary",
         "oneiros",
         "pathos_selfhood",
         "pathos_deliberation",

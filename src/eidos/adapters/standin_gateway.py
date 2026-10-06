@@ -848,6 +848,20 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "pathos_life_summary":
+            weighing = [str(item) for item in context.get("weighing_on_me") or []][:2]
+            day = [str(item) for item in context.get("the_day_just_gone") or []][:2]
+            text = "Life's been ordinary mostly. I go to the workshop, I potter about at home. "
+            if day:
+                text += "Lately: " + " ".join(day) + " "
+            if weighing:
+                text += "What's on my mind: " + " ".join(weighing)
+            return ModelResponse(
+                content=json.dumps({"text": text.strip()}),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_text":
             group = context.get("task") == "group chat"
             pick = int(hashlib.sha256(str(context.get("time", "")).encode()).hexdigest()[:4], 16)

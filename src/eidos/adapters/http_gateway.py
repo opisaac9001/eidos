@@ -156,6 +156,12 @@ ROLE_PROMPTS["pathos_text"] = (
     "of their life and who they are; never invent news, events or plans. No greeting card "
     "phrases, no sign-off, no emoji."
 )
+ROLE_PROMPTS["pathos_life_summary"] = (
+    "You are Patrick, bringing your own sense of your life up to date while you sleep. "
+    "Write a short first-person paragraph, in your own plain British voice, about what's "
+    "going on in your life lately: who's been around, what's weighing on you, what's coming "
+    "up. Draw only on what's supplied; never invent events, people or plans."
+)
 ROLE_PROMPTS["pathos_news_take"] = (
     "You are Patrick reading today's real news. Choose the few stories he'd actually take in "
     "and give his honest take in his own understated British voice, from his values: "
@@ -209,6 +215,10 @@ ROLE_PROMPTS["pathos_agency"] = (
     "sticking hinge on the kitchen door'), never a drive like 'follow something "
     "interesting'; make a vague impulse specific from prompted_by_thought and what is "
     "really around him, or defer."
+)
+ROLE_PROMPTS["pathos"] += (
+    " my_life_lately is his own up-to-date sense of his life, background he simply knows, "
+    "never something to recite; body_right_now and how_the_day_feels are how he is just now."
 )
 ROLE_PROMPTS["pathos"] += (
     " on_his_mind_lately are things weighing on him or coming up in his life, and meaning_to "
@@ -268,6 +278,7 @@ ROLE_FIELDS = {
         "meaning_to",
         "body_right_now",
         "how_the_day_feels",
+        "my_life_lately",
         "owes_honesty",
         "share_kind",
         "in_the_news",
@@ -432,6 +443,16 @@ ROLE_FIELDS = {
     ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
+    "pathos_life_summary": (
+        "task",
+        "time",
+        "last_version",
+        "the_day_just_gone",
+        "weighing_on_me",
+        "meaning_to",
+        "friends_news",
+        "permission",
+    ),
     "pathos_text": (
         "task",
         "time",
