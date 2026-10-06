@@ -77,6 +77,12 @@ from eidos.application.friends_lives import (
     friends_news_hour,
 )
 from eidos.application.friendship import friendships
+from eidos.application.gossip import (
+    gossip_events,
+    patrick_heard,
+    they_remember,
+    worth_mentioning,
+)
 from eidos.application.holiday import PLACES as HOLIDAY_PLACES
 from eidos.application.holiday import holiday_events
 from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
@@ -2862,6 +2868,17 @@ class Life(LifeConversation):
         self._extend_warmed(tick, overdue, self._planning)
         pending.extend(concern_lifecycle_events(history + pending, current))
         pending.extend(self._open_loops(tick))
+        if not self.authored_scenario:
+            town = self._world_catalog(history + pending)
+            pending.extend(
+                gossip_events(
+                    history + pending,
+                    current,
+                    names={pid: person.name for pid, person in town.people.items()},
+                    locations=_npc_locations(history + pending, current),
+                    residents=frozenset(town.people),
+                )
+            )
         pending.extend(
             relationship_belief_events(history + pending, at, self._beliefs(history + pending))
         )
@@ -3158,6 +3175,12 @@ class Life(LifeConversation):
             if activity != "unrecorded"
             else None
         )
+        # What they remember of him, and anything they've heard that he hasn't.
+        now = datetime.fromisoformat(at)
+        remembered = they_remember([*history, *pending], person.person_id, now)
+        news = worth_mentioning([*history, *pending], person.person_id, now)
+        catalog = self._world_catalog([*history, *pending])
+        teller = catalog.people.get(news.teller_id) if news and news.teller_id else None
         text = await perform(
             self.gateway,
             "firmament",
@@ -3166,6 +3189,15 @@ class Life(LifeConversation):
                 "person": person.name,
                 "avoid_details": _encounter_details(recent_encounters, person.name),
                 **({"what_they_are_doing": doing} if doing else {}),
+                **({"they_remember": remembered} if remembered else {}),
+                **(
+                    {
+                        "they_might_mention": f"{news.text} (they heard it from "
+                        f"{teller.name.split()[0] if teller else 'someone'})"
+                    }
+                    if news
+                    else {}
+                ),
             },
             at,
             pending,
@@ -3185,6 +3217,12 @@ class Life(LifeConversation):
             },
         )
         pending.append(encounter)
+        subject = catalog.people.get(news.subject_id) if news else None
+        if news and subject and subject.name.split()[0] in text:
+            # They passed it on: now he's heard it, from them.
+            pending.extend(
+                patrick_heard(news, person.person_id, person.name.split()[0], now, encounter)
+            )
         memory = await perform(
             self.gateway, "mnemosyne", {**context, "experience": text}, at, pending
         )
