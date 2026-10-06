@@ -22,7 +22,7 @@ import json
 import random
 import re
 import threading
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import perf_counter, time
@@ -42,6 +42,8 @@ MAX_BACKOFF_SECONDS = 300.0
 KEEP = 5000
 # A thought only counts as following on from the ones before it for this long.
 THREAD_MINUTES = 30
+# Thinking about what's in front of him rather than wandering off.
+ON_TASK = frozenset({"here", "doing", "next", "person", "body"})
 # Cues and how often his mind drifts to each, roughly.
 CUE_WEIGHTS: dict[str, float] = {
     "here": 1.2,
@@ -384,6 +386,18 @@ def choose_cue(
         / (wandering if cue.kind == "wander" else 1)
         for cue in pool
     ]
+    # How much of the time his mind is on what's in front of him. People wander off about
+    # half the time, less when absorbed in something or with someone (Killingsworth &
+    # Gilbert); the many things he could drift to mustn't drown out the moment by number.
+    on_task = [i for i, cue in enumerate(pool) if cue.kind in ON_TASK]
+    if on_task and len(on_task) < len(pool):
+        engaged = any(pool[i].kind in {"doing", "person"} for i in on_task)
+        target = 0.55 if engaged else 0.4
+        on_sum = sum(weights[i] for i in on_task)
+        off_sum = sum(weights) - on_sum
+        if on_sum > 0 and off_sum > 0:
+            scale = target / (1 - target) * off_sum / on_sum
+            weights = [w * scale if i in on_task else w for i, w in enumerate(weights)]
     return rng.choices(pool, weights=weights, k=1)[0]
 
 
@@ -1221,6 +1235,17 @@ class InnerStream:
         ]
         if not_again:
             context["not_again"] = not_again[-3:]
+        # An opening he keeps reaching for ("Ellis is...", 45 times in a week) is worn out.
+        openings = Counter(
+            " ".join(thought.text.split()[:2]).strip(".,!?").casefold()
+            for thought in self.store.recent(12)
+            if len(thought.text.split()) >= 3
+        )
+        worn_opening = next(
+            (opening for opening, count in openings.most_common(1) if count >= 3), None
+        )
+        if worn_opening:
+            context["avoid_opening"] = worn_opening
         tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired
