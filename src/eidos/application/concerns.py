@@ -77,7 +77,7 @@ def concern_lifecycle_events(
         for event in events_of(history, *_SOURCE_KINDS)
         if str(event.event_id) not in opened_source_ids
         and _safe_concern_source(event, history) is not None
-        and _is_recent(event, simulated_at, timedelta(hours=2))
+        and _is_recent(event, simulated_at, _STILL_WEIGHS.get(event.kind, timedelta(hours=2)))
     ]
     candidates.sort(key=lambda event: (_concern_priority(event), _event_time(event)))
     active_people = {
@@ -146,6 +146,8 @@ _SOURCE_KINDS = (
     "friend.life_event",
     "schedule.created",
 )
+# A friend's news still weighs on him for a while after he hears it.
+_STILL_WEIGHS = {"friend.life_event": timedelta(days=21)}
 # Upcoming things he'd look forward to or dread, by what they are.
 _ANTICIPATED = re.compile(
     r"\b(dentist|doctor|gp|appointment|interview|hospital|exam|review|tax|court|wedding|"
@@ -250,6 +252,13 @@ def _concern_source(
         kind = source.payload.get("kind")
         text = _string(source, "text")
         if kind == "family_worry":
+            if any(
+                event.payload.get("kind") == "family_better"
+                and event.payload.get("person_id") == person_id
+                and _event_time(event) > _event_time(source)
+                for event in events_of(history, "friend.life_event")
+            ):
+                return None  # already better
             return (
                 text,
                 0.72,

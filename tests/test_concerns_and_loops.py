@@ -243,3 +243,10 @@ def test_his_life_carries_loops_and_concerns_into_his_mind_and_his_voice(tmp_pat
     request = next(r for r in reversed(gateway.requests) if r.capability == "pathos")
     context = json.loads(request.messages[0].content)
     assert context["meaning_to"] == ["ring Dad back"]
+
+
+def test_a_worry_heard_days_ago_still_weighs_unless_its_already_better() -> None:
+    news = friend_news("family_worry", AT - timedelta(days=10))
+    assert any(e.kind == "concern.opened" for e in concern_lifecycle_events([news], AT))
+    better = friend_news("family_better", AT - timedelta(days=2))
+    assert not any(e.kind == "concern.opened" for e in concern_lifecycle_events([news, better], AT))
