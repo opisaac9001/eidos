@@ -30,6 +30,7 @@ from eidos.application.open_loops import loops_view
 from eidos.application.personal_journeys import journey_context
 from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
+from eidos.application.self_interview import Question, interview_report, questions_for
 from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
@@ -492,17 +493,18 @@ class LifeConversation(LifeProjections):
                 return
             await self._respond_to_message(incoming)
 
-    async def _respond_to_message(self, incoming: DomainEvent) -> None:
-        history = self.history()
-        request_id = str(incoming.payload["request_id"])
-        if any(
-            event.kind == "conversation.message"
-            and event.payload.get("request_id") == request_id
-            and event.payload.get("speaker") in {"pathos", "system"}
-            for event in history
-        ):
-            return
-        text = str(incoming.payload["text"])
+    def _reply_context(
+        self,
+        history: list[DomainEvent],
+        text: str,
+        request_id: str,
+        incoming: DomainEvent | None,
+    ) -> tuple[PathosState, str, list[DomainEvent], dict[str, object], dict[str, object]]:
+        """Everything his voice needs to answer ``text`` now, and the events that go with it.
+
+        Without ``incoming`` (a question nobody actually sent, as in the self-interview),
+        nothing is tied to a real message.
+        """
         state = self._project_state(history)
         at = state.simulated_at.isoformat()
         pending: list[DomainEvent] = []
@@ -515,7 +517,11 @@ class LifeConversation(LifeProjections):
         planning = self._planning(history)
         catalog = self._world_catalog(history)
         selected = self._recall_for_message(history, text, state, planning, catalog)
-        reminder = _reminder_event(incoming, text, selected, request_id, at)
+        reminder = (
+            _reminder_event(incoming, text, selected, request_id, at)
+            if incoming is not None
+            else None
+        )
         if reminder is not None:
             pending.append(reminder)
         reply_emotion = project_emotion(history)
@@ -569,7 +575,7 @@ class LifeConversation(LifeProjections):
                 }
                 for event in history
                 if event.kind == "conversation.message"
-                and event.event_id != incoming.event_id
+                and (incoming is None or event.event_id != incoming.event_id)
                 and event.payload.get("speaker") in {"you", "pathos"}
             ][-8:],
             "identity": {
@@ -662,6 +668,50 @@ class LifeConversation(LifeProjections):
         )
         context.update(honesty)
         pending.extend(honesty_events)
+        return state, at, pending, context, reply_voice
+
+    def interview_prompts(self) -> list[tuple[Question, dict[str, object], str]]:
+        """Questions about his week, each with the context his voice would answer from.
+
+        Call under the world lock; the answers themselves can be fetched without it.
+        """
+        history = self.history()
+        state = self._project_state(history)
+        catalog = self._world_catalog(history)
+        names = {person_id: person.name for person_id, person in catalog.people.items()}
+        prompts: list[tuple[Question, dict[str, object], str]] = []
+        for number, question in enumerate(questions_for(history, state.simulated_at, names)):
+            _, at, _, context, _ = self._reply_context(
+                history, question.text, f"self-interview-{number}", None
+            )
+            prompts.append((question, context, at))
+        return prompts
+
+    async def interview_answers(
+        self, prompts: Sequence[tuple[Question, dict[str, object], str]]
+    ) -> dict[str, object]:
+        """His answers, scored against what happened; nothing is recorded in his life."""
+        asked: list[tuple[Question, str]] = []
+        for question, context, at in prompts:
+            scratch: list[DomainEvent] = []
+            answer = await perform_pathos_reply(self.gateway, context, at, scratch)
+            asked.append((question, answer or ""))
+        return interview_report(asked)
+
+    async def _respond_to_message(self, incoming: DomainEvent) -> None:
+        history = self.history()
+        request_id = str(incoming.payload["request_id"])
+        if any(
+            event.kind == "conversation.message"
+            and event.payload.get("request_id") == request_id
+            and event.payload.get("speaker") in {"pathos", "system"}
+            for event in history
+        ):
+            return
+        text = str(incoming.payload["text"])
+        state, at, pending, context, reply_voice = self._reply_context(
+            history, text, request_id, incoming
+        )
         reply = await perform_pathos_reply(self.gateway, context, at, pending)
         if reply:
             pending.extend(

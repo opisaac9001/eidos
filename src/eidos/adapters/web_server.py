@@ -1,5 +1,6 @@
 """Loopback-only operator server and serialized simulation worker."""
 
+import asyncio
 import hmac
 import json
 import logging
@@ -12,7 +13,8 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from time import monotonic, sleep
-from typing import Any, Callable, Iterator
+from time import time as wall_time
+from typing import Any, Callable, Iterator, Mapping
 from urllib.parse import parse_qs, urlsplit
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
@@ -52,6 +54,7 @@ class Runtime:
         self.sleeper = sleeper
         self.realtime_quantum_seconds = realtime_quantum_seconds
         self.lock = threading.RLock()
+        self._interviewing = False
         self.stop = threading.Event()
         self.error: str | None = None
         self.ticks = 0
@@ -139,6 +142,33 @@ class Runtime:
         if self.stream is not None:
             self.stream.start()
 
+    def _interview_file(self) -> Path | None:
+        path = getattr(getattr(self.life, "store", None), "path", None)
+        return Path(path).with_name("self_interview.json") if path else None
+
+    def last_interview(self) -> dict[str, Any] | None:
+        target = self._interview_file()
+        if target is None or not target.exists():
+            return None
+        try:
+            loaded: dict[str, Any] = json.loads(target.read_text())
+            return loaded
+        except (OSError, ValueError):
+            return None
+
+    def run_interview(self) -> dict[str, Any]:
+        """Ask him about his week and score the answers; kept beside the database, never
+        in his life. The questions are prepared under the lock, answered outside it."""
+        with self.lock:
+            prompts = self.life.interview_prompts()
+            asked_at = self.life_snapshot()["time"]
+        report = asyncio.run(self.life.interview_answers(prompts))
+        report["his_time"] = asked_at
+        target = self._interview_file()
+        if target is not None:
+            target.write_text(json.dumps(report, indent=1))
+        return report
+
     def _loop(self) -> None:
         while not self.stop.wait(self.interval):
             wall_now = self.clock()
@@ -184,6 +214,37 @@ class Runtime:
                     self.stop.set()
                 finally:
                     self.working = False
+            self._maybe_interview(config)
+
+    INTERVIEW_EVERY_SECONDS = 7 * 86400
+
+    def _maybe_interview(self, config: Mapping[str, Any]) -> None:
+        """Once a week, while he's awake, ask him about his week (in its own thread)."""
+        if not config.get("running") or self.stream is None or self._interviewing:
+            return
+        target = self._interview_file()
+        if target is None:
+            return
+        try:
+            age = wall_time() - target.stat().st_mtime if target.exists() else None
+        except OSError:
+            return
+        if age is not None and age < self.INTERVIEW_EVERY_SECONDS:
+            return
+        snapshot = self.cached or {}
+        if not (snapshot.get("pathos") or {}).get("awake"):
+            return
+        self._interviewing = True
+
+        def ask() -> None:
+            try:
+                self.run_interview()
+            except Exception:
+                logger.exception("Self-interview failed")
+            finally:
+                self._interviewing = False
+
+        threading.Thread(target=ask, name="self-interview", daemon=True).start()
 
     def close(self) -> None:
         self.stop.set()
@@ -498,10 +559,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     else []
                 )
                 counts = (stream.kept, stream.rejections) if stream is not None else None
-                self.respond(
-                    200,
-                    believability_report(history, at, thoughts=thoughts, stream_counts=counts),
-                )
+                report = believability_report(history, at, thoughts=thoughts, stream_counts=counts)
+                interview = runtime.last_interview()
+                if interview is not None:
+                    report["self_interview"] = interview
+                self.respond(200, report)
             elif path == "/api/export":
                 with runtime.lock:
                     events = [event_json(event) for event in runtime.life.history()]
@@ -556,6 +618,10 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     if runtime.models is None:
                         raise ValueError("This server runs a fixed model setup")
                     self.respond(200, _models_action(runtime, path, body))
+                    return
+                if path == "/api/self-interview":
+                    # Questions under the lock, answers outside it: his world keeps going.
+                    self.respond(200, runtime.run_interview())
                     return
                 operation_started = runtime.clock()
                 with runtime.mutation():
@@ -627,6 +693,7 @@ OPERATOR_GET_PATHS = frozenset(
 )
 OPERATOR_POST_PATHS = frozenset(
     {
+        "/api/self-interview",
         "/api/control",
         "/api/step",
         "/api/catch-up",
