@@ -81,7 +81,7 @@ def ring(gateway) -> list[DomainEvent]:
 
 def test_a_call_is_answered_on_the_spot_or_goes_unanswered() -> None:
     outcomes = set()
-    for _ in range(12):
+    for _ in range(40):  # three in four pick up; forty tries see both outcomes
         gateway = Answering()
         events = ring(gateway)
         rang = next(e for e in events if e.kind == REACHED)
