@@ -29,6 +29,7 @@ from eidos.application.place_discovery import known_place_ids
 from eidos.application.reaching_out import texts_view
 from eidos.application.selfhood import selfhood_view
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.time_feel import time_feel_now
 from eidos.application.town_calendar import whats_on
 from eidos.application.visitors import visitor_locations
 from eidos.application.volition import volition_snapshot
@@ -677,6 +678,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "open_loops": loops_view(history, state.simulated_at),
         "body_now": body_now(history, state.simulated_at),
         "phone": phone_view(history),
+        "time_feel": time_feel_now(history, state.simulated_at),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,

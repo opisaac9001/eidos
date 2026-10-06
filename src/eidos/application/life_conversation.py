@@ -32,6 +32,7 @@ from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.time_feel import time_feel_now
 from eidos.application.user_notes import asked_about_events, user_knowledge_context
 from eidos.application.world_news import news_context
 from eidos.domain.conversation_time import reply_pacing
@@ -108,6 +109,9 @@ class LifeConversation(LifeProjections):
         ]
         if weighing:
             context["on_his_mind_lately"] = weighing
+        week = time_feel_now(list(history), at)
+        if week:
+            context["how_the_day_feels"] = week
         felt = body_now(history, at)
         if felt:
             context["body_right_now"] = felt

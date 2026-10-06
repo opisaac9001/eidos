@@ -305,6 +305,9 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
             found.append(
                 Cue("phone", f"{latest['from']} in the group chat: {latest.get('text')}", fresh)
             )
+    # How the day or the week feels (Sunday evening before work, a day off, dark at six).
+    if snapshot.get("time_feel"):
+        found.append(Cue("feeling", str(snapshot["time_feel"]), 1.4))
     found.extend(_concern_cues(snapshot))
     found.extend(_loop_cues(snapshot))
     found.extend(Cue("wander", text) for text in WANDERING)

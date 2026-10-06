@@ -199,6 +199,7 @@ from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
 from eidos.application.surfacing import surfacing_events
 from eidos.application.time_budget import personal_time_budget
+from eidos.application.time_feel import time_feel_events
 from eidos.application.town_issues import HOURS as TOWN_ISSUE_HOURS
 from eidos.application.town_issues import REVIEW_HOUR as TOWN_MEETING_REVIEW_HOUR
 from eidos.application.town_issues import TALK_HOUR as TOWN_TALK_HOUR
@@ -1223,6 +1224,22 @@ class Life(LifeConversation):
         )
         pending.extend(recovery)
         if not self.authored_scenario:
+            planning = self._planning(history + pending)
+            pending.extend(
+                time_feel_events(
+                    history + pending,
+                    current,
+                    awake=tick.state.awake,
+                    shift_starts=[
+                        datetime.fromisoformat(entry.starts_at)
+                        for entry in planning.calendar.values()
+                        if is_rota_shift(entry.schedule_id)
+                        and entry.status in {"scheduled", "active", "completed"}
+                    ],
+                    balance_pence=self._finances(history + pending).balance_pence,
+                    at_work=_at_work(planning, current),
+                )
+            )
             weather = events_of(history + pending, "world.weather")[-1:]
             pending.extend(
                 body_sensation_events(

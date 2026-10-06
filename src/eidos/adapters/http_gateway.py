@@ -267,6 +267,7 @@ ROLE_FIELDS = {
         "on_his_mind_lately",
         "meaning_to",
         "body_right_now",
+        "how_the_day_feels",
         "owes_honesty",
         "share_kind",
         "in_the_news",

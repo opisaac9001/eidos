@@ -719,6 +719,11 @@ def _effect(
         return ("affect", 0.0, 0.22, 0.15, 0.8)
     if event.kind == "household.task_completed":
         return ("mastery", 0.025, 0.18, 0.1, 0.9)
+    if event.kind == "time.felt":
+        tone = event.payload.get("tone")
+        if isinstance(tone, (int, float)) and not isinstance(tone, bool):
+            return ("affect", 0.0, max(-0.2, min(0.2, float(tone))), 0.1, 0.6)
+        return None
     if event.kind == "body.sensed":
         tone = event.payload.get("tone")
         if isinstance(tone, (int, float)) and not isinstance(tone, bool):
