@@ -103,6 +103,20 @@ def believability_report(
             "verdict": _compare(slip, 0.05, 0.25) if len(formed) >= 5 else "not enough yet",
         }
 
+    promised = [e for e in formed if e.payload.get("source") == "said"]
+    if promised:
+        ids = {str(e.payload.get("intention_id")) for e in promised}
+        kept = sum(str(e.payload.get("intention_id")) in ids for e in done)
+        broken = sum(
+            str(e.payload.get("intention_id")) in ids
+            for e in _within(events_of(history, "intention.slipped", "intention.dropped"), since)
+        )
+        report["promises_said_aloud"] = {
+            "made": len(promised),
+            "kept": kept,
+            "let_slip": broken,
+            "aim": "most kept; some slip, as with anyone",
+        }
     by_day: dict[str, set[str]] = {}
     for event in _within(events_of(history, "schedule.created"), since):
         when = _at(event)

@@ -212,28 +212,25 @@ def open_loop_events(
             )
         )
 
-    # Meaning to do something, from what he's been thinking.
-    for thought in reversed(events_of(history, "thought.recorded")[-12:]):
-        if str(thought.event_id) in formed_from:
-            continue
-        try:
-            if _when(thought) < since:
-                break
-        except (KeyError, ValueError):
-            continue
-        text = intended(str(thought.payload.get("text", "")))
-        if text is None:
-            continue
+    # Meaning to do something, from what he's been thinking and, weightier, what he's said:
+    # telling you "I'll ring Dad later" or the group "count me in" is a promise he keeps
+    # or doesn't (Project Sid's lesson: what's said and what's done must agree).
+    for source, text, origin in _what_he_meant(history, since, formed_from):
         lowered = f" {text.casefold()} "
         person = next(
             (pid for name, pid in {**_FAMILY, **people}.items() if f" {name} " in lowered), None
         )
         place = next((pid for name, pid in places.items() if name in lowered), None)
-        importance = 0.4 + (0.2 if person else 0.0) + (0.1 if _due(text, at) else 0.0)
+        importance = (
+            0.4
+            + (0.2 if person else 0.0)
+            + (0.1 if _due(text, at) else 0.0)
+            + (0.15 if origin == "said" else 0.0)
+        )
         form(
             text,
-            thought,
-            "thought",
+            source,
+            origin,
             importance,
             person_id=person,
             place_id=place,
@@ -302,6 +299,59 @@ def open_loop_events(
         ):
             output.append(_event(SLIPPED, loop, at, None))
     return output
+
+
+_SAID_YES = re.compile(
+    r"\b(count me in|i'm in|i'll come|i'll be there|see you there|go on then|sounds good)\b",
+    re.IGNORECASE,
+)
+
+
+def _what_he_meant(
+    history: Sequence[DomainEvent], since: datetime, formed_from: set[str]
+) -> list[tuple[DomainEvent, str, str]]:
+    """(source, what he means to do, "thought" or "said") from his recent thoughts, his
+    replies to you, his texts and what he's posted in the group chat."""
+    found: list[tuple[DomainEvent, str, str]] = []
+    for event in reversed(
+        events_of(
+            history,
+            "thought.recorded",
+            "conversation.message",
+            "contact.reached_out",
+            "chat.message",
+        )[-30:]
+    ):
+        if str(event.event_id) in formed_from:
+            continue
+        try:
+            if _when(event) < since:
+                break
+        except (KeyError, ValueError):
+            continue
+        p = event.payload
+        if event.kind == "conversation.message" and p.get("speaker") != "pathos":
+            continue
+        if event.kind == "chat.message" and p.get("speaker_id") != "pathos":
+            continue
+        said = event.kind != "thought.recorded"
+        raw = str(p.get("text", ""))
+        text = intended(raw)
+        if text is None and event.kind == "chat.message" and _SAID_YES.search(raw):
+            # Agreeing to the group's plan: the last friend's message says what it was.
+            proposal = next(
+                (
+                    str(e.payload.get("text", ""))
+                    for e in reversed(events_of(history, "chat.message")[-10:])
+                    if e.payload.get("speaker_id") != "pathos"
+                ),
+                "",
+            )
+            if proposal:
+                text = f"go along to what the group's planning ({proposal[:60].rstrip('?!. ')})"
+        if text is not None:
+            found.append((event, text, "said" if said else "thought"))
+    return found
 
 
 def _pending_loops(output: Sequence[DomainEvent]) -> list[Loop]:

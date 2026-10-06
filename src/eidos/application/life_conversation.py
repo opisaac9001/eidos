@@ -41,6 +41,7 @@ from eidos.application.world_news import news_context
 from eidos.domain.conversation_time import reply_pacing
 from eidos.domain.emotions import emotional_planning_bias, emotional_speech_bias, project_emotion
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.planning import PlanningState
 from eidos.domain.relationship_repairs import project_relationship_repairs
@@ -112,6 +113,30 @@ class LifeConversation(LifeProjections):
         ]
         if weighing:
             context["on_his_mind_lately"] = weighing
+        # A question of his you left hanging when you went: he may pick it back up.
+        said = [
+            e
+            for e in events_of(history, "conversation.message")[-6:]
+            if e.payload.get("speaker") in {"you", "pathos"}
+        ]
+        # Your message just now (the one he's answering) isn't an answer to his question.
+        while said and said[-1].payload.get("speaker") == "you":
+            try:
+                sent = datetime.fromisoformat(str(said[-1].payload.get("simulated_at")))
+            except ValueError:
+                break
+            if at - sent > timedelta(minutes=15):
+                break
+            said.pop()
+        if said and said[-1].payload.get("speaker") == "pathos":
+            last = said[-1]
+            text = str(last.payload.get("text", "")).strip()
+            try:
+                waited = at - datetime.fromisoformat(str(last.payload.get("simulated_at")))
+            except ValueError:
+                waited = timedelta(0)
+            if text.endswith("?") and waited >= timedelta(hours=2):
+                context["left_hanging"] = text[-200:]
         feeling = [str(f["feeling"]) for f in feelings_view(history, at)[:3]]
         if feeling:
             context["feeling_now"] = feeling
