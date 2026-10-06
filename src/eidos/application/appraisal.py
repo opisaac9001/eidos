@@ -714,6 +714,11 @@ def _effect(
         return ("affect", 0.0, 0.22, 0.15, 0.8)
     if event.kind == "household.task_completed":
         return ("mastery", 0.025, 0.18, 0.1, 0.9)
+    if event.kind == "intention.done":
+        # Off his mind at last: a small relief.
+        return ("mastery", 0.02, 0.2, 0.1, 0.85)
+    if event.kind == "intention.recalled" and event.payload.get("too_late"):
+        return ("affect", 0.0, -0.3, 0.35, 0.6)
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)

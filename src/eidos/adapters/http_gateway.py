@@ -211,6 +211,11 @@ ROLE_PROMPTS["pathos_agency"] = (
     "really around him, or defer."
 )
 ROLE_PROMPTS["pathos"] += (
+    " on_his_mind_lately are things weighing on him or coming up in his life, and meaning_to "
+    "are things he keeps meaning to do; like anyone, he may mention one when it fits, never "
+    "as a list."
+)
+ROLE_PROMPTS["pathos"] += (
     " what_he_knows_about_you is his own loose picture of the user's life from what they have "
     "told him; use it the way a friend would, never recite it. things_to_ask_you_about are "
     "follow-ups he has been meaning to ask; he may ask one if it fits the moment, and need "
@@ -259,6 +264,8 @@ ROLE_FIELDS = {
         "just_been_thinking",
         "pulling_at_him",
         "texts_lately",
+        "on_his_mind_lately",
+        "meaning_to",
         "owes_honesty",
         "share_kind",
         "in_the_news",
@@ -565,6 +572,8 @@ PATHOS_SHEDDABLE = (
     "dream_inspirations",
     "memory_recollections",
     "journey",
+    "meaning_to",
+    "on_his_mind_lately",
 )
 
 

@@ -11,7 +11,7 @@ from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.in_jokes import jokes_with_you
-from eidos.application.inner_life import active_dream_inspirations
+from eidos.application.inner_life import active_concerns, active_dream_inspirations
 from eidos.application.life_context import (
     latest_weather,
     mood_name,
@@ -24,6 +24,7 @@ from eidos.application.masking import masking_context
 from eidos.application.memory import RecalledMemory, recall, terms
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
+from eidos.application.open_loops import loops_view
 from eidos.application.personal_journeys import journey_context
 from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
@@ -97,6 +98,18 @@ class LifeConversation(LifeProjections):
         texts = texts_view(history, limit=3)
         if texts:
             context["texts_lately"] = texts
+        # What's weighing on him or coming up, and what he keeps meaning to do: a person
+        # asked how they are says so.
+        weighing = [
+            str(concern.payload.get("text"))
+            for concern in active_concerns(history)[-4:]
+            if concern.payload.get("text")
+        ]
+        if weighing:
+            context["on_his_mind_lately"] = weighing
+        meaning = [str(loop["text"]) for loop in loops_view(history, at)[:3]]
+        if meaning:
+            context["meaning_to"] = meaning
         return context
 
     async def _advance(self, hours: float) -> None:

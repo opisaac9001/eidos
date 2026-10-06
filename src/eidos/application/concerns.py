@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.application.inner_life import active_concerns
+from eidos.application.work_rota import is_rota_shift
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import event_index, events_of, kind_index
 
@@ -139,6 +141,21 @@ _SOURCE_KINDS = (
     "relationship.changed",
     "goal.blocked",
     "schedule.failed",
+    # What's going on in his people's lives, and what's coming up in his own: the
+    # "current concerns" that most of a person's idle thought turns to (Klinger).
+    "friend.life_event",
+    "schedule.created",
+)
+# Upcoming things he'd look forward to or dread, by what they are.
+_ANTICIPATED = re.compile(
+    r"\b(dentist|doctor|gp|appointment|interview|hospital|exam|review|tax|court|wedding|"
+    r"party|leaving do|birthday|holiday|trip|gig|concert|match|dinner|drinks|visit|"
+    r"date|course|class|christening|funeral|meet(?:ing)?)\b",
+    re.IGNORECASE,
+)
+_DREADED = re.compile(
+    r"\b(dentist|doctor|gp|hospital|interview|exam|review|tax|court|funeral|appointment)\b",
+    re.IGNORECASE,
 )
 
 
@@ -228,6 +245,71 @@ def _concern_source(
             timedelta(days=21),
             {"goal_id": goal_id},
         )
+    if source.kind == "friend.life_event":
+        person_id = _string(source, "person_id")
+        kind = source.payload.get("kind")
+        text = _string(source, "text")
+        if kind == "family_worry":
+            return (
+                text,
+                0.72,
+                timedelta(days=21),
+                {
+                    "person_id": person_id,
+                    "concern_kind": "worry",
+                    "valence": -0.6,
+                },
+            )
+        if kind == "moving_announced":
+            return (
+                text,
+                0.7,
+                timedelta(days=45),
+                {
+                    "person_id": person_id,
+                    "concern_kind": "loss",
+                    "valence": -0.45,
+                },
+            )
+        if kind == "wedding_invited" and isinstance(source.payload.get("wedding_on"), str):
+            wedding_on = str(source.payload["wedding_on"])
+            day = datetime.fromisoformat(f"{wedding_on}T14:00:00+00:00")
+            return (
+                text,
+                0.6,
+                day - _event_time(source) + timedelta(days=1),
+                {
+                    "person_id": person_id,
+                    "concern_kind": "anticipation",
+                    "valence": 0.5,
+                    "about_at": day.isoformat(),
+                },
+            )
+        return None
+    if source.kind == "schedule.created":
+        title = str(source.payload.get("title", ""))
+        starts = datetime.fromisoformat(_string(source, "starts_at"))
+        lead = starts - _event_time(source)
+        if (
+            is_rota_shift(source.payload.get("schedule_id"))
+            or source.payload.get("actor_id") not in {None, "pathos"}
+            or not timedelta(hours=20) <= lead <= timedelta(days=30)
+            or not (_ANTICIPATED.search(title) or source.payload.get("companion_id"))
+        ):
+            return None
+        dread = bool(_DREADED.search(title))
+        return (
+            f"{title}, coming up. "
+            + ("Not looking forward to it." if dread else "Looking forward to it."),
+            0.55 if dread else 0.5,
+            lead + timedelta(hours=6),
+            {
+                "schedule_id": _string(source, "schedule_id"),
+                "concern_kind": "dread" if dread else "anticipation",
+                "valence": -0.4 if dread else 0.45,
+                "about_at": starts.isoformat(),
+            },
+        )
     if source.kind == "schedule.failed":
         cause = _event_by_id(history, str(source.causation_id)) if source.causation_id else None
         if cause is not None and cause.kind == "commitment.missed":
@@ -278,6 +360,18 @@ def _concern_resolution(
         return index.select(*kinds, start=opened_index + 1)
 
     source_kind = concern.payload.get("source_kind")
+    if concern.payload.get("concern_kind") == "worry" and source_kind == "friend.life_event":
+        evidence = next(
+            (
+                event
+                for event in later("friend.life_event")
+                if event.payload.get("kind") == "family_better"
+                and event.payload.get("person_id") == concern.payload.get("person_id")
+            ),
+            None,
+        )
+        if evidence:
+            return evidence, "things_got_better", "Things got better; the worry eased."
     if source_kind == "goal.blocked":
         evidence = next(
             (
@@ -393,6 +487,8 @@ def _concern_priority(event: DomainEvent) -> int:
         "relationship.changed": 3,
         "goal.blocked": 4,
         "schedule.failed": 5,
+        "friend.life_event": 6,
+        "schedule.created": 7,
     }.get(event.kind, 99)
 
 
@@ -400,6 +496,10 @@ def _concern_key(source: DomainEvent, history: Sequence[DomainEvent]) -> str:
     """Group repeated manifestations of the same unresolved theme."""
     if source.kind == "commitment.missed":
         return f"commitment:{_string(source, 'commitment_id')}"
+    if source.kind == "friend.life_event":
+        return f"friend-{source.payload.get('kind')}:{_string(source, 'person_id')}"
+    if source.kind == "schedule.created":
+        return f"coming-up:{_string(source, 'schedule_id')}"
     if source.kind == "finance.payment_missed":
         return f"finance:{source.payload.get('category', _string(source, 'obligation_id'))}"
     if source.kind == "relationship.repair_opened":

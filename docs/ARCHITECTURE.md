@@ -32,6 +32,15 @@ always-on monologue (`application/inner_stream.py`): a background thread that re
 cached snapshot, calls `murmur` directly (outside the durable queue), and keeps fleeting
 thoughts in a rolling `inner_stream` table rather than the event log. Each pulse records
 the most salient of them as its `thought.recorded` (`kept_from_stream`).
+What his mind drifts to is weighted toward what's unresolved in his life: *current
+concerns* (`application/concerns.py`, after Klinger) now open from friends' worries and
+losses and from things coming up that he looks forward to or dreads, pull harder as the day
+nears or while a worry is fresh, and resolve or recede; *open loops*
+(`application/open_loops.py`) are intentions picked out of his own thoughts ("should oil
+that hinge") or left by interruptions, recalled by cues (being at the place, seeing the
+person, the time arriving), sometimes slipping overnight, and closed when he does or plans
+them. Both reach his passing thoughts as cues and his voice as `on_his_mind_lately` and
+`meaning_to`; the bookkeeping is code and the models only word it.
 Explainable term/entity/goal/relationship recall is implemented; vector retrieval and
 outside tools are not.
 The [master roadmap](ROADMAP.md), [feature inventory](FEATURES.md) and

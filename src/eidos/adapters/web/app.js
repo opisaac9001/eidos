@@ -1621,6 +1621,26 @@ function renderStream() {
   const pullText = pulls.length ? `On his mind to do: ${pulls.join(", ")}` : "";
   $("stream-pulls").hidden = !pullText;
   if ($("stream-pulls").textContent !== pullText) $("stream-pulls").textContent = pullText;
+  // What's weighing on him or coming up, and what he keeps meaning to do.
+  const firstLine = (text) => {
+    const line = String(text || "").split(/(?<=[.!?])\s/)[0];
+    return line.length > 70 ? `${line.slice(0, 67).trimEnd()}…` : line;
+  };
+  const concerns = (state.concerns || []).filter((item) => item.status === "active").slice(-3);
+  const weighing = concerns
+    .filter((item) => !["anticipation", "dread"].includes(item.concern_kind))
+    .map((item) => firstLine(item.text));
+  const coming = concerns
+    .filter((item) => ["anticipation", "dread"].includes(item.concern_kind))
+    .map((item) => firstLine(item.text).replace(/, coming up\.?$/, ""));
+  const meaning = (state.open_loops || []).slice(0, 3).map((item) => item.text);
+  const mindText = [
+    weighing.length ? `Weighing on him: ${weighing.join(" · ")}` : "",
+    coming.length ? `Coming up: ${coming.join(" · ")}` : "",
+    meaning.length ? `Meaning to: ${meaning.join(", ")}` : "",
+  ].filter(Boolean).join("  —  ");
+  $("his-concerns").hidden = !mindText;
+  if ($("his-concerns").textContent !== mindText) $("his-concerns").textContent = mindText;
   const texts = (state.texts || []).slice(0, 2)
     .map((item) => `<li><span>To ${esc(item.to)}:</span> “${esc(item.he_wrote)}”${item.they_replied ? `<br /><span>${esc(item.to)}:</span> “${esc(item.they_replied)}”` : ""}</li>`)
     .join("");

@@ -30,6 +30,7 @@ from typing import Any, Callable, Collection, Mapping, Protocol, Sequence
 
 from eidos.application.cognition import perform
 from eidos.application.pronouns import KNOWN as KNOWN_PRONOUNS
+from eidos.application.time_budget import when_in_words
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelGateway
 
@@ -55,6 +56,10 @@ CUE_WEIGHTS: dict[str, float] = {
     "money": 0.4,
     "wanting": 0.6,
     "wander": 0.9,
+    # What's unresolved in his life is where an idle mind goes most (Klinger's current
+    # concerns); then the things he keeps meaning to do.
+    "concern": 2.2,
+    "loop": 1.4,
 }
 # Where an idle mind goes when nothing in particular calls it: the senses, his own past
 # (from his authored background), small practical things, or nowhere much.
@@ -81,6 +86,9 @@ WANDERING = (
 class Cue:
     kind: str
     text: str
+    # How strongly this particular thing pulls, on top of its kind (a concern that's close
+    # or fresh pulls harder than one that's fading).
+    weight: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,7 +291,57 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
         ):
             about = f" ({str(person['occupation']).lower()})" if person.get("occupation") else ""
             found.append(Cue("someone", f"{person['name']}{about}, not here"))
+    found.extend(_concern_cues(snapshot))
+    found.extend(_loop_cues(snapshot))
     found.extend(Cue("wander", text) for text in WANDERING)
+    return found
+
+
+def _concern_cues(snapshot: Mapping[str, Any]) -> list[Cue]:
+    """What's unresolved: worries about his people, losses, things he's looking forward to
+    or dreading. A worry fades as the weeks pass; anticipation builds as the day nears."""
+    try:
+        now = datetime.fromisoformat(str(snapshot.get("time")))
+    except ValueError:
+        return []
+    found: list[Cue] = []
+    for concern in snapshot.get("concerns") or []:
+        if not isinstance(concern, Mapping) or concern.get("status") != "active":
+            continue
+        text = str(concern.get("text") or "")
+        if not text:
+            continue
+        importance = float(concern.get("importance") or 0.5)
+        pull = importance
+        about = concern.get("about_at")
+        if isinstance(about, str) and about:
+            try:
+                days = max(0.0, (datetime.fromisoformat(about) - now).total_seconds() / 86400)
+            except ValueError:
+                days = 7.0
+            pull *= 1 + 2 / (1 + days)
+            text = f"{text} ({when_in_words(datetime.fromisoformat(about), now)})"
+        else:
+            try:
+                opened = datetime.fromisoformat(str(concern.get("opened_at")))
+                pull *= max(0.4, 1 - (now - opened).total_seconds() / 86400 / 30)
+            except ValueError:
+                pass
+        found.append(Cue("concern", _short(text), round(pull, 2)))
+    return found
+
+
+def _loop_cues(snapshot: Mapping[str, Any]) -> list[Cue]:
+    """The things he's meaning to do; one he's just been reminded of is right there."""
+    found: list[Cue] = []
+    for loop in snapshot.get("open_loops") or []:
+        if not isinstance(loop, Mapping) or not loop.get("text"):
+            continue
+        importance = float(loop.get("importance") or 0.4)
+        if loop.get("just_remembered"):
+            found.append(Cue("loop", f"just remembered: need to {loop['text']}", importance * 4))
+        else:
+            found.append(Cue("loop", f"meaning to {loop['text']}", importance))
     return found
 
 
@@ -304,6 +362,7 @@ def choose_cue(
     wandering = sum(cue.kind == "wander" for cue in pool) or 1
     weights = [
         CUE_WEIGHTS.get(cue.kind, 1.0)
+        * cue.weight
         * (0.4 if cue.kind in recent_kinds[-3:] else 1.0)
         / (wandering if cue.kind == "wander" else 1)
         for cue in pool
@@ -425,6 +484,8 @@ CUE_SALIENCE = {
     "here": 0.05,
     "wander": 0.1,
     "stirring": 0.1,
+    "concern": 0.4,
+    "loop": 0.3,
 }
 _WORDS = re.compile(r"[a-z']+")
 

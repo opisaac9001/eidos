@@ -142,6 +142,7 @@ from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
+from eidos.application.open_loops import open_loop_events
 from eidos.application.opportunities import opportunity_events
 from eidos.application.outreach import outreach_events
 from eidos.application.personal_journeys import journey_context
@@ -2800,6 +2801,42 @@ class Life(LifeConversation):
         )
         self._extend_warmed(tick, negotiation_responses, self._planning)
 
+    def _open_loops(self, tick: _Tick) -> list[DomainEvent]:
+        """What he means to do: formed from his thoughts, cued back, done, or slipping."""
+        history = tick.history + tick.pending
+        catalog = self._world_catalog(history)
+        here = tick.state.location_id
+        places: dict[str, str] = {}
+        for place_id, place in catalog.places.items():
+            if place_id == "home":
+                continue  # he's home most of the time; it cues nothing in particular
+            for name in (place.name, place.label):
+                key = name.casefold().removeprefix("the ").strip()
+                if len(key) >= 4:
+                    places[key] = place_id
+                    places[key.replace("é", "e")] = place_id
+        return open_loop_events(
+            history,
+            tick.current,
+            awake=tick.state.awake,
+            location_id=here,
+            with_him={
+                person_id
+                for person_id, place in _npc_locations(history, tick.current).items()
+                if place == here and place != "home"
+            },
+            people={
+                person.name.split()[0].casefold(): person_id
+                for person_id, person in catalog.people.items()
+                if person.name
+            },
+            places=places,
+            titles={
+                entry.schedule_id: (entry.title, entry.location_id)
+                for entry in self._planning(history).calendar.values()
+            },
+        )
+
     def _phase_growth(self, tick: _Tick) -> None:
         """Slow change: skills, preferences, traits, self-story, concerns, beliefs, dreams."""
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
@@ -2810,6 +2847,7 @@ class Life(LifeConversation):
         overdue = overdue_plan_events(self._planning(history + pending), current)
         self._extend_warmed(tick, overdue, self._planning)
         pending.extend(concern_lifecycle_events(history + pending, current))
+        pending.extend(self._open_loops(tick))
         pending.extend(
             relationship_belief_events(history + pending, at, self._beliefs(history + pending))
         )

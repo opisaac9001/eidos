@@ -21,6 +21,7 @@ from eidos.application.memory import memory_view
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability
 from eidos.application.npc_simulation import npc_detail_tier
+from eidos.application.open_loops import loops_view
 from eidos.application.personal_journeys import journey_context
 from eidos.application.place_discovery import known_place_ids
 from eidos.application.reaching_out import texts_view
@@ -671,6 +672,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "conversation_clocks": [vars_for(item) for item in conversation_clocks.values()],
         "season": season.name if season is not None else season_for(state.simulated_at),
         "texts": texts_view(history),
+        "open_loops": loops_view(history, state.simulated_at),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,
