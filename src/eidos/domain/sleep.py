@@ -18,6 +18,12 @@ class SleepWindow:
     bedtime: str
     wake_at: str
     reason: str
+    # When he really drops off and really comes to, to the minute, and how he wakes. The
+    # intended window is on the hour; a body isn't. Older nights have none of these.
+    asleep_at: str = ""
+    up_at: str = ""
+    waking: str = ""
+    snoozes: int = 0
 
     @property
     def bed(self) -> datetime:
@@ -26,6 +32,19 @@ class SleepWindow:
     @property
     def wake(self) -> datetime:
         return datetime.fromisoformat(self.wake_at)
+
+    @property
+    def falls_asleep(self) -> datetime:
+        return datetime.fromisoformat(self.asleep_at) if self.asleep_at else self.bed
+
+    @property
+    def wakes(self) -> datetime:
+        return datetime.fromisoformat(self.up_at) if self.up_at else self.wake
+
+    @property
+    def ends(self) -> datetime:
+        """When the night is over, by intention or in fact, whichever is later."""
+        return max(self.wake, self.wakes)
 
 
 def project_sleep_windows(events: Sequence[DomainEvent]) -> dict[str, SleepWindow]:
@@ -44,6 +63,10 @@ def _windows_step(windows: dict[str, SleepWindow], event: DomainEvent) -> dict[s
         _required(payload, "bedtime"),
         _required(payload, "wake_at"),
         _required(payload, "reason"),
+        str(payload.get("asleep_at") or ""),
+        str(payload.get("up_at") or ""),
+        str(payload.get("waking") or ""),
+        int(payload.get("snoozes") or 0),
     )
     selected, bedtime, wake = (
         datetime.fromisoformat(window.selected_at),
@@ -79,7 +102,7 @@ def sleep_window_at(events: Sequence[DomainEvent], at: datetime) -> SleepWindow 
     candidates = [
         window
         for window in windows.values()
-        if datetime.fromisoformat(window.selected_at) <= at <= window.wake
+        if datetime.fromisoformat(window.selected_at) <= at <= window.ends
     ]
     return max(candidates, key=lambda item: item.selected_at, default=None)
 

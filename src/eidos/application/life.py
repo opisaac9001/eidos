@@ -26,6 +26,7 @@ from eidos.application.attention import attention_state
 from eidos.application.belief_review import relationship_belief_events, testimony_belief_events
 from eidos.application.body import body_events
 from eidos.application.bonds import bond_events, current_bonds
+from eidos.application.bookings import remember
 from eidos.application.catchup import (
     CatchUpPreview,
     active_catch_up,
@@ -257,6 +258,7 @@ from eidos.domain.scenes import (
     resolve_scene_end,
 )
 from eidos.domain.seasons import season_change_events, season_for
+from eidos.domain.sleep import SleepWindow, sleep_window_at
 from eidos.domain.state import PathosState
 from eidos.domain.tastes import project_tastes
 from eidos.domain.townsfolk import project_townsfolk
@@ -549,6 +551,61 @@ class Life(LifeConversation):
             )
         self.store.append("pathos", pending, len(history))
         return text is not None
+
+    def next_sleep_change(self) -> datetime | None:
+        """The minute he's due to drop off or come to, if it's still ahead tonight."""
+        history = self.history()
+        state = self._project_state(history)
+        window = sleep_window_at(history, state.simulated_at)
+        if window is None:
+            return None
+        due = window.falls_asleep if state.awake else window.wakes
+        return due if due > state.simulated_at else None
+
+    def settle_sleep(self) -> str | None:
+        """Drop off or wake now, to the minute, if his night says it's time.
+
+        The hourly body step still governs a world run hour by hour; this lets a world in
+        real time wake him at 07:12 rather than on the hour.
+        """
+        history = self.history()
+        state = self._project_state(history)
+        at = state.simulated_at
+        window = sleep_window_at(history, at)
+        if window is None:
+            return None
+        should_be_awake = not (window.falls_asleep <= at < window.wakes)
+        if should_be_awake == state.awake:
+            return None
+        if not should_be_awake and (
+            state.location_id == "in_transit"
+            or any(
+                scene.status in {"active", "paused"}
+                and "pathos" in {scene.initiator_id, scene.partner_id}
+                for scene in project_scenes(history).scenes.values()
+            )
+        ):
+            return None  # still busy; he'll go when it's done
+        transition = DomainEvent(
+            "sleep.ended" if should_be_awake else "sleep.started",
+            "pathos",
+            {
+                "simulated_at": at.isoformat(),
+                "reason": (
+                    f"woke {window.waking}"
+                    if should_be_awake and window.waking
+                    else f"selected nightly window: {window.reason}"
+                ),
+            },
+        )
+        pending = [transition]
+        said = _how_he_woke(window, at) if should_be_awake else None
+        if said:
+            pending.append(
+                remember(transition, said, at, 0.25, origin="lived-sleep", category="experience")
+            )
+        self.store.append("pathos", pending, len(history))
+        return transition.kind
 
     def act_on_impulse(self, impulse: Mapping[str, object]) -> str:
         """Weigh something his thoughts keep reaching for, and maybe act on it.
@@ -3823,6 +3880,30 @@ def _deferred_cognition_events(
         )
         settled.add(job_id)
     return output
+
+
+def _how_he_woke(window: SleepWindow, at: datetime) -> str | None:
+    """A morning worth remembering: a lie-in, the snooze button, waking too early."""
+    clock = f"{at:%H:%M}"
+    pick = int(window.window_id.encode().hex(), 16) % 3
+    if window.snoozes:
+        times = "twice" if window.snoozes > 1 else "once"
+        return f"Hit snooze {times} before I dragged myself up at {clock}."
+    if window.waking.startswith("early"):
+        return (
+            f"Awake at {clock}, well before I needed to be. Couldn't get back off.",
+            f"Woke at {clock} with my head already going. Gave up on sleep.",
+            f"Up at {clock} for no good reason. Lay there a while, then gave in.",
+        )[pick]
+    if "lie-in" in window.waking:
+        return (
+            f"Slept in till {clock}. Needed that.",
+            f"Didn't surface till {clock}. Proper lie-in.",
+            f"Woke at {clock}, later than I meant to. Felt good, honestly.",
+        )[pick]
+    if window.waking == "just before the alarm":
+        return "Woke a few minutes before the alarm. Lay there waiting for it."
+    return None
 
 
 def _went_to_sleep_tonight(history: Sequence[DomainEvent], at: datetime) -> bool:

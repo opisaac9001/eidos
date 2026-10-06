@@ -178,8 +178,8 @@ def _latest_completed_window(
     history: Sequence[DomainEvent], simulated_at: datetime
 ) -> SleepWindow | None:
     windows = project_sleep_windows(history) if history else {}
-    latest = max(windows.values(), key=lambda item: item.wake, default=None)
-    if latest is None or not latest.wake <= simulated_at < latest.wake + timedelta(hours=18):
+    latest = max(windows.values(), key=lambda item: item.ends, default=None)
+    if latest is None or not latest.ends <= simulated_at < latest.ends + timedelta(hours=18):
         return None
     return latest
 
@@ -206,7 +206,7 @@ def sleep_and_need_events(
         should_be_awake = 7 <= simulated_at.hour < 23
         reason = "circadian fallback"
     else:
-        should_be_awake = not (window.bed <= simulated_at < window.wake)
+        should_be_awake = not (window.falls_asleep <= simulated_at < window.wakes)
         reason = f"selected nightly window: {window.reason}"
     if not should_be_awake and current.awake and pathos_busy:
         should_be_awake = True

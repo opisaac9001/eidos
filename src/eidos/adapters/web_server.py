@@ -230,6 +230,8 @@ class Runtime:
         remaining = self.realtime_pending_seconds
         self.realtime_pending_seconds = 0.0
         simulated_at = datetime.fromisoformat(self.life_snapshot()["time"])
+        # He drops off and wakes at his own minute, not on the hour.
+        sleep_change = self.life.next_sleep_change()
         try:
             while remaining > 0.000001:
                 seconds_into_quarter = (
@@ -238,10 +240,18 @@ class Runtime:
                     + simulated_at.microsecond / 1_000_000
                 )
                 until_boundary = 900 - seconds_into_quarter if seconds_into_quarter else 900
-                step = min(remaining, until_boundary)
+                until_sleep_change = (
+                    (sleep_change - simulated_at).total_seconds()
+                    if sleep_change is not None and sleep_change > simulated_at
+                    else None
+                )
+                step = min(remaining, until_boundary, until_sleep_change or until_boundary)
                 self.life.advance(step / 3600)
                 remaining -= step
                 simulated_at += timedelta(seconds=step)
+                if until_sleep_change is not None and abs(step - until_sleep_change) <= 0.000001:
+                    self.life.settle_sleep()
+                    sleep_change = self.life.next_sleep_change()
                 if abs(step - until_boundary) <= 0.000001:
                     if self.stream is not None:
                         self.stream.keep_for_pulse(self.life.pulse_inner_stream)

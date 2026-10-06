@@ -282,6 +282,7 @@ ROLE_FIELDS = {
         "who_is_who",
         "alone",
         "worn_out",
+        "half_awake",
         "stream_pulse_id",
         "mind_layers",
         "cognitive_workspace",
@@ -646,6 +647,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
+        if context.get("half_awake"):
+            # Surfacing from sleep: fragments, not plans.
+            details["state"] = "barely awake in bed; drowsy, fragmentary, not yet up"
         who = context.get("who_is_who")
         if isinstance(who, Mapping) and who:
             details["who_is_who"] = {str(k): str(v) for k, v in list(who.items())[:4]}

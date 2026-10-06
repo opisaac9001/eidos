@@ -24,7 +24,7 @@ import re
 import threading
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter, time
 from typing import Any, Callable, Collection, Mapping, Protocol, Sequence
 
@@ -423,6 +423,7 @@ CUE_SALIENCE = {
     "body": 0.1,
     "here": 0.05,
     "wander": 0.1,
+    "stirring": 0.1,
 }
 _WORDS = re.compile(r"[a-z']+")
 
@@ -954,7 +955,7 @@ class InnerStream:
         if snapshot is None or not running:
             self.state = "paused"
             return IDLE_POLL_SECONDS
-        if not (snapshot.get("pathos") or {}).get("awake"):
+        if not (snapshot.get("pathos") or {}).get("awake") and stirring(snapshot) is None:
             self.state = "asleep"
             return IDLE_POLL_SECONDS
         if self.yield_to():
@@ -988,11 +989,21 @@ class InnerStream:
             if now - thought.wall_at <= THREAD_MINUTES * 60
         ]
         recent_texts = [thought.text for thought in reversed(thread)]
-        cue = choose_cue(
-            cues(snapshot),
-            [thought.cue_kind for thought in reversed(thread)],
-            self.rng,
-            list(self._tried),
+        drowsy = stirring(snapshot) if not (snapshot.get("pathos") or {}).get("awake") else None
+        cue = (
+            choose_cue(
+                [Cue("stirring", text) for text in drowsy["drifting"]],
+                [],
+                self.rng,
+                list(self._tried),
+            )
+            if drowsy is not None
+            else choose_cue(
+                cues(snapshot),
+                [thought.cue_kind for thought in reversed(thread)],
+                self.rng,
+                list(self._tried),
+            )
         )
         if cue is not None:
             self._tried.append(cue.text)
@@ -1000,6 +1011,10 @@ class InnerStream:
         pending: list[DomainEvent] = []
         started = perf_counter()
         context = stream_context(snapshot, recent_texts[-3:], cue)
+        if drowsy is not None:
+            context["location"] = "in bed at home"
+            context["half_awake"] = True
+            context.pop("ongoing_activities", None)
         tired = worn_out(recent_texts, known_names(snapshot))
         if tired:
             context["worn_out"] = tired
@@ -1059,7 +1074,8 @@ class InnerStream:
             )
             if kept.id is not None and kept.id % 100 == 0:
                 self.store.prune(KEEP)
-        self.impulses.notice(kept.text, snapshot)
+        if drowsy is None:  # half-asleep wants don't get him out of bed
+            self.impulses.notice(kept.text, snapshot)
         return kept
 
     # For the quarter-hour pulse ---------------------------------------------------------
@@ -1114,6 +1130,48 @@ class InnerStream:
                 for thought in thoughts
             ],
         }
+
+
+STIR_MINUTES = 30
+_DROWSY = (
+    "half awake, light at the edge of the curtains",
+    "warm in bed, not ready to move yet",
+    "a dream already slipping away",
+    "a sound from the street, half asleep",
+    "what day it is",
+)
+
+
+def stirring(snapshot: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Half awake: the last half hour before he comes to, snoozing included.
+
+    Nobody goes from asleep to thinking in sentences on the hour. As waking nears his mind
+    surfaces in drowsy fragments; on an alarm morning, the alarm and five more minutes.
+    """
+    try:
+        now = datetime.fromisoformat(str(snapshot.get("time")))
+    except ValueError:
+        return None
+    for window in reversed(snapshot.get("sleep_windows") or []):
+        if not isinstance(window, Mapping) or not window.get("up_at"):
+            continue
+        try:
+            up = datetime.fromisoformat(str(window["up_at"]))
+            alarm = datetime.fromisoformat(str(window["wake_at"]))
+        except (KeyError, ValueError):
+            continue
+        if not up - timedelta(minutes=STIR_MINUTES) <= now < up:
+            continue
+        waking = str(window.get("waking") or "")
+        drifting = list(_DROWSY)
+        if "alarm" in waking and now >= alarm:
+            drifting = ["the alarm going off; five more minutes"]
+        else:
+            budget = snapshot.get("time_budget")
+            if isinstance(budget, Mapping) and budget.get("next_plan"):
+                drifting.append(f"the day ahead: {budget['next_plan']}")
+        return {"minutes_to_waking": round((up - now).total_seconds() / 60), "drifting": drifting}
+    return None
 
 
 def _simulated_now(snapshot: Mapping[str, Any]) -> str:
