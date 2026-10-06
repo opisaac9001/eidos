@@ -112,6 +112,10 @@ def main() -> None:
     commands.add_parser("resume-catch-up", help="Resume an interrupted catch-up session")
     commands.add_parser("cancel-catch-up", help="Cancel an interrupted catch-up session")
     commands.add_parser("journal", help="Read accepted autobiographical events")
+    lifelike = commands.add_parser(
+        "believability", help="Measure his recent life against how people actually live"
+    )
+    lifelike.add_argument("--days", type=int, default=7)
     commands.add_parser(
         "self", help="Read his life chapters, open questions, insights and possible selves"
     )
@@ -226,6 +230,30 @@ def main() -> None:
             else:
                 experiment_result = compare_experiment(args.database, args.input)
             print(json.dumps(asdict(experiment_result), indent=2, default=str))
+            return
+        if args.command == "believability":
+            from time import time
+
+            from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+            from eidos.application.believability import believability_report
+
+            lived = SQLiteEventStore(args.database).read("pathos")
+            stream = SQLiteInnerStream(args.database)
+            print(
+                json.dumps(
+                    believability_report(
+                        lived,
+                        Life.project(lived).simulated_at,
+                        thoughts=[
+                            (thought.cue_kind, thought.text)
+                            for thought in stream.since(time() - args.days * 86400)
+                        ],
+                        days=args.days,
+                    ),
+                    indent=2,
+                    default=str,
+                )
+            )
             return
         if args.command == "world-pack-import":
             from eidos.application.world_packs import import_world_pack

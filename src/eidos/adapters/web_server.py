@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from eidos.adapters.sqlite_store import SQLiteEventStore
 from eidos.adapters.standin_gateway import StandInGateway
+from eidos.application.believability import believability_report
 from eidos.application.life import Life
 from eidos.domain.events import DomainEvent
 from eidos.ports.event_store import RevisionConflict
@@ -482,6 +483,25 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     self.respond(200, memory_page)
                 except (ValueError, TypeError) as error:
                     self.respond(400, {"error": str(error)})
+            elif path == "/api/believability":
+                # How lifelike his recent life has been, against people's base rates.
+                with runtime.lock:
+                    history = runtime.life.history()
+                    at = datetime.fromisoformat(runtime.life.snapshot()["time"])
+                stream = runtime.stream
+                thoughts = (
+                    [
+                        (thought.cue_kind, thought.text)
+                        for thought in stream.store.since(stream.wall_clock() - 7 * 86400)
+                    ]
+                    if stream is not None
+                    else []
+                )
+                counts = (stream.kept, stream.rejections) if stream is not None else None
+                self.respond(
+                    200,
+                    believability_report(history, at, thoughts=thoughts, stream_counts=counts),
+                )
             elif path == "/api/export":
                 with runtime.lock:
                     events = [event_json(event) for event in runtime.life.history()]
