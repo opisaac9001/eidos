@@ -176,3 +176,12 @@ def test_only_observed_opportunities_persist_and_never_create_a_booking():
     assert len(options) == 1 and options[0]["action_authority"] is False
     assert available_opportunities(history, NOW + timedelta(hours=3)) == []
     assert not any(event.kind == "schedule.created" for event in history)
+
+
+def test_a_day_at_work_gives_a_resident_purpose():
+    history = npc_world_events([], NOW.replace(hour=6))
+    for hour in range(7, 15):
+        history += npc_world_events(history, NOW.replace(hour=hour))
+    mara = project_npcs(history, NOW.replace(hour=14)).people["mara"]
+    assert mara.location_id == "cafe"
+    assert mara.purpose > 0.5

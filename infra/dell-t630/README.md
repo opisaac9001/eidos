@@ -24,9 +24,13 @@ host. See [INVENTORY.md](INVENTORY.md) for current hardware and storage findings
 Ollama 0.33.3 is the initial runtime, using its bundled CUDA 12 support for the
 P40s. It provides the existing OpenAI-compatible model boundary without a full
 CUDA development toolkit or container stack. A custom llama.cpp build remains a
-future benchmarking option. Qwen2.5 14B is assigned to each P40 and Qwen2.5 7B to
-the RTX 3060; the two 14B workers share stored weights but have separate GPU
-allocations. `warm_model.py` loads the model before a worker reports readiness.
+future benchmarking option. Since 2026-10-05, Qwen3.5 35B (a mixture-of-experts model,
+about 3B active, thinking off) spans both P40s on the `pathos` worker (:11434, 16k
+context, `OLLAMA_SCHED_SPREAD=1`) for his voice, inner life and choices; Qwen2.5 14B runs
+on the RTX 3060 (`cognition` worker, :11436) for the world and as the backup; the `world`
+worker is disabled. (Before, Qwen2.5 14B ran on each P40 and 7B on the 3060.)
+`warm_model.py` loads the model before a worker reports readiness; it must stay
+readable by the `ollama` user (mode 644).
 
 The mount unit is specific to this machine's existing XFS filesystem UUID. The
 GPU environment files must match this machine's verified GPU ordering; prefer

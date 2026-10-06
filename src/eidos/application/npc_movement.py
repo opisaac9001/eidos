@@ -102,12 +102,25 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             energy_rate = (
                 (0.09 if asleep_hours else 0.035) if person.location_id == "home" else -0.025
             )
+            # Being among people tops up connection, and doing their job gives purpose:
+            # before, only finishing a plan did, and every resident sat at zero for days.
+            company = person.location_id not in {"home", "in-transit"} and any(
+                other.actor_id != actor_id and other.location_id == person.location_id
+                for other in state.people.values()
+            )
+            working = person.location_id not in {"home", "in-transit"} and (
+                person.location_id == their_place_now(actor_id, person.usual_location_id, now)
+            )
             emit(
                 "npc.needs_changed",
                 {
                     "energy": max(0.0, min(1.0, person.energy + elapsed * energy_rate)),
-                    "connection": max(0.0, person.connection - elapsed * 0.018),
-                    "purpose": max(0.0, person.purpose - elapsed * 0.014),
+                    "connection": max(
+                        0.0, min(1.0, person.connection + elapsed * (0.04 if company else -0.018))
+                    ),
+                    "purpose": max(
+                        0.0, min(1.0, person.purpose + elapsed * (0.04 if working else -0.014))
+                    ),
                 },
                 last_needs,
             )
