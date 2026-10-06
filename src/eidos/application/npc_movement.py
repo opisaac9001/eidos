@@ -1,6 +1,8 @@
-"""Elapsed-time NPC movement and work; no stock hourly location itinerary."""
+"""Elapsed-time NPC movement and work: their own plans, their employer's hours, and their
+ordinary day (work by day, home at night) when nothing else has them."""
 
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Callable, Hashable, Sequence
 
 from eidos.application.friends_lives import away_people
@@ -15,7 +17,7 @@ from eidos.domain.folding import (
 )
 from eidos.domain.npcs import project_npcs
 from eidos.domain.travel import route_duration
-from eidos.domain.world import location_allows_interval
+from eidos.domain.world import location_allows_interval, npc_location
 from eidos.domain.world_catalog import project_world_catalog
 
 
@@ -34,6 +36,8 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                 },
             )
         )
+    # Everyone starts at home; their own day takes them from there on the next step.
+    starting = bool(output)
     state = project_npcs([*history, *output] if output else history, now)
     catalog = project_world_catalog(history)
     workdays = _employer_workdays(history)
@@ -201,6 +205,39 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                     },
                 )
                 continue
+        # Their own day, when no plan of theirs has them: at work in working hours, home at
+        # night. Without it, Mara stayed in the café till dawn and every need sat at zero.
+        plan_soon = person.plan_status == "active" and (
+            person.plan_scheduled_for is None
+            or person.plan_scheduled_for <= now + timedelta(hours=1)
+        )
+        # The employer's agreed hours decide a working day (above), until well after closing.
+        on_the_rota = workday is not None and now < workday[2] + timedelta(hours=3)
+        if (
+            not plan_soon
+            and not on_the_rota
+            and not starting
+            and person.location_id != "in-transit"
+        ):
+            target = their_place_now(actor_id, person.usual_location_id, now)
+            if target != person.location_id and (target == "home" or target in catalog.places):
+                try:
+                    duration = route_duration(person.location_id, target, catalog.route_minutes)
+                except ValueError:
+                    duration = None
+                if duration is not None:
+                    emit(
+                        "npc.travel_started",
+                        {
+                            "plan_id": f"day-{actor_id}-{now.date().isoformat()}",
+                            "origin_id": person.location_id,
+                            "destination_id": target,
+                            "depart_at": now.isoformat(),
+                            "arrive_at": (now + duration).isoformat(),
+                            "reason": "home for the night" if target == "home" else "their day",
+                        },
+                    )
+                    continue
         if person.plan_status != "active" or person.plan_id is None:
             continue
         plan = owned.latest(
@@ -306,6 +343,17 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
         if person.plan_goal_id is not None:
             emit("npc.goal_achieved", {"goal_id": person.plan_goal_id}, completed, ends_at)
     return output
+
+
+def their_place_now(actor_id: str, usual_location_id: str, now: datetime) -> str:
+    """Where someone would be at this hour on an ordinary day of theirs.
+
+    Their authored rhythm (Mara opens the café, Ellis keeps the workshop), shifted by up to
+    an hour either way from day to day so nobody leaves on the stroke of five.
+    """
+    roll = sha256(f"{actor_id}:{now.date().isoformat()}".encode()).digest()[0] % 3 - 1
+    hour = (now.hour - roll) % 24
+    return npc_location(actor_id, hour, usual_location_id)
 
 
 # The kinds of an NPC's own events that movement looks back over.

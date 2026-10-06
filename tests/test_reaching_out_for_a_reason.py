@@ -114,6 +114,7 @@ def test_a_call_to_a_close_friend_gets_their_answer_there_and_then(tmp_path, mon
         lambda history, at: {person.person_id: type("F", (), {"level": 9})()},
     )
     monkeypatch.setattr(life_module, "_at_work", lambda planning, at: False)
+    monkeypatch.setattr(life_module, "_npc_locations", lambda history, at: {})  # not with him
     outcome = life.act_on_impulse(
         {
             "kind": "contact",

@@ -151,3 +151,12 @@ The latest focused causal-opportunity run passed all seven checks, including the
 subsequently added project-decline trace check. Type checks passed for the six
 changed causal/planning application modules; changed-file lint and diff checks passed.
 No server deployment or live saved-state migration was performed.
+
+## Residents keep an ordinary day (2026-10-06)
+
+Residents had no rhythm once the simulation started: after finishing a plan they waited a
+week for the next, Mara stayed in the café until dawn, and every need sat at zero. Now,
+when no plan of their own is due, they keep their authored ordinary day (work by day, home
+at night, shifted by up to an hour from day to day) by travelling, never teleporting. An
+employer's agreed hours still decide a working day. At critical energy, residents go home
+to rest at once, and at home overnight they sleep.

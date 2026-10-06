@@ -29,7 +29,7 @@ def test_life_processes_npc_arrival_between_hourly_updates(tmp_path):
     journey = next(
         event
         for event in life.history()
-        if event.kind == "npc.travel_started" and event.payload["actor_id"] == "rowan"
+        if event.kind == "npc.travel_started" and event.payload["plan_id"] == "walk-and-read"
     )
     arrival = datetime.fromisoformat(journey.payload["arrive_at"])
     life.advance((arrival - NOW).total_seconds() / 3600)
@@ -67,18 +67,28 @@ def test_no_clock_based_teleport_and_real_time_before_arrival_and_completion():
     history.append(plan())
     departure = npc_world_events(history, NOW)
     history += departure
-    journey = next(event for event in departure if event.kind == "npc.travel_started")
+    journey = next(
+        event
+        for event in departure
+        if event.kind == "npc.travel_started" and event.payload["plan_id"] == "walk-and-read"
+    )
     assert project_npcs(history, NOW).people["rowan"].location_id == "in-transit"
     arrival_at = datetime.fromisoformat(journey.payload["arrive_at"])
     assert arrival_at > NOW
     before = npc_world_events(history, arrival_at - timedelta(seconds=1))
-    assert not any(event.kind == "npc.moved" for event in before)
+    assert not any(
+        event.kind == "npc.moved" and event.payload["actor_id"] == "rowan" for event in before
+    )
     history += before
     arrival = npc_world_events(history, arrival_at)
     history += arrival
     assert project_npcs(history, arrival_at).people["rowan"].location_id == "park"
     assert not any(event.kind == "npc.plan_completed" for event in arrival)
-    assert npc_world_events(history, arrival_at) == []
+    assert not [
+        event
+        for event in npc_world_events(history, arrival_at)
+        if event.payload.get("actor_id") == "rowan"
+    ]
     finished = npc_world_events(history, arrival_at + timedelta(hours=1))
     assert any(event.kind == "npc.plan_completed" for event in finished)
     history += finished
@@ -86,18 +96,29 @@ def test_no_clock_based_teleport_and_real_time_before_arrival_and_completion():
         project_npcs(history, arrival_at + timedelta(hours=1)).people["rowan"].plan_status
         == "completed"
     )
-    assert npc_world_events(history, arrival_at + timedelta(hours=1)) == []
+    after = npc_world_events(history, arrival_at + timedelta(hours=1))
+    # Only their own day may move them on now that the plan is done.
+    assert all(str(event.payload.get("plan_id", "")).startswith("day-") for event in after)
 
 
-def test_clock_without_plan_does_not_assign_a_location_or_activity():
+def test_without_a_plan_residents_keep_their_own_day_but_invent_no_activity():
     history = npc_world_events([], NOW)
-    for offset in (1, 3, 8):
+    for offset in (1, 3, 8, 14):
         events = npc_world_events(history, NOW + timedelta(hours=offset))
-        assert not any(
-            event.kind in {"npc.moved", "npc.travel_started", "npc.activity_recorded"}
+        assert not any(event.kind == "npc.activity_recorded" for event in events)
+        # Any travel is their ordinary day (work, home for the night), never a teleport.
+        assert all(
+            event.payload.get("reason") in {"their day", "home for the night"}
             for event in events
+            if event.kind == "npc.travel_started"
         )
         history += events
+    # Late at night, everyone without plans of their own is home.
+    night = NOW.replace(hour=23, minute=30) + timedelta(days=0)
+    for step in range(4):
+        history += npc_world_events(history, night + timedelta(hours=step))
+    people = project_npcs(history, night + timedelta(hours=3)).people
+    assert people["mara"].location_id == "home"
 
 
 def test_npc_can_leave_need_unplanned_before_day_eleven_and_outside_seven_pm():
