@@ -25,6 +25,7 @@ from eidos.application.life_lately import life_lately
 from eidos.application.life_projections import LifeProjections
 from eidos.application.masking import masking_context
 from eidos.application.memory import RecalledMemory, recall, terms
+from eidos.application.memory_life import stayed_with_me
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.open_loops import loops_view
@@ -140,6 +141,9 @@ class LifeConversation(LifeProjections):
         feeling = [str(f["feeling"]) for f in feelings_view(history, at)[:3]]
         if feeling:
             context["feeling_now"] = feeling
+        stayed = stayed_with_me(history)
+        if stayed:
+            context["stayed_with_him"] = stayed
         lately = life_lately(history)
         if lately:
             context["my_life_lately"] = lately

@@ -17,6 +17,7 @@ from typing import Sequence
 
 from eidos.application.friends_lives import friends_lives_context
 from eidos.application.inner_life import active_concerns
+from eidos.application.memory_life import stayed_with_me
 from eidos.application.open_loops import loops_view
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -76,6 +77,7 @@ async def life_lately_events(
         "the_day_just_gone": today,
         "weighing_on_me": [str(c.payload.get("text")) for c in active_concerns(history)][-4:],
         "meaning_to": [str(loop["text"]) for loop in loops_view(history, at)][:4],
+        "stayed_with_me": stayed_with_me(history),
         "friends_news": [
             f"{item['who']}: {item['what']}" for item in friends_lives_context(history, at, names)
         ][:5],

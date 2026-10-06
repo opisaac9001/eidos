@@ -130,6 +130,7 @@ from eidos.application.memory import (
     recall,
     terms,
 )
+from eidos.application.memory_life import brooded_access, formative_events, routine_merge_events
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability
@@ -523,6 +524,8 @@ class Life(LifeConversation):
                     correlation_id=pulse_id,
                 )
             )
+            # Going back to a memory in passing keeps it vivid.
+            pending.extend(brooded_access(history, text, state.simulated_at))
         if text is not None:
             pending.extend(
                 await outreach_events(
@@ -3519,6 +3522,9 @@ class Life(LifeConversation):
         hours, while he's actually asleep (and the model that dreams isn't busy thinking his
         waking thoughts), close enough to waking that it may stay with him."""
         if not self.authored_scenario:
+            # Overnight: routine runs together, and what he keeps going back to stays.
+            tick.pending.extend(routine_merge_events(tick.history + tick.pending, tick.current))
+            tick.pending.extend(formative_events(tick.history + tick.pending, tick.current))
             await self._consolidate(tick)
         day = tick.current.date()
         for role, scheduled_hour, kind in (
