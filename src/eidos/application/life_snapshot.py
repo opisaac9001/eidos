@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from eidos.application.activity_execution import execution_context
+from eidos.application.alertness import body_now
 from eidos.application.ambient_population import ambient_population
 from eidos.application.attention import attention_state
 from eidos.application.bonds import current_bonds
@@ -673,6 +674,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "season": season.name if season is not None else season_for(state.simulated_at),
         "texts": texts_view(history),
         "open_loops": loops_view(history, state.simulated_at),
+        "body_now": body_now(history, state.simulated_at),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,

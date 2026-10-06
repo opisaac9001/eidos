@@ -210,11 +210,15 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
         found.append(
             Cue("next", f"{budget['next_plan']}, {when}" if when else str(budget["next_plan"]))
         )
+    # What his body's actually been telling him, with its cause ("heavy-headed, only got
+    # five hours"), rather than a meter reading.
+    felt = [str(text) for text in snapshot.get("body_now") or [] if text]
+    found.extend(Cue("body", text, 1.5) for text in felt)
     needs = pathos.get("needs") or {}
     energy = pathos.get("energy")
-    if isinstance(needs, Mapping) and float(needs.get("hunger", 0) or 0) > 0.6:
+    if not felt and isinstance(needs, Mapping) and float(needs.get("hunger", 0) or 0) > 0.6:
         found.append(Cue("body", "getting hungry"))
-    if isinstance(energy, (int, float)) and energy < 0.35:
+    if not felt and isinstance(energy, (int, float)) and energy < 0.35:
         found.append(Cue("body", "tired, running low"))
     wellbeing = (snapshot.get("wellbeing") or {}).get("active")
     if isinstance(wellbeing, Mapping) and wellbeing.get("kind"):

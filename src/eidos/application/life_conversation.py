@@ -6,6 +6,7 @@ from typing import Callable, Mapping, Sequence
 
 from eidos.application.activity_execution import execution_context
 from eidos.application.advice import advice_asked_events, advice_context, advice_names
+from eidos.application.alertness import body_now
 from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
@@ -107,6 +108,9 @@ class LifeConversation(LifeProjections):
         ]
         if weighing:
             context["on_his_mind_lately"] = weighing
+        felt = body_now(history, at)
+        if felt:
+            context["body_right_now"] = felt
         meaning = [str(loop["text"]) for loop in loops_view(history, at)[:3]]
         if meaning:
             context["meaning_to"] = meaning

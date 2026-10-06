@@ -16,6 +16,7 @@ from eidos.application.activity_execution import (
 )
 from eidos.application.advice import advice_heard_events, advice_names, advice_wanted_events
 from eidos.application.agency import autonomous_activity_events
+from eidos.application.alertness import alertness, body_sensation_events
 from eidos.application.ambient_population import ambient_population
 from eidos.application.appraisal import (
     affect_episode_events,
@@ -1210,8 +1211,21 @@ class Life(LifeConversation):
             energy_rhythm=not self.authored_scenario,
             mood_baseline=mood_baseline,
             waking_drain=waking_drain,
+            alert=None if self.authored_scenario else alertness(history + pending, current),
         )
         pending.extend(recovery)
+        if not self.authored_scenario:
+            weather = events_of(history + pending, "world.weather")[-1:]
+            pending.extend(
+                body_sensation_events(
+                    history + pending,
+                    current,
+                    awake=tick.state.awake,
+                    location_id=tick.state.location_id,
+                    hunger=tick.state.hunger,
+                    weather=str(weather[0].payload.get("text")) if weather else None,
+                )
+            )
         physical_events = wellbeing_events(history + pending, tick.state, current)
         self._extend_warmed(tick, physical_events, self._wellbeing)
         tick.active_wellbeing = self._wellbeing(history + pending).active

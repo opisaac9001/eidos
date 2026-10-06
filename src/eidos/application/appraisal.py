@@ -18,6 +18,7 @@ def baseline_affect_events(
     energy_rhythm: bool = False,
     mood_baseline: float = 0.0,
     waking_drain: float = 0.03,
+    alert: float | None = None,
 ) -> tuple[list[DomainEvent], PathosState]:
     """Move transient affect gently toward baseline without erasing its causes.
 
@@ -34,6 +35,10 @@ def baseline_affect_events(
         energy = (
             round(min(1.0, state.energy + 0.1), 4)
             if not state.awake
+            # Awake, energy follows how alert his body actually is (sleep pressure, last
+            # night's sleep, the time of day); what he does still spends it on top.
+            else round(max(0.05, state.energy + 0.5 * (alert - state.energy)), 4)
+            if alert is not None
             else round(max(0.1, state.energy - waking_drain), 4)
         )
     if valence == state.valence and arousal == state.arousal and energy == state.energy:
@@ -714,6 +719,11 @@ def _effect(
         return ("affect", 0.0, 0.22, 0.15, 0.8)
     if event.kind == "household.task_completed":
         return ("mastery", 0.025, 0.18, 0.1, 0.9)
+    if event.kind == "body.sensed":
+        tone = event.payload.get("tone")
+        if isinstance(tone, (int, float)) and not isinstance(tone, bool):
+            return ("affect", 0.0, max(-0.3, min(0.3, float(tone))), 0.2, 0.7)
+        return None
     if event.kind == "intention.done":
         # Off his mind at last: a small relief.
         return ("mastery", 0.02, 0.2, 0.1, 0.85)
