@@ -39,6 +39,7 @@ from time import perf_counter
 from typing import Callable, Mapping, Sequence
 from uuid import uuid4
 
+from eidos.application.day_rhythm import is_the_hour
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -47,7 +48,15 @@ from eidos.ports.news import NewsSource, NewsStory
 
 HEARD = "news.heard"
 TAKE = "news.take"
-HOURS = frozenset({7, 18})  # breakfast headlines, and his phone in the evening
+HOURS = frozenset({7, 18})  # breakfast headlines, and his phone in the evening (usually)
+
+
+def news_hour(at: datetime) -> bool:
+    """Whether he looks at the news this hour: over breakfast and in the evening, give or
+    take, not at 07:00 and 18:00 every day."""
+    return is_the_hour("news-morning", at, 7, 0, 2) or is_the_hour("news-evening", at, 18, 1, 2)
+
+
 IN_STEP = timedelta(days=3)
 OFFERED = 8
 TAKES_AT_MOST = 3
@@ -109,7 +118,7 @@ async def news_events(
     is his news whatever his calendar says; otherwise his simulated day must be today.
     """
     real_now = now()
-    if source is None or not awake or at.hour not in HOURS:
+    if source is None or not awake or not news_hour(at):
         return []
     if not live and not in_step_with_now(at, real_now):
         return []

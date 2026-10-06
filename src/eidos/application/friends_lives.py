@@ -23,6 +23,7 @@ from hashlib import sha256
 from typing import Mapping, Sequence
 
 from eidos.application.bookings import book
+from eidos.application.day_rhythm import is_the_hour
 from eidos.application.pronouns import in_his_words
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
@@ -177,7 +178,7 @@ def friend_life_events(
     location_id: str = "",
 ) -> list[DomainEvent]:
     """This evening's turn in a friend's life, or the next step of one already under way."""
-    if at.hour != EVENT_HOUR:
+    if not friends_news_hour(at):
         return []
     lives = friends_lives(history)
     follow_on = _follow_on(history, lives, at, names, known_places, depths, location_id)
@@ -564,6 +565,11 @@ def _memory(source: DomainEvent, text: str, at: datetime, importance: float) -> 
         causation_id=source.event_id,
         correlation_id=source.correlation_id,
     )
+
+
+def friends_news_hour(at: datetime) -> bool:
+    """Friends' news reaches him in the evening, give or take an hour or two."""
+    return is_the_hour("friends-news", at, EVENT_HOUR, 2, 2)
 
 
 def friends_lives_context(

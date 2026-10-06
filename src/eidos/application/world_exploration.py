@@ -55,14 +55,15 @@ def planned_activity_beat(
         return None
     entry = entries[0]
     starts_at = datetime.fromisoformat(entry.starts_at)
+    # In his words, like a note to himself, not a log line ("Started the planned activity").
     if simulated_at == starts_at:
         description = (
-            f"Set out for the planned activity: {entry.title}."
+            f"Headed out for this: {entry.title}."
             if current_location_id is not None and current_location_id != entry.location_id
-            else f"Started the planned activity: {entry.title}."
+            else f"Made a start: {entry.title}."
         )
     else:
-        description = f"Stayed with the planned activity: {entry.title}."
+        description = f"{STILL_AT_IT} {entry.title}."
     return RoutineBeat(
         simulated_at.hour,
         entry.location_id,
@@ -70,6 +71,9 @@ def planned_activity_beat(
         max(0.15, energy - 0.04),
         entry.action or "planned_activity",
     )
+
+
+STILL_AT_IT = "Still at it:"
 
 
 def feasible_activity_windows(

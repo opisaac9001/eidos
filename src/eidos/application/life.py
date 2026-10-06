@@ -39,6 +39,7 @@ from eidos.application.cognition import perform, request_for
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import consolidation_events
+from eidos.application.day_rhythm import hour_today
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import (
     active_habit_context,
@@ -67,12 +68,12 @@ from eidos.application.family_visits import family_visit_events
 from eidos.application.far_friends import far_friend_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
-from eidos.application.friends_lives import EVENT_HOUR as FRIEND_EVENT_HOUR
 from eidos.application.friends_lives import (
     away_people,
     busy_people,
     friend_life_events,
     friends_lives,
+    friends_news_hour,
 )
 from eidos.application.friendship import friendships
 from eidos.application.holiday import PLACES as HOLIDAY_PLACES
@@ -217,10 +218,9 @@ from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_even
 from eidos.application.work_arc import work_arc_events
 from eidos.application.work_rota import is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
-from eidos.application.world_exploration import planned_activity_beat
+from eidos.application.world_exploration import STILL_AT_IT, planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
-from eidos.application.world_news import HOURS as NEWS_HOURS
-from eidos.application.world_news import news_events
+from eidos.application.world_news import news_events, news_hour
 from eidos.application.world_perception import (
     authored_community_schedule,
     community_resource_events,
@@ -1406,7 +1406,9 @@ class Life(LifeConversation):
                     # favour the moments that stood out.
                     "importance": 0.15
                     if not self.authored_scenario
-                    and beat.description.startswith("Stayed with the planned activity")
+                    and beat.description.startswith(
+                        (STILL_AT_IT, "Stayed with the planned activity")
+                    )
                     else 0.45,
                     "confidence": 1.0,
                 },
@@ -1934,7 +1936,7 @@ class Life(LifeConversation):
 
     def _phase_friends_lives(self, tick: _Tick) -> None:
         """New jobs, new babies, worries and moves in his friends' lives."""
-        if self.authored_scenario or tick.current.hour != FRIEND_EVENT_HOUR:
+        if self.authored_scenario or not friends_news_hour(tick.current):
             return
         history, pending, current = tick.history, tick.pending, tick.current
         catalog = self._world_catalog(history + pending)
@@ -2174,7 +2176,7 @@ class Life(LifeConversation):
             self.authored_scenario
             or self.news_source is None
             or not tick.state.awake
-            or tick.current.hour not in NEWS_HOURS
+            or not news_hour(tick.current)
         ):
             return
         history, pending, current = tick.history, tick.pending, tick.current
@@ -3352,8 +3354,10 @@ class Life(LifeConversation):
         """Evening reflection at 21:00 and the day's summary at 23:00; he dreams in the small
         hours, while he's actually asleep (and the model that dreams isn't busy thinking his
         waking thoughts), close enough to waking that it may stay with him."""
+        day = tick.current.date()
         for role, scheduled_hour, kind in (
-            ("reflection", 21, "reflection.recorded"),
+            # Thinking back over the day before bed, at about nine, never always at nine.
+            ("reflection", hour_today("reflection", day, 21, 1, 1), "reflection.recorded"),
             ("oneiros", DREAM_HOUR, "dream.recorded"),
             ("chronicler", 23, "day.summarized"),
         ):

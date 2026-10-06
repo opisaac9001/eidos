@@ -476,7 +476,7 @@ def scheduled_activity_events(
         memory = consequence(
             "memory.recorded",
             {
-                "text": f"I completed the planned {action.value}: {entry.title}.",
+                "text": f"Done: {entry.title}.",
                 "owner": "pathos",
                 "category": "accomplishment",
                 "source": "deterministic-consequence",

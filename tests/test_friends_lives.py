@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from eidos.application.day_rhythm import hour_today
 from eidos.application.friends_lives import (
     WILL_MOVE,
     _roll,
@@ -27,6 +28,8 @@ def live(days: int, depths=None, residents=None) -> list[DomainEvent]:
     depths = depths or {person: 5.0 for person in FRIENDS} | {"ellis": 8.0, "user": 9.0}
     for day in range(days):
         at = START + timedelta(days=day)
+        # Friends' news comes in the evening, at a different hour each day.
+        at = at.replace(hour=hour_today("friends-news", at.date(), 18, 2, 2))
         history += friend_life_events(
             history,
             at,
@@ -183,6 +186,7 @@ def test_a_close_friend_gets_engaged_then_married_and_he_is_there() -> None:
     history: list[DomainEvent] = [partner]
     for day in range(365 * 5):
         at = START + timedelta(days=day)
+        at = at.replace(hour=hour_today("friends-news", at.date(), 18, 2, 2))
         invited = [
             e
             for e in history

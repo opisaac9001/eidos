@@ -1,12 +1,13 @@
 """Real news reaches him, he has a take, it touches his life, and he can talk about it."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
 from eidos.adapters.news_feeds import RssNewsAdapter
 from eidos.adapters.standin_gateway import StandInGateway, _standin_news_reply
+from eidos.application.day_rhythm import hour_today
 from eidos.application.town_signals import real_weather
 from eidos.application.world_news import (
     _valid,
@@ -18,7 +19,11 @@ from eidos.application.world_news import (
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected
 
-TODAY = datetime(2026, 9, 25, 7, tzinfo=timezone.utc)
+# His breakfast news hour that day (it moves from day to day).
+TODAY = datetime(
+    2026, 9, 25, hour_today("news-morning", date(2026, 9, 25), 7, 0, 2), tzinfo=timezone.utc
+)
+EVENING = hour_today("news-evening", date(2026, 9, 25), 18, 1, 2)
 
 RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>BBC News</title>
 <item><title><![CDATA[Energy bills to rise again this winter]]></title>
@@ -79,7 +84,7 @@ def test_morning_news_is_heard_and_he_has_a_take() -> None:
     assert bills.payload["touches_his_life"] == "prices" and bills.payload["feeling"] < 0
     assert all(e.payload["real_world"] for e in heard)
     # Already seen: nothing new that evening.
-    evening = read(TODAY.replace(hour=18), history=events)
+    evening = read(TODAY.replace(hour=EVENING), history=events)
     assert not [e for e in evening if e.kind == "news.heard"]
 
 
@@ -137,7 +142,9 @@ def test_the_real_sky_is_his_sky_when_his_day_is_today() -> None:
 
 
 def test_a_live_world_hears_todays_news_whatever_its_calendar_says() -> None:
-    january = datetime(2026, 1, 8, 7, tzinfo=timezone.utc)
+    january = datetime(
+        2026, 1, 8, hour_today("news-morning", date(2026, 1, 8), 7, 0, 2), tzinfo=timezone.utc
+    )
     assert read(at=january) == []
     live = asyncio.run(
         news_events(

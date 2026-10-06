@@ -139,7 +139,8 @@ def _short(text: str, limit: int = 160) -> str:
 # of an encounter ("...offering Pathos a cup..."), and his own outgoing messages.
 _NOT_EVOCATIVE = re.compile(
     r"^(?:started the planned|stayed with the planned|i completed the planned|"
-    r"i showed up for my planned|completed the planned|you sent a message|i sent a message)"
+    r"i showed up for my planned|completed the planned|you sent a message|i sent a message|"
+    r"made a start:|still at it:|done:|headed out for this:)"
     r"|\bpathos\b",
     re.IGNORECASE,
 )

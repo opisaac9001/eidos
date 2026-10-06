@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+from dataclasses import replace
 from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Mapping, Sequence
@@ -611,12 +613,15 @@ async def autonomous_activity_events(
                     raise ProposalRejected(
                         "travel_required", "Starting now requires already being at the place"
                     )
-            elif route_duration(
-                current_location_id, candidate.location_id, catalog.route_minutes
-            ) > timedelta(hours=candidate.starts_in_hours):
-                raise ProposalRejected(
-                    "travel_required", "The chosen start leaves too little time to get there"
+            else:
+                travel = route_duration(
+                    current_location_id, candidate.location_id, catalog.route_minutes
                 )
+                if travel > timedelta(hours=candidate.starts_in_hours):
+                    # Deciding to go somewhere now means starting once he's got there, not
+                    # giving up the idea (this threw away an evening's outings).
+                    minutes = math.ceil(travel.total_seconds() / 300) * 5
+                    candidate = replace(candidate, starts_in_hours=minutes / 60)
     except (KeyError, OSError, TimeoutError, TypeError, ValueError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
         output.extend(

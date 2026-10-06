@@ -102,10 +102,9 @@ def test_overlong_choice_is_rejected_not_silently_shrunk_or_booked():
     assert row["dish_load_after"] == 0.8
 
 
-def test_future_start_still_requires_enough_time_to_reach_the_place():
+def test_a_start_too_soon_to_get_there_waits_until_he_could_arrive():
     row = asyncio.run(trial.run_case(ChoiceFixture(5, "workshop", 1 / 60), 90))
-    assert any(e["payload"].get("error_code") == "travel_required" for e in row["decisions"])
-    assert not any(e["kind"] == "schedule.created" for e in row["decisions"])
+    assert not any(e["payload"].get("error_code") == "travel_required" for e in row["decisions"])
 
 
 @pytest.mark.parametrize("minutes", [1, 5, 15, 30])

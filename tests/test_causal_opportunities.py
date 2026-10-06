@@ -194,9 +194,10 @@ def test_explicit_choice_can_start_here_now_but_cannot_teleport():
     here = agency(history, ChoiceGateway(), current_location_id="home")
     entry = next(event for event in here if event.kind == "schedule.created")
     assert entry.payload["starts_at"] == NOW.isoformat()
+    # Elsewhere, he starts once he's got there rather than giving the idea up.
     elsewhere = agency(history, ChoiceGateway(), current_location_id="park")
-    assert not any(event.kind == "schedule.created" for event in elsewhere)
-    assert any(event.payload.get("error_code") == "travel_required" for event in elsewhere)
+    later = next(event for event in elsewhere if event.kind == "schedule.created")
+    assert datetime.fromisoformat(later.payload["starts_at"]) > NOW
 
 
 def test_thought_can_remain_private_without_a_booking_and_is_not_reconsidered_forever():

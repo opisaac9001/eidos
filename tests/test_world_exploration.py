@@ -92,7 +92,7 @@ class WorldExplorationTests(unittest.TestCase):
         self.assertIsNotNone(beat)
         assert beat is not None
         self.assertEqual((beat.location_id, beat.activity), ("old-glasshouse", "attend"))
-        self.assertIn("Set out", beat.description)
+        self.assertIn("Headed out", beat.description)
         self.assertIsNone(planned_activity_beat(PlanningState(), starts_at, 0.7))
 
     def test_activity_does_not_create_an_extra_departure_at_its_end(self):
@@ -107,7 +107,7 @@ class WorldExplorationTests(unittest.TestCase):
         )
 
         assert already_there is not None
-        self.assertIn("Started", already_there.description)
+        self.assertIn("Made a start", already_there.description)
         self.assertIsNone(
             planned_activity_beat(planning, ends_at, 0.7, current_location_id="old-glasshouse")
         )
