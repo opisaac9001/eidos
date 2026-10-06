@@ -84,6 +84,7 @@ from eidos.application.gossip import (
     worth_mentioning,
 )
 from eidos.application.group_chat import GROUP_FROM_LEVEL, group_chat_events
+from eidos.application.happenings import happening_events, phone_dead
 from eidos.application.holiday import PLACES as HOLIDAY_PLACES
 from eidos.application.holiday import holiday_events
 from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
@@ -1241,6 +1242,25 @@ class Life(LifeConversation):
                 )
             )
             weather = events_of(history + pending, "world.weather")[-1:]
+            upcoming = sorted(
+                datetime.fromisoformat(entry.starts_at)
+                for entry in planning.calendar.values()
+                if entry.status == "scheduled"
+                and entry.actor_id in {None, "pathos"}
+                and datetime.fromisoformat(entry.starts_at) >= current
+            )
+            pending.extend(
+                happening_events(
+                    history + pending,
+                    current,
+                    awake=tick.state.awake,
+                    location_id=tick.state.location_id,
+                    weather=str(weather[0].payload.get("text")) if weather else None,
+                    alertness=alertness(history + pending, current),
+                    at_work=_at_work(planning, current),
+                    next_commitment=upcoming[0] if upcoming else None,
+                )
+            )
             pending.extend(
                 body_sensation_events(
                     history + pending,
@@ -3691,7 +3711,8 @@ class Life(LifeConversation):
                 members=members,
                 free_to_look=tick.state.awake
                 and not busy
-                and not _at_work(self._planning(history), tick.current),
+                and not _at_work(self._planning(history), tick.current)
+                and not phone_dead(history, tick.current),
                 whereabouts=_their_whereabouts(history, tick.state, catalog),
                 on_his_mind=[
                     str(concern.payload.get("text")) for concern in active_concerns(history)[-2:]

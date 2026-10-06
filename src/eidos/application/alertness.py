@@ -151,6 +151,15 @@ def body_sensation_events(
         )
     if at.hour >= 16 and up >= 8 and _stayed_in(history, at):
         candidates.append(("cooped_up", "Been in all day. Getting a bit of cabin fever.", -0.1))
+    # The aftermath of what happened to him earlier.
+    for event in events_of(history, "happening.occurred")[-3:]:
+        when = _at(event)
+        if when is None or not timedelta(hours=1) <= at - when <= timedelta(hours=4):
+            continue
+        if event.payload.get("kind") == "nicked_thumb":
+            candidates.insert(0, ("thumb", "Thumb's still throbbing from the chisel.", -0.1))
+        elif event.payload.get("kind") == "caught_in_rain":
+            candidates.insert(0, ("damp", "Still damp and cold from the rain.", -0.1))
     for sensation, text, tone in candidates:
         if sensation not in already:
             return [
