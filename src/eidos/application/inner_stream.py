@@ -29,6 +29,7 @@ from time import perf_counter, time
 from typing import Any, Callable, Collection, Mapping, Protocol, Sequence
 
 from eidos.application.cognition import perform
+from eidos.application.pronouns import KNOWN as KNOWN_PRONOUNS
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelGateway
 
@@ -63,9 +64,9 @@ WANDERING = (
     "his hands",
     "something from growing up in Wye",
     "Bristol, and who he was at university",
-    "Dad's clocks in the shed",
+    "Dad and his clocks, in the shed at home in Wye",
     "Tom, Jess and little Isla in London",
-    "Gulliver, the old family dog",
+    "Gulliver, the old family dog, who died years ago",
     "what to eat later",
     "the weekend",
     "a tune stuck in his head",
@@ -154,6 +155,25 @@ def _his_memories(snapshot: Mapping[str, Any]) -> list[object]:
     ]
 
 
+_AN_ID = re.compile(r"\b(?:townsfolk|resident)[ -]?\d+\b", re.IGNORECASE)
+_MEDIA_VERB = {
+    "series": "watching",
+    "film": "meaning to watch",
+    "album": "listening to",
+    "book": "reading",
+    "podcast": "listening to",
+}
+
+
+def _media(item: object) -> str | None:
+    """A title labelled as what it is: bare, an album's name read like part of his past."""
+    if not isinstance(item, Mapping) or not item.get("title"):
+        return _text_of(item)
+    kind = str(item.get("kind") or "thing")
+    by = f" ({item['by']})" if item.get("by") else ""
+    return f"{item['title']}{by}, the {kind} he's {_MEDIA_VERB.get(kind, 'into')}"
+
+
 def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     """Everything in his present his mind could wander to, as short plain cues."""
     found: list[Cue] = []
@@ -230,7 +250,7 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
             found.append(Cue("wanting", f"saving for {saving}"))
         media = selfhood.get("reading_watching_listening") or {}
         for item in (media.get("currently") or [])[:2] if isinstance(media, Mapping) else []:
-            text = _text_of(item)
+            text = _media(item)
             if text:
                 found.append(Cue("wanting", _short(text)))
     for item in snapshot.get("feed") or []:
@@ -243,9 +263,16 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     balance = finances.get("balance_pence") if isinstance(finances, Mapping) else None
     if isinstance(balance, int) and balance < 80_000:
         found.append(Cue("money", f"only £{balance / 100:.0f} in the bank"))
-    for goal in (snapshot.get("goals") or [])[:4]:
-        if isinstance(goal, Mapping) and goal.get("status") == "active" and goal.get("title"):
-            found.append(Cue("wanting", str(goal["title"])))
+    goals = {
+        str(goal["title"])
+        for goal in (snapshot.get("goals") or [])[:4]
+        if isinstance(goal, Mapping)
+        and goal.get("status") == "active"
+        and goal.get("title")
+        and not _AN_ID.search(str(goal["title"]))
+    }
+    # Said as something he means to do: bare, "Young Team" read as a team he once led.
+    found.extend(Cue("wanting", f"something he means to do: {title}") for title in sorted(goals))
     for person in snapshot.get("people") or []:
         if (
             isinstance(person, Mapping)
@@ -349,25 +376,30 @@ def stream_context(
     # Who people are to him, for anyone this thought might involve: without it a small model
     # had his boss coming home to his flat.
     involved = " ".join([cue.text if cue else "", *recent, *with_him])
-    who = {
-        str(person["name"]): str(person.get("occupation") or "").lower()
-        for person in snapshot.get("people") or []
-        if isinstance(person, Mapping)
-        and person.get("name")
-        and person.get("occupation")
-        and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
-    }
+    who: dict[str, str] = {}
+    for person in snapshot.get("people") or []:
+        if (
+            isinstance(person, Mapping)
+            and person.get("name")
+            and person.get("occupation")
+            and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
+        ):
+            # With pronouns: Rowan (they) kept becoming "she", Ellis "she" too.
+            pronoun = PRONOUNS.get(KNOWN_PRONOUNS.get(str(person.get("id")), "they"))
+            who[str(person["name"])] = f"{str(person['occupation']).lower()}; {pronoun}"
     # His family, when they come up: "Rowan's mum" became "Mum's packing for work" in a flat
-    # he lives in alone.
+    # he lives in alone, and "Dad won't be back" when Dad is alive and well in Wye.
     selfhood = snapshot.get("selfhood") or {}
     for member in (selfhood.get("family") or []) if isinstance(selfhood, Mapping) else []:
         if not isinstance(member, Mapping) or not member.get("who"):
             continue
         label = str(member["who"]).split(" (")[0]
-        if re.search(rf"\b{re.escape(label)}\b", involved, re.IGNORECASE):
-            who[label] = (
-                f"{member.get('who')}; {str(member.get('about', ''))[:90]}; doesn't live with him"
-            )
+        # "Rowan's mum" is someone else's mother.
+        if re.search(rf"(?<!'s )\b{re.escape(label)}\b", involved, re.IGNORECASE):
+            where = FAMILY_WHERE.get(str(member.get("relation")), "doesn't live with him")
+            who[label] = f"{member.get('who')}; {where}; {str(member.get('about', ''))[:80]}"
+    if re.search(r"\bGulliver\b", involved):
+        who["Gulliver"] = "the Shaws' old family dog; died years ago"
     if who:
         context["who_is_who"] = dict(list(who.items())[:4])
     if not with_him:
@@ -401,6 +433,13 @@ def _words(text: str) -> set[str]:
 
 # His family by name, from his authored background; "Mum" and "Dad" are never a slip.
 FAMILY_NAMES = ("Helen", "Richard", "Tom", "Jess", "Isla", "Gulliver")
+# Where his family are, from his authored background: all alive, none living with him.
+FAMILY_WHERE = {
+    "mother": "alive and well, at home in Wye with Dad",
+    "father": "alive and well, at home in Wye with Mum",
+    "older brother": "lives in London",
+}
+PRONOUNS = {"he": "he/him", "she": "she/her", "they": "they/them"}
 
 
 def known_names(snapshot: Mapping[str, Any]) -> set[str]:
@@ -430,6 +469,131 @@ def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str
             rf"\b{re.escape(name)}\b", allowed
         ):
             return name
+    return None
+
+
+# Something that happened between him and someone: a call, a text, a visit, words said.
+_HAPPENED = {
+    "call": r"called|rang|phoned|calls|rings|(?:'s |a )?(?:call|ring)\b",
+    "text": r"texted|texts|messaged|(?:'s )?(?:text|message)\b|wrote",
+    "visit": r"dropped (?:by|in|round)|popped (?:by|in|round|over)|came (?:by|over|round)|"
+    r"stopped by|turned up|visited|brought",
+    "said": r"said|says|told me|mentioned|asked me",
+}
+# What counts as evidence of each in what he really remembers.
+_EVIDENCE = {
+    "call": r"\b(?:call|called|rang|ring|phone)",
+    "text": r"\b(?:text|texted|message|messaged|wrote)",
+    "visit": r"\b(?:came|visit|dropped|popped|round|here|brought|met|saw|bumped)",
+    "said": r"\b(?:said|says|told|tell|mention|ask|text|repl|call|rang)|[“\"]",
+}
+# Not something that happened: hoped for, wondered about, or not done.
+_NOT_SO = re.compile(
+    r"\b(?:if|whether|should|could|might|maybe|hope|wish|never|not|no|\w+n't)\b", re.IGNORECASE
+)
+
+
+def grounding(snapshot: Mapping[str, Any]) -> list[str]:
+    """What really happened, as far as he knows: memories, texts, friends' and family news."""
+    # Every memory of his, bookkeeping and narrated encounters included.
+    found = [
+        text
+        for text in (
+            _text_of(item)
+            for item in snapshot.get("memories") or []
+            if not isinstance(item, Mapping) or item.get("owner", "pathos") == "pathos"
+        )
+        if text
+    ]
+    for text in snapshot.get("texts") or []:
+        if isinstance(text, Mapping):
+            found.append(f"I texted {text.get('to')}: {text.get('he_wrote')}")
+            if text.get("they_replied"):
+                found.append(f"{text.get('to')} texted back: {text.get('they_replied')}")
+    selfhood = snapshot.get("selfhood") or {}
+    if isinstance(selfhood, Mapping):
+        for item in selfhood.get("whats_going_on_with_his_friends") or []:
+            if isinstance(item, Mapping):
+                found.append(f"{item.get('who')}: {item.get('what')}")
+        for member in selfhood.get("family") or []:
+            if isinstance(member, Mapping):
+                found.extend(
+                    f"{member.get('who')}: {news}" for news in member.get("latest_news") or []
+                )
+    return found
+
+
+def invented_happening(
+    text: str, names: set[str], known: Sequence[str], with_him: Collection[str] = ()
+) -> str | None:
+    """A call, text, visit or remark from someone that nothing he knows of backs up.
+
+    Small models made up "Rowan called about their mum" and "Rowan dropped by", and kept
+    thoughts fed back in turned them into a story. A thought may report what happened only
+    if it's in his memories, his texts, or what he's heard from friends and family. Someone
+    in the room with him can say things; and hoping, wondering if, or noting that someone
+    hasn't is fine.
+    """
+    here = " ".join(with_him)
+    for sentence in re.split(r"(?<=[.!?…])\s+", text):
+        if _NOT_SO.search(sentence):
+            continue
+        for name in sorted(names | {"Mum", "Dad"}):
+            if re.search(rf"\b{re.escape(name)}\b", here):
+                continue
+            for kind, verbs in _HAPPENED.items():
+                if not re.search(
+                    rf"\b{re.escape(name)}\b(?:'s)?\s+(?:\w+\s+)?(?:{verbs})", sentence
+                ):
+                    continue
+                # They did it, in what he remembers: "I texted Rowan" isn't Rowan texting.
+                did_it = re.compile(
+                    rf"\b{re.escape(name)}\b[^.!?]{{0,60}}?(?:{_EVIDENCE[kind]})", re.IGNORECASE
+                )
+                if not any(did_it.search(item) for item in known):
+                    return f"{name} ({kind})"
+    return None
+
+
+# Someone in the room with him: hearing, seeing or noticing him, or near him.
+_WITH_HIM = (
+    r"hear(?:s|d)? me|notic(?:e|es|ed) me|see(?:s)? me|saw me|watching me|"
+    r"next room|other room|in the kitchen|in the shower|on the sofa|beside me|next to me|"
+    r"across the (?:room|table)|in here|is here|'s here|"
+    r"(?:\w+ ){0,2}(?:is|are|lies|lying) (?:open|on the table|on the sofa|by the door|here)"
+)
+# Things only someone in sight could be seen doing, unless he's only wondering.
+_SEEN_DOING = (
+    r"finally asleep|fast asleep|(?:is |'s )?(?:asleep|snoring)|"
+    r"looks? (?!after|like|forward|into|up\b|for\b|out\b)(?:so |really |a bit )?\w+"
+)
+_HEDGED = re.compile(
+    r"\b(?:wonder|probably|must|bet|might|maybe|guess|hope|imagine|if|whether|at theirs|"
+    r"at home|at his|at her|over there)\b",
+    re.IGNORECASE,
+)
+
+
+def placed_with_him(text: str, context: Mapping[str, object], names: set[str]) -> str | None:
+    """A named person put in the room with him when he's alone.
+
+    Told plainly that he's on his own, a small model still wrote "Rowan's finally asleep"
+    and "Hope Rowan doesn't hear me" in his flat. Wondering what someone elsewhere is up to
+    is fine; seeing, hearing or being near them is not.
+    """
+    if not context.get("alone"):
+        return None
+    for sentence in re.split(r"(?<=[.!?…])\s+", text):
+        for name in sorted(names | {"Mum", "Dad"}):
+            if not re.search(rf"(?<!'s )\b{re.escape(name)}\b", sentence):
+                continue
+            after = rf"\b{re.escape(name)}\b(?:'s)?[^.!?]{{0,30}}?"
+            if re.search(after + rf"\b(?:{_WITH_HIM})", sentence, re.IGNORECASE):
+                return name
+            if re.search(after + rf"(?:{_SEEN_DOING})\b", sentence) and not _HEDGED.search(
+                sentence
+            ):
+                return name
     return None
 
 
@@ -862,6 +1026,23 @@ class InnerStream:
         )
         if stray is not None:
             self.last_error = f"brought in {stray} from nowhere, skipped: {text[:80]}"
+            self.rejected = True
+            return None
+        names = known_names(snapshot)
+        with_him = context.get("with_him")
+        invented = invented_happening(
+            text,
+            names,
+            grounding(snapshot),
+            [str(name) for name in with_him] if isinstance(with_him, list) else [],
+        )
+        if invented is not None:
+            self.last_error = f"made up something from {invented}, skipped: {text[:80]}"
+            self.rejected = True
+            return None
+        present = placed_with_him(text, context, names)
+        if present is not None:
+            self.last_error = f"put {present} with him when he's alone, skipped: {text[:80]}"
             self.rejected = True
             return None
         with self._lock:

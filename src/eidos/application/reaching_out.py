@@ -23,7 +23,7 @@ import re
 from datetime import datetime, timedelta
 from hashlib import sha256
 from time import perf_counter
-from typing import Collection, Sequence
+from typing import Callable, Collection, Mapping, Sequence
 from uuid import uuid4
 
 from eidos.application.bookings import remember
@@ -179,9 +179,16 @@ async def reach_out_events(
 
 
 async def reply_events(
-    history: Sequence[DomainEvent], at: datetime, gateway: ModelGateway
+    history: Sequence[DomainEvent],
+    at: datetime,
+    gateway: ModelGateway,
+    whereabouts: Callable[[str], Mapping[str, object]] | None = None,
 ) -> list[DomainEvent]:
-    """Replies that have come in by now, written from the other person's side."""
+    """Replies that have come in by now, written from the other person's side.
+
+    ``whereabouts`` says where someone is and what they're doing, so a reply fits it: Ellis
+    wrote "Morning, just woke up" while at the workshop with Patrick.
+    """
     settled = {
         str(event.payload.get("contact_id"))
         for event in history
@@ -211,12 +218,18 @@ async def reply_events(
             for item in friends_lives_context(history, at, {person_id: name})
             if item["who"] == name
         ][:3]
+        right_now = dict(whereabouts(person_id)) if whereabouts and person_id else {}
+        in_person = bool(right_now.get("with_patrick"))
         reply = await perform(
             gateway,
             "firmament",
             {
                 "time": at.isoformat(),
-                "location": "by text message",
+                "location": (
+                    f"in person, {right_now.get('where_they_are')}"
+                    if in_person
+                    else "by text message"
+                ),
                 "person": name,
                 "scene_mode": True,
                 "scene_speaker": name,
@@ -225,10 +238,15 @@ async def reply_events(
                 "prior_turns": [{"speaker": "Pathos", "text": sent.payload.get("text", "")}],
                 "personal_relationship_context": {
                     "what_is_going_on_in_their_life": their_life,
+                    "right_now": right_now,
                     "instruction": (
-                        f"Reply as {name} would by text: short and natural. What's going on in "
-                        "their life is true; they may mention it, but invent no news, plans or "
-                        "changes beyond it."
+                        f"Reply as {name} would"
+                        + (", in person, since they're with him now" if in_person else " by text")
+                        + ": short and natural, answering only what his text actually said, "
+                        "from where they are and what they're doing right now. What's going on "
+                        "in their life is true; they may mention it. Invent nothing else: no "
+                        "news, plans, visits or promises, and don't offer to come round or "
+                        "bring anything."
                     ),
                 },
             },
@@ -258,7 +276,9 @@ async def reply_events(
                 received,
                 remember(
                     received,
-                    f"{name} texted back: “{reply}”",
+                    f"{name} answered my text in person: “{reply}”"
+                    if in_person
+                    else f"{name} texted back: “{reply}”",
                     at,
                     0.55,
                     origin="lived-reaching-out",

@@ -523,7 +523,14 @@ class Life(LifeConversation):
                 )
             )
         # Friends' replies to his texts arrive in their own time.
-        pending.extend(await reply_events(history + pending, state.simulated_at, self.gateway))
+        pending.extend(
+            await reply_events(
+                history + pending,
+                state.simulated_at,
+                self.gateway,
+                _their_whereabouts(history, state, catalog),
+            )
+        )
         await self._notice_arrivals(history, state, pending)
         # How this quarter hour felt (his thoughts, any reply) moves his feelings now, not on
         # the hour.
@@ -3570,6 +3577,42 @@ def _association_cue(
         else str(source.event.payload.get("category", location_id))
     )
     return salience, cue
+
+
+def _their_whereabouts(
+    history: Sequence[DomainEvent], state: PathosState, catalog: WorldCatalog
+) -> Callable[[str], dict[str, object]]:
+    """Where someone is and what they're doing now, worked out only if it's asked for."""
+    world: list[Any] = []
+
+    def lookup(person_id: str) -> dict[str, object]:
+        if not world:
+            world.append(project_npcs(history, state.simulated_at))
+        person = world[0].people.get(person_id)
+        if person is None:
+            return {}
+        if person.location_id == "home":
+            where = "at their own place"
+        else:
+            try:
+                where = f"at {catalog.location_name(person.location_id)}"
+            except ValueError:
+                where = "out"
+        doing = (
+            person.plan_title
+            if person.plan_status == "active"
+            else None
+            if person.private_activity == "unrecorded"
+            else person.private_activity
+        )
+        found: dict[str, object] = {"where_they_are": where}
+        if doing:
+            found["what_they_are_doing"] = doing
+        if person.location_id == state.location_id and person.location_id != "home":
+            found["with_patrick"] = True
+        return found
+
+    return lookup
 
 
 def _npc_locations(history: Sequence[DomainEvent], now: datetime) -> dict[str, str]:

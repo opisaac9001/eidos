@@ -5,6 +5,7 @@ import json
 import re
 import time
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -515,8 +516,9 @@ COMPACT_PROMPTS = {
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
         "Start differently from the recent_thoughts, and never use any of the avoid_words. "
-        "Fit the time_of_day. Name only people in this moment's details, never someone "
-        "only in recent_thoughts. "
+        "Fit the time_of_day and time_of_year. Name only people in this moment's details, "
+        "never someone only in recent_thoughts. recent_thoughts are only things he thought, "
+        "not things that happened. "
         "Don't address anyone, don't say his name, don't invent things that "
         "happened, and don't repeat a recent thought. "
         'Reply only with JSON: {"text": "..."}\nThe style, for other situations:\n'
@@ -601,6 +603,22 @@ def part_of_day(hour: int) -> str:
     return "the middle of the night"
 
 
+_SEASONS = (
+    *("winter", "winter", "spring", "spring", "spring", "summer"),
+    *("summer", "summer", "autumn", "autumn", "autumn", "winter"),
+)
+
+
+def time_of_year(time: str) -> str | None:
+    """The date in words, with the English season: "Tuesday 25 August, late summer"."""
+    try:
+        at = datetime.fromisoformat(time)
+    except ValueError:
+        return None
+    part = "early" if at.day <= 10 else "mid" if at.day <= 20 else "late"
+    return f"{at:%A} {at.day} {at:%B}, {part} {_SEASONS[at.month - 1]}"
+
+
 def compact_context(capability: str, context: Mapping[str, object]) -> dict[str, object]:
     """The few details a small model needs for a thought or a dream."""
     details: dict[str, object] = {}
@@ -611,6 +629,10 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         # Words, not the clock: given "16:58", a small model wrote "16:58 feels early".
         if time[11:13].isdigit():
             details["time_of_day"] = part_of_day(int(time[11:13]))
+        season = time_of_year(time)
+        if season:
+            # Without it: "Wonder if it's still Christmas" and frost on the window in August.
+            details["time_of_year"] = season
     emotion = context.get("emotion")
     if isinstance(emotion, Mapping) and emotion.get("label"):
         details["feeling"] = emotion["label"]

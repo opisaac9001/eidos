@@ -423,12 +423,12 @@ def test_the_stream_knows_who_people_are_to_him() -> None:
 
     world = snapshot()
     world["people"] = [
-        {"name": "Ellis", "location_id": "cafe", "occupation": "Repair artist"},
-        {"name": "Mara", "location_id": "cafe", "occupation": "Café owner"},
+        {"id": "ellis", "name": "Ellis", "location_id": "cafe", "occupation": "Repair artist"},
+        {"id": "mara", "name": "Mara", "location_id": "cafe", "occupation": "Café owner"},
     ]
     context = stream_context(world, ["Ellis should be home soon."], Cue("here", "The flat"))
-    assert context["who_is_who"] == {"Ellis": "repair artist"}
-    assert compact_context("murmur", context)["who_is_who"] == {"Ellis": "repair artist"}
+    assert context["who_is_who"] == {"Ellis": "repair artist; he/him"}
+    assert compact_context("murmur", context)["who_is_who"] == {"Ellis": "repair artist; he/him"}
 
 
 def test_the_stream_knows_when_he_is_alone_and_where_his_family_is() -> None:
@@ -440,7 +440,7 @@ def test_the_stream_knows_when_he_is_alone_and_where_his_family_is() -> None:
         "family": [{"who": "Mum (Helen Shaw)", "relation": "mother", "about": "Gardens in Wye."}]
     }
     context = stream_context(world, ["Mum's packing for work."], Cue("here", "The flat"))
-    assert "doesn't live with him" in context["who_is_who"]["Mum"]
+    assert "at home in Wye" in context["who_is_who"]["Mum"]
     assert compact_context("murmur", context)["with_him"] == "nobody; he's on his own"
 
 
