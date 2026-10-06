@@ -122,11 +122,12 @@ def gossip_events(
     residents who are together."""
     output: list[DomainEvent] = []
     known = held(history)
-    since = at - timedelta(hours=2)
     started = {claim_id for claim_id, _ in known}
     for event in events_of(history, "friend.life_event", "commitment.missed")[-20:]:
         try:
-            if _at(event) < since:
+            # A friend's news is still worth passing on for a few weeks.
+            window = timedelta(days=21) if event.kind == "friend.life_event" else timedelta(hours=2)
+            if _at(event) < at - window:
                 continue
         except (KeyError, ValueError):
             continue

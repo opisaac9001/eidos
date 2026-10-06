@@ -83,6 +83,7 @@ from eidos.application.gossip import (
     they_remember,
     worth_mentioning,
 )
+from eidos.application.group_chat import GROUP_FROM_LEVEL, group_chat_events
 from eidos.application.holiday import PLACES as HOLIDAY_PLACES
 from eidos.application.holiday import holiday_events
 from eidos.application.home_move import HOUR as HOME_MOVE_HOUR
@@ -1003,6 +1004,7 @@ class Life(LifeConversation):
             await self._phase_selfhood(tick)
             await self._phase_nightly(tick, mind)
             await self._phase_outreach(tick, mind)
+            await self._phase_group_chat(tick)
             self._phase_affect_and_memory(tick)
             await self._phase_voicing(tick, hour_starts)
             state = tick.state
@@ -3644,6 +3646,40 @@ class Life(LifeConversation):
                 self.gateway,
                 pathos_awake=tick.state.awake,
                 context=mind.context,
+            )
+        )
+
+    async def _phase_group_chat(self, tick: _Tick) -> None:
+        """His friends' group chat: they post, and when he's free he reads and may reply."""
+        if self.authored_scenario:
+            return
+        history = tick.history + tick.pending
+        catalog = self._world_catalog(history)
+        members = {
+            person_id: catalog.people[person_id].name.split()[0]
+            for person_id, friendship in friendships(history, tick.current).items()
+            if friendship.level >= GROUP_FROM_LEVEL and person_id in catalog.people
+        }
+        busy = tick.state.location_id == "in_transit" or any(
+            scene.status in {"active", "paused"}
+            and "pathos" in {scene.initiator_id, scene.partner_id}
+            for scene in project_scenes(history).scenes.values()
+        )
+        emotion = project_emotion(history)
+        tick.pending.extend(
+            await group_chat_events(
+                history,
+                tick.current,
+                self.gateway,
+                members=members,
+                free_to_look=tick.state.awake
+                and not busy
+                and not _at_work(self._planning(history), tick.current),
+                whereabouts=_their_whereabouts(history, tick.state, catalog),
+                on_his_mind=[
+                    str(concern.payload.get("text")) for concern in active_concerns(history)[-2:]
+                ],
+                mood=emotion.label,
             )
         )
 

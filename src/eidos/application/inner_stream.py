@@ -60,6 +60,7 @@ CUE_WEIGHTS: dict[str, float] = {
     # concerns); then the things he keeps meaning to do.
     "concern": 2.2,
     "loop": 1.4,
+    "phone": 1.0,
 }
 # Where an idle mind goes when nothing in particular calls it: the senses, his own past
 # (from his authored background), small practical things, or nowhere much.
@@ -295,6 +296,15 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
         ):
             about = f" ({str(person['occupation']).lower()})" if person.get("occupation") else ""
             found.append(Cue("someone", f"{person['name']}{about}, not here"))
+    # The phone buzzing: the latest from the group chat, until he's read it.
+    phone = snapshot.get("phone") or {}
+    if isinstance(phone, Mapping) and phone.get("recent"):
+        latest = phone["recent"][-1]
+        if isinstance(latest, Mapping) and latest.get("from") and latest.get("from") != "Patrick":
+            fresh = 2.5 if phone.get("unread") else 0.6
+            found.append(
+                Cue("phone", f"{latest['from']} in the group chat: {latest.get('text')}", fresh)
+            )
     found.extend(_concern_cues(snapshot))
     found.extend(_loop_cues(snapshot))
     found.extend(Cue("wander", text) for text in WANDERING)
@@ -490,6 +500,7 @@ CUE_SALIENCE = {
     "stirring": 0.1,
     "concern": 0.4,
     "loop": 0.3,
+    "phone": 0.2,
 }
 _WORDS = re.compile(r"[a-z']+")
 
@@ -550,7 +561,7 @@ _HAPPENED = {
 # What counts as evidence of each in what he really remembers.
 _EVIDENCE = {
     "call": r"\b(?:call|called|rang|ring|phone)",
-    "text": r"\b(?:text|texted|message|messaged|wrote)",
+    "text": r"\b(?:text|texted|message|messaged|wrote|chat)",
     "visit": r"\b(?:came|visit|dropped|popped|round|here|brought|met|saw|bumped)",
     "said": r"\b(?:said|says|told|tell|mention|ask|text|repl|call|rang)|[“\"]",
 }
@@ -582,6 +593,10 @@ def grounding(snapshot: Mapping[str, Any]) -> list[str]:
             found.append(f"I texted {text.get('to')}: {text.get('he_wrote')}")
             if text.get("they_replied"):
                 found.append(f"{text.get('to')} texted back: {text.get('they_replied')}")
+    phone = snapshot.get("phone") or {}
+    for line in (phone.get("recent") or []) if isinstance(phone, Mapping) else []:
+        if isinstance(line, Mapping) and line.get("from"):
+            found.append(f"{line.get('from')} messaged the group chat: {line.get('text')}")
     selfhood = snapshot.get("selfhood") or {}
     if isinstance(selfhood, Mapping):
         for item in selfhood.get("whats_going_on_with_his_friends") or []:

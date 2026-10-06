@@ -1641,9 +1641,12 @@ function renderStream() {
   ].filter(Boolean).join("  —  ");
   $("his-concerns").hidden = !mindText;
   if ($("his-concerns").textContent !== mindText) $("his-concerns").textContent = mindText;
+  const chat = ((state.phone || {}).recent || []).slice(-3)
+    .map((item) => `<li><span>Group chat · ${esc(item.from)}:</span> ${esc(item.text)}</li>`)
+    .join("");
   const texts = (state.texts || []).slice(0, 2)
     .map((item) => `<li><span>To ${esc(item.to)}:</span> “${esc(item.he_wrote)}”${item.they_replied ? `<br /><span>${esc(item.to)}:</span> “${esc(item.they_replied)}”` : ""}</li>`)
-    .join("");
+    .join("") + chat;
   $("his-texts").hidden = !texts;
   if ($("his-texts").innerHTML !== texts) $("his-texts").innerHTML = texts;
   const label = stream.enabled ? STREAM_STATES[stream.state] || "" : "";

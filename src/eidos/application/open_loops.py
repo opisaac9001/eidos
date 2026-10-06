@@ -46,7 +46,7 @@ _WORD = re.compile(r"[a-z']+")
 _PLAIN = frozenset(
     "that this them they their there then with from have just still some about later "
     "today tonight tomorrow really maybe probably properly finally again soon first "
-    "before after into over back down make sure get got going something".split()
+    "before after into over back down make sure get got going something yet".split()
 )
 _CONTACTING = re.compile(r"\b(text|ring|call|phone|message|reply|write)\b", re.IGNORECASE)
 _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
@@ -130,6 +130,8 @@ def intended(thought: str) -> str | None:
         match = _MEANING.search(sentence)
         if match is None:
             continue
+        if re.search(r"(?:n't|\bnot|\bno|\bnever)\s+(?:\w+\s+)?$", sentence[: match.start()], re.I):
+            continue  # "don't have to", "no need to": nothing to do
         rest = sentence[match.end() :].strip(" .!?…,;:-")
         rest = re.split(r"\b(?:but|though|because|before|if|so)\b|[,;:—-]", rest)[0].strip()
         if len(_content(rest)) >= 2 and len(rest) <= 90:

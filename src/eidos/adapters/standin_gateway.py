@@ -849,10 +849,16 @@ class StandInGateway(ModelGateway):
                 finish_reason="stop",
             )
         elif role == "pathos_text":
+            group = context.get("task") == "group chat"
+            pick = int(hashlib.sha256(str(context.get("time", "")).encode()).hexdigest()[:4], 16)
             return ModelResponse(
                 content=json.dumps(
                     {
-                        "text": f"Hey {context.get('to', 'you')}, been thinking about you. How are things?"
+                        "text": ("Ha, go on then.", "Same, honestly.", "Count me in, maybe.")[
+                            pick % 3
+                        ]
+                        if group
+                        else f"Hey {context.get('to', 'you')}, been thinking about you. How are things?"
                     }
                 ),
                 resolved_model="authored-stand-in-v1",

@@ -437,6 +437,7 @@ ROLE_FIELDS = {
         "to",
         "who_they_are",
         "why_hes_getting_in_touch",
+        "recent_messages",
         "what_he_knows_of_their_life",
         "mood",
         "permission",

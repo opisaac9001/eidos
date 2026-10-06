@@ -14,6 +14,7 @@ from eidos.application.city_map import city_map
 from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.followups import project_followups
+from eidos.application.group_chat import phone_view
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.application.latent_town import TOWN_POPULATION
 from eidos.application.life_context import mood_name, self_concept_context, vars_for
@@ -675,6 +676,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "texts": texts_view(history),
         "open_loops": loops_view(history, state.simulated_at),
         "body_now": body_now(history, state.simulated_at),
+        "phone": phone_view(history),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,
