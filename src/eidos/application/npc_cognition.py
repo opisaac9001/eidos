@@ -213,6 +213,11 @@ def npc_need_plan_events(
             for candidate, candidate_level in eligible.items()
         }
         need = min(eligible, key=lambda candidate: (scores[candidate], candidate))
+        if person.energy <= 0.25:
+            # Critical energy is what displaced the last plan, so it decides the next one.
+            # Scored against connection with a familiar face, connection won, the resident
+            # was never sent home to rest, and every need sat at zero for days.
+            need = "energy"
         level = eligible[need]
         action, location_id, title, scheduled_for = _need_plan(
             actor_id, need, now, person.usual_location_id
@@ -404,8 +409,9 @@ def _need_plan(
     actor_id: str, need: str, now: datetime, usual_location_id: str = "park"
 ) -> tuple[str, str, str, datetime]:
     if need == "energy":
-        midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        return "rest", "home", "Protect an unhurried stretch of rest", midnight
+        # Worn out, people go home to rest now, not at midnight tomorrow.
+        soon = (now + timedelta(minutes=30)).replace(second=0, microsecond=0)
+        return "rest", "home", "Go home and rest", soon
     choices: dict[tuple[str, str], tuple[tuple[str, str, str, int], ...]] = {
         ("mara", "connection"): (
             ("host", "cafe", "Make room for conversation at the café", 12),

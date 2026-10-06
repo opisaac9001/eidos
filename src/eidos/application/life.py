@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -98,7 +99,7 @@ from eidos.application.inner_life import (
     record_dream_events,
     waking_dream_events,
 )
-from eidos.application.inner_stream import felt_tone
+from eidos.application.inner_stream import CALLS_FROM_LEVEL, contact_reasons, felt_tone
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.life_context import latest_weather
 from eidos.application.life_context import mood_name as mood_name
@@ -148,7 +149,7 @@ from eidos.application.phone_calls import phone_call_events
 from eidos.application.place_discovery import known_place_ids, place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
-from eidos.application.reaching_out import reach_out_events, reply_events
+from eidos.application.reaching_out import reach_out_events, reply_events, why_not
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
@@ -637,6 +638,15 @@ class Life(LifeConversation):
         )
         if not thoughts:
             return "nothing"
+        working = _at_work(self._planning(history), at)
+        if kind == "you" and (busy or working):
+            return "later: busy"  # he'd message once he's free, not mid-shift
+        if kind == "contact":
+            # Why he wants to get in touch, not every passing mention of their name.
+            thoughts = [text for text in thoughts if contact_reasons(text)] or thoughts
+            not_now = why_not(history, at, str(impulse.get("target", "")))
+            if not_now in {"too late or too early to text", "just been in touch with someone"}:
+                return f"later: {not_now}"
         impulse_id = str(uuid4())
         felt = DomainEvent(
             "impulse.felt",
@@ -680,6 +690,15 @@ class Life(LifeConversation):
                     for person_id, place in _npc_locations(history, at).items()
                     if place == state.location_id and place != "home"
                 }
+                bond = friendships(history, at).get(person.person_id)
+                # A worry about someone close is a phone call, if he's free to make one.
+                calling = (
+                    bond is not None
+                    and bond.level >= CALLS_FROM_LEVEL
+                    and not working
+                    and not busy
+                    and re.search(r"\b(call|ring|phone)\b", " ".join(thoughts), re.I) is not None
+                )
                 pending.extend(
                     await reach_out_events(
                         history + pending,
@@ -692,8 +711,19 @@ class Life(LifeConversation):
                         mood=emotion.label,
                         with_him=with_him,
                         cause=felt,
+                        channel="call" if calling else "text",
                     )
                 )
+                if calling:
+                    # They pick up and answer there and then.
+                    pending.extend(
+                        await reply_events(
+                            history + pending,
+                            at,
+                            self.gateway,
+                            _their_whereabouts(history, state, catalog),
+                        )
+                    )
         elif kind == "you":
             pending.extend(
                 await outreach_events(
@@ -705,6 +735,10 @@ class Life(LifeConversation):
                         "time": at.isoformat(),
                         "memories": thoughts,
                         "emotion": {"label": emotion.label, "intensity": emotion.intensity},
+                        "people_he_knows": {
+                            person.name: (person.occupation or person.description or "")[:80]
+                            for person in self._world_catalog(history).people.values()
+                        },
                     },
                 )
             )
@@ -3040,15 +3074,33 @@ class Life(LifeConversation):
         context: Mapping[str, object],
     ) -> None:
         """He notices someone where he is: the moment, and his memory of it."""
-        # Shown so a new moment isn't told in the same words as the last few.
+        # Shown whole, the last few moments were copied: a blueprint and a glance at the clock
+        # turned up in every encounter. Only the details to leave alone are named now.
         recent_encounters = [
             str(event.payload.get("text", ""))
             for event in events_of([*history, *pending], "npc.encountered")[-5:]
         ]
+        npc = project_npcs([*history, *pending], datetime.fromisoformat(at)).people.get(
+            person.person_id
+        )
+        plan_status = getattr(npc, "plan_status", None)
+        activity = getattr(npc, "private_activity", "unrecorded")
+        doing = (
+            getattr(npc, "plan_title", None)
+            if plan_status == "active"
+            else activity
+            if activity != "unrecorded"
+            else None
+        )
         text = await perform(
             self.gateway,
             "firmament",
-            {**context, "person": person.name, "recent_encounters": recent_encounters},
+            {
+                **context,
+                "person": person.name,
+                "avoid_details": _encounter_details(recent_encounters, person.name),
+                **({"what_they_are_doing": doing} if doing else {}),
+            },
             at,
             pending,
         )
@@ -3355,6 +3407,18 @@ class Life(LifeConversation):
                 role_context["memories"] = [*residue, *[m for m in recalled if m not in residue]][
                     :5
                 ]
+        if role == "reflection":
+            # Looking back on today, not on whatever recall surfaced: two evenings running he
+            # reflected on "small moments taking up space" and the same cooling mug, while the
+            # day held his first texts, Beth leaving and Rowan's mum.
+            day = _day_memories(history + pending, current, limit=6)
+            if day:
+                role_context["memories"] = [str(event.payload["text"]) for event in day]
+            role_context["recent_reflections"] = [
+                str(event.payload.get("text", ""))[:240]
+                for event in (history + pending)[-6000:]
+                if event.kind == "reflection.recorded"
+            ][-3:]
         if role == "chronicler":
             # Going over the day means the things that mattered in it, in order; what
             # recall happens to surface at bedtime missed nearly all of it.
@@ -3634,6 +3698,21 @@ def _association_cue(
         else str(source.event.payload.get("category", location_id))
     )
     return salience, cue
+
+
+def _at_work(planning: Any, at: datetime) -> bool:
+    """Whether a rota shift is under way now."""
+    for item in planning.calendar.values():
+        if not is_rota_shift(item.schedule_id) or item.status not in {"scheduled", "active"}:
+            continue
+        try:
+            starts = datetime.fromisoformat(item.starts_at)
+            ends = datetime.fromisoformat(item.ends_at) if item.ends_at else starts
+        except ValueError:
+            continue
+        if starts <= at < ends:
+            return True
+    return False
 
 
 def _their_whereabouts(
@@ -3975,6 +4054,27 @@ def _day_memories(
         )
     kept = sorted(found, key=lambda item: (item[0], item[1]), reverse=True)[:limit]
     return [event for _, _, event in sorted(kept, key=lambda item: item[1])]
+
+
+_PLAIN_WORDS = frozenset(
+    "about after again along always another around asking asks before being between "
+    "could doesn every first from going have he'd here into just know later little "
+    "looks makes maybe might more much never other over pathos quick quickly quietly "
+    "really said says should since some something still that their them then there "
+    "these they this those through today what when where which while with without "
+    "would your".split()
+)
+
+
+def _encounter_details(recent: Sequence[str], name: str) -> list[str]:
+    """The objects and gestures recent encounters were made of, to leave alone next time."""
+    names = {part.casefold() for part in name.split()}
+    seen: dict[str, int] = {}
+    for text in recent:
+        for word in re.findall(r"[a-z]+", text.casefold()):
+            if len(word) >= 5 and word not in _PLAIN_WORDS and word not in names:
+                seen[word] = seen.get(word, 0) + 1
+    return sorted(seen, key=lambda word: -seen[word])[:12]
 
 
 def _encounter_importance(history: Sequence[DomainEvent], person_id: str, at: str) -> float:

@@ -508,6 +508,11 @@ def grounding(snapshot: Mapping[str, Any]) -> list[str]:
     ]
     for text in snapshot.get("texts") or []:
         if isinstance(text, Mapping):
+            if text.get("channel") == "call":
+                found.append(f"I rang {text.get('to')}: {text.get('he_wrote')}")
+                if text.get("they_replied"):
+                    found.append(f"{text.get('to')} said on the phone: {text.get('they_replied')}")
+                continue
             found.append(f"I texted {text.get('to')}: {text.get('he_wrote')}")
             if text.get("they_replied"):
                 found.append(f"{text.get('to')} texted back: {text.get('they_replied')}")
@@ -652,14 +657,62 @@ def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
     """
     names = {name.casefold() for name in people}
     counts: dict[str, int] = {}
-    for text in list(recent)[-4:]:
-        for word in {w.removesuffix("'s") for w in _WORDS.findall(text.casefold())}:
+    topics: dict[str, int] = {}
+    for text in list(recent)[-5:]:
+        words = {w.removesuffix("'s") for w in _WORDS.findall(text.casefold())}
+        for word in words:
             stem = word
             if len(stem) >= 3 and stem not in _COMMON and stem not in names:
                 counts[stem] = counts.get(stem, 0) + 1
-    return sorted((word for word, count in counts.items() if count >= 2), key=lambda w: -counts[w])[
-        :6
-    ]
+        for topic, family in _TOPICS.items():
+            if words & family:
+                topics[topic] = topics.get(topic, 0) + 1
+    tired = sorted((word for word, count in counts.items() if count >= 2), key=lambda w: -counts[w])
+    # The same thing in other words is the same rut: an hour of Ellis's hammer, then his
+    # drill, then the noise, never repeated a word twice.
+    for topic, count in sorted(topics.items(), key=lambda item: -item[1]):
+        if count >= 2:
+            tired = [*_TOPIC_WORDS[topic], *(word for word in tired if word not in _TOPICS[topic])]
+    return list(dict.fromkeys(tired))[:6]
+
+
+# Ruts a mind falls into in different words.
+_TOPIC_WORDS = {
+    "noise": ("noise", "hammer", "drill", "banging", "racket"),
+    "quiet": ("quiet", "silence", "still", "hush"),
+    "cold": ("cold", "chilly", "frost", "freezing"),
+    "brew": ("tea", "coffee", "kettle", "mug", "brew"),
+    "rain": ("rain", "drizzle", "wet", "puddles"),
+    "tired": ("tired", "knackered", "exhausted", "sleepy"),
+}
+_TOPICS = {
+    "noise": frozenset(
+        {
+            "noise",
+            "noisy",
+            "hammer",
+            "hammering",
+            "drill",
+            "drilling",
+            "banging",
+            "bang",
+            "racket",
+            "clatter",
+            "clanging",
+            "whirr",
+            "whirring",
+            "sander",
+            "saw",
+            "buzzing",
+            "din",
+        }
+    ),
+    "quiet": frozenset({"quiet", "quieter", "silence", "silent", "still", "stillness", "hush"}),
+    "cold": frozenset({"cold", "colder", "chilly", "chill", "frost", "freezing", "nippy"}),
+    "brew": frozenset({"tea", "coffee", "kettle", "mug", "brew", "cuppa"}),
+    "rain": frozenset({"rain", "raining", "rainy", "drizzle", "wet", "puddles", "damp"}),
+    "tired": frozenset({"tired", "knackered", "exhausted", "sleepy", "shattered", "drained"}),
+}
 
 
 def near_repeat(text: str, earlier: Sequence[str]) -> bool:
@@ -724,10 +777,20 @@ _DESIRE = re.compile(
     re.IGNORECASE,
 )
 _WORRY = re.compile(
-    r"\b(sick|ill|unwell|worried|worry|gutted|miss|missing|quiet lately|haven't heard|"
-    r"sad|struggling|alright|okay|ok)\b",
+    r"\b(sick|ill|unwell|worried|worry|gutted|quiet lately|sad|struggling|hospital|"
+    r"poorly|is (?:he|she|they) alright|(?:are|is) \w+ alright|sounds? (?:awful|terrible|rough))\b",
     re.IGNORECASE,
 )
+# Wanting to know how someone is, or missing them.
+_CARE = re.compile(
+    r"\b(how (?:\w+ )?(?:is|are|'s) (?:\w+ )?(?:doing|getting on|holding up)|wonder how|"
+    r"thinking (?:of|about) (?:him|her|them)|haven't (?:seen|heard)|miss(?:ing)? (?:him|her|them)|"
+    r"been (?:a while|ages)|ages since|should see|congratulat\w*|good luck)\b",
+    re.IGNORECASE,
+)
+# The bond at which he'd have someone's number and text them; and ring them.
+TEXTS_FROM_LEVEL = 4
+CALLS_FROM_LEVEL = 7
 _CONTACT = re.compile(
     r"\b(text|ring|call|message|check on|check in|catch up|see how|ask (?:him|her|them)|"
     r"drop (?:him|her|them))\b",
@@ -790,12 +853,33 @@ class Impulse:
     thoughts: tuple[str, ...]
 
 
+def contact_reasons(thought: str) -> float:
+    """How much reason this thought gives to get in touch: meaning to, worry, missing them."""
+    return (
+        (0.7 if _CONTACT.search(thought) else 0.0)
+        + (0.8 if _WORRY.search(thought) else 0.0)
+        + (0.5 if _CARE.search(thought) else 0.0)
+    )
+
+
+def bond_levels(snapshot: Mapping[str, Any]) -> dict[str, int]:
+    """How close he is to each of his people, by name; empty when the snapshot doesn't say."""
+    selfhood = snapshot.get("selfhood") or {}
+    people = selfhood.get("his_people") if isinstance(selfhood, Mapping) else None
+    return {
+        str(item["person"]): int(item.get("level") or 0)
+        for item in people or []
+        if isinstance(item, Mapping) and item.get("person")
+    }
+
+
 def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, str, str, float]]:
     """(key, kind, target, target_name, weight) for each thing this thought reaches towards."""
     found: list[tuple[str, str, str, str, float]] = []
     desire = 0.5 if _DESIRE.search(thought) else 0.0
     pathos = snapshot.get("pathos") or {}
     here = pathos.get("location_id")
+    levels = bond_levels(snapshot)
     for person in snapshot.get("people") or []:
         if not isinstance(person, Mapping) or not person.get("name") or not person.get("id"):
             continue
@@ -805,9 +889,12 @@ def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, 
             continue
         if here and person.get("location_id") == here:
             continue  # he's with them; no need to reach out
-        weight = 1.0 + desire
-        weight += 0.5 if _CONTACT.search(thought) else 0.0
-        weight += 0.3 if _WORRY.search(thought) else 0.0
+        if levels and levels.get(name, 0) < TEXTS_FROM_LEVEL:
+            continue  # someone he knows to say hello to, not someone he'd text
+        # A name in passing barely pulls; a reason to get in touch does. Before, every
+        # mention counted, and the day's texts were gone by half past eight on nothing.
+        reasons = contact_reasons(thought)
+        weight = 0.3 + (desire + reasons if reasons else 0.0)
         found.append((f"contact:{person['id']}", "contact", str(person["id"]), name, weight))
     budget = snapshot.get("time_budget") or {}
     plan = str(budget.get("next_plan") or "") if isinstance(budget, Mapping) else ""
@@ -835,6 +922,8 @@ class ImpulseTracker:
         self._pull: dict[str, tuple[float, float, Impulse]] = {}
         self._settled: dict[str, float] = {}
         self._ripe: list[Impulse] = []
+        self._later: list[tuple[float, Impulse]] = []
+        self._deferrals: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def notice(self, thought: str, snapshot: Mapping[str, Any]) -> None:
@@ -862,9 +951,21 @@ class ImpulseTracker:
                     self._pull[key] = (value, now, impulse)
 
     def take_ripe(self) -> list[Impulse]:
+        now = self.clock()
         with self._lock:
-            ripe, self._ripe = self._ripe, []
+            due = [impulse for when, impulse in self._later if when <= now]
+            self._later = [(when, impulse) for when, impulse in self._later if when > now]
+            ripe, self._ripe = [*self._ripe, *due], []
             return ripe
+
+    def defer(self, impulse: Impulse, seconds: float) -> None:
+        """Not now, but it hasn't gone away: weigh it again later (once he's free, or it's
+        a decent hour to text). Each thing is put off at most a few times."""
+        with self._lock:
+            if impulse.key in self._deferrals and self._deferrals[impulse.key] >= 3:
+                return
+            self._deferrals[impulse.key] = self._deferrals.get(impulse.key, 0) + 1
+            self._later.append((self.clock() + seconds, impulse))
 
     def view(self) -> list[dict[str, object]]:
         now = self.clock()
@@ -919,6 +1020,7 @@ class InnerStream:
         self.rejections = 0
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
+        self._turned_away: deque[tuple[float, str]] = deque(maxlen=4)
         self.impulses = ImpulseTracker(self.wall_clock)
 
     # The thread -----------------------------------------------------------------------
@@ -981,6 +1083,11 @@ class InnerStream:
         self.state = "resting"
         return gap
 
+    def _turn_away(self, why: str, text: str) -> None:
+        self.last_error = why
+        self.rejected = True
+        self._turned_away.append((self.wall_clock(), text))
+
     async def think(self, snapshot: Mapping[str, Any]) -> StreamThought | None:
         now = self.wall_clock()
         thread = [
@@ -1015,7 +1122,14 @@ class InnerStream:
             context["location"] = "in bed at home"
             context["half_awake"] = True
             context.pop("ongoing_activities", None)
-        tired = worn_out(recent_texts, known_names(snapshot))
+        # What it just said that was turned away: told, a small model tries something else
+        # instead of the same thought again (40% of the Pi's work was being thrown away).
+        not_again = [
+            said for wall_at, said in self._turned_away if now - wall_at <= THREAD_MINUTES * 60
+        ]
+        if not_again:
+            context["not_again"] = not_again[-3:]
+        tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired
         text = await perform(self.gateway, "murmur", context, at, pending)
@@ -1032,16 +1146,14 @@ class InnerStream:
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
         if near_repeat(text, recent_texts[-4:]):
-            self.last_error = f"repeated itself, skipped: {text[:80]}"
-            self.rejected = True
+            self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
             return None
         # Where his mind was pointed in the last several thoughts is still on it.
         stray = stray_name(
             text, {**context, "lately_on_his_mind": list(self._tried)}, known_names(snapshot)
         )
         if stray is not None:
-            self.last_error = f"brought in {stray} from nowhere, skipped: {text[:80]}"
-            self.rejected = True
+            self._turn_away(f"brought in {stray} from nowhere, skipped: {text[:80]}", text)
             return None
         names = known_names(snapshot)
         with_him = context.get("with_him")
@@ -1052,13 +1164,11 @@ class InnerStream:
             [str(name) for name in with_him] if isinstance(with_him, list) else [],
         )
         if invented is not None:
-            self.last_error = f"made up something from {invented}, skipped: {text[:80]}"
-            self.rejected = True
+            self._turn_away(f"made up something from {invented}, skipped: {text[:80]}", text)
             return None
         present = placed_with_him(text, context, names)
         if present is not None:
-            self.last_error = f"put {present} with him when he's alone, skipped: {text[:80]}"
-            self.rejected = True
+            self._turn_away(f"put {present} with him when he's alone, skipped: {text[:80]}", text)
             return None
         with self._lock:
             kept = self.store.add(

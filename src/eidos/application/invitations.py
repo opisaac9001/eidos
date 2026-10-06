@@ -196,7 +196,8 @@ def _feasible_request(
             responder_id=person_id,
             action="talk",
             target_id=person_id,
-            title=f"Spend time with {person_id.replace('-', ' ').title()}",
+            # By name: an id read "Spend time with Townsfolk 8103".
+            title=f"Spend time with {_name_of(catalog, person_id)}",
             due_at=end.isoformat(),
             earliest_start=start.isoformat(),
             location_id=location_id,
@@ -215,6 +216,11 @@ def _feasible_request(
         ).accepted:
             return request
     return None
+
+
+def _name_of(catalog: WorldCatalog, person_id: str) -> str:
+    person = catalog.people.get(person_id)
+    return person.name if person is not None else person_id.replace("-", " ").title()
 
 
 def _sample(key: str) -> float:

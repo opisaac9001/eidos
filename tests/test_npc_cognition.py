@@ -319,3 +319,30 @@ class NPCCognitionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_a_worn_out_familiar_resident_goes_home_to_rest_now() -> None:
+    """At zero energy, connection with a familiar face outscored rest; every need sat at 0."""
+    from datetime import datetime
+
+    exhausted = DomainEvent(
+        "npc.needs_changed",
+        "pathos",
+        {
+            "actor_id": "rowan",
+            "energy": 0.0,
+            "connection": 0.0,
+            "purpose": 0.0,
+            "owner": "rowan",
+            "visibility": "private",
+        },
+    )
+    events = npc_need_plan_events(
+        [exhausted],
+        "2026-08-25T10:00:00+00:00",
+        {"rowan": Relationship("rowan", familiarity=1.0)},
+    )
+    plan = next(event for event in events if event.kind == "npc.plan_created")
+    assert (plan.payload["motivation_need"], plan.payload["location_id"]) == ("energy", "home")
+    soon = datetime.fromisoformat(plan.payload["scheduled_for"])
+    assert soon <= datetime.fromisoformat("2026-08-25T10:30:00+00:00")

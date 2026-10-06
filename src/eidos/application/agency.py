@@ -502,6 +502,9 @@ async def autonomous_activity_events(
         )
     if chosen_source_context is not None:
         context["chosen_source_context"] = chosen_source_context
+    if cause.kind == "thought.recorded" and isinstance(cause.payload.get("text"), str):
+        # The passing thought that set this off: what a vague drive becomes concrete from.
+        context["prompted_by_thought"] = cause.payload["text"]
     for motivational_key in (
         "choice_field",
         "available_opportunities",

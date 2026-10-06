@@ -88,6 +88,8 @@ def financial_consequence_events(
         output.append(event)
         current = current.apply(event)
         processed.add(source_id)
+        if category == "work_income" and at.weekday() == 4:
+            output.append(_payday_memory(event, current, at))
 
     rota_world = at.hour == 17 and any(
         is_rota_shift(event.payload.get("schedule_id"))
@@ -270,6 +272,36 @@ def _transaction(
         },
         causation_id=source.event_id,
         correlation_id=source.correlation_id or f"money:{source_id}",
+    )
+
+
+def _payday_memory(wage: DomainEvent, state: FinancialState, at: datetime) -> DomainEvent:
+    """Friday's pay is the week's pay, and a week's pay is something he notices."""
+    from eidos.application.bookings import remember
+
+    week = at.isocalendar()[:2]
+    earned = sum(
+        item.amount_pence
+        for item in state.transactions.values()
+        if item.category == "work_income"
+        and datetime.fromisoformat(item.simulated_at).isocalendar()[:2] == week
+    )
+    balance = state.balance_pence
+    feeling = (
+        "Bit tight, honestly."
+        if balance < 50_000
+        else "Rent's covered."
+        if balance < 150_000
+        else "Not bad, for once."
+    )
+    return remember(
+        wage,
+        f"Payday. £{earned / 100:.0f} in for the week; £{balance / 100:.0f} in the bank. "
+        + feeling,
+        at,
+        0.45,
+        origin="lived-work",
+        category="experience",
     )
 
 

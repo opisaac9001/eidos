@@ -38,7 +38,10 @@ REPLIED = "contact.reply_received"
 UNANSWERED = "contact.went_unanswered"
 TEXT_FROM_HOUR, TEXT_UNTIL_HOUR = 8, 22
 SAME_PERSON_GAP = timedelta(hours=20)
+# Spread through the day: three texts in twenty-five minutes at 08:00 used the day up.
+BETWEEN_ANY = timedelta(minutes=75)
 PER_DAY = 3
+CALL_ANSWERED_CHANCE = 0.75
 NO_REPLY_CHANCE = 0.12
 GIVE_UP_AFTER = timedelta(hours=8)
 _SCHEMA = {
@@ -81,6 +84,8 @@ def why_not(
             continue
         if event.payload.get("person_id") == person_id and at - when < SAME_PERSON_GAP:
             return "already texted them today"
+        if at - when < BETWEEN_ANY:
+            return "just been in touch with someone"
         if when.date() == at.date():
             today += 1
         if at - when > timedelta(days=1):
@@ -102,16 +107,49 @@ async def reach_out_events(
     mood: str,
     with_him: Collection[str] = (),
     cause: DomainEvent | None = None,
+    channel: str = "text",
 ) -> list[DomainEvent]:
-    """He texts someone he's been thinking about; empty if now isn't the moment."""
+    """He texts (or rings) someone he's been thinking about; empty if now isn't the moment.
+
+    ``on_his_mind`` is why: the thoughts that made him want to get in touch.
+    """
     if why_not(history, at, person_id, with_him) is not None:
         return []
+    calling = channel == "call"
+    contact_id = str(uuid4())
+    if calling and _roll("answers", contact_id) >= CALL_ANSWERED_CHANCE:
+        rang = DomainEvent(
+            REACHED,
+            "pathos",
+            {
+                "contact_id": contact_id,
+                "person_id": person_id,
+                "person_name": person_name,
+                "channel": "call",
+                "text": "",
+                "reply_due_at": "",
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=cause.event_id if cause is not None else None,
+            correlation_id=contact_id,
+        )
+        return [
+            rang,
+            remember(
+                rang,
+                f"Rang {person_name}. No answer.",
+                at,
+                0.4,
+                origin="lived-reaching-out",
+                person_id=person_id,
+            ),
+        ]
     context = {
-        "task": "text",
+        "task": "call" if calling else "text",
         "time": at.isoformat(),
         "to": person_name,
         "who_they_are": who_they_are,
-        "on_his_mind": [str(thought) for thought in on_his_mind][-3:],
+        "why_hes_getting_in_touch": [str(thought) for thought in on_his_mind][-3:],
         "what_he_knows_of_their_life": [
             item["what"]
             for item in friends_lives_context(history, at, {person_id: person_name})
@@ -119,11 +157,16 @@ async def reach_out_events(
         ][:3],
         "mood": mood,
         "permission": (
-            f"Patrick has been thinking about {person_name} and decides to text them. Write "
-            "the text he sends: one to three short lines, casual and British, the way he'd "
-            "really text a friend. Ground it in what's on his mind; don't invent news, plans "
-            "or events. No sign-off, no emoji unless it's natural. Return only the text."
-        ),
+            f"Patrick rings {person_name} and they pick up. Write what he says first: one or "
+            "two short spoken lines, casual and British, about why he's getting in touch."
+            if calling
+            else f"Patrick has been thinking about {person_name} and decides to text them. "
+            "Write the text he sends: one to three short lines, casual and British, the way "
+            "he'd really text a friend."
+        )
+        + " It's about why he's getting in touch, not what's around him; they aren't with "
+        "him. Don't invent news, plans or events. No sign-off and no emoji. Return only the "
+        "words.",
     }
     request = ModelRequest(
         capability="pathos_text",
@@ -146,9 +189,11 @@ async def reach_out_events(
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
         return [_trace("failed", at, started, None, gateway, code)]
-    contact_id = str(uuid4())
-    replies = _roll("reply", contact_id) >= NO_REPLY_CHANCE
-    delay = timedelta(minutes=10 + int(_roll("delay", contact_id) * 140))
+    replies = calling or _roll("reply", contact_id) >= NO_REPLY_CHANCE
+    # On the phone they answer straight away.
+    delay = (
+        timedelta(0) if calling else timedelta(minutes=10 + int(_roll("delay", contact_id) * 140))
+    )
     sent = DomainEvent(
         REACHED,
         "pathos",
@@ -156,7 +201,7 @@ async def reach_out_events(
             "contact_id": contact_id,
             "person_id": person_id,
             "person_name": person_name,
-            "channel": "text",
+            "channel": channel,
             "text": text,
             "reply_due_at": (at + delay).isoformat() if replies else "",
             "simulated_at": at.isoformat(),
@@ -169,7 +214,7 @@ async def reach_out_events(
         sent,
         remember(
             sent,
-            f"I texted {person_name}: “{text}”",
+            f"I rang {person_name}: “{text}”" if calling else f"I texted {person_name}: “{text}”",
             at,
             0.5,
             origin="lived-reaching-out",
@@ -219,14 +264,17 @@ async def reply_events(
             if item["who"] == name
         ][:3]
         right_now = dict(whereabouts(person_id)) if whereabouts and person_id else {}
-        in_person = bool(right_now.get("with_patrick"))
+        on_the_phone = sent.payload.get("channel") == "call"
+        in_person = bool(right_now.get("with_patrick")) and not on_the_phone
         reply = await perform(
             gateway,
             "firmament",
             {
                 "time": at.isoformat(),
                 "location": (
-                    f"in person, {right_now.get('where_they_are')}"
+                    "on the phone"
+                    if on_the_phone
+                    else f"in person, {right_now.get('where_they_are')}"
                     if in_person
                     else "by text message"
                 ),
@@ -241,8 +289,14 @@ async def reply_events(
                     "right_now": right_now,
                     "instruction": (
                         f"Reply as {name} would"
-                        + (", in person, since they're with him now" if in_person else " by text")
-                        + ": short and natural, answering only what his text actually said, "
+                        + (
+                            ", on the phone, having just picked up"
+                            if on_the_phone
+                            else ", in person, since they're with him now"
+                            if in_person
+                            else " by text"
+                        )
+                        + ": short and natural, answering only what he actually said, "
                         "from where they are and what they're doing right now. What's going on "
                         "in their life is true; they may mention it. Invent nothing else: no "
                         "news, plans, visits or promises, and don't offer to come round or "
@@ -276,7 +330,9 @@ async def reply_events(
                 received,
                 remember(
                     received,
-                    f"{name} answered my text in person: “{reply}”"
+                    f"{name} on the phone: “{reply}”"
+                    if on_the_phone
+                    else f"{name} answered my text in person: “{reply}”"
                     if in_person
                     else f"{name} texted back: “{reply}”",
                     at,
@@ -336,6 +392,7 @@ def texts_view(history: Sequence[DomainEvent], limit: int = 10) -> list[dict[str
             {
                 "to": sent.payload.get("person_name"),
                 "at": sent.payload.get("simulated_at"),
+                "channel": sent.payload.get("channel", "text"),
                 "he_wrote": sent.payload.get("text"),
                 "they_replied": reply.payload.get("text") if reply else None,
             }

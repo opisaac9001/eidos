@@ -40,7 +40,8 @@ class MonthSoakTests(unittest.TestCase):
         # (melancholy, frustration, unease...). Which low states occur varies by month.
         self.assertTrue({"quiet", "contentment"} <= emotion_labels, emotion_labels)
         self.assertTrue(
-            emotion_labels & {"melancholy", "frustration", "unease", "sadness", "anxiety"},
+            emotion_labels
+            & {"melancholy", "a bit flat", "frustration", "unease", "sadness", "anxiety"},
             emotion_labels,
         )
         self.assertLess(min(float(event.payload["valence"]) for event in emotion_samples), -0.05)

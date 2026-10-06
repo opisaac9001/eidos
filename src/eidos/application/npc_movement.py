@@ -93,7 +93,11 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
         )
         if last_needs is None or elapsed >= 0.25:
             # Baseline rates are per elapsed hour, not per invocation.
-            energy_rate = 0.035 if person.location_id == "home" else -0.025
+            # At home overnight they sleep, and a night's sleep restores a day's energy.
+            asleep_hours = now.hour >= 23 or now.hour < 7
+            energy_rate = (
+                (0.09 if asleep_hours else 0.035) if person.location_id == "home" else -0.025
+            )
             emit(
                 "npc.needs_changed",
                 {

@@ -572,6 +572,21 @@ def friends_lives_context(
     """What's going on with his friends, as he'd tell it."""
     lately = at - timedelta(days=120)
     news: list[dict[str, str]] = []
+    # What they've told him themselves lately, by text or on the phone, is the freshest
+    # thing he knows of their life; it carries into his next thoughts and texts.
+    for event in reversed(events_of(history, "contact.reply_received")[-20:]):
+        when = datetime.fromisoformat(str(event.payload["simulated_at"]))
+        if at - when > timedelta(days=14) or when > at:
+            continue
+        person = str(event.payload.get("person_id") or "")
+        if person in names and len([n for n in news if n["who"] == names[person]]) < 1:
+            news.append(
+                {
+                    "who": names[person],
+                    "what": f"told me lately: “{event.payload.get('text', '')}”",
+                    "when": when.date().isoformat(),
+                }
+            )
     for event in reversed(events_of(history, KIND)):
         when = datetime.fromisoformat(str(event.payload["simulated_at"]))
         if when < lately:

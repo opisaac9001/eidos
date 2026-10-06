@@ -93,6 +93,9 @@ class Runtime:
             try:
                 outcome = self.life.act_on_impulse(asdict(impulse))
                 logger.info("Impulse %s (%s): %s", impulse.kind, impulse.target_name, outcome)
+                if outcome.startswith("later"):
+                    # Not now (at work, or too early to text): it comes back in a while.
+                    self.stream.impulses.defer(impulse, 45 * 60)
             except Exception:
                 logger.exception("Weighing an impulse failed")
         if ripe:

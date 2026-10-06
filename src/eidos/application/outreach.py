@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
@@ -11,6 +12,27 @@ from eidos.domain.folding import events_of
 from eidos.domain.outreach import project_outreach_config
 from eidos.domain.scenes import project_scenes
 from eidos.ports.model_gateway import ModelGateway
+
+# The user isn't part of his town: "Stuart's gossip is making me wonder about tomorrow's
+# shift" meant nothing to them.
+_FOR_AN_OUTSIDER = (
+    " The user doesn't live in his town or know his people: if he mentions someone, say in a "
+    "few words who they are (see who_is_who), and give enough of what happened that a friend "
+    "outside his life could follow."
+)
+
+
+def _who_is_who(context: Mapping[str, object], text: str) -> dict[str, object]:
+    """Who the people named in what he'd share are, from ``people_he_knows``."""
+    known = context.get("people_he_knows")
+    if not isinstance(known, Mapping):
+        return {}
+    who = {
+        str(name): str(about)
+        for name, about in known.items()
+        if re.search(rf"\b{re.escape(str(name).split()[0])}\b", text)
+    }
+    return {"who_is_who": dict(list(who.items())[:4])} if who else {}
 
 
 async def outreach_events(
@@ -137,11 +159,13 @@ async def outreach_events(
             "Do not claim the user is absent or owes a reply."
         ),
         "source_memory": str(source.payload["text"]),
+        **_who_is_who(context, str(source.payload["text"])),
         "recent_dialogue": [
             {"speaker": event.payload.get("speaker"), "text": event.payload.get("text")}
             for event in messages[-12:]
         ],
     }
+    model_context["outreach_reason"] = str(model_context["outreach_reason"]) + _FOR_AN_OUTSIDER
     text = await perform_pathos_reply(gateway, model_context, simulated_at.isoformat(), pending)
     if not text:
         return pending
@@ -379,11 +403,13 @@ async def _share_news(
             "message asking, without pressure and without assuming how it went."
         ),
         "source_memory": text_of_news,
+        **_who_is_who(context, text_of_news),
         "recent_dialogue": [
             {"speaker": event.payload.get("speaker"), "text": event.payload.get("text")}
             for event in messages[-12:]
         ],
     }
+    model_context["outreach_reason"] = str(model_context["outreach_reason"]) + _FOR_AN_OUTSIDER
     text = await perform_pathos_reply(gateway, model_context, simulated_at.isoformat(), pending)
     if not text or "[keep_private]" in text.lower():
         pending.append(

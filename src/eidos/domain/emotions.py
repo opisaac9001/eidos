@@ -66,8 +66,12 @@ def classify_emotion(valence: float, arousal: float, sustained_low_hours: int = 
         return "anxiety"
     if valence <= -0.1 and arousal >= 0.42:
         return "frustration"
-    if valence <= -0.06:
+    if valence <= -0.14:
         return "melancholy"
+    if valence <= -0.06:
+        # A mildly low day is a bit flat, not melancholy: that label sat on him for four
+        # hours of a cold flat and some worry.
+        return "a bit flat"
     if arousal >= 0.7:
         return "alertness"
     if arousal <= 0.2:

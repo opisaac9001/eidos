@@ -35,6 +35,14 @@ _FIELDS = {
 _COMPLETION_CLAIMS = re.compile(
     r"\b(?:completed|finished|succeeded|achieved|already did|turned out)\b", re.IGNORECASE
 )
+# A drive, not a thing to do: "Follow something interesting that catches my attention at
+# home" became an hour of his evening, twice.
+_VAGUE_TITLE = re.compile(
+    r"\b(?:something (?:interesting|new|fun|nice|different|useful)|an interesting (?:detail|thing)|"
+    r"catch(?:es)? my (?:attention|eye)|follow something|make progress on something|"
+    r"seek some kind of contact|whatever (?:fits|catches|feels))\b",
+    re.IGNORECASE,
+)
 _MEAL_ACTIVITY_TYPES = frozenset(
     {
         "breakfast",
@@ -153,6 +161,8 @@ def parse_agency_candidate(
         raise ProposalRejected(
             "invalid_estimate_confidence", "estimate confidence must be between zero and one"
         )
+    if _VAGUE_TITLE.search(value["title"]):
+        raise ProposalRejected("vague_title", "An activity needs a concrete thing to do")
     if _COMPLETION_CLAIMS.search(value["title"]) or (
         _COMPLETION_CLAIMS.search(value["motivation"])
         and not _grounded_past_completion(value["motivation"], completed_activity_titles)
