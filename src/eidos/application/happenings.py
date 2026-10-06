@@ -85,7 +85,7 @@ def happening_events(
         candidates.append(
             (
                 "cutting_it_fine",
-                0.35,
+                0.12,
                 "Cut it fine. Had to run the last bit, made it just.",
                 -0.1,
                 {},

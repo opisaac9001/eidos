@@ -13,6 +13,7 @@ from eidos.application.catchup import active_catch_up
 from eidos.application.city_map import city_map
 from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.epistemics import pathos_known_person_ids
+from eidos.application.feelings import coping_thoughts, feelings_view
 from eidos.application.followups import project_followups
 from eidos.application.group_chat import phone_view
 from eidos.application.inner_life import active_dream_inspirations
@@ -681,6 +682,8 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),
+        "feelings": feelings_view(history, state.simulated_at),
+        "coping": coping_thoughts(history, state.simulated_at),
         "config": scan.config,
         "outreach": {
             "enabled": outreach_config.enabled,

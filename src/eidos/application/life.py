@@ -67,6 +67,7 @@ from eidos.application.family import FAMILY_HOME, christmas_events, family_event
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
 from eidos.application.far_friends import far_friend_events
+from eidos.application.feelings import feeling_events
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import (
@@ -2917,6 +2918,13 @@ class Life(LifeConversation):
                     names={pid: person.name for pid, person in town.people.items()},
                     locations=_npc_locations(history + pending, current),
                     residents=frozenset(town.people),
+                )
+            )
+            pending.extend(
+                feeling_events(
+                    history + pending,
+                    current,
+                    names={pid: person.name for pid, person in town.people.items()},
                 )
             )
         pending.extend(

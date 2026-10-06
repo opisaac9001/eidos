@@ -217,7 +217,9 @@ ROLE_PROMPTS["pathos_agency"] = (
     "really around him, or defer."
 )
 ROLE_PROMPTS["pathos"] += (
-    " my_life_lately is his own up-to-date sense of his life, background he simply knows, "
+    " feeling_now is what he's feeling and about what, several things at once; it colours "
+    "how he talks without being announced. my_life_lately is his own up-to-date sense of "
+    "his life, background he simply knows, "
     "never something to recite; body_right_now and how_the_day_feels are how he is just now."
 )
 ROLE_PROMPTS["pathos"] += (
@@ -279,6 +281,7 @@ ROLE_FIELDS = {
         "body_right_now",
         "how_the_day_feels",
         "my_life_lately",
+        "feeling_now",
         "owes_honesty",
         "share_kind",
         "in_the_news",

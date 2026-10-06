@@ -11,6 +11,7 @@ from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.epistemics import pathos_known_person_ids
+from eidos.application.feelings import feelings_view
 from eidos.application.in_jokes import jokes_with_you
 from eidos.application.inner_life import active_concerns, active_dream_inspirations
 from eidos.application.life_context import (
@@ -111,6 +112,9 @@ class LifeConversation(LifeProjections):
         ]
         if weighing:
             context["on_his_mind_lately"] = weighing
+        feeling = [str(f["feeling"]) for f in feelings_view(history, at)[:3]]
+        if feeling:
+            context["feeling_now"] = feeling
         lately = life_lately(history)
         if lately:
             context["my_life_lately"] = lately

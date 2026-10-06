@@ -719,6 +719,13 @@ def _effect(
         return ("affect", 0.0, 0.22, 0.15, 0.8)
     if event.kind == "household.task_completed":
         return ("mastery", 0.025, 0.18, 0.1, 0.9)
+    if event.kind in {"feeling.arose", "feeling.renewed"} and event.payload.get("moves_mood"):
+        valence, intensity = event.payload.get("valence"), event.payload.get("intensity")
+        if isinstance(valence, (int, float)) and isinstance(intensity, (int, float)):
+            tone = max(-0.35, min(0.35, 0.5 * float(valence) * float(intensity)))
+            stirring = event.payload.get("kind") in {"worry", "dread", "excitement", "guilt"}
+            return ("affect", 0.0, round(tone, 3), 0.45 if stirring else 0.15, 0.6)
+        return None
     if event.kind == "happening.occurred":
         tone = event.payload.get("tone")
         if isinstance(tone, (int, float)) and not isinstance(tone, bool) and tone:

@@ -227,7 +227,16 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     if isinstance(wellbeing, Mapping) and wellbeing.get("kind"):
         found.append(Cue("body", str(wellbeing["kind"]).replace("_", " ")))
     emotion = snapshot.get("emotion") or {}
-    if isinstance(emotion, Mapping) and emotion.get("label"):
+    feelings = [
+        f for f in snapshot.get("feelings") or [] if isinstance(f, Mapping) and f.get("feeling")
+    ]
+    if feelings:
+        # Feelings about things: worried about Rowan, looking forward to Saturday.
+        found.extend(
+            Cue("feeling", str(f["feeling"]), round(0.5 + 2 * float(f.get("strength") or 0.3), 2))
+            for f in feelings[:3]
+        )
+    elif isinstance(emotion, Mapping) and emotion.get("label"):
         feeling = str(emotion["label"])
         if emotion.get("secondary_label"):
             feeling += f", with some {emotion['secondary_label']}"
@@ -426,8 +435,13 @@ def stream_context(
     }
     if cue is None or cue.kind == "feeling":
         # Given his mood every time, a small model made every thought about it ("too quiet").
+        felt = [
+            str(f["feeling"])
+            for f in snapshot.get("feelings") or []
+            if isinstance(f, Mapping) and f.get("feeling")
+        ]
         context["emotion"] = {
-            "label": emotion.get("label", "quiet"),
+            "label": ", and ".join(felt[:2]) if felt else emotion.get("label", "quiet"),
             "intensity": emotion.get("intensity", 0.3),
             "pattern": emotion.get("pattern", "transient"),
         }
@@ -1127,6 +1141,7 @@ class InnerStream:
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
         self._turned_away: deque[tuple[float, str]] = deque(maxlen=4)
+        self._coped: dict[str, float] = {}
         self.impulses = ImpulseTracker(self.wall_clock)
 
     # The thread -----------------------------------------------------------------------
@@ -1166,6 +1181,13 @@ class InnerStream:
         if not (snapshot.get("pathos") or {}).get("awake") and stirring(snapshot) is None:
             self.state = "asleep"
             return IDLE_POLL_SECONDS
+        # What his feelings make him want to do joins the pull of his thoughts, hourly.
+        now = self.wall_clock()
+        if (snapshot.get("pathos") or {}).get("awake"):
+            for urge in snapshot.get("coping") or []:
+                if isinstance(urge, str) and now - self._coped.get(urge, 0.0) >= 3600:
+                    self._coped[urge] = now
+                    self.impulses.notice(urge, snapshot)
         if self.yield_to():
             self.state = "making way"
             return IDLE_POLL_SECONDS

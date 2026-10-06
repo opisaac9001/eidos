@@ -1733,9 +1733,14 @@ function render(next) {
   setBusy(busy);
   renderStream();
   if (!changed) return;
-  $("presence-mood").textContent = state.emotion?.secondary_label
-    ? `${state.emotion.label} with ${state.emotion.secondary_label}`
-    : state.emotion?.label || state.pathos.mood;
+  // What he's feeling and about what, when he has feelings about things.
+  const feelings = (state.feelings || []).slice(0, 2).map((item) => item.feeling);
+  const feelingText = feelings.join(", and ");
+  $("presence-mood").textContent = feelingText
+    ? feelingText.charAt(0).toUpperCase() + feelingText.slice(1)
+    : state.emotion?.secondary_label
+      ? `${state.emotion.label} with ${state.emotion.secondary_label}`
+      : state.emotion?.label || state.pathos.mood;
   const physical = state.wellbeing?.active;
   $("presence-location").textContent =
     `${state.pathos.awake ? "Awake" : "Asleep"} · At ${state.pathos.location}${physical ? ` · ${physical.kind.replaceAll("_", " ")}` : ""}`;
