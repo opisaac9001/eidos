@@ -164,3 +164,29 @@ def test_messages_to_you_say_who_people_are() -> None:
     assert _who_is_who(context, "Stuart's gossip has me wondering.") == {
         "who_is_who": {"Stuart Hart": "semi-retired accountant"}
     }
+
+
+def test_a_worry_about_his_mum_has_him_ring_her_not_rowans_mum() -> None:
+    kinds = {
+        kind for _, kind, *_ in pulls_in("Mum sounded off on Sunday. Should ring her.", world())
+    }
+    assert "family" in kinds
+    assert not any(
+        kind == "family" for _, kind, *_ in pulls_in("Rowan's mum sounds awful.", world())
+    )
+
+
+def test_ringing_home_is_remembered_with_whatever_news_there_is() -> None:
+    from eidos.application.family import ring_family
+
+    events = ring_family([], AT, "mum", "Mum sounded off on Sunday. Should ring her.")
+    contact = next(e for e in events if e.kind == "family.contact")
+    assert contact.payload["channel"] == "call" and contact.payload["direction"] == "outgoing"
+    texts = [e.payload["text"] for e in events if e.kind == "memory.recorded"]
+    assert texts and texts[0].startswith("Rang Mum")
+    again = ring_family(events, AT + timedelta(hours=2), "mum", "")
+    if contact.payload["missed"]:
+        assert again  # no answer, so he tries again later
+    else:
+        assert again == []  # they've just spoken
+    assert ring_family([], AT.replace(hour=23), "mum", "") == []

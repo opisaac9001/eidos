@@ -15,6 +15,7 @@ only voice it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from hashlib import sha256
@@ -376,6 +377,46 @@ def _missing_them(
         "Rang Dad, which I don't do often enough. He sounded pleased, in his way."
         if person_id == "dad"
         else "Rang Mum for no reason. She was delighted and pretended not to be."
+    )
+    text = opener + "".join(f" {e.payload['text']}" for e in news if e.kind == "family.news")
+    return [*_contact(call_id, person_id, at, channel="call", incoming=False, text=text), *news]
+
+
+def ring_family(
+    history: Sequence[DomainEvent], at: datetime, person_id: str, why: str
+) -> list[DomainEvent]:
+    """He rings one of his family because they've been on his mind; empty if not now.
+
+    Not late, not first thing, and not someone he spoke to in the last day. They don't
+    always pick up; when they do, he may hear what's new with them.
+    """
+    relative = FAMILY.get(person_id)
+    if relative is None or not 9 <= at.hour <= 21:
+        return []
+    last = _last_spoke(history, person_id)
+    if last is not None and at - last < timedelta(days=1):
+        return []
+    call_id = f"ring-{person_id}-{at.isoformat()}"
+    if _happened(history, call_id):
+        return []
+    called = relative.called
+    if _roll(call_id, "answers") < 0.25:
+        return _contact(
+            call_id,
+            person_id,
+            at,
+            channel="call",
+            incoming=False,
+            text=f"Rang {called}. No answer; I'll try again later.",
+            missed=True,
+        )
+    news = _news(history, at, person_id, call_id, chance=0.6)
+    them = {"she": "her", "he": "him"}.get(relative.pronoun, "them")
+    worried = bool(re.search(r"\b(worr|ill|unwell|sick|alright|hospital|off)\w*", why, re.I))
+    opener = (
+        f"Rang {called} to check {relative.pronoun} was alright."
+        if worried
+        else f"Rang {called}. I'd had {them} on my mind."
     )
     text = opener + "".join(f" {e.payload['text']}" for e in news if e.kind == "family.news")
     return [*_contact(call_id, person_id, at, channel="call", incoming=False, text=text), *news]

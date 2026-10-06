@@ -847,7 +847,7 @@ class Impulse:
     """Something his thoughts keep reaching for, strong enough now to weigh."""
 
     key: str
-    kind: str  # contact, plan, food, rest, out, later, you
+    kind: str  # contact, family, plan, food, rest, out, later, you
     target: str
     target_name: str
     strength: float
@@ -897,6 +897,14 @@ def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, 
         reasons = contact_reasons(thought)
         weight = 0.3 + (desire + reasons if reasons else 0.0)
         found.append((f"contact:{person['id']}", "contact", str(person["id"]), name, weight))
+    # His family, when he means to ring them: "Should ring Mum", not "Rowan's mum".
+    for family_id, called in (("mum", "Mum"), ("dad", "Dad"), ("tom", "Tom")):
+        if re.search(rf"(?<!'s )\b{called}\b", thought):
+            reasons = contact_reasons(thought)
+            if reasons:
+                found.append(
+                    (f"family:{family_id}", "family", family_id, called, 0.3 + desire + reasons)
+                )
     budget = snapshot.get("time_budget") or {}
     plan = str(budget.get("next_plan") or "") if isinstance(budget, Mapping) else ""
     plan_words = {word for word in _words(plan) if len(word) >= 4 and word not in _COMMON} - {

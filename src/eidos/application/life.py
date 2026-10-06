@@ -62,7 +62,7 @@ from eidos.application.evening_course import evening_course_events
 from eidos.application.experience import experience_events
 from eidos.application.falling_out import HOUR as FALLING_OUT_HOUR
 from eidos.application.falling_out import falling_out_events
-from eidos.application.family import FAMILY_HOME, christmas_events, family_events
+from eidos.application.family import FAMILY_HOME, christmas_events, family_events, ring_family
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
 from eidos.application.far_friends import far_friend_events
@@ -639,8 +639,10 @@ class Life(LifeConversation):
         if not thoughts:
             return "nothing"
         working = _at_work(self._planning(history), at)
-        if kind == "you" and (busy or working):
-            return "later: busy"  # he'd message once he's free, not mid-shift
+        if kind in {"you", "family"} and (busy or working):
+            return "later: busy"  # he'd message or ring once he's free, not mid-shift
+        if kind == "family" and not 9 <= at.hour <= 21:
+            return "later: too late or too early to ring"
         if kind == "contact":
             # Why he wants to get in touch, not every passing mention of their name.
             thoughts = [text for text in thoughts if contact_reasons(text)] or thoughts
@@ -724,6 +726,15 @@ class Life(LifeConversation):
                             _their_whereabouts(history, state, catalog),
                         )
                     )
+        elif kind == "family":
+            pending.extend(
+                ring_family(
+                    history + pending,
+                    at,
+                    str(impulse.get("target", "")),
+                    next((text for text in reversed(thoughts) if contact_reasons(text)), ""),
+                )
+            )
         elif kind == "you":
             pending.extend(
                 await outreach_events(
@@ -776,7 +787,8 @@ class Life(LifeConversation):
                 )
             )
         acted = any(
-            event.kind in {"schedule.created", "contact.reached_out", "conversation.message"}
+            event.kind
+            in {"schedule.created", "contact.reached_out", "conversation.message", "family.contact"}
             for event in pending
         )
         outcome = "acted" if acted else "let go"
