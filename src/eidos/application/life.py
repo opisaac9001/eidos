@@ -3263,6 +3263,11 @@ class Life(LifeConversation):
                 **({"what_they_are_doing": doing} if doing else {}),
                 **({"they_remember": remembered} if remembered else {}),
                 **(
+                    {"how_they_are": state_of}
+                    if (state_of := _how_they_are(history, npc, person, now))
+                    else {}
+                ),
+                **(
                     {"he_means_to": meaning}
                     if (meaning := _what_he_means_to_say(history, person))
                     else {}
@@ -3952,6 +3957,27 @@ def _at_work(planning: Any, at: datetime) -> bool:
         if starts <= at < ends:
             return True
     return False
+
+
+def _how_they_are(
+    history: Sequence[DomainEvent], npc: Any, person: Any, at: datetime
+) -> str | None:
+    """How a resident is in themselves today: tired, glad of company, preoccupied."""
+    parts: list[str] = []
+    energy = getattr(npc, "energy", None)
+    connection = getattr(npc, "connection", None)
+    if isinstance(energy, float) and energy < 0.3:
+        parts.append("tired")
+    if isinstance(connection, float) and connection < 0.25:
+        parts.append("glad of some company")
+    life = friends_lives(history).people.get(person.person_id)
+    if (
+        life is not None
+        and life.worry_since is not None
+        and at - life.worry_since <= timedelta(days=30)
+    ):
+        parts.append("preoccupied: things are hard at home for them")
+    return ", ".join(parts) or None
 
 
 def _what_he_means_to_say(history: Sequence[DomainEvent], person: Any) -> str | None:

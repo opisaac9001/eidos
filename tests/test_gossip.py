@@ -204,3 +204,27 @@ def test_his_friends_own_news_isnt_served_back_to_him_as_gossip() -> None:
         held([original])[("news:2", "mara")], "mara", "Mara", AT, DomainEvent("x", "pathos", {})
     )
     assert told[0].payload["story"] == "family_worry"  # the story travels with it
+
+
+def test_a_resident_has_a_state_of_their_own_when_he_meets_them() -> None:
+    from types import SimpleNamespace
+
+    from eidos.application.life import _how_they_are
+
+    worry = DomainEvent(
+        "friend.life_event",
+        "pathos",
+        {
+            "person_id": "rowan",
+            "kind": "family_worry",
+            "text": "Rowan told me their mum's not been well.",
+            "simulated_at": (AT - timedelta(days=3)).isoformat(),
+        },
+    )
+    rowan = SimpleNamespace(person_id="rowan", name="Rowan")
+    worn = SimpleNamespace(energy=0.2, connection=0.1)
+    assert _how_they_are([worry], worn, rowan, AT) == (
+        "tired, glad of some company, preoccupied: things are hard at home for them"
+    )
+    fine = SimpleNamespace(energy=0.8, connection=0.6)
+    assert _how_they_are([], fine, rowan, AT) is None
