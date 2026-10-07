@@ -165,6 +165,7 @@ from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
 from eidos.application.open_loops import open_loop_events
+from eidos.application.opinions import opinion_events, their_view_of_him
 from eidos.application.opportunities import opportunity_events
 from eidos.application.outreach import outreach_events
 from eidos.application.personal_journeys import journey_context
@@ -268,6 +269,7 @@ from eidos.domain.identity import identity_established_event, project_identity
 from eidos.domain.mind import LayerPulse, project_mind
 from eidos.domain.npcs import project_npcs
 from eidos.domain.outreach import project_outreach_config
+from eidos.domain.resident_relationships import project_resident_relationships
 from eidos.domain.routine import (
     RoutineBeat,
     beats_between,
@@ -2931,6 +2933,14 @@ class Life(LifeConversation):
                     names={pid: person.name for pid, person in town.people.items()},
                     locations=_npc_locations(history + pending, current),
                     residents=frozenset(town.people),
+                    trust=_resident_trust(history + pending),
+                )
+            )
+            pending.extend(
+                opinion_events(
+                    history + pending,
+                    current,
+                    names={pid: person.name for pid, person in town.people.items()},
                 )
             )
             pending.extend(
@@ -3251,6 +3261,11 @@ class Life(LifeConversation):
                 "avoid_details": _encounter_details(recent_encounters, person.name),
                 **({"what_they_are_doing": doing} if doing else {}),
                 **({"they_remember": remembered} if remembered else {}),
+                **(
+                    {"how_they_feel_about_him": view}
+                    if (view := their_view_of_him([*history, *pending], person.person_id, now))
+                    else {}
+                ),
                 **(
                     {
                         "they_might_mention": f"{news.text} (they heard it from "
@@ -3937,6 +3952,18 @@ def _at_work(planning: Any, at: datetime) -> bool:
         if starts <= at < ends:
             return True
     return False
+
+
+def _resident_trust(history: Sequence[DomainEvent]) -> Callable[[str, str], float]:
+    """How far one resident trusts another, worked out only if gossip needs it."""
+    state: list[Any] = []
+
+    def trust(listener: str, teller: str) -> float:
+        if not state:
+            state.append(project_resident_relationships(history))
+        return float(state[0].between(listener, teller).trust)
+
+    return trust
 
 
 def _their_whereabouts(

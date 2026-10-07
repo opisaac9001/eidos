@@ -481,6 +481,11 @@ def stream_context(
     # Who people are to him, for anyone this thought might involve: without it a small model
     # had his boss coming home to his flat.
     involved = " ".join([cue.text if cue else "", *recent, *with_him])
+    views = {
+        str(v["who"]): f"{v['leaning']} ({v['because']})"
+        for v in snapshot.get("his_views") or []
+        if isinstance(v, Mapping) and v.get("leaning") != "neutral"
+    }
     who: dict[str, str] = {}
     for person in snapshot.get("people") or []:
         if (
@@ -492,6 +497,9 @@ def stream_context(
             # With pronouns: Rowan (they) kept becoming "she", Ellis "she" too.
             pronoun = PRONOUNS.get(KNOWN_PRONOUNS.get(str(person.get("id")), "they"))
             who[str(person["name"])] = f"{str(person['occupation']).lower()}; {pronoun}"
+            view = views.get(str(person["name"]))
+            if view:
+                who[str(person["name"])] += f"; he's {view}"
     # His family, when they come up: "Rowan's mum" became "Mum's packing for work" in a flat
     # he lives in alone, and "Dad won't be back" when Dad is alive and well in Wye.
     selfhood = snapshot.get("selfhood") or {}
@@ -992,6 +1000,11 @@ def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, 
     pathos = snapshot.get("pathos") or {}
     here = pathos.get("location_id")
     levels = bond_levels(snapshot)
+    leanings = {
+        str(v.get("who")): str(v.get("leaning"))
+        for v in snapshot.get("his_views") or []
+        if isinstance(v, Mapping)
+    }
     for person in snapshot.get("people") or []:
         if not isinstance(person, Mapping) or not person.get("name") or not person.get("id"):
             continue
@@ -1007,6 +1020,15 @@ def pulls_in(thought: str, snapshot: Mapping[str, Any]) -> list[tuple[str, str, 
         # mention counted, and the day's texts were gone by half past eight on nothing.
         reasons = contact_reasons(thought)
         weight = 0.3 + (desire + reasons if reasons else 0.0)
+        # Fond of them, he reaches out more readily; sore, less.
+        leaning = leanings.get(name)
+        weight *= (
+            1.25
+            if leaning in {"fond", "warm"}
+            else 0.6
+            if leaning in {"sore", "a bit put out"}
+            else 1.0
+        )
         found.append((f"contact:{person['id']}", "contact", str(person["id"]), name, weight))
     # His family, when he means to ring them: "Should ring Mum", not "Rowan's mum".
     for family_id, called in (("mum", "Mum"), ("dad", "Dad"), ("tom", "Tom")):

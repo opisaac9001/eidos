@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
@@ -128,9 +128,14 @@ def gossip_events(
     names: Mapping[str, str],
     locations: Mapping[str, str],
     residents: frozenset[str],
+    trust: Callable[[str, str], float] | None = None,
 ) -> list[DomainEvent]:
     """This hour: new stories start with the people they're about, and spread between
-    residents who are together."""
+    residents who are together.
+
+    ``trust(listener, teller)`` (0 to 1) makes news travel more readily between people
+    who trust each other, and be believed more (Talk of the Town).
+    """
     output: list[DomainEvent] = []
     known = held(history)
     started = {claim_id for claim_id, _ in known}
@@ -180,11 +185,12 @@ def gossip_events(
                         continue
                     if claim.subject_id == listener:
                         continue  # nobody tells you your own news
-                    if (
-                        _roll(claim_id, teller, listener, at.isoformat())
-                        >= SPREAD_CHANCE * claim.strength
-                    ):
+                    affinity = trust(listener, teller) if trust is not None else 0.5
+                    if _roll(
+                        claim_id, teller, listener, at.isoformat()
+                    ) >= SPREAD_CHANCE * claim.strength * (0.5 + affinity):
                         continue
+                    believed = claim.strength * (0.7 + 0.3 * affinity)
                     story = stories.get(claim_id, "")
                     drifted = (
                         story in _STORIES
@@ -200,7 +206,7 @@ def gossip_events(
                         teller,
                         text,
                         claim.version + (1 if drifted else 0),
-                        claim.strength * 0.85,
+                        believed,
                         at,
                         story,
                         None,
@@ -208,7 +214,8 @@ def gossip_events(
                     output.append(heard)
                     claims[(claim_id, listener)] = Claim(
                         claim_id, claim.subject_id, listener, teller, text,
-                        claim.version + (1 if drifted else 0), claim.strength * 0.85, at,
+                        claim.version + (1 if drifted else 0), believed, at, story,
+                        claim.started_at,
                     )  # fmt: skip
                     spread += 1
     return output

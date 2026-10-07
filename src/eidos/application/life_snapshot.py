@@ -26,6 +26,7 @@ from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability
 from eidos.application.npc_simulation import npc_detail_tier
 from eidos.application.open_loops import loops_view
+from eidos.application.opinions import his_views
 from eidos.application.personal_journeys import journey_context
 from eidos.application.place_discovery import known_place_ids
 from eidos.application.reaching_out import texts_view
@@ -683,6 +684,11 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),
         "feelings": feelings_view(history, state.simulated_at),
+        "his_views": his_views(
+            history,
+            state.simulated_at,
+            {person.person_id: person.name for person in catalog.people.values()},
+        ),
         "coping": coping_thoughts(history, state.simulated_at),
         "config": scan.config,
         "outreach": {

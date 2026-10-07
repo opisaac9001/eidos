@@ -29,6 +29,7 @@ from eidos.application.memory_life import stayed_with_me
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.open_loops import loops_view
+from eidos.application.opinions import his_views
 from eidos.application.personal_journeys import journey_context
 from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
@@ -141,6 +142,10 @@ class LifeConversation(LifeProjections):
         feeling = [str(f["feeling"]) for f in feelings_view(history, at)[:3]]
         if feeling:
             context["feeling_now"] = feeling
+        catalog = self._world_catalog(list(history))
+        views = his_views(history, at, {pid: person.name for pid, person in catalog.people.items()})
+        if views:
+            context["how_i_feel_about_people"] = views
         stayed = stayed_with_me(history)
         if stayed:
             context["stayed_with_him"] = stayed
