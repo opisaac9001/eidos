@@ -223,6 +223,9 @@ ROLE_PROMPTS["pathos_agency"] = (
     "really around him, or defer."
 )
 ROLE_PROMPTS["pathos"] += (
+    " that_time is what he remembers of the time being asked about, in order; answer from "
+    "it, picking what he'd mention, not listing it. If what_he_remembers is empty it was an "
+    "ordinary one he can't say much about; say so plainly and invent nothing."
     " my_life_story is his own account of his life before Alderwick, the parts that bear on "
     "what's being said; he can draw on it as anyone draws on their past, never reciting it. "
     "nearly_told_you are things he almost messaged the user about and held back; he may "
@@ -301,6 +304,7 @@ ROLE_FIELDS = {
         "nearly_told_you",
         "while_you_were_away",
         "my_life_story",
+        "that_time",
         "owes_honesty",
         "share_kind",
         "in_the_news",

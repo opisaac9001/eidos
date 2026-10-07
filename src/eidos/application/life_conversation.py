@@ -10,6 +10,7 @@ from eidos.application.alertness import body_now
 from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
+from eidos.application.day_recall import recall_of_that_time
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.feelings import feelings_view
 from eidos.application.in_jokes import jokes_with_you
@@ -759,6 +760,10 @@ class LifeConversation(LifeProjections):
         story = passages_for(talked)
         if story:
             context["my_life_story"] = story
+        # Asked about a particular time, he thinks back to that time.
+        then = recall_of_that_time(history, text, state.simulated_at)
+        if then is not None:
+            context["that_time"] = then
         return state, at, pending, context, reply_voice
 
     def interview_prompts(self) -> list[tuple[Question, dict[str, object], str]]:
