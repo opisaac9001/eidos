@@ -100,3 +100,34 @@ def test_a_question_you_left_hanging_can_come_back(tmp_path) -> None:
     request = next(r for r in reversed(gateway.requests) if r.capability == "pathos")
     context = json.loads(request.messages[0].content)
     assert context["left_hanging"] == "How did the interview go, in the end?"
+
+
+def test_seeing_the_person_he_meant_to_ask_lets_him_ask_and_ticks_it_off() -> None:
+    from eidos.application.life import _what_he_means_to_say
+    from eidos.application.open_loops import DONE
+
+    meant = DomainEvent(
+        "thought.recorded",
+        "pathos",
+        {"text": "Should ask Ellis about the chisel later.", "simulated_at": AT.isoformat()},
+    )
+    history = [meant]
+    history += open_loop_events(
+        history, AT + timedelta(minutes=10), awake=True, location_id="home", with_him=set(),
+        people={"ellis": "ellis"}, places={}, titles={},
+    )  # fmt: skip
+    ellis = type("Person", (), {"name": "Ellis", "person_id": "ellis"})()
+    assert _what_he_means_to_say(history, ellis) == "ask Ellis about the chisel later"
+    history.append(
+        DomainEvent(
+            "npc.encountered",
+            "pathos",
+            {
+                "person_id": "ellis",
+                "text": "Ellis listens as Pathos asks about the chisel.",
+                "simulated_at": (AT + timedelta(hours=2)).isoformat(),
+            },
+        )
+    )
+    after = hour(history, AT + timedelta(hours=3))
+    assert [e.kind for e in after] == [DONE]

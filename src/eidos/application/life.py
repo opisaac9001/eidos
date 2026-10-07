@@ -165,7 +165,7 @@ from eidos.application.object_recovery import object_recovery_events
 from eidos.application.object_story import object_story_events
 from eidos.application.object_supply import object_supply_events
 from eidos.application.offscreen import npc_world_events
-from eidos.application.open_loops import open_loop_events
+from eidos.application.open_loops import open_loop_events, open_loops
 from eidos.application.opinions import opinion_events, their_view_of_him
 from eidos.application.opportunities import opportunity_events
 from eidos.application.outreach import outreach_events
@@ -3263,6 +3263,11 @@ class Life(LifeConversation):
                 **({"what_they_are_doing": doing} if doing else {}),
                 **({"they_remember": remembered} if remembered else {}),
                 **(
+                    {"he_means_to": meaning}
+                    if (meaning := _what_he_means_to_say(history, person))
+                    else {}
+                ),
+                **(
                     {"how_they_feel_about_him": view}
                     if (view := their_view_of_him([*history, *pending], person.person_id, now))
                     else {}
@@ -3947,6 +3952,16 @@ def _at_work(planning: Any, at: datetime) -> bool:
         if starts <= at < ends:
             return True
     return False
+
+
+def _what_he_means_to_say(history: Sequence[DomainEvent], person: Any) -> str | None:
+    """Something he's been meaning to ask or tell this person, now he's seen them."""
+    first = str(person.name).split()[0].casefold()
+    for loop in open_loops(history):
+        text = loop.text.casefold()
+        if loop.person_id == person.person_id or f" {first} " in f" {text} ":
+            return loop.text
+    return None
 
 
 def _resident_trust(history: Sequence[DomainEvent]) -> Callable[[str, str], float]:

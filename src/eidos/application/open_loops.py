@@ -423,8 +423,12 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
                 return event
             continue
         if event.kind == "npc.encountered":
-            # Saw them in person: whatever he meant to tell them, he could.
-            if contacting and loop.person_id and payload.get("person_id") == loop.person_id:
+            # Saw them in person: whatever he meant to ask or tell them, he could.
+            met = str(payload.get("person_id") or "")
+            named = loop.person_id == met or (
+                met and f" {met.split('-')[0]} " in f" {loop.text.casefold()} "
+            )
+            if contacting and named:
                 return event
             continue
         theirs = _content(str(payload.get("title") or payload.get("text") or ""))
