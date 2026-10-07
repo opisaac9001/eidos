@@ -96,7 +96,10 @@ ROLE_PROMPTS["murmur"] = (
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
-    "Use casual contemporary English. Return only the words this speaker says; no "
+    "Use casual contemporary British English, the way people talk in a small Kent market "
+    "town (mum, biscuits, in town or the high street, cheers); no 'Hey everyone', no "
+    "@-mentions. Call people only by the names given in scene_speaker, scene_audience and "
+    "prior_turns; never invent a name. Return only the words this speaker says; no "
     "stage directions, speaker labels or descriptions of anyone's actions. In prior_turns, "
     "speaker identifies who said each text: another person's I, plans, time pressure "
     "and experiences do not become yours. Answer their last line rather than restarting "
@@ -365,6 +368,7 @@ ROLE_FIELDS = {
         "scene_audience",
         "scene_topic",
         "prior_turns",
+        "who_is_who",
     ),
     "moira": ("time", "location"),
     "mnemosyne": ("experience",),
@@ -903,10 +907,27 @@ class HTTPModelGateway(ModelGateway):
                 or personal.get("owner") in {"pathos", "user"}
             ):
                 context.pop("personal_relationship_context", None)
-            # People speak to him by his name, never the system's ("Thanks, Pathos").
+            # People speak to him by his name, never the system's ("Thanks, Pathos"), and
+            # to everyone else by theirs, not an id the model fills with a made-up name.
+            raw_names = context.pop("who_is_who", None)
+            names = (
+                {str(k): str(v) for k, v in raw_names.items()}
+                if isinstance(raw_names, dict)
+                else {}
+            )
+            names["pathos"] = "Patrick"
             for key in ("scene_audience", "scene_speaker"):
-                if str(context.get(key, "")).casefold() == "pathos":
-                    context[key] = "Patrick"
+                said = str(context.get(key, ""))
+                if said in names or said.casefold() == "pathos":
+                    context[key] = names.get(said, "Patrick")
+            turns = context.get("prior_turns")
+            if isinstance(turns, list):
+                context["prior_turns"] = [
+                    {**turn, "speaker": names.get(str(turn.get("speaker")), turn.get("speaker"))}
+                    if isinstance(turn, dict)
+                    else turn
+                    for turn in turns
+                ]
         if request.capability in PERSONAL_ROLES:
             system += calendar_identity(context.get("time"))
         if request.capability == "pathos":

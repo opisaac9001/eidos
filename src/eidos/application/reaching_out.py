@@ -29,6 +29,7 @@ from uuid import uuid4
 from eidos.application.bookings import remember
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -181,7 +182,7 @@ async def reach_out_events(
         if response.finish_reason != "stop":
             raise ProposalRejected("incomplete", "The text was cut off")
         raw = json.loads(response.content)
-        text = " ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else ""
+        text = british(" ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else "")
         words = len(text.split())
         if not 2 <= words <= 60 or re.search(r"\b(as an ai|language model)\b", text, re.I):
             raise ProposalRejected("not_a_text", "That isn't a text he'd send")

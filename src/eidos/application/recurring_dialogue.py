@@ -221,6 +221,10 @@ async def _advance_scene(
                         scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                     ),
                     "scene_topic": topic_id.replace("-", " "),
+                    "who_is_who": {
+                        partner_id: name,
+                        **{k: v for k, v in actor_names.items() if k in {speaker_id, partner_id}},
+                    },
                     "personal_relationship_context": personal_relationship_context(
                         combined,
                         speaker_id,

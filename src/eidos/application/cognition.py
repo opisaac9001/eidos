@@ -7,6 +7,7 @@ from typing import Mapping
 from uuid import uuid4
 
 from eidos.application.semantic_quality import semantic_quality_findings
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected, validate_completion
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -84,6 +85,10 @@ def request_for(role: str, context: Mapping[str, object]) -> ModelRequest:
     )
 
 
+# Roles whose words are said or written in the town.
+_SPOKEN = frozenset({"firmament", "pathos", "murmur"})
+
+
 async def perform(
     gateway: ModelGateway,
     role: str,
@@ -100,6 +105,8 @@ async def perform(
             timeout=ROLE_TIMEOUTS.get(role, 50),
         )
         text = validate_completion(role, response.content, response.finish_reason, context)
+        if role in _SPOKEN:
+            text = british(text)
         semantic_findings = semantic_quality_findings(
             role,
             text,

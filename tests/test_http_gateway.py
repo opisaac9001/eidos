@@ -77,6 +77,30 @@ class GatewayTests(unittest.TestCase):
             context = json.loads(self.payload["messages"][1]["content"])
             self.assertEqual("personal_relationship_context" in context, allowed)
 
+    def test_people_in_a_scene_are_named_not_ids(self):
+        """'townsfolk-1880' to 'Patrick' had the model invent a name ('Stuart, ...')."""
+        asyncio.run(
+            self.gateway.generate(
+                request_for(
+                    "firmament",
+                    {
+                        "scene_mode": True,
+                        "scene_speaker": "townsfolk-1880",
+                        "scene_audience": "pathos",
+                        "scene_topic": "the weather",
+                        "who_is_who": {"townsfolk-1880": "June Pike"},
+                        "prior_turns": [{"speaker": "pathos", "text": "Grim out."}],
+                    },
+                )
+            )
+        )
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["scene_speaker"], "June Pike")
+        self.assertEqual(context["scene_audience"], "Patrick")
+        self.assertEqual(context["prior_turns"][0]["speaker"], "Patrick")
+        self.assertNotIn("who_is_who", context)
+        self.assertIn("British English", self.payload["messages"][0]["content"])
+
     def test_a_friends_reply_reaches_the_model_with_their_life_and_his_name(self):
         """It was stripped as unowned, so real replies invented plans and said 'Pathos'."""
         import asyncio as running
@@ -150,7 +174,10 @@ class GatewayTests(unittest.TestCase):
         }
         asyncio.run(self.gateway.generate(request_for("firmament", context)))
         supplied = json.loads(self.payload["messages"][1]["content"])
-        self.assertEqual(supplied["prior_turns"], context["prior_turns"])
+        # His words are still his, under his own name.
+        self.assertEqual(
+            supplied["prior_turns"], [{"speaker": "Patrick", "text": "I've got to leave."}]
+        )
         self.assertNotIn("memories", supplied)
         self.assertIn("not a narrator", self.payload["messages"][0]["content"])
 

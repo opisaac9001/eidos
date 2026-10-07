@@ -24,6 +24,7 @@ from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
 from eidos.application.gossip import _STORIES
 from eidos.application.inner_life import active_concerns
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -520,7 +521,7 @@ async def _his_reply(
     try:
         response = await gateway.generate(request)
         raw = json.loads(response.content)
-        text = " ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else ""
+        text = british(" ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else "")
         if not 1 <= len(text.split()) <= 40:
             raise ProposalRejected("not_a_message", "That isn't something he'd post")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError):

@@ -177,6 +177,9 @@ async def _advance(
                     "scene_speaker": speaker_id,
                     "scene_audience": audience_id,
                     "scene_topic": scene.topic_id.replace("-", " "),
+                    "who_is_who": {
+                        k: v for k, v in actor_names.items() if k in {speaker_id, audience_id}
+                    },
                     "prior_turns": [
                         {
                             "speaker": str(event.payload["actor_id"]),
