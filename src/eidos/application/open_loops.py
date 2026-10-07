@@ -58,6 +58,28 @@ _NOT_DOING = frozenset(
     "believe trust forget mind admit".split()
 )
 _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
+# Something to take somewhere: "bring my chisel to the workshop", "take the book back to Nina".
+_CARRY = re.compile(
+    r"\b(?:bring|take|drop off|return)\s+(.+?)\s+(?:back\s+)?(?:to|round to|over to|into|in to)\b",
+    re.IGNORECASE,
+)
+_WHEN_WORDS = re.compile(
+    r"\s+(?:tomorrow|tonight|later|this evening|at the weekend|on \w+day)\b.*$", re.IGNORECASE
+)
+
+
+def _carried(text: str) -> str | None:
+    """'bring my chisel to the workshop tomorrow' -> 'my chisel'."""
+    match = _CARRY.search(text)
+    if match is None:
+        return None
+    thing = match.group(1).strip()
+    return thing if 1 <= len(thing.split()) <= 5 else None
+
+
+def _plainly(text: str) -> str:
+    """The to-do without its when: 'bring my chisel to the workshop'."""
+    return _WHEN_WORDS.sub("", text).rstrip(" .")
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +94,7 @@ class Loop:
     last_recalled_at: datetime | None = None
     slipped: bool = False
     closed: bool = False
+    carry: str | None = None  # something to take with him ("my chisel")
 
 
 def _when(event: DomainEvent) -> datetime:
@@ -93,13 +116,20 @@ def _step(loops: dict[str, Loop], event: DomainEvent) -> dict[str, Loop]:
             str(payload["person_id"]) if payload.get("person_id") else None,
             str(payload["place_id"]) if payload.get("place_id") else None,
             datetime.fromisoformat(str(due)) if due else None,
+            carry=str(payload["carry"]) if payload.get("carry") else None,
         )
         return {**loops, loop_id: formed}
     loop = loops.get(loop_id)
     if loop is None:
         return loops
     if event.kind == RECALLED:
-        changed = replace(loop, last_recalled_at=_when(event), slipped=False)
+        due = payload.get("due_at")
+        changed = replace(
+            loop,
+            last_recalled_at=_when(event),
+            slipped=False,
+            due_at=datetime.fromisoformat(str(due)) if due else loop.due_at,
+        )
     elif event.kind == SLIPPED:
         changed = replace(loop, slipped=True)
     else:
@@ -255,6 +285,7 @@ def open_loop_events(
             person_id=person,
             place_id=place,
             due_at=(_due(text, at) or at).isoformat() if _due(text, at) else None,
+            carry=_carried(text) if place else None,
         )
     # What was interrupted pulls him back to finish it.
     for stopped in events_of(history, "schedule.interrupted", "activity.execution_unfinished")[-4:]:
@@ -269,7 +300,48 @@ def open_loop_events(
                 f"finish {title[0].lower()}{title[1:]}", stopped, "interrupted", 0.5, place_id=place
             )
 
+    # Setting off from home is when you remember what to take, or don't.
+    set_off = [
+        e
+        for e in events_of(history, "travel.started")[-3:]
+        if e.payload.get("origin_id") == "home" and _when(e) >= since
+    ]
     for loop in loops:
+        if loop.carry and set_off and awake:
+            leaving = set_off[-1]
+            going = leaving.payload.get("destination_id") == loop.place_id or (
+                loop.due_at is not None and loop.due_at.date() == at.date()
+            )
+            if going and _roll(loop.intention_id, leaving.event_id) < 0.55 + 0.4 * loop.importance:
+                recalled = _event(RECALLED, loop, at, None, cue="setting off")
+                output += [
+                    recalled,
+                    _event(DONE, loop, at, None),
+                    remember(
+                        recalled, f"Remembered to {_plainly(loop.text)}.", at, 0.25,
+                        origin="lived-open-loop", category="experience",
+                    ),
+                ]  # fmt: skip
+                continue
+        if (
+            loop.carry
+            and awake
+            and loop.place_id == location_id
+            and (loop.last_recalled_at is None or at - loop.last_recalled_at >= RECALL_GAP)
+        ):
+            # There, and it's still at home.
+            recalled = _event(
+                RECALLED, loop, at, None, cue="being there without it",
+                due_at=(at + timedelta(days=1)).replace(hour=9, minute=0).isoformat(),
+            )  # fmt: skip
+            output += [
+                recalled,
+                remember(
+                    recalled, f"Got there and realised I'd left {loop.carry} at home.",
+                    at, 0.35, origin="lived-open-loop", category="experience",
+                ),
+            ]  # fmt: skip
+            continue
         if not _still_a_to_do(loop.text):
             # Formed before the rules knew better ("see one like that soon enough").
             output.append(_event(DROPPED, loop, at, None, reason="not something to do"))
