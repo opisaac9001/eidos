@@ -187,6 +187,7 @@ from eidos.application.renegotiations import (
     reflective_renegotiation_offer_events,
     renegotiation_response_events,
 )
+from eidos.application.repair_jobs import repair_job_events
 from eidos.application.rescheduling import reflective_rescheduling_events
 from eidos.application.resident_social import resident_social_events
 from eidos.application.romance import current_arc, romance_events
@@ -2927,6 +2928,20 @@ class Life(LifeConversation):
         pending.extend(self._open_loops(tick))
         if not self.authored_scenario:
             town = self._world_catalog(history + pending)
+            pending.extend(
+                repair_job_events(
+                    history + pending,
+                    current,
+                    at_work=tick.state.awake
+                    and tick.state.location_id == "workshop"
+                    and _at_work(self._planning(history + pending), current),
+                    customers={
+                        pid: person.name
+                        for pid, person in town.people.items()
+                        if pid not in {"ellis", "pathos"}
+                    },
+                )
+            )
             pending.extend(
                 gossip_events(
                     history + pending,

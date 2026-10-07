@@ -127,6 +127,14 @@ def _first(name: str) -> str:
     return name.split()[0] if name else "someone"
 
 
+def _the(item: str) -> str:
+    """'a Roberts radio' -> 'the Roberts radio'."""
+    for article in ("a ", "an "):
+        if item.startswith(article):
+            return "the " + item[len(article) :]
+    return item
+
+
 def _sources(
     history: Sequence[DomainEvent], at: datetime, names: Mapping[str, str]
 ) -> list[tuple[str, str, str, float, bool, DomainEvent]]:
@@ -144,6 +152,9 @@ def _sources(
         "commitment.missed",
         "time.felt",
         "gossip.heard",
+        "work.job_setback",
+        "work.job_finished",
+        "work.job_collected",
     )
     for event in events_of(history, *kinds)[-40:]:
         try:
@@ -239,6 +250,15 @@ def _sources(
                 found.append(("dread:work-tomorrow", "dread", "work tomorrow", 0.25, False, event))
             elif p.get("feeling") == "day_off":
                 found.append(("contentment:day-off", "contentment", "a day off", 0.3, False, event))
+        elif event.kind in {"work.job_setback", "work.job_finished"}:
+            item = _the(str(p.get("item", "")))
+            kind = "irritation" if event.kind == "work.job_setback" else "satisfaction"
+            strength = 0.35 if kind == "irritation" else 0.3 + 0.15 * bool(p.get("setback"))
+            found.append((f"{kind}:{p.get('job_id')}", kind, item, strength, True, event))
+        elif event.kind == "work.job_collected" and p.get("feeling") == "contentment":
+            owner = str(p.get("owner", ""))
+            about = f"{owner.split()[0] if owner and not owner.startswith(('a ', 'an ')) else 'them'} being pleased with {_the(str(p.get('item', '')))}"
+            found.append((f"contentment:{p.get('job_id')}", "contentment", about, 0.3, True, event))
         elif event.kind == "gossip.heard" and p.get("holder_id") == "pathos":
             subject = str(p.get("subject_id"))
             if subject in names and p.get("story") == "family_worry":

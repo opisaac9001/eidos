@@ -207,6 +207,10 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     for item in snapshot.get("activity_execution") or []:
         if isinstance(item, Mapping) and item.get("is_working") and item.get("title"):
             found.append(Cue("doing", str(item["title"])))
+            if "workshop" in str(item["title"]).casefold():
+                # At the bench: the actual job in front of him, not "a shift".
+                bench = [str(line) for line in snapshot.get("on_the_bench") or [] if line]
+                found.extend(Cue("doing", line, 1.4) for line in bench[:2])
     budget = snapshot.get("time_budget") or {}
     if isinstance(budget, Mapping) and budget.get("next_plan"):
         when = budget.get("when")

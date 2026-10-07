@@ -35,6 +35,7 @@ from eidos.application.outreach import nearly_told_you
 from eidos.application.personal_journeys import journey_context
 from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
+from eidos.application.repair_jobs import bench_view
 from eidos.application.self_interview import Question, interview_report, questions_for
 from eidos.application.selfhood import selfhood_context
 from eidos.application.social_preferences import social_preference_events
@@ -205,6 +206,9 @@ class LifeConversation(LifeProjections):
         meaning = [str(loop["text"]) for loop in loops_view(history, at)[:3]]
         if meaning:
             context["meaning_to"] = meaning
+        bench = bench_view(history, at)
+        if bench:
+            context["on_the_bench"] = bench
         return context
 
     async def _advance(self, hours: float) -> None:

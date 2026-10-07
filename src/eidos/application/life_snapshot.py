@@ -30,6 +30,7 @@ from eidos.application.opinions import his_views
 from eidos.application.personal_journeys import journey_context
 from eidos.application.place_discovery import known_place_ids
 from eidos.application.reaching_out import texts_view
+from eidos.application.repair_jobs import bench_view
 from eidos.application.selfhood import selfhood_view
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.time_feel import time_feel_now
@@ -680,6 +681,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "texts": texts_view(history),
         "open_loops": loops_view(history, state.simulated_at),
         "body_now": body_now(history, state.simulated_at),
+        "on_the_bench": bench_view(history, state.simulated_at),
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),
