@@ -57,7 +57,8 @@ def _at(event: DomainEvent) -> datetime | None:
 def _opinion(event: DomainEvent) -> Opinion | None:
     p = event.payload
     when = _at(event)
-    if when is None:
+    # opinion.formed is shared with his views on the town's rows (town_issues.py).
+    if when is None or not p.get("holder") or not p.get("about"):
         return None
     return Opinion(
         str(p.get("holder")), str(p.get("about")), float(p.get("value", 0) or 0),

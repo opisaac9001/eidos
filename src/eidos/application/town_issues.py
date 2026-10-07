@@ -636,6 +636,9 @@ def views(history: Sequence[DomainEvent]) -> dict[str, View]:
             if issue_id in output:
                 output[issue_id] = _with(output[issue_id], ellis_heard=True)
             continue
+        if "issue_id" not in event.payload or "lean" not in event.payload:
+            # opinion.formed is shared with people's opinions of each other (opinions.py).
+            continue
         lean = float(event.payload["lean"])
         previous = output.get(issue_id)
         output[issue_id] = View(

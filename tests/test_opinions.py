@@ -101,3 +101,26 @@ def test_news_travels_more_readily_between_people_who_trust_each_other() -> None
         return count
 
     assert news and spread(0.9) > spread(0.05)
+
+
+def test_town_views_and_opinions_of_people_share_an_event_kind_without_tripping() -> None:
+    """A person-opinion with no 'lean' stopped his world (KeyError in town_issues.views)."""
+    from eidos.application.opinions import opinions
+    from eidos.application.town_issues import views
+
+    at = datetime(2026, 8, 27, 2, tzinfo=timezone.utc)
+    about_a_person = DomainEvent(
+        "opinion.formed",
+        "pathos",
+        {"holder": "mara", "about": "pathos", "value": 0.3, "reason": "he helped",
+         "simulated_at": at.isoformat()},
+    )  # fmt: skip
+    about_the_town = DomainEvent(
+        "opinion.formed",
+        "pathos",
+        {"issue_id": "car-park", "lean": 0.4, "side": "for", "strength": 0.5,
+         "text": "fair enough", "simulated_at": at.isoformat(), "owner": "pathos"},
+    )  # fmt: skip
+    history = [about_a_person, about_the_town]
+    assert list(views(history)) == ["car-park"]
+    assert [(o.holder, o.about) for o in opinions(history, at)] == [("mara", "pathos")]
