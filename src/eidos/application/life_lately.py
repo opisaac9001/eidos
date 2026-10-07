@@ -72,7 +72,8 @@ async def life_lately_events(
             or is_routine_note(str(p.get("text", "")))
         ):
             continue
-        day.append((float(p.get("importance", 0.3) or 0.3), str(p.get("text", ""))))
+        # With the day it happened, or the model guesses one ("Tuesday" for a Wednesday).
+        day.append((float(p.get("importance", 0.3) or 0.3), f"{when:%A}: {p.get('text', '')}"))
     today = [text for _, text in sorted(day, key=lambda item: -item[0])[:10]]
     context = {
         "task": "life lately",
