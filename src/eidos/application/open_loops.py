@@ -270,9 +270,21 @@ def open_loop_events(
             )
 
     for loop in loops:
+        if not _still_a_to_do(loop.text):
+            # Formed before the rules knew better ("see one like that soon enough").
+            output.append(_event(DROPPED, loop, at, None, reason="not something to do"))
+            continue
         evidence = _done_by(history, loop)
         if evidence is not None:
             output.append(_event(DONE, loop, at, evidence))
+            continue
+        if (
+            loop.person_id
+            and _CONTACTING.search(loop.text)
+            and _contacted_lately(history, loop.person_id, loop.formed_at)
+        ):
+            # He'd been in touch just before the thought: already done.
+            output.append(_event(DONE, loop, at, None))
             continue
         cue = (
             None
@@ -374,14 +386,25 @@ def _what_he_meant(
     return found
 
 
+def _still_a_to_do(text: str) -> bool:
+    """Whether a loop's words are still something one could do, by today's rules."""
+    return intended(f"Should {text}.") is not None
+
+
 def _contacted_lately(history: Sequence[DomainEvent], person_id: str, at: datetime) -> bool:
     for event in reversed(events_of(history, "contact.reached_out", "family.contact")[-12:]):
         try:
-            if at - _when(event) > timedelta(hours=6):
-                return False
+            since = at - _when(event)
         except (KeyError, ValueError):
             continue
-        if event.payload.get("person_id") == person_id:
+        if since < timedelta(0):
+            continue  # after the moment in question
+        if since > timedelta(hours=6):
+            return False
+        unanswered = event.payload.get("missed") is True or (
+            event.payload.get("channel") == "call" and not event.payload.get("text")
+        )
+        if event.payload.get("person_id") == person_id and not unanswered:
             return True
     return False
 

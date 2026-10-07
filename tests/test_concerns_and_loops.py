@@ -268,3 +268,40 @@ def test_a_call_nobody_answered_doesnt_tick_it_off() -> None:
         )
     )
     assert not any(e.kind == DONE for e in hour(history, AT + timedelta(hours=2)))
+
+
+def test_old_loops_are_swept_by_todays_rules() -> None:
+    from eidos.application.open_loops import DROPPED
+
+    junk = DomainEvent(
+        FORMED,
+        "pathos",
+        {
+            "intention_id": "loop:old",
+            "text": "see one like that soon enough",
+            "importance": 0.4,
+            "simulated_at": AT.isoformat(),
+        },
+    )
+    swept = hour([junk], AT + timedelta(hours=1))
+    assert [(e.kind, e.payload.get("reason")) for e in swept] == [(DROPPED, "not something to do")]
+
+
+def test_a_check_in_he_had_just_done_is_already_done() -> None:
+    texted = DomainEvent(
+        "contact.reached_out",
+        "pathos",
+        {"person_id": "rowan", "text": "How's your mum?", "simulated_at": AT.isoformat()},
+    )
+    loop = DomainEvent(
+        FORMED,
+        "pathos",
+        {
+            "intention_id": "loop:rowan",
+            "text": "check in on Rowan",
+            "person_id": "rowan",
+            "importance": 0.6,
+            "simulated_at": (AT + timedelta(hours=1)).isoformat(),
+        },
+    )
+    assert [e.kind for e in hour([texted, loop], AT + timedelta(hours=2))] == [DONE]
