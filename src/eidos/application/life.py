@@ -68,7 +68,7 @@ from eidos.application.family import FAMILY_HOME, christmas_events, family_event
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
 from eidos.application.far_friends import far_friend_events
-from eidos.application.feelings import feeling_events
+from eidos.application.feelings import feeling_events, mood_from_feelings
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.friends_lives import (
@@ -577,8 +577,12 @@ class Life(LifeConversation):
             # ...and he knows it: the named emotion follows, not an hour later.
             pending.extend(
                 emotion_sample_events(
-                    history + pending, felt_state, state.simulated_at, whole_hour=False
-                )
+                    history + pending,
+                    felt_state,
+                    state.simulated_at,
+                    whole_hour=False,
+                    felt=mood_from_feelings(history + pending, state.simulated_at),
+                )  # fmt: skip
             )
         self.store.append("pathos", pending, len(history))
         return text is not None
@@ -3806,7 +3810,14 @@ class Life(LifeConversation):
         pending.extend(appraisals)
         episodes, tick.state = affect_episode_events(history + pending, tick.state, current)
         pending.extend(episodes)
-        pending.extend(emotion_sample_events(history + pending, tick.state, current))
+        pending.extend(
+            emotion_sample_events(
+                history + pending,
+                tick.state,
+                current,
+                felt=mood_from_feelings(history + pending, current),
+            )
+        )
         regulation_events, tick.state = emotional_regulation_events(
             history + pending,
             tick.state,

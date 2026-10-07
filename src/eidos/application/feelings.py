@@ -102,6 +102,33 @@ def _step(live: dict[str, Feeling], event: DomainEvent) -> dict[str, Feeling]:
 _LIVE: IncrementalFold[dict[str, Feeling]] = IncrementalFold(dict, _step)
 
 
+# How a feeling about something leaves him, when nothing else is colouring the day.
+_MOOD = {
+    "worry": "worried",
+    "sadness": "a bit low",
+    "excitement": "looking forward to something",
+    "dread": "uneasy",
+    "relief": "relieved",
+    "irritation": "irritated",
+    "fondness": "warm",
+    "hurt": "a bit hurt",
+    "satisfaction": "pleased",
+    "self_reproach": "annoyed with himself",
+    "guilt": "guilty",
+    "contentment": "content",
+}
+
+
+def mood_from_feelings(
+    history: Sequence[DomainEvent], at: datetime, threshold: float = 0.2
+) -> str | None:
+    """What his strongest feeling about something makes him, if it's strong enough."""
+    live = live_feelings(history, at)
+    if not live or live[0].now(at) < threshold:
+        return None
+    return _MOOD.get(live[0].kind)
+
+
 def live_feelings(history: Sequence[DomainEvent], at: datetime) -> list[Feeling]:
     """What he's feeling now, strongest first."""
     return sorted(

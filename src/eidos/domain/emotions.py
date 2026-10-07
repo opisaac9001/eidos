@@ -50,6 +50,10 @@ class EmotionalSpeechBias:
     target_words: int
 
 
+# Labels that only say nothing much is going on.
+_NEUTRAL = frozenset({"quiet", "calm", "alertness"})
+
+
 def classify_emotion(valence: float, arousal: float, sustained_low_hours: int = 0) -> str:
     _dimensions(valence, arousal)
     if sustained_low_hours >= 72 and valence <= -0.35:
@@ -160,9 +164,13 @@ def emotion_sample_events(
     at: datetime,
     *,
     whole_hour: bool = True,
+    felt: str | None = None,
 ) -> list[DomainEvent]:
     """Name how he feels now. Between hours (``whole_hour`` False) the sample keeps his
-    feelings current without counting another hour towards how long he has been low."""
+    feelings current without counting another hour towards how long he has been low.
+
+    ``felt`` is what his strongest feeling about something makes him (worried, pleased):
+    when the overall mood is only neutral, that's how he'd say he is."""
     if at.utcoffset() is None:
         raise ValueError("Emotion sampling time must be timezone-aware")
     sample_id = f"emotion:{at.isoformat()}" + ("" if whole_hour else ":felt")
@@ -176,6 +184,8 @@ def emotion_sample_events(
         previous.sustained_low_hours + (1 if whole_hour else 0) if state.valence <= -0.35 else 0
     )
     label = classify_emotion(state.valence, state.arousal, low_hours)
+    if felt and label in _NEUTRAL:
+        label = felt
     intensity = _clamp(max(abs(state.valence), abs(state.arousal - 0.35) * 1.25))
     pattern = "prolonged" if low_hours >= 72 else "sustained" if low_hours >= 24 else "transient"
     positive, negative = _recent_opposed_appraisals(history, at, previous)
