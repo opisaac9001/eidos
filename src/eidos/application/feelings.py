@@ -19,6 +19,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
+from eidos.application.open_loops import _plainly
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
 
@@ -38,7 +39,8 @@ KINDS: Mapping[str, tuple[float, float, str, str]] = {
     "irritation": (-0.4, 3, "wait", "annoyed about {about}"),
     "fondness": (0.4, 12, "savour", "glad to hear from {about}"),
     "hurt": (-0.3, 24, "wait", "a bit hurt {about} hasn't replied"),
-    "satisfaction": (0.3, 4, "savour", "pleased to have {about} done"),
+    "satisfaction": (0.3, 4, "savour", "pleased with how {about} came out"),
+    "accomplishment": (0.3, 4, "savour", "glad I finally got round to it: {about}"),
     "self_reproach": (-0.3, 6, "act", "annoyed with myself for forgetting to {about}"),
     "guilt": (-0.5, 48, "act", "guilty about letting {about} down"),
     "contentment": (0.35, 6, "savour", "glad of {about}"),
@@ -113,6 +115,7 @@ _MOOD = {
     "fondness": "warm",
     "hurt": "a bit hurt",
     "satisfaction": "pleased",
+    "accomplishment": "pleased",
     "self_reproach": "annoyed with himself",
     "guilt": "guilty",
     "contentment": "content",
@@ -243,9 +246,9 @@ def _sources(
         elif event.kind == "intention.done":
             found.append(
                 (
-                    f"satisfaction:{p.get('intention_id')}",
-                    "satisfaction",
-                    str(p.get("text")),
+                    f"accomplishment:{p.get('intention_id')}",
+                    "accomplishment",
+                    _plainly(str(p.get("text"))),
                     0.3,
                     False,
                     event,

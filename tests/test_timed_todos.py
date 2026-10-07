@@ -64,3 +64,23 @@ def test_setting_off_somewhere_else_isnt_the_cue() -> None:
     history.append(set_off(MORNING - timedelta(days=0, hours=0), to="cafe", origin="workshop"))
     out = hour(history, MORNING + timedelta(minutes=10), location_id="cafe")
     assert not any(e.kind == DONE for e in out)
+
+
+def test_a_shift_being_booked_doesnt_tick_off_what_to_take() -> None:
+    history = _meaning_to("y")
+    history.append(
+        DomainEvent(
+            "schedule.created",
+            "pathos",
+            {
+                "schedule_id": "work-rota-2026-09-03",
+                "title": "Shift at the repair workshop",
+                "starts_at": "2026-09-03T10:00:00+00:00",
+                "location_id": "workshop",
+                "actor_id": "pathos",
+                "simulated_at": (EVENING + timedelta(hours=10)).isoformat(),
+            },
+        )
+    )
+    out = hour(history, EVENING + timedelta(hours=10, minutes=20))
+    assert not any(e.kind == DONE for e in out)

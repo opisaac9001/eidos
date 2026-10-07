@@ -46,7 +46,9 @@ _WORD = re.compile(r"[a-z']+")
 _PLAIN = frozenset(
     "that this them they their there then with from have just still some about later "
     "today tonight tomorrow really maybe probably properly finally again soon first "
-    "before after into over back down make sure get got going something yet".split()
+    "before after into over back down make sure get got going something yet "
+    # Filler counted as content: "the" tied "bring my chisel to the workshop" to a shift.
+    "the and for you your his her our its not but".split()
 )
 _CONTACTING = re.compile(
     r"\b(text|ring|call|phone|message|reply|write|check in|catch up|see how|ask|tell)\b",
@@ -526,6 +528,8 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
             if contacting and named:
                 return event
             continue
+        if loop.carry:
+            continue  # taking something is done by taking it, not by any plan to be there
         theirs = _content(str(payload.get("title") or payload.get("text") or ""))
         if words and len(words & theirs) >= max(2, (len(words) + 1) // 2):
             return event
