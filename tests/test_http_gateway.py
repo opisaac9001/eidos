@@ -77,6 +77,37 @@ class GatewayTests(unittest.TestCase):
             context = json.loads(self.payload["messages"][1]["content"])
             self.assertEqual("personal_relationship_context" in context, allowed)
 
+    def test_a_friends_reply_reaches_the_model_with_their_life_and_his_name(self):
+        """It was stripped as unowned, so real replies invented plans and said 'Pathos'."""
+        import asyncio as running
+        from datetime import datetime, timedelta, timezone
+
+        from eidos.application.reaching_out import REACHED, reply_events
+        from eidos.domain.events import DomainEvent
+
+        at = datetime(2026, 8, 26, 12, tzinfo=timezone.utc)
+        sent = DomainEvent(
+            REACHED,
+            "pathos",
+            {
+                "contact_id": "c1",
+                "person_id": "rowan",
+                "person_name": "Rowan",
+                "channel": "text",
+                "text": "How's your mum doing?",
+                "reply_due_at": at.isoformat(),
+                "simulated_at": (at - timedelta(hours=1)).isoformat(),
+            },
+        )
+        running.run(
+            reply_events([sent], at, self.gateway, lambda person: {"where_they_are": "at the park"})
+        )
+        context = json.loads(self.payload["messages"][1]["content"])
+        self.assertEqual(context["scene_audience"], "Patrick")
+        relationship = context["personal_relationship_context"]
+        self.assertEqual(relationship["right_now"], {"where_they_are": "at the park"})
+        self.assertIn("answering only what he actually said", relationship["instruction"])
+
     def test_real_http_contract_and_role_isolation(self):
         result = asyncio.run(self.gateway.generate(self.request()))
         self.assertEqual(self.path, "/v1/chat/completions")

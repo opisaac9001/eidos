@@ -281,10 +281,13 @@ async def reply_events(
                 "person": name,
                 "scene_mode": True,
                 "scene_speaker": name,
-                "scene_audience": "Pathos",
+                "scene_audience": "pathos",
                 "scene_topic": f"replying to his text: {sent.payload.get('text', '')}",
-                "prior_turns": [{"speaker": "Pathos", "text": sent.payload.get("text", "")}],
+                "prior_turns": [{"speaker": "Patrick", "text": sent.payload.get("text", "")}],
                 "personal_relationship_context": {
+                    # Labelled as theirs, about him, or the gateway keeps it from the model.
+                    "owner": name,
+                    "about": "pathos",
                     "what_is_going_on_in_their_life": their_life,
                     "right_now": right_now,
                     "instruction": (

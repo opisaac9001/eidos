@@ -224,6 +224,8 @@ async def _speak(
                 for e in recent[-5:]
             ],
             "personal_relationship_context": {
+                "owner": name,
+                "about": "the group chat (Patrick and their other close friends)",
                 "what_is_going_on_in_their_life": their_life,
                 "right_now": dict(whereabouts(speaker)) if whereabouts else {},
                 "instruction": (

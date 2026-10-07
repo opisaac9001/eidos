@@ -34,6 +34,20 @@ _ROUTINE = re.compile(
 MERGE_HOUR = 3
 
 
+# The notes that carry stock texture; "Done: ..." is kept, it says what he got done.
+_TEXTURED = re.compile(
+    r"^(?:made a start: |still at it: |headed out for this: |started the planned activity: |"
+    r"stayed with the planned activity: |set out for the planned activity: )",
+    re.IGNORECASE,
+)
+
+
+def is_routine_note(text: str) -> bool:
+    """A routine note with stock texture ("Made a start: ...", "Still at it: ..."), not a
+    moment that stood out."""
+    return bool(_TEXTURED.match(text.strip()))
+
+
 def _words(text: str) -> set[str]:
     return {w for w in _WORD.findall(text.casefold()) if len(w) >= 4 and w not in _PLAIN}
 

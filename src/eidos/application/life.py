@@ -110,7 +110,12 @@ from eidos.application.inner_life import (
     record_dream_events,
     waking_dream_events,
 )
-from eidos.application.inner_stream import CALLS_FROM_LEVEL, contact_reasons, felt_tone
+from eidos.application.inner_stream import (
+    CALLS_FROM_LEVEL,
+    contact_reasons,
+    felt_tone,
+    near_repeat,
+)
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.life_context import latest_weather
 from eidos.application.life_context import mood_name as mood_name
@@ -130,7 +135,12 @@ from eidos.application.memory import (
     recall,
     terms,
 )
-from eidos.application.memory_life import brooded_access, formative_events, routine_merge_events
+from eidos.application.memory_life import (
+    brooded_access,
+    formative_events,
+    is_routine_note,
+    routine_merge_events,
+)
 from eidos.application.memory_retention import memory_retention_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability
@@ -3255,6 +3265,9 @@ class Life(LifeConversation):
         )
         if not text:
             return
+        if near_repeat(text, recent_encounters):
+            # The same moment told again ("Ellis waves... the blueprint", 10:00 and 13:00).
+            return
         encounter = DomainEvent(
             "npc.encountered",
             "pathos",
@@ -4257,6 +4270,9 @@ def _day_memories(
             or payload.get("category") == "dream"
             or not isinstance(text, str)
             or not text.strip()
+            # Routine notes carry stock texture ("A mug cooled by the sink") that his
+            # reflection kept reading as the day's meaning.
+            or is_routine_note(text)
         ):
             continue
         importance = payload.get("importance")

@@ -17,7 +17,7 @@ from typing import Sequence
 
 from eidos.application.friends_lives import friends_lives_context
 from eidos.application.inner_life import active_concerns
-from eidos.application.memory_life import stayed_with_me
+from eidos.application.memory_life import is_routine_note, stayed_with_me
 from eidos.application.open_loops import loops_view
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -66,7 +66,11 @@ async def life_lately_events(
         if when is None or when < since:
             break
         p = event.payload
-        if p.get("owner", "pathos") != "pathos" or p.get("category") == "dream":
+        if (
+            p.get("owner", "pathos") != "pathos"
+            or p.get("category") == "dream"
+            or is_routine_note(str(p.get("text", "")))
+        ):
             continue
         day.append((float(p.get("importance", 0.3) or 0.3), str(p.get("text", ""))))
     today = [text for _, text in sorted(day, key=lambda item: -item[0])[:10]]

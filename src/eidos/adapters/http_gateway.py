@@ -316,6 +316,7 @@ ROLE_FIELDS = {
         "alone",
         "worn_out",
         "avoid_opening",
+        "avoid_phrase",
         "not_again",
         "half_awake",
         "stream_pulse_id",
@@ -569,7 +570,7 @@ COMPACT_PROMPTS = {
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
-        "Start differently from the recent_thoughts, never start with dont_start_with, and never use any of the avoid_words. "
+        "Start differently from the recent_thoughts, never start with dont_start_with, never use dont_use_phrase or any of the avoid_words. "
         "Fit the time_of_day and time_of_year. Name only people in this moment's details, "
         "never someone only in recent_thoughts. recent_thoughts are only things he thought, "
         "not things that happened. "
@@ -713,6 +714,8 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["avoid_words"] = [str(word) for word in tired][:6]
         if context.get("avoid_opening"):
             details["dont_start_with"] = str(context["avoid_opening"])
+        if context.get("avoid_phrase"):
+            details["dont_use_phrase"] = str(context["avoid_phrase"])
         tried = context.get("not_again")
         if isinstance(tried, list) and tried:
             # Thoughts it just had that weren't kept: something different this time.
@@ -873,6 +876,10 @@ class HTTPModelGateway(ModelGateway):
                 or personal.get("owner") in {"pathos", "user"}
             ):
                 context.pop("personal_relationship_context", None)
+            # People speak to him by his name, never the system's ("Thanks, Pathos").
+            for key in ("scene_audience", "scene_speaker"):
+                if str(context.get(key, "")).casefold() == "pathos":
+                    context[key] = "Patrick"
         if request.capability in PERSONAL_ROLES:
             system += calendar_identity(context.get("time"))
         if request.capability == "pathos":

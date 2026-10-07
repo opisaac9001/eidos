@@ -48,7 +48,15 @@ _PLAIN = frozenset(
     "today tonight tomorrow really maybe probably properly finally again soon first "
     "before after into over back down make sure get got going something yet".split()
 )
-_CONTACTING = re.compile(r"\b(text|ring|call|phone|message|reply|write)\b", re.IGNORECASE)
+_CONTACTING = re.compile(
+    r"\b(text|ring|call|phone|message|reply|write|check in|catch up|see how|ask|tell)\b",
+    re.IGNORECASE,
+)
+# Things one can't put on a to-do list.
+_NOT_DOING = frozenset(
+    "see remember think wonder know feel be stop keep wait hope learn accept relax "
+    "believe trust forget mind admit".split()
+)
 _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
 
 
@@ -134,6 +142,15 @@ def intended(thought: str) -> str | None:
             continue  # "don't have to", "no need to": nothing to do
         rest = sentence[match.end() :].strip(" .!?…,;:-")
         rest = re.split(r"\b(?:but|though|because|before|if|so)\b|[,;:—-]", rest)[0].strip()
+        rest = re.sub(
+            r"^(?:(?:definitely|really|probably|actually|properly|just|maybe|honestly)\s+)+",
+            "",
+            rest,
+            flags=re.I,
+        )
+        first = rest.split(" ", 1)[0].casefold() if rest else ""
+        if first in _NOT_DOING:
+            continue  # "see one like that soon", "remember why I bought it": not a to-do
         if len(_content(rest)) >= 2 and len(rest) <= 90:
             return rest[0].lower() + rest[1:]
     return None
@@ -189,6 +206,9 @@ def open_loop_events(
 
     def form(text: str, source: DomainEvent, origin: str, importance: float, **cues: Any) -> None:
         words = _content(text)
+        person = cues.get("person_id")
+        if person and _CONTACTING.search(text) and _contacted_lately(history, str(person), at):
+            return  # he's only just been in touch with them
         for loop in [*loops, *(_pending_loops(output))]:
             theirs = _content(loop.text)
             if theirs and len(words & theirs) / len(words | theirs) >= 0.5:
@@ -352,6 +372,18 @@ def _what_he_meant(
         if text is not None:
             found.append((event, text, "said" if said else "thought"))
     return found
+
+
+def _contacted_lately(history: Sequence[DomainEvent], person_id: str, at: datetime) -> bool:
+    for event in reversed(events_of(history, "contact.reached_out", "family.contact")[-12:]):
+        try:
+            if at - _when(event) > timedelta(hours=6):
+                return False
+        except (KeyError, ValueError):
+            continue
+        if event.payload.get("person_id") == person_id:
+            return True
+    return False
 
 
 def _pending_loops(output: Sequence[DomainEvent]) -> list[Loop]:

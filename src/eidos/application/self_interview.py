@@ -127,16 +127,21 @@ def questions_for(
     if chat:
         found.append(Question("group chat", "What's been going on in the group chat?", tuple(chat)))
     last = nights(history, at, 1)
+    restless = any(
+        (when := _at(e)) is not None and at - when <= timedelta(hours=14)
+        for e in events_of(history, "sleep.restless")[-3:]
+    )
     if last:
-        short = last[0] < 6.5
+        short = last[0] < 6.5 or restless
         found.append(
             Question(
                 "sleep",
                 "How did you sleep last night?",
                 ("badly short not much tired rough" if short else "fine well decent good okay",),
                 contradictions=(
-                    ("slept great", "slept really well", "best sleep") if short
-                    else ("barely slept", "terrible night", "didn't sleep")
+                    ("slept great", "slept really well", "best sleep", "slept well") if short
+                    else ("barely slept", "terrible night", "didn't sleep", "not great",
+                          "restless", "badly", "rough night")
                 ),
             )
         )  # fmt: skip

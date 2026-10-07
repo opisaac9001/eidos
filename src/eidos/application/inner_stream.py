@@ -1268,6 +1268,21 @@ class InnerStream:
         )
         if worn_opening:
             context["avoid_opening"] = worn_opening
+        # A phrase he keeps leaning on anywhere in the thought ("Wonder if Mara's...", in
+        # every other thought one evening) is a tic too.
+        phrases: Counter[str] = Counter()
+        for thought in self.store.recent(8):
+            said = _WORDS.findall(thought.text.casefold())
+            phrases.update(
+                {
+                    " ".join(pair)
+                    for pair in zip(said, said[1:])
+                    if any(len(word) >= 4 and word not in _COMMON for word in pair)
+                }
+            )
+        worn_phrase = next((phrase for phrase, count in phrases.most_common(5) if count >= 3), None)
+        if worn_phrase:
+            context["avoid_phrase"] = worn_phrase
         tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired

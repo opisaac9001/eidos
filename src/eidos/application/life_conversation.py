@@ -728,6 +728,8 @@ class LifeConversation(LifeProjections):
         for question, context, at in prompts:
             scratch: list[DomainEvent] = []
             answer = await perform_pathos_reply(self.gateway, context, at, scratch)
+            if not answer:  # one more try, as anyone asked twice would answer
+                answer = await perform_pathos_reply(self.gateway, context, at, scratch)
             asked.append((question, answer or ""))
         return interview_report(asked)
 
