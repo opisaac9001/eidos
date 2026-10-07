@@ -18,7 +18,7 @@ import json
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Collection, Mapping, Sequence
 
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
@@ -41,10 +41,18 @@ _TOPICS = (
     "a moan about work",
     "a programme they've been watching",
     "the weather",
-    "asking if anyone fancies a pint later in the week",
     "a photo of something they saw today",
     "an old memory of something the group did together",
 )
+# Plans a friend might suggest to the group: (what, where, hour, hours, kind).
+_PLANS = (
+    ("a film at the Regent", "cinema", 19, 2, "film"),
+    ("music at the Listening Room", "music-room", 20, 2, "music"),
+    ("a walk along the river", "riverside", 11, 1, "walk"),
+    ("a wander round the market", "market-hall", 11, 1, "market"),
+    ("a coffee at Juniper", "cafe", 10, 1, "coffee"),
+)
+PLAN_PREFIX = "chat-plan-"
 _QUESTION = re.compile(r"\?|\b(anyone|who's|fancy|are you|you lot)\b", re.IGNORECASE)
 _SCHEMA = {
     "type": "object",
@@ -106,6 +114,7 @@ async def group_chat_events(
     whereabouts: Callable[[str], Mapping[str, object]] | None = None,
     on_his_mind: Sequence[str] = (),
     mood: str = "",
+    places: Collection[str] = (),
 ) -> list[DomainEvent]:
     """This hour on the group chat: a friend may post or answer, and he may read and reply.
 
@@ -141,7 +150,13 @@ async def group_chat_events(
         last = recent[-1] if recent else None
         thread_live = last is not None and at - _at(last) <= timedelta(hours=1)
         chance = 0.45 if thread_live else 0.3 if at.hour >= 18 else 0.12
-        if _roll("chat", hour_key) < chance:
+        plan = _plan_to_suggest(history, at, places) if not thread_live else None
+        if plan is not None and _roll("chat", hour_key) < chance:
+            speaker = sorted(members)[int(_roll("planner", hour_key) * len(members))]
+            await _suggest(
+                history, at, gateway, speaker, members, plan, recent, whereabouts, output
+            )
+        elif _roll("chat", hour_key) < chance:
             others = sorted(p for p in members if not last or p != last.payload.get("speaker_id"))
             speaker = others[int(_roll("who", hour_key) * len(others))]
             topic = (
@@ -150,6 +165,14 @@ async def group_chat_events(
                 else _TOPICS[int(_roll("topic", hour_key) * len(_TOPICS))]
             )
             await _speak(history, at, gateway, speaker, members, topic, recent, whereabouts, output)
+    # A plan he's decided on gets his answer in the chat, yes or no.
+    if free_to_look:
+        for decided in _plans_to_answer(history):
+            await _his_reply(
+                history, at, gateway, [*recent][-8:], on_his_mind, mood, output,
+                stance=decided,
+            )  # fmt: skip
+            break
     # He looks when he's free, and sometimes says something.
     seen = [*unread(history), *(e for e in output if e.kind == MESSAGE)]
     if free_to_look and seen:
@@ -182,6 +205,10 @@ def _wants_to_reply(
     ]
     if len(mine_today) >= HIS_POSTS_PER_DAY:
         return False
+    # A plan suggested is answered once he's decided, not straight away.
+    seen = [e for e in seen if not e.payload.get("invitation_id")]
+    if not seen:
+        return False
     text = " ".join(str(e.payload.get("text", "")) for e in seen)
     pull = 0.2
     if _QUESTION.search(text):
@@ -193,6 +220,118 @@ def _wants_to_reply(
     quiet_hours = (at - _at(mine_today[-1])).total_seconds() / 3600 if mine_today else 12.0
     pull *= float(1.02 ** min(quiet_hours * 6, 60))  # the longer he's been quiet, the stronger
     return bool(_roll("reply", str(seen[-1].event_id)) < min(0.9, pull))
+
+
+def _plan_to_suggest(
+    history: Sequence[DomainEvent], at: datetime, places: Collection[str]
+) -> tuple[str, str, int, int, str] | None:
+    """Now and then someone suggests doing something, a few days out; not if a plan is
+    already in the air."""
+    if not places or not 9 <= at.hour <= 21:
+        return None
+    recent = [
+        e
+        for e in events_of(history, "invitation.made")[-10:]
+        if str(e.payload.get("invitation_id", "")).startswith(PLAN_PREFIX)
+        and at - _at(e) < timedelta(days=4)
+    ]
+    if recent or _roll("plan", at.isoformat()[:13]) >= 0.15:
+        return None
+    options = [plan for plan in _PLANS if plan[1] in places]
+    if not options:
+        return None
+    return options[int(_roll("which-plan", at.date().isoformat()) * len(options))]
+
+
+def _plans_to_answer(history: Sequence[DomainEvent]) -> list[DomainEvent]:
+    """Group plans he's decided on and not yet answered in the chat."""
+    answered = {
+        str(e.payload.get("answers")) for e in messages(history, 40) if e.payload.get("answers")
+    }
+    return [
+        e
+        for e in events_of(history, "invitation.accepted", "invitation.declined")[-6:]
+        if str(e.payload.get("invitation_id", "")).startswith(PLAN_PREFIX)
+        and str(e.payload.get("invitation_id")) not in answered
+    ]
+
+
+async def _suggest(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    gateway: ModelGateway,
+    speaker: str,
+    members: Mapping[str, str],
+    plan: tuple[str, str, int, int, str],
+    recent: Sequence[DomainEvent],
+    whereabouts: Callable[[str], Mapping[str, object]] | None,
+    output: list[DomainEvent],
+) -> None:
+    """A friend suggests a plan: a real invitation to him, a message to the group."""
+    what, place_id, hour, hours, kind = plan
+    ahead = 2 + int(_roll("ahead", at.date().isoformat()) * 3)
+    day = at + timedelta(days=ahead)
+    if hour < 17:  # daytime plans are for the weekend
+        day = at + timedelta(days=max(1, (5 - at.weekday()) % 7 or 7))
+    starts = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+    name = members[speaker]
+    when = f"{starts:%A}"
+    said = await _speak(
+        history, at, gateway, speaker, members,
+        f"suggesting to the group: {what} on {when} (around {starts:%H:%M}), asking who's up for it",
+        recent, whereabouts, output,
+    )  # fmt: skip
+    if not said:
+        return
+    invitation_id = f"{PLAN_PREFIX}{speaker}-{at.date().isoformat()}"
+    message = output[-1]
+    output[-1] = DomainEvent(
+        message.kind,
+        message.aggregate_id,
+        {**message.payload, "invitation_id": invitation_id},
+    )
+    request_id = f"request-{invitation_id}"
+    due = at + timedelta(hours=1 + int(_roll("respond", invitation_id) * 3))
+    invited = DomainEvent(
+        "invitation.made",
+        "pathos",
+        {
+            "invitation_id": invitation_id,
+            "request_id": request_id,
+            "inviter_id": speaker,
+            "invitee_id": "pathos",
+            "person_id": speaker,
+            "location_id": place_id,
+            "starts_at": starts.isoformat(),
+            "activity_type": f"group_{kind}",
+            "response_due_at": due.isoformat(),
+            "text": f"{name} suggested {what} on {when} in the group chat.",
+            "simulated_at": at.isoformat(),
+        },
+        correlation_id=invitation_id,
+    )
+    output.append(invited)
+    output.append(
+        DomainEvent(
+            "social.request_opened",
+            "pathos",
+            {
+                "request_id": request_id,
+                "requester_id": speaker,
+                "responder_id": "pathos",
+                "action": "attend",
+                "target_id": speaker,
+                "title": f"{what[0].upper()}{what[1:]} with {name}",
+                "due_at": (starts + timedelta(hours=hours)).isoformat(),
+                "earliest_start": starts.isoformat(),
+                "location_id": place_id,
+                "duration_hours": hours,
+                "simulated_at": at.isoformat(),
+            },
+            causation_id=invited.event_id,
+            correlation_id=invitation_id,
+        )
+    )
 
 
 async def _speak(
@@ -271,9 +410,17 @@ async def _his_reply(
     on_his_mind: Sequence[str],
     mood: str,
     output: list[DomainEvent],
+    stance: DomainEvent | None = None,
 ) -> None:
     from eidos.application.bookings import remember
 
+    answering = (
+        "He has said yes to the plan; say so in a few words, e.g. 'count me in'."
+        if stance is not None and stance.kind == "invitation.accepted"
+        else "He can't make the plan; say so in a few words, kindly, without a long excuse."
+        if stance is not None
+        else ""
+    )
     request = ModelRequest(
         capability="pathos_text",
         task_version="1",
@@ -298,7 +445,8 @@ async def _his_reply(
                             "Patrick has just read the group chat with his closest friends. "
                             "Write what he posts in reply: one short casual line, British, the "
                             "way he'd really write in a group chat, answering what was said. "
-                            "Invent no news, plans or events. Return only the words."
+                            + answering
+                            + " Invent no news, plans or events. Return only the words."
                         ),
                     }
                 ),
@@ -322,6 +470,7 @@ async def _his_reply(
             "speaker_name": "Patrick",
             "text": text,
             "news": False,
+            **({"answers": str(stance.payload.get("invitation_id"))} if stance is not None else {}),
             "simulated_at": at.isoformat(),
         },
     )

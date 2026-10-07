@@ -3782,6 +3782,7 @@ class Life(LifeConversation):
                     str(concern.payload.get("text")) for concern in active_concerns(history)[-2:]
                 ],
                 mood=emotion.label,
+                places=frozenset(catalog.places),
             )
         )
 

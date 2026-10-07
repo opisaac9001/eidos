@@ -164,7 +164,7 @@ _STILL_WEIGHS = {"friend.life_event": timedelta(days=21)}
 _ANTICIPATED = re.compile(
     r"\b(dentist|doctor|gp|appointment|interview|hospital|exam|review|tax|court|wedding|"
     r"party|leaving do|birthday|holiday|trip|gig|concert|match|dinner|drinks|visit|"
-    r"date|course|class|christening|funeral|meet(?:ing)?)\b",
+    r"date|course|class|christening|funeral|meet(?:ing)?|film|music|market)\b",
     re.IGNORECASE,
 )
 _DREADED = re.compile(
