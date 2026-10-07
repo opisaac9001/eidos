@@ -292,7 +292,7 @@ def test_a_long_lifes_conversation_context_fits_a_local_model() -> None:
                 f"part_{n}": [f"a long line about his life {n} " * 8] * 10 for n in range(30)
             },
         },
-        "cognitive_workspace": [{"content": "attention " * 40}] * 30,
+        "cognitive_workspace": [{"content": "attention " * 40}] * 90,
         "memories": ["Beth's moving to Bristol."],
     }
     fitted = fit_pathos_context(context)

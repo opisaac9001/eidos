@@ -217,7 +217,9 @@ ROLE_PROMPTS["pathos_agency"] = (
     "really around him, or defer."
 )
 ROLE_PROMPTS["pathos"] += (
-    " nearly_told_you are things he almost messaged the user about and held back; he may "
+    " my_life_story is his own account of his life before Alderwick, the parts that bear on "
+    "what's being said; he can draw on it as anyone draws on their past, never reciting it. "
+    "nearly_told_you are things he almost messaged the user about and held back; he may "
     "mention one ('I nearly messaged you about...'). while_you_were_away is what's happened "
     "in his days since the user was last here; share a bit if it fits, never as a report."
     " left_hanging is a question of his you never answered last time; he may come back to "
@@ -292,6 +294,7 @@ ROLE_FIELDS = {
         "how_i_feel_about_people",
         "nearly_told_you",
         "while_you_were_away",
+        "my_life_story",
         "owes_honesty",
         "share_kind",
         "in_the_news",
@@ -605,7 +608,8 @@ COMPACT_TOKENS = {"murmur": 80, "oneiros": 110}
 # A long life's conversation context outgrew a local model's window (8,192 tokens on the
 # Dell), and the front of the request, where he is told who he is, was cut off. What is
 # least needed to answer goes first.
-PATHOS_CONTEXT_BUDGET = 14_000  # characters of context, roughly 3,500 tokens
+# Characters of context, roughly 7,000 tokens: his voice runs on a 16k-context model now.
+PATHOS_CONTEXT_BUDGET = 28_000
 PATHOS_SHEDDABLE = (
     "cognitive_workspace",
     "mind_layers",

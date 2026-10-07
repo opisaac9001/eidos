@@ -81,3 +81,20 @@ remain subjective beliefs, not silently corrected against hidden truth.
 Real-model tests show partial improvement, not acceptance: the 14B model still
 invents disposing of the old car and an intention to call his brother. Do not treat
 prompt instructions as validated guarantees. See the follow-up evaluation record.
+
+## His life story (patrick-life-story-v1, 2026-10-07)
+
+`domain/life_story.py` holds an authored first-person interview about his life before
+Alderwick: Wye and the Downs, his family, Gulliver, school, Philosophy and Computer Science
+at Bristol (and where the nickname came from), the graduate software job he left, why he
+came to Alderwick in January 2026, the workshop, what a good evening is, his love life
+(left open, as before), what he's like, what matters to him and what he's unsure about.
+It's written to be consistent with the authored background above and leaves out what the
+blend dropped (the old Bristol flat, the Volvo, freelance work).
+
+It is character background, never memory: nothing from it is recorded in his history. His
+voice gets the one or two passages that bear on what's being said (`my_life_story`), and
+the directive now says scenes from before Alderwick come only from those passages. This
+follows the finding that agents built from a long life interview behave more like the
+person than agents built from trait lists (Park et al., 2024). Edit or cut it freely; it
+changes nothing that has happened.

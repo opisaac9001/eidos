@@ -46,6 +46,7 @@ from eidos.domain.emotions import emotional_planning_bias, emotional_speech_bias
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.identity import identity_established_event, project_identity
+from eidos.domain.life_story import passages_for
 from eidos.domain.planning import PlanningState
 from eidos.domain.relationship_repairs import project_relationship_repairs
 from eidos.domain.scenes import (
@@ -748,6 +749,16 @@ class LifeConversation(LifeProjections):
         )
         context.update(honesty)
         pending.extend(honesty_events)
+        # The parts of his life story that bear on what's being said (authored background,
+        # never memories).
+        dialogue = context.get("recent_dialogue")
+        turns = (
+            [t for t in dialogue if isinstance(t, Mapping)] if isinstance(dialogue, list) else []
+        )
+        talked = " ".join([text, *(str(turn.get("text", "")) for turn in turns[-2:])])
+        story = passages_for(talked)
+        if story:
+            context["my_life_story"] = story
         return state, at, pending, context, reply_voice
 
     def interview_prompts(self) -> list[tuple[Question, dict[str, object], str]]:
