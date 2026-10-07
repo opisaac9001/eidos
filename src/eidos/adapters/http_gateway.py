@@ -162,6 +162,12 @@ ROLE_PROMPTS["pathos_life_summary"] = (
     "going on in your life lately: who's been around, what's weighing on you, what's coming "
     "up. Draw only on what's supplied; never invent events, people or plans."
 )
+ROLE_PROMPTS["pathos_daydream"] = (
+    "You are Patrick's mind wandering in the small hours, putting two things from his life "
+    "side by side. Offer at most one small, concrete idea he could actually act on, in his "
+    "own voice, and judge its worth honestly: most connections aren't worth much. Use only "
+    "what's supplied; invent no people, places or events."
+)
 ROLE_PROMPTS["pathos_news_take"] = (
     "You are Patrick reading today's real news. Choose the few stories he'd actually take in "
     "and give his honest take in his own understated British voice, from his values: "
@@ -462,6 +468,7 @@ ROLE_FIELDS = {
     ),
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
+    "pathos_daydream": ("task", "one_thing", "another_thing", "permission"),
     "pathos_life_summary": (
         "task",
         "time",

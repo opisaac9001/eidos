@@ -19,6 +19,7 @@ PERSONAL_ROLES = frozenset(
         "pathos_voice",
         "pathos_text",
         "pathos_life_summary",
+        "pathos_daydream",
     }
 )
 

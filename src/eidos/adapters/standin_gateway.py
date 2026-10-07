@@ -848,6 +848,19 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "pathos_daydream":
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "idea": "I could take the film camera to the workshop and photograph the hands on the bench.",
+                        "kind": "photo",
+                        "worth": 4,
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_life_summary":
             weighing = [str(item) for item in context.get("weighing_on_me") or []][:2]
             day = [str(item) for item in context.get("the_day_just_gone") or []][:2]

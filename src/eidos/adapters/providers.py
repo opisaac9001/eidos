@@ -96,6 +96,7 @@ ROLE_GROUPS: dict[str, tuple[str, ...]] = {
         "murmur",
         "reflection",
         "pathos_life_summary",
+        "pathos_daydream",
         "oneiros",
         "pathos_selfhood",
         "pathos_deliberation",

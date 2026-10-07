@@ -41,6 +41,7 @@ from eidos.application.cognitive_workspace import cognitive_workspace, recent_in
 from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import consolidation_events
 from eidos.application.day_rhythm import hour_today
+from eidos.application.daydreams import daydream_events
 from eidos.application.deliveries import delivery_events
 from eidos.application.development import (
     active_habit_context,
@@ -3539,6 +3540,14 @@ class Life(LifeConversation):
             # Overnight: routine runs together, and what he keeps going back to stays.
             tick.pending.extend(routine_merge_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(formative_events(tick.history + tick.pending, tick.current))
+            tick.pending.extend(
+                await daydream_events(
+                    tick.history + tick.pending,
+                    tick.current,
+                    self.gateway,
+                    asleep=not tick.state.awake,
+                )
+            )
             await self._consolidate(tick)
         day = tick.current.date()
         for role, scheduled_hour, kind in (

@@ -22,7 +22,7 @@ CHECKS="test_folding test_web test_always_on_stream test_body test_providers tes
   test_world_exploration test_natural_npcs test_daily_rhythm test_concerns_and_loops
   test_alertness test_gossip test_group_chat test_time_feel test_happenings test_life_lately
   test_believability test_self_interview test_feelings test_say_and_do test_memory_life
-  test_http_gateway test_opinions test_messaging_you test_outreach test_life_story test_providers test_warm_voice"
+  test_http_gateway test_opinions test_messaging_you test_outreach test_life_story test_providers test_warm_voice test_daydreams"
 FILES=$(for name in $CHECKS; do printf 'tests/%s.py ' "$name"; done)
 RESULT=$($SSH "cd /srv/eidos && PYTHONPATH=src nice -n 10 .venv/bin/python -m pytest -q -p no:cacheprovider $FILES 2>&1 | tail -1")
 echo "$RESULT"

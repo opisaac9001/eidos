@@ -12,6 +12,7 @@ STRUCTURED_CAPABILITIES = {
     "pathos_voice",
     "pathos_text",
     "pathos_life_summary",
+    "pathos_daydream",
     "firmament_family",
     "moira_event",
     "moira_expansion",
