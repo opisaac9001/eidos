@@ -30,9 +30,14 @@ class NourishmentTests(unittest.TestCase):
         return [event], project_planning([event])
 
     def test_hunger_and_free_time_produce_one_replayable_meal(self):
-        state = PathosState(simulated_at=self.noon, awake=True, hunger=0.56, energy=0.5)
+        # Lunch drifts from day to day; the first meal of a free early afternoon is it.
         history, planning = self.provisions()
-        events = nourishment_events(history, state, self.noon, planning, 12_000, pathos_busy=False)
+        for hour in range(12, 16):
+            at = self.noon.replace(hour=hour)
+            state = PathosState(simulated_at=at, awake=True, hunger=0.56, energy=0.5)
+            events = nourishment_events(history, state, at, planning, 12_000, pathos_busy=False)
+            if events:
+                break
         self.assertEqual([event.kind for event in events], ["meal.eaten", "object.stock_changed"])
         self.assertEqual(events[0].payload["meal_kind"], "lunch")
         after = state.apply(events[0])
@@ -41,9 +46,7 @@ class NourishmentTests(unittest.TestCase):
         after_stock = project_planning([*history, *events]).objects["household-provisions"]
         self.assertEqual(after_stock.quantity, 3)
         self.assertEqual(
-            nourishment_events(
-                [*history, *events], after, self.noon, planning, 12_000, pathos_busy=False
-            ),
+            nourishment_events([*history, *events], after, at, planning, 12_000, pathos_busy=False),
             [],
         )
 
@@ -70,7 +73,7 @@ class NourishmentTests(unittest.TestCase):
         )
 
     def test_pressing_hunger_can_produce_a_bounded_snack_outside_mealtime(self):
-        at = self.noon.replace(hour=16)
+        at = self.noon.replace(hour=17)
         state = PathosState(simulated_at=at, awake=True, hunger=0.82, energy=0.3)
         history, planning = self.provisions()
         events = nourishment_events(history, state, at, planning, 12_000, pathos_busy=False)
@@ -80,15 +83,16 @@ class NourishmentTests(unittest.TestCase):
         self.assertLess(after.hunger, state.hunger)
 
     def test_empty_home_stock_prevents_a_meal_but_cafe_service_is_explicit(self):
+        at = self.noon.replace(hour=14)  # lunchtime, however lunch drifts today
         history, empty = self.provisions(0)
-        home = PathosState(simulated_at=self.noon, awake=True, hunger=0.7)
-        unavailable = nourishment_events(history, home, self.noon, empty, 12_000, pathos_busy=False)
+        home = PathosState(simulated_at=at, awake=True, hunger=0.7)
+        unavailable = nourishment_events(history, home, at, empty, 12_000, pathos_busy=False)
         self.assertEqual([event.kind for event in unavailable], ["meal.unavailable"])
-        cafe = PathosState(simulated_at=self.noon, location_id="cafe", awake=True, hunger=0.7)
-        served = nourishment_events(history, cafe, self.noon, empty, 12_000, pathos_busy=False)
+        cafe = PathosState(simulated_at=at, location_id="cafe", awake=True, hunger=0.7)
+        served = nourishment_events(history, cafe, at, empty, 12_000, pathos_busy=False)
         self.assertEqual([event.kind for event in served], ["meal.eaten"])
         self.assertEqual(served[0].payload["provision_source"], "cafe_service")
-        unaffordable = nourishment_events(history, cafe, self.noon, empty, 599, pathos_busy=False)
+        unaffordable = nourishment_events(history, cafe, at, empty, 599, pathos_busy=False)
         self.assertEqual([event.kind for event in unaffordable], ["meal.unavailable"])
         self.assertIn("balance", str(unaffordable[0].payload["reason"]))
 

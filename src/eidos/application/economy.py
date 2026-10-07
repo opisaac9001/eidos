@@ -18,6 +18,7 @@ from eidos.domain.folding import events_of, kind_index, payload_candidates
 
 OPENING_BALANCE_PENCE = 40_000  # A modest cushion: a couple of weeks of rent and food.
 CAFE_MEAL_PENCE = 600
+TAKEAWAY_PENCE = 1_150
 PROVISIONS_PENCE = 2_400
 WORKSHOP_SHIFT_PENCE = 3_200
 WEEKLY_HOUSING_PENCE = 12_500  # Rent and bills for a small place in a market town.
@@ -233,6 +234,8 @@ def _source_consequence(
             return (partial, "work_income", "Wages for the hours worked on a cut-short shift")
     if source.kind == "meal.eaten" and source.payload.get("provision_source") == "cafe_service":
         return (-CAFE_MEAL_PENCE, "cafe_meal", "Meal at Juniper Café")
+    if source.kind == "meal.eaten" and source.payload.get("provision_source") == "takeaway":
+        return (-TAKEAWAY_PENCE, "takeaway", "Takeaway")
     if (
         source.kind == "object.replenishment_ordered"
         and source.payload.get("object_id") == "household-provisions"

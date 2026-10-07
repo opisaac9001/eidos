@@ -13,6 +13,7 @@ _CATEGORIES = {
     "opening",
     "work_income",
     "cafe_meal",
+    "takeaway",
     "provisions",
     "housing",
     "refund",
