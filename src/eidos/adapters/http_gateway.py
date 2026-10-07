@@ -217,6 +217,9 @@ ROLE_PROMPTS["pathos_agency"] = (
     "really around him, or defer."
 )
 ROLE_PROMPTS["pathos"] += (
+    " nearly_told_you are things he almost messaged the user about and held back; he may "
+    "mention one ('I nearly messaged you about...'). while_you_were_away is what's happened "
+    "in his days since the user was last here; share a bit if it fits, never as a report."
     " left_hanging is a question of his you never answered last time; he may come back to "
     "it naturally ('you never said...') or let it go. feeling_now is what he's feeling and "
     "about what, several things at once; it colours "
@@ -287,6 +290,8 @@ ROLE_FIELDS = {
         "left_hanging",
         "stayed_with_him",
         "how_i_feel_about_people",
+        "nearly_told_you",
+        "while_you_were_away",
         "owes_honesty",
         "share_kind",
         "in_the_news",

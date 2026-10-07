@@ -65,7 +65,7 @@ async def outreach_events(
         or simulated_at.hour < config.quiet_end_hour
     ):
         return []
-    messages = [event for event in history if event.kind == "conversation.message"]
+    messages = list(events_of(history, "conversation.message"))
     if not any(event.payload.get("speaker") == "you" for event in messages):
         return []
     replied = {
@@ -87,17 +87,15 @@ async def outreach_events(
         return []
     memories = {
         str(event.event_id): event
-        for event in history
-        if event.kind == "memory.recorded"
-        and event.payload.get("owner", "pathos") == "pathos"
+        for event in events_of(history, "memory.recorded")
+        if event.payload.get("owner", "pathos") == "pathos"
         and event.payload.get("source") == "user-conversation"
     }
     source = next(
         (
             event
-            for event in reversed(history)
-            if event.kind == "thought.recorded"
-            and str(event.payload.get("source_memory_id")) in memories
+            for event in reversed(events_of(history, "thought.recorded")[-40:])
+            if str(event.payload.get("source_memory_id")) in memories
             and isinstance(event.payload.get("text"), str)
             and isinstance(event.payload.get("simulated_at"), str)
             and timedelta(0) <= simulated_at - _event_time(event) <= timedelta(minutes=30)
@@ -115,6 +113,17 @@ async def outreach_events(
         if source is None and news is None and asking is None
         else None
     )
+    missing = (
+        _missing_you(history, simulated_at, messages)
+        if source is None and news is None and asking is None and advice is None
+        else None
+    )
+    if missing is not None:
+        return await _share_news(
+            history, simulated_at, gateway, context, messages, missing,
+            "He hasn't heard from them in a few days and wonders how they are.",
+            share_kind="miss",
+        )  # fmt: skip
     if advice is not None:
         wanted, question = advice
         return await _share_news(
@@ -177,6 +186,10 @@ async def outreach_events(
         ],
     }
     model_context["outreach_reason"] = str(model_context["outreach_reason"]) + _FOR_AN_OUTSIDER
+    held = _hold_back(messages, simulated_at)
+    if held is not None:
+        pending.append(_held_back(request_id, str(source.payload["text"]), held, simulated_at))
+        return pending
     text = await perform_pathos_reply(gateway, model_context, simulated_at.isoformat(), pending)
     if not text:
         return pending
@@ -241,6 +254,74 @@ _FORBIDDEN_PRESSURE = (
     "i need you",
     "lonely without you",
 )
+
+
+# He messages you of his own accord at most twice a day, a few hours apart, and not again
+# while one of his is still unanswered.
+OWN_MESSAGES_PER_DAY = 2
+OWN_MESSAGE_GAP = timedelta(hours=3)
+HELD_BACK = "outreach.held_back"
+
+
+def _hold_back(messages: Sequence[DomainEvent], at: datetime) -> str | None:
+    """Why he wouldn't send a message of his own right now, or None if he might."""
+    his_own = [
+        e
+        for e in messages
+        if e.payload.get("speaker") == "pathos"
+        and str(e.payload.get("request_id", "")).startswith("outreach")
+    ]
+    if messages and str(messages[-1].payload.get("request_id", "")).startswith("outreach"):
+        return "his last message is still unanswered"
+    today = [e for e in his_own if _event_time(e).date() == at.date()]
+    if len(today) >= OWN_MESSAGES_PER_DAY:
+        return "he's already messaged twice today"
+    if his_own and at - _event_time(his_own[-1]) < OWN_MESSAGE_GAP:
+        return "he messaged not long ago"
+    return None
+
+
+def _held_back(request_id: str, about: str, why: str, at: datetime) -> DomainEvent:
+    """A message he nearly sent: he can mention it later ('I nearly messaged you...')."""
+    return DomainEvent(
+        HELD_BACK,
+        "pathos",
+        {
+            "request_id": request_id,
+            "about": about[:200],
+            "reason": why,
+            "simulated_at": at.isoformat(),
+        },
+        correlation_id=request_id,
+    )
+
+
+def nearly_told_you(history: Sequence[DomainEvent], at: datetime) -> list[str]:
+    """What he nearly messaged you about lately, and held back."""
+    found = []
+    for event in events_of(history, HELD_BACK)[-4:]:
+        try:
+            if at - _event_time(event) <= timedelta(days=2):
+                found.append(str(event.payload.get("about")))
+        except ValueError:
+            continue
+    return found[-2:]
+
+
+def _missing_you(
+    history: Sequence[DomainEvent], at: datetime, messages: Sequence[DomainEvent]
+) -> DomainEvent | None:
+    """Days without hearing from a friend: a reason to say hello, once per silence."""
+    from eidos.application.bonds import current_bonds
+
+    if current_bonds(history).get("user") not in {"friend", "close", "closest"}:
+        return None
+    yours = [e for e in messages if e.payload.get("speaker") == "you"]
+    if not yours or at - _event_time(yours[-1]) < timedelta(days=3):
+        return None
+    if not 10 <= at.hour <= 20:
+        return None
+    return yours[-1]
 
 
 def _news_to_share(
@@ -408,6 +489,13 @@ async def _share_news(
         )
         if share_kind == "advice"
         else (
+            "He hasn't heard from the user in a few days and wonders how they are (a friend "
+            "missing a friend, not chasing). Decide whether he'd actually drop a line. If not, "
+            "return exactly [KEEP_PRIVATE]. Otherwise write only a short, easy hello, without "
+            "guilt, pressure or remarking on how long it's been."
+        )
+        if share_kind == "miss"
+        else (
             "Something in the user's life was coming up (source_memory), and he has been meaning "
             "to ask how it went. Decide whether a friend would drop them a short message to "
             "ask. If not, return exactly [KEEP_PRIVATE]. Otherwise write only a short, warm "
@@ -421,6 +509,10 @@ async def _share_news(
         ],
     }
     model_context["outreach_reason"] = str(model_context["outreach_reason"]) + _FOR_AN_OUTSIDER
+    held = _hold_back(messages, simulated_at)
+    if held is not None:
+        pending.append(_held_back(request_id, text_of_news, held, simulated_at))
+        return pending
     text = await perform_pathos_reply(gateway, model_context, simulated_at.isoformat(), pending)
     if not text or "[keep_private]" in text.lower():
         pending.append(

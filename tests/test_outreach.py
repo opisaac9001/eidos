@@ -141,16 +141,20 @@ class OutreachTests(unittest.TestCase):
     def test_legacy_config_has_no_fixed_cooldown(self):
         self.assertEqual(project_outreach_config(self.history()).minimum_interval_hours, 0)
 
-    def test_different_thought_can_lead_to_another_message_same_day(self):
+    def test_another_thought_waits_while_his_last_message_is_unanswered(self):
         history = self.history()
         first = self.run_outreach(history)
+        self.assertTrue(any(e.kind == "conversation.message" for e in first))
         second_thought = DomainEvent(
             "thought.recorded",
             "pathos",
             {**dict(history[-1].payload), "text": "I wonder what they thought of that rain."},
         )
         second = self.run_outreach(history + first + [second_thought])
-        self.assertTrue(any(e.kind == "conversation.message" for e in second))
+        # He doesn't pile on; the near-miss is remembered so he can mention it later.
+        self.assertFalse(any(e.kind == "conversation.message" for e in second))
+        held = next(e for e in second if e.kind == "outreach.held_back")
+        self.assertEqual(held.payload["reason"], "his last message is still unanswered")
         self.assertEqual(self.run_outreach(history + first), [])
 
     def test_pathos_can_keep_thought_private_without_retrying(self):

@@ -25,11 +25,12 @@ from eidos.application.life_lately import life_lately
 from eidos.application.life_projections import LifeProjections
 from eidos.application.masking import masking_context
 from eidos.application.memory import RecalledMemory, recall, terms
-from eidos.application.memory_life import stayed_with_me
+from eidos.application.memory_life import is_routine_note, stayed_with_me
 from eidos.application.mental_layers import mind_context
 from eidos.application.messaging import communication_availability, reply_due_at
 from eidos.application.open_loops import loops_view
 from eidos.application.opinions import his_views
+from eidos.application.outreach import nearly_told_you
 from eidos.application.personal_journeys import journey_context
 from eidos.application.reaching_out import texts_view
 from eidos.application.reconsolidation import reconsolidation_events
@@ -77,6 +78,41 @@ def _is_explicit_memory_reminder(text: str) -> bool:
             "do not forget",
         )
     )
+
+
+def _while_you_were_away(history: Sequence[DomainEvent], at: datetime) -> list[str]:
+    """After a long gap, the things from his days he might tell you about, if it fits."""
+    yours = [
+        e for e in events_of(history, "conversation.message") if e.payload.get("speaker") == "you"
+    ]
+    # The message he's answering now is the newest; the gap is before it.
+    earlier = yours[:-1] if yours else []
+    if not earlier:
+        return []
+    try:
+        last = datetime.fromisoformat(str(earlier[-1].payload.get("simulated_at")))
+    except ValueError:
+        return []
+    if at - last < timedelta(hours=12):
+        return []
+    moments: list[tuple[float, str]] = []
+    for memory in events_of(history, "memory.recorded")[-400:]:
+        p = memory.payload
+        try:
+            when = datetime.fromisoformat(str(p.get("simulated_at")))
+        except ValueError:
+            continue
+        text = str(p.get("text", ""))
+        if (
+            when <= last
+            or p.get("owner", "pathos") != "pathos"
+            or p.get("category") == "dream"
+            or is_routine_note(text)
+            or float(p.get("importance", 0.3) or 0.3) < 0.45
+        ):
+            continue
+        moments.append((float(p.get("importance", 0.45)), text[:160]))
+    return [text for _, text in sorted(moments, key=lambda m: -m[0])[:5]]
 
 
 class LifeConversation(LifeProjections):
@@ -139,6 +175,12 @@ class LifeConversation(LifeProjections):
                 waited = timedelta(0)
             if text.endswith("?") and waited >= timedelta(hours=2):
                 context["left_hanging"] = text[-200:]
+        nearly = nearly_told_you(history, at)
+        if nearly:
+            context["nearly_told_you"] = nearly
+        away = _while_you_were_away(history, at)
+        if away:
+            context["while_you_were_away"] = away
         feeling = [str(f["feeling"]) for f in feelings_view(history, at)[:3]]
         if feeling:
             context["feeling_now"] = feeling
