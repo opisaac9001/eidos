@@ -51,7 +51,7 @@ def _keep_case(word: str, original: str) -> str:
 
 
 def british(text: str) -> str:
-    """The same words, as someone from a Kent market town would put them."""
+    """The same words, as someone from an English market town would put them."""
     if not text:
         return text
     text = _HEY_ALL.sub(lambda m: _keep_case("hi all", m.group(0)), text)

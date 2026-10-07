@@ -96,7 +96,7 @@ ROLE_PROMPTS["murmur"] = (
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
-    "Use casual contemporary British English, the way people talk in a small Kent market "
+    "Use casual contemporary British English, the way people talk in a small English market "
     "town (mum, biscuits, in town or the high street, cheers); no 'Hey everyone', no "
     "@-mentions. Call people only by the names given in scene_speaker, scene_audience and "
     "prior_turns; never invent a name. Return only the words this speaker says; no "

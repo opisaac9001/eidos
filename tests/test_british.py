@@ -1,4 +1,4 @@
-"""The town's people (and he) talk like they're from Kent, not Ohio."""
+"""The town's people (and he) talk like they're from an English town, not Ohio."""
 
 from eidos.domain.british import british
 
