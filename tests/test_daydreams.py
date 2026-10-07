@@ -50,9 +50,13 @@ def test_now_and_then_a_good_idea_becomes_something_he_means_to_do() -> None:
     )
 
 
-def test_weak_or_vague_ideas_are_let_go() -> None:
-    assert nights(Idea("I could photograph the wheel.", 2)) == []
-    assert nights(Idea("I could explore something about wheels.", 5)) == []
+def test_weak_or_vague_ideas_are_let_go_but_kept_on_record() -> None:
+    from eidos.application.daydreams import LET_GO
+
+    weak = nights(Idea("I could photograph the wheel.", 2))
+    assert weak and all(e.kind == LET_GO and e.payload["reason"] == "not good enough" for e in weak)
+    vague = nights(Idea("I could explore something about wheels.", 5))
+    assert vague and all(e.payload["reason"] == "too vague" for e in vague)
 
 
 def test_only_while_he_sleeps_in_the_small_hours() -> None:

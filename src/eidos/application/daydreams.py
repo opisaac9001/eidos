@@ -26,6 +26,7 @@ from eidos.domain.folding import events_of
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 IDEA = "idea.had"
+LET_GO = "idea.let_go"
 HOUR = 2
 _INTERESTS = (
     "his film camera",
@@ -105,7 +106,10 @@ async def daydream_events(
     """Most nights nothing; now and then an idea worth keeping."""
     if not asleep or at.hour != HOUR or _roll("tonight", at.date().isoformat()) >= 0.5:
         return []
-    if any((w := _when(e)) and at - w < timedelta(hours=20) for e in events_of(history, IDEA)[-3:]):
+    if any(
+        (w := _when(e)) and at - w < timedelta(hours=20)
+        for e in events_of(history, IDEA, LET_GO)[-3:]
+    ):
         return []
     pair = _pair(history, at)
     if pair is None:
@@ -150,13 +154,34 @@ async def daydream_events(
         return []
     # The critic: concrete, new, doable, and honestly worth it.
     meant = intended(idea) or _could(idea)
-    if worth < 4 or kind not in _KINDS or meant is None or _VAGUE.search(idea):
-        return []
-    if any(
-        len(_words(loop.text) & _words(meant)) >= max(2, len(_words(meant)) // 2)
-        for loop in open_loops(history)
-    ):
-        return []
+    why_not = (
+        "not good enough"
+        if worth < 4
+        else "not something he could do"
+        if kind not in _KINDS or meant is None
+        else "too vague"
+        if _VAGUE.search(idea)
+        else "he's already meaning to"
+        if any(
+            len(_words(loop.text) & _words(meant or "")) >= max(2, len(_words(meant or "")) // 2)
+            for loop in open_loops(history)
+        )
+        else None
+    )
+    if why_not is not None:
+        # Let go, but kept on record so the critic can be checked.
+        return [
+            DomainEvent(
+                LET_GO,
+                "pathos",
+                {
+                    "idea": idea[:240],
+                    "worth": worth,
+                    "reason": why_not,
+                    "simulated_at": at.isoformat(),
+                },
+            )
+        ]
     had = DomainEvent(
         IDEA,
         "pathos",

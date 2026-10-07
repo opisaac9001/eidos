@@ -581,6 +581,11 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     self.respond(400, {"error": str(error)})
             elif path == "/api/believability":
                 # How lifelike his recent life has been, against people's base rates.
+                try:
+                    days = int(parse_qs(urlsplit(self.path).query).get("days", ["7"])[0])
+                except ValueError:
+                    days = 7
+                days = max(1, min(28, days))
                 with runtime.lock:
                     history = runtime.life.history()
                     at = datetime.fromisoformat(runtime.life.snapshot()["time"])
@@ -588,13 +593,15 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 thoughts = (
                     [
                         (thought.cue_kind, thought.text)
-                        for thought in stream.store.since(stream.wall_clock() - 7 * 86400)
+                        for thought in stream.store.since(stream.wall_clock() - days * 86400)
                     ]
                     if stream is not None
                     else []
                 )
                 counts = (stream.kept, stream.rejections) if stream is not None else None
-                report = believability_report(history, at, thoughts=thoughts, stream_counts=counts)
+                report = believability_report(
+                    history, at, thoughts=thoughts, stream_counts=counts, days=days
+                )
                 interview = runtime.last_interview()
                 if interview is not None:
                     report["self_interview"] = interview

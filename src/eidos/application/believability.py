@@ -171,6 +171,15 @@ def believability_report(
             "valence_range": [round(min(valences), 2), round(max(valences), 2)],
             "verdict": "varied" if len(labels) >= 4 else "flat",
         }
+    arose = _within(events_of(history, "feeling.arose"), since)
+    if arose:
+        kinds = Counter(str(e.payload.get("kind")) for e in arose)
+        report["feelings_about_things"] = {
+            "arose": len(arose),
+            "kinds": len(kinds),
+            "most_common": kinds.most_common(4),
+            "verdict": "varied" if len(kinds) >= 4 else "narrow",
+        }
     report["happenings"] = len(_within(events_of(history, "happening.occurred"), since))
     report["body_noticed"] = len(_within(events_of(history, "body.sensed"), since))
     return report
