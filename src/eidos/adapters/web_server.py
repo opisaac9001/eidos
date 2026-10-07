@@ -8,6 +8,7 @@ import mimetypes
 import os
 import secrets
 import threading
+import urllib.request
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -142,6 +143,36 @@ class Runtime:
         self.thread.start()
         if self.stream is not None:
             self.stream.start()
+
+    def warm_voice(self) -> None:
+        """You've come to visit: load his voice's model now, so his first reply isn't
+        kept waiting while a big model wakes from idle. Runs in the background."""
+        configured = getattr(self.models, "configured", None)
+        if configured is None:
+            return
+        try:
+            settings = configured.settings()
+            chain = settings["roles"].get("voice") or settings["roles"].get("default") or []
+            entry = settings["models"][chain[0]]
+            provider = settings["providers"][entry["provider"]]
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return
+        if provider.get("kind") != "ollama":
+            return
+        base = str(provider.get("base_url", "")).removesuffix("/").removesuffix("/v1")
+        body = json.dumps({"model": entry["model"], "prompt": "", "stream": False}).encode()
+
+        def warm() -> None:
+            try:
+                request = urllib.request.Request(
+                    f"{base}/api/generate", data=body, headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(request, timeout=180):
+                    pass
+            except (OSError, ValueError):
+                logger.info("Could not warm the voice model")
+
+        threading.Thread(target=warm, name="warm-voice", daemon=True).start()
 
     def _interview_file(self) -> Path | None:
         path = getattr(getattr(self.life, "store", None), "path", None)
@@ -676,6 +707,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                         if not isinstance(request_id, str):
                             raise ValueError("Visit request ID must be a string")
                         runtime.life.request_visit(request_id)
+                        runtime.warm_voice()
                     elif path == "/api/visit/end":
                         request_id = body.get("request_id")
                         if not isinstance(request_id, str):

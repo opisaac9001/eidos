@@ -3302,24 +3302,10 @@ class Life(LifeConversation):
             pending.extend(
                 patrick_heard(news, person.person_id, person.name.split()[0], now, encounter)
             )
-        memory = await perform(
-            self.gateway, "mnemosyne", {**context, "experience": text}, at, pending
-        )
-        recovered = memory is None
-        if recovered:
-            memory = text
-            pending.append(
-                DomainEvent(
-                    "memory.recovered",
-                    "pathos",
-                    {
-                        "text": "Archived the accepted encounter verbatim after the memory performer failed.",
-                        "simulated_at": at,
-                        "source_event_id": str(encounter.event_id),
-                        "source": "source-archive",
-                    },
-                )
-            )
+        # The encounter is remembered as it was told; copying it word for word needs no
+        # model (a call to the 14B for every encounter, only ever to repeat it).
+        memory = text
+        recovered = False
         if memory:
             pending.append(
                 DomainEvent(
@@ -3333,7 +3319,7 @@ class Life(LifeConversation):
                         "source_event_id": str(encounter.event_id),
                         "location_id": location_id,
                         "person_id": person.person_id,
-                        "role": "source-archive" if recovered else "mnemosyne",
+                        "role": "source-archive" if recovered else "verbatim",
                         "owner": "pathos",
                         "importance": _encounter_importance(
                             [*history, *pending], person.person_id, at

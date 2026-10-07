@@ -52,7 +52,11 @@ class LifeTests(unittest.TestCase):
             sum(event.kind == "identity.established" for event in self.life.history()), 1
         )
         for role in snapshot["roles"]:
-            self.assertGreater(role["calls"], 0) if role["id"] != "pathos" else None
+            # Copying an encounter into memory needs no model any more.
+            self.assertGreater(role["calls"], 0) if role["id"] not in {
+                "pathos",
+                "mnemosyne",
+            } else None
         self.assertEqual(snapshot["time"], "2026-01-02T05:00:00+00:00")
         self.assertGreater(snapshot["pathos"]["needs"]["connection"], 0.5)
         self.assertEqual(snapshot["mind"]["pulse_counts"]["somatic"], 29)
@@ -688,7 +692,7 @@ class LifeTests(unittest.TestCase):
         self.life.bootstrap()
         self.assertEqual(len(self.life.history()), revision)
 
-    def test_failed_memory_is_archived_from_source_with_visible_recovery(self):
+    def test_an_encounter_is_remembered_word_for_word_without_a_model(self):
         class AlteredMemory(StandInGateway):
             async def generate(self, request):
                 if request.capability == "mnemosyne":
@@ -703,24 +707,12 @@ class LifeTests(unittest.TestCase):
         sources = {
             str(e.event_id): e.payload["text"] for e in events if e.kind == "npc.encountered"
         }
-        memories = [m for m in life.snapshot()["memories"] if m["source"] == "source-archive"]
+        memories = [m for m in life.snapshot()["memories"] if m.get("source_event_id") in sources]
         self.assertEqual(len(memories), len(sources))
         self.assertGreater(len(memories), 0)
         for memory in memories:
             self.assertEqual(memory["text"], sources[memory["source_event_id"]])
-        self.assertTrue(any(e.kind == "memory.recovered" for e in events))
-        self.assertTrue(
-            any(
-                d.get("error_code") == "source_mismatch" and d["role"] == "critic"
-                for d in life.snapshot()["diagnostics"]
-            )
-        )
-        self.assertEqual(
-            Life(SQLiteEventStore(self.path), AlteredMemory(), authored_scenario=True).snapshot()[
-                "memories"
-            ],
-            life.snapshot()["memories"],
-        )
+        self.assertFalse(any("invented memory" in str(e.payload.get("text")) for e in events))
 
     def test_controls_reject_invalid_values(self):
         for running, speed in (("yes", 15), (True, True), (False, 100)):
