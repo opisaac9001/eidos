@@ -1168,6 +1168,8 @@ class InnerStream:
         # Thoughts kept and turned away since the stream started; turned away is wasted work.
         self.kept = 0
         self.rejections = 0
+        # Why, so the commonest reason can be fixed rather than guessed at.
+        self.turned_away_why: Counter[str] = Counter()
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
         self._turned_away: deque[tuple[float, str]] = deque(maxlen=4)
@@ -1243,6 +1245,7 @@ class InnerStream:
 
     def _turn_away(self, why: str, text: str) -> None:
         self.last_error = why
+        self.turned_away_why[why.split(",")[0].split(" from ")[0].split(" with ")[0]] += 1
         self.rejected = True
         self._turned_away.append((self.wall_clock(), text))
 
@@ -1409,6 +1412,7 @@ class InnerStream:
             "last_error": self.last_error,
             "kept_since_start": self.kept,
             "turned_away_since_start": self.rejections,
+            "turned_away_why": dict(self.turned_away_why.most_common(6)),
             "pulling_at_him": self.impulses.view(),
             "thoughts": [
                 {

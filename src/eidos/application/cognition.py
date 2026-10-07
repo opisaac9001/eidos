@@ -23,7 +23,8 @@ ROLE_MODEL_PROFILES = {
     "chronicler": ("3", 180, 0.2),
 }
 # A dream is long and comes while nothing else is waiting on the model; give it time.
-ROLE_TIMEOUTS = {"oneiros": 120}
+# The Pi takes around 40 seconds a thought (it re-reads the whole prompt every time).
+ROLE_TIMEOUTS = {"oneiros": 120, "murmur": 65}
 REPAIRABLE_PATHOS_FINDINGS = {
     "lost_first_person_role",
     "contradicted_activity_status",
