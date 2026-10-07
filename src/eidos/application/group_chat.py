@@ -23,6 +23,7 @@ from typing import Callable, Collection, Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
 from eidos.application.gossip import _STORIES
+from eidos.application.inner_life import active_concerns
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -170,7 +171,7 @@ async def group_chat_events(
         for decided in _plans_to_answer(history):
             await _his_reply(
                 history, at, gateway, [*recent][-8:], on_his_mind, mood, output,
-                stance=decided,
+                stance=decided, members=members,
             )  # fmt: skip
             break
     # He looks when he's free, and sometimes says something.
@@ -189,7 +190,10 @@ async def group_chat_events(
             )
         )
         if _wants_to_reply(history, seen, at):
-            await _his_reply(history, at, gateway, [*recent, *seen][-8:], on_his_mind, mood, output)
+            await _his_reply(
+                history, at, gateway, [*recent, *seen][-8:], on_his_mind, mood, output,
+                members=members,
+            )  # fmt: skip
     return output
 
 
@@ -402,6 +406,63 @@ async def _speak(
     return True
 
 
+# Words too common to give away what someone's going through.
+_PLAIN = frozenset(
+    "the and that this with they they're their them have been about just still really what "
+    "when then there here from into over some more much very well good fine okay yeah isn't "
+    "it's i'm you your will would could should going got get for are was were not but all".split()
+)
+
+
+def _words(text: str) -> set[str]:
+    return {
+        w.removesuffix("'s")
+        for w in re.findall(r"[a-z']+", text.casefold())
+        if len(w.removesuffix("'s")) >= 3 and w not in _PLAIN
+    }
+
+
+def _shared_in_chat(history: Sequence[DomainEvent], person_id: str) -> bool:
+    """Whether they've told the group their news themselves."""
+    return any(
+        e.payload.get("speaker_id") == person_id and e.payload.get("news")
+        for e in messages(history, 80)
+    )
+
+
+def his_to_share(
+    history: Sequence[DomainEvent], members: Mapping[str, str], limit: int = 2
+) -> list[str]:
+    """What's on his mind that's his to bring up in the group: his own things, and a friend's
+    trouble only once they've told the group themselves. It's their news to tell."""
+    keeping = {
+        pid: name.split()[0].casefold()
+        for pid, name in members.items()
+        if not _shared_in_chat(history, pid)
+    }
+    return [
+        str(concern.payload.get("text"))
+        for concern in active_concerns(history)
+        if concern.payload.get("text")
+        and concern.payload.get("person_id") not in keeping
+        and not set(keeping.values()) & _words(str(concern.payload.get("text")))
+    ][-limit:]
+
+
+def _tells_on(text: str, history: Sequence[DomainEvent], members: Mapping[str, str]) -> str | None:
+    """The friend whose private trouble this post would give away, if any."""
+    said = _words(text)
+    for concern in active_concerns(history):
+        person = concern.payload.get("person_id")
+        if person not in members or _shared_in_chat(history, str(person)):
+            continue
+        name = members[str(person)].split()[0].casefold()
+        trouble = _words(str(concern.payload.get("text", ""))) - {name}
+        if name in said and said & trouble:
+            return str(person)
+    return None
+
+
 async def _his_reply(
     history: Sequence[DomainEvent],
     at: datetime,
@@ -411,6 +472,7 @@ async def _his_reply(
     mood: str,
     output: list[DomainEvent],
     stance: DomainEvent | None = None,
+    members: Mapping[str, str] | None = None,
 ) -> None:
     from eidos.application.bookings import remember
 
@@ -446,7 +508,9 @@ async def _his_reply(
                             "Write what he posts in reply: one short casual line, British, the "
                             "way he'd really write in a group chat, answering what was said. "
                             + answering
-                            + " Invent no news, plans or events. Return only the words."
+                            + " Invent no news, plans or events. Anything a friend told him "
+                            "privately is theirs to share, not his: never bring up someone's "
+                            "troubles in the group. Return only the words."
                         ),
                     }
                 ),
@@ -460,6 +524,9 @@ async def _his_reply(
         if not 1 <= len(text.split()) <= 40:
             raise ProposalRejected("not_a_message", "That isn't something he'd post")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError):
+        return
+    # Discretion: a post that gives away a friend's private trouble isn't sent.
+    if members and _tells_on(text, history, members) is not None:
         return
     posted = DomainEvent(
         MESSAGE,

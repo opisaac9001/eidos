@@ -85,7 +85,7 @@ from eidos.application.gossip import (
     they_remember,
     worth_mentioning,
 )
-from eidos.application.group_chat import GROUP_FROM_LEVEL, group_chat_events
+from eidos.application.group_chat import GROUP_FROM_LEVEL, group_chat_events, his_to_share
 from eidos.application.happenings import happening_events, phone_dead
 from eidos.application.holiday import PLACES as HOLIDAY_PLACES
 from eidos.application.holiday import holiday_events
@@ -3793,9 +3793,7 @@ class Life(LifeConversation):
                 and not _at_work(self._planning(history), tick.current)
                 and not phone_dead(history, tick.current),
                 whereabouts=_their_whereabouts(history, tick.state, catalog),
-                on_his_mind=[
-                    str(concern.payload.get("text")) for concern in active_concerns(history)[-2:]
-                ],
+                on_his_mind=his_to_share(history, members),
                 mood=emotion.label,
                 places=frozenset(catalog.places),
             )
