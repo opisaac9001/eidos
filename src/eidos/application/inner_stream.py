@@ -1043,7 +1043,7 @@ class ImpulseTracker:
         self._settled: dict[str, float] = {}
         self._ripe: list[Impulse] = []
         self._later: list[tuple[float, Impulse]] = []
-        self._deferrals: dict[str, int] = {}
+        self._deferrals: dict[str, tuple[int, float]] = {}
         self._lock = threading.Lock()
 
     def notice(self, thought: str, snapshot: Mapping[str, Any]) -> None:
@@ -1081,11 +1081,15 @@ class ImpulseTracker:
     def defer(self, impulse: Impulse, seconds: float) -> None:
         """Not now, but it hasn't gone away: weigh it again later (once he's free, or it's
         a decent hour to text). Each thing is put off at most a few times."""
+        now = self.clock()
         with self._lock:
-            if impulse.key in self._deferrals and self._deferrals[impulse.key] >= 3:
+            count, since = self._deferrals.get(impulse.key, (0, now))
+            if now - since > 6 * 3600:
+                count, since = 0, now  # a new occasion: the old put-offs don't count
+            if count >= 3:
                 return
-            self._deferrals[impulse.key] = self._deferrals.get(impulse.key, 0) + 1
-            self._later.append((self.clock() + seconds, impulse))
+            self._deferrals[impulse.key] = (count + 1, since)
+            self._later.append((now + seconds, impulse))
 
     def view(self) -> list[dict[str, object]]:
         now = self.clock()

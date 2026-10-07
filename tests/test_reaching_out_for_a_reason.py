@@ -191,3 +191,17 @@ def test_ringing_home_is_remembered_with_whatever_news_there_is() -> None:
     else:
         assert again == []  # they've just spoken
     assert ring_family([], AT.replace(hour=23), "mum", "") == []
+
+
+def test_putting_something_off_is_limited_per_occasion_not_forever() -> None:
+    now = [1000.0]
+    tracker = ImpulseTracker(lambda: now[0])
+    impulse = Impulse("you", "you", "you", "you", 2.6, ("Tell them about the hinge.",))
+    for _ in range(5):
+        tracker.defer(impulse, 60)
+    now[0] += 120
+    assert len(tracker.take_ripe()) == 3  # at most three put-offs on one occasion
+    now[0] += 7 * 3600  # another day, another occasion
+    tracker.defer(impulse, 60)
+    now[0] += 120
+    assert tracker.take_ripe() == [impulse]

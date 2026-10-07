@@ -30,6 +30,7 @@ from eidos.application.bookings import remember
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
 from eidos.domain.events import DomainEvent
+from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
@@ -76,9 +77,7 @@ def why_not(
     if person_id in with_him:
         return "they're right here"
     today = 0
-    for event in reversed(history):
-        if event.kind != REACHED:
-            continue
+    for event in reversed(events_of(history, REACHED)):
         when = _at(event)
         if when is None:
             continue
@@ -235,12 +234,10 @@ async def reply_events(
     wrote "Morning, just woke up" while at the workshop with Patrick.
     """
     settled = {
-        str(event.payload.get("contact_id"))
-        for event in history
-        if event.kind in {REPLIED, UNANSWERED}
+        str(event.payload.get("contact_id")) for event in events_of(history, REPLIED, UNANSWERED)
     }
     output: list[DomainEvent] = []
-    for sent in [event for event in history if event.kind == REACHED][-12:]:
+    for sent in events_of(history, REACHED)[-12:]:
         contact_id = str(sent.payload.get("contact_id"))
         if contact_id in settled:
             continue
@@ -385,11 +382,9 @@ def _trace(
 
 def texts_view(history: Sequence[DomainEvent], limit: int = 10) -> list[dict[str, object]]:
     """His recent texts with friends, and what came back, for the page and his context."""
-    replies = {
-        str(event.payload.get("contact_id")): event for event in history if event.kind == REPLIED
-    }
+    replies = {str(event.payload.get("contact_id")): event for event in events_of(history, REPLIED)}
     output: list[dict[str, object]] = []
-    for sent in [event for event in history if event.kind == REACHED][-limit:]:
+    for sent in events_of(history, REACHED)[-limit:]:
         reply = replies.get(str(sent.payload.get("contact_id")))
         output.append(
             {

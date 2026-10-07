@@ -189,7 +189,7 @@ def _sources(
             what = _HAPPENED.get(str(p.get("kind")))
             if what:
                 found.append((f"irritation:{p.get('kind')}", "irritation", what, 0.4, False, event))
-        elif event.kind == "contact.reply_received" and who:
+        elif event.kind == "contact.reply_received" and person in names:
             found.append((f"fondness:{person}", "fondness", who, 0.35, True, event))
         elif event.kind == "contact.went_unanswered":
             sent = next(
@@ -197,7 +197,7 @@ def _sources(
                  if e.payload.get("contact_id") == p.get("contact_id")),
                 None,
             )  # fmt: skip
-            if sent is not None:
+            if sent is not None and sent.payload.get("channel") != "call":
                 name = _first(str(sent.payload.get("person_name", "")))
                 found.append(
                     (f"hurt:{sent.payload.get('person_id')}", "hurt", name, 0.3, True, event)
@@ -241,7 +241,7 @@ def _sources(
                 found.append(("contentment:day-off", "contentment", "a day off", 0.3, False, event))
         elif event.kind == "gossip.heard" and p.get("holder_id") == "pathos":
             subject = str(p.get("subject_id"))
-            if subject in names and p.get("story") in {"family_worry", ""}:
+            if subject in names and p.get("story") == "family_worry":
                 found.append(
                     (f"worry:{subject}", "worry", _first(names[subject]), 0.45, True, event)
                 )
@@ -297,8 +297,14 @@ def feeling_events(
         str(e.payload.get("concern_id"))
         for e in events_of(history, "concern.resolved", "concern.receded")[-30:]
     }
+    # A worry or sadness about a person ends with the concern it came from.
+    gone_ids = {f"{kind}:{concern}" for concern in resolved for kind in ("excitement", "dread")}
+    for opened in events_of(history, "concern.opened")[-60:]:
+        if str(opened.payload.get("concern_id")) in resolved and opened.payload.get("person_id"):
+            person = str(opened.payload["person_id"])
+            gone_ids.update({f"worry:{person}", f"sadness:{person}"})
     for feeling in live.values():
-        gone = any(feeling.feeling_id.endswith(f":{concern}") for concern in resolved)
+        gone = feeling.feeling_id in gone_ids
         if feeling.now(at) < FADED_BELOW or gone:
             output.append(
                 DomainEvent(

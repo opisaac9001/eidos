@@ -76,8 +76,9 @@ def concern_lifecycle_events(
         event
         for event in events_of(history, *_SOURCE_KINDS)
         if str(event.event_id) not in opened_source_ids
-        and _safe_concern_source(event, history) is not None
+        # Cheap time check first: every booking ever made is a candidate kind.
         and _is_recent(event, simulated_at, _STILL_WEIGHS.get(event.kind, timedelta(hours=2)))
+        and _safe_concern_source(event, history) is not None
     ]
     candidates.sort(key=lambda event: (_concern_priority(event), _event_time(event)))
     active_people = {
@@ -104,6 +105,17 @@ def concern_lifecycle_events(
         concern_key = _concern_key(source, history)
         if concern_key in recent_keys:
             continue
+        about_at = identifiers.get("about_at")
+        if isinstance(about_at, str) and any(
+            isinstance(other.payload.get("about_at"), str)
+            and abs(
+                datetime.fromisoformat(str(other.payload["about_at"]))
+                - datetime.fromisoformat(about_at)
+            )
+            <= timedelta(hours=12)
+            for other in [*projected_active, *(e for e in output if e.kind == "concern.opened")]
+        ):
+            continue  # already looking forward to (or dreading) this occasion
         person_id = identifiers.get("person_id")
         if isinstance(person_id, str) and person_id in active_people:
             continue

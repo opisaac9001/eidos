@@ -411,7 +411,15 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
             continue
         payload = event.payload
         if event.kind in {"contact.reached_out", "family.contact"}:
-            if contacting and loop.person_id and payload.get("person_id") == loop.person_id:
+            unanswered = payload.get("missed") is True or (
+                payload.get("channel") == "call" and not payload.get("text")
+            )
+            if (
+                contacting
+                and not unanswered
+                and loop.person_id
+                and payload.get("person_id") == loop.person_id
+            ):
                 return event
             continue
         if event.kind == "npc.encountered":

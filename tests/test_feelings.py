@@ -91,3 +91,22 @@ def test_coping_turns_feelings_into_pulls_and_thoughts_follow_them() -> None:
         "feelings": feelings_view(history, AT),
     }
     assert any(c.kind == "feeling" and c.text == "worried about Rowan" for c in cues(snapshot))
+
+
+def test_a_worry_ends_when_things_get_better() -> None:
+    worry = opened("worry", AT - timedelta(minutes=5), person_id="rowan")
+    history = [worry]
+    history += feeling_events(history, AT, names=NAMES)
+    better = DomainEvent(
+        "concern.resolved",
+        "pathos",
+        {
+            "concern_id": "concern:worry",
+            "resolution_kind": "things_got_better",
+            "simulated_at": (AT + timedelta(days=1)).isoformat(),
+        },
+    )
+    history.append(better)
+    later = feeling_events(history, AT + timedelta(days=1, minutes=10), names=NAMES)
+    assert any(e.kind == SETTLED and e.payload["feeling_id"] == "worry:rowan" for e in later)
+    assert any(e.kind == AROSE and e.payload["kind"] == "relief" for e in later)

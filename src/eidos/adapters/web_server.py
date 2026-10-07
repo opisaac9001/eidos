@@ -55,6 +55,7 @@ class Runtime:
         self.realtime_quantum_seconds = realtime_quantum_seconds
         self.lock = threading.RLock()
         self._interviewing = False
+        self._interview_failed_at = 0.0
         self.stop = threading.Event()
         self.error: str | None = None
         self.ticks = 0
@@ -222,6 +223,8 @@ class Runtime:
         """Once a week, while he's awake, ask him about his week (in its own thread)."""
         if not config.get("running") or self.stream is None or self._interviewing:
             return
+        if wall_time() - self._interview_failed_at < 6 * 3600:
+            return  # it failed recently; don't hammer his world with retries
         target = self._interview_file()
         if target is None:
             return
@@ -240,6 +243,7 @@ class Runtime:
             try:
                 self.run_interview()
             except Exception:
+                self._interview_failed_at = wall_time()
                 logger.exception("Self-interview failed")
             finally:
                 self._interviewing = False
@@ -621,7 +625,13 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/self-interview":
                     # Questions under the lock, answers outside it: his world keeps going.
-                    self.respond(200, runtime.run_interview())
+                    if runtime._interviewing:
+                        raise ValueError("A self-interview is already under way")
+                    runtime._interviewing = True
+                    try:
+                        self.respond(200, runtime.run_interview())
+                    finally:
+                        runtime._interviewing = False
                     return
                 operation_started = runtime.clock()
                 with runtime.mutation():

@@ -22,6 +22,7 @@ from typing import Callable, Mapping, Sequence
 
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
+from eidos.application.gossip import _STORIES
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
@@ -125,8 +126,12 @@ async def group_chat_events(
         except (KeyError, ValueError):
             continue
         if fresh:
+            # Their news as it is, not in Patrick's words ("Rowan told me...").
+            story = _STORIES.get(str(news.payload.get("kind")))
+            what = story[0].format(n=members[person]) if story else "some news of their own"
             said = await _speak(
-                history, at, gateway, person, members, f"telling the group: {news.payload['text']}",
+                history, at, gateway, person, members,
+                f"telling the group their own news, in their own words: {what}",
                 recent, whereabouts, output,
             )  # fmt: skip
             if said:
@@ -250,7 +255,7 @@ async def _speak(
                 "speaker_id": speaker,
                 "speaker_name": name,
                 "text": line,
-                "news": topic.startswith("telling the group"),
+                "news": topic.startswith("telling the group their own news"),
                 "simulated_at": at.isoformat(),
             },
         )

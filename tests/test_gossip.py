@@ -163,8 +163,8 @@ def test_an_encounter_carries_what_they_remember_and_passes_news_on(tmp_path) ->
             "subject_id": subject.person_id,
             "holder_id": teller.person_id,
             "teller_id": "",
-            "text": f"{subject.name.split()[0]}'s seeing someone.",
-            "version": 0,
+            "text": f"{subject.name.split()[0]}'s got serious with someone, apparently.",
+            "version": 1,  # drifted in the telling: news to him
             "strength": 0.9,
             "simulated_at": now.isoformat(),
         },
@@ -176,8 +176,31 @@ def test_an_encounter_carries_what_they_remember_and_passes_news_on(tmp_path) ->
             life.history(), pending, teller, "cafe", now.isoformat(), {"time": now.isoformat()}
         )
     )
-    assert "seeing someone" in gateway.contexts[-1]["they_might_mention"]
+    assert "serious with someone" in gateway.contexts[-1]["they_might_mention"]
     assert any(e.kind == HEARD and e.payload["holder_id"] == PATRICK for e in pending)
     assert any(
         e.kind == "memory.recorded" and "told me they'd heard" in e.payload["text"] for e in pending
     )
+
+
+def test_his_friends_own_news_isnt_served_back_to_him_as_gossip() -> None:
+    original = DomainEvent(
+        HEARD,
+        "pathos",
+        {
+            "claim_id": "news:2",
+            "story": "family_worry",
+            "subject_id": "rowan",
+            "holder_id": "mara",
+            "teller_id": "rowan",
+            "text": "Rowan's family's going through it; a parent's not well.",
+            "version": 0,
+            "strength": 0.8,
+            "simulated_at": AT.isoformat(),
+        },
+    )
+    assert worth_mentioning([original], "mara", AT + timedelta(hours=1)) is None
+    told = patrick_heard(
+        held([original])[("news:2", "mara")], "mara", "Mara", AT, DomainEvent("x", "pathos", {})
+    )
+    assert told[0].payload["story"] == "family_worry"  # the story travels with it

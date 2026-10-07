@@ -46,6 +46,17 @@ async def outreach_events(
     """Allow a recent user-linked thought to prompt bounded daytime outreach."""
     if simulated_at.utcoffset() is None:
         raise ValueError("Outreach time must be timezone-aware")
+    if "people_he_knows" not in context:
+        # Every path that may message you can say who people are.
+        from eidos.domain.world_catalog import project_world_catalog
+
+        context = {
+            **context,
+            "people_he_knows": {
+                person.name: (person.occupation or person.description or "")[:80]
+                for person in project_world_catalog(history).people.values()
+            },
+        }
     config = project_outreach_config(history)
     if (
         not config.enabled

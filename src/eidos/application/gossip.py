@@ -41,6 +41,10 @@ _STORIES: Mapping[str, tuple[str, str]] = {
 }  # fmt: skip
 
 
+# Stories that start with his friends' own news, which he heard first-hand.
+_FRIEND_NEWS = frozenset(_STORIES) - {"no_show"}
+
+
 @dataclass(frozen=True, slots=True)
 class Claim:
     claim_id: str
@@ -51,6 +55,8 @@ class Claim:
     version: int
     strength: float
     heard_at: datetime
+    story: str = ""
+    started_at: datetime | None = None
 
 
 def _at(event: DomainEvent) -> datetime:
@@ -61,8 +67,11 @@ def _step(held: dict[tuple[str, str], Claim], event: DomainEvent) -> dict[tuple[
     if event.kind != HEARD:
         return held
     p = event.payload
+    claim_id = str(p["claim_id"])
+    # The story and when it started are the claim's, whoever's version this is.
+    earlier = next((c for (cid, _), c in held.items() if cid == claim_id), None)
     claim = Claim(
-        str(p["claim_id"]),
+        claim_id,
         str(p["subject_id"]),
         str(p["holder_id"]),
         str(p.get("teller_id") or ""),
@@ -70,6 +79,8 @@ def _step(held: dict[tuple[str, str], Claim], event: DomainEvent) -> dict[tuple[
         int(p.get("version", 0) or 0),
         float(p.get("strength", 1.0) or 1.0),
         _at(event),
+        str(p.get("story") or (earlier.story if earlier else "")),
+        earlier.started_at if earlier is not None else _at(event),
     )
     return {**held, (claim.claim_id, claim.holder_id): claim}
 
@@ -154,10 +165,10 @@ def gossip_events(
         if person in residents and place not in {"home", "in-transit", "in_transit"}:
             together.setdefault(place, []).append(person)
     claims = {**known, **held(output)}
-    stories = {
-        str(e.payload["claim_id"]): str(e.payload.get("story"))
-        for e in [*events_of(history, HEARD), *output]
-    }
+    stories: dict[str, str] = {}
+    for e in [*events_of(history, HEARD), *output]:
+        if e.payload.get("story"):
+            stories.setdefault(str(e.payload["claim_id"]), str(e.payload["story"]))
     spread = 0
     for place, people in sorted(together.items()):
         for teller in sorted(people):
@@ -224,7 +235,9 @@ def worth_mentioning(history: Sequence[DomainEvent], person_id: str, at: datetim
         and claim_id not in patrick_has
         and claim.subject_id not in {person_id, PATRICK}
         and claim.strength >= FADES_BELOW
-        and at - claim.heard_at <= timedelta(days=10)
+        and at - (claim.started_at or claim.heard_at) <= timedelta(days=10)
+        # His friends told him their own news; only a version that's drifted is news to him.
+        and not (claim.story in _FRIEND_NEWS and claim.version == 0)
     ]
     return max(found, key=lambda claim: (claim.strength, claim.heard_at), default=None)
 
@@ -244,7 +257,7 @@ def patrick_heard(
         claim.version,
         claim.strength * 0.85,
         at,
-        "",
+        claim.story,
         cause,
     )
     return [

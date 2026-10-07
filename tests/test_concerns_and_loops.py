@@ -250,3 +250,21 @@ def test_a_worry_heard_days_ago_still_weighs_unless_its_already_better() -> None
     assert any(e.kind == "concern.opened" for e in concern_lifecycle_events([news], AT))
     better = friend_news("family_better", AT - timedelta(days=2))
     assert not any(e.kind == "concern.opened" for e in concern_lifecycle_events([news, better], AT))
+
+
+def test_a_call_nobody_answered_doesnt_tick_it_off() -> None:
+    history = [thought("Need to ring Nina tonight.", AT)]
+    history += hour(history, AT + timedelta(minutes=10))
+    history.append(
+        DomainEvent(
+            "contact.reached_out",
+            "pathos",
+            {
+                "person_id": "nina-vale",
+                "channel": "call",
+                "text": "",
+                "simulated_at": (AT + timedelta(hours=1)).isoformat(),
+            },
+        )
+    )
+    assert not any(e.kind == DONE for e in hour(history, AT + timedelta(hours=2)))

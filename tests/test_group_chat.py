@@ -75,7 +75,7 @@ def test_a_friends_news_goes_to_the_group() -> None:
     posted = next(e for e in out if e.kind == MESSAGE)
     assert posted.payload["speaker_id"] == "rowan" and posted.payload["news"]
     topic = json.loads(gateway.requests[0].messages[-1].content)["scene_topic"]
-    assert "Rowan's engaged!" in topic
+    assert "their own news" in topic and "Rowan's engaged." in topic
 
 
 def test_an_unread_message_buzzes_into_his_thoughts() -> None:
