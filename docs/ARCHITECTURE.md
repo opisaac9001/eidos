@@ -246,3 +246,19 @@ with models only wording what the rules decide:
 - Residents keep an ordinary day of their own (`npc_movement.their_place_now`) and go home
   to rest when worn out; the news, friends' news and reflection move by an hour or two a day
   (`application/day_rhythm.py`).
+- Plans suggested in the group chat are real invitations (`chat-plan-` ids) he decides on
+  through the ordinary invitation flow; a yes is booked with that friend as companion, and
+  he answers in the chat once. A friend's private trouble stays out of his posts until
+  they've told the group themselves (`group_chat.his_to_share`, `_tells_on`).
+- `application/day_recall.py`: "what did you do Monday evening?" hands his voice
+  `that_time`, what he remembers of that stretch, in order.
+- `application/repair_jobs.py`: the jobs on his bench (taken in, worked hour by hour on
+  shift, setbacks and parts on order, finished, collected), feeding feelings, his thoughts
+  at work and `on_the_bench` in conversation. No model calls.
+- `domain/british.py`: the commonest American slips put right in anything said in the
+  town; scene participants reach the model by name (`who_is_who`), not id.
+- Meals drift with the day (`nourishment._MEAL_HOURS`): later on a day off, sometimes
+  skipped on a rushed work morning, cooked properly or beans on toast, a takeaway now and
+  then (`provision_source` "takeaway", charged by the economy).
+- A neutral mood takes its name from his strongest feeling (`feelings.mood_from_feelings`).
+- Things to take somewhere come back as he sets off from home (`open_loops._carried`).
