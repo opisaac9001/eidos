@@ -92,7 +92,8 @@ ROLE_PROMPTS["murmur"] = (
     "or repeated paraphrase of recent_inner_stream. When drifting_to is given, his mind has "
     "just wandered there: follow on from the last thought in recent_inner_stream towards it, "
     "the way a mind actually moves from one thing to the next. Leave the words in "
-    "worn_out alone: his mind has moved on from them."
+    "worn_out alone: his mind has moved on from them. leave_aside names people he's "
+    "thought about over and over just now; leave them out of this thought."
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
@@ -340,6 +341,7 @@ ROLE_FIELDS = {
         "who_is_who",
         "alone",
         "worn_out",
+        "leave_aside",
         "avoid_opening",
         "avoid_phrase",
         "not_again",
@@ -600,7 +602,7 @@ COMPACT_PROMPTS = {
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
-        "Start differently from the recent_thoughts, never start with dont_start_with, never use dont_use_phrase or any of the avoid_words. "
+        "Start differently from the recent_thoughts, never start with dont_start_with, never use dont_use_phrase or any of the avoid_words, never mention leave_out_people. "
         "Fit the time_of_day and time_of_year. Name only people in this moment's details, "
         "never someone only in recent_thoughts. recent_thoughts are only things he thought, "
         "not things that happened. "
@@ -731,7 +733,7 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
     if capability == "murmur":
         stream = context.get("recent_inner_stream")
         if isinstance(stream, list) and stream:
-            details["recent_thoughts"] = [str(item)[:120] for item in stream[-2:]]
+            details["recent_thoughts"] = [str(item)[:120] for item in stream[-3:]]
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
         if context.get("half_awake"):
@@ -743,6 +745,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         tired = context.get("worn_out")
         if isinstance(tired, list) and tired:
             details["avoid_words"] = [str(word) for word in tired][:6]
+        aside = context.get("leave_aside")
+        if isinstance(aside, list) and aside:
+            details["leave_out_people"] = [str(name) for name in aside][:2]
         if context.get("avoid_opening"):
             details["dont_start_with"] = str(context["avoid_opening"])
         if context.get("avoid_phrase"):

@@ -382,9 +382,11 @@ def choose_cue(
     recent_kinds: Sequence[str],
     rng: random.Random,
     recently_tried: Sequence[str] = (),
+    set_aside: Sequence[str] = (),
 ) -> Cue | None:
-    """Drift somewhere, but not back to the same kind of thing twice running, and not
-    straight back to something just tried."""
+    """Drift somewhere, but not back to the same kind of thing twice running, not
+    straight back to something just tried, and mostly not back to someone he's been
+    thinking about over and over."""
     if not available:
         return None
     last = recent_kinds[-1] if recent_kinds else None
@@ -411,6 +413,11 @@ def choose_cue(
         if on_sum > 0 and off_sum > 0:
             scale = target / (1 - target) * off_sum / on_sum
             weights = [w * scale if i in on_task else w for i, w in enumerate(weights)]
+    # After the balance above, or it hands the share straight back.
+    weights = [
+        w * (0.15 if any(name in cue.text for name in set_aside) else 1.0)
+        for cue, w in zip(pool, weights)
+    ]
     return rng.choices(pool, weights=weights, k=1)[0]
 
 
@@ -771,6 +778,16 @@ _COMMON = frozenset(
         "later",
     }
 )
+
+
+def rutted_people(recent: Sequence[str], people: Collection[str]) -> list[str]:
+    """Someone his last few thoughts keep coming back to: Rowan in eleven thoughts running
+    one evening. Words to avoid leave names alone, so a person needs setting aside too."""
+    counts: Counter[str] = Counter()
+    for text in list(recent)[-5:]:
+        said = {w.removesuffix("'s") for w in re.findall(r"[A-Za-z']+", text)}
+        counts.update(name for name in people if name in said)
+    return [name for name, count in counts.most_common(2) if count >= 3]
 
 
 def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
@@ -1257,6 +1274,7 @@ class InnerStream:
             if now - thought.wall_at <= THREAD_MINUTES * 60
         ]
         recent_texts = [thought.text for thought in reversed(thread)]
+        set_aside = rutted_people(recent_texts, known_names(snapshot))
         drowsy = stirring(snapshot) if not (snapshot.get("pathos") or {}).get("awake") else None
         cue = (
             choose_cue(
@@ -1271,6 +1289,7 @@ class InnerStream:
                 [thought.cue_kind for thought in reversed(thread)],
                 self.rng,
                 list(self._tried),
+                set_aside,
             )
         )
         if cue is not None:
@@ -1319,6 +1338,8 @@ class InnerStream:
         tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired
+        if set_aside and not (cue is not None and any(n in cue.text for n in set_aside)):
+            context["leave_aside"] = set_aside
         text = await perform(self.gateway, "murmur", context, at, pending)
         trace = next(
             (
@@ -1332,7 +1353,8 @@ class InnerStream:
             failure = next((event for event in pending if event.kind == "role.failed"), None)
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
-        if near_repeat(text, recent_texts[-4:]):
+        # Judged against the thoughts it was shown, not ones it never saw.
+        if near_repeat(text, recent_texts[-3:]):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
             return None
         # Where his mind was pointed in the last several thoughts is still on it.
