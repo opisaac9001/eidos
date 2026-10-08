@@ -2,6 +2,8 @@
 
 import asyncio
 import hashlib
+import inspect
+import logging
 import math
 import re
 from dataclasses import dataclass, field
@@ -321,6 +323,9 @@ _CALLER_INTERRUPTIONS = frozenset(
 
 # The small hours: asleep on any ordinary night, and near enough to waking to be recalled.
 DREAM_HOUR = 4
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -986,52 +991,55 @@ class Life(LifeConversation):
             hour_starts = len(pending)
             tick = _Tick(history, pending, state, current, beats.get(current), deferred_requests)
             self._phase_clock(tick)
-            self._phase_foundations(tick)
-            await self._phase_world(tick)
-            self._phase_body(tick)
-            await self._phase_self_direction(tick)
+            await self._guarded(tick, self._phase_foundations)
+            await self._guarded(tick, self._phase_world)
+            await self._guarded(tick, self._phase_body)
+            await self._guarded(tick, self._phase_self_direction)
             if not self.authored_scenario:
-                self._live_activity_window(tick, current, current)
-            self._phase_routine_beat(tick)
-            self._phase_consequences(tick)
-            await self._phase_world_story(tick)
-            self._phase_perception(tick)
-            await self._phase_townsfolk(tick)
-            self._phase_family(tick)
-            self._phase_friends_lives(tick)
-            self._phase_home(tick)
-            self._phase_holiday(tick)
-            self._phase_social_calendar(tick)
-            self._phase_far_friends(tick)
-            self._phase_sleep_trouble(tick)
-            await self._phase_news(tick)
-            self._phase_course(tick)
-            self._phase_falling_out(tick)
-            self._phase_in_jokes(tick)
-            self._phase_surfacing(tick)
-            self._phase_town_issues(tick)
-            self._phase_small_touches(tick)
-            self._phase_media(tick)
-            self._phase_seasons(tick)
-            self._phase_imperfection(tick)
-            self._phase_body_over_time(tick)
-            await self._phase_npc_agency(tick)
-            self._phase_callers(tick)
-            await self._phase_social(tick)
-            self._phase_invitations(tick)
-            self._phase_growth(tick)
-            mind = self._hour_mind(tick)
-            await self._phase_weather(tick, mind)
-            await self._phase_murmur(tick, mind)
-            await self._phase_encounters(tick, mind)
-            self._phase_activities(tick)
-            self._phase_objects(tick)
-            await self._phase_selfhood(tick)
-            await self._phase_nightly(tick, mind)
-            await self._phase_outreach(tick, mind)
-            await self._phase_group_chat(tick)
-            self._phase_affect_and_memory(tick)
-            await self._phase_voicing(tick, hour_starts)
+                await self._guarded(tick, self._live_activity_window, current, current)
+            await self._guarded(tick, self._phase_routine_beat)
+            await self._guarded(tick, self._phase_consequences)
+            await self._guarded(tick, self._phase_world_story)
+            await self._guarded(tick, self._phase_perception)
+            await self._guarded(tick, self._phase_townsfolk)
+            await self._guarded(tick, self._phase_family)
+            await self._guarded(tick, self._phase_friends_lives)
+            await self._guarded(tick, self._phase_home)
+            await self._guarded(tick, self._phase_holiday)
+            await self._guarded(tick, self._phase_social_calendar)
+            await self._guarded(tick, self._phase_far_friends)
+            await self._guarded(tick, self._phase_sleep_trouble)
+            await self._guarded(tick, self._phase_news)
+            await self._guarded(tick, self._phase_course)
+            await self._guarded(tick, self._phase_falling_out)
+            await self._guarded(tick, self._phase_in_jokes)
+            await self._guarded(tick, self._phase_surfacing)
+            await self._guarded(tick, self._phase_town_issues)
+            await self._guarded(tick, self._phase_small_touches)
+            await self._guarded(tick, self._phase_media)
+            await self._guarded(tick, self._phase_seasons)
+            await self._guarded(tick, self._phase_imperfection)
+            await self._guarded(tick, self._phase_body_over_time)
+            await self._guarded(tick, self._phase_npc_agency)
+            await self._guarded(tick, self._phase_callers)
+            await self._guarded(tick, self._phase_social)
+            await self._guarded(tick, self._phase_invitations)
+            await self._guarded(tick, self._phase_growth)
+            mind = await self._guarded(tick, self._hour_mind)
+            # Without his hour's mind, the parts that need it sit this hour out.
+            if mind is not None:
+                await self._guarded(tick, self._phase_weather, mind)
+                await self._guarded(tick, self._phase_murmur, mind)
+                await self._guarded(tick, self._phase_encounters, mind)
+            await self._guarded(tick, self._phase_activities)
+            await self._guarded(tick, self._phase_objects)
+            await self._guarded(tick, self._phase_selfhood)
+            if mind is not None:
+                await self._guarded(tick, self._phase_nightly, mind)
+                await self._guarded(tick, self._phase_outreach, mind)
+            await self._guarded(tick, self._phase_group_chat)
+            await self._guarded(tick, self._phase_affect_and_memory)
+            await self._guarded(tick, self._phase_voicing, hour_starts)
             state = tick.state
         if not self.authored_scenario:
             tick = _Tick(history, pending, state, target, None, deferred_requests)
@@ -1054,6 +1062,36 @@ class Life(LifeConversation):
                 self.gateway.submit_deferred(request)
 
     # -- Shared steps --------------------------------------------------------------------
+
+    # The live server sets this: one part of an hour going wrong (a bug, a bad event) is
+    # rolled back, logged and recorded, and the rest of his hour goes on, instead of his
+    # whole world stopping until someone notices. Tests leave it off, so failures are loud.
+    isolate_failures = False
+
+    async def _guarded(self, tick: _Tick, phase: Callable[..., Any], *args: Any) -> Any:
+        """Run one part of the hour; if it fails, undo what it added and carry on."""
+        if not self.isolate_failures:
+            result = phase(tick, *args)
+            return await result if inspect.isawaitable(result) else result
+        mark = (len(tick.pending), len(tick.deferred_requests), tick.state)
+        try:
+            result = phase(tick, *args)
+            return await result if inspect.isawaitable(result) else result
+        except Exception as error:
+            pending, deferred, state = mark
+            del tick.pending[pending:]
+            del tick.deferred_requests[deferred:]
+            tick.state = state
+            name = getattr(phase, "__name__", "phase").lstrip("_")
+            logger.exception("Part of the hour failed and was skipped: %s", name)
+            failure = {
+                "phase": name,
+                "error": f"{type(error).__name__}: {error}"[:300],
+                "simulated_at": tick.at,
+            }
+            self.phase_failures = [*getattr(self, "phase_failures", [])[-9:], failure]
+            tick.pending.append(DomainEvent("life.phase_failed", "pathos", failure))
+            return None
 
     def _extend_warmed(
         self,
@@ -1470,6 +1508,15 @@ class Life(LifeConversation):
                 if unavailable
                 else "The usual meal was delayed while the hour remained occupied."
             )
+        if (
+            not self.authored_scenario
+            and not meal_claim
+            and beat.description.startswith(STILL_AT_IT)
+            and _at_work(self._planning(history + pending), current)
+        ):
+            # Another hour of the shift: what he remembers of it is the job on his bench
+            # (repair_jobs), not "Still at it" with a line of stock texture.
+            return beat
         remembered_description = lived_moment_description(
             remembered_description,
             beat.location_id,

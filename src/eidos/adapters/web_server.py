@@ -44,6 +44,8 @@ class Runtime:
         operator_token: str | None = None,
     ) -> None:
         self.life = life
+        # Live: a part of his hour that fails is skipped, not the whole world stopped.
+        life.isolate_failures = True
         # Operator controls change time and expose private history; they need this token.
         # The switchable model setup behind the Models page, when this server has one.
         self.models: Any = None
@@ -464,6 +466,7 @@ class Runtime:
             if self.stream is not None
             else {"enabled": False, "state": "off", "thoughts": []},
             "runtime": {
+                "skipped_parts": list(getattr(self.life, "phase_failures", []))[-5:],
                 "ticks": self.ticks,
                 "interval_seconds": self.interval,
                 "error": self.error,
