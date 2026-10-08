@@ -803,11 +803,15 @@ def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
     names = {name.casefold() for name in people}
     counts: dict[str, int] = {}
     topics: dict[str, int] = {}
+    acronyms: set[str] = set()
     for text in list(recent)[-5:]:
         words = {w.removesuffix("'s") for w in _WORDS.findall(text.casefold())}
+        # Short capitalised words count too: "AC" opened half an evening.
+        short = {w.casefold() for w in re.findall(r"\b[A-Z]{2,4}\b", text) if w != "I"}
+        acronyms |= short
         for word in words:
             stem = word
-            if len(stem) >= 3 and stem not in _COMMON and stem not in names:
+            if (len(stem) >= 3 or stem in short) and stem not in _COMMON and stem not in names:
                 counts[stem] = counts.get(stem, 0) + 1
         for topic, family in _TOPICS.items():
             if words & family:
@@ -818,7 +822,7 @@ def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
     for topic, count in sorted(topics.items(), key=lambda item: -item[1]):
         if count >= 2:
             tired = [*_TOPIC_WORDS[topic], *(word for word in tired if word not in _TOPICS[topic])]
-    return list(dict.fromkeys(tired))[:6]
+    return [w.upper() if w in acronyms else w for w in dict.fromkeys(tired)][:6]
 
 
 # Ruts a mind falls into in different words.
@@ -858,6 +862,16 @@ _TOPICS = {
     "rain": frozenset({"rain", "raining", "rainy", "drizzle", "wet", "puddles", "damp"}),
     "tired": frozenset({"tired", "knackered", "exhausted", "sleepy", "shattered", "drained"}),
 }
+
+
+def said_before(text: str, earlier: Sequence[str]) -> bool:
+    """Nearly word for word one of these ("Beth texted back. A bit of a laugh in this flat."
+    three times in twenty minutes)."""
+    words = _words(text)
+    return bool(words) and any(
+        (theirs := _words(other)) and len(words & theirs) / len(words | theirs) >= 0.8
+        for other in earlier
+    )
 
 
 def near_repeat(text: str, earlier: Sequence[str]) -> bool:
@@ -1322,8 +1336,19 @@ class InnerStream:
         worn_opening = next(
             (opening for opening, count in openings.most_common(1) if count >= 3), None
         )
-        if worn_opening:
-            context["avoid_opening"] = worn_opening
+        # The same first word in other clothes is the same tic ("AC rattles", "AC screaming",
+        # "AC still screaming": half an evening's thoughts).
+        first_words = Counter(
+            thought.text.split()[0].strip(".,!?'").casefold()
+            for thought in self.store.recent(8)
+            if thought.text.split()
+        )
+        worn_first = next(
+            (word for word, count in first_words.most_common(1) if count >= 3 and word != "i"),
+            None,
+        )
+        if worn_opening or worn_first:
+            context["avoid_opening"] = worn_opening or worn_first
         # A phrase he keeps leaning on anywhere in the thought ("Wonder if Mara's...", in
         # every other thought one evening) is a tic too.
         phrases: Counter[str] = Counter()
@@ -1358,7 +1383,9 @@ class InnerStream:
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
         # Judged against the thoughts it was shown, not ones it never saw.
-        if near_repeat(text, recent_texts[-3:]):
+        # And never nearly the same thought as one of the last dozen, however long ago.
+        earlier = [thought.text for thought in self.store.recent(12)]
+        if near_repeat(text, recent_texts[-3:]) or said_before(text, earlier):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
             return None
         # Where his mind was pointed in the last several thoughts is still on it.

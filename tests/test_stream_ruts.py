@@ -48,3 +48,15 @@ def test_retellings_lose_their_filler_endings() -> None:
     )
     assert unpadded("I fixed it, anyway, and it works.") == "I fixed it, anyway, and it works."
     assert unpadded("Anyway, Mum rang.") == "Anyway, Mum rang."
+
+
+def test_a_short_word_and_a_same_first_word_are_ruts_too() -> None:
+    from eidos.application.inner_stream import said_before, worn_out
+
+    evening = ["AC rattles away.", "AC screams in the flat.", "AC still screaming."]
+    assert worn_out(evening) == ["AC"]
+    assert said_before(
+        "Beth texted back. A bit of a laugh in this flat.",
+        ["Beth texted back. A bit of a laugh in this quiet flat.", "Rowan needs rest."],
+    )
+    assert not said_before("Rowan needs rest before the drive.", ["Beth texted back."])
