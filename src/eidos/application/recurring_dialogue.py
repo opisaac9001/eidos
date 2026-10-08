@@ -9,6 +9,7 @@ from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
 from eidos.application.relationship_experience import personal_relationship_context
+from eidos.application.shared_past import REVISION, invents_shared_past
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -189,6 +190,7 @@ async def _advance_scene(
             else None
         )
         text: str | None
+        asked: dict[str, object] | None = None
         if disclosure is not None:
             decision = DomainEvent(
                 "npc.biography_disclosure_decided",
@@ -208,47 +210,59 @@ async def _advance_scene(
             topic_id = f"personal-history-{disclosure.topic}"
             text = f"I haven't told many people this: {disclosure.text}"
         else:
+            asked = {
+                "time": simulated_at.isoformat(),
+                "location": scene.location_id,
+                "person": name,
+                "scene_mode": True,
+                "scene_speaker": speaker_id,
+                "scene_audience": (
+                    scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
+                ),
+                "scene_topic": _topic_words(topic_id, name),
+                "who_is_who": {
+                    partner_id: name,
+                    **{k: v for k, v in actor_names.items() if k in {speaker_id, partner_id}},
+                },
+                "personal_relationship_context": personal_relationship_context(
+                    combined,
+                    speaker_id,
+                    "pathos" if speaker_id == partner_id else partner_id,
+                    simulated_at,
+                ),
+                "prior_turns": [
+                    {
+                        "speaker": str(event.payload["actor_id"]),
+                        "text": str(event.payload["text"]),
+                    }
+                    for event in combined
+                    if event.kind == "scene.turn_taken"
+                    and event.payload.get("scene_id") == scene_id
+                ][-6:],
+            }
             text = await perform(
                 gateway,
                 "firmament",
-                {
-                    "time": simulated_at.isoformat(),
-                    "location": scene.location_id,
-                    "person": name,
-                    "scene_mode": True,
-                    "scene_speaker": speaker_id,
-                    "scene_audience": (
-                        scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
-                    ),
-                    "scene_topic": topic_id.replace("-", " "),
-                    "who_is_who": {
-                        partner_id: name,
-                        **{k: v for k, v in actor_names.items() if k in {speaker_id, partner_id}},
-                    },
-                    "personal_relationship_context": personal_relationship_context(
-                        combined,
-                        speaker_id,
-                        "pathos" if speaker_id == partner_id else partner_id,
-                        simulated_at,
-                    ),
-                    "prior_turns": [
-                        {
-                            "speaker": str(event.payload["actor_id"]),
-                            "text": str(event.payload["text"]),
-                        }
-                        for event in combined
-                        if event.kind == "scene.turn_taken"
-                        and event.payload.get("scene_id") == scene_id
-                    ][-6:],
-                },
+                asked,
                 simulated_at.isoformat(),
                 output,
             )
+        if text is not None and asked is not None and invents_shared_past(text):
+            # A past with him from before he came: asked once to say it without one.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": REVISION},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and invents_shared_past(text):
+                text = None
         if text is None:
             text = (
-                f"{name} mentioned {topic_id.replace('-', ' ')}."
+                f"{name} talked a little about something from before."
                 if speaker_id == partner_id
-                else f"I stayed with what {name} was saying about {topic_id.replace('-', ' ')}."
+                else f"I listened to {name} for a bit."
             )
             output.append(
                 DomainEvent(
@@ -279,6 +293,7 @@ async def _advance_scene(
             actor_locations=actor_locations,
             actual_revision=actual_revision + len(output),
             simulated_at=simulated_at.isoformat(),
+            speaker_name=name if speaker_id == partner_id else "Patrick",
         )
         output.extend(turn.events)
         if not turn.accepted:
@@ -415,3 +430,14 @@ def _cooldown_complete(
     if not isinstance(value, str):
         return False
     return simulated_at - datetime.fromisoformat(value) >= cooldown
+
+
+def _topic_words(topic_id: str, name: str) -> str:
+    """What the scene is about, in words that keep someone's past their own."""
+    if topic_id.startswith("personal-history-"):
+        about = topic_id.removeprefix("personal-history-").replace("-", " ")
+        return (
+            f"{name}'s own {about}, from {name}'s life before they knew Patrick; it's "
+            f"{name}'s story, not something the two of them share"
+        )
+    return topic_id.replace("-", " ")

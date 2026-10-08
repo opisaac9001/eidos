@@ -229,6 +229,7 @@ async def _advance(
             actor_locations=actor_locations,
             actual_revision=actual_revision + len(output),
             simulated_at=simulated_at.isoformat(),
+            speaker_name=actor_names.get(speaker_id),
         )
         output.extend(turn.events)
         if not turn.accepted:

@@ -98,7 +98,8 @@ class CharacterHistoryTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
         )
-        self.assertEqual(memory.payload["text"], turn.payload["text"])
+        # He remembers who told him, not just the words.
+        self.assertEqual(memory.payload["text"], f"Rowan said: “{turn.payload['text']}”")
         fact = project_character_history([seed, *events]).facts["rowan-left-coast"]
         self.assertEqual((fact.status, fact.scene_id), ("disclosed", turn.payload["scene_id"]))
         self.assertIsNone(

@@ -253,7 +253,9 @@ def resolve_scene_turn(
     actor_locations: Mapping[str, str],
     actual_revision: int,
     simulated_at: str,
+    speaker_name: str | None = None,
 ) -> SceneResolution:
+    """``speaker_name``: who said it, as each observer remembers it ("Ellis said: ...")."""
     proposed = _proposal_event("scene.turn_proposed", proposal.proposal_id, proposal.scene_id)
     if proposal.expected_revision != actual_revision:
         return _reject(proposed, "stale_revision", "The scene changed before this turn")
@@ -377,7 +379,10 @@ def resolve_scene_turn(
                 "person_id": proposal.actor_id,
                 "scene_id": scene.scene_id,
                 "topic_id": proposal.topic_id,
-                "text": proposal.text,
+                # Who said it, or a memory of their words becomes his own.
+                "text": f"{speaker_name} said: “{proposal.text}”"
+                if speaker_name
+                else proposal.text,
                 "location_id": scene.location_id,
                 "importance": 0.6,
                 "confidence": 1.0,

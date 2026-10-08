@@ -1527,10 +1527,10 @@ class Life(LifeConversation):
             not self.authored_scenario
             and not meal_claim
             and beat.description.startswith(STILL_AT_IT)
-            and _at_work(self._planning(history + pending), current)
         ):
-            # Another hour of the shift: what he remembers of it is the job on his bench
-            # (repair_jobs), not "Still at it" with a line of stock texture.
+            # Another hour of the same thing isn't remembered on its own ("Still at it: a walk.
+            # Clouds moved without hurry."); its start and its end are, and the work notes
+            # (the bench, the writing) carry what happened in between.
             return beat
         remembered_description = lived_moment_description(
             remembered_description,
