@@ -119,3 +119,14 @@ drafts, waiting, feedback (sometimes more than they asked for); a deadline moved
 awkward email; half up front on bigger company jobs; invoices on thirty days, some late
 and chased; local IT jobs paid on the spot. His life story now says he freelanced after
 leaving the software job, as the original did.
+
+## Money (2026-10-08)
+
+He's comfortable, and lived into it rather than given it (`application/wealth.py`): the
+small Bristol software company he joined after university has been bought (why their docs
+person left), and the share options he assumed would come to nothing pay out, about
+£548,000 after tax. Most goes into index funds, its own pot valued at the start of each
+month; a few thousand stays in his current account, and money moves across a thousand at a
+time when it runs low, or back when it builds up, each move a transaction in the ledger.
+He keeps freelancing because he likes it, choosier about what he takes on, and is
+understated about the money (`my_money` in his voice).

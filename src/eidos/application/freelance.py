@@ -378,8 +378,9 @@ def freelance_events(
     places: frozenset[str],
     place_people: Mapping[str, tuple[str, str]],
     on_shift_at_workshop: bool,
+    comfortable: bool = False,
 ) -> list[DomainEvent]:
-    """This hour of his working life."""
+    """This hour of his working life. ``comfortable``: money isn't why he works."""
     output = _the_change(history, at, awake=awake, planning=planning,
                          on_shift_at_workshop=on_shift_at_workshop)  # fmt: skip
     if output:
@@ -388,15 +389,17 @@ def freelance_events(
         return []
     everything = jobs(history)
     hour = at.isoformat()[:13]
-    output += _replies(everything, at, balance_pence)
-    output += _payments(everything, at, awake)
+    output += _replies(everything, at, balance_pence, comfortable)
+    output += _payments(everything, at, awake, comfortable)
     if awake:
         output += _deadlines(everything, at)
     if output:
         return output
     if not awake:
         return []
-    output += _new_work(history, everything, at, places, place_people, balance_pence, hour)
+    output += _new_work(
+        history, everything, at, places, place_people, balance_pence, hour, comfortable
+    )
     if output:
         return output
     session = _session_now(planning, at)
@@ -405,7 +408,7 @@ def freelance_events(
     if busy or session is not None:
         return []
     sat_down = _maybe_sit_down(history, everything, at, location_id, energy, valence, planning,
-                               places, hour, balance_pence)  # fmt: skip
+                               places, hour, balance_pence, comfortable)  # fmt: skip
     booked = next((e for e in sat_down if e.kind == "schedule.created"), None)
     if booked is not None and booked.payload["starts_at"] == at.isoformat():
         # Sat down to it now: this hour's work counts.
@@ -558,6 +561,7 @@ def _new_work(
     place_people: Mapping[str, tuple[str, str]],
     balance_pence: int,
     hour: str,
+    comfortable: bool = False,
 ) -> list[DomainEvent]:
     output: list[DomainEvent] = []
     # Replying to an enquiry: a quote, or a polite no when he's got too much on.
@@ -618,11 +622,15 @@ def _new_work(
         if at - last_job >= timedelta(days=7) and _roll("reach-out", at.date().isoformat()) < 0.35:
             out = _event(REACHED_OUT, at)
             output += [out, _note(out, "Emailed a few old contacts to say I'm taking on work. "
-                                  "Hate doing it. Quiet weeks make me twitchy about money.", at, 0.4)]  # fmt: skip
+                                  + ("Not for the money. I just like having something on."
+                                     if comfortable else
+                                     "Hate doing it. Quiet weeks make me twitchy about money."), at, 0.4)]  # fmt: skip
     return output
 
 
-def _replies(everything: Sequence[Job], at: datetime, balance_pence: int) -> list[DomainEvent]:
+def _replies(
+    everything: Sequence[Job], at: datetime, balance_pence: int, comfortable: bool = False
+) -> list[DomainEvent]:
     for job in everything:
         if job.status != "quoted" or job.reply_due is None or at < job.reply_due:
             continue
@@ -633,7 +641,10 @@ def _replies(everything: Sequence[Job], at: datetime, balance_pence: int) -> lis
             # They want it cheaper. With money in the bank he can afford to say no.
             offer = int(job.fee_pence * 0.85)
             haggle = _event(HAGGLED, at, job_id=job.job_id, fee_pence=offer)
-            if balance_pence >= 50_000 and _roll("take-it", job.job_id) >= 0.6:
+            # With money in the bank he can afford to say no; with real money, mostly does.
+            if (comfortable or balance_pence >= 50_000) and _roll("take-it", job.job_id) >= (
+                0.25 if comfortable else 0.6
+            ):
                 no = _event(DECLINED, at, job_id=job.job_id)
                 return [haggle, no, _note(no, f"{job.client[0].upper() + job.client[1:]} wanted "
                         f"{job.brief.short} for less. I said no, politely. Felt good, then "
@@ -718,6 +729,7 @@ def _maybe_sit_down(
     places: frozenset[str],
     hour: str,
     balance_pence: int = 0,
+    comfortable: bool = False,
 ) -> list[DomainEvent]:
     """Whether he sits down to work now, and for how long, and where."""
     workable = _workable(everything, at)
@@ -736,6 +748,7 @@ def _maybe_sit_down(
                    if left > timedelta(days=10) else 1.0)  # fmt: skip
     pull *= 0.45 if energy < 0.35 else 0.8 if energy < 0.5 else 1.0
     pull *= 0.7 if valence < -0.2 else 1.0
+    pull *= 0.85 if comfortable else 1.0  # no rent riding on it
     if _roll("sit-down", hour) >= min(0.92, pull):
         return []
     hours = 1 + int(_roll("how-long", hour) * (3 if crunch else 2.4))
@@ -895,7 +908,9 @@ def _deadlines(everything: Sequence[Job], at: datetime) -> list[DomainEvent]:
     return []
 
 
-def _payments(everything: Sequence[Job], at: datetime, awake: bool) -> list[DomainEvent]:
+def _payments(
+    everything: Sequence[Job], at: datetime, awake: bool, comfortable: bool = False
+) -> list[DomainEvent]:
     for job in everything:
         if (
             job.deposit_pence
@@ -907,7 +922,7 @@ def _payments(everything: Sequence[Job], at: datetime, awake: bool) -> list[Doma
             paid = _event(PAID, at, job_id=job.job_id, fee_pence=job.deposit_pence, deposit=True,
                           what=f"{job.brief.short} (half up front)", client=job.client)  # fmt: skip
             return [paid, _note(paid, f"The first half for {job.brief.short} came in: "
-                                f"£{job.deposit_pence // 100}. Breathing a bit easier.", at, 0.4)]  # fmt: skip
+                                f"£{job.deposit_pence // 100}." + ("" if comfortable else " Breathing a bit easier."), at, 0.4)]  # fmt: skip
         if job.status != "delivered" or job.pay_due is None or at < job.pay_due:
             continue
         if not job.late and not job.chased and _roll("late", job.job_id) < job.brief.late_chance:

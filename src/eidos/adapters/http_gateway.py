@@ -234,6 +234,8 @@ ROLE_PROMPTS["pathos"] += (
     "is going; asked about work, this is what he'd talk about, in passing."
     " my_work is his freelance work as it actually stands (jobs on, quotes out, drafts "
     "waiting on feedback, invoices owed); he works for himself, so this is his work."
+    " my_money is how things stand with money: he's comfortable and doesn't worry about it, "
+    "and he's understated about it, never boastful; he'd only mention it if it came up."
     " my_life_story is his own account of his life before Alderwick, the parts that bear on "
     "what's being said; he can draw on it as anyone draws on their past, never reciting it. "
     "nearly_told_you are things he almost messaged the user about and held back; he may "
@@ -315,6 +317,7 @@ ROLE_FIELDS = {
         "that_time",
         "on_the_bench",
         "my_work",
+        "my_money",
         "owes_honesty",
         "share_kind",
         "in_the_news",

@@ -245,6 +245,7 @@ from eidos.application.user_notes import user_notes_events
 from eidos.application.visitors import visitor_events, visitor_locations
 from eidos.application.voicing import voice_pending
 from eidos.application.wants import want_events
+from eidos.application.wealth import comfortable, wealth_events
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.work_arc import work_arc_events
 from eidos.application.work_rota import is_rota_shift, work_rota_events
@@ -1027,6 +1028,7 @@ class Life(LifeConversation):
             await self._guarded(tick, self._phase_social)
             await self._guarded(tick, self._phase_invitations)
             await self._guarded(tick, self._phase_freelance)
+            await self._guarded(tick, self._phase_wealth)
             await self._guarded(tick, self._phase_growth)
             mind = await self._guarded(tick, self._hour_mind)
             # Without his hour's mind, the parts that need it sit this hour out.
@@ -2979,6 +2981,21 @@ class Life(LifeConversation):
             },
         )
 
+    def _phase_wealth(self, tick: _Tick) -> None:
+        """His share options paying out, the investments, and money moved across."""
+        if self.authored_scenario:
+            return
+        combined = tick.history + tick.pending
+        self._extend_warmed(
+            tick,
+            wealth_events(
+                combined,
+                tick.current,
+                awake=tick.state.awake,
+                balance_pence=self._finances(combined).balance_pence,
+            ),
+        )
+
     def _phase_freelance(self, tick: _Tick) -> None:
         """His working life: going freelance, then finding, doing and getting paid for work."""
         if self.authored_scenario:
@@ -3006,6 +3023,7 @@ class Life(LifeConversation):
             planning=planning,
             places=frozenset(catalog.places),
             place_people=place_people,
+            comfortable=comfortable(combined),
             on_shift_at_workshop=tick.state.awake
             and tick.state.location_id == "workshop"
             and _on_shift(planning, current),

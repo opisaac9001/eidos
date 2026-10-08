@@ -93,8 +93,9 @@ INTERVIEW: tuple[tuple[str, str], ...] = (
     ),
     (
         "What did you do after you graduated?",
-        "The obvious thing. A graduate job in software in Bristol, decent money, nice office, "
-        "free fruit. I was fine at it. I built things that made other things slightly more "
+        "The obvious thing. A graduate job in software in Bristol, at a small company that "
+        "gave everyone share options I assumed would come to nothing. Decent money, nice "
+        "office, free fruit. I was fine at it. I built things that made other things slightly more "
         "efficient, and after a couple of years I couldn't have told you why any of it "
         "mattered. There wasn't a dramatic moment. I just noticed I was happiest on the days "
         "I fixed something real, a bike, a friend's lamp, and least happy when someone said "

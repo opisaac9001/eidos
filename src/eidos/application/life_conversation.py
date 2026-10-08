@@ -43,6 +43,7 @@ from eidos.application.social_preferences import social_preference_events
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.time_feel import time_feel_now
 from eidos.application.user_notes import asked_about_events, user_knowledge_context
+from eidos.application.wealth import money_in_words
 from eidos.application.world_news import news_context
 from eidos.domain.conversation_time import reply_pacing
 from eidos.domain.emotions import emotional_planning_bias, emotional_speech_bias, project_emotion
@@ -213,6 +214,9 @@ class LifeConversation(LifeProjections):
         work = work_view(history, at)
         if work:
             context["my_work"] = work
+        money = money_in_words(history, self._finances(list(history)).balance_pence)
+        if money:
+            context["my_money"] = money
         return context
 
     async def _advance(self, hours: float) -> None:

@@ -39,6 +39,7 @@ from eidos.application.town_calendar import whats_on
 from eidos.application.visitors import visitor_locations
 from eidos.application.volition import volition_snapshot
 from eidos.application.wants import wants_view
+from eidos.application.wealth import wealth_view
 from eidos.domain.character_history import project_character_history
 from eidos.domain.commitments import project_renegotiations
 from eidos.domain.conversation_time import project_conversation_clocks
@@ -684,6 +685,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "body_now": body_now(history, state.simulated_at),
         "on_the_bench": bench_view(history, state.simulated_at),
         "my_work": work_view(history, state.simulated_at),
+        "investments": wealth_view(history),
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),

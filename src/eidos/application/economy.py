@@ -196,6 +196,8 @@ _SOURCE_KINDS = (
     "object.replenishment_cancelled",
     "spending.made",
     "freelance.paid",
+    "finance.moved_from_investments",
+    "finance.moved_to_investments",
 )
 
 
@@ -213,6 +215,14 @@ def _source_consequence(
         cost = source.payload.get("cost_pence")
         if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
             return (-cost, str(source.payload["category"]), str(source.payload.get("text")))
+    if source.kind == "finance.moved_to_investments":
+        amount = source.payload.get("amount_pence")
+        if isinstance(amount, int) and not isinstance(amount, bool) and 0 < amount <= 100_000:
+            return (-amount, "savings_transfer", "Moved into investments")
+    if source.kind == "finance.moved_from_investments":
+        amount = source.payload.get("amount_pence")
+        if isinstance(amount, int) and not isinstance(amount, bool) and 0 < amount <= 100_000:
+            return (amount, "savings_transfer", "Moved from investments")
     if source.kind == "freelance.paid":
         fee = source.payload.get("fee_pence")
         if isinstance(fee, int) and not isinstance(fee, bool) and fee > 0:

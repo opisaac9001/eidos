@@ -24,6 +24,7 @@ _CATEGORIES = {
     "going_out",
     "gifts",
     "travel",
+    "savings_transfer",
 }
 
 
