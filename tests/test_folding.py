@@ -147,6 +147,15 @@ class IncrementalFoldTests(unittest.TestCase):
         self.assertEqual(counter.fold(EventView(view)), tuple(reversed(range(10))))
         self.assertEqual(counter.steps, 0)
 
+    def test_a_sequence_ending_exactly_at_a_checkpoint_is_returned(self) -> None:
+        """It was taken out of the wrong list, and parts of a live hour failed."""
+        counter = CountingFold()
+        counter.fold.CHECKPOINT_EVERY = 4  # type: ignore[misc]
+        life = _events(10)
+        counter.fold(life)  # leaves a checkpoint at 8
+        self.assertEqual(counter.fold(life[:8]), tuple(range(8)))
+        self.assertEqual(counter.fold(life), tuple(range(10)))
+
     def test_keys_keep_differently_seeded_folds_apart(self) -> None:
         fold: IncrementalFold[tuple[str, int]] = IncrementalFold(
             lambda: ("default", 0), lambda state, _event: (state[0], state[1] + 1)

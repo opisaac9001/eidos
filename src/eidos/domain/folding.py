@@ -352,11 +352,16 @@ class IncrementalFold(Generic[S]):
             self._entries.clear()
             self._checkpoints.clear()
 
-    @staticmethod
-    def _touch(entries: list[_Entry[S]], entry: _Entry[S]) -> None:
-        if entries[0] is not entry:
+    def _touch(self, entries: list[_Entry[S]], entry: _Entry[S]) -> None:
+        # The best match can be a checkpoint, which lives in its own list: bring it to the
+        # front of the heads without trying to take it out of a list it isn't in (that
+        # stopped parts of an hour whenever his history landed exactly on a checkpoint).
+        if entries and entries[0] is entry:
+            return
+        if entry in entries:
             entries.remove(entry)
-            entries.insert(0, entry)
+        entries.insert(0, entry)
+        del entries[self._capacity :]
 
 
 R = TypeVar("R")
