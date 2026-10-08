@@ -211,7 +211,7 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
                 # At the bench: the actual job in front of him, not "a shift".
                 bench = [str(line) for line in snapshot.get("on_the_bench") or [] if line]
                 found.extend(Cue("doing", line, 1.4) for line in bench[:2])
-            elif str(item["title"]).startswith(("Work on", "Sort out")):
+            elif str(item["title"]).startswith(("Work on", "Write", "Call with a source")):
                 # Working: where the job's at (half done, due Friday), not just its name.
                 work = [str(line) for line in snapshot.get("my_work") or [] if line]
                 found.extend(Cue("doing", line, 1.4) for line in work[:1])

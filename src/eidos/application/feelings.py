@@ -191,6 +191,8 @@ def _sources(
         "freelance.paid",
         "freelance.went_quiet",
         "freelance.deadline_moved",
+        "freelance.published",
+        "freelance.column_offered",
     )
     for event in events_of(history, *kinds)[-40:]:
         try:
@@ -295,7 +297,12 @@ def _sources(
             owner = str(p.get("owner", ""))
             about = f"{owner.split()[0] if owner and not owner.startswith(('a ', 'an ')) else 'them'} being pleased with {_the(str(p.get('item', '')))}"
             found.append((f"contentment:{p.get('job_id')}", "contentment", about, 0.3, True, event))
-        elif event.kind == "freelance.delivered":
+        elif event.kind == "freelance.published":
+            found.append((f"satisfaction:out-{p.get('job_id')}", "satisfaction",
+                          str(p.get("short")), 0.45, True, event))  # fmt: skip
+        elif event.kind == "freelance.column_offered":
+            found.append(("excitement:column", "excitement", "writing a column", 0.5, True, event))
+        elif event.kind == "freelance.delivered" and not p.get("publish_due"):
             found.append((f"satisfaction:{p.get('job_id')}", "satisfaction", str(p.get("short")),
                           0.35, True, event))  # fmt: skip
         elif event.kind == "freelance.feedback" and p.get("feeling"):

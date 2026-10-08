@@ -19,6 +19,8 @@ from eidos.application.freelance import (
     LATE,
     OFFER,
     PAID,
+    PITCHED,
+    PUBLISHED,
     QUOTED,
     STARTED,
     TOLD,
@@ -36,7 +38,7 @@ from eidos.domain.events import DomainEvent
 def lived(tmp_path_factory) -> list[DomainEvent]:
     path = Path(tmp_path_factory.mktemp("freelance")) / "world.sqlite3"
     life = Life(SQLiteEventStore(path), StandInGateway())
-    for _ in range(35):
+    for _ in range(60):
         life.advance(24)
     return life.history()
 
@@ -82,7 +84,7 @@ def test_the_work_comes_and_gets_done_in_his_own_hours(lived) -> None:
         if _at(e) > started:
             per_day[_at(e).date().isoformat()] = per_day.get(_at(e).date().isoformat(), 0) + 1
     assert len(set(per_day.values())) >= 2
-    assert sum(1 for e in lived if e.kind == ENQUIRY) >= 2
+    assert sum(1 for e in lived if e.kind in {ENQUIRY, PITCHED}) >= 3
     assert any(e.kind == DELIVERED for e in lived)
     # Half up front on the first contract, as income.
     deposit = next(e for e in lived if e.kind == PAID and e.payload.get("deposit"))
@@ -148,3 +150,23 @@ def test_what_he_has_on_as_he_would_say_it() -> None:
                                      "simulated_at": (AT - timedelta(days=20)).isoformat()})
     )  # fmt: skip
     assert work_view(history, AT) == ["the API guide: done, invoice for £175 not paid yet"]
+
+
+def test_he_pitches_only_once_hes_freelance_and_pieces_get_written_and_published(lived) -> None:
+    started = _at(_first(lived, STARTED))
+    pitches = [
+        e for e in lived if e.kind == PITCHED and not str(e.payload["job_id"]).startswith("column")
+    ]
+    assert pitches and all(_at(e) >= started for e in pitches)
+    # The first one is the piece the workshop gave him.
+    assert pitches[0].payload["brief"] == "repair-feature"
+    published = [e for e in lived if e.kind == PUBLISHED]
+    assert published
+    for out in published:
+        job = out.payload["job_id"]
+        kinds = [e.kind for e in lived if e.payload.get("job_id") == job]
+        # Filed, edited, sent, then out; invoiced on publication, not before.
+        assert kinds.index("freelance.draft_sent") < kinds.index("freelance.feedback")
+        assert kinds.index("freelance.feedback") < kinds.index(DELIVERED) < kinds.index(PUBLISHED)
+    # A feature means talking to someone.
+    assert any(e.kind == WORKED and e.payload.get("how") == "call" for e in lived)

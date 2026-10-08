@@ -89,7 +89,8 @@ def financial_consequence_events(
         output.append(event)
         current = current.apply(event)
         processed.add(source_id)
-        if category == "work_income" and at.weekday() == 4:
+        # Payday is the workshop's Friday wages; freelance money has its own note.
+        if category == "work_income" and at.weekday() == 4 and source.kind != "freelance.paid":
             output.append(_payday_memory(event, current, at))
 
     rota_world = at.hour == 17 and any(
@@ -196,8 +197,9 @@ _SOURCE_KINDS = (
     "object.replenishment_cancelled",
     "spending.made",
     "freelance.paid",
-    "finance.moved_from_investments",
-    "finance.moved_to_investments",
+    "finance.moved_from_savings",
+    "finance.moved_to_savings",
+    "finance.tax_set_aside",
 )
 
 
@@ -215,14 +217,16 @@ def _source_consequence(
         cost = source.payload.get("cost_pence")
         if isinstance(cost, int) and not isinstance(cost, bool) and cost > 0:
             return (-cost, str(source.payload["category"]), str(source.payload.get("text")))
-    if source.kind == "finance.moved_to_investments":
+    moves = {
+        "finance.moved_from_savings": (1, "savings_transfer", "From savings"),
+        "finance.moved_to_savings": (-1, "savings_transfer", "Into savings"),
+        "finance.tax_set_aside": (-1, "tax_set_aside", "Put aside for tax"),
+    }
+    if source.kind in moves:
+        sign, category, words = moves[source.kind]
         amount = source.payload.get("amount_pence")
         if isinstance(amount, int) and not isinstance(amount, bool) and 0 < amount <= 100_000:
-            return (-amount, "savings_transfer", "Moved into investments")
-    if source.kind == "finance.moved_from_investments":
-        amount = source.payload.get("amount_pence")
-        if isinstance(amount, int) and not isinstance(amount, bool) and 0 < amount <= 100_000:
-            return (amount, "savings_transfer", "Moved from investments")
+            return (sign * amount, category, words)
     if source.kind == "freelance.paid":
         fee = source.payload.get("fee_pence")
         if isinstance(fee, int) and not isinstance(fee, bool) and fee > 0:
