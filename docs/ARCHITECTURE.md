@@ -262,3 +262,11 @@ with models only wording what the rules decide:
   then (`provision_source` "takeaway", charged by the economy).
 - A neutral mood takes its name from his strongest feeling (`feelings.mood_from_feelings`).
 - Things to take somewhere come back as he sets off from home (`open_loops._carried`).
+- `application/freelance.py`: his work. He goes freelance in his life (offer, quote, telling
+  Ellis, the notice shifts, a last day: `career.*`, `work.agreement_ended`,
+  `work.freelance_started`), then jobs move enquiry, quoted, accepted, worked in sessions he
+  books himself (`freelance-` calendar entries), draft, feedback, delivered, paid (or late
+  and chased). `freelance.paid` is income in the economy. `my_work` is his work as he'd say
+  it, in conversation, his snapshot and his thoughts while working.
+- Each part of a live hour runs guarded (`Life._guarded`): a failure is rolled back,
+  logged, recorded as `life.phase_failed`, and the hour goes on.

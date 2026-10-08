@@ -55,7 +55,7 @@ def work_arc_events(
 ) -> list[DomainEvent]:
     """At the end of a shift, the next step in where the job is going, if it's time."""
     agreed = events_of(history, "work.agreement_accepted")
-    if not agreed or at.hour != 16:
+    if not agreed or at.hour != 16 or events_of(history, "work.agreement_ended"):
         return []
     today = f"{ROTA_PREFIX}{at.date().isoformat()}"
     if not any(

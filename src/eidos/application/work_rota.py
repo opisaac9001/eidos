@@ -32,6 +32,12 @@ SHIFT_WAGE_PENCE = HOURLY_WAGE_PENCE * (SHIFT_END_HOUR - SHIFT_START_HOUR)
 def current_terms(history: Sequence[DomainEvent]) -> tuple[frozenset[int], int]:
     """(weekdays, hourly wage in pence) under the job as it stands now."""
     weekdays, wage = SHIFT_WEEKDAYS, HOURLY_WAGE_PENCE
+    if any(
+        e.payload.get("agreement_id") == AGREEMENT_ID
+        for e in events_of(history, "work.agreement_ended")
+    ):
+        # He's left: no shift days (the notice shifts are already on his calendar).
+        return frozenset(), wage
     for event in events_of(history, "work.agreement_accepted", "work.terms_changed"):
         if event.payload.get("agreement_id") not in (None, AGREEMENT_ID):
             continue

@@ -73,6 +73,8 @@ from eidos.application.far_friends import far_friend_events
 from eidos.application.feelings import feeling_events, mood_from_feelings
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
+from eidos.application.freelance import freelance_events, self_employed
+from eidos.application.freelance import working_now as freelance_working_now
 from eidos.application.friends_lives import (
     away_people,
     busy_people,
@@ -1024,6 +1026,7 @@ class Life(LifeConversation):
             await self._guarded(tick, self._phase_callers)
             await self._guarded(tick, self._phase_social)
             await self._guarded(tick, self._phase_invitations)
+            await self._guarded(tick, self._phase_freelance)
             await self._guarded(tick, self._phase_growth)
             mind = await self._guarded(tick, self._hour_mind)
             # Without his hour's mind, the parts that need it sit this hour out.
@@ -1297,7 +1300,17 @@ class Life(LifeConversation):
                         for entry in planning.calendar.values()
                         if is_rota_shift(entry.schedule_id)
                         and entry.status in {"scheduled", "active", "completed"}
-                    ],
+                    ]
+                    # Working for himself, the week is still Monday to Friday.
+                    + (
+                        [
+                            current + timedelta(days=offset)
+                            for offset in range(-7, 8)
+                            if (current + timedelta(days=offset)).weekday() < 5
+                        ]
+                        if self_employed(history + pending)
+                        else []
+                    ),
                     balance_pence=self._finances(history + pending).balance_pence,
                     at_work=_at_work(planning, current),
                 )
@@ -2966,6 +2979,39 @@ class Life(LifeConversation):
             },
         )
 
+    def _phase_freelance(self, tick: _Tick) -> None:
+        """His working life: going freelance, then finding, doing and getting paid for work."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        combined = history + pending
+        catalog = self._world_catalog(combined)
+        planning = self._planning(combined)
+        npcs = project_npcs(combined, current).people
+        place_people: dict[str, tuple[str, str]] = {}
+        for person_id, person in sorted(catalog.people.items()):
+            npc = npcs.get(person_id)
+            place = getattr(npc, "usual_location_id", None) if npc is not None else None
+            if place and place not in {"home", "workshop"} and place not in place_people:
+                place_people[place] = (person_id, person.name.split()[0])
+        work = freelance_events(
+            combined,
+            current,
+            awake=tick.state.awake,
+            location_id=tick.state.location_id,
+            busy=tick.pathos_busy,
+            energy=tick.effective_energy,
+            valence=tick.state.valence,
+            balance_pence=self._finances(combined).balance_pence,
+            planning=planning,
+            places=frozenset(catalog.places),
+            place_people=place_people,
+            on_shift_at_workshop=tick.state.awake
+            and tick.state.location_id == "workshop"
+            and _on_shift(planning, current),
+        )
+        self._extend_warmed(tick, work, self._planning)
+
     def _phase_growth(self, tick: _Tick) -> None:
         """Slow change: skills, preferences, traits, self-story, concerns, beliefs, dreams."""
         history, pending, current, at = tick.history, tick.pending, tick.current, tick.at
@@ -2985,7 +3031,7 @@ class Life(LifeConversation):
                     current,
                     at_work=tick.state.awake
                     and tick.state.location_id == "workshop"
-                    and _at_work(self._planning(history + pending), current),
+                    and _on_shift(self._planning(history + pending), current),
                     customers={
                         pid: person.name
                         for pid, person in town.people.items()
@@ -4017,6 +4063,11 @@ def _association_cue(
 
 
 def _at_work(planning: Any, at: datetime) -> bool:
+    """Whether he's working now: a shift, or a freelance session."""
+    return _on_shift(planning, at) or freelance_working_now(planning, at)
+
+
+def _on_shift(planning: Any, at: datetime) -> bool:
     """Whether a rota shift is under way now."""
     for item in planning.calendar.values():
         if not is_rota_shift(item.schedule_id) or item.status not in {"scheduled", "active"}:

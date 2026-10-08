@@ -15,6 +15,7 @@ from eidos.application.cognitive_workspace import cognitive_workspace
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.feelings import coping_thoughts, feelings_view
 from eidos.application.followups import project_followups
+from eidos.application.freelance import work_view
 from eidos.application.group_chat import phone_view
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.application.latent_town import TOWN_POPULATION
@@ -682,6 +683,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "open_loops": loops_view(history, state.simulated_at),
         "body_now": body_now(history, state.simulated_at),
         "on_the_bench": bench_view(history, state.simulated_at),
+        "my_work": work_view(history, state.simulated_at),
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),

@@ -185,6 +185,12 @@ def _sources(
         "work.job_setback",
         "work.job_finished",
         "work.job_collected",
+        "freelance.feedback",
+        "freelance.delivered",
+        "freelance.payment_late",
+        "freelance.paid",
+        "freelance.went_quiet",
+        "freelance.deadline_moved",
     )
     for event in events_of(history, *kinds)[-40:]:
         try:
@@ -289,6 +295,25 @@ def _sources(
             owner = str(p.get("owner", ""))
             about = f"{owner.split()[0] if owner and not owner.startswith(('a ', 'an ')) else 'them'} being pleased with {_the(str(p.get('item', '')))}"
             found.append((f"contentment:{p.get('job_id')}", "contentment", about, 0.3, True, event))
+        elif event.kind == "freelance.delivered":
+            found.append((f"satisfaction:{p.get('job_id')}", "satisfaction", str(p.get("short")),
+                          0.35, True, event))  # fmt: skip
+        elif event.kind == "freelance.feedback" and p.get("feeling"):
+            kind = str(p.get("feeling"))
+            about = (
+                f"{p.get('client')} wanting more" if kind == "irritation"
+                else f"{p.get('client')} liking {p.get('short')}"
+            )  # fmt: skip
+            found.append((f"{kind}:{p.get('job_id')}", kind, about, 0.35, True, event))
+        elif event.kind == "freelance.payment_late":
+            found.append((f"worry:invoice-{p.get('job_id')}", "worry",
+                          f"the invoice for {p.get('short')}", 0.35, True, event))  # fmt: skip
+        elif event.kind == "freelance.paid" and p.get("late"):
+            found.append((f"relief:{p.get('job_id')}", "relief", f"getting paid for {p.get('what')}",
+                          0.4, True, event))  # fmt: skip
+        elif event.kind == "freelance.deadline_moved":
+            found.append((f"self_reproach:{p.get('job_id')}", "self_reproach",
+                          f"finish {p.get('short')} on time", 0.35, True, event))  # fmt: skip
         elif event.kind == "gossip.heard" and p.get("holder_id") == "pathos":
             subject = str(p.get("subject_id"))
             if subject in names and p.get("story") == "family_worry":

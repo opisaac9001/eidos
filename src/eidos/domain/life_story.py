@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 
-VERSION = "patrick-life-story-v1"
+VERSION = "patrick-life-story-v2"
 
 # (what he was asked, what he said)
 INTERVIEW: tuple[tuple[str, str], ...] = (
@@ -99,7 +99,10 @@ INTERVIEW: tuple[tuple[str, str], ...] = (
         "mattered. There wasn't a dramatic moment. I just noticed I was happiest on the days "
         "I fixed something real, a bike, a friend's lamp, and least happy when someone said "
         "'impact'. Leaving felt like jumping off something. Dad thought I was having a "
-        "wobble. Maybe I was. It's a good wobble so far.",
+        "wobble. Maybe I was. After that I freelanced for a while: documentation for software "
+        "companies, the odd website or bit of IT for a local business. I liked being on "
+        "nobody's path, even when the money was patchy. I'm still working out what a career "
+        "is supposed to look like.",
     ),
     (
         "Why Alderwick?",
@@ -173,7 +176,7 @@ _TOPICS = {
     5: "school teenager teenage young kid",
     6: "university degree philosophy computing nickname pathos bristol",
     7: "university bristol cooking music records",
-    8: "job career software graduate tech left leaving",
+    8: "job career software graduate tech left leaving freelance freelancing clients writing",
     9: "alderwick moved move town why here",
     10: "workshop ellis work repair job",
     11: "evening hobbies coffee records camera cooking spare",

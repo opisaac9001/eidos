@@ -327,6 +327,10 @@ def _take_in(
 
 def bench_view(history: Sequence[DomainEvent], at: datetime) -> list[str]:
     """What's on his bench, as he'd think of it, and what he finished lately."""
+    from eidos.application.freelance import self_employed
+
+    if self_employed(history):
+        return []  # the bench is Ellis's again; whatever was on it, Ellis finishes
     found: list[str] = []
     for job in jobs(history):
         if job.collected:

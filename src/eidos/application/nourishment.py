@@ -332,7 +332,7 @@ def nourishment_events(
 def working_day(planning: PlanningState, at: datetime) -> bool:
     """Whether he has a shift today."""
     return any(
-        is_rota_shift(entry.schedule_id)
+        (is_rota_shift(entry.schedule_id) or entry.schedule_id.startswith("freelance-"))
         and entry.status in {"scheduled", "active", "completed"}
         and entry.starts_at[:10] == at.date().isoformat()
         for entry in planning.calendar.values()

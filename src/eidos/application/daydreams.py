@@ -36,6 +36,9 @@ _INTERESTS = (
     "vegetarian cooking",
     "walking by the River Alder",
     "the repair workshop and the things people bring in",
+    "the interactive fiction game he keeps tinkering with",
+    "an essay he means to write about technology and ethics",
+    "the freelance work he's got on",
 )
 _KINDS = {"project", "photo", "tell_someone", "try", "make", "question"}
 _SCHEMA = {

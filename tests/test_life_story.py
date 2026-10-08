@@ -16,7 +16,8 @@ def test_the_story_fits_his_authored_background() -> None:
     for fact in ("Wye", "Helen", "Richard", "Tom", "Jess", "Isla", "Gulliver", "Bristol", "Ellis"):
         assert fact in told
     # What his profile says not to import stays out.
-    for dropped in ("Volvo", "freelance"):
+    assert "freelanced" in told  # restored from the original, as his own past
+    for dropped in ("Volvo", "Montpelier"):
         assert dropped not in told
 
 

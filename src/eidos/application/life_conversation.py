@@ -13,6 +13,7 @@ from eidos.application.cognitive_workspace import cognitive_workspace, recent_in
 from eidos.application.day_recall import recall_of_that_time
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.feelings import feelings_view
+from eidos.application.freelance import work_view
 from eidos.application.in_jokes import jokes_with_you
 from eidos.application.inner_life import active_concerns, active_dream_inspirations
 from eidos.application.life_context import (
@@ -209,6 +210,9 @@ class LifeConversation(LifeProjections):
         bench = bench_view(history, at)
         if bench:
             context["on_the_bench"] = bench
+        work = work_view(history, at)
+        if work:
+            context["my_work"] = work
         return context
 
     async def _advance(self, hours: float) -> None:
