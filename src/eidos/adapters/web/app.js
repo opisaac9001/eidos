@@ -1388,15 +1388,27 @@ function renderPlans() {
   const lately = Object.entries(finances.last_four_weeks || {}).sort(
     (a, b) => b[1] - a[1],
   );
-  $("finance-lately").hidden = !lately.length;
-  $("finance-lately").textContent = lately.length
-    ? `Last four weeks: ${lately
-        .map(
-          ([category, pence]) =>
-            `${category.replaceAll("_", " ")} ${pence > 0 ? "+" : ""}${money(pence)}`,
-        )
-        .join(" · ")}`
+  const accounts = state.accounts;
+  const accountLine = accounts
+    ? `Savings ${money(accounts.savings_pence)} · ISA ${money(accounts.isa_pence)} · ` +
+      `Investments ${money(accounts.general_investments_pence)} · ` +
+      `Tax pot ${money(accounts.tax_pot_pence)}` +
+      (accounts.tax_owed_pence ? ` (owes ${money(accounts.tax_owed_pence)} on the shares)` : "")
     : "";
+  $("finance-lately").hidden = !lately.length && !accountLine;
+  $("finance-lately").textContent = [
+    accountLine,
+    lately.length
+      ? `Last four weeks: ${lately
+          .map(
+            ([category, pence]) =>
+              `${category.replaceAll("_", " ")} ${pence > 0 ? "+" : ""}${money(pence)}`,
+          )
+          .join(" · ")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" — ");
   const financeItems = [
     ...[...finances.transactions]
       .reverse()

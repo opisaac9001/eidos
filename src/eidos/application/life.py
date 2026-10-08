@@ -2986,13 +2986,18 @@ class Life(LifeConversation):
         if self.authored_scenario:
             return
         combined = tick.history + tick.pending
+        finances = self._finances(combined)
         self._extend_warmed(
             tick,
             wealth_events(
                 combined,
                 tick.current,
                 awake=tick.state.awake,
-                balance_pence=self._finances(combined).balance_pence,
+                balance_pence=finances.balance_pence,
+                ledger=[
+                    (item.simulated_at, item.amount_pence, item.category)
+                    for item in list(finances.transactions.values())[-300:]
+                ],
             ),
         )
 

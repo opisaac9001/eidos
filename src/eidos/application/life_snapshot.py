@@ -685,7 +685,7 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "body_now": body_now(history, state.simulated_at),
         "on_the_bench": bench_view(history, state.simulated_at),
         "my_work": work_view(history, state.simulated_at),
-        "investments": wealth_view(history),
+        "accounts": wealth_view(history),
         "phone": phone_view(history),
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),

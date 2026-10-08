@@ -102,31 +102,39 @@ changes nothing that has happened.
 
 ## His work (2026-10-08)
 
-The original made him freelance: technical writing and documentation for software
-companies, and small web or IT jobs for local businesses, because he valued being on no
-one's corporate path. The rebuild had given him a part-time job at Ellis's workshop instead.
+The original made him freelance, writing essays on tech, philosophy and everyday life between
+technical writing jobs. The rebuild had given him a part-time job at Ellis's workshop instead.
 `application/freelance.py` takes him back, as something that happens in his life: his old
 team in Bristol asks him to rewrite their developer docs, he quotes, they say yes, he tells
-Ellis on his next shift, works the shifts already on the rota as his notice, has a last
-day, and is freelance. Eight months at the workshop stay in his history; Ellis stays a
-friend, and he drops in now and then to give Ellis a hand.
+Ellis on his next shift, works the shifts already on the rota as his notice, has a last day,
+and is freelance. Eight months at the workshop stay in his history; Ellis stays a friend, and
+he drops in now and then to give Ellis a hand.
 
-Freelancing runs on rules, the way it really goes: work through people who know him and
-word of mouth after local jobs (an email round to old contacts in a quiet patch); quotes
-that are accepted, haggled or ignored; hours he undercounts; his own working hours, pulled
-by deadlines and pushed back by tiredness and low mood, at home or now and then at Juniper;
-drafts, waiting, feedback (sometimes more than they asked for); a deadline moved with an
-awkward email; half up front on bigger company jobs; invoices on thirty days, some late
-and chased; local IT jobs paid on the spot. His life story now says he freelanced after
-leaving the software job, as the original did.
+He's a **freelance writer on technology and how it changes ordinary life**. He pitches ideas
+from his own life and interests (the first is the right to repair, from the workshop) to a
+tech magazine's features desk, a long-read site, a paper's opinion desk, a philosophy
+magazine, a design quarterly. Many editors never reply, some pass, some commission with a
+word count, fee and deadline. Features mean a call with a source. He writes in sessions he
+plans himself (a morning block, often an afternoon one, more as a deadline nears), files,
+gets edits, sends the final version, and a week or so later it's out; people react (his dad,
+his mum, Tom in the family chat, a stranger's email, someone cross online). Publications pay
+on publication, thirty to sixty days later and sometimes late. An editor who has run two of
+his pieces may offer a monthly column. Technical writing from old contacts (half up front on
+bigger jobs) and local writing once people know what he does (the Regent's centenary history,
+programme notes for The Listening Room) fill in around it.
 
 ## Money (2026-10-08)
 
-He's comfortable, and lived into it rather than given it (`application/wealth.py`): the
-small Bristol software company he joined after university has been bought (why their docs
-person left), and the share options he assumed would come to nothing pay out, about
-£548,000 after tax. Most goes into index funds, its own pot valued at the start of each
-month; a few thousand stays in his current account, and money moves across a thousand at a
-time when it runs low, or back when it builds up, each move a transaction in the ledger.
-He keeps freelancing because he likes it, choosier about what he takes on, and is
-understated about the money (`my_money` in his voice).
+He's comfortable, and lived into it (`application/wealth.py`): the small Bristol software
+company he joined after university has been bought, and the share options he assumed would
+come to nothing pay out, £612,000 before tax. He manages it the way a sensible person in
+England would: capital gains tax (18% above the annual exempt amount) put aside in its own
+pot for the self-assessment bill due the January after the tax year ends; £20,000 into a
+stocks and shares ISA, another year's allowance each 6 April; £25,000 in easy-access savings;
+the rest in a general investment account in the same global index fund. Savings pay interest
+monthly and the fund is valued monthly (up most months, down some). His current account is
+topped up from savings a thousand at a time when it runs low and swept back when it builds
+up; a quarter of each freelance payment goes into the tax pot. On the first Sunday of the
+month he looks at where it went. He does his tax return late in January and pays from the
+pot. He keeps writing because he likes it, is choosier about work, and is understated about
+the money (`my_money` in his voice).

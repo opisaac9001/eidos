@@ -25,6 +25,7 @@ _CATEGORIES = {
     "gifts",
     "travel",
     "savings_transfer",
+    "tax_set_aside",
 }
 
 

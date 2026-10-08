@@ -264,9 +264,15 @@ with models only wording what the rules decide:
 - Things to take somewhere come back as he sets off from home (`open_loops._carried`).
 - `application/freelance.py`: his work. He goes freelance in his life (offer, quote, telling
   Ellis, the notice shifts, a last day: `career.*`, `work.agreement_ended`,
-  `work.freelance_started`), then jobs move enquiry, quoted, accepted, worked in sessions he
-  books himself (`freelance-` calendar entries), draft, feedback, delivered, paid (or late
-  and chased). `freelance.paid` is income in the economy. `my_work` is his work as he'd say
-  it, in conversation, his snapshot and his thoughts while working.
+  `work.freelance_started`), then writes: pitches (`freelance.pitched`) that editors
+  commission, pass on or ignore; sessions he books himself (`freelance-` calendar entries)
+  and calls with sources; filed, edited, sent, published (`freelance.published`), reacted
+  to, paid on publication; a monthly column offer; technical and local writing through
+  enquiries and quotes. `freelance.paid` is income in the economy. `my_work` is his work as
+  he'd say it.
+- `application/wealth.py`: his money beyond the current account (savings, a tax pot, an ISA,
+  a general investment account), folded from `finance.*` events; transfers to and from his
+  current account and tax set aside are ledger transactions; tax return and bill in January;
+  `accounts` on the state, `my_money` in his voice.
 - Each part of a live hour runs guarded (`Life._guarded`): a failure is rolled back,
   logged, recorded as `life.phase_failed`, and the hour goes on.
