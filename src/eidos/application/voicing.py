@@ -107,6 +107,24 @@ def _names(text: str) -> set[str]:
     return found
 
 
+# Sign-offs a model tacks on to reach the length: "Not much to add, really."
+_FILLER = re.compile(
+    r"(?<=[.!?])\s*(?:(?:not|nothing) (?:much )?(?:more |else )?to (?:add|say)|that'?s (?:about )?(?:it|all)|"
+    r"anyway|so there (?:we go|it is)|there (?:we go|it is)|such is life|it is what it is|"
+    r"make of that what you will|but there you go)[^.!?]*[.!?]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def unpadded(text: str) -> str:
+    """The re-telling without a filler ending."""
+    while True:
+        trimmed = _FILLER.sub("", text).rstrip()
+        if trimmed == text or not trimmed:
+            return text if not trimmed else trimmed
+        text = trimmed
+
+
 def keeps_the_facts(original: str, retold: str) -> bool:
     retold = " ".join(retold.split())
     if not 0.5 * len(original) <= len(retold) <= 1.8 * len(original) + 40:
@@ -180,7 +198,8 @@ async def _retell(
             "Re-tell it as he'd put it in his own head today: first person, his understated "
             "British voice, coloured by his mood. Keep every fact: every name, place and number "
             "exactly as given. Add no new people, places, events or numbers. About the same "
-            "length. Return only the re-telling."
+            "length; don't pad it out or sign off ('not much to add', 'anyway'). Return only "
+            "the re-telling."
         ),
     }
     request = ModelRequest(
@@ -199,6 +218,7 @@ async def _retell(
             raise ProposalRejected("incomplete", "Re-telling was incomplete")
         raw = json.loads(response.content)
         retold = " ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else ""
+        retold = unpadded(retold)
         if not keeps_the_facts(original, retold):
             raise ProposalRejected("changed_facts", "A re-telling must keep the facts")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError) as error:
