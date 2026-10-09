@@ -5,6 +5,7 @@ import hashlib
 import inspect
 import logging
 import math
+import random
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -117,10 +118,13 @@ from eidos.application.inner_life import (
 )
 from eidos.application.inner_stream import (
     CALLS_FROM_LEVEL,
+    FORMS,
+    choose_form,
     contact_reasons,
     felt_tone,
     near_repeat,
     said_before,
+    stock_phrase,
 )
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.life_context import latest_weather
@@ -3283,6 +3287,18 @@ class Life(LifeConversation):
         if not 7 <= current.hour < 23:
             return
         selected_context = mind.selected_context
+        # The same shapes as his passing thoughts, and none of his stock phrases.
+        recent = [
+            str(e.payload.get("text", ""))
+            for e in events_of(history + pending, "thought.recorded")[-6:]
+        ]
+        shaped = {
+            **mind.context,
+            "form": FORMS[choose_form("memory" if selected_context else "", [], random.Random(at))][
+                0
+            ],
+            **({"avoid_phrase": phrase} if (phrase := stock_phrase(recent)) else {}),
+        }
         if isinstance(self.gateway, DeferredModelGateway) and selected_context:
             source = selected_context[0]
             salience, cue = _association_cue(source, mind.focused_concern, tick.state.location_id)
@@ -3290,7 +3306,7 @@ class Life(LifeConversation):
                 request_for(
                     "murmur",
                     {
-                        **mind.context,
+                        **shaped,
                         "deferred_kind": "association",
                         "source_memory_id": str(source.event.event_id),
                         "cue": cue,
@@ -3304,14 +3320,14 @@ class Life(LifeConversation):
                 request_for(
                     "murmur",
                     {
-                        **mind.context,
+                        **shaped,
                         "deferred_kind": "inner_thought",
                     },
                 )
             )
             text = None
         else:
-            text = await perform(self.gateway, "murmur", mind.context, at, pending)
+            text = await perform(self.gateway, "murmur", shaped, at, pending)
         if text and not selected_context:
             pending.append(
                 DomainEvent(

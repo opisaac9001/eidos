@@ -49,9 +49,17 @@ class ContinuousInnerStreamTests(unittest.TestCase):
                 StandInGateway(),
             )
             life.advance(23)
+            # Some nights (a keyed-up mind) he drops off after midnight.
+            for _ in range(4):
+                if not life.snapshot()["pathos"]["awake"]:
+                    break
+                life.advance(1)
+            pulsed_before = sum(e.kind == "mind.stream_pulsed" for e in life.history())
 
             self.assertFalse(life.pulse_inner_stream())
-            self.assertFalse(any(event.kind == "mind.stream_pulsed" for event in life.history()))
+            self.assertEqual(
+                sum(e.kind == "mind.stream_pulsed" for e in life.history()), pulsed_before
+            )
 
     def test_inner_stream_reaches_the_next_spoken_response_as_subjective_context(self):
         class CapturingGateway(StandInGateway):
