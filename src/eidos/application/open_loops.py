@@ -60,6 +60,8 @@ _NOT_DOING = frozenset(
     "believe trust forget mind admit".split()
 )
 _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
+# Words that say how much he means it, not what it is.
+_EMPHATIC = frozenset("definitely properly actually really quick quickly bit little".split())
 # Something to take somewhere: "bring my chisel to the workshop", "take the book back to Nina".
 _CARRY = re.compile(
     r"\b(?:bring|take|drop off|return)\s+(.+?)\s+(?:back\s+)?(?:to|round to|over to|into|in to)\b",
@@ -403,6 +405,19 @@ def open_loop_events(
         if at - loop.formed_at >= LET_GO_AFTER:
             output.append(_event(DROPPED, loop, at, None))
             continue
+        # "Later", "tonight": a day past it and it's gone out of his head, the way they do.
+        if (
+            loop.due_at is not None
+            and not loop.slipped
+            and not loop.carry
+            and at - loop.due_at >= timedelta(days=1)
+        ):
+            output.append(
+                _event(SLIPPED, loop, at, None)
+                if loop.importance >= 0.5
+                else _event(DROPPED, loop, at, None, reason="it faded")
+            )
+            continue
         # Once a day, out of mind: what hasn't come back for a while may quietly slip.
         if (
             at.hour == 4
@@ -541,7 +556,10 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
         if loop.carry:
             continue  # taking something is done by taking it, not by any plan to be there
         theirs = _content(str(payload.get("title") or payload.get("text") or ""))
-        if words and len(words & theirs) >= max(2, (len(words) + 1) // 2):
+        # "get out for a walk" is done by a walk: a short to-do needs only its key word.
+        core = words - _EMPHATIC
+        needed = 1 if len(core) <= 2 else max(2, (len(core) + 1) // 2)
+        if core and len(core & theirs) >= needed:
             return event
     return None
 

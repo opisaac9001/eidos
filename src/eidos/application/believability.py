@@ -25,7 +25,8 @@ _FUTURE = re.compile(
     re.IGNORECASE,
 )
 # Thinking about what's in front of him, not wandering.
-_ON_TASK = {"here", "doing", "next", "person", "body"}
+# Half awake in bed, the light and the warmth are the moment he's in.
+_ON_TASK = {"here", "doing", "next", "person", "body", "stirring"}
 
 
 def _at(event: DomainEvent) -> datetime | None:

@@ -321,3 +321,27 @@ def test_his_yes_to_a_booked_group_plan_isnt_another_to_do() -> None:
          "simulated_at": (AT + timedelta(minutes=30)).isoformat()},
     )  # fmt: skip
     assert not [e for e in hour([plan, yes], AT + timedelta(hours=1)) if e.kind == FORMED]
+
+
+def test_a_walk_takes_get_out_for_a_walk_off_his_mind() -> None:
+    history = [thought("Should definitely get out for a walk.", AT - timedelta(minutes=20))]
+    history += hour(history, AT)
+    assert [loop.text for loop in open_loops(history)] == ["get out for a walk"]
+    history.append(
+        DomainEvent(
+            "activity.completed",
+            "pathos",
+            {"title": "Walk along the river", "schedule_id": "walk-1",
+             "simulated_at": (AT + timedelta(hours=2)).isoformat()},
+        )
+    )  # fmt: skip
+    assert [e.kind for e in hour(history, AT + timedelta(hours=3))] == [DONE]
+
+
+def test_a_later_thing_fades_a_day_on_and_one_that_mattered_comes_back_too_late() -> None:
+    history = [thought("Should check on Hannah later.", AT - timedelta(minutes=20))]
+    history += hour(history, AT)
+    later = AT + timedelta(days=1, hours=7)
+    out = hour(history, later)
+    assert [e.kind for e in out] in (["intention.dropped"], [SLIPPED])
+    assert not open_loops([*history, *out]) or open_loops([*history, *out])[0].slipped

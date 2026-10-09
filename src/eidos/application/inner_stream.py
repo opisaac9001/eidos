@@ -456,7 +456,8 @@ def choose_cue(
         return None
     last = recent_kinds[-1] if recent_kinds else None
     fresh = [cue for cue in available if cue.text not in recently_tried] or list(available)
-    pool = [cue for cue in fresh if cue.kind != last] or fresh
+    # Not the same place twice running, except the moment he's in: a mind can stay on it.
+    pool = [cue for cue in fresh if cue.kind != last or cue.kind in ON_TASK] or fresh
     # However many there are, the idle wanderings together weigh as one kind.
     wandering = sum(cue.kind == "wander" for cue in pool) or 1
     weights = [
@@ -483,6 +484,13 @@ def choose_cue(
         w * (0.15 if any(name in cue.text for name in set_aside) else 1.0)
         for cue, w in zip(pool, weights)
     ]
+    # Setting someone aside may leave his mind more on the moment, never less.
+    if on_task and len(on_task) < len(pool):
+        on_sum = sum(weights[i] for i in on_task)
+        off_sum = sum(weights) - on_sum
+        if on_sum > 0 and off_sum > 0 and on_sum / (on_sum + off_sum) < target:
+            scale = target / (1 - target) * off_sum / on_sum
+            weights = [w * scale if i in on_task else w for i, w in enumerate(weights)]
     return rng.choices(pool, weights=weights, k=1)[0]
 
 

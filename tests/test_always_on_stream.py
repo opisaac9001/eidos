@@ -92,8 +92,12 @@ def test_his_mind_can_drift_to_everything_around_and_inside_him() -> None:
 
 def test_the_stream_doesnt_drift_to_the_same_kind_of_thing_twice_running() -> None:
     rng = random.Random(4)
-    available = [Cue("here", "the workshop"), Cue("body", "hungry")]
-    assert all(choose_cue(available, ["here"], rng).kind == "body" for _ in range(20))
+    # Drifting away goes somewhere new each time...
+    available = [Cue("memory", "the old flat"), Cue("concern", "Rowan's mum")]
+    assert all(choose_cue(available, ["memory"], rng).kind == "concern" for _ in range(20))
+    # ...but a mind can stay on the moment it's in.
+    here = [Cue("here", "the workshop"), Cue("memory", "the old flat")]
+    assert any(choose_cue(here, ["here"], rng).kind == "here" for _ in range(20))
     assert choose_cue([], ["here"], rng) is None
 
 

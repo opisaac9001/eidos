@@ -160,13 +160,27 @@ def test_he_pitches_only_once_hes_freelance_and_pieces_get_written_and_published
     assert pitches and all(_at(e) >= started for e in pitches)
     # The first one is the piece the workshop gave him.
     assert pitches[0].payload["brief"] == "repair-feature"
+    commissioned = [
+        e for e in lived
+        if e.kind == ACCEPTED and str(e.payload["job_id"]).startswith("piece-")
+    ]  # fmt: skip
+    assert commissioned  # in two months at least one editor said yes
     published = [e for e in lived if e.kind == PUBLISHED]
-    assert published
     for out in published:
         job = out.payload["job_id"]
         kinds = [e.kind for e in lived if e.payload.get("job_id") == job]
         # Filed, edited, sent, then out; invoiced on publication, not before.
         assert kinds.index("freelance.draft_sent") < kinds.index("freelance.feedback")
         assert kinds.index("freelance.feedback") < kinds.index(DELIVERED) < kinds.index(PUBLISHED)
-    # A feature means talking to someone.
-    assert any(e.kind == WORKED and e.payload.get("how") == "call" for e in lived)
+    # A feature means talking to someone, booked for when it's commissioned.
+    features = [e for e in commissioned if e.payload["brief"] in {"repair-feature", "boring-tech",
+                "doorbells", "grief-tech", "self-checkout", "companions", "data-after-death",
+                "screen-time", "small-town-tech"}]  # fmt: skip
+    assert all(
+        any(
+            x.kind == "schedule.created"
+            and x.payload["schedule_id"] == f"freelance-{e.payload['job_id']}-call"
+            for x in lived
+        )
+        for e in features
+    )
