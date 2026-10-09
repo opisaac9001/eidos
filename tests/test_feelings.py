@@ -110,3 +110,21 @@ def test_a_worry_ends_when_things_get_better() -> None:
     later = feeling_events(history, AT + timedelta(days=1, minutes=10), names=NAMES)
     assert any(e.kind == SETTLED and e.payload["feeling_id"] == "worry:rowan" for e in later)
     assert any(e.kind == AROSE and e.payload["kind"] == "relief" for e in later)
+
+
+def test_looking_forward_to_a_coffee_not_to_a_capital_a() -> None:
+    from datetime import datetime, timezone
+
+    from eidos.application.feelings import feeling_events
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 8, 28, 9, tzinfo=timezone.utc)
+    opened = DomainEvent(
+        "concern.opened",
+        "pathos",
+        {"concern_id": "c1", "concern_kind": "anticipation",
+         "text": "A coffee at Juniper with Ellis, coming up. Looking forward to it.",
+         "simulated_at": at.isoformat()},
+    )  # fmt: skip
+    arose = feeling_events([opened], at, names={})
+    assert arose and arose[0].payload["about"] == "a coffee at Juniper with Ellis"

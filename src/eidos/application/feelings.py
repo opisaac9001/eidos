@@ -221,6 +221,10 @@ def _sources(
                 found.append((f"sadness:{person}", "sadness", f"{who} leaving", 0.6, True, event))
             elif kind_of in {"anticipation", "dread"}:
                 title = str(p.get("text", "")).split(",")[0]
+                # Mid-sentence: "looking forward to a coffee", not "to A coffee".
+                first, _, rest = title.partition(" ")
+                if first in {"A", "An", "The"}:
+                    title = f"{first.lower()} {rest}"
                 kind = "excitement" if kind_of == "anticipation" else "dread"
                 found.append((f"{kind}:{p.get('concern_id')}", kind, title, 0.35, True, event))
         elif event.kind == "concern.resolved" and p.get("resolution_kind") == "things_got_better":

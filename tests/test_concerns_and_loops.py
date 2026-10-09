@@ -305,3 +305,19 @@ def test_a_check_in_he_had_just_done_is_already_done() -> None:
         },
     )
     assert [e.kind for e in hour([texted, loop], AT + timedelta(hours=2))] == [DONE]
+
+
+def test_his_yes_to_a_booked_group_plan_isnt_another_to_do() -> None:
+    plan = DomainEvent(
+        "chat.message",
+        "pathos",
+        {"speaker_id": "ellis", "text": "Coffee at Juniper on Saturday around 10? Who's in?",
+         "invitation_id": "chat-plan-ellis-2026-08-26", "simulated_at": AT.isoformat()},
+    )  # fmt: skip
+    yes = DomainEvent(
+        "chat.message",
+        "pathos",
+        {"speaker_id": "pathos", "text": "Count me in", "answers": "chat-plan-ellis-2026-08-26",
+         "simulated_at": (AT + timedelta(minutes=30)).isoformat()},
+    )  # fmt: skip
+    assert not [e for e in hour([plan, yes], AT + timedelta(hours=1)) if e.kind == FORMED]

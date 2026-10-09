@@ -309,6 +309,14 @@ def open_loop_events(
         if e.payload.get("origin_id") == "home" and _when(e) >= since
     ]
     for loop in loops:
+        if loop.text.startswith("go along to what the group's planning") and any(
+            str(e.payload.get("invitation_id", "")).startswith("chat-plan-")
+            and _when(e) >= loop.formed_at
+            for e in events_of(history, "invitation.accepted")[-6:]
+        ):
+            # An older way of noting a group plan; it's on his calendar now.
+            output.append(_event(DONE, loop, at, None))
+            continue
         if loop.carry and set_off and awake:
             leaving = set_off[-1]
             going = leaving.payload.get("destination_id") == loop.place_id or (
@@ -442,6 +450,8 @@ def _what_he_meant(
             continue
         said = event.kind != "thought.recorded"
         raw = str(p.get("text", ""))
+        if event.kind == "chat.message" and p.get("answers"):
+            continue  # his answer to a plan he's already said yes to: it's on his calendar
         text = intended(raw)
         if text is None and event.kind == "chat.message" and _SAID_YES.search(raw):
             # Agreeing to the group's plan: the last friend's message says what it was.
