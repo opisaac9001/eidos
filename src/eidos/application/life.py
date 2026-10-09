@@ -180,6 +180,7 @@ from eidos.application.phone_calls import phone_call_events
 from eidos.application.place_discovery import known_place_ids, place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
+from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.reaching_out import reach_out_events, reply_events, why_not
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
@@ -3395,6 +3396,7 @@ class Life(LifeConversation):
             {
                 **context,
                 "person": person.name,
+                "pronouns": {person.name: SAYING[pronoun_of(person.person_id)]},
                 "avoid_details": _encounter_details(recent_encounters, person.name),
                 **({"what_they_are_doing": doing} if doing else {}),
                 **({"they_remember": remembered} if remembered else {}),

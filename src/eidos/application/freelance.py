@@ -41,6 +41,7 @@ from typing import Mapping, NamedTuple, Sequence
 
 from eidos.application.bookings import remember
 from eidos.application.day_rhythm import hour_today
+from eidos.application.pronouns import in_his_words
 from eidos.application.work_rota import AGREEMENT_ID, EMPLOYER_ID, ROTA_PREFIX
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, events_of
@@ -560,7 +561,7 @@ def _the_change(
                 causation_id=told_ellis.event_id,
                 correlation_id=AGREEMENT_ID,
             ),
-            _note(told_ellis, words, at, 0.6, person_id=EMPLOYER_ID,
+            _note(told_ellis, in_his_words(words, EMPLOYER_ID), at, 0.6, person_id=EMPLOYER_ID,
                   location_id="workshop" if in_person else None),
             *meant,
         ]  # fmt: skip

@@ -29,7 +29,7 @@ from time import perf_counter, time
 from typing import Any, Callable, Collection, Mapping, Protocol, Sequence
 
 from eidos.application.cognition import perform
-from eidos.application.pronouns import KNOWN as KNOWN_PRONOUNS
+from eidos.application.pronouns import chosen as chosen_pronoun
 from eidos.application.time_budget import when_in_words
 from eidos.domain.events import DomainEvent
 from eidos.ports.model_gateway import ModelGateway
@@ -579,7 +579,7 @@ def stream_context(
             and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
         ):
             # With pronouns: Rowan (they) kept becoming "she", Ellis "she" too.
-            pronoun = PRONOUNS.get(KNOWN_PRONOUNS.get(str(person.get("id")), "they"))
+            pronoun = PRONOUNS.get(chosen_pronoun(str(person.get("id")), str(person["name"])))
             who[str(person["name"])] = f"{str(person['occupation']).lower()}; {pronoun}"
             view = views.get(str(person["name"]))
             if view:

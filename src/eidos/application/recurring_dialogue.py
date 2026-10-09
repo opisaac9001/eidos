@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
+from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
 from eidos.application.shared_past import REVISION, invents_shared_past
 from eidos.domain.character_history import eligible_character_fact
@@ -220,6 +221,14 @@ async def _advance_scene(
                     scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                 ),
                 "scene_topic": _topic_words(topic_id, name),
+                "pronouns": {
+                    actor_names.get(pid, name if pid == partner_id else pid): SAYING[
+                        pronoun_of(pid)
+                    ]
+                    for pid in {speaker_id, partner_id}
+                    if pid != "pathos"
+                }
+                | {"Patrick": "he/him"},
                 "who_is_who": {
                     partner_id: name,
                     **{k: v for k, v in actor_names.items() if k in {speaker_id, partner_id}},

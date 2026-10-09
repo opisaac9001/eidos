@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from itertools import combinations
 
 from eidos.application.cognition import perform
+from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.domain.beliefs import Belief, project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
@@ -179,6 +180,11 @@ async def _advance(
                     "scene_topic": scene.topic_id.replace("-", " "),
                     "who_is_who": {
                         k: v for k, v in actor_names.items() if k in {speaker_id, audience_id}
+                    },
+                    "pronouns": {
+                        actor_names[k]: SAYING[pronoun_of(k)]
+                        for k in {speaker_id, audience_id}
+                        if k in actor_names and k != "pathos"
                     },
                     "prior_turns": [
                         {

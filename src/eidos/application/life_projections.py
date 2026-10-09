@@ -4,6 +4,7 @@ from datetime import datetime
 
 from eidos.application.consolidation import ConsolidationIndex
 from eidos.application.memory import MemoryIndex
+from eidos.application.pronouns import know_names
 from eidos.domain.beliefs import BeliefState, project_beliefs
 from eidos.domain.events import DomainEvent
 from eidos.domain.finances import FinancialState, project_finances
@@ -158,8 +159,10 @@ class LifeProjections:
                     catalog = catalog.apply(event)
                 anchor = str(history[-1].event_id) if history else ""
                 self._world_catalog_cache = (len(history), anchor, catalog)
+                know_names({pid: person.name for pid, person in catalog.people.items()})
                 return catalog
         catalog = project_world_catalog(history)
+        know_names({pid: person.name for pid, person in catalog.people.items()})
         anchor = str(history[-1].event_id) if history else ""
         self._world_catalog_cache = (len(history), anchor, catalog)
         return catalog
