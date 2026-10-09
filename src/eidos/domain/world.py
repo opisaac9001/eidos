@@ -6,11 +6,11 @@ from typing import Mapping
 LOCATIONS = (
     {
         "id": "home",
-        "name": "The apartment",
+        "name": "The flat",
         "label": "Home",
         "x": 23,
         "y": 24,
-        "description": "A small upstairs apartment. Books on the table, a kettle by the window.",
+        "description": "A small upstairs flat. Books on the table, a kettle by the window.",
     },
     {
         "id": "cafe",

@@ -19,6 +19,7 @@ from eidos.application.friends_lives import friends_lives_context
 from eidos.application.inner_life import active_concerns
 from eidos.application.memory_life import is_routine_note, stayed_with_me
 from eidos.application.open_loops import loops_view
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -105,7 +106,7 @@ async def life_lately_events(
     try:
         response = await gateway.generate(request)
         raw = json.loads(response.content)
-        text = " ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else ""
+        text = british(" ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else "")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError):
         return []
     words = len(text.split())

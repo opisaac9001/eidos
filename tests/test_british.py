@@ -25,3 +25,20 @@ def test_meaning_and_british_words_are_left_alone() -> None:
         "",
     ):
         assert british(fine) == fine
+
+
+def test_his_home_is_a_flat() -> None:
+    from eidos.domain.world_catalog import project_world_catalog
+
+    assert project_world_catalog([]).location_name("home") == "The flat"
+
+
+def test_a_dream_is_told_once() -> None:
+    from eidos.application.life import _one_dream
+
+    assert (
+        _one_dream(
+            "In a dream, the shift echoed endlessly. In a dream, the river showed only my reflection."
+        )
+        == "In a dream, the shift echoed endlessly. The river showed only my reflection."
+    )

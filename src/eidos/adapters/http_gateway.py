@@ -622,7 +622,7 @@ COMPACT_PROMPTS = {
     ),
     "oneiros": (
         "Write Patrick's dream as he'd remember it, in the first person (I, me): one to three "
-        "short sentences that begin with 'In a dream'. "
+        "short sentences, only the first beginning 'In a dream'. "
         "Dreams can be ordinary or strange, loosely built from the details given (not from "
         "the examples), with no moral or explanation. Don't reuse a recent dream's image. "
         'Reply only with JSON: {"text": "In a dream, ..."}\nThe style, for other situations:\n'

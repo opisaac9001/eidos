@@ -136,7 +136,7 @@ def _resolve_due_attempt(
             {
                 "delivery_id": delivery_id,
                 "attempt": attempt,
-                "reason": "No one answered at the apartment.",
+                "reason": "No one answered at the flat.",
                 "simulated_at": simulated_at.isoformat(),
             },
             causation_id=due.event_id,

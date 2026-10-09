@@ -21,6 +21,7 @@ from typing import Sequence
 from eidos.application.bookings import remember
 from eidos.application.memory_life import is_routine_note
 from eidos.application.open_loops import FORMED, intended, open_loops
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
@@ -150,7 +151,7 @@ async def daydream_events(
     try:
         response = await gateway.generate(request)
         raw = json.loads(response.content)
-        idea = " ".join(str(raw.get("idea", "")).split())
+        idea = british(" ".join(str(raw.get("idea", "")).split()))
         kind = str(raw.get("kind", ""))
         worth = int(raw.get("worth", 0))
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError):

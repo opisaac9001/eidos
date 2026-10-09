@@ -26,6 +26,7 @@ from time import perf_counter
 from typing import Mapping, MutableSequence, Sequence
 from uuid import uuid4
 
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.proposals import ProposalRejected
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest, ModelResponse
@@ -218,7 +219,7 @@ async def _retell(
             raise ProposalRejected("incomplete", "Re-telling was incomplete")
         raw = json.loads(response.content)
         retold = " ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else ""
-        retold = unpadded(retold)
+        retold = british(unpadded(retold))
         if not keeps_the_facts(original, retold):
             raise ProposalRejected("changed_facts", "A re-telling must keep the facts")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError) as error:

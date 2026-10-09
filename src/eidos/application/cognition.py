@@ -87,7 +87,18 @@ def request_for(role: str, context: Mapping[str, object]) -> ModelRequest:
 
 
 # Roles whose words are said or written in the town.
-_SPOKEN = frozenset({"firmament", "pathos", "murmur"})
+_SPOKEN = frozenset(
+    {
+        "firmament",
+        "pathos",
+        "murmur",
+        "oneiros",
+        "reflection",
+        "pathos_agency",
+        "pathos_project",
+        "pathos_deliberation",
+    }
+)
 
 
 async def perform(

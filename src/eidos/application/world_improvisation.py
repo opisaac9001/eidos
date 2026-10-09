@@ -80,7 +80,7 @@ async def improvised_world_events(
     locations = dict(
         known_locations
         or {
-            "home": "The apartment",
+            "home": "The flat",
             "cafe": "Juniper Café",
             "workshop": "The workshop",
             "park": "Willow Square",

@@ -120,6 +120,7 @@ from eidos.application.inner_stream import (
     contact_reasons,
     felt_tone,
     near_repeat,
+    said_before,
 )
 from eidos.application.invitations import follow_up_invitation_events
 from eidos.application.life_context import latest_weather
@@ -3787,6 +3788,10 @@ class Life(LifeConversation):
         if not text:
             return
         if role == "oneiros":
+            text = _one_dream(text)
+            if said_before(text, [str(item["text"]) for item in recent_dream_context]):
+                # The same dream again, word for word: that night he remembers none.
+                return
             seeds = dream_seed_sources([item.event for item in selected_context], mind.concerns_now)
             dream_events = record_dream_events(
                 text,
@@ -4088,6 +4093,19 @@ def _association_cue(
 def _at_work(planning: Any, at: datetime) -> bool:
     """Whether he's working now: a shift, or a freelance session."""
     return _on_shift(planning, at) or freelance_working_now(planning, at)
+
+
+def _one_dream(text: str) -> str:
+    """One dream told once: 'In a dream' opens it, not every sentence of it."""
+    first, sep, rest = text.partition("In a dream")
+    if not sep:
+        return text
+    rest = re.sub(
+        r"(?<=[.!?])\s+In a dream,?\s*(\w)",
+        lambda match: " " + match.group(1).upper(),
+        rest,
+    )
+    return f"{first}{sep}{rest}"
 
 
 def _on_shift(planning: Any, at: datetime) -> bool:
