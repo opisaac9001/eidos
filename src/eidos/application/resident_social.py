@@ -182,9 +182,9 @@ async def _advance(
                         k: v for k, v in actor_names.items() if k in {speaker_id, audience_id}
                     },
                     "pronouns": {
-                        actor_names[k]: SAYING[pronoun_of(k)]
-                        for k in {speaker_id, audience_id}
-                        if k in actor_names and k != "pathos"
+                        person_name: SAYING[pronoun_of(k)]
+                        for k, person_name in actor_names.items()
+                        if k not in {"pathos", "user"}
                     },
                     "prior_turns": [
                         {

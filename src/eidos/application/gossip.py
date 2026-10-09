@@ -285,8 +285,18 @@ def they_remember(
 ) -> list[str]:
     """What this resident remembers of their recent moments with Patrick."""
     found: list[str] = []
-    for event in reversed(events_of(history, "npc.encountered", "contact.reached_out")[-60:]):
-        if event.payload.get("person_id") != person_id:
+    for event in reversed(
+        events_of(history, "npc.encountered", "contact.reached_out", "memory.recorded")[-500:]
+    ):
+        if event.kind == "memory.recorded":
+            # What he said to them in conversation, as they remember it.
+            if (
+                event.payload.get("owner") != person_id
+                or event.payload.get("category") != "scene"
+                or event.payload.get("person_id") != "pathos"
+            ):
+                continue
+        elif event.payload.get("person_id") != person_id:
             continue
         try:
             days = (at - _at(event)).days
@@ -298,6 +308,8 @@ def they_remember(
         if event.kind == "contact.reached_out":
             if event.payload.get("text"):
                 found.append(f"{when}, he texted them: {event.payload['text']}")
+        elif event.kind == "memory.recorded":
+            found.append(f"{when}, in conversation: {event.payload.get('text')}")
         else:
             found.append(f"{when}: {event.payload.get('text')}")
         if len(found) >= limit:

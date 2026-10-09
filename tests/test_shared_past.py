@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from eidos.adapters.standin_gateway import StandInGateway
 from eidos.application.recurring_dialogue import _topic_words
@@ -71,3 +71,33 @@ def test_a_line_with_an_invented_past_is_asked_for_again() -> None:
                 datetime(2026, 8, 28, tzinfo=timezone.utc).isoformat(), out)
     )  # fmt: skip
     assert second and not invents_shared_past(second)
+
+
+def test_an_earlier_conversation_they_never_had_is_caught() -> None:
+    from eidos.application.shared_past import invents_past_talk
+
+    made_up = "I wanted to check if you needed help with that project you mentioned last week."
+    assert invents_past_talk(made_up, [])
+    assert invents_past_talk("She mentioned something about it the last time we chatted.", [])
+    # Something they do remember can be brought up.
+    remembered = ["yesterday, in conversation: Patrick said: “The mantel clock project is a pig.”"]
+    assert not invents_past_talk("How's that clock project you mentioned?", remembered)
+    assert not invents_past_talk("Lovely morning for it.", [])
+
+
+def test_they_remember_what_he_said_to_them() -> None:
+    from eidos.application.gossip import they_remember
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 8, 29, 10, tzinfo=timezone.utc)
+    said = DomainEvent(
+        "memory.recorded",
+        "pathos",
+        {"owner": "mara", "category": "scene", "person_id": "pathos",
+         "text": "Patrick said: “I'm going freelance.”",
+         "simulated_at": (at - timedelta(days=1)).isoformat()},
+    )  # fmt: skip
+    assert they_remember([said], "mara", at) == [
+        "yesterday, in conversation: Patrick said: “I'm going freelance.”"
+    ]
+    assert they_remember([said], "ellis", at) == []

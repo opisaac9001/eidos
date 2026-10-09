@@ -8,9 +8,10 @@ from typing import Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
+from eidos.application.gossip import they_remember
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
-from eidos.application.shared_past import REVISION, invents_shared_past
+from eidos.application.shared_past import REVISION, invents_past_talk, invents_shared_past
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -227,14 +228,19 @@ async def _advance_scene(
                     scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                 ),
                 "scene_topic": _topic_words(topic_id, name),
+                # Everyone he knows, so people mentioned in passing are right too.
                 "pronouns": {
-                    actor_names.get(pid, name if pid == partner_id else pid): SAYING[
-                        pronoun_of(pid)
-                    ]
-                    for pid in {speaker_id, partner_id}
-                    if pid != "pathos"
+                    person_name: SAYING[pronoun_of(pid)]
+                    for pid, person_name in actor_names.items()
+                    if pid not in {"pathos", "user"}
                 }
                 | {"Patrick": "he/him"},
+                **(
+                    {"they_remember": remembered}
+                    if speaker_id == partner_id
+                    and (remembered := they_remember(combined, partner_id, simulated_at))
+                    else {}
+                ),
                 "who_is_who": {
                     partner_id: name,
                     **{k: v for k, v in actor_names.items() if k in {speaker_id, partner_id}},
@@ -262,7 +268,13 @@ async def _advance_scene(
                 simulated_at.isoformat(),
                 output,
             )
-        if text is not None and asked is not None and invents_shared_past(text):
+        held = asked.get("they_remember") if asked else None
+        memories = [str(m) for m in held] if isinstance(held, list) else []
+        if (
+            text is not None
+            and asked is not None
+            and (invents_shared_past(text) or invents_past_talk(text, memories))
+        ):
             # A past with him from before he came: asked once to say it without one.
             text = await perform(
                 gateway,
@@ -271,7 +283,9 @@ async def _advance_scene(
                 simulated_at.isoformat(),
                 output,
             )
-            if text is not None and invents_shared_past(text):
+            if text is not None and (
+                invents_shared_past(text) or invents_past_talk(text, memories)
+            ):
                 text = None
         if text is None:
             text = (
