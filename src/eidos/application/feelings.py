@@ -271,7 +271,7 @@ def _sources(
                 (
                     f"self_reproach:{p.get('intention_id')}",
                     "self_reproach",
-                    str(p.get("text")),
+                    _plainly(str(p.get("text"))),
                     0.35,
                     False,
                     event,

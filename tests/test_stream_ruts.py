@@ -91,3 +91,15 @@ def test_a_stock_phrase_twice_lately_is_one_to_leave_out() -> None:
 def test_the_small_model_is_told_the_shape() -> None:
     details = compact_context("murmur", {"form": "a picture in his mind's eye"})
     assert details["thought_form"] == "a picture in his mind's eye"
+
+
+def test_he_isnt_put_where_he_isnt() -> None:
+    from eidos.application.inner_stream import somewhere_else
+
+    assert somewhere_else("I sit here alone in Wye tonight.", "The flat") == "in Wye"
+    assert somewhere_else("Clouds moving fast over Wye.", "The flat", about_now=True) == "in Wye"
+    assert somewhere_else("Pathos told me they're managing.", "The flat") == "outside himself"
+    # Thinking of Wye, or wishing he were there, is fine.
+    assert somewhere_else("Mum in Wye would know.", "The flat") is None
+    assert somewhere_else("Wish I was back in Wye.", "The flat") is None
+    assert somewhere_else("Tea in the garden here.", "Mum and Dad's house in Wye") is None

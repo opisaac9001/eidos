@@ -2838,6 +2838,9 @@ class Life(LifeConversation):
                 current,
                 len(history) + len(pending),
                 self.gateway,
+                meeting=_meeting_now(
+                    self._planning(history + pending), current, tick.state.location_id
+                ),
             )
         )
         pending.extend(
@@ -3348,10 +3351,15 @@ class Life(LifeConversation):
         if not (tick.beat and tick.state.location_id != "home"):
             return
         npc_state_now = project_npcs(history + pending, current)
-        for person in mind.catalog.people.values():
+        meeting = _meeting_now(self._planning(history + pending), current, tick.state.location_id)
+        # Someone he arranged to meet is who he's with, whoever else is in.
+        people = sorted(mind.catalog.people.values(), key=lambda p: p.person_id != meeting)
+        for person in people:
             if npc_state_now.people[person.person_id].location_id != tick.state.location_id:
                 continue
-            if _met_recently(history, pending, person.person_id, tick.state.location_id, current):
+            if person.person_id != meeting and _met_recently(
+                history, pending, person.person_id, tick.state.location_id, current
+            ):
                 # Working alongside someone is not a fresh encounter every hour.
                 continue
             await self._meet(history, pending, person, tick.state.location_id, at, mind.context)
@@ -4108,6 +4116,23 @@ def _one_dream(text: str) -> str:
         rest,
     )
     return f"{first}{sep}{rest}"
+
+
+def _meeting_now(planning: Any, at: datetime, location_id: str) -> str | None:
+    """Someone he arranged to meet here, now (a coffee with Ellis at Juniper)."""
+    for item in planning.calendar.values():
+        if not item.companion_id or item.location_id != location_id:
+            continue
+        if item.status not in {"scheduled", "active", "completed"}:
+            continue
+        try:
+            starts = datetime.fromisoformat(item.starts_at)
+            ends = datetime.fromisoformat(item.ends_at) if item.ends_at else starts
+        except ValueError:
+            continue
+        if starts <= at < ends + timedelta(minutes=30):
+            return str(item.companion_id)
+    return None
 
 
 def _on_shift(planning: Any, at: datetime) -> bool:

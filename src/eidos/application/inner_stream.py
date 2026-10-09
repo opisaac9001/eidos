@@ -391,8 +391,9 @@ FORMS: Mapping[str, tuple[str, float]] = {
                "two to eight words", 0.2),
     "sensing": ("one thing he's noticing right now with one sense, said plainly, with no "
                 "wondering or second thought", 0.15),
-    "image": ("a picture in his mind's eye of a person, place or thing from his life, in a "
-              "few words, not a sentence about it", 0.1),
+    "image": ("a picture in his mind's eye of a person, place or thing from his life, "
+              "remembered or imagined, not where he is now; a few words, not a sentence about "
+              "it", 0.1),
     "feeling": ("how he feels just now, in a few words, and what about if he knows", 0.12),
     "question": ("one real question he asks himself, and nothing after it", 0.08),
     "plan": ("what he'll do next or later, in the bare way he'd tell himself", 0.12),
@@ -782,6 +783,34 @@ _HEDGED = re.compile(
     r"at home|at his|at her|over there)\b",
     re.IGNORECASE,
 )
+
+
+# Places from his past he can picture but isn't in.
+_AWAY = re.compile(
+    r"\b(?:in|at|back in|down in) (Wye|Bristol|Canterbury|Mum and Dad's|Mum's|the Downs)\b", re.I
+)
+_HERE_AND_NOW = re.compile(
+    r"\b(?:now|tonight|here|this evening|this morning|I'm|sit|sitting|alone)\b", re.I
+)
+
+
+_PAST_PLACES = re.compile(r"\b(Wye|Canterbury|the Downs)\b", re.I)
+
+
+def somewhere_else(text: str, location: str, about_now: bool = False) -> str | None:
+    """A thought that puts him where he isn't ("sit here alone in Wye tonight", at home in
+    Alderwick), or speaks of him as 'Pathos', as if from outside."""
+    if re.search(r"\bPathos\b", text):
+        return "outside himself"
+    match = _AWAY.search(text)
+    if match is not None and match.group(1).casefold() not in location.casefold():
+        if _HERE_AND_NOW.search(text):
+            return f"in {match.group(1)}"
+    # A thought about the moment he's in ("Clouds moving fast over Wye") is about where he is.
+    past = _PAST_PLACES.search(text)
+    if about_now and past is not None and past.group(1).casefold() not in location.casefold():
+        return f"in {past.group(1)}"
+    return None
 
 
 def placed_with_him(text: str, context: Mapping[str, object], names: set[str]) -> str | None:
@@ -1485,6 +1514,14 @@ class InnerStream:
         present = placed_with_him(text, context, names)
         if present is not None:
             self._turn_away(f"put {present} with him when he's alone, skipped: {text[:80]}", text)
+            return None
+        elsewhere = somewhere_else(
+            text,
+            str(context.get("location") or ""),
+            about_now=bool(cue and cue.kind in {"here", "body", "stirring"}),
+        )
+        if elsewhere is not None:
+            self._turn_away(f"put him {elsewhere}, skipped: {text[:80]}", text)
             return None
         with self._lock:
             kept = self.store.add(

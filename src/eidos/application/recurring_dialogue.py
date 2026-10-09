@@ -39,8 +39,11 @@ async def recurring_dialogue_events(
     simulated_at: datetime,
     actual_revision: int,
     gateway: ModelGateway,
+    meeting: str | None = None,
 ) -> list[DomainEvent]:
-    """Start or advance one ordinary NPC conversation without leaking private state."""
+    """Start or advance one ordinary NPC conversation without leaking private state.
+
+    ``meeting`` is someone he arranged to meet here now: the conversation is with them."""
     state = project_scenes(history)
     active = next(
         (
@@ -109,9 +112,12 @@ async def recurring_dialogue_events(
             and actor_id not in busy_actors
             and location == location_id
             and actor_id in actor_names
-            and _cooldown_complete(history, actor_id, simulated_at, relationships)
+            and (
+                actor_id == meeting
+                or _cooldown_complete(history, actor_id, simulated_at, relationships)
+            )
         ),
-        key=lambda actor_id: (actor_id not in ready_people, actor_id),
+        key=lambda actor_id: (actor_id != meeting, actor_id not in ready_people, actor_id),
     )
     if not candidates:
         return []

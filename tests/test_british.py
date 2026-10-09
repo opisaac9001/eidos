@@ -42,3 +42,10 @@ def test_a_dream_is_told_once() -> None:
         )
         == "In a dream, the shift echoed endlessly. The river showed only my reflection."
     )
+
+
+def test_a_title_that_isnt_a_doing_stays_as_it_is() -> None:
+    from eidos.application.experience import _gerund
+
+    assert _gerund("A coffee at Juniper with Ellis") == "A coffee at Juniper with Ellis"
+    assert _gerund("Walk along the river") == "Walking along the river"

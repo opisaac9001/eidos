@@ -313,7 +313,7 @@ def open_loop_events(
     for loop in loops:
         if loop.text.startswith("go along to what the group's planning") and any(
             str(e.payload.get("invitation_id", "")).startswith("chat-plan-")
-            and _when(e) >= loop.formed_at
+            and abs(_when(e) - loop.formed_at) <= timedelta(days=7)
             for e in events_of(history, "invitation.accepted")[-6:]
         ):
             # An older way of noting a group plan; it's on his calendar now.
@@ -393,7 +393,7 @@ def open_loop_events(
                 output.append(
                     remember(
                         recalled,
-                        f"Completely forgot to {loop.text}. Annoying.",
+                        f"Completely forgot to {_plainly(loop.text)}. Annoying.",
                         at,
                         0.35,
                         origin="lived-open-loop",

@@ -173,3 +173,37 @@ def test_a_plan_he_says_yes_to_is_booked_like_any_invitation() -> None:
     assert "invitation.accepted" in kinds or "invitation.declined" in kinds
     if "invitation.accepted" in kinds:
         assert "schedule.created" in kinds
+
+
+def test_a_plan_thats_already_happened_isnt_answered() -> None:
+    from eidos.application.group_chat import _plans_to_answer
+
+    history = _decided("invitation.accepted")
+    history.insert(
+        0,
+        DomainEvent(
+            "invitation.made",
+            "pathos",
+            {"invitation_id": f"{PLAN_PREFIX}rowan-2026-08-24",
+             "starts_at": (MORNING + timedelta(hours=2)).isoformat(),
+             "simulated_at": MORNING.isoformat()},
+        ),
+    )  # fmt: skip
+    assert _plans_to_answer(history, MORNING + timedelta(hours=1))
+    assert not _plans_to_answer(history, MORNING + timedelta(hours=8))
+
+
+def test_the_person_hes_meeting_is_who_he_talks_to() -> None:
+    from types import SimpleNamespace
+
+    from eidos.application.life import _meeting_now
+
+    coffee = SimpleNamespace(
+        companion_id="ellis", location_id="cafe", status="completed",
+        starts_at="2026-08-29T10:00:00+00:00", ends_at="2026-08-29T11:00:00+00:00",
+    )  # fmt: skip
+    planning = SimpleNamespace(calendar={"c": coffee})
+    at = datetime(2026, 8, 29, 10, 30, tzinfo=timezone.utc)
+    assert _meeting_now(planning, at, "cafe") == "ellis"
+    assert _meeting_now(planning, at, "park") is None
+    assert _meeting_now(planning, at + timedelta(hours=3), "cafe") is None

@@ -359,12 +359,19 @@ _SECOND_VERBS = frozenset(
     }
 )
 _DOUBLED = frozenset({"sit", "get", "put", "cut", "jog", "run", "set", "dig", "hop", "shop"})
+_NOT_VERBS = frozenset(
+    "a an the my his her their our this that some coffee lunch dinner breakfast tea drinks "
+    "music film".split()
+)
 
 
 def _gerund(title: str) -> str:
-    """'Go along to the quiz' -> 'Going along to the quiz'."""
+    """'Go along to the quiz' -> 'Going along to the quiz'. A title that isn't a doing
+    ('A coffee at Juniper with Ellis') stays as it is, not 'Aing coffee'."""
     first, _, rest = title.strip().partition(" ")
     word = first.lower()
+    if word in _NOT_VERBS or word.endswith(("'s", "’s")) or not word.isalpha():
+        return title.strip()
     if word in _DOUBLED:
         word = word + word[-1] + "ing"
     elif word.endswith("ie"):

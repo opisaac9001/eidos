@@ -169,7 +169,7 @@ async def group_chat_events(
             await _speak(history, at, gateway, speaker, members, topic, recent, whereabouts, output)
     # A plan he's decided on gets his answer in the chat, yes or no.
     if free_to_look:
-        for decided in _plans_to_answer(history):
+        for decided in _plans_to_answer(history, at):
             await _his_reply(
                 history, at, gateway, [*recent][-8:], on_his_mind, mood, output,
                 stance=decided, members=members,
@@ -248,16 +248,22 @@ def _plan_to_suggest(
     return options[int(_roll("which-plan", at.date().isoformat()) * len(options))]
 
 
-def _plans_to_answer(history: Sequence[DomainEvent]) -> list[DomainEvent]:
-    """Group plans he's decided on and not yet answered in the chat."""
+def _plans_to_answer(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
+    """Group plans he's decided on and not yet answered in the chat, while it's still worth
+    answering (not 'works for me' eight hours after the coffee)."""
     answered = {
         str(e.payload.get("answers")) for e in messages(history, 40) if e.payload.get("answers")
+    }
+    starts = {
+        str(e.payload.get("invitation_id")): str(e.payload.get("starts_at", ""))
+        for e in events_of(history, "invitation.made")[-20:]
     }
     return [
         e
         for e in events_of(history, "invitation.accepted", "invitation.declined")[-6:]
         if str(e.payload.get("invitation_id", "")).startswith(PLAN_PREFIX)
         and str(e.payload.get("invitation_id")) not in answered
+        and starts.get(str(e.payload.get("invitation_id")), "9999") > at.isoformat()
     ]
 
 
