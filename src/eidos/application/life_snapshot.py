@@ -17,6 +17,7 @@ from eidos.application.feelings import coping_thoughts, feelings_view
 from eidos.application.followups import project_followups
 from eidos.application.freelance import work_view
 from eidos.application.group_chat import phone_view
+from eidos.application.happenings import phone_dead
 from eidos.application.inner_life import active_dream_inspirations
 from eidos.application.latent_town import TOWN_POPULATION
 from eidos.application.life_context import mood_name, self_concept_context, vars_for
@@ -686,7 +687,8 @@ def build_snapshot(life: LifeProjections) -> dict[str, Any]:
         "on_the_bench": bench_view(history, state.simulated_at),
         "my_work": work_view(history, state.simulated_at),
         "accounts": wealth_view(history),
-        "phone": phone_view(history),
+        # A dead phone shows him nothing.
+        "phone": {**phone_view(history), "dead": phone_dead(history, state.simulated_at)},
         "time_feel": time_feel_now(history, state.simulated_at),
         "life_lately": life_lately(history),
         "feelings": feelings_view(history, state.simulated_at),

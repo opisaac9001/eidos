@@ -48,13 +48,16 @@ async def outreach_events(
         raise ValueError("Outreach time must be timezone-aware")
     if "people_he_knows" not in context:
         # Every path that may message you can say who people are.
+        from eidos.application.epistemics import pathos_known_person_ids
         from eidos.domain.world_catalog import project_world_catalog
 
+        known = pathos_known_person_ids(history)
         context = {
             **context,
             "people_he_knows": {
                 person.name: (person.occupation or person.description or "")[:80]
                 for person in project_world_catalog(history).people.values()
+                if person.person_id in known
             },
         }
     config = project_outreach_config(history)

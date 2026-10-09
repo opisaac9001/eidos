@@ -317,7 +317,7 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
             found.append(Cue("someone", f"{person['name']}{about}, not here"))
     # The phone buzzing: the latest from the group chat, until he's read it.
     phone = snapshot.get("phone") or {}
-    if isinstance(phone, Mapping) and phone.get("recent"):
+    if isinstance(phone, Mapping) and phone.get("recent") and not phone.get("dead"):
         latest = phone["recent"][-1]
         if isinstance(latest, Mapping) and latest.get("from") and latest.get("from") != "Patrick":
             fresh = 2.5 if phone.get("unread") else 0.6
@@ -576,12 +576,14 @@ def stream_context(
         if (
             isinstance(person, Mapping)
             and person.get("name")
-            and person.get("occupation")
             and re.search(rf"\b{re.escape(str(person['name']).split()[0])}\b", involved)
         ):
-            # With pronouns: Rowan (they) kept becoming "she", Ellis "she" too.
+            # With pronouns: Rowan (they) kept becoming "she", Ellis "she" too. What they do
+            # only once he actually knows them, not someone he's only heard of.
             pronoun = PRONOUNS.get(chosen_pronoun(str(person.get("id")), str(person["name"])))
-            who[str(person["name"])] = f"{str(person['occupation']).lower()}; {pronoun}"
+            knows_them = float(person.get("familiarity", 0) or 0) >= 0.3
+            job = str(person.get("occupation") or "").lower() if knows_them else ""
+            who[str(person["name"])] = f"{job}; {pronoun}" if job else str(pronoun)
             view = views.get(str(person["name"]))
             if view:
                 who[str(person["name"])] += f"; he's {view}"

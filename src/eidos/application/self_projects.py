@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from eidos.application.causal_opportunities import fresh_cause, optional_schema
 from eidos.application.dream_planning import dream_planning_workspace, dream_project_link_events
-from eidos.application.place_discovery import known_world
+from eidos.application.place_discovery import known_place_ids, known_world
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import payload_candidates
 from eidos.domain.mind import CognitiveLayer, project_mind
@@ -79,7 +79,14 @@ async def autonomous_project_events(
         for item in planning.objects.values()
         if item.condition in {"good", "usable", "repaired"}
         and item.quantity != 0
-        and (item.custodian_id == "pathos" or item.owner_id == item.custodian_id == "community")
+        and (
+            item.custodian_id == "pathos"
+            # Shared things, only in places he knows of.
+            or (
+                item.owner_id == item.custodian_id == "community"
+                and item.location_id in known_place_ids(history, catalog)
+            )
+        )
     }
     catalog = known_world(history, catalog)
     places = {

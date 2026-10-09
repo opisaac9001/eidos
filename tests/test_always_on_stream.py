@@ -427,8 +427,20 @@ def test_the_stream_knows_who_people_are_to_him() -> None:
 
     world = snapshot()
     world["people"] = [
-        {"id": "ellis", "name": "Ellis", "location_id": "cafe", "occupation": "Repair artist"},
-        {"id": "mara", "name": "Mara", "location_id": "cafe", "occupation": "Café owner"},
+        {
+            "id": "ellis",
+            "name": "Ellis",
+            "location_id": "cafe",
+            "occupation": "Repair artist",
+            "familiarity": 0.8,
+        },
+        {
+            "id": "mara",
+            "name": "Mara",
+            "location_id": "cafe",
+            "occupation": "Café owner",
+            "familiarity": 0.8,
+        },
     ]
     context = stream_context(world, ["Ellis should be home soon."], Cue("here", "The flat"))
     assert context["who_is_who"] == {"Ellis": "repair artist; he/him"}

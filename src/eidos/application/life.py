@@ -569,15 +569,17 @@ class Life(LifeConversation):
                     },
                 )
             )
-        # Friends' replies to his texts arrive in their own time.
-        pending.extend(
-            await reply_events(
-                history + pending,
-                state.simulated_at,
-                self.gateway,
-                _their_whereabouts(history, state, catalog),
+        # Friends' replies to his texts arrive in their own time, and reach him once his
+        # phone's alive again.
+        if not phone_dead(history, state.simulated_at):
+            pending.extend(
+                await reply_events(
+                    history + pending,
+                    state.simulated_at,
+                    self.gateway,
+                    _their_whereabouts(history, state, catalog),
+                )
             )
-        )
         await self._notice_arrivals(history, state, pending)
         # How this quarter hour felt (his thoughts, any reply) moves his feelings now, not on
         # the hour.
@@ -797,6 +799,7 @@ class Life(LifeConversation):
                         "people_he_knows": {
                             person.name: (person.occupation or person.description or "")[:80]
                             for person in self._world_catalog(history).people.values()
+                            if person.person_id in pathos_known_person_ids(history)
                         },
                     },
                 )
@@ -3401,11 +3404,12 @@ class Life(LifeConversation):
         )
         plan_status = getattr(npc, "plan_status", None)
         activity = getattr(npc, "private_activity", "unrecorded")
+        # What they're visibly doing, before what they mean to do: he can see the one.
         doing = (
-            getattr(npc, "plan_title", None)
-            if plan_status == "active"
-            else activity
+            activity
             if activity != "unrecorded"
+            else getattr(npc, "plan_title", None)
+            if plan_status == "active"
             else None
         )
         # What they remember of him, and anything they've heard that he hasn't.
@@ -3435,7 +3439,10 @@ class Life(LifeConversation):
                     else {}
                 ),
                 **(
-                    {"how_they_feel_about_him": view}
+                    {
+                        "how_they_feel_about_him": f"{view} (theirs to show in how they are "
+                        "with him, or to say if they would; never narrated as a fact)"
+                    }
                     if (view := their_view_of_him([*history, *pending], person.person_id, now))
                     else {}
                 ),

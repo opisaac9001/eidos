@@ -110,7 +110,14 @@ async def autonomous_activity_events(
         for item in planning.objects.values()
         if item.condition in {"good", "usable", "repaired"}
         and item.quantity != 0
-        and (item.custodian_id == "pathos" or item.owner_id == item.custodian_id == "community")
+        and (
+            item.custodian_id == "pathos"
+            # Shared things, only in places he knows of.
+            or (
+                item.owner_id == item.custodian_id == "community"
+                and item.location_id in known_place_ids(history, catalog)
+            )
+        )
     }
     people = {
         person.person_id: {"name": person.name, "occupation": person.occupation}

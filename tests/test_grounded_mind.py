@@ -27,12 +27,19 @@ def home_alone() -> dict:
         "time": "2026-08-25T19:20:00+00:00",
         "pathos": {"location": "Home", "location_id": "home", "awake": True},
         "people": [
-            {"id": "rowan", "name": "Rowan", "location_id": "park", "occupation": "Illustrator"},
+            {
+                "id": "rowan",
+                "name": "Rowan",
+                "location_id": "park",
+                "occupation": "Illustrator",
+                "familiarity": 0.8,
+            },
             {
                 "id": "ellis",
                 "name": "Ellis",
                 "location_id": "workshop",
                 "occupation": "Repair artist",
+                "familiarity": 0.8,
             },
         ],
         "memories": [
@@ -195,3 +202,25 @@ def test_a_reply_fits_where_they_are_and_comes_in_person_if_theyre_with_him() ->
     assert "don't offer to come round" in context["personal_relationship_context"]["instruction"]
     memory = next(e for e in replies if e.kind == "memory.recorded")
     assert memory.payload["text"].startswith("Ellis answered my text in person")
+
+
+def test_he_only_knows_what_he_could_know() -> None:
+    from eidos.application.inner_stream import cues
+
+    world = home_alone()
+    # Someone he's only heard of: their name, not what they do.
+    world["people"] = [
+        {"id": "townsfolk-9", "name": "June Hollis", "location_id": "market-hall",
+         "occupation": "Market trader", "familiarity": 0.05},
+    ]  # fmt: skip
+    context = stream_context(world, ["June Hollis, apparently."], Cue("wander", "June Hollis"))
+    assert "trader" not in str(context.get("who_is_who", {})).casefold()
+    # A dead phone shows him nothing from the group chat.
+    world["phone"] = {
+        "recent": [{"from": "Rowan", "text": "pub later?"}],
+        "unread": 1,
+        "dead": True,
+    }
+    assert not [cue for cue in cues(world) if cue.kind == "phone"]
+    world["phone"]["dead"] = False
+    assert [cue for cue in cues(world) if cue.kind == "phone"]

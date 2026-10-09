@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
 from eidos.application.inner_life import active_concerns
+from eidos.application.pronouns import name_of
 from eidos.domain.emotions import classify_emotion, project_emotion
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of, payload_candidates
@@ -142,7 +143,7 @@ def mental_layer_events(
                 "foreground",
                 "person",
                 companions[0],
-                f"Notice {companions[0]}",
+                f"Notice {name_of(companions[0])}",
                 min(0.9, 0.5 + 0.2 * state.connection),
             )
         )
@@ -270,7 +271,7 @@ def _attention_focus(
                 0.45 + 0.4 * (1 - state.connection),
                 "person",
                 person_id,
-                f"Notice {person_id}",
+                f"Notice {name_of(person_id)}",
             )
         )
     recent_encounter = next(

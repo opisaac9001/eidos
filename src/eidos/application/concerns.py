@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.application.inner_life import active_concerns
+from eidos.application.pronouns import name_of
 from eidos.application.work_rota import is_rota_shift
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import event_index, events_of, kind_index
@@ -221,7 +222,7 @@ def _concern_source(
     if source.kind == "relationship.repair_opened":
         person_id = _string(source, "person_id")
         return (
-            f"I don't really know where things stand with {person_id} after my apology.",
+            f"I don't really know where things stand with {name_of(person_id)} after my apology.",
             0.82,
             timedelta(days=30),
             {"repair_id": _string(source, "repair_id"), "person_id": person_id},
@@ -237,7 +238,8 @@ def _concern_source(
         if person_id in {"pathos", "user"}:
             return None
         return (
-            f"Things feel strained with {person_id}, and I haven't settled what to do about it.",
+            f"Things feel strained with {name_of(person_id)}, and I haven't settled what to do "
+            "about it.",
             0.78,
             timedelta(days=14),
             {"person_id": person_id},

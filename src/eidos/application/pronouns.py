@@ -63,6 +63,12 @@ def know_names(names: dict[str, str]) -> None:
     _NAMES.update(names)
 
 
+def name_of(person_id: str) -> str:
+    """How he'd say someone's name: 'Ellis', not 'ellis' or 'townsfolk-1880'."""
+    name = _NAMES.get(person_id, "")
+    return name.split()[0] if name.split() else person_id.replace("-", " ").title()
+
+
 def pronoun_of(person_id: str) -> str:
     return chosen(person_id, _NAMES.get(person_id, ""))
 
