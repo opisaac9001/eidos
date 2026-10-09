@@ -381,6 +381,67 @@ def _loop_cues(snapshot: Mapping[str, Any]) -> list[Cue]:
     return found
 
 
+# What a moment of inner experience is actually like. Sampling studies of people's inner
+# lives (Hurlburt's Descriptive Experience Sampling) find five common forms: inner speech,
+# inner seeing, unworded thinking, feelings and sensory awareness; and inner speech is
+# clipped, not prose. Left alone, the small model wrote every thought the same way ("Fridge
+# hums. Wonder if Mara's up."); naming a form for each thought keeps the shapes changing.
+FORMS: Mapping[str, tuple[str, float]] = {
+    "speech": ("words he says to himself, clipped the way inner speech is, a note to self of "
+               "two to eight words", 0.2),
+    "sensing": ("one thing he's noticing right now with one sense, said plainly, with no "
+                "wondering or second thought", 0.15),
+    "image": ("a picture in his mind's eye of a person, place or thing from his life, in a "
+              "few words, not a sentence about it", 0.1),
+    "feeling": ("how he feels just now, in a few words, and what about if he knows", 0.12),
+    "question": ("one real question he asks himself, and nothing after it", 0.08),
+    "plan": ("what he'll do next or later, in the bare way he'd tell himself", 0.12),
+    "memory": ("a flash of something that happened, a glimpse or a line someone said", 0.1),
+    "judgement": ("a quick opinion about something in front of him, a few words", 0.08),
+    "musing": ("a longer thought that follows itself for a sentence or two", 0.05),
+}  # fmt: skip
+# Forms that suit what his mind has gone to.
+_FORMS_FOR: Mapping[str, tuple[str, ...]] = {
+    "body": ("sensing", "feeling", "speech"),
+    "next": ("plan", "speech"),
+    "memory": ("memory", "image"),
+    "someone": ("image", "memory", "question"),
+    "concern": ("feeling", "question", "plan"),
+    "here": ("sensing", "judgement", "image"),
+    "doing": ("speech", "plan", "judgement"),
+    "stirring": ("sensing", "speech", "image"),
+    "feeling": ("feeling", "image", "speech"),
+    "loop": ("plan", "speech", "question"),
+    "phone": ("speech", "judgement", "question"),
+}
+
+
+def choose_form(cue_kind: str, recent: Sequence[str], rng: random.Random) -> str:
+    """The form this thought takes: suited to where his mind went, never the last two."""
+    suited = _FORMS_FOR.get(cue_kind, ())
+    options = [form for form in FORMS if form not in recent[-2:]] or list(FORMS)
+    weights = [FORMS[form][1] * (3.0 if form in suited else 1.0) for form in options]
+    return rng.choices(options, weights=weights, k=1)[0]
+
+
+# Stock phrases a small model leans on, by their shapes ("Wonder if...", 27% of thoughts).
+_STOCK = {
+    "wonder if": re.compile(r"\bwonder(?:ing)? (?:if|whether)\b", re.IGNORECASE),
+    "hope": re.compile(r"\bhope\b", re.IGNORECASE),
+    "maybe I'll": re.compile(r"\bmaybe i'?ll\b", re.IGNORECASE),
+    "feels like": re.compile(r"\bfeels like\b", re.IGNORECASE),
+    "might as well": re.compile(r"\bmight as well\b", re.IGNORECASE),
+}
+
+
+def stock_phrase(recent: Sequence[str]) -> str | None:
+    """A stock phrase in two of his last few thoughts: the next one does without it."""
+    for phrase, pattern in _STOCK.items():
+        if sum(bool(pattern.search(text)) for text in recent[-6:]) >= 2:
+            return phrase
+    return None
+
+
 def choose_cue(
     available: Sequence[Cue],
     recent_kinds: Sequence[str],
@@ -1207,6 +1268,7 @@ class InnerStream:
         self.turned_away_why: Counter[str] = Counter()
         self._lock = threading.Lock()
         self._tried: deque[str] = deque(maxlen=8)
+        self._forms: deque[str] = deque(maxlen=4)
         self._turned_away: deque[tuple[float, str]] = deque(maxlen=4)
         self._coped: dict[str, float] = {}
         self.impulses = ImpulseTracker(self.wall_clock)
@@ -1361,9 +1423,15 @@ class InnerStream:
                     if any(len(word) >= 4 and word not in _COMMON for word in pair)
                 }
             )
-        worn_phrase = next((phrase for phrase, count in phrases.most_common(5) if count >= 3), None)
+        worn_phrase = stock_phrase([t.text for t in self.store.recent(6)]) or next(
+            (phrase for phrase, count in phrases.most_common(5) if count >= 3), None
+        )
         if worn_phrase:
             context["avoid_phrase"] = worn_phrase
+        # The shape this one takes (inner speech, a sensation, an image...), not the last two.
+        form = choose_form(cue.kind if cue else "", list(self._forms), self.rng)
+        self._forms.append(form)
+        context["form"] = FORMS[form][0]
         tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired

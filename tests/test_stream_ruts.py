@@ -60,3 +60,34 @@ def test_a_short_word_and_a_same_first_word_are_ruts_too() -> None:
         ["Beth texted back. A bit of a laugh in this quiet flat.", "Rowan needs rest."],
     )
     assert not said_before("Rowan needs rest before the drive.", ["Beth texted back."])
+
+
+def test_each_thought_has_a_shape_and_not_the_same_one_running() -> None:
+    from eidos.application.inner_stream import FORMS, choose_form
+
+    rng = random.Random(3)
+    forms: list[str] = []
+    for kind in ["body", "next", "here", "someone", "concern", "doing"] * 20:
+        form = choose_form(kind, forms, rng)
+        assert form not in forms[-2:]
+        forms.append(form)
+    assert set(forms) == set(FORMS)  # all of them turn up
+    # What his mind went to shapes it: a plan for what's next, a sensation of his body.
+    rng = random.Random(5)
+    nexts = [choose_form("next", [], rng) for _ in range(200)]
+    assert nexts.count("plan") > nexts.count("musing") * 3
+
+
+def test_a_stock_phrase_twice_lately_is_one_to_leave_out() -> None:
+    from eidos.application.inner_stream import stock_phrase
+
+    assert (
+        stock_phrase(["Fridge hums. Wonder if Mara's up.", "Cold. Wondering if Beth texted."])
+        == "wonder if"
+    )
+    assert stock_phrase(["Fridge hums.", "Cold out."]) is None
+
+
+def test_the_small_model_is_told_the_shape() -> None:
+    details = compact_context("murmur", {"form": "a picture in his mind's eye"})
+    assert details["thought_form"] == "a picture in his mind's eye"

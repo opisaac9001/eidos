@@ -243,7 +243,7 @@ def test_small_models_get_a_short_example_led_request() -> None:
         sent = provider.requests[0]
         system, details = sent["messages"][0]["content"], json.loads(sent["messages"][1]["content"])
         assert system.startswith("You are the passing inner thoughts of Patrick")
-        assert "Bus is late again" in system  # style examples from other situations
+        assert "Come on, come on" in system  # style examples from other situations
         assert details == {
             "where": "kitchen",
             "time_of_day": "late evening",
@@ -259,7 +259,7 @@ def test_small_models_get_a_short_example_led_request() -> None:
 
 
 def test_a_copied_style_example_is_not_a_thought() -> None:
-    copied = '{"text": "Bus is late again. Should\'ve brought gloves, obviously."}'
+    copied = '{"text": "Come on, come on. Gloves, idiot."}'
     provider = FakeProvider([(200, completion(copied))])
     try:
         gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)
@@ -270,7 +270,7 @@ def test_a_copied_style_example_is_not_a_thought() -> None:
 
 
 def test_a_phrase_lifted_from_a_style_example_is_not_a_thought() -> None:
-    lifted = '{"text": "Rowan never rings. Wonder if my old flatmate still burns toast."}'
+    lifted = '{"text": "Rowan never rings. Sam\'s toast, black at the edges, honestly."}'
     provider = FakeProvider([(200, completion(lifted))])
     try:
         gateway = HTTPModelGateway(provider.url, "tiny", compact=True, retries=0)

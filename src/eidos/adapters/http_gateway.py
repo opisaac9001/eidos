@@ -93,7 +93,9 @@ ROLE_PROMPTS["murmur"] = (
     "just wandered there: follow on from the last thought in recent_inner_stream towards it, "
     "the way a mind actually moves from one thing to the next. Leave the words in "
     "worn_out alone: his mind has moved on from them. leave_aside names people he's "
-    "thought about over and over just now; leave them out of this thought."
+    "thought about over and over just now; leave them out of this thought. form is the shape "
+    "this thought takes (clipped inner speech, a sensation, an image, a feeling, a plan...); "
+    "write it in that shape."
 )
 ROLE_PROMPTS["firmament"] += (
     " In scene_mode, you are scene_speaker, speaking TO scene_audience, not a narrator. "
@@ -349,6 +351,7 @@ ROLE_FIELDS = {
         "alone",
         "worn_out",
         "leave_aside",
+        "form",
         "avoid_opening",
         "avoid_phrase",
         "not_again",
@@ -580,15 +583,16 @@ ROLE_FIELDS = {
 # models copy labels ("Patrick's thoughts") or ramble until they run out of room.
 COMPACT_EXAMPLES = {
     "murmur": (
-        ("bus stop, cold, running late", "Bus is late again. Should've brought gloves, obviously."),
+        ("bus stop, cold, running late; inner speech", "Come on, come on. Gloves, idiot."),
         (
-            "supermarket queue, tired",
-            "Why does the self-checkout I pick always need a person to come over.",
+            "supermarket queue, tired; a question",
+            "Why does the self-checkout I pick always need someone to come over?",
         ),
         (
-            "kitchen, kettle on, mind wanders to an old friend",
-            "Kettle's taking ages. Wonder if my old flatmate still burns toast every morning.",
+            "kitchen, kettle on, an old friend; an image",
+            "Sam's toast, black at the edges, every single morning.",
         ),
+        ("park in the sun; sensing", "Cut grass. Somebody's barbecue already."),
     ),
     "oneiros": (
         (
@@ -605,10 +609,11 @@ COMPACT_EXAMPLES = {
 COMPACT_PROMPTS = {
     "murmur": (
         "You are the passing inner thoughts of Patrick, a young man in a small English market "
-        "town. Write ONE short private thought, 5 to 25 words, first person, casual and "
+        "town. Write ONE short private thought, 2 to 25 words, first person, casual and "
         "British, drawn from the details given (not from the examples). It can wander or "
         "trail off; if mind_wanders_to is given, drift from the recent thoughts towards it. "
         "Never borrow anything from the style examples: not their places, objects or words. "
+        "thought_form says what shape this thought takes; write it in that shape and length. "
         "Start differently from the recent_thoughts, never start with dont_start_with, never use dont_use_phrase or any of the avoid_words, never mention leave_out_people. "
         "Fit the time_of_day and time_of_year. Name only people in this moment's details, "
         "never someone only in recent_thoughts. recent_thoughts are only things he thought, "
@@ -759,6 +764,8 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
             details["dont_start_with"] = str(context["avoid_opening"])
         if context.get("avoid_phrase"):
             details["dont_use_phrase"] = str(context["avoid_phrase"])
+        if context.get("form"):
+            details["thought_form"] = str(context["form"])
         tried = context.get("not_again")
         if isinstance(tried, list) and tried:
             # Thoughts it just had that weren't kept: something different this time.
