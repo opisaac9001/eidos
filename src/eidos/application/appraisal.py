@@ -212,7 +212,12 @@ def sleep_and_need_events(
         reason = "circadian fallback"
     else:
         should_be_awake = not (window.falls_asleep <= simulated_at < window.wakes)
-        reason = f"selected nightly window: {window.reason}"
+        # Waking on the hour is still waking his own way ("to the alarm"), not a timetable.
+        reason = (
+            f"woke {window.waking}"
+            if should_be_awake and not current.awake and window.waking
+            else f"selected nightly window: {window.reason}"
+        )
     if not should_be_awake and current.awake and pathos_busy:
         should_be_awake = True
     if should_be_awake != current.awake:

@@ -84,11 +84,13 @@ def test_in_real_time_he_wakes_at_his_own_minute(tmp_path) -> None:
     # The server steps to the exact minute he drops off...
     assert life.next_sleep_change() == asleep_at
     life.advance((asleep_at - now).total_seconds() / 3600)
-    assert life.settle_sleep() == "sleep.started"
+    # (On the hour, the hourly step itself does it; either way it's his own minute.)
+    assert life.settle_sleep() in {"sleep.started", None}
+    assert not life.snapshot()["pathos"]["awake"]
     # ...and to the exact minute he comes to.
     assert life.next_sleep_change() == up_at
     life.advance((up_at - asleep_at).total_seconds() / 3600)
-    assert life.settle_sleep() == "sleep.ended"
+    assert life.settle_sleep() in {"sleep.ended", None}
     woke = next(e for e in reversed(life.history()) if e.kind == "sleep.ended")
     assert datetime.fromisoformat(woke.payload["simulated_at"]) == up_at
     assert woke.payload["reason"] == f"woke {night['waking']}"
