@@ -56,3 +56,30 @@ def test_his_body_speaks_up_once_and_with_a_cause() -> None:
         == []
     )
     assert all(e.kind == SENSED for e in felt)
+
+
+def test_he_knows_how_he_slept_last_night() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from eidos.application.alertness import last_night
+    from eidos.domain.events import DomainEvent
+
+    down = datetime(2026, 8, 28, 23, 40, tzinfo=timezone.utc)
+    up = down + timedelta(hours=7, minutes=30)
+    history = [
+        DomainEvent("sleep.started", "pathos", {"simulated_at": down.isoformat()}),
+        DomainEvent("sleep.ended", "pathos",
+                    {"simulated_at": up.isoformat(), "reason": "woke to the alarm"}),
+    ]  # fmt: skip
+    told = last_night(history, up + timedelta(hours=3))
+    assert (
+        told
+        == "Dropped off about 23:40, woke to the alarm at 07:10: about 7.5 hours, slept through."
+    )
+    restless = [
+        DomainEvent(
+            "sleep.restless", "pathos", {"simulated_at": (down + timedelta(hours=2)).isoformat()}
+        )
+    ]
+    assert "restless" in last_night([*history, *restless], up + timedelta(hours=1))
+    assert last_night(history, up + timedelta(days=2)) is None  # that's not last night

@@ -6,7 +6,7 @@ from typing import Callable, Mapping, Sequence
 
 from eidos.application.activity_execution import execution_context
 from eidos.application.advice import advice_asked_events, advice_context, advice_names
-from eidos.application.alertness import body_now
+from eidos.application.alertness import body_now, last_night
 from eidos.application.ambient_population import ambient_population
 from eidos.application.cognition import perform_pathos_reply
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
@@ -16,6 +16,7 @@ from eidos.application.feelings import feelings_view
 from eidos.application.freelance import work_view
 from eidos.application.in_jokes import jokes_with_you
 from eidos.application.inner_life import active_concerns, active_dream_inspirations
+from eidos.application.inner_stream import somewhere_else
 from eidos.application.life_context import (
     latest_weather,
     mood_name,
@@ -136,10 +137,17 @@ class LifeConversation(LifeProjections):
             except Exception:  # a stream hiccup must never cost him his reply
                 live = {}
         thoughts = live.get("thoughts")
-        context: dict[str, object] = {
-            "just_been_thinking": list(thoughts)[-4:]
+        # Not the ones that put him somewhere he isn't ("quiet here with Mum and Dad").
+        here = self._world_catalog(list(history)).location_name(
+            self._project_state(list(history)).location_id
+        )
+        thinking = (
+            list(thoughts)[-4:]
             if isinstance(thoughts, (list, tuple)) and thoughts
-            else recent_inner_stream(history, at),
+            else recent_inner_stream(history, at)
+        )
+        context: dict[str, object] = {
+            "just_been_thinking": [t for t in thinking if somewhere_else(str(t), here) is None],
         }
         pulls = live.get("pulling_at_him")
         if isinstance(pulls, (list, tuple)) and pulls:
@@ -205,6 +213,9 @@ class LifeConversation(LifeProjections):
         felt = body_now(history, at)
         if felt:
             context["body_right_now"] = felt
+        slept = last_night(history, at)
+        if slept:
+            context["last_night"] = slept
         meaning = [str(loop["text"]) for loop in loops_view(history, at)[:3]]
         if meaning:
             context["meaning_to"] = meaning

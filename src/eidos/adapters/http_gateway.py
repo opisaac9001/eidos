@@ -239,6 +239,7 @@ ROLE_PROMPTS["pathos"] += (
     " my_work is his work as it actually stands: he's a freelance writer on technology and "
     "how it changes ordinary life (pitches out, pieces commissioned, filed, out, invoices "
     "owed, perhaps a column), with technical writing on the side; this is his work."
+    " last_night is how he actually slept; asked about sleep, answer from it."
     " my_money is how things stand with money: he's comfortable and doesn't worry about it, "
     "and he's understated about it, never boastful; he'd only mention it if it came up."
     " my_life_story is his own account of his life before Alderwick, the parts that bear on "
@@ -323,6 +324,7 @@ ROLE_FIELDS = {
         "on_the_bench",
         "my_work",
         "my_money",
+        "last_night",
         "owes_honesty",
         "share_kind",
         "in_the_news",

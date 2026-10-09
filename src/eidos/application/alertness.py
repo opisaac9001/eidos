@@ -54,6 +54,37 @@ def nights(history: Sequence[DomainEvent], at: datetime, count: int = 3) -> list
     return slept
 
 
+def last_night(history: Sequence[DomainEvent], at: datetime) -> str | None:
+    """How last night actually went, as he'd know it: when he dropped off, when and how he
+    came to. Asked how he slept, he answered from nothing and made up a restless night."""
+    ended = started = None
+    for event in reversed(events_of(history, "sleep.started", "sleep.ended")[-8:]):
+        when = _at(event)
+        if when is None or when > at:
+            continue
+        if event.kind == "sleep.ended" and ended is None:
+            ended = event
+        elif event.kind == "sleep.started" and ended is not None:
+            started = event
+            break
+    if ended is None or started is None:
+        return None
+    up, down = _at(ended), _at(started)
+    if up is None or down is None or at - up > timedelta(hours=20):
+        return None
+    hours = (up - down).total_seconds() / 3600
+    reason = str(ended.payload.get("reason", ""))
+    how = reason if reason.startswith("woke ") else "woke up"
+    restless = any(
+        (w := _at(e)) is not None and down - timedelta(hours=2) <= w <= up
+        for e in events_of(history, "sleep.restless")[-3:]
+    )
+    return (
+        f"Dropped off about {down:%H:%M}, {how} at {up:%H:%M}: about {round(hours * 2) / 2:g} "
+        "hours" + (", and a restless night" if restless else ", slept through") + "."
+    )
+
+
 def hours_awake(history: Sequence[DomainEvent], at: datetime) -> float:
     for event in reversed(events_of(history, "sleep.ended", "sleep.started")[-4:]):
         when = _at(event)
