@@ -271,3 +271,17 @@ idempotent; divergent moods produce plausible optional choices, not guaranteed
 destinations. Test a quiet day, an interrupted outing, a new acquaintance, a mistaken
 recollection, and a trip beyond town with deterministic stand-ins first, then the
 configured models. Do not advance the live person's clock just to run those tests.
+
+## On real streets: Frome (2026-10-10)
+
+Alderwick keeps its name, its people and its businesses' names, but from 2026-10-10 its
+places sit where their counterparts are in Frome, Somerset (where his weather and news come
+from), and walking times between them are the real ones along the streets.
+`tools/build_real_town.py` turns an OpenStreetMap extract into
+`src/eidos/application/frome_v1.json` (positions, the real-world spot each place stands for,
+a walking network linking each place to its three nearest at 75 m a minute plus a minute for
+doors, and every pair's real time for checking). `application/real_town.py` applies it once
+to a world that has the whole town, as `world.place_relocated` for each place and one
+`world.routes_set` that replaces the routes among them; routes to anywhere else (the train to
+Wye) stay. Journeys already made keep the times recorded with them. Map data © OpenStreetMap
+contributors, available under the Open Database Licence (ODbL).

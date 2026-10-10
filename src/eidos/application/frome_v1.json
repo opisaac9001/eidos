@@ -1,0 +1,433 @@
+{
+ "plan_id": "frome-v1",
+ "source": "OpenStreetMap contributors (ODbL), Overpass extract of Frome, Somerset",
+ "walking_metres_per_minute": 75,
+ "places": {
+  "home": {
+   "lat": 51.23176,
+   "lon": -2.3261,
+   "where": "a quiet terrace up the hill behind the town centre",
+   "x": 30,
+   "y": 64
+  },
+  "cafe": {
+   "lat": 51.2307,
+   "lon": -2.32098,
+   "where": "off the Market Place, where the town centre slopes down",
+   "x": 50,
+   "y": 71
+  },
+  "workshop": {
+   "lat": 51.2296,
+   "lon": -2.3233,
+   "where": "on the steep old shopping street climbing up from the centre",
+   "x": 41,
+   "y": 77
+  },
+  "park": {
+   "lat": 51.22796,
+   "lon": -2.32815,
+   "where": "the big Victorian park with the bandstand and the ponds",
+   "x": 23,
+   "y": 88
+  },
+  "market-hall": {
+   "lat": 51.23362,
+   "lon": -2.31997,
+   "where": "the big hall by the river where the markets and gigs are",
+   "x": 54,
+   "y": 53
+  },
+  "station": {
+   "lat": 51.22723,
+   "lon": -2.31003,
+   "where": "the little station down the hill on the edge of town",
+   "x": 92,
+   "y": 92
+  },
+  "library": {
+   "lat": 51.23244,
+   "lon": -2.32072,
+   "where": "by the river crossing in the middle of town",
+   "x": 51,
+   "y": 60
+  },
+  "riverside": {
+   "lat": 51.23318,
+   "lon": -2.3193,
+   "where": "the path along the river below the market hall",
+   "x": 56,
+   "y": 56
+  },
+  "cinema": {
+   "lat": 51.23158,
+   "lon": -2.32208,
+   "where": "a small old cinema just off the main street",
+   "x": 46,
+   "y": 65
+  },
+  "grocer": {
+   "lat": 51.23193,
+   "lon": -2.32094,
+   "where": "the greengrocer's on the main street",
+   "x": 50,
+   "y": 63
+  },
+  "allotments": {
+   "lat": 51.23565,
+   "lon": -2.32134,
+   "where": "allotments in the dip by the river on the north side",
+   "x": 49,
+   "y": 40
+  },
+  "community-hall": {
+   "lat": 51.23432,
+   "lon": -2.33194,
+   "where": "the community centre on the west side of town",
+   "x": 8,
+   "y": 49
+  },
+  "bakery": {
+   "lat": 51.23176,
+   "lon": -2.32394,
+   "where": "on the street of independent shops up from the centre",
+   "x": 39,
+   "y": 64
+  },
+  "secondhand": {
+   "lat": 51.23146,
+   "lon": -2.32134,
+   "where": "among the charity shops on the main street",
+   "x": 49,
+   "y": 66
+  },
+  "sports-ground": {
+   "lat": 51.24093,
+   "lon": -2.31072,
+   "where": "the leisure centre and pitches on the northern edge",
+   "x": 89,
+   "y": 8
+  },
+  "music-room": {
+   "lat": 51.23062,
+   "lon": -2.32172,
+   "where": "in the old vaulted cellars under the town centre",
+   "x": 47,
+   "y": 71
+  }
+ },
+ "routes": [
+  [
+   "allotments",
+   "bakery",
+   10
+  ],
+  [
+   "allotments",
+   "grocer",
+   9
+  ],
+  [
+   "allotments",
+   "library",
+   8
+  ],
+  [
+   "allotments",
+   "sports-ground",
+   18
+  ],
+  [
+   "bakery",
+   "cinema",
+   4
+  ],
+  [
+   "bakery",
+   "community-hall",
+   15
+  ],
+  [
+   "bakery",
+   "grocer",
+   5
+  ],
+  [
+   "bakery",
+   "home",
+   5
+  ],
+  [
+   "cafe",
+   "cinema",
+   4
+  ],
+  [
+   "cafe",
+   "grocer",
+   4
+  ],
+  [
+   "cafe",
+   "home",
+   9
+  ],
+  [
+   "cafe",
+   "music-room",
+   3
+  ],
+  [
+   "cafe",
+   "secondhand",
+   3
+  ],
+  [
+   "cafe",
+   "station",
+   14
+  ],
+  [
+   "cafe",
+   "workshop",
+   6
+  ],
+  [
+   "cinema",
+   "community-hall",
+   17
+  ],
+  [
+   "cinema",
+   "grocer",
+   4
+  ],
+  [
+   "cinema",
+   "home",
+   7
+  ],
+  [
+   "cinema",
+   "library",
+   4
+  ],
+  [
+   "cinema",
+   "music-room",
+   4
+  ],
+  [
+   "cinema",
+   "station",
+   16
+  ],
+  [
+   "cinema",
+   "workshop",
+   6
+  ],
+  [
+   "community-hall",
+   "home",
+   13
+  ],
+  [
+   "grocer",
+   "library",
+   3
+  ],
+  [
+   "grocer",
+   "market-hall",
+   5
+  ],
+  [
+   "grocer",
+   "riverside",
+   5
+  ],
+  [
+   "grocer",
+   "secondhand",
+   3
+  ],
+  [
+   "home",
+   "park",
+   12
+  ],
+  [
+   "library",
+   "market-hall",
+   4
+  ],
+  [
+   "library",
+   "riverside",
+   4
+  ],
+  [
+   "market-hall",
+   "riverside",
+   4
+  ],
+  [
+   "market-hall",
+   "sports-ground",
+   19
+  ],
+  [
+   "music-room",
+   "park",
+   13
+  ],
+  [
+   "music-room",
+   "secondhand",
+   3
+  ],
+  [
+   "music-room",
+   "station",
+   15
+  ],
+  [
+   "music-room",
+   "workshop",
+   5
+  ],
+  [
+   "park",
+   "workshop",
+   12
+  ],
+  [
+   "riverside",
+   "sports-ground",
+   17
+  ]
+ ],
+ "all_pairs": {
+  "allotments|bakery": 10,
+  "allotments|cafe": 11,
+  "allotments|cinema": 10,
+  "allotments|community-hall": 20,
+  "allotments|grocer": 9,
+  "allotments|home": 13,
+  "allotments|library": 8,
+  "allotments|market-hall": 10,
+  "allotments|music-room": 11,
+  "allotments|park": 21,
+  "allotments|riverside": 10,
+  "allotments|secondhand": 10,
+  "allotments|sports-ground": 18,
+  "allotments|station": 24,
+  "allotments|workshop": 14,
+  "bakery|cafe": 6,
+  "bakery|cinema": 4,
+  "bakery|community-hall": 15,
+  "bakery|grocer": 5,
+  "bakery|home": 5,
+  "bakery|library": 6,
+  "bakery|market-hall": 8,
+  "bakery|music-room": 6,
+  "bakery|park": 14,
+  "bakery|riverside": 8,
+  "bakery|secondhand": 6,
+  "bakery|sports-ground": 24,
+  "bakery|station": 18,
+  "bakery|workshop": 8,
+  "cafe|cinema": 4,
+  "cafe|community-hall": 18,
+  "cafe|grocer": 4,
+  "cafe|home": 9,
+  "cafe|library": 6,
+  "cafe|market-hall": 8,
+  "cafe|music-room": 3,
+  "cafe|park": 14,
+  "cafe|riverside": 7,
+  "cafe|secondhand": 3,
+  "cafe|sports-ground": 21,
+  "cafe|station": 14,
+  "cafe|workshop": 6,
+  "cinema|community-hall": 17,
+  "cinema|grocer": 4,
+  "cinema|home": 7,
+  "cinema|library": 4,
+  "cinema|market-hall": 6,
+  "cinema|music-room": 4,
+  "cinema|park": 15,
+  "cinema|riverside": 7,
+  "cinema|secondhand": 4,
+  "cinema|sports-ground": 22,
+  "cinema|station": 16,
+  "cinema|workshop": 6,
+  "community-hall|grocer": 19,
+  "community-hall|home": 13,
+  "community-hall|library": 19,
+  "community-hall|market-hall": 21,
+  "community-hall|music-room": 17,
+  "community-hall|park": 18,
+  "community-hall|riverside": 21,
+  "community-hall|secondhand": 18,
+  "community-hall|sports-ground": 33,
+  "community-hall|station": 30,
+  "community-hall|workshop": 18,
+  "grocer|home": 9,
+  "grocer|library": 3,
+  "grocer|market-hall": 5,
+  "grocer|music-room": 5,
+  "grocer|park": 16,
+  "grocer|riverside": 5,
+  "grocer|secondhand": 3,
+  "grocer|sports-ground": 20,
+  "grocer|station": 17,
+  "grocer|workshop": 7,
+  "home|library": 9,
+  "home|market-hall": 11,
+  "home|music-room": 9,
+  "home|park": 12,
+  "home|riverside": 11,
+  "home|secondhand": 9,
+  "home|sports-ground": 27,
+  "home|station": 21,
+  "home|workshop": 10,
+  "library|market-hall": 4,
+  "library|music-room": 6,
+  "library|park": 17,
+  "library|riverside": 4,
+  "library|secondhand": 5,
+  "library|sports-ground": 20,
+  "library|station": 18,
+  "library|workshop": 9,
+  "market-hall|music-room": 8,
+  "market-hall|park": 19,
+  "market-hall|riverside": 4,
+  "market-hall|secondhand": 6,
+  "market-hall|sports-ground": 19,
+  "market-hall|station": 20,
+  "market-hall|workshop": 11,
+  "music-room|park": 13,
+  "music-room|riverside": 7,
+  "music-room|secondhand": 3,
+  "music-room|sports-ground": 22,
+  "music-room|station": 15,
+  "music-room|workshop": 5,
+  "park|riverside": 18,
+  "park|secondhand": 15,
+  "park|sports-ground": 33,
+  "park|station": 24,
+  "park|workshop": 12,
+  "riverside|secondhand": 5,
+  "riverside|sports-ground": 17,
+  "riverside|station": 19,
+  "riverside|workshop": 10,
+  "secondhand|sports-ground": 20,
+  "secondhand|station": 16,
+  "secondhand|workshop": 6,
+  "sports-ground|station": 30,
+  "sports-ground|workshop": 25,
+  "station|workshop": 16
+ }
+}

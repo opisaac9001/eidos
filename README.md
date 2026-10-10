@@ -293,3 +293,7 @@ changes and how to roll back.
   export or backup.
 
 The original 2025 implementation of Eidos is preserved on the `legacy-2025` branch and tag.
+
+## Credits
+
+Alderwick's streets and walking times come from OpenStreetMap data of Frome, Somerset. © OpenStreetMap contributors, available under the Open Database Licence (ODbL): https://www.openstreetmap.org/copyright

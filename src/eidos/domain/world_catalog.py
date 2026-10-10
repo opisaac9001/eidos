@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import time
 from enum import StrEnum
 from types import MappingProxyType
@@ -89,6 +89,8 @@ class WorldCatalog:
             "world.place_registered",
             "world.person_registered",
             "object.registered",
+            "world.place_relocated",
+            "world.routes_set",
         }:
             return self
         places, people, routes = dict(self.places), dict(self.people), dict(self.route_minutes)
@@ -127,6 +129,33 @@ class WorldCatalog:
                 home,
                 True,
             )
+        elif event.kind == "world.place_relocated":
+            # Geography revised going forward: where a place is on the map, and how it's
+            # described. What already happened keeps the times recorded with it.
+            place_id = _required(event, "entity_id")
+            if place_id not in places:
+                raise ValueError("Only a known place can be relocated")
+            description = event.payload.get("description")
+            places[place_id] = replace(
+                places[place_id],
+                x=_integer(event, "x", 5, 95),
+                y=_integer(event, "y", 5, 95),
+                description=str(description) if description else places[place_id].description,
+            )
+        elif event.kind == "world.routes_set":
+            # A walking network among these places replaces their old routes; routes to
+            # anywhere else (the train to Wye) stay as they were.
+            among = {part for part in _required(event, "places").split(",") if part}
+            if not among <= set(places):
+                raise ValueError("A route network needs known places")
+            routes = {pair: m for pair, m in routes.items() if not pair <= among}
+            for edge in _required(event, "routes").split(";"):
+                a, b, minutes = edge.split("|")
+                if a not in among or b not in among or a == b or not 1 <= int(minutes) <= 180:
+                    raise ValueError(
+                        "A route joins two of the network's places in 1 to 180 minutes"
+                    )
+                routes[frozenset((a, b))] = int(minutes)
         elif event.kind == "object.registered":
             object_id = _required(event, "object_id")
             name = _required(event, "name")
