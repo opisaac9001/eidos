@@ -222,3 +222,14 @@ grounded; Gemma 3 4B was about 33 seconds and invented weather. The Pi holds onl
 model in memory at a time (loading a second, or one at its default context window, brings
 Ollama down), so thoughts and dreams share the model. `murmur-qwen3-5-4b` is kept on the Pi
 for rollback; the settings backup on the Dell is `/var/lib/eidos/models.json.bak-2026-10-10`.
+
+## Online fallback (2026-10-10)
+
+Every role's chain on the Dell ends with `openrouter-nemotron`
+(`nvidia/nemotron-3-super-120b-a12b:free` on OpenRouter), used only when the local models
+for that role fail. The key is a free-tier key, saved by the owner straight into
+`/var/lib/eidos/models.json` (mode 600, never in the repo; `~/set-openrouter-key.py` on the
+Dell reads a new one from stdin). `budget.daily_requests` is 45, under the free tier's
+roughly 50 a day; past it, online calls stop for the day and the step is skipped as before.
+Free models are often run by providers who may log prompts, which is why it's a fallback,
+not a primary. Gemma 4 31B was the first choice but was rate-limited upstream when tested.
