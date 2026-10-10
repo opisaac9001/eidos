@@ -209,3 +209,16 @@ The SSH forward and preview are foreground processes, not installed services;
 they may need restarting between sessions. Connection failure is reported as
 `endpoint_unavailable`, not a successful model test. Durable local service
 installation is separate from the prototype launch commands above.
+
+## The Pi's model (2026-10-10)
+
+His passing thoughts and dreams run on the Raspberry Pi as `murmur-qwen3-4b`: Qwen3 4B
+(`qwen3:4b`) created on the Pi with `num_ctx 2048`, `num_thread 2`, temperature 0.8,
+top_p 0.95, top_k 40, called with `reasoning_effort: none`. It replaced `murmur-qwen3-5-4b`
+(Qwen3.5 4B), a hybrid-attention model that Ollama can't reuse a cached prompt prefix for, so
+every thought re-read the whole prompt (about 40 seconds on a busy Pi). On the same eight
+moments from his day, Qwen3 4B took about 12 seconds a thought after loading and was the most
+grounded; Gemma 3 4B was about 33 seconds and invented weather. The Pi holds only one 4B
+model in memory at a time (loading a second, or one at its default context window, brings
+Ollama down), so thoughts and dreams share the model. `murmur-qwen3-5-4b` is kept on the Pi
+for rollback; the settings backup on the Dell is `/var/lib/eidos/models.json.bak-2026-10-10`.
