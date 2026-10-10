@@ -224,3 +224,18 @@ def test_he_only_knows_what_he_could_know() -> None:
     assert not [cue for cue in cues(world) if cue.kind == "phone"]
     world["phone"]["dead"] = False
     assert [cue for cue in cues(world) if cue.kind == "phone"]
+
+
+def test_at_his_parents_they_are_with_him() -> None:
+    world = home_alone()
+    world["pathos"] = {
+        **world["pathos"],
+        "location_id": "wye-home",
+        "location": "Mum and Dad's, Wye",
+    }
+    context = stream_context(world, ["Mum's roast."], Cue("here", "Mum and Dad's, Wye"))
+    assert {"Mum", "Dad"} <= set(context["with_him"]) and not context.get("alone")
+    assert placed_with_him("Mum's in the kitchen humming.", context, NAMES) is None
+    from eidos.application.inner_stream import somewhere_else
+
+    assert somewhere_else("Sitting here in Wye tonight.", "Mum and Dad's, Wye") is None

@@ -539,6 +539,9 @@ def stream_context(
         and here
         and person.get("location_id") == here
     ]
+    if here == "wye-home":
+        # Staying at his parents': they're there with him.
+        with_him = ["Mum", "Dad", *with_him]
     if with_him:
         # Whoever is in the room with him is fair to think about.
         context["with_him"] = with_him[:4]
@@ -596,7 +599,11 @@ def stream_context(
         label = str(member["who"]).split(" (")[0]
         # "Rowan's mum" is someone else's mother.
         if re.search(rf"(?<!'s )\b{re.escape(label)}\b", involved, re.IGNORECASE):
-            where = FAMILY_WHERE.get(str(member.get("relation")), "doesn't live with him")
+            where = (
+                "here with him; he's staying at their house in Wye"
+                if here == "wye-home" and member.get("relation") in {"mother", "father"}
+                else FAMILY_WHERE.get(str(member.get("relation")), "doesn't live with him")
+            )
             who[label] = f"{member.get('who')}; {where}; {str(member.get('about', ''))[:80]}"
     if re.search(r"\bGulliver\b", involved):
         who["Gulliver"] = "the Shaws' old family dog; died years ago"
@@ -1418,7 +1425,12 @@ class InnerStream:
         started = perf_counter()
         context = stream_context(snapshot, recent_texts[-3:], cue)
         if drowsy is not None:
-            context["location"] = "in bed at home"
+            staying = str((snapshot.get("pathos") or {}).get("location_id") or "")
+            context["location"] = (
+                "in bed in his old room at Mum and Dad's, Wye"
+                if staying == "wye-home"
+                else "in bed at home"
+            )
             context["half_awake"] = True
             context.pop("ongoing_activities", None)
         # What it just said that was turned away: told, a small model tries something else
