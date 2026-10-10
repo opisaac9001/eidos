@@ -9,7 +9,7 @@ PREFERENCE_LABELS = {
     "action:attend:social": "sharing unhurried time with others",
     "action:learn": "learning through patient practice",
     "action:work": "making things through focused work",
-    "place:cafe": "watching neighborhood life unfold",
+    "place:cafe": "watching neighbourhood life unfold",
     "place:home": "quiet projects at home",
     "place:park": "spending reflective time outdoors",
     "place:workshop": "working with practical craft",

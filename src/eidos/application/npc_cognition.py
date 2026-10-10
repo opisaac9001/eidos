@@ -59,9 +59,9 @@ def npc_belief_events(
                 subject_id=location_id,
                 predicate="community_activity",
                 object_value=(
-                    "a neighborhood event is still developing"
+                    "a neighbourhood event is still developing"
                     if continuing
-                    else "neighbors gather here"
+                    else "neighbours gather here"
                 ),
                 confidence=0.85,
                 evidence_event_id=perception.event_id,
@@ -420,11 +420,11 @@ def _need_plan(
         ),
         ("mara", "purpose"): (
             ("prepare", "cafe", "Test a simple seasonal lunch for the café", 12),
-            ("organize", "cafe", "Refresh the neighborhood noticeboard", 12),
+            ("organize", "cafe", "Refresh the neighbourhood noticeboard", 12),
             ("host", "cafe", "Make the quiet afternoon feel welcoming", 12),
         ),
         ("ellis", "connection"): (
-            ("walk", "park", "Take an evening walk where neighbors may be around", 18),
+            ("walk", "park", "Take an evening walk where neighbours may be around", 18),
             ("teach", "workshop", "Offer an open hour for novice repairers", 12),
             ("visit", "cafe", "Stop for tea and an unhurried conversation", 12),
         ),
@@ -436,7 +436,7 @@ def _need_plan(
         ("rowan", "connection"): (
             ("sketch", "park", "Sketch among familiar people in the square", 12),
             ("visit", "cafe", "Bring a sketchbook into the café's afternoon room", 12),
-            ("share", "park", "Show a neighbor one unfinished drawing", 12),
+            ("share", "park", "Show a neighbour one unfinished drawing", 12),
         ),
         ("rowan", "purpose"): (
             ("sketch", "park", "Draw a changing corner of Willow Square", 12),

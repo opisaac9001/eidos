@@ -18,7 +18,7 @@ LOCATIONS = (
         "label": "Café",
         "x": 70,
         "y": 22,
-        "description": "The neighborhood's morning meeting place. Mara tends the counter.",
+        "description": "The neighbourhood's morning meeting place. Mara tends the counter.",
     },
     {
         "id": "workshop",
@@ -66,7 +66,7 @@ NPC_PLAN_PROFILES = {
     "mara": {
         "action": "host",
         "location_id": "cafe",
-        "title": "Host a welcoming hour for neighborhood conversation",
+        "title": "Host a welcoming hour for neighbourhood conversation",
     },
     "ellis": {
         "action": "repair",
@@ -83,7 +83,7 @@ NPC_PLAN_PROFILES = {
 ROLES = (
     {"id": "pathos", "name": "Pathos", "purpose": "Voice & conscious response"},
     {"id": "murmur", "name": "The Murmur", "purpose": "Associations & inner life"},
-    {"id": "firmament", "name": "Firmament", "purpose": "Neighbors & encounters"},
+    {"id": "firmament", "name": "Firmament", "purpose": "Neighbours & encounters"},
     {"id": "moira", "name": "Moira", "purpose": "Weather & world rhythm"},
     {"id": "mnemosyne", "name": "Mnemosyne", "purpose": "Memory & provenance"},
     {"id": "reflection", "name": "Reflection", "purpose": "Evening perspective"},

@@ -132,7 +132,7 @@ class NPCCognitionTests(unittest.TestCase):
         events = npc_belief_events([perception], "2026-01-02T13:00:00+00:00")
         belief = next(iter(project_beliefs([perception, *events]).beliefs.values()))
         self.assertEqual(belief.owner_id, "rowan")
-        self.assertEqual(belief.object_value, "a neighborhood event is still developing")
+        self.assertEqual(belief.object_value, "a neighbourhood event is still developing")
 
     def test_private_low_need_can_form_a_source_linked_personal_plan(self):
         evidence = DomainEvent(

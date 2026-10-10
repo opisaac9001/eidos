@@ -29,7 +29,7 @@ def object_collaboration_events(
     npc_people: Mapping[str, NPCState],
     relationships: Mapping[str, Relationship],
 ) -> list[DomainEvent]:
-    """Let one co-present neighbor independently join or decline a new-object session."""
+    """Let one co-present neighbour independently join or decline a new-object session."""
     handled_objects = {
         str(event.payload["object_id"])
         for event in events_of(history, "object.collaboration_decided")
@@ -84,9 +84,9 @@ def object_collaboration_events(
             "decision_score": score,
             "decision_sample": sample,
             "reason": (
-                "The neighbor had the capacity and interest to join the practical activity."
+                "The neighbour had the capacity and interest to join the practical activity."
                 if joins
-                else "The neighbor was present but chose not to join the activity."
+                else "The neighbour was present but chose not to join the activity."
             ),
             "simulated_at": simulated_at.isoformat(),
         },

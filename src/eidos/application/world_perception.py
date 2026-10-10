@@ -25,13 +25,13 @@ COMMUNITY_RESOURCES_V2 = (
     ("little-library-crate", "Little library crate", "mara", "cafe"),
     ("bird-count-binoculars", "Bird-count binoculars", "rowan", "park"),
     ("community-mending-basket", "Community mending basket", "ellis", "workshop"),
-    ("recipe-card-box", "Neighborhood recipe-card box", "mara", "cafe"),
+    ("recipe-card-box", "Neighbourhood recipe-card box", "mara", "cafe"),
     ("park-litter-grabbers", "Park litter grabbers", "rowan", "park"),
     ("tool-sharpening-stone", "Shared tool-sharpening stone", "ellis", "workshop"),
     ("reading-hour-books", "Reading-hour book stack", "mara", "cafe"),
     ("leaf-print-press", "Leaf-print press", "rowan", "park"),
     ("community-bicycle-pump", "Community bicycle pump", "ellis", "workshop"),
-    ("neighborhood-puzzle-box", "Neighborhood puzzle box", "mara", "cafe"),
+    ("neighbourhood-puzzle-box", "Neighbourhood puzzle box", "mara", "cafe"),
     ("park-chalk-box", "Park chalk box", "rowan", "park"),
     ("household-swap-shelf", "Household swap shelf", "ellis", "workshop"),
 )
@@ -41,7 +41,7 @@ COMMUNITY_RESOURCES = (*COMMUNITY_RESOURCES_V1, *COMMUNITY_RESOURCES_V2)
 COMMUNITY_EVENT_PALETTE = (
     (
         "seed-swap",
-        "Neighbors set out a small table for swapping seeds and cuttings.",
+        "Neighbours set out a small table for swapping seeds and cuttings.",
         "park",
         0.25,
         "seed-swap-table",
@@ -50,7 +50,7 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "repair-clinic",
-        "The workshop opens a quiet table for neighbors to mend small household things.",
+        "The workshop opens a quiet table for neighbours to mend small household things.",
         "workshop",
         0.30,
         "community-repair-kit",
@@ -59,7 +59,7 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "shared-tea",
-        "The cafe sets aside a shared pot of tea for an informal neighborhood hour.",
+        "The cafe sets aside a shared pot of tea for an informal neighbourhood hour.",
         "cafe",
         0.20,
         "shared-tea-service",
@@ -68,7 +68,7 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "sketch-walk",
-        "A small group meets in the square to sketch overlooked corners of the neighborhood.",
+        "A small group meets in the square to sketch overlooked corners of the neighbourhood.",
         "park",
         0.25,
         "community-sketch-basket",
@@ -86,7 +86,7 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "bird-count",
-        "Neighbors spend an hour noting the ordinary birds that visit Willow Square.",
+        "Neighbours spend an hour noting the ordinary birds that visit Willow Square.",
         "park",
         0.22,
         "bird-count-binoculars",
@@ -113,12 +113,12 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "square-care-walk",
-        "A few neighbors make a slow circuit of the square collecting windblown litter.",
+        "A few neighbours make a slow circuit of the square collecting windblown litter.",
         "park",
         0.23,
         "park-litter-grabbers",
         "care",
-        "neighborhood",
+        "neighbourhood",
     ),
     (
         "tool-care-hour",
@@ -131,7 +131,7 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "quiet-reading",
-        "The cafe keeps one table quiet for neighbors who want to read in company.",
+        "The cafe keeps one table quiet for neighbours who want to read in company.",
         "cafe",
         0.16,
         "reading-hour-books",
@@ -158,16 +158,16 @@ COMMUNITY_EVENT_PALETTE = (
     ),
     (
         "puzzle-table",
-        "A half-finished neighborhood puzzle occupies the cafe's shared table for an hour.",
+        "A half-finished neighbourhood puzzle occupies the cafe's shared table for an hour.",
         "cafe",
         0.17,
-        "neighborhood-puzzle-box",
+        "neighbourhood-puzzle-box",
         "play",
         "cooperation",
     ),
     (
         "chalk-map",
-        "Neighbors draw a temporary chalk map of remembered local details in the square.",
+        "Neighbours draw a temporary chalk map of remembered local details in the square.",
         "park",
         0.20,
         "park-chalk-box",
@@ -187,7 +187,7 @@ COMMUNITY_EVENT_PALETTE = (
 
 
 def community_resource_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
-    """Register the finite physical resources used by the neighborhood rhythm."""
+    """Register the finite physical resources used by the neighbourhood rhythm."""
     existing = project_planning(history).objects
     missing = [resource for resource in COMMUNITY_RESOURCES if resource[0] not in existing]
     if not missing:
@@ -224,14 +224,14 @@ def community_resource_events(history: Sequence[DomainEvent], at: datetime) -> l
 def authored_community_schedule(
     history: Sequence[DomainEvent], simulated_at: datetime, actual_revision: int
 ) -> list[DomainEvent]:
-    """Plan one low-stakes weekly neighborhood event with five hours of lead time."""
+    """Plan one low-stakes weekly neighbourhood event with five hours of lead time."""
     day = (simulated_at.date() - datetime(2026, 1, 1).date()).days + 1
     if day < 2 or (day - 2) % 7 != 0 or simulated_at.hour != 8:
         return []
     occurrence = (day - 2) // 7
     event = COMMUNITY_EVENT_PALETTE[occurrence % len(COMMUNITY_EVENT_PALETTE)]
     event_id, description, location_id, intensity, resource_id, theme, opportunity = event
-    proposal_id = f"neighborhood-rhythm-{occurrence + 1}-{event_id}"
+    proposal_id = f"neighbourhood-rhythm-{occurrence + 1}-{event_id}"
     if any(
         item.payload.get("proposal_id") == proposal_id
         for item in payload_candidates(history, "proposal_id", proposal_id)

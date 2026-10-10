@@ -62,7 +62,7 @@ def delivery_events(
     )
     if source is None:
         return []
-    delivery_id = f"neighborhood-parcel-{str(source.event_id)[:12]}"
+    delivery_id = f"neighbourhood-parcel-{str(source.event_id)[:12]}"
     item_name = _item_name(source)
     arrives_at = (simulated_at + timedelta(days=2)).replace(
         hour=11, minute=0, second=0, microsecond=0
@@ -78,7 +78,7 @@ def delivery_events(
                 "item_name": item_name,
                 "arrives_at": arrives_at.isoformat(),
                 "attempt": 1,
-                "text": f"A neighborhood follow-up parcel was expected: {item_name}.",
+                "text": f"A neighbourhood follow-up parcel was expected: {item_name}.",
                 "simulated_at": simulated_at.isoformat(),
             },
             causation_id=source.event_id,
@@ -334,11 +334,11 @@ def _item_name(source: DomainEvent) -> str:
         (("repair", "craft", "mending"), "a small bundle of repair materials"),
         (("reading", "learning", "book"), "a slim secondhand book"),
         (("art", "sketch", "print"), "a packet of drawing paper"),
-        (("tea", "hospitality", "cooking"), "a small box of neighborhood tea"),
+        (("tea", "hospitality", "cooking"), "a small box of neighbourhood tea"),
     )
     return next(
         (name for terms, name in choices if any(term in cue for term in terms)),
-        "a neighborhood circular and keepsake",
+        "a neighbourhood circular and keepsake",
     )
 
 

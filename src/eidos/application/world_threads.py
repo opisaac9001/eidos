@@ -1,4 +1,4 @@
-"""Advance bounded consequences from accepted neighborhood events."""
+"""Advance bounded consequences from accepted neighbourhood events."""
 
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ def world_thread_events(
                     "due_at": (
                         datetime.fromisoformat(thread.due_at) + timedelta(days=2)
                     ).isoformat(),
-                    "summary": f"The {thread.event_type.replace('_', ' ')} has prompted neighbors to continue for two more days.",
+                    "summary": f"The {thread.event_type.replace('_', ' ')} has prompted neighbours to continue for two more days.",
                     "simulated_at": simulated_at.isoformat(),
                 },
                 causation_id=_latest_transition(history, output, thread.thread_id).event_id,
@@ -124,7 +124,7 @@ def world_thread_events(
         else:
             outcomes = (
                 "settled quietly",
-                "left an open question in the neighborhood",
+                "left an open question in the neighbourhood",
                 "ended with a modest shared result",
             )
             outcome = outcomes[int(_sample(f"outcome-{thread.thread_id}") * len(outcomes))]

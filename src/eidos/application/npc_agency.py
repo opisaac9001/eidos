@@ -114,7 +114,7 @@ async def autonomous_npc_plan_events(
             "actor": {
                 "id": actor_id,
                 "name": actor.name if actor else actor_id,
-                "occupation": actor.occupation if actor else "neighbor",
+                "occupation": actor.occupation if actor else "neighbour",
                 "usual_location_id": person.usual_location_id,
             },
             "needs": needs,
