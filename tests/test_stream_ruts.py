@@ -103,3 +103,20 @@ def test_he_isnt_put_where_he_isnt() -> None:
     assert somewhere_else("Mum in Wye would know.", "The flat") is None
     assert somewhere_else("Wish I was back in Wye.", "The flat") is None
     assert somewhere_else("Tea in the garden here.", "Mum and Dad's house in Wye") is None
+
+
+def test_a_word_in_three_of_his_last_five_thoughts_is_a_rut() -> None:
+    from eidos.application.inner_stream import rutted
+
+    recent = [
+        "Dad's clock ticking slow.",
+        "Mum's roast, and the clock in the hall.",
+        "Garden's warm. That clock again.",
+        "Shed's cold.",
+        "Rain coming.",
+    ]
+    assert rutted("The clock, still ticking.", recent) == "clock"
+    assert rutted("Kettle's nearly boiled.", recent) is None
+    # Someone he keeps thinking of is set aside by rutted_people, not turned away here.
+    people = ["Ellis at the bench.", "Ellis laughing.", "Ellis again, tea."]
+    assert rutted("Ellis would like this.", people, {"Ellis"}) is None

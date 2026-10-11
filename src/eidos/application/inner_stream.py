@@ -829,10 +829,14 @@ def placed_with_him(text: str, context: Mapping[str, object], names: set[str]) -
     and "Hope Rowan doesn't hear me" in his flat. Wondering what someone elsewhere is up to
     is fine; seeing, hearing or being near them is not.
     """
-    if not context.get("alone"):
-        return None
+    # With company, still not anyone who isn't actually there (Ellis's face at the window
+    # of his parents' house in Wye).
+    company = context.get("with_him")
+    present = {
+        str(n).split()[0] for n in (company if isinstance(company, list) else []) if str(n).strip()
+    }
     for sentence in re.split(r"(?<=[.!?…])\s+", text):
-        for name in sorted(names | {"Mum", "Dad"}):
+        for name in sorted((names | {"Mum", "Dad"}) - present):
             if not re.search(rf"(?<!'s )\b{re.escape(name)}\b", sentence):
                 continue
             after = rf"\b{re.escape(name)}\b(?:'s)?[^.!?]{{0,30}}?"
@@ -899,6 +903,21 @@ def rutted_people(recent: Sequence[str], people: Collection[str]) -> list[str]:
         said = {w.removesuffix("'s") for w in re.findall(r"[A-Za-z']+", text)}
         counts.update(name for name in people if name in said)
     return [name for name, count in counts.most_common(2) if count >= 3]
+
+
+def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> str | None:
+    """A word in three of his last five thoughts, used again: a rut, not a thought ("Dad's
+    clock ticks slow", evening after evening). Small models ignore words they're told to
+    leave alone, so this one is turned away."""
+    names = {name.casefold() for name in people}
+    counts: Counter[str] = Counter()
+    for earlier in list(recent)[-5:]:
+        counts.update(
+            {w for w in _WORDS.findall(earlier.casefold()) if len(w) >= 4 and w not in _COMMON}
+        )
+    said = {w for w in _WORDS.findall(text.casefold()) if len(w) >= 4 and w not in _COMMON}
+    worn = sorted(w for w in said if counts[w] >= 3 and w not in names)
+    return worn[0] if worn else None
 
 
 def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
@@ -1504,7 +1523,11 @@ class InnerStream:
         # Judged against the thoughts it was shown, not ones it never saw.
         # And never nearly the same thought as one of the last dozen, however long ago.
         earlier = [thought.text for thought in self.store.recent(12)]
-        if near_repeat(text, recent_texts[-3:]) or said_before(text, earlier):
+        if (
+            near_repeat(text, recent_texts[-3:])
+            or said_before(text, earlier)
+            or rutted(text, earlier[:5], known_names(snapshot)) is not None
+        ):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
             return None
         # Where his mind was pointed in the last several thoughts is still on it.

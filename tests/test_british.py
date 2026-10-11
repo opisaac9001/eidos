@@ -49,3 +49,8 @@ def test_a_title_that_isnt_a_doing_stays_as_it_is() -> None:
 
     assert _gerund("A coffee at Juniper with Ellis") == "A coffee at Juniper with Ellis"
     assert _gerund("Walk along the river") == "Walking along the river"
+
+
+def test_cosy_pyjamas_and_his_mums_kitchen() -> None:
+    assert british("A cozy night in pajamas.") == "A cosy night in pyjamas."
+    assert british("My mom's kitchen.") == "My mum's kitchen."

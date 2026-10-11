@@ -103,6 +103,11 @@ def test_alone_at_home_nobody_is_in_the_room_with_him() -> None:
     ):
         assert placed_with_him(elsewhere, alone, NAMES) is None, elsewhere
     assert placed_with_him("Rowan's finally asleep.", {"with_him": ["Rowan"]}, NAMES) is None
+    # In company, only the people actually there can be seen or heard.
+    assert (
+        placed_with_him("Ellis looks so tired today.", {"with_him": ["Mum", "Dad"]}, NAMES)
+        == "Ellis"
+    )
 
 
 def test_he_knows_who_people_are_where_his_family_live_and_that_gulliver_is_gone() -> None:

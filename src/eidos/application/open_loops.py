@@ -436,6 +436,15 @@ _SAID_YES = re.compile(
 )
 
 
+# A friend's message that's actually a plan: a day or a time, or asking who's coming.
+_PROPOSES = re.compile(
+    r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tonight|tomorrow|"
+    r"this weekend|anyone\??|who'?s (?:in|up for|coming)|fancy|shall we|let'?s|"
+    r"\d{1,2}(?::\d\d)?\s?(?:am|pm)|o'?clock)",
+    re.IGNORECASE,
+)
+
+
 def _what_he_meant(
     history: Sequence[DomainEvent], since: datetime, formed_from: set[str]
 ) -> list[tuple[DomainEvent, str, str]]:
@@ -469,16 +478,17 @@ def _what_he_meant(
             continue  # his answer to a plan he's already said yes to: it's on his calendar
         text = intended(raw)
         if text is None and event.kind == "chat.message" and _SAID_YES.search(raw):
-            # Agreeing to the group's plan: the last friend's message says what it was.
+            # Agreeing to a friend's plan in the chat ("Pub quiz Thursday? Anyone?"). A yes
+            # to a message that wasn't a plan ("sounds good" to news) isn't a to-do.
             proposal = next(
                 (
                     str(e.payload.get("text", ""))
                     for e in reversed(events_of(history, "chat.message")[-10:])
-                    if e.payload.get("speaker_id") != "pathos"
+                    if e.payload.get("speaker_id") != "pathos" and _when(e) <= _when(event)
                 ),
                 "",
             )
-            if proposal:
+            if _PROPOSES.search(proposal):
                 text = f"go along to what the group's planning ({proposal[:60].rstrip('?!. ')})"
         if text is not None:
             found.append((event, text, "said" if said else "thought"))

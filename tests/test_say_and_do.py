@@ -70,6 +70,32 @@ def test_saying_yes_in_the_group_chat_means_going() -> None:
     assert "Pub quiz Thursday" in loop.text
 
 
+def test_sounds_good_to_news_is_not_a_plan() -> None:
+    news = DomainEvent(
+        "chat.message",
+        "pathos",
+        {
+            "speaker_id": "rowan",
+            "speaker_name": "Rowan",
+            "text": "Finally finished the mural.",
+            "simulated_at": (AT - timedelta(minutes=30)).isoformat(),
+        },
+    )
+    reply = DomainEvent(
+        "chat.message",
+        "pathos",
+        {
+            "speaker_id": "pathos",
+            "speaker_name": "Patrick",
+            "text": "Sounds good, well done.",
+            "simulated_at": (AT - timedelta(minutes=20)).isoformat(),
+        },
+    )
+    history = [news, reply]
+    history += hour(history, AT)
+    assert open_loops(history) == []
+
+
 def test_a_question_you_left_hanging_can_come_back(tmp_path) -> None:
     class Capturing(StandInGateway):
         def __init__(self) -> None:
