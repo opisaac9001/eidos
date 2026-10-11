@@ -28,10 +28,10 @@ from eidos.application.family import FAMILY_HOME
 from eidos.application.media import current as media_now
 from eidos.application.place_discovery import known_place_ids
 from eidos.domain.actions import ActionKind
-from eidos.domain.agency import AgencyCandidate, resolve_agency_candidate
+from eidos.domain.agency import STAY, AgencyCandidate, resolve_agency_candidate
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
-from eidos.domain.planning import PlanningState
+from eidos.domain.planning import CalendarEntry, PlanningState
 from eidos.domain.sleep import sleep_window_at
 from eidos.domain.travel import route_duration
 from eidos.domain.world_catalog import WorldCatalog
@@ -332,7 +332,7 @@ def everyday_events(
     for a while after he felt it, so thinking about something is often how he ends up
     doing it.
     """
-    if busy or location_id == "in_transit" or not _between_things(planning, at):
+    if busy or location_id == "in_transit" or not _between_things(planning, at, location_id):
         return []
     bedtime = _bedtime(history, at)
     if bedtime is not None and bedtime - at < timedelta(minutes=15):
@@ -461,7 +461,8 @@ def make_way(planning: PlanningState, at: datetime) -> list[DomainEvent]:
             (
                 plan
                 for plan in plans
-                if datetime.fromisoformat(plan.starts_at) < ends
+                if not _stay(plan, doing.location_id)
+                and datetime.fromisoformat(plan.starts_at) < ends
                 and starts < datetime.fromisoformat(plan.ends_at or plan.starts_at)
             ),
             None,
@@ -515,7 +516,7 @@ def need_restored(activity_type: str) -> tuple[str, float] | None:
 # -- rules -------------------------------------------------------------------------------
 
 
-def _between_things(planning: PlanningState, at: datetime) -> bool:
+def _between_things(planning: PlanningState, at: datetime, location_id: str) -> bool:
     """Nothing under way, nothing about to start, and a moment since the last thing."""
     last_end: datetime | None = None
     for entry in planning.calendar.values():
@@ -527,6 +528,8 @@ def _between_things(planning: PlanningState, at: datetime) -> bool:
             continue
         starts = datetime.fromisoformat(entry.starts_at)
         ends = datetime.fromisoformat(entry.ends_at) if entry.ends_at else starts
+        if _stay(entry, location_id):
+            continue
         # A plan holds its slot to the end: lived activity is settled up to when it's
         # done, so "completed" can be marked before the slot is over.
         if starts - timedelta(minutes=10) <= at < ends:
@@ -538,6 +541,13 @@ def _between_things(planning: PlanningState, at: datetime) -> bool:
     # Pottering between things: a couple of minutes, sometimes a quarter of an hour.
     gap = timedelta(minutes=2 + 13 * _roll("gap", last_end.isoformat()))
     return at - last_end >= gap
+
+
+def _stay(entry: CalendarEntry, location_id: str) -> bool:
+    """A weekend at his parents', a holiday: somewhere he is, not something he's doing."""
+    starts = datetime.fromisoformat(entry.starts_at)
+    ends = datetime.fromisoformat(entry.ends_at) if entry.ends_at else starts
+    return ends - starts >= STAY and entry.location_id == location_id
 
 
 def _bedtime(history: Sequence[DomainEvent], at: datetime) -> datetime | None:
@@ -832,6 +842,12 @@ def _latest_end(
         if entry.status != "scheduled" or entry.actor_id not in {None, "pathos"}:
             continue
         other = datetime.fromisoformat(entry.starts_at)
+        if _stay(entry, place) and entry.ends_at:
+            # Done before it's time to head back.
+            end = datetime.fromisoformat(entry.ends_at) - timedelta(minutes=5)
+            if end > starts:
+                latest = end if latest is None or end < latest else latest
+            continue
         if other < starts:
             continue
         minutes = _travel_minutes(place, entry.location_id, catalog)

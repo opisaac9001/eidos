@@ -18,6 +18,8 @@ from eidos.domain.world import location_allows_interval
 from eidos.domain.world_catalog import WorldCatalog
 
 AGENCY_ACTIONS = {ActionKind.WORK, ActionKind.LEARN, ActionKind.ATTEND}
+# A plan this long is a stay somewhere, not one thing he's doing the whole time.
+STAY = timedelta(hours=8)
 _ACTIVITY_TYPE = re.compile(r"^[a-z][a-z0-9_]{2,39}$")
 _FIELDS = {
     "activity_type",
@@ -340,6 +342,13 @@ def resolve_agency_candidate(
             continue
         other_start = datetime.fromisoformat(entry.starts_at)
         other_end = datetime.fromisoformat(entry.ends_at) if entry.ends_at else other_start
+        # A stay (a weekend at his parents', a holiday) is where small doings happen.
+        if (
+            proposal_id.startswith("doing-")
+            and other_end - other_start >= STAY
+            and entry.location_id == candidate.location_id
+        ):
+            continue
         if starts_at < other_end and other_start < ends_at:
             return reject("schedule_conflict", f"The activity overlaps {entry.title}")
         try:

@@ -239,3 +239,30 @@ def test_he_puts_the_kettle_down_when_you_come_round(tmp_path) -> None:
         and str(event.payload["schedule_id"]).startswith("doing-")
     ]
     assert cancelled and cancelled[-1].payload["reason"] == "Put it down when you came round."
+
+
+def test_a_weekend_away_is_somewhere_he_is_not_one_long_thing_hes_doing() -> None:
+    from eidos.application.everyday import _between_things, _stay
+    from eidos.domain.planning import CalendarEntry, PlanningState
+
+    weekend = CalendarEntry(
+        "summer-2026",
+        "Weekend at home",
+        (AT - timedelta(days=1)).isoformat(),
+        "wye-home",
+        ends_at=(AT + timedelta(hours=8)).isoformat(),
+        actor_id="pathos",
+        activity_type="visiting_home",
+    )
+    planning = PlanningState(calendar={weekend.schedule_id: weekend})
+    assert _stay(weekend, "wye-home")
+    assert _between_things(planning, AT, "wye-home")
+    # A two-hour plan is something he's doing.
+    afternoon = CalendarEntry(
+        "x",
+        "A long walk",
+        AT.isoformat(),
+        "wye-home",
+        ends_at=(AT + timedelta(hours=2)).isoformat(),
+    )
+    assert not _between_things(PlanningState(calendar={"x": afternoon}), AT, "wye-home")
