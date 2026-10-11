@@ -14,6 +14,7 @@ from uuid import uuid4
 from eidos.application.activity_execution import execution_context
 from eidos.application.causal_opportunities import fresh_cause
 from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
+from eidos.application.everyday import PREFIX as EVERYDAY_PREFIX
 from eidos.application.experience import activity_tastes, taste_notes
 from eidos.application.opportunities import available_opportunities
 from eidos.application.place_discovery import known_place_ids, visited_place_ids
@@ -92,6 +93,9 @@ async def autonomous_activity_events(
                 "opportunity.noticed",
             }
         ),
+        # Finishing a cup of tea is not an occasion to rethink his life: everyday doings
+        # are chosen by habit and feeling (``everyday``), not deliberated.
+        ignore=_everyday,
     )
     if cause is None:
         return []
@@ -760,6 +764,13 @@ async def autonomous_activity_events(
         dream_plan_link_events(history, planning_workspace, resolution.events, simulated_at)
     )
     return output
+
+
+def _everyday(event: DomainEvent) -> bool:
+    return any(
+        str(event.payload.get(key, "")).startswith(EVERYDAY_PREFIX)
+        for key in ("schedule_id", "intention_id")
+    )
 
 
 def _deliberation_schema(choice_field: Mapping[str, object]) -> dict[str, object]:

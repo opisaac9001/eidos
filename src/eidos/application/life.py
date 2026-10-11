@@ -64,6 +64,8 @@ from eidos.application.economy import (
 from eidos.application.emotional_regulation import emotional_regulation_events
 from eidos.application.epistemics import pathos_known_person_ids
 from eidos.application.evening_course import evening_course_events
+from eidos.application.everyday import URGES as EVERYDAY_URGES
+from eidos.application.everyday import doing_now, everyday_events, make_way
 from eidos.application.experience import experience_events
 from eidos.application.falling_out import HOUR as FALLING_OUT_HOUR
 from eidos.application.falling_out import falling_out_events
@@ -732,6 +734,7 @@ class Life(LifeConversation):
             correlation_id=impulse_id,
         )
         pending: list[DomainEvent] = [felt, thought]
+        outcome_now = ""
         emotion = project_emotion(history)
         if kind == "contact":
             catalog = self._world_catalog(history)
@@ -805,6 +808,39 @@ class Life(LifeConversation):
                     },
                 )
             )
+        elif kind in EVERYDAY_URGES and not busy:
+            # Fresh air, a lie-down, the kettle: no deliberation, he just goes and does it,
+            # once he's done with what he's in the middle of.
+            if working:
+                return "later: busy"
+            planning = self._planning(history + pending)
+            # Mid-cuppa, the pull is felt now and answered when he's done (``everyday``
+            # weighs a recent pull for a while).
+            pending.extend(
+                []
+                if doing_now(planning, at) is not None
+                else everyday_events(
+                    history + pending,
+                    at,
+                    planning=planning,
+                    catalog=self._world_catalog(history + pending),
+                    location_id=state.location_id,
+                    needs={
+                        "rest": state.rest,
+                        "connection": state.connection,
+                        "curiosity": state.curiosity,
+                        "mastery": state.mastery,
+                    },
+                    energy=state.energy,
+                    valence=state.valence,
+                    busy=False,
+                    phone_dead=phone_dead(history, at),
+                    weather=latest_weather(history),
+                    actual_revision=len(history) + len(pending),
+                )
+            )
+            if doing_now(planning, at) is not None:
+                outcome_now = "when he's done"
         elif not busy:
             agency_history = history + pending
             identity = project_identity(agency_history)
@@ -843,7 +879,7 @@ class Life(LifeConversation):
             in {"schedule.created", "contact.reached_out", "conversation.message", "family.contact"}
             for event in pending
         )
-        outcome = "acted" if acted else "let go"
+        outcome = "acted" if acted else outcome_now or "let go"
         pending.append(
             DomainEvent(
                 "impulse.resolved",
@@ -1010,6 +1046,7 @@ class Life(LifeConversation):
             await self._guarded(tick, self._phase_self_direction)
             if not self.authored_scenario:
                 await self._guarded(tick, self._live_activity_window, current, current)
+                await self._guarded(tick, self._phase_everyday)
             await self._guarded(tick, self._phase_routine_beat)
             await self._guarded(tick, self._phase_consequences)
             await self._guarded(tick, self._phase_world_story)
@@ -1467,6 +1504,57 @@ class Life(LifeConversation):
             else []
         )
         self._extend_warmed(tick, agency, self._planning)
+
+    def _phase_everyday(self, tick: _Tick) -> None:
+        """Free and between things, he does whatever he feels like next (``everyday``)."""
+        history, pending, current = tick.history, tick.pending, tick.current
+        if self.authored_scenario:
+            return
+        self._make_way(tick)
+        if not tick.state.awake:
+            return
+        planning = self._planning(history + pending)
+        busy = (
+            tick.state.location_id == "in_transit"
+            or any(
+                scene.status in {"active", "paused"}
+                and "pathos" in {scene.initiator_id, scene.partner_id}
+                for scene in project_scenes(history + pending).scenes.values()
+            )
+            or active_incident_location(history + pending, current) is not None
+            or _at_work(planning, current)
+        )
+        state = tick.state
+        self._extend_warmed(
+            tick,
+            everyday_events(
+                history + pending,
+                current,
+                planning=planning,
+                catalog=self._world_catalog(history + pending),
+                location_id=state.location_id,
+                needs={
+                    "rest": state.rest,
+                    "connection": state.connection,
+                    "curiosity": state.curiosity,
+                    "mastery": state.mastery,
+                },
+                energy=min(state.energy, tick.physical_capacity),
+                valence=state.valence,
+                busy=busy,
+                phone_dead=phone_dead(history + pending, current),
+                weather=latest_weather(history + pending),
+                actual_revision=len(history) + len(pending),
+            ),
+            self._planning,
+        )
+
+    def _make_way(self, tick: _Tick) -> None:
+        """Cut short any small doing that something he's since planned lands on."""
+        history, pending = tick.history, tick.pending
+        self._extend_warmed(
+            tick, make_way(self._planning(history + pending), tick.current), self._planning
+        )
 
     def _phase_routine_beat(self, tick: _Tick) -> None:
         """Choose and live what this hour is for, then eat if he can; sets ``tick.beat``."""
@@ -3537,6 +3625,8 @@ class Life(LifeConversation):
 
     def _phase_activities(self, tick: _Tick) -> None:
         """Scheduled social plans and activities happen, with what they lead to."""
+        if not self.authored_scenario:
+            self._make_way(tick)
         history, pending, current = tick.history, tick.pending, tick.current
         social_activity = scheduled_social_events(
             self._planning(history + pending),
@@ -4001,7 +4091,10 @@ class Life(LifeConversation):
         """Live the part-hour up to the target time (``tick.current``) of a natural life."""
         history, pending, target = tick.history, tick.pending, tick.current
         pending.extend(npc_world_events(history + pending, target))
+        self._make_way(tick)
         self._live_activity_window(tick, tick.state.simulated_at, target)
+        # Between the hours he still finishes one thing and drifts into the next.
+        self._phase_everyday(tick)
         fractional_activity = scheduled_activity_events(
             self._planning(history + pending),
             actor_location_id=tick.state.location_id,

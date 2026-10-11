@@ -276,3 +276,33 @@ with models only wording what the rules decide:
   `accounts` on the state, `my_money` in his voice.
 - Each part of a live hour runs guarded (`Life._guarded`): a failure is rolled back,
   logged, recorded as `life.phase_failed`, and the hour goes on.
+
+## Two speeds of choosing (2026-10-11)
+
+A real mind mostly runs on habit and feeling and only sometimes deliberates. Patrick's
+choices now work the same way:
+
+- **Fast: `application/everyday.py`.** Whenever he is awake, free and between things (checked
+  every live tick, so to the minute), he chooses what to do next from what he could
+  actually do where he is: his repertoire from his canon (filter coffee, a record played for
+  the whole side, his book, the river, the film camera, the block plane, cooking that takes
+  the evening, the sofa, his phone...) plus new things he tried and enjoyed. Each option is
+  scored by the need it serves, his energy (effort costs more when tired), his mood (comfort
+  when low), learned habits (repetition at a time of day, fading over weeks), tastes,
+  boredom (the same thing, or the same kind of thing, recently), weather, the walk there,
+  and a passing thought that mentioned it. The top few compete; the best usually, not
+  always, wins. No model call. The choice (`everyday.chosen`, with the reasons) is booked
+  through `resolve_agency_candidate` like any plan, so it can't overlap work, an
+  arrangement, a closed place or bedtime. It is lived by the usual execution, felt
+  (`experience.felt`, never "samey"), and gives back the need it serves (appraisal). It
+  can't slip his mind, never prompts a deliberation, doesn't stop you visiting (he puts it
+  down when you come round), and reading or watching moves him through his book or series.
+- **Thought to action.** A passing thought about something primes it ("could murder a
+  coffee"). A pull his thoughts keep returning to (fresh air, a lie-down, the kettle: the
+  stream's `rest`, `out` and `food` impulses) is answered by the fast chooser, then or when
+  he's finished what he's doing. Contact, family and "some day" pulls still go to his
+  models.
+- **Slow: `application/agency.py`.** A fresh thought, perception or opportunity can still
+  become a new plan through the model path (deliberation, then a concrete activity checked
+  by the same rules). That is where genuinely new things come from; an idea he tried and
+  enjoyed joins the fast repertoire (`everyday._learned`) and can become a habit of its own.

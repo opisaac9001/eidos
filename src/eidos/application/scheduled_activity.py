@@ -102,7 +102,9 @@ def scheduled_activity_events(
                     for event in missed:
                         projected = projected.apply(event)
                 continue
-        if prospective_memory_lapse(
+        # Forgetting needs time to forget in: what he chose to do this minute can't slip
+        # his mind (``everyday``), only plans made earlier can.
+        if not entry.schedule_id.startswith("doing-") and prospective_memory_lapse(
             entry,
             intention.priority,
             cognitive_history,

@@ -357,6 +357,8 @@ def _calendar_clear(planning: PlanningState, at: datetime, hours: float) -> bool
     for entry in planning.calendar.values():
         if entry.status not in {"scheduled", "active"} or entry.actor_id not in {None, "pathos"}:
             continue
+        if entry.schedule_id.startswith("doing-"):
+            continue  # he puts the book down to get on with work (``everyday``)
         starts = datetime.fromisoformat(entry.starts_at)
         ends = datetime.fromisoformat(entry.ends_at) if entry.ends_at else starts
         if starts < until and at < ends:

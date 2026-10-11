@@ -331,6 +331,8 @@ def _next_upcoming_plan(
             for item in planning.calendar.values()
             if item.status == "scheduled"
             and item.actor_id in {None, "pathos"}
+            # Nobody looks ahead to a shower they're about to have (``everyday``).
+            and not item.schedule_id.startswith("doing-")
             and at <= datetime.fromisoformat(item.starts_at) <= at + timedelta(hours=within_hours)
         ),
         key=lambda pair: (pair[0], pair[1].schedule_id),

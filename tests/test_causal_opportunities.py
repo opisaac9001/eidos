@@ -249,11 +249,21 @@ def test_default_life_has_no_authored_itinerary_or_automatic_opening_bookings(tm
     life = Life(SQLiteEventStore(tmp_path / "natural.sqlite3"), QuietGateway())
     life.advance(24)
     history = life.history()
-    # The only bookings a new life has are shifts under the job agreement he accepted.
+    # A new life's bookings are shifts under the job agreement he accepted, and the small
+    # things he chose to do in his free time, each traceable to his own choice.
     agreements = {event.event_id for event in history if event.kind == "work.agreement_accepted"}
+    by_id = {event.event_id: event for event in history}
+
+    def chosen(event):
+        while event is not None:
+            if event.kind == "everyday.chosen":
+                return True
+            event = by_id.get(event.causation_id)
+        return False
+
     bookings = [event for event in history if event.kind == "schedule.created"]
     assert agreements
-    assert all(event.causation_id in agreements for event in bookings)
+    assert all(event.causation_id in agreements or chosen(event) for event in bookings)
     assert not any(
         event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine"
         for event in history

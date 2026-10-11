@@ -118,6 +118,7 @@ def fresh_cause(
     history: Sequence[DomainEvent],
     now: datetime,
     kinds: frozenset[str],
+    ignore: Callable[[DomainEvent], bool] | None = None,
 ) -> DomainEvent | None:
     """Newest eligible cause only; never drain stale incidents into new stories."""
     if now.utcoffset() is None:
@@ -130,6 +131,8 @@ def fresh_cause(
         reverse=True,
     )
     for _, event in candidates:
+        if ignore is not None and ignore(event):
+            continue
         try:
             at = datetime.fromisoformat(str(event.payload.get("simulated_at")))
         except ValueError:

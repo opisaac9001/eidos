@@ -85,9 +85,11 @@ class ContinuousInnerStreamTests(unittest.TestCase):
             )
             context = json.loads(pathos_request.messages[0].content)
             handoff = next(
-                item for item in context["cognitive_workspace"] if item["from_faculty"] == "murmur"
+                item
+                for item in context["cognitive_workspace"]
+                if item["from_faculty"] == "murmur"
+                and item["epistemic_status"] == "inner_monologue"
             )
-            self.assertEqual(handoff["epistemic_status"], "inner_monologue")
             self.assertFalse(handoff["action_authority"])
 
 

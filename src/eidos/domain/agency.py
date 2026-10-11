@@ -334,6 +334,10 @@ def resolve_agency_candidate(
     for entry in state.calendar.values():
         if entry.status != "scheduled" or entry.actor_id not in {None, "pathos"}:
             continue
+        # A cup of tea or a few chapters give way to anything he actually plans; only
+        # another of those small doings can't be squeezed on top of one.
+        if entry.schedule_id.startswith("doing-") and not proposal_id.startswith("doing-"):
+            continue
         other_start = datetime.fromisoformat(entry.starts_at)
         other_end = datetime.fromisoformat(entry.ends_at) if entry.ends_at else other_start
         if starts_at < other_end and other_start < ends_at:

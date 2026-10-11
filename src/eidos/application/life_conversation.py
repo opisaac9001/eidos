@@ -286,6 +286,26 @@ class LifeConversation(LifeProjections):
         )
         output = [requested, *start.events]
         if start.accepted:
+            # Whatever he was pottering at, he puts down when you come round.
+            output.extend(
+                DomainEvent(
+                    "schedule.cancelled",
+                    "pathos",
+                    {
+                        "schedule_id": entry.schedule_id,
+                        "reason": "Put it down when you came round.",
+                        "simulated_at": at,
+                    },
+                    causation_id=requested.event_id,
+                    correlation_id=request_id,
+                )
+                for entry in self._planning(history).calendar.values()
+                if entry.schedule_id.startswith("doing-")
+                and entry.status in {"scheduled", "interrupted"}
+                and datetime.fromisoformat(entry.starts_at)
+                <= state.simulated_at
+                < datetime.fromisoformat(entry.ends_at or entry.starts_at)
+            )
             output.append(
                 DomainEvent(
                     "visit.accepted",

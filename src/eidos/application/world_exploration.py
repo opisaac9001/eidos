@@ -41,6 +41,9 @@ def planned_activity_beat(
             for entry in planning.calendar.values()
             if entry.status == "scheduled"
             and entry.actor_id == "pathos"
+            # Small everyday doings are lived and felt on their own (``everyday``); they
+            # aren't the hour's beat, or "Made a start: a cup of tea" is a memory.
+            and not entry.schedule_id.startswith("doing-")
             and datetime.fromisoformat(entry.starts_at)
             <= simulated_at
             < (

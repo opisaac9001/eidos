@@ -114,6 +114,8 @@ def communication_availability(
     now = state.simulated_at
     if any(
         item.status == "scheduled"
+        # Making a pot of coffee isn't a reason to turn someone away (``everyday``).
+        and not item.schedule_id.startswith("doing-")
         and datetime.fromisoformat(item.starts_at) <= now
         and (item.ends_at is None or now < datetime.fromisoformat(item.ends_at))
         for item in planning.calendar.values()
@@ -162,6 +164,7 @@ def _next_commitment(
         (datetime.fromisoformat(item.starts_at), item.title)
         for item in planning.calendar.values()
         if item.status == "scheduled"
+        and not item.schedule_id.startswith("doing-")
         and datetime.fromisoformat(item.starts_at) > state.simulated_at
     ]
     routine = [

@@ -125,7 +125,8 @@ def test_his_life_weighs_an_impulse_and_records_what_came_of_it(tmp_path) -> Non
             "thoughts": ("Starving. Should make some toast.",),
         }
     )
-    assert outcome in {"acted", "let go"}
+    # Mid-cuppa, he gets to it once he's done (``everyday``) rather than dropping it.
+    assert outcome in {"acted", "let go", "when he's done"}
     kinds = [event.kind for event in life.history()]
     assert "impulse.felt" in kinds and "impulse.resolved" in kinds
     thought = next(

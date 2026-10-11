@@ -163,7 +163,9 @@ def experience_events(
         <= at - datetime.fromisoformat(str(event.payload["simulated_at"]))
         <= timedelta(days=14)
     )
-    if recent_same >= 4:
+    # The morning coffee isn't samey; it's his. Habits are exempt, new outings aren't.
+    everyday = str(payload.get("schedule_id", "")).startswith("doing-")
+    if recent_same >= 4 and not everyday:
         parts.append((-0.15, "", "it's getting a bit samey"))
     # Temperament: some things just suit him and some don't, consistently, and he only
     # finds out which by trying them. It belongs to the thing, not to the day.
@@ -199,7 +201,8 @@ def experience_events(
     output = [felt]
     first_visit = any(text == "it was somewhere new" for _, text, _ in parts)
     doing = _gerund(title)
-    if abs(enjoyment) >= 0.3 or first_visit:
+    # A cup of tea is only remembered when it was more than a cup of tea.
+    if abs(enjoyment) >= (0.55 if everyday else 0.3) or first_visit:
         sentence = f"{doing}: {_verdict(enjoyment)}."
         if reasons:
             joined = " and ".join(reasons)

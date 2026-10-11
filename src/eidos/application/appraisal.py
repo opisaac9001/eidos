@@ -751,6 +751,19 @@ def _effect(
         return ("mastery", 0.02, 0.2, 0.1, 0.85)
     if event.kind == "intention.recalled" and event.payload.get("too_late"):
         return ("affect", 0.0, -0.3, 0.35, 0.6)
+    if event.kind == "agency.activity_realized" and str(
+        event.payload.get("schedule_id", "")
+    ).startswith("doing-"):
+        # The nap rests him, the walk freshens him up, the record settles him.
+        from eidos.application.everyday import need_restored
+
+        restored = need_restored(str(event.payload.get("activity_type", "")))
+        # Small: an hour's ordinary decay of curiosity is a fraction of a percent.
+        return (restored[0], round(0.3 * restored[1], 3), 0.1, 0.1, 0.9) if restored else None
+    if event.kind == "activity.completed" and str(event.payload.get("schedule_id", "")).startswith(
+        "doing-"
+    ):
+        return None
     if event.kind == "activity.completed":
         if event.payload.get("activity") == "attend":
             return ("connection", 0.05, 0.45, 0.3, 0.75)

@@ -149,6 +149,7 @@ def media_events(
     return (
         _acquire(history, at, location_id, known_places)
         or _start_next(history, at, location_id)
+        or _lived_session(history, at)
         or _session(history, at, location_id, free)
     )
 
@@ -335,11 +336,45 @@ _SESSION_HOURS = {"book": (21, 22), "series": (19, 21), "album": (8, 21)}
 _SESSION_CHANCE = {"book": 0.45, "series": 0.3, "album": 0.12}
 
 
+_DOING_KIND = {"read_book": "book", "watch_series": "series", "listen_album": "album"}
+
+
+def _chosen_lately(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
+    """Everyday doings (``everyday``) he's finished in the last few days."""
+    return [
+        event
+        for event in events_of(history, "agency.activity_realized")[-60:]
+        if str(event.payload.get("schedule_id", "")).startswith("doing-")
+        and timedelta(0) <= at - _time(event) <= timedelta(days=3)
+    ]
+
+
+def _lived_session(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
+    """He sat down and read it, watched it or listened to it: that's how far he got."""
+    already = {
+        str(e.payload.get("after_doing")) for e in events_of(history, "media.progressed")[-20:]
+    }
+    under_way = current(history)
+    for event in _chosen_lately(history, at):
+        kind = _DOING_KIND.get(str(event.payload.get("activity_type")))
+        schedule_id = str(event.payload.get("schedule_id"))
+        if kind is None or kind not in under_way or schedule_id in already:
+            continue
+        if at - _time(event) > timedelta(hours=2):
+            continue
+        work, done = under_way[kind]
+        step = 1 + int(_roll("how much", schedule_id) * (2 if kind != "album" else 1))
+        return _progress(history, work, min(work.units, done + step), at, after=schedule_id)
+    return []
+
+
 def _session(
     history: Sequence[DomainEvent], at: datetime, location_id: str, free: bool
 ) -> list[DomainEvent]:
     """A chapter before bed, an episode on a free evening, the album on in the background."""
-    if location_id != "home" or not free:
+    # Once he chooses what to do with his evenings himself, reading is something he sits
+    # down and does (``_lived_session``), not a roll of the dice at nine o'clock.
+    if location_id != "home" or not free or _chosen_lately(history, at):
         return []
     today = at.date().isoformat()
     progressed_today = {
@@ -354,31 +389,39 @@ def _session(
         if _roll("session", work.media_id, today) >= _SESSION_CHANCE[kind]:
             continue
         step = 1 + int(_roll("how much", work.media_id, today) * (2 if kind != "album" else 1))
-        done = min(work.units, done + step)
-        progressed = DomainEvent(
-            "media.progressed",
-            "pathos",
-            {
-                "media_id": work.media_id,
-                "done": done,
-                "of": work.units,
-                "simulated_at": at.isoformat(),
-                "owner": "pathos",
-            },
-            correlation_id=f"media-{work.media_id}",
-        )
-        feeling = liking(work)
-        # Something he really isn't getting on with gets dropped, a third of the way in.
-        if kind != "album" and feeling <= -0.3 and done >= work.units // 3:
-            return [progressed, *_ended(work, at, feeling, gave_up=True)]
-        if done >= work.units:
-            return [
-                progressed,
-                *_ended(work, at, feeling, gave_up=False),
-                *_taste(history, work, feeling, at),
-            ]
-        return [progressed]
+        return _progress(history, work, min(work.units, done + step), at)
     return []
+
+
+def _progress(
+    history: Sequence[DomainEvent], work: Work, done: int, at: datetime, *, after: str = ""
+) -> list[DomainEvent]:
+    """How far he's got, and whether that's the end of it (or the end of his patience)."""
+    kind = work.kind
+    progressed = DomainEvent(
+        "media.progressed",
+        "pathos",
+        {
+            "media_id": work.media_id,
+            "done": done,
+            "of": work.units,
+            "simulated_at": at.isoformat(),
+            "owner": "pathos",
+            **({"after_doing": after} if after else {}),
+        },
+        correlation_id=f"media-{work.media_id}",
+    )
+    feeling = liking(work)
+    # Something he really isn't getting on with gets dropped, a third of the way in.
+    if kind != "album" and feeling <= -0.3 and done >= work.units // 3:
+        return [progressed, *_ended(work, at, feeling, gave_up=True)]
+    if done >= work.units:
+        return [
+            progressed,
+            *_ended(work, at, feeling, gave_up=False),
+            *_taste(history, work, feeling, at),
+        ]
+    return [progressed]
 
 
 def _ended(work: Work, at: datetime, feeling: float, *, gave_up: bool) -> list[DomainEvent]:

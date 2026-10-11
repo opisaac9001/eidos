@@ -60,9 +60,11 @@ class DeferredCognitionTests(unittest.TestCase):
             life.advance(8)
             self.assertNotIn("murmur", gateway.generated)
             self.assertGreater(len(gateway.submitted), 0)
+            # A free thought, or one cued by something he's just done (an association).
             self.assertTrue(
                 all(
                     '"deferred_kind": "inner_thought"' in request.messages[0].content
+                    or '"deferred_kind": "association"' in request.messages[0].content
                     for request in gateway.submitted
                 )
             )
