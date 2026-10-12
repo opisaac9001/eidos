@@ -735,11 +735,21 @@ def _on_his_mind(history: Sequence[DomainEvent], at: datetime) -> list[str]:
 
 
 def _meant(history: Sequence[DomainEvent], at: datetime) -> list[tuple[str, str]]:
-    """Things he's said or thought he'd do lately ("get out for a walk"), still undone."""
+    """Things he's said or thought he'd do ("get out for a walk"), undone and in mind."""
+    # Only while it's in mind: just thought of, or come back to him lately. Nothing brings
+    # the rest to mind, and that is how intentions really get forgotten.
     return [
         (loop.intention_id, loop.text)
         for loop in open_loops(history)
-        if not loop.carry and timedelta(0) <= at - loop.formed_at <= timedelta(days=3)
+        if not loop.carry
+        and timedelta(0) <= at - loop.formed_at <= timedelta(days=3)
+        and (
+            at - loop.formed_at <= timedelta(hours=3)
+            or (
+                loop.last_recalled_at is not None
+                and timedelta(0) <= at - loop.last_recalled_at <= timedelta(hours=2)
+            )
+        )
     ]
 
 

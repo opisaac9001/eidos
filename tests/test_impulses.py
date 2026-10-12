@@ -324,3 +324,45 @@ def test_seeing_someone_every_day_stands_out_less() -> None:
     assert _encounter_importance([met(2)], "ellis", at.isoformat()) == 0.55
     daily = [met(day) for day in (5, 4, 3, 2, 1)]
     assert _encounter_importance(daily, "ellis", at.isoformat()) == 0.35
+
+
+def test_a_pull_he_decided_against_doesnt_nag_again_for_hours() -> None:
+    clock = Clock()
+    tracker = ImpulseTracker(clock)
+    for _ in range(4):
+        tracker.notice("Rowan's mum is ill. Should text him.", snapshot())
+    [impulse] = tracker.take_ripe()
+    tracker.let_go(impulse)
+    clock.now += 2 * 3600  # past the ordinary settling, still let go
+    for _ in range(4):
+        tracker.notice("Should text Rowan.", snapshot())
+    assert tracker.take_ripe() == []
+    clock.now += 3 * 3600
+    for _ in range(4):
+        tracker.notice("Should text Rowan.", snapshot())
+    assert [i.kind for i in tracker.take_ripe()] == ["contact"]
+
+
+def test_thinking_about_whats_next_is_looking_ahead_not_a_new_plan(tmp_path) -> None:
+    class NoModels(StandInGateway):
+        armed = False
+
+        async def generate(self, request):
+            if self.armed:
+                assert request.capability not in {"pathos_deliberation", "pathos_agency"}
+            return await super().generate(request)
+
+    gateway = NoModels()
+    life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), gateway)
+    life.advance(10)
+    gateway.armed = True
+    outcome = life.act_on_impulse(
+        {
+            "kind": "plan",
+            "target": "Shift at the repair workshop",
+            "target_name": "Shift at the repair workshop",
+            "strength": 2.6,
+            "thoughts": ("Shift at the workshop tomorrow.",),
+        }
+    )
+    assert outcome == "on his mind"

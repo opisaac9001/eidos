@@ -808,6 +808,10 @@ class Life(LifeConversation):
                     },
                 )
             )
+        elif kind == "plan":
+            # Dwelling on what's next (tomorrow's shift) is looking ahead, not a decision
+            # to plan anything new: it stays on his mind, no deliberation.
+            outcome_now = "on his mind"
         elif kind in EVERYDAY_URGES and not busy:
             # Fresh air, a lie-down, the kettle: no deliberation, he just goes and does it,
             # once he's done with what he's in the middle of.

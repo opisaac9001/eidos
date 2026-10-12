@@ -104,6 +104,8 @@ class Runtime:
                 if outcome.startswith("later"):
                     # Not now (at work, or too early to text): it comes back in a while.
                     self.stream.impulses.defer(impulse, 45 * 60)
+                elif outcome == "let go":
+                    self.stream.impulses.let_go(impulse)
             except Exception:
                 logger.exception("Weighing an impulse failed")
         if ripe:

@@ -1281,9 +1281,29 @@ def _maybe_drop_in(
 # -- what he'd say about it -------------------------------------------------------------
 
 
+def _the_change_in_his_words(history: Sequence[DomainEvent], at: datetime) -> list[str]:
+    """Where he is in leaving the workshop for freelance writing, until he's done it."""
+    if self_employed(history) or not events_of(history, OFFER):
+        return []
+    if not freelancing(history):
+        return ["the old team in Bristol want me to rewrite their developer docs; "
+                "thinking about going freelance again"]  # fmt: skip
+    told = events_of(history, TOLD)
+    if not told:
+        return ["going freelance again, writing; haven't told Ellis yet, "
+                "meaning to at my next shift"]  # fmt: skip
+    last_day = str(told[0].payload.get("last_day", ""))
+    try:
+        when = datetime.fromisoformat(last_day).strftime("%A %-d %B")
+    except ValueError:
+        when = "soon"
+    return [f"told Ellis I'm leaving to go freelance; working the shifts already on the rota, "
+            f"last one {when}"]  # fmt: skip
+
+
 def work_view(history: Sequence[DomainEvent], at: datetime) -> list[str]:
     """His work as he'd think of it: what's on, how it's going, what's owed."""
-    found: list[str] = []
+    found: list[str] = _the_change_in_his_words(history, at)
     for job in jobs(history):
         if job.status in {"declined", "quiet", "paid"}:
             continue

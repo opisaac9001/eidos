@@ -184,3 +184,16 @@ def test_he_pitches_only_once_hes_freelance_and_pieces_get_written_and_published
         )
         for e in features
     )
+
+
+def test_until_hes_left_the_workshop_his_work_is_the_change_itself() -> None:
+    from eidos.application.freelance import FIRST_JOB, _event
+
+    offered = [_event(OFFER, AT, from_client="Old team", job_id=FIRST_JOB)]
+    assert "thinking about going freelance" in work_view(offered, AT)[0]
+    accepted = offered + [_event(ACCEPTED, AT, job_id=FIRST_JOB)]
+    assert "haven't told Ellis yet" in work_view(accepted, AT)[0]
+    told = accepted + [_event(TOLD, AT, employer_id="ellis", last_day="2026-09-04")]
+    assert "last one Friday 4 September" in work_view(told, AT)[0]
+    started = told + [_event(STARTED, AT)]
+    assert not any("Ellis" in line for line in work_view(started, AT))

@@ -1058,6 +1058,8 @@ def is_stand_in(gateway: ModelGateway) -> bool:
 PULL_HALF_LIFE_SECONDS = 20 * 60
 PULL_TO_ACT = 2.5
 SETTLE_SECONDS = 90 * 60
+# Once he's thought about texting Beth and decided not to, it's a while before it nags again.
+LET_GO_SECONDS = 4 * 3600
 _DESIRE = re.compile(
     r"\b(should|need to|want to|wanna|might|could|gonna|going to|ought|must|have to|got to|"
     r"i'll|let's|maybe i|time to|hope i|tempted|fancy)\b",
@@ -1279,6 +1281,11 @@ class ImpulseTracker:
                 return
             self._deferrals[impulse.key] = (count + 1, since)
             self._later.append((now + seconds, impulse))
+
+    def let_go(self, impulse: Impulse, seconds: float = LET_GO_SECONDS) -> None:
+        """Weighed and decided against: it doesn't nag again for a good while."""
+        with self._lock:
+            self._settled[impulse.key] = self.clock() + seconds - SETTLE_SECONDS
 
     def view(self) -> list[dict[str, object]]:
         now = self.clock()
