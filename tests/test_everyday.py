@@ -366,3 +366,43 @@ def test_what_he_already_did_under_another_name_is_the_same_habit() -> None:
     )
     idea = _realized("slow_coffee", AT - timedelta(days=1), "pathos-agency-cause-2-schedule")
     assert "slow_coffee" not in {doing.kind for doing in repertoire([idea, felt])}
+
+
+def test_the_coffee_hes_making_isnt_whats_next() -> None:
+    from eidos.application.time_budget import personal_time_budget
+    from eidos.domain.planning import CalendarEntry, PlanningState
+    from eidos.domain.world_catalog import project_world_catalog
+
+    coffee = CalendarEntry(
+        "doing-x-schedule",
+        "Make a slow pot of filter coffee",
+        AT.isoformat(),
+        "home",
+        ends_at=(AT + timedelta(minutes=12)).isoformat(),
+        actor_id="pathos",
+    )
+    shift = CalendarEntry(
+        "work-rota-x",
+        "Shift at the repair workshop",
+        (AT + timedelta(hours=2)).isoformat(),
+        "workshop",
+        ends_at=(AT + timedelta(hours=8)).isoformat(),
+        actor_id="pathos",
+    )
+    planning = PlanningState(calendar={e.schedule_id: e for e in (coffee, shift)})
+    budget = personal_time_budget(planning, project_world_catalog([]), AT, "home")
+    assert budget["next_plan"] == "Shift at the repair workshop"
+
+
+def test_his_notebook_isnt_his_freelance_work() -> None:
+    from eidos.application.inner_stream import cues
+
+    snapshot = {
+        "activity_execution": [
+            {"title": "Write in his notebook", "is_working": True, "schedule_id": "doing-x"}
+        ],
+        "my_work": ["going freelance again, writing; haven't told Ellis yet"],
+        "pathos": {},
+    }
+    texts = [cue.text for cue in cues(snapshot) if cue.kind == "doing"]
+    assert texts == ["Write in his notebook"]

@@ -244,3 +244,10 @@ def test_at_his_parents_they_are_with_him() -> None:
     from eidos.application.inner_stream import somewhere_else
 
     assert somewhere_else("Sitting here in Wye tonight.", "Mum and Dad's, Wye") is None
+
+
+def test_nobody_touches_him_who_isnt_there() -> None:
+    alone = {"alone": True}
+    assert placed_with_him("Ellis's hands, warm against my neck.", alone, NAMES) == "Ellis"
+    assert placed_with_him("Rowan's hand on my shoulder, like last week.", alone, NAMES) == "Rowan"
+    assert placed_with_him("Ellis's hands, warm, fixing a bike chain.", alone, NAMES) is None

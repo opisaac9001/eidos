@@ -121,3 +121,16 @@ def test_a_word_in_three_of_his_last_five_thoughts_is_a_rut() -> None:
     # Someone he keeps thinking of is set aside by rutted_people, not turned away here.
     people = ["Ellis at the bench.", "Ellis laughing.", "Ellis again, tea."]
     assert rutted("Ellis would like this.", people, {"Ellis"}) is None
+
+
+def test_clock_and_clocks_are_the_same_rut() -> None:
+    from eidos.application.inner_stream import rutted
+
+    recent = [
+        "Shift starts at ten. Clocks need fixing.",
+        "Dad's clock tower, still ticking.",
+        "Dad's clock needs fixing.",
+        "Cold floorboards.",
+        "Radiator hisses.",
+    ]
+    assert rutted("Clock's in the shed. Must fix it.", recent) == "clock"

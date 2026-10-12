@@ -211,7 +211,10 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
                 # At the bench: the actual job in front of him, not "a shift".
                 bench = [str(line) for line in snapshot.get("on_the_bench") or [] if line]
                 found.extend(Cue("doing", line, 1.4) for line in bench[:2])
-            elif str(item["title"]).startswith(("Work on", "Write", "Call with a source")):
+            elif str(item["title"]).startswith(
+                ("Work on", "Write", "Call with a source")
+            ) and not str(item.get("schedule_id", "")).startswith("doing-"):
+                # His own notebook is not the freelance work.
                 # Working: where the job's at (half done, due Friday), not just its name.
                 work = [str(line) for line in snapshot.get("my_work") or [] if line]
                 found.extend(Cue("doing", line, 1.4) for line in work[:1])
@@ -782,7 +785,10 @@ _WITH_HIM = (
     r"hear(?:s|d)? me|notic(?:e|es|ed) me|see(?:s)? me|saw me|watching me|"
     r"next room|other room|in the kitchen|in the shower|on the sofa|beside me|next to me|"
     r"across the (?:room|table)|in here|is here|'s here|"
-    r"(?:\w+ ){0,2}(?:is|are|lies|lying) (?:open|on the table|on the sofa|by the door|here)"
+    r"(?:\w+ ){0,2}(?:is|are|lies|lying) (?:open|on the table|on the sofa|by the door|here)|"
+    # Touch is only from someone there: "Ellis's hands, warm against my neck".
+    r"against my|on my (?:shoulder|arm|neck|back|hand|cheek|face)|touch(?:es|ed)? me|"
+    r"holding my|holds my|in my arms"
 )
 # Things only someone in sight could be seen doing, unless he's only wondering.
 _SEEN_DOING = (
@@ -912,12 +918,20 @@ def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> st
     clock ticks slow", evening after evening). Small models ignore words they're told to
     leave alone, so this one is turned away."""
     names = {name.casefold() for name in people}
+
+    def stems(said: str) -> set[str]:
+        # "clock" and "clocks" are one rut.
+        return {
+            w.removesuffix("'s").rstrip("s") or w
+            for w in _WORDS.findall(said.casefold())
+            if len(w) >= 4 and w not in _COMMON
+        }
+
     counts: Counter[str] = Counter()
     for earlier in list(recent)[-5:]:
-        counts.update(
-            {w for w in _WORDS.findall(earlier.casefold()) if len(w) >= 4 and w not in _COMMON}
-        )
-    said = {w for w in _WORDS.findall(text.casefold()) if len(w) >= 4 and w not in _COMMON}
+        counts.update(stems(earlier))
+    said = stems(text)
+    names = {name.rstrip("s") for name in names} | names
     worn = sorted(w for w in said if counts[w] >= 3 and w not in names)
     return worn[0] if worn else None
 

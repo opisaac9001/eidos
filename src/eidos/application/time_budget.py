@@ -18,6 +18,8 @@ def personal_time_budget(
             for e in planning.calendar.values()
             if e.actor_id in {None, "pathos"}
             and e.status == "scheduled"
+            # The cup of coffee he's making isn't "what's next" (``everyday``).
+            and not e.schedule_id.startswith("doing-")
             and datetime.fromisoformat(e.ends_at or e.starts_at) > now
         ),
         key=lambda e: datetime.fromisoformat(e.starts_at),
