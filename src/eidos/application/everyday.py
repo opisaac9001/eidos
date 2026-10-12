@@ -28,7 +28,12 @@ from eidos.application.family import FAMILY_HOME
 from eidos.application.media import current as media_now
 from eidos.application.place_discovery import known_place_ids
 from eidos.domain.actions import ActionKind
-from eidos.domain.agency import STAY, AgencyCandidate, resolve_agency_candidate
+from eidos.domain.agency import (
+    STAY,
+    VAGUE_TITLE,
+    AgencyCandidate,
+    resolve_agency_candidate,
+)
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.planning import CalendarEntry, PlanningState
@@ -289,6 +294,46 @@ REPERTOIRE: tuple[Doing, ...] = (
         daily=1,
         cues=("cafe", "juniper", "flat white"),
         action=ActionKind.ATTEND,
+    ),
+    # At his parents' in Wye: they're there, and that's half of why he goes.
+    Doing(
+        "kitchen_with_mum",
+        "Sit with Mum in the kitchen over a cup of tea",
+        (FAMILY_HOME,),
+        (20, 50),
+        (("connection", 0.06),),
+        effort=0.1,
+        hours=(8, 22),
+        daily=2,
+        comfort=0.5,
+        cues=("mum", "kitchen", "tea"),
+        action=ActionKind.ATTEND,
+        group="drink",
+    ),
+    Doing(
+        "shed_with_dad",
+        "Give Dad a hand with a clock in his shed",
+        (FAMILY_HOME,),
+        (30, 75),
+        (("connection", 0.04), ("mastery", 0.04)),
+        effort=0.35,
+        hours=(9, 18),
+        daily=1,
+        cues=("dad", "shed", "clock"),
+        action=ActionKind.ATTEND,
+    ),
+    Doing(
+        "village_walk",
+        "Walk round the village",
+        (FAMILY_HOME,),
+        (30, 60),
+        (("curiosity", 0.04),),
+        effort=0.35,
+        hours=(8, 20),
+        daily=1,
+        outdoors=True,
+        cues=("walk", "village", "lane", "fields"),
+        group="walk",
     ),
     Doing(
         "laptop_game",
@@ -605,7 +650,7 @@ def _lately(
     for entry in planning.calendar.values():
         if not entry.activity_type or entry.actor_id not in {None, "pathos"}:
             continue
-        if entry.status not in {"scheduled", "active", "completed"}:
+        if entry.status not in {"scheduled", "active", "completed", "interrupted"}:
             continue
         starts = datetime.fromisoformat(entry.starts_at)
         if starts > at or at - starts > timedelta(days=14):
@@ -693,20 +738,32 @@ def _answers(doing: Doing, urges: frozenset[str]) -> bool:
 
 
 def _primed(doing: Doing, title: str, thoughts: Sequence[str]) -> str | None:
-    """A passing thought that leads to doing the thing it was about."""
-    cues = set(doing.cues)
-    if doing.media is not None:
-        cues |= {word for word in re.findall(r"[a-z]{5,}", title.casefold())} - {
-            "chapters",
-            "episode",
-            "listen",
-            "properly",
-        }
+    """A passing thought that leads to doing the thing it was about.
+
+    Wanting it ("could murder a coffee", "might read for a bit"), or the book itself on
+    his mind; a word in passing ("old books", "the shop window") isn't a want.
+    """
+    named = (
+        {word for word in re.findall(r"[a-z]{5,}", title.casefold())}
+        - {"chapters", "episode", "listen", "properly", "watch", "read"}
+        if doing.media is not None
+        else set()
+    )
     for thought in thoughts:
         lowered = thought.casefold()
-        if any(re.search(rf"\b{re.escape(cue)}", lowered) for cue in cues):
+        if any(re.search(rf"\b{re.escape(word)}\b", lowered) for word in named):
+            return thought
+        if _WANTING.search(lowered) and any(
+            re.search(rf"\b{re.escape(cue)}", lowered) for cue in doing.cues
+        ):
             return thought
     return None
+
+
+_WANTING = re.compile(
+    r"\b(could do with|could murder|fancy|fancied|want(?:s|ed)? to|wanna|need(?:s)? (?:a|to|some)|"
+    r"should|might|maybe|time for|in the mood|dying for|gonna|going to|i'll|let's|could)\b"
+)
 
 
 def _learned(history: Sequence[DomainEvent]) -> tuple[Doing, ...]:
@@ -731,7 +788,7 @@ def _learned(history: Sequence[DomainEvent]) -> tuple[Doing, ...]:
         place = str(event.payload.get("location_id") or "")
         title = str(event.payload.get("title") or "")
         when = _when(event)
-        if not place or not title or when is None:
+        if not place or not title or when is None or VAGUE_TITLE.search(title):
             continue
         action = str(event.payload.get("action", "work"))
         need = {"learn": "curiosity", "attend": "connection"}.get(action, "mastery")

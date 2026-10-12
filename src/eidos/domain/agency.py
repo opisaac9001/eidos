@@ -45,6 +45,7 @@ _VAGUE_TITLE = re.compile(
     r"seek some kind of contact|whatever (?:fits|catches|feels))\b",
     re.IGNORECASE,
 )
+VAGUE_TITLE = _VAGUE_TITLE
 _MEAL_ACTIVITY_TYPES = frozenset(
     {
         "breakfast",

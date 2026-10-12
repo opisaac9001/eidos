@@ -173,6 +173,10 @@ def test_a_passing_thought_leads_to_the_thing_it_was_about() -> None:
     book = DOING["read_book"]
     title = book.title.format(title="Piranesi")
     assert _primed(book, title, ["Wonder what happens in Piranesi next."])
+    # A word in passing isn't wanting it.
+    assert _primed(book, title, ["Mum's garden smells like cut grass and old books."]) is None
+    window = DOING["window"]
+    assert _primed(window, window.title, ["Hannah's laugh over the shop window."]) is None
 
 
 def test_a_nagging_pull_weighs_in_for_a_while() -> None:
@@ -266,3 +270,44 @@ def test_a_weekend_away_is_somewhere_he_is_not_one_long_thing_hes_doing() -> Non
         ends_at=(AT + timedelta(hours=2)).isoformat(),
     )
     assert not _between_things(PlanningState(calendar={"x": afternoon}), AT, "wye-home")
+
+
+def test_what_he_does_on_a_weekend_away_is_what_holds_his_attention() -> None:
+    from eidos.application.activity_execution import execution_events
+    from eidos.domain.planning import CalendarEntry, PlanningState
+
+    weekend = CalendarEntry(
+        "summer-2026",
+        "Weekend at home",
+        (AT - timedelta(days=1)).isoformat(),
+        "wye-home",
+        ends_at=(AT + timedelta(hours=8)).isoformat(),
+        actor_id="pathos",
+        action="attend",
+        activity_type="visiting_home",
+    )
+    reading = CalendarEntry(
+        "doing-x-schedule",
+        "Read a few chapters of Stoner",
+        AT.isoformat(),
+        "wye-home",
+        ends_at=(AT + timedelta(minutes=40)).isoformat(),
+        actor_id="pathos",
+        action="learn",
+        activity_type="read_book",
+    )
+    planning = PlanningState(calendar={e.schedule_id: e for e in (weekend, reading)})
+    there = DomainEvent(
+        "pathos.moved",
+        "pathos",
+        {"location_id": "wye-home", "simulated_at": (AT - timedelta(hours=2)).isoformat()},
+    )
+    awake = DomainEvent(
+        "sleep.ended", "pathos", {"simulated_at": (AT - timedelta(hours=1)).isoformat()}
+    )
+    started = [
+        event.payload["schedule_id"]
+        for event in execution_events([there, awake], planning, AT)
+        if event.kind == "activity.execution_started"
+    ]
+    assert "doing-x-schedule" in started

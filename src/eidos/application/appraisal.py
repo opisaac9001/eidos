@@ -770,6 +770,9 @@ def _effect(
         if event.payload.get("activity") in {"learn", "work"}:
             return ("mastery", 0.06, 0.6, 0.3, 0.85)
     if event.kind == "schedule.interrupted":
+        # Not finishing a chapter isn't a failure; not finishing what he set out to do is.
+        if str(event.payload.get("schedule_id", "")).startswith("doing-"):
+            return None
         return ("mastery", -0.04, -0.35, 0.5, 0.4)
     if event.kind == "action.accepted" and event.payload.get("action") == "repair":
         return ("mastery", 0.08, 0.7, 0.35, 0.9)

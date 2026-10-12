@@ -13,6 +13,7 @@ from typing import Callable, NamedTuple, Sequence
 
 from eidos.application.activity_stages import stage_context, stage_events
 from eidos.application.work_rota import EMPLOYER_ID, ROTA_PREFIX
+from eidos.domain.agency import STAY
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
     CombinedEvents,
@@ -526,6 +527,14 @@ def activity_effort(
     }
 
 
+def _is_stay(entry: CalendarEntry) -> bool:
+    starts = datetime.fromisoformat(entry.starts_at)
+    ends = datetime.fromisoformat(entry.ends_at or entry.starts_at)
+    return entry.activity_type in STAYS or (
+        ends - starts >= STAY and not entry.schedule_id.startswith(ROTA_PREFIX)
+    )
+
+
 def execution_events(
     history: Sequence[DomainEvent], planning: PlanningState, now: datetime
 ) -> list[DomainEvent]:
@@ -556,7 +565,9 @@ def execution_events(
                 continue
             kind = "paused"
         else:
-            claimed = True
+            # A stay (a weekend at his parents') is where he is, not what holds his
+            # attention: the things he does while there are what he's doing.
+            claimed = not _is_stay(entry)
             kind = "started" if effort["started_at"] is None else "resumed"
         resume_after = None
         if kind == "resumed" and own and own[-1].kind == "activity.execution_paused":
