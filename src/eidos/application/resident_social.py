@@ -10,6 +10,7 @@ from itertools import combinations
 from eidos.application.cognition import perform
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.domain.beliefs import Belief, project_beliefs
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.npcs import project_npcs
 from eidos.domain.resident_relationships import project_resident_relationships
@@ -359,13 +360,19 @@ def _belief_in_words(
     subject_id: str, predicate: str, value: object, names: Mapping[str, str]
 ) -> str:
     """Say a belief the way a person would, hedged, not as a database row."""
+    # The town calls him Patrick, and spells it the English way ("neighbours").
     subject = names.get(subject_id) or (
-        "Pathos" if subject_id == "pathos" else subject_id.replace("-", " ")
+        "Patrick" if subject_id == "pathos" else subject_id.replace("-", " ")
     )
     if predicate == "community_activity":
-        return f"I could be mistaken, but I think {value} at the {subject} these days."
-    if predicate == "commitment_reliability":
-        return f"I could be mistaken, but {subject} seems {value} about keeping their word."
-    if predicate == "usually_at":
-        return f"I could be mistaken, but I think {subject} is usually at the {value}."
-    return f"I could be mistaken, but I think {subject}'s {predicate.replace('_', ' ')} is {value}."
+        said = f"I could be mistaken, but I think {value} at the {subject} these days."
+    elif predicate == "commitment_reliability":
+        said = f"I could be mistaken, but {subject} seems {value} about keeping their word."
+    elif predicate == "usually_at":
+        said = f"I could be mistaken, but I think {subject} is usually at the {value}."
+    else:
+        said = (
+            f"I could be mistaken, but I think {subject}'s {predicate.replace('_', ' ')} "
+            f"is {value}."
+        )
+    return british(said)

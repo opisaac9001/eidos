@@ -228,6 +228,7 @@ from eidos.application.social_calendar import social_calendar_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
 from eidos.application.surfacing import surfacing_events
+from eidos.application.talking_points import setting as encounter_setting
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.time_feel import time_feel_events
 from eidos.application.town_issues import HOURS as TOWN_ISSUE_HOURS
@@ -3524,6 +3525,13 @@ class Life(LifeConversation):
                 "person": person.name,
                 "pronouns": {person.name: SAYING[pronoun_of(person.person_id)]},
                 "avoid_details": _encounter_details(recent_encounters, person.name),
+                # Why he's here: arriving for his shift isn't "just walking by".
+                "setting": encounter_setting(
+                    [*history, *pending],
+                    now,
+                    catalog.places[location_id].name if location_id in catalog.places else "here",
+                    person.name,
+                ),
                 **({"what_they_are_doing": doing} if doing else {}),
                 **({"they_remember": remembered} if remembered else {}),
                 **(

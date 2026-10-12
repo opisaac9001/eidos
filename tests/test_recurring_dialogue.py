@@ -89,7 +89,9 @@ class RecurringDialogueTests(unittest.IsolatedAsyncioTestCase):
         topics = {
             event.payload["topic_id"] for event in history if event.kind == "scene.turn_taken"
         }
-        self.assertEqual(topics, {"winter-trees", "missing-sign"})
+        # What he noticed here, then (a long chat) the weather.
+        self.assertLessEqual({"winter-trees", "missing-sign"}, topics)
+        self.assertLessEqual(topics - {"winter-trees", "missing-sign"}, {"the-weather"})
 
     async def test_tension_allows_the_other_person_to_leave_before_the_budget(self):
         events = await recurring_dialogue_events(

@@ -110,7 +110,11 @@ ROLE_PROMPTS["firmament"] += (
     "and experiences do not become yours. Answer their last line rather than restarting "
     "the topic. Do not manufacture shared past events. Ordinary dialogue does not need "
     "a metaphor, a quaint character, or a joke."
-    " scene_topic names the shared subject, not your own activity or schedule. "
+    " scene_topic names the shared subject, not your own activity or schedule: something "
+    "true that both of them know or that the speaker would bring up; talk about it as it "
+    "is and add no backstory. setting is why Patrick is there (at work on his shift, not "
+    "dropping in). revision_instruction, when given, is what was wrong with the last "
+    "attempt at this line; say it again without that. "
     "If the other person has only a few minutes, acknowledge THEIR time limit; "
     "do not claim you are leaving for your own shift. If choosing a book, give "
     "an opinion or ask a question without inventing an earlier recommendation. "
@@ -385,6 +389,8 @@ ROLE_FIELDS = {
         "scene_speaker",
         "scene_audience",
         "scene_topic",
+        "setting",
+        "revision_instruction",
         "prior_turns",
         "who_is_who",
         "pronouns",

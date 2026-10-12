@@ -9,9 +9,11 @@ from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
 from eidos.application.gossip import they_remember
+from eidos.application.inner_stream import near_repeat
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
 from eidos.application.shared_past import REVISION, invents_past_talk, invents_shared_past
+from eidos.application.talking_points import setting, talking_points
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -124,7 +126,13 @@ async def recurring_dialogue_events(
         return []
     partner_id = candidates[0]
     relationship = relationships.get(partner_id, Relationship(partner_id))
-    topics = _observable_topics(history, location_id, partner_id)
+    topics, _ = _topics(
+        history,
+        simulated_at,
+        location_id,
+        partner_id,
+        actor_names.get(partner_id, partner_id.replace("-", " ").title()),
+    )
     scene_id = f"ordinary-{simulated_at.date().isoformat()}-{partner_id}-{location_id}"
     max_turns = 2 if relationship.familiarity < 0.35 else 4 if relationship.familiarity < 0.7 else 6
     start = resolve_scene_start(
@@ -183,7 +191,13 @@ async def _advance_scene(
     scene_id: str,
     partner_id: str,
 ) -> list[DomainEvent]:
-    topics = _observable_topics(history, actor_locations["pathos"], partner_id)
+    topics, topic_words = _topics(
+        history,
+        simulated_at,
+        actor_locations["pathos"],
+        partner_id,
+        actor_names.get(partner_id, partner_id.replace("-", " ").title()),
+    )
     for _ in range(2):
         combined = [*history, *output]
         scene = project_scenes(combined).scenes[scene_id]
@@ -227,7 +241,11 @@ async def _advance_scene(
                 "scene_audience": (
                     scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                 ),
-                "scene_topic": _topic_words(topic_id, name),
+                "scene_topic": topic_words.get(topic_id) or _topic_words(topic_id, name),
+                # Why they're both there: at work, he isn't "just dropping in".
+                "setting": setting(
+                    combined, simulated_at, scene.location_id.replace("-", " "), name
+                ),
                 # Everyone he knows, so people mentioned in passing are right too.
                 "pronouns": {
                     person_name: SAYING[pronoun_of(pid)]
@@ -270,6 +288,25 @@ async def _advance_scene(
             )
         held = asked.get("they_remember") if asked else None
         memories = [str(m) for m in held] if isinstance(held, list) else []
+        their_lines = [
+            str(event.payload["text"])
+            for event in [*history, *output]
+            if event.kind == "scene.turn_taken"
+            and event.payload.get("scene_id") == scene_id
+            and event.payload.get("actor_id") == speaker_id
+        ]
+        if text is not None and asked is not None and near_repeat(text, their_lines):
+            # Saying the same thing again ("Cheers, Patrick. I should probably reach out to
+            # Ellis...", twice running): asked once for something that moves it on.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": SAID_IT_ALREADY},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and near_repeat(text, their_lines):
+                text = None
         if (
             text is not None
             and asked is not None
@@ -385,6 +422,38 @@ async def _advance_scene(
             )
         )
     return output
+
+
+SAID_IT_ALREADY = (
+    "That repeats what this speaker already said in this conversation. Answer the other "
+    "person's last line with something new, or let the conversation wind down."
+)
+
+
+def _topics(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    location_id: str,
+    partner_id: str,
+    name: str,
+) -> tuple[list[str], dict[str, str]]:
+    """What they talk about, in order: a repair or follow-up first if one's due, then
+    what's really going on between them (``talking_points``), then what he's noticed
+    here, then the weather."""
+    observed = _observable_topics(history, location_id, partner_id)
+    points = talking_points(history, at, partner_id, name, location_id)
+    first = [
+        topic for topic in observed if topic.startswith(("cautious-repair-", "following-up-with-"))
+    ]
+    noticed = [
+        topic
+        for topic in observed
+        if topic not in first and not topic.startswith("ordinary-life-at-")
+    ]
+    news = [point_id for point_id, _ in points if point_id != "the-weather"][:3]
+    weather = [point_id for point_id, _ in points if point_id == "the-weather"]
+    ids = [*first, *news, *noticed, *weather] or observed
+    return ids, dict(points)
 
 
 def _observable_topics(
