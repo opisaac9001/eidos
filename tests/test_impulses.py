@@ -15,6 +15,7 @@ from eidos.application.reaching_out import (
     texts_view,
     why_not,
 )
+from eidos.domain.events import DomainEvent
 
 
 def snapshot() -> dict:
@@ -366,3 +367,24 @@ def test_thinking_about_whats_next_is_looking_ahead_not_a_new_plan(tmp_path) -> 
         }
     )
     assert outcome == "on his mind"
+
+
+def test_he_doesnt_text_someone_he_has_just_spent_the_day_with() -> None:
+    at = datetime(2026, 9, 1, 17, 0, tzinfo=timezone.utc)
+    met = DomainEvent(
+        "npc.encountered",
+        "pathos",
+        {"person_id": "ellis", "simulated_at": (at - timedelta(hours=2)).isoformat()},
+    )
+    assert why_not([met], at, "ellis") == "just seen them"
+    assert why_not([met], at + timedelta(hours=4), "ellis") is None
+
+
+def test_an_answer_that_slips_into_another_language_is_refused() -> None:
+    import pytest
+
+    from eidos.adapters.http_gateway import _refuse_other_script
+
+    _refuse_other_script('{"text": "Fancy a brew, Stuart?"}')
+    with pytest.raises(ValueError):
+        _refuse_other_script('{"text": "that old project you俩之间的对话"}')

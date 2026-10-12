@@ -1061,6 +1061,7 @@ class HTTPModelGateway(ModelGateway):
                 response = _with_content(response, _extract_json(response.content))
             if self.compact and request.capability in COMPACT_EXAMPLES:
                 _refuse_copied_example(request.capability, response.content)
+            _refuse_other_script(response.content)
             if self.on_usage is not None:
                 self.on_usage(response)
             return response
@@ -1234,6 +1235,19 @@ def _with_content(response: ModelResponse, content: str) -> ModelResponse:
 def _without_required_opening(words: list[str]) -> list[str]:
     """Every dream must begin "In a dream"; sharing that with an example isn't copying."""
     return words[3:] if words[:3] == ["in", "a", "dream"] else words
+
+
+# Chinese, Japanese, Korean and other scripts a multilingual model can slip into mid-sentence
+# ("that old project you俩之间的对..."): the town is English, so the answer is unusable.
+_OTHER_SCRIPT = re.compile(
+    r"[\u0400-\u04ff\u0600-\u06ff\u0e00-\u0e7f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]"
+)
+
+
+def _refuse_other_script(content: str) -> None:
+    """Refuse an answer that slipped into another language, so the next model is tried."""
+    if _OTHER_SCRIPT.search(content or ""):
+        raise ValueError("Model slipped into another language")
 
 
 def _refuse_copied_example(capability: str, content: str) -> None:

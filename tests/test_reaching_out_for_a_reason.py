@@ -105,6 +105,8 @@ def test_a_call_to_a_close_friend_gets_their_answer_there_and_then(tmp_path, mon
     import eidos.application.reaching_out as reaching_out
 
     monkeypatch.setattr(reaching_out, "CALL_ANSWERED_CHANCE", 1.0)
+    # Not someone he's just spent the morning with.
+    monkeypatch.setattr(reaching_out, "_just_seen", lambda history, at, person_id: False)
     life = Life(SQLiteEventStore(tmp_path / "world.sqlite3"), StandInGateway())
     life.advance(12)
     person = next(iter(life._world_catalog(life.history()).people.values()))

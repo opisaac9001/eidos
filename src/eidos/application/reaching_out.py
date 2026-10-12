@@ -77,6 +77,9 @@ def why_not(
         return "too late or too early to text"
     if person_id in with_him:
         return "they're right here"
+    if _just_seen(history, at, person_id):
+        # An hour after a day at the bench with Ellis, you don't text Ellis.
+        return "just seen them"
     today = 0
     for event in reversed(events_of(history, REACHED)):
         when = _at(event)
@@ -93,6 +96,20 @@ def why_not(
     if today >= PER_DAY:
         return "has texted enough people today"
     return None
+
+
+def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
+    """Whether he's been with them in person in the last few hours."""
+    for event in reversed(events_of(history, "npc.encountered", "scene.started")[-30:]):
+        when = _at(event)
+        if when is None:
+            continue
+        if at - when > timedelta(hours=3):
+            break
+        p = event.payload
+        if person_id in {p.get("person_id"), p.get("partner_id"), p.get("initiator_id")}:
+            return True
+    return False
 
 
 async def reach_out_events(
