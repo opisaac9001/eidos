@@ -16,6 +16,7 @@ from hashlib import sha256
 from statistics import fmean
 from typing import Mapping, Sequence
 
+from eidos.application.activity_execution import STAYS
 from eidos.application.place_discovery import HOME_GROUND
 from eidos.application.work_rota import ROTA_PREFIX
 from eidos.domain.events import DomainEvent
@@ -112,6 +113,10 @@ def experience_events(
     payload = realized.payload
     if str(payload.get("schedule_id", "")).startswith(ROTA_PREFIX):
         # A shift is the job, not something he chose to spend his time on.
+        return []
+    if payload.get("activity_type") in STAYS:
+        # A weekend at his parents' isn't an outing to rate ("just not my sort of thing");
+        # how it went is in what happened there: Mum's roast, Isla, the walk with Dad.
         return []
     at = datetime.fromisoformat(str(payload["simulated_at"]))
     place_id = str(payload.get("location_id") or "home")
@@ -423,4 +428,5 @@ def activity_tastes(history: Sequence[DomainEvent]) -> dict[str, str]:
         )
         for taste in project_tastes(history).tastes.values()
         if taste.subject.startswith("activity:")
+        and taste.subject.removeprefix("activity:") not in STAYS
     }

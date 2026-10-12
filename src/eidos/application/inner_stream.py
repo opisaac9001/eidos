@@ -672,8 +672,10 @@ def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str
     """
     given = dict(context)
     given.pop("recent_inner_stream", None)
-    # Who's who explains names; it doesn't put anyone in front of his mind.
-    given.pop("who_is_who", None)
+    # Who's who explains names; it doesn't put anyone in front of his mind. Nor do thoughts
+    # already turned away, or the mind's background layers.
+    for key in ("who_is_who", "not_again", "mind_layers"):
+        given.pop(key, None)
     allowed = json.dumps(given, ensure_ascii=False)
     for name in names:
         if re.search(rf"\b{re.escape(name)}\b", text) and not re.search(
@@ -1532,7 +1534,10 @@ class InnerStream:
             return None
         # Where his mind was pointed in the last several thoughts is still on it.
         stray = stray_name(
-            text, {**context, "lately_on_his_mind": list(self._tried)}, known_names(snapshot)
+            # Where his mind was in the last few minutes, not the last half hour.
+            text,
+            {**context, "lately_on_his_mind": list(self._tried)[-3:]},
+            known_names(snapshot),
         )
         if stray is not None:
             self._turn_away(f"brought in {stray} from nowhere, skipped: {text[:80]}", text)

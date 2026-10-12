@@ -475,6 +475,10 @@ def scheduled_activity_events(
                     ),
                 )
             )
+        if entry.schedule_id.startswith("doing-"):
+            # A cup of tea isn't an accomplishment to remember; how it felt, if it stood out
+            # at all, is remembered by ``experience``.
+            continue
         memory = consequence(
             "memory.recorded",
             {

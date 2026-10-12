@@ -84,3 +84,22 @@ def test_a_shift_being_booked_doesnt_tick_off_what_to_take() -> None:
     )
     out = hour(history, EVENING + timedelta(hours=10, minutes=20))
     assert not any(e.kind == DONE for e in out)
+
+
+def test_wearing_something_somewhere_is_something_to_take() -> None:
+    assert _carried("wear my work coat to the workshop tomorrow") == "my work coat"
+
+
+def test_remembered_and_still_not_done_is_let_go_not_forgotten() -> None:
+    from eidos.application.open_loops import DROPPED, SLIPPED
+
+    history = [thought("I should find Mara at the café later.", EVENING)]
+    history += hour(history, EVENING + timedelta(minutes=5))
+    [loop] = open_loops(history)
+    # It comes back to him at the café, and he doesn't.
+    history += hour(history, EVENING + timedelta(hours=1), location_id="cafe")
+    assert any(e.kind == RECALLED for e in history)
+    later = EVENING + timedelta(days=2)
+    fate = [e for e in hour(history, later) if e.payload.get("intention_id") == loop.intention_id]
+    assert not any(e.kind == SLIPPED for e in fate)
+    assert any(e.kind == DROPPED for e in fate) or open_loops(history + fate) == []

@@ -748,9 +748,9 @@ def compact_context(capability: str, context: Mapping[str, object]) -> dict[str,
         # The most relevant come first (a dream's day residue, recall's best matches).
         details["on_his_mind"] = [str(m)[:160] for m in memories[:2]]
     if capability == "murmur":
-        stream = context.get("recent_inner_stream")
-        if isinstance(stream, list) and stream:
-            details["recent_thoughts"] = [str(item)[:120] for item in stream[-3:]]
+        # No recent thoughts: shown them, a small model carried their people and images
+        # into every next thought whatever it was about ("Ellis's hands, warm" eighteen
+        # times in an evening). Repeats are turned away by the stream's own checks.
         if context.get("drifting_to"):
             details["mind_wanders_to"] = str(context["drifting_to"])[:160]
         if context.get("half_awake"):

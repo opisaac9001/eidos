@@ -36,7 +36,8 @@ def test_the_small_model_is_told_and_shown_what_it_will_be_judged_against() -> N
         "murmur", {"recent_inner_stream": EVENING[-3:], "leave_aside": ["Rowan"]}
     )
     assert details["leave_out_people"] == ["Rowan"]
-    assert len(details["recent_thoughts"]) == 3
+    # Not shown its last thoughts: it copied their people into every next one.
+    assert "recent_thoughts" not in details
 
 
 def test_retellings_lose_their_filler_endings() -> None:

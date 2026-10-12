@@ -26,6 +26,7 @@ from typing import Mapping, Sequence
 from eidos.application.experience import activity_tastes
 from eidos.application.family import FAMILY_HOME
 from eidos.application.media import current as media_now
+from eidos.application.open_loops import open_loops
 from eidos.application.place_discovery import known_place_ids
 from eidos.domain.actions import ActionKind
 from eidos.domain.agency import (
@@ -61,6 +62,9 @@ class Doing:
     action: ActionKind = ActionKind.WORK
     media: str | None = None  # book, series or album he's partway through
     group: str = ""  # a cup of tea and a pot of coffee: having had one, he's had one
+    # What his own ideas called the same thing before this existed ("slow_coffee"): his
+    # habits and tastes for those are his habits and tastes for this.
+    aliases: tuple[str, ...] = ()
     habit: tuple[tuple[int, int, float], ...] = ()  # (from, to, strength) he came in with
     learned: bool = False
 
@@ -81,6 +85,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         comfort=0.4,
         cues=("coffee", "filter", "pot", "grind", "beans"),
         group="drink",
+        aliases=("slow_coffee",),
         habit=((6, 10, 0.65),),
     ),
     Doing(
@@ -120,6 +125,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         daily=2,
         comfort=0.5,
         cues=("record", "vinyl", "album", "music", "side", "needle"),
+        aliases=("whole_record",),
         habit=((19, 22, 0.3),),
     ),
     Doing(
@@ -209,6 +215,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         daily=2,
         comfort=0.3,
         cues=("window", "street", "outside"),
+        aliases=("notice_interesting_detail", "observe_interesting_detail"),
     ),
     Doing(
         "river_walk",
@@ -222,6 +229,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         outdoors=True,
         cues=("river", "walk", "water", "heron", "towpath", "bridge"),
         group="walk",
+        aliases=("walk_riverside", "walk_along_riverside_path", "quiet_observation_walk"),
         habit=((17, 20, 0.2),),
     ),
     Doing(
@@ -236,6 +244,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         outdoors=True,
         cues=("square", "walk", "air", "park"),
         group="walk",
+        aliases=("question_walk", "park_wandering", "street_texture_walk"),
     ),
     Doing(
         "camera_walk",
@@ -249,6 +258,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         outdoors=True,
         cues=("camera", "photo", "film", "light", "shadow", "frame"),
         group="walk",
+        aliases=("film_camera_practice",),
     ),
     Doing(
         "cook_slowly",
@@ -271,6 +281,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         hours=(9, 21),
         daily=1,
         cues=("plane", "blade", "sharpen", "wood", "shaving"),
+        aliases=("hand_plane_practice",),
     ),
     Doing(
         "notebook",
@@ -282,6 +293,7 @@ REPERTOIRE: tuple[Doing, ...] = (
         hours=(8, 24),
         daily=1,
         cues=("write", "notebook", "idea", "story", "jot"),
+        aliases=("week_in_notebook", "object_story_notes", "sound_atlas_draft"),
     ),
     Doing(
         "cafe_sit",
@@ -349,6 +361,8 @@ REPERTOIRE: tuple[Doing, ...] = (
     ),
 )
 KINDS = frozenset(doing.kind for doing in REPERTOIRE)
+# Another name for one of these, to the one it is.
+ALIAS_OF = {alias: doing.kind for doing in REPERTOIRE for alias in doing.aliases}
 # What a nagging pull in his thoughts (``inner_stream`` impulses) reaches for.
 URGES = frozenset({"rest", "out", "food"})
 _NEED_WEIGHT = 6.0
@@ -394,9 +408,10 @@ def everyday_events(
     tastes = activity_tastes(history)
     thoughts = _on_his_mind(history, at)
     urges = _urges(history, at)
+    meant = _meant(history, at)
     wet = any(word in weather.casefold() for word in _WET)
     fine = not wet and any(word in weather.casefold() for word in _FINE)
-    scored: list[tuple[float, Doing, str, str, str | None, str]] = []
+    scored: list[tuple[float, Doing, str, str, str | None, str, tuple[str, str] | None]] = []
     for doing, place, title in options:
         if doing.daily and done_today.get(doing.kind, 0) >= doing.daily:
             continue
@@ -416,13 +431,17 @@ def everyday_events(
         reasons.append((doing.comfort * (0.1 + 0.6 * max(0.0, -valence)), "comfort"))
         reasons.append((-doing.effort * (0.15 + 0.9 * (1 - energy)), "too much effort"))
         reasons.append((doing.effort * 0.5 * max(0.0, energy - 0.6), "he had energy for it"))
-        taste = tastes.get(doing.kind)
+        taste = tastes.get(doing.kind) or next(
+            (tastes[alias] for alias in doing.aliases if alias in tastes), None
+        )
         reasons.append(
             (0.25 if taste == "loves" else -0.3 if taste == "not for him" else 0.0, "he loves it")
         )
         primed = _primed(doing, title, thoughts)
         reasons.append((0.4 if primed else 0.0, "it was on his mind"))
         reasons.append((0.5 if _answers(doing, urges) else 0.0, "he'd been wanting to"))
+        loop = _meant_to(doing, title, meant)
+        reasons.append((0.45 if loop else 0.0, "he'd meant to"))
         reasons.append((-0.35 * recent.get(doing.kind, 0), "he'd only just done it"))
         if doing.group:
             alike = sum(
@@ -442,7 +461,7 @@ def everyday_events(
         reasons.append(((_roll(decision_id, doing.kind, place) - 0.5) * 0.16, "just felt like it"))
         score = sum(weight for weight, _ in reasons)
         why = max(reasons, key=lambda item: item[0])[1]
-        scored.append((score, doing, place, title, primed, why))
+        scored.append((score, doing, place, title, primed, why, loop))
     if not scored:
         return []
     scored.sort(key=lambda item: (-item[0], item[1].kind, item[2]))
@@ -458,7 +477,7 @@ def everyday_events(
             break
     # If the first choice can't happen (it won't fit before the next thing), the next.
     order = [top[chosen], *(item for index, item in enumerate(top) if index != chosen)]
-    for score, doing, place, title, primed, why in order:
+    for score, doing, place, title, primed, why, loop in order:
         events = _book(
             history,
             at,
@@ -468,6 +487,7 @@ def everyday_events(
             score,
             primed,
             why,
+            loop,
             [item[1].kind for item in top if item[1] is not doing][:3],
             decision_id=decision_id,
             planning=planning,
@@ -655,7 +675,7 @@ def _lately(
         starts = datetime.fromisoformat(entry.starts_at)
         if starts > at or at - starts > timedelta(days=14):
             continue
-        kind = entry.activity_type
+        kind = ALIAS_OF.get(entry.activity_type, entry.activity_type)
         if kind not in last or starts > last[kind]:
             last[kind] = starts
         if at - starts > timedelta(hours=24):
@@ -683,7 +703,7 @@ def _habit(history: Sequence[DomainEvent], doing: Doing, at: datetime) -> float:
         age = (at - when).total_seconds() / 86400
         if age > 28:
             break
-        if event.payload.get("activity_type") != doing.kind:
+        if event.payload.get("activity_type") not in {doing.kind, *doing.aliases}:
             continue
         hours_apart = abs((when.hour + when.minute / 60) - (at.hour + at.minute / 60))
         hours_apart = min(hours_apart, 24 - hours_apart)
@@ -712,6 +732,32 @@ def _on_his_mind(history: Sequence[DomainEvent], at: datetime) -> list[str]:
         if when is not None and timedelta(0) <= at - when <= timedelta(minutes=45):
             found.append(str(event.payload.get("text", "")))
     return found
+
+
+def _meant(history: Sequence[DomainEvent], at: datetime) -> list[tuple[str, str]]:
+    """Things he's said or thought he'd do lately ("get out for a walk"), still undone."""
+    return [
+        (loop.intention_id, loop.text)
+        for loop in open_loops(history)
+        if not loop.carry and timedelta(0) <= at - loop.formed_at <= timedelta(days=3)
+    ]
+
+
+_GENERIC = frozenset("with some have that make take this from about down into round".split())
+
+
+def _meant_to(doing: Doing, title: str, meant: Sequence[tuple[str, str]]) -> tuple[str, str] | None:
+    """The undone intention this doing would answer, if any."""
+    words = {
+        word
+        for word in re.findall(r"[a-z]{4,}", f"{title} {' '.join(doing.cues)}".casefold())
+        if word not in _GENERIC
+    }
+    for loop_id, text in meant:
+        said = {word.removesuffix("s") for word in re.findall(r"[a-z]{4,}", text.casefold())}
+        if said & {word.removesuffix("s") for word in words}:
+            return loop_id, text
+    return None
 
 
 def _urges(history: Sequence[DomainEvent], at: datetime) -> frozenset[str]:
@@ -780,6 +826,7 @@ def _learned(history: Sequence[DomainEvent]) -> tuple[Doing, ...]:
         schedule_id = str(event.payload.get("schedule_id", ""))
         if (
             kind in KINDS
+            or kind in ALIAS_OF
             or schedule_id.startswith(PREFIX)
             or not schedule_id.startswith("pathos-agency-")
             or enjoyed.get(kind, 0.0) < 0.3
@@ -817,6 +864,7 @@ def _book(
     score: float,
     primed: str | None,
     why: str,
+    loop: tuple[str, str] | None,
     considered: Sequence[str],
     *,
     decision_id: str,
@@ -854,6 +902,8 @@ def _book(
             "mostly_because": why,
             "learned": doing.learned,
             **({"prompted_by_thought": primed[:160]} if primed else {}),
+            # Something he'd meant to do: doing it takes it off his mind (``open_loops``).
+            **({"meant_to_id": loop[0], "meant_to": loop[1][:160]} if loop else {}),
             **{f"considered_{index}": kind for index, kind in enumerate(considered, 1)},
             "simulated_at": at.isoformat(),
         },

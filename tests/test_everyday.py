@@ -311,3 +311,58 @@ def test_what_he_does_on_a_weekend_away_is_what_holds_his_attention() -> None:
         if event.kind == "activity.execution_started"
     ]
     assert "doing-x-schedule" in started
+
+
+def test_something_he_meant_to_do_pulls_until_he_does_it() -> None:
+    from eidos.application.everyday import _meant_to
+    from eidos.application.open_loops import DONE, open_loop_events
+
+    meant = [("loop-1", "get out for a walk"), ("loop-2", "pop to Juniper for a hot drink")]
+    river = DOING["river_walk"]
+    cafe = DOING["cafe_sit"]
+    assert _meant_to(river, river.title, meant) == meant[0]
+    assert _meant_to(cafe, cafe.title, meant) == meant[1]
+    assert _meant_to(DOING["sofa"], DOING["sofa"].title, meant) is None
+
+    thought = DomainEvent(
+        "thought.recorded",
+        "pathos",
+        {"text": "Should get out for a walk later.", "simulated_at": AT.isoformat()},
+    )
+    history = [thought]
+    history += open_loop_events(
+        history, AT + timedelta(minutes=5), awake=True, location_id="home",
+        with_him=set(), people={}, places={}, titles={},
+    )  # fmt: skip
+    from eidos.application.open_loops import open_loops
+
+    [loop] = open_loops(history)
+    chosen = DomainEvent(
+        "everyday.chosen",
+        "pathos",
+        {
+            "activity_type": "river_walk",
+            "meant_to_id": loop.intention_id,
+            "simulated_at": (AT + timedelta(hours=1)).isoformat(),
+        },
+    )
+    history.append(chosen)
+    done = open_loop_events(
+        history, AT + timedelta(hours=2), awake=True, location_id="home",
+        with_him=set(), people={}, places={}, titles={},
+    )  # fmt: skip
+    assert any(event.kind == DONE for event in done)
+
+
+def test_what_he_already_did_under_another_name_is_the_same_habit() -> None:
+    coffee = DOING["filter_coffee"]
+    before = [_realized("slow_coffee", AT - timedelta(days=day)) for day in range(1, 8)]
+    assert _habit(before, coffee, AT) > 0.5
+    # And his old ideas aren't learned all over again as something new.
+    felt = DomainEvent(
+        "experience.felt",
+        "pathos",
+        {"activity_type": "slow_coffee", "enjoyment": 0.8, "simulated_at": AT.isoformat()},
+    )
+    idea = _realized("slow_coffee", AT - timedelta(days=1), "pathos-agency-cause-2-schedule")
+    assert "slow_coffee" not in {doing.kind for doing in repertoire([idea, felt])}

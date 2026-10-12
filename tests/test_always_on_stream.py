@@ -243,7 +243,7 @@ def test_small_models_are_told_where_his_mind_is_wandering() -> None:
     context = stream_context(snapshot(), ["Rain again."], Cue("someone", "owes Dad a call"))
     details = compact_context("murmur", context)
     assert details["mind_wanders_to"] == "owes Dad a call"
-    assert details["recent_thoughts"] == ["Rain again."]
+    assert "recent_thoughts" not in details
 
 
 def test_a_thought_names_only_people_in_front_of_his_mind() -> None:
@@ -258,6 +258,9 @@ def test_a_thought_names_only_people_in_front_of_his_mind() -> None:
     assert stray_name("Tea with Mara soon. Hands are filthy.", context, names) is None
     here = stream_context(snapshot(), [], Cue("person", "Ellis is here"))
     assert stray_name("Ellis is humming again.", here, names) is None
+    # A thought already turned away doesn't let its people into the next one.
+    rejected = {**context, "not_again": ["Jess's hands, warm."]}
+    assert stray_name("Jess's hands, warm as ever.", rejected, names) == "Jess"
 
 
 def test_small_models_get_the_time_of_day_in_words() -> None:

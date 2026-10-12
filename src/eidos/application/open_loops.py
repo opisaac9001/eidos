@@ -64,7 +64,7 @@ _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
 _EMPHATIC = frozenset("definitely properly actually really quick quickly bit little".split())
 # Something to take somewhere: "bring my chisel to the workshop", "take the book back to Nina".
 _CARRY = re.compile(
-    r"\b(?:bring|take|drop off|return)\s+(.+?)\s+(?:back\s+)?(?:to|round to|over to|into|in to)\b",
+    r"\b(?:bring|take|drop off|return|wear)\s+(.+?)\s+(?:back\s+)?(?:to|round to|over to|into|in to)\b",
     re.IGNORECASE,
 )
 _WHEN_WORDS = re.compile(
@@ -274,7 +274,10 @@ def open_loop_events(
         person = next(
             (pid for name, pid in {**_FAMILY, **people}.items() if f" {name} " in lowered), None
         )
-        place = next((pid for name, pid in places.items() if name in lowered), None)
+        # "the café" and "the cafe" are one place.
+        place = next(
+            (pid for name, pid in places.items() if name in lowered.replace("é", "e")), None
+        )
         importance = (
             0.4
             + (0.2 if person else 0.0)
@@ -413,7 +416,10 @@ def open_loop_events(
             and at - loop.due_at >= timedelta(days=1)
         ):
             output.append(
-                _event(SLIPPED, loop, at, None)
+                # Remembered once and still not done: he let it go, he didn't forget it.
+                _event(DROPPED, loop, at, None, reason="let it go")
+                if loop.last_recalled_at is not None
+                else _event(SLIPPED, loop, at, None)
                 if loop.importance >= 0.5
                 else _event(DROPPED, loop, at, None, reason="it faded")
             )
@@ -526,6 +532,10 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
     """Something he did (or firmly planned) since forming it that takes it off his mind."""
     words = _content(loop.text)
     contacting = bool(_CONTACTING.search(loop.text))
+    # He chose to do it because he'd meant to (``everyday``).
+    for event in events_of(history, "everyday.chosen")[-12:]:
+        if event.payload.get("meant_to_id") == loop.intention_id:
+            return event
     for event in reversed(
         events_of(
             history,
