@@ -6,6 +6,7 @@ from hashlib import sha256
 from typing import Callable, Hashable, Sequence
 
 from eidos.application.friends_lives import away_people
+from eidos.application.resident_day import day_off, outing_now
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
     IRREGULAR,
@@ -366,7 +367,12 @@ def their_place_now(actor_id: str, usual_location_id: str, now: datetime) -> str
     """
     roll = sha256(f"{actor_id}:{now.date().isoformat()}".encode()).digest()[0] % 3 - 1
     hour = (now.hour - roll) % 24
-    return npc_location(actor_id, hour, usual_location_id)
+    place = npc_location(actor_id, hour, usual_location_id)
+    # Their weekends are their own (``resident_day``), and their days have more in them
+    # than work and home: lunch out, a walk after work, the market on Saturday.
+    if day_off(actor_id, now) and place not in {"home", "park"}:
+        place = "home"
+    return outing_now(actor_id, usual_location_id, now) or place
 
 
 # The kinds of an NPC's own events that movement looks back over.
