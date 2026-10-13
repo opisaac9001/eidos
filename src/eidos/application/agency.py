@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import re
 from dataclasses import replace
 from datetime import datetime, timedelta
 from time import perf_counter
@@ -14,6 +15,7 @@ from uuid import uuid4
 from eidos.application.activity_execution import execution_context
 from eidos.application.causal_opportunities import fresh_cause
 from eidos.application.dream_planning import dream_plan_link_events, dream_planning_workspace
+from eidos.application.everyday import ALIAS_OF
 from eidos.application.everyday import PREFIX as EVERYDAY_PREFIX
 from eidos.application.experience import activity_tastes, taste_notes
 from eidos.application.opportunities import available_opportunities
@@ -618,6 +620,45 @@ async def autonomous_activity_events(
             ],
         )
         _validate_choice_alignment(candidate.activity_type, chosen_impulse)
+        if _already_doing(candidate.activity_type, candidate.title, planning, simulated_at):
+            # Deciding to read the book he's reading is carrying on, not a new plan that
+            # interrupts him to start it again.
+            output.extend(
+                (
+                    _trace(
+                        "ok",
+                        trace_id,
+                        simulated_at,
+                        started,
+                        response.resolved_model,
+                        response.backend,
+                        None,
+                    ),
+                    DomainEvent(
+                        "agency.choice_made",
+                        "pathos",
+                        {
+                            "proposal_id": proposal_id,
+                            "decision": "continue",
+                            "new_plan": False,
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        causation_id=chosen.event_id,
+                        correlation_id=proposal_id,
+                    ),
+                    DomainEvent(
+                        "agency.left_unplanned",
+                        "pathos",
+                        {
+                            "proposal_id": proposal_id,
+                            "decision": "continue",
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        correlation_id=proposal_id,
+                    ),
+                )
+            )
+            return output
         if candidate.location_id != current_location_id:
             if current_location_id is None:
                 if candidate.starts_in_hours == 0:
@@ -764,6 +805,27 @@ async def autonomous_activity_events(
         dream_plan_link_events(history, planning_workspace, resolution.events, simulated_at)
     )
     return output
+
+
+def _already_doing(activity_type: str, title: str, planning: PlanningState, at: datetime) -> bool:
+    """Whether this idea is the everyday thing he's in the middle of."""
+    for entry in planning.calendar.values():
+        if not entry.schedule_id.startswith(EVERYDAY_PREFIX) or entry.status != "scheduled":
+            continue
+        starts = datetime.fromisoformat(entry.starts_at)
+        ends = datetime.fromisoformat(entry.ends_at or entry.starts_at)
+        if not starts <= at < ends:
+            continue
+        if ALIAS_OF.get(activity_type, activity_type) == entry.activity_type:
+            return True
+        words = {w for w in re.findall(r"[a-z]{4,}", title.casefold())} - _PLAIN_WORDS
+        theirs = {w for w in re.findall(r"[a-z]{4,}", entry.title.casefold())} - _PLAIN_WORDS
+        if len(words & theirs) >= 2:
+            return True
+    return False
+
+
+_PLAIN_WORDS = frozenset("with from into some home have just make take bit".split())
 
 
 def _everyday(event: DomainEvent) -> bool:

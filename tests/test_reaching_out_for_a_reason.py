@@ -207,3 +207,52 @@ def test_putting_something_off_is_limited_per_occasion_not_forever() -> None:
     tracker.defer(impulse, 60)
     now[0] += 120
     assert tracker.take_ripe() == [impulse]
+
+
+def test_a_friend_doesnt_send_the_same_reply_twice(tmp_path) -> None:
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    from eidos.application.reaching_out import REACHED, REPLIED, reply_events
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 9, 1, 17, 0, tzinfo=timezone.utc)
+    earlier = DomainEvent(
+        REPLIED,
+        "pathos",
+        {
+            "contact_id": "c-old",
+            "person_id": "ellis",
+            "person_name": "Ellis",
+            "text": "Cheers, feeling much better now. And yeah, your coat's still there.",
+            "simulated_at": (at - timedelta(days=3)).isoformat(),
+        },
+    )
+    sent = DomainEvent(
+        REACHED,
+        "pathos",
+        {
+            "contact_id": "c-new",
+            "person_id": "ellis",
+            "person_name": "Ellis",
+            "text": "Good shift today.",
+            "reply_due_at": (at + timedelta(minutes=5)).isoformat(),
+            "simulated_at": at.isoformat(),
+        },
+    )
+
+    class Parrot(StandInGateway):
+        async def generate(self, request):
+            from eidos.ports.model_gateway import ModelResponse
+
+            return ModelResponse(
+                '{"text": "Cheers, feeling much better now. And yeah, your coat\\u0027s still there."}',
+                "parrot",
+                "test",
+                "stop",
+            )
+
+    events = asyncio.run(reply_events([earlier, sent], at + timedelta(hours=1), Parrot()))
+    assert not any(
+        event.kind == REPLIED and event.payload.get("contact_id") == "c-new" for event in events
+    )

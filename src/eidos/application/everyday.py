@@ -35,6 +35,7 @@ from eidos.domain.agency import (
     AgencyCandidate,
     resolve_agency_candidate,
 )
+from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 from eidos.domain.planning import CalendarEntry, PlanningState
@@ -851,7 +852,7 @@ def _learned(history: Sequence[DomainEvent]) -> tuple[Doing, ...]:
         need = {"learn": "curiosity", "attend": "connection"}.get(action, "mastery")
         found[kind] = Doing(
             kind,
-            title,
+            british(title),
             (place,),
             (30, 75),
             ((need, 0.05),),

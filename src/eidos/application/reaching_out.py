@@ -29,6 +29,7 @@ from uuid import uuid4
 from eidos.application.bookings import remember
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
+from eidos.application.inner_stream import near_repeat
 from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -96,6 +97,12 @@ def why_not(
     if today >= PER_DAY:
         return "has texted enough people today"
     return None
+
+
+ALREADY_SAID = (
+    "That is what they said in an earlier message to him. Reply to what he said this "
+    "time, in different words."
+)
 
 
 def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
@@ -281,50 +288,62 @@ async def reply_events(
         right_now = dict(whereabouts(person_id)) if whereabouts and person_id else {}
         on_the_phone = sent.payload.get("channel") == "call"
         in_person = bool(right_now.get("with_patrick")) and not on_the_phone
-        reply = await perform(
-            gateway,
-            "firmament",
-            {
-                "time": at.isoformat(),
-                "location": (
-                    "on the phone"
-                    if on_the_phone
-                    else f"in person, {right_now.get('where_they_are')}"
-                    if in_person
-                    else "by text message"
+        asked: dict[str, object] = {
+            "time": at.isoformat(),
+            "location": (
+                "on the phone"
+                if on_the_phone
+                else f"in person, {right_now.get('where_they_are')}"
+                if in_person
+                else "by text message"
+            ),
+            "person": name,
+            "scene_mode": True,
+            "scene_speaker": name,
+            "scene_audience": "pathos",
+            "scene_topic": f"replying to his text: {sent.payload.get('text', '')}",
+            "prior_turns": [{"speaker": "Patrick", "text": sent.payload.get("text", "")}],
+            "personal_relationship_context": {
+                # Labelled as theirs, about him, or the gateway keeps it from the model.
+                "owner": name,
+                "about": "pathos",
+                "what_is_going_on_in_their_life": their_life,
+                "right_now": right_now,
+                "instruction": (
+                    f"Reply as {name} would"
+                    + (
+                        ", on the phone, having just picked up"
+                        if on_the_phone
+                        else ", in person, since they're with him now"
+                        if in_person
+                        else " by text"
+                    )
+                    + ": short and natural, answering only what he actually said, "
+                    "from where they are and what they're doing right now. What's going on "
+                    "in their life is true; they may mention it. Invent nothing else: no "
+                    "news, plans, visits or promises, and don't offer to come round or "
+                    "bring anything."
                 ),
-                "person": name,
-                "scene_mode": True,
-                "scene_speaker": name,
-                "scene_audience": "pathos",
-                "scene_topic": f"replying to his text: {sent.payload.get('text', '')}",
-                "prior_turns": [{"speaker": "Patrick", "text": sent.payload.get("text", "")}],
-                "personal_relationship_context": {
-                    # Labelled as theirs, about him, or the gateway keeps it from the model.
-                    "owner": name,
-                    "about": "pathos",
-                    "what_is_going_on_in_their_life": their_life,
-                    "right_now": right_now,
-                    "instruction": (
-                        f"Reply as {name} would"
-                        + (
-                            ", on the phone, having just picked up"
-                            if on_the_phone
-                            else ", in person, since they're with him now"
-                            if in_person
-                            else " by text"
-                        )
-                        + ": short and natural, answering only what he actually said, "
-                        "from where they are and what they're doing right now. What's going on "
-                        "in their life is true; they may mention it. Invent nothing else: no "
-                        "news, plans, visits or promises, and don't offer to come round or "
-                        "bring anything."
-                    ),
-                },
             },
-            at.isoformat(),
-            pending,
-        )
+        }
+        reply = await perform(gateway, "firmament", asked, at.isoformat(), pending)
+        before = [
+            str(e.payload.get("text", ""))
+            for e in events_of(history, REPLIED)[-40:]
+            if e.payload.get("person_id") == sent.payload.get("person_id")
+        ]
+        if reply is not None and near_repeat(reply, before):
+            # Word for word what they texted last week ("Cheers, feeling much better
+            # now..."): asked once for a reply to what he actually said this time.
+            reply = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": ALREADY_SAID},
+                at.isoformat(),
+                pending,
+            )
+            if reply is not None and near_repeat(reply, before):
+                reply = None
         output.extend(event for event in pending if event.kind == "role.completed")
         if reply is None:
             if at - sent_at >= GIVE_UP_AFTER:

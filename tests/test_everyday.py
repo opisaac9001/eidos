@@ -406,3 +406,53 @@ def test_his_notebook_isnt_his_freelance_work() -> None:
     }
     texts = [cue.text for cue in cues(snapshot) if cue.kind == "doing"]
     assert texts == ["Write in his notebook"]
+
+
+def test_deciding_to_read_the_book_hes_reading_is_carrying_on() -> None:
+    from eidos.application.agency import _already_doing
+    from eidos.domain.planning import CalendarEntry, PlanningState
+
+    reading = CalendarEntry(
+        "doing-x-schedule",
+        "Read a few chapters of Stoner",
+        AT.isoformat(),
+        "home",
+        ends_at=(AT + timedelta(minutes=50)).isoformat(),
+        actor_id="pathos",
+        activity_type="read_book",
+    )
+    planning = PlanningState(calendar={reading.schedule_id: reading})
+    later = AT + timedelta(minutes=20)
+    assert _already_doing(
+        "finish_reading", "Finish reading a few chapters of Stoner at home", planning, later
+    )
+    assert not _already_doing("river_walk_now", "Walk down by the river", planning, later)
+    assert not _already_doing(
+        "finish_reading",
+        "Finish reading a few chapters of Stoner",
+        planning,
+        AT + timedelta(hours=2),
+    )
+
+
+def test_an_idea_he_learned_is_said_the_english_way() -> None:
+    at = AT - timedelta(days=2)
+    idea = DomainEvent(
+        "agency.activity_realized",
+        "pathos",
+        {
+            "schedule_id": "pathos-agency-cause-9-schedule",
+            "activity_type": "apartment_details",
+            "title": "Notice details in the apartment with a film camera",
+            "location_id": "home",
+            "action": "work",
+            "simulated_at": at.isoformat(),
+        },
+    )
+    felt = DomainEvent(
+        "experience.felt",
+        "pathos",
+        {"activity_type": "apartment_details", "enjoyment": 0.6, "simulated_at": at.isoformat()},
+    )
+    titles = {doing.title for doing in repertoire([idea, felt]) if doing.learned}
+    assert titles == {"Notice details in the flat with a film camera"}
