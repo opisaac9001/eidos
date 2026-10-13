@@ -10,8 +10,11 @@ where he is.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from hashlib import sha256
+from typing import Mapping
+
+Hours = Mapping[str, tuple[time, time]]
 
 # Places people go out to, with the hours they'd be there (start, end) and when.
 _LUNCH = ("cafe",)
@@ -47,8 +50,10 @@ def day_off(actor_id: str, now: datetime) -> bool:
     return weekday == 5 and actor_id not in _SATURDAY_WORK
 
 
-def outings(actor_id: str, usual_location_id: str, now: datetime) -> list[tuple[float, float, str]]:
-    """Their outings today: (from hour, until hour, place)."""
+def outings(
+    actor_id: str, usual_location_id: str, now: datetime, hours: Hours | None = None
+) -> list[tuple[float, float, str]]:
+    """Their outings today: (from hour, until hour, place), within opening hours."""
     day = now.date().isoformat()
     found: list[tuple[float, float, str]] = []
 
@@ -58,7 +63,15 @@ def outings(actor_id: str, usual_location_id: str, now: datetime) -> list[tuple[
         if _roll(kind, actor_id, day) < chance:
             shift = (_roll(kind, "when", actor_id, day) - 0.5) * 1.0
             stay = length * (0.7 + 0.6 * _roll(kind, "long", actor_id, day))
-            found.append((start + shift, start + shift + stay, _pick(actor_id, places, kind, day)))
+            place = _pick(actor_id, places, kind, day)
+            begin, end = start + shift, start + shift + stay
+            if hours is not None and place in hours:
+                opens, closes = hours[place]
+                # Nobody sits in a café that's shut: the visit ends at closing time.
+                begin = max(begin, opens.hour + opens.minute / 60)
+                end = min(end, closes.hour + closes.minute / 60 + (1 if closes.second else 0) / 60)
+            if end - begin >= 0.33:
+                found.append((begin, end, place))
 
     sociable = 0.6 + 0.8 * _roll("sociable", actor_id)  # some go out a lot, some rarely
     if day_off(actor_id, now):
@@ -72,10 +85,12 @@ def outings(actor_id: str, usual_location_id: str, now: datetime) -> list[tuple[
     return found
 
 
-def outing_now(actor_id: str, usual_location_id: str, now: datetime) -> str | None:
+def outing_now(
+    actor_id: str, usual_location_id: str, now: datetime, hours: Hours | None = None
+) -> str | None:
     """Where they've gone out to right now, if they're out."""
     hour = now.hour + now.minute / 60
-    for start, end, place in outings(actor_id, usual_location_id, now):
+    for start, end, place in outings(actor_id, usual_location_id, now, hours):
         if start <= hour < end:
             return place
     return None

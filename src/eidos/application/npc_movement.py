@@ -6,7 +6,7 @@ from hashlib import sha256
 from typing import Callable, Hashable, Sequence
 
 from eidos.application.friends_lives import away_people
-from eidos.application.resident_day import day_off, outing_now
+from eidos.application.resident_day import Hours, day_off, outing_now
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
     IRREGULAR,
@@ -233,7 +233,7 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             and not starting
             and person.location_id != "in-transit"
         ):
-            target = their_place_now(actor_id, person.usual_location_id, now)
+            target = their_place_now(actor_id, person.usual_location_id, now, catalog.opening_hours)
             if target != person.location_id and (target == "home" or target in catalog.places):
                 try:
                     duration = route_duration(person.location_id, target, catalog.route_minutes)
@@ -359,7 +359,9 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     return output
 
 
-def their_place_now(actor_id: str, usual_location_id: str, now: datetime) -> str:
+def their_place_now(
+    actor_id: str, usual_location_id: str, now: datetime, hours: Hours | None = None
+) -> str:
     """Where someone would be at this hour on an ordinary day of theirs.
 
     Their authored rhythm (Mara opens the café, Ellis keeps the workshop), shifted by up to
@@ -372,7 +374,7 @@ def their_place_now(actor_id: str, usual_location_id: str, now: datetime) -> str
     # than work and home: lunch out, a walk after work, the market on Saturday.
     if day_off(actor_id, now) and place not in {"home", "park"}:
         place = "home"
-    return outing_now(actor_id, usual_location_id, now) or place
+    return outing_now(actor_id, usual_location_id, now, hours) or place
 
 
 # The kinds of an NPC's own events that movement looks back over.

@@ -40,3 +40,16 @@ def test_at_night_theyre_home() -> None:
     for day in range(14):
         night = (MONDAY + timedelta(days=day)).replace(hour=2)
         assert their_place_now("stuart-hart", "library", night) == "home"
+
+
+def test_nobody_stays_in_the_cafe_after_it_shuts() -> None:
+    from datetime import time
+
+    hours = {"cafe": (time(7), time(18))}
+    for day in range(60):
+        for person in ("stuart-hart", "nina-vale", "townsfolk-8103"):
+            for start, end, place in outings(
+                person, "library", MONDAY + timedelta(days=day), hours
+            ):
+                if place == "cafe":
+                    assert 7 <= start and end <= 18
