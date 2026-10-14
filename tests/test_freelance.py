@@ -15,7 +15,6 @@ from eidos.application.freelance import (
     CHASED,
     DELIVERED,
     ENQUIRY,
-    LAST_SHIFT,
     LATE,
     OFFER,
     PAID,
@@ -53,12 +52,14 @@ def _first(history, kind):
     return next(e for e in history if e.kind == kind)
 
 
-def test_going_freelance_happens_in_order_and_he_works_his_notice(lived) -> None:
+def test_going_freelance_happens_in_order_and_ellis_lets_him_go(lived) -> None:
+    from eidos.application.freelance import leaving_day
+
     order = [_first(lived, kind) for kind in (OFFER, QUOTED, ACCEPTED, TOLD, STARTED)]
     assert [_at(e) for e in order] == sorted(_at(e) for e in order)
     ended = _first(lived, "work.agreement_ended")
-    last_day = ended.payload["last_day"]
-    # No shift after his last day was ever published, and the notice shifts were worked.
+    last_day = leaving_day(lived)
+    # No shift after his last day was ever published; Ellis let him off the rest.
     shifts = [
         e for e in lived
         if e.kind == "schedule.created" and str(e.payload["schedule_id"]).startswith(ROTA_PREFIX)
@@ -66,7 +67,6 @@ def test_going_freelance_happens_in_order_and_he_works_his_notice(lived) -> None
     ]  # fmt: skip
     assert not shifts
     assert _at(_first(lived, STARTED)).date().isoformat() > last_day
-    assert any(e.kind == LAST_SHIFT for e in lived)
     # Telling Ellis took it off his mind.
     assert any(e.kind == "intention.done" and "Ellis" in str(e.payload.get("text")) for e in lived)
 
@@ -197,3 +197,27 @@ def test_until_hes_left_the_workshop_his_work_is_the_change_itself() -> None:
     assert "last one Friday 4 September" in work_view(told, AT)[0]
     started = told + [_event(STARTED, AT)]
     assert not any("Ellis" in line for line in work_view(started, AT))
+
+
+def test_ellis_lets_him_off_the_rest_of_his_notice(lived) -> None:
+    from eidos.application.freelance import NOTICE_WAIVED, leaving_day
+
+    history = lived
+    told = [e for e in history if e.kind == TOLD]
+    waived = [e for e in history if e.kind == NOTICE_WAIVED]
+    assert told and waived
+    # The same evening, or after the next shift: no more of the rota after it.
+    let_off = datetime.fromisoformat(str(waived[0].payload["simulated_at"]))
+    assert let_off - datetime.fromisoformat(str(told[0].payload["simulated_at"])) <= timedelta(
+        days=4
+    )
+    assert leaving_day(history) == waived[0].payload["last_day"]
+    later_shifts = [
+        e
+        for e in history
+        if e.kind == "activity.completed"
+        and str(e.payload.get("schedule_id", "")).startswith(ROTA_PREFIX)
+        and datetime.fromisoformat(str(e.payload["simulated_at"])) > let_off
+    ]
+    assert later_shifts == []
+    assert any(e.kind == STARTED for e in history)

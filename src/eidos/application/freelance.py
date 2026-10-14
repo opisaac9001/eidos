@@ -50,6 +50,8 @@ from eidos.domain.planning import PlanningState
 # The change.
 OFFER = "career.offer_received"
 TOLD = "career.told_employer"
+# Ellis lets him off the rest of his notice: the shifts left on the rota are cancelled.
+NOTICE_WAIVED = "career.notice_waived"
 LAST_SHIFT = "career.last_shift"
 STARTED = "work.freelance_started"
 # Finding work.
@@ -567,7 +569,41 @@ def _the_change(
                   location_id="workshop" if in_person else None),
             *meant,
         ]  # fmt: skip
-    last_day = str(told[0].payload.get("last_day", ""))
+    last_day = leaving_day(history)
+    waived = events_of(history, NOTICE_WAIVED)
+    still_on_rota = sorted(
+        (entry for entry in planning.calendar.values()
+         if entry.schedule_id.startswith(ROTA_PREFIX) and entry.status == "scheduled"
+         and datetime.fromisoformat(entry.starts_at) > at),
+        key=lambda entry: entry.starts_at,
+    ) if not waived else []  # fmt: skip
+    if still_on_rota and awake and 17 <= at.hour <= 21 and not on_shift_at_workshop:
+        # The evening after his next shift (or the same one), Ellis rings: no need to
+        # work the rest. He's a writer now; that was his last shift.
+        today = at.date().isoformat()
+        let_off = _event(NOTICE_WAIVED, at, employer_id=EMPLOYER_ID, last_day=today)
+        return [
+            let_off,
+            *(
+                DomainEvent(
+                    "schedule.cancelled",
+                    "pathos",
+                    {
+                        "schedule_id": entry.schedule_id,
+                        "reason": "Ellis let him off the rest of his notice.",
+                        "simulated_at": at.isoformat(),
+                    },
+                    causation_id=let_off.event_id,
+                    correlation_id=entry.schedule_id,
+                )
+                for entry in still_on_rota
+            ),
+            _note(let_off, in_his_words(
+                "Ellis rang. Said not to bother with the rest of the rota: they'll manage, "
+                "and I should get on with the writing. So today was my last shift and I "
+                "didn't even know it. Said I'm to drop in for a cup of tea whenever.",
+                EMPLOYER_ID), at, 0.6, person_id=EMPLOYER_ID),
+        ]  # fmt: skip
     if (
         on_shift_at_workshop
         and at.date().isoformat() == last_day
@@ -1281,6 +1317,15 @@ def _maybe_drop_in(
 # -- what he'd say about it -------------------------------------------------------------
 
 
+def leaving_day(history: Sequence[DomainEvent]) -> str:
+    """His last day at the workshop: the end of his notice, or sooner if Ellis let him off."""
+    waived = events_of(history, NOTICE_WAIVED)
+    if waived:
+        return str(waived[-1].payload.get("last_day", ""))
+    told = events_of(history, TOLD)
+    return str(told[0].payload.get("last_day", "")) if told else ""
+
+
 def _the_change_in_his_words(history: Sequence[DomainEvent], at: datetime) -> list[str]:
     """Where he is in leaving the workshop for freelance writing, until he's done it."""
     if self_employed(history) or not events_of(history, OFFER):
@@ -1292,7 +1337,10 @@ def _the_change_in_his_words(history: Sequence[DomainEvent], at: datetime) -> li
     if not told:
         return ["going freelance again, writing; haven't told Ellis yet, "
                 "meaning to at my next shift"]  # fmt: skip
-    last_day = str(told[0].payload.get("last_day", ""))
+    if events_of(history, NOTICE_WAIVED):
+        return ["finished at the workshop: Ellis let me off the rest of my notice; "
+                "writing full time from now on"]  # fmt: skip
+    last_day = leaving_day(history)
     try:
         when = datetime.fromisoformat(last_day).strftime("%A %-d %B")
     except ValueError:

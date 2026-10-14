@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from eidos.application.freelance import STARTED, TOLD
+from eidos.application.freelance import STARTED, TOLD, leaving_day
 from eidos.application.gossip import worth_mentioning
 from eidos.application.life_context import latest_weather
 from eidos.application.repair_jobs import bench_view
@@ -34,7 +34,7 @@ def talking_points(
     told = events_of(history, TOLD)
     if told and not events_of(history, STARTED):
         when = datetime.fromisoformat(str(told[0].payload["simulated_at"]))
-        last = str(told[0].payload.get("last_day", ""))
+        last = leaving_day(history)
         try:
             last_words = datetime.fromisoformat(last).strftime("%A %-d %B")
         except ValueError:

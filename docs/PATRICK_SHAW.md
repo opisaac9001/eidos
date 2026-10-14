@@ -106,8 +106,9 @@ The original made him freelance, writing essays on tech, philosophy and everyday
 technical writing jobs. The rebuild had given him a part-time job at Ellis's workshop instead.
 `application/freelance.py` takes him back, as something that happens in his life: his old
 team in Bristol asks him to rewrite their developer docs, he quotes, they say yes, he tells
-Ellis on his next shift, works the shifts already on the rota as his notice, has a last day,
-and is freelance. Eight months at the workshop stay in his history; Ellis stays a friend, and
+Ellis on his next shift, and that evening Ellis rings to let him off the rest of his notice
+(`career.notice_waived`: the shifts left on the rota are cancelled, so that shift was his last).
+The next morning he's freelance. Eight months at the workshop stay in his history; Ellis stays a friend, and
 he drops in now and then to give Ellis a hand.
 
 He's a **freelance writer on technology and how it changes ordinary life**. He pitches ideas
