@@ -25,6 +25,7 @@ from eidos.application.time_budget import personal_time_budget
 from eidos.application.town_calendar import happening_opportunities
 from eidos.application.volition import attended_impulses, impulse_attention_event
 from eidos.domain.agency import (
+    AgencyCandidate,
     agency_output_schema,
     parse_agency_candidate,
     resolve_agency_candidate,
@@ -659,6 +660,7 @@ async def autonomous_activity_events(
                 )
             )
             return output
+        candidate = _after_whats_nearly_done(candidate, planning, simulated_at)
         if candidate.location_id != current_location_id:
             if current_location_id is None:
                 if candidate.starts_in_hours == 0:
@@ -805,6 +807,26 @@ async def autonomous_activity_events(
         dream_plan_link_events(history, planning_workspace, resolution.events, simulated_at)
     )
     return output
+
+
+def _after_whats_nearly_done(
+    candidate: AgencyCandidate, planning: PlanningState, at: datetime
+) -> AgencyCandidate:
+    """An idea that comes while he's nearly done with something waits till he's finished.
+
+    Twenty minutes from the end of a chapter, you finish the chapter; longer than that and
+    the idea can win (``everyday.make_way`` cuts the doing short).
+    """
+    starts = at + timedelta(hours=candidate.starts_in_hours)
+    for entry in planning.calendar.values():
+        if not entry.schedule_id.startswith(EVERYDAY_PREFIX) or entry.status != "scheduled":
+            continue
+        began = datetime.fromisoformat(entry.starts_at)
+        ends = datetime.fromisoformat(entry.ends_at or entry.starts_at)
+        if began <= starts < ends and ends - starts <= timedelta(minutes=20):
+            wait = (ends + timedelta(minutes=2) - at).total_seconds() / 3600
+            return replace(candidate, starts_in_hours=math.ceil(wait * 12) / 12)
+    return candidate
 
 
 def _already_doing(activity_type: str, title: str, planning: PlanningState, at: datetime) -> bool:

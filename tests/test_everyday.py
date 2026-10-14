@@ -456,3 +456,29 @@ def test_an_idea_he_learned_is_said_the_english_way() -> None:
     )
     titles = {doing.title for doing in repertoire([idea, felt]) if doing.learned}
     assert titles == {"Notice details in the flat with a film camera"}
+
+
+def test_an_idea_while_hes_nearly_done_waits_until_hes_finished() -> None:
+    from eidos.application.agency import _after_whats_nearly_done
+    from eidos.domain.actions import ActionKind
+    from eidos.domain.agency import AgencyCandidate
+    from eidos.domain.planning import CalendarEntry, PlanningState
+
+    reading = CalendarEntry(
+        "doing-x-schedule",
+        "Read a few chapters of Stoner",
+        AT.isoformat(),
+        "home",
+        ends_at=(AT + timedelta(minutes=40)).isoformat(),
+        actor_id="pathos",
+    )
+    planning = PlanningState(calendar={reading.schedule_id: reading})
+    idea = AgencyCandidate(
+        "tune_turntable", "Set up the record player", "Felt like it", ActionKind.WORK,
+        "home", None, None, 0.0, 0.5, 0.4,
+    )  # fmt: skip
+    near_the_end = AT + timedelta(minutes=30)
+    waited = _after_whats_nearly_done(idea, planning, near_the_end)
+    assert near_the_end + timedelta(hours=waited.starts_in_hours) >= AT + timedelta(minutes=40)
+    # Early on, the idea can win.
+    assert _after_whats_nearly_done(idea, planning, AT + timedelta(minutes=5)) == idea

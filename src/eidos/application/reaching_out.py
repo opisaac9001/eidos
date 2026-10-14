@@ -30,6 +30,7 @@ from eidos.application.bookings import remember
 from eidos.application.cognition import perform
 from eidos.application.friends_lives import friends_lives_context
 from eidos.application.inner_stream import near_repeat
+from eidos.application.work_rota import EMPLOYER_ID, is_rota_shift
 from eidos.domain.british import british
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -107,6 +108,16 @@ ALREADY_SAID = (
 
 def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
     """Whether he's been with them in person in the last few hours."""
+    if person_id == EMPLOYER_ID:
+        # A day at the bench together counts, until the evening's well on.
+        for event in reversed(events_of(history, "activity.completed")[-20:]):
+            when = _at(event)
+            if (
+                when is not None
+                and is_rota_shift(event.payload.get("schedule_id"))
+                and timedelta(0) <= at - when <= timedelta(hours=5)
+            ):
+                return True
     for event in reversed(events_of(history, "npc.encountered", "scene.started")[-30:]):
         when = _at(event)
         if when is None:

@@ -52,3 +52,32 @@ def test_a_real_model_is_actually_sent_the_setting_and_any_correction() -> None:
     # Unlisted keys never reach a real model (the stand-in sees everything, so only this
     # catches it): the shared-past retry was resent unchanged for months.
     assert {"setting", "revision_instruction", "scene_topic"} <= set(ROLE_FIELDS["firmament"])
+
+
+def test_nobody_in_alderwick_calls_him_pathos() -> None:
+    import asyncio
+
+    from eidos.adapters.standin_gateway import StandInGateway
+    from eidos.application.cognition import perform
+    from eidos.ports.model_gateway import ModelResponse
+
+    class SaysPathos(StandInGateway):
+        async def generate(self, request):
+            return ModelResponse('{"text": "Sure, Pathos. See you at 11."}', "x", "test", "stop")
+
+    pending: list = []
+    text = asyncio.run(
+        perform(
+            SaysPathos(),
+            "firmament",
+            {
+                "person": "Ellis",
+                "scene_mode": True,
+                "scene_speaker": "ellis",
+                "scene_audience": "pathos",
+            },
+            "2026-09-02T19:00:00+00:00",
+            pending,
+        )
+    )
+    assert text == "Sure, Patrick. See you at 11."

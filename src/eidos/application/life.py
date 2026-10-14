@@ -258,7 +258,7 @@ from eidos.application.wants import want_events
 from eidos.application.wealth import comfortable, wealth_events
 from eidos.application.wellbeing import physically_adjusted_beat, wellbeing_events
 from eidos.application.work_arc import work_arc_events
-from eidos.application.work_rota import is_rota_shift, work_rota_events
+from eidos.application.work_rota import EMPLOYER_ID, is_rota_shift, work_rota_events
 from eidos.application.world_expansion import expanding_world_events
 from eidos.application.world_exploration import STILL_AT_IT, planned_activity_beat
 from eidos.application.world_improvisation import improvised_world_events
@@ -3479,6 +3479,12 @@ class Life(LifeConversation):
                 history, pending, person.person_id, tick.state.location_id, current
             ):
                 # Working alongside someone is not a fresh encounter every hour.
+                continue
+            if person.person_id == EMPLOYER_ID and _on_shift(
+                self._planning(history + pending), current
+            ):
+                # Ellis on his shift is the day's work, not bumping into him "walking by";
+                # the bench and their talk there are the shift (``repair_jobs``, scenes).
                 continue
             await self._meet(history, pending, person, tick.state.location_id, at, mind.context)
 

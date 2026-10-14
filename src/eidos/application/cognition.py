@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from time import perf_counter
 from typing import Mapping
 from uuid import uuid4
@@ -119,6 +120,9 @@ async def perform(
         text = validate_completion(role, response.content, response.finish_reason, context)
         if role in _SPOKEN:
             text = british(text)
+        if role == "firmament":
+            # Pathos is an old university nickname; nobody in Alderwick calls him it.
+            text = re.sub(r"\bPathos\b", "Patrick", text)
         semantic_findings = semantic_quality_findings(
             role,
             text,

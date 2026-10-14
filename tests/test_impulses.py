@@ -388,3 +388,14 @@ def test_an_answer_that_slips_into_another_language_is_refused() -> None:
     _refuse_other_script('{"text": "Fancy a brew, Stuart?"}')
     with pytest.raises(ValueError):
         _refuse_other_script('{"text": "that old project you俩之间的对话"}')
+
+
+def test_after_a_shift_at_the_bench_he_doesnt_text_ellis() -> None:
+    at = datetime(2026, 9, 2, 19, 0, tzinfo=timezone.utc)
+    shift = DomainEvent(
+        "activity.completed",
+        "pathos",
+        {"schedule_id": "work-rota-2026-09-02", "simulated_at": at - timedelta(hours=3)},
+    )
+    assert why_not([shift], at, "ellis") == "just seen them"
+    assert why_not([shift], at, "rowan") is None
