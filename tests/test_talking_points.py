@@ -51,7 +51,9 @@ def test_a_real_model_is_actually_sent_the_setting_and_any_correction() -> None:
 
     # Unlisted keys never reach a real model (the stand-in sees everything, so only this
     # catches it): the shared-past retry was resent unchanged for months.
-    assert {"setting", "revision_instruction", "scene_topic"} <= set(ROLE_FIELDS["firmament"])
+    assert {"setting", "revision_instruction", "scene_topic", "his_news"} <= set(
+        ROLE_FIELDS["firmament"]
+    )
 
 
 def test_nobody_in_alderwick_calls_him_pathos() -> None:

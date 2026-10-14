@@ -914,9 +914,10 @@ def rutted_people(recent: Sequence[str], people: Collection[str]) -> list[str]:
 
 
 def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> str | None:
-    """A word in three of his last five thoughts, used again: a rut, not a thought ("Dad's
-    clock ticks slow", evening after evening). Small models ignore words they're told to
-    leave alone, so this one is turned away."""
+    """A word in three of his last five thoughts, or four of his last twelve, used again:
+    a rut, not a thought ("Dad's clock ticks slow", evening after evening; "Ellis's hands"
+    fifteen times in a morning at the bench). Small models ignore words they're told to
+    leave alone, so this one is turned away. ``recent`` is newest first."""
     names = {name.casefold() for name in people}
 
     def stems(said: str) -> set[str]:
@@ -927,12 +928,16 @@ def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> st
             if len(w) >= 4 and w not in _COMMON
         }
 
-    counts: Counter[str] = Counter()
-    for earlier in list(recent)[-5:]:
-        counts.update(stems(earlier))
+    short: Counter[str] = Counter()
+    long: Counter[str] = Counter()
+    for index, earlier in enumerate(list(recent)[:12]):
+        words = stems(earlier)
+        long.update(words)
+        if index < 5:
+            short.update(words)
     said = stems(text)
     names = {name.rstrip("s") for name in names} | names
-    worn = sorted(w for w in said if counts[w] >= 3 and w not in names)
+    worn = sorted(w for w in said if (short[w] >= 3 or long[w] >= 4) and w not in names)
     return worn[0] if worn else None
 
 
@@ -1549,7 +1554,7 @@ class InnerStream:
         if (
             near_repeat(text, recent_texts[-3:])
             or said_before(text, earlier)
-            or rutted(text, earlier[:5], known_names(snapshot)) is not None
+            or rutted(text, earlier, known_names(snapshot)) is not None
         ):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
             return None

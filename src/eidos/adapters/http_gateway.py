@@ -113,7 +113,9 @@ ROLE_PROMPTS["firmament"] += (
     " scene_topic names the shared subject, not your own activity or schedule: something "
     "true that both of them know or that the speaker would bring up; talk about it as it "
     "is and add no backstory. setting is why Patrick is there (at work on his shift, not "
-    "dropping in). revision_instruction, when given, is what was wrong with the last "
+    "dropping in). his_news, when Patrick is speaking, is how his own life actually "
+    "stands (his work, leaving the workshop); he speaks from it and invents nothing about "
+    "it. revision_instruction, when given, is what was wrong with the last "
     "attempt at this line; say it again without that. "
     "If the other person has only a few minutes, acknowledge THEIR time limit; "
     "do not claim you are leaving for your own shift. If choosing a book, give "
@@ -390,6 +392,7 @@ ROLE_FIELDS = {
         "scene_audience",
         "scene_topic",
         "setting",
+        "his_news",
         "revision_instruction",
         "prior_turns",
         "who_is_who",

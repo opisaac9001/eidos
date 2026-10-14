@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 from eidos.application.cognition import perform
 from eidos.application.epistemics import pathos_person_introduction_event
 from eidos.application.followups import project_followups
+from eidos.application.freelance import work_view
 from eidos.application.gossip import they_remember
 from eidos.application.inner_stream import near_repeat
 from eidos.application.pronouns import SAYING, pronoun_of
@@ -242,6 +243,13 @@ async def _advance_scene(
                     scene.partner_id if speaker_id == scene.initiator_id else scene.initiator_id
                 ),
                 "scene_topic": topic_words.get(topic_id) or _topic_words(topic_id, name),
+                # Speaking himself, he talks from how his life really stands, not a
+                # version the model makes up ("talking it over with Beth").
+                **(
+                    {"his_news": news}
+                    if speaker_id == "pathos" and (news := work_view(combined, simulated_at)[:3])
+                    else {}
+                ),
                 # Why they're both there: at work, he isn't "just dropping in".
                 "setting": setting(
                     combined, simulated_at, scene.location_id.replace("-", " "), name
@@ -442,17 +450,17 @@ def _topics(
     here, then the weather."""
     observed = _observable_topics(history, location_id, partner_id)
     points = talking_points(history, at, partner_id, name, location_id)
-    first = [
-        topic for topic in observed if topic.startswith(("cautious-repair-", "following-up-with-"))
-    ]
+    repair = [topic for topic in observed if topic.startswith("cautious-repair-")]
+    follow_up = [topic for topic in observed if topic.startswith("following-up-with-")]
     noticed = [
         topic
         for topic in observed
-        if topic not in first and not topic.startswith("ordinary-life-at-")
+        if topic not in repair + follow_up and not topic.startswith("ordinary-life-at-")
     ]
     news = [point_id for point_id, _ in points if point_id != "the-weather"][:3]
     weather = [point_id for point_id, _ in points if point_id == "the-weather"]
-    ids = [*first, *news, *noticed, *weather] or observed
+    # Big news before a vague follow-up: the morning he gives notice, that's the talk.
+    ids = [*repair, *news, *follow_up, *noticed, *weather] or observed
     return ids, dict(points)
 
 

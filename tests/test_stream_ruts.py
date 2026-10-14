@@ -134,3 +134,24 @@ def test_clock_and_clocks_are_the_same_rut() -> None:
         "Radiator hisses.",
     ]
     assert rutted("Clock's in the shed. Must fix it.", recent) == "clock"
+
+
+def test_the_same_image_all_morning_is_a_rut_even_with_gaps() -> None:
+    from eidos.application.inner_stream import rutted
+
+    morning = [  # newest first, "hands" four times in twelve, never three in five
+        "Stuart's quiet. Good to see him.",
+        "Ellis's hands are always so steady.",
+        "Mogwai's next track, what's the one?",
+        "Ellis's tools will be where he left them.",
+        "Shift started. Gloves on.",
+        "Ellis's hands, steady on the tools.",
+        "Why's the workshop clock always ahead?",
+        "Cold coffee.",
+        "Ellis's hands, coffee steam rising.",
+        "Morning mist on the road.",
+        "Ellis's hands, grease-stained, fixing a chain.",
+        "Docs. Start. Now.",
+    ]
+    assert rutted("Ellis's hands, warm and steady.", morning, {"Ellis"}) == "hand"
+    assert rutted("The lamp flex is cracked too.", morning, {"Ellis"}) is None
