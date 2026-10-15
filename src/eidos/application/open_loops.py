@@ -57,7 +57,17 @@ _CONTACTING = re.compile(
 # Things one can't put on a to-do list.
 _NOT_DOING = frozenset(
     "see remember think wonder know feel be stop keep wait hope learn accept relax "
-    "believe trust forget mind admit".split()
+    "believe trust forget mind admit "
+    # Feelings and states, not things to do: "miss her laugh", "have energy left".
+    "miss love like enjoy hate have stick sleep smile laugh cry calm".split()
+)
+# Things done with someone in person, which seeing them gives him the chance to do.
+_WITH_THEM = re.compile(
+    r"\b(show|give|help|thank|lend|return|talk|apologi[sz]e|say sorry|pay)\b", re.IGNORECASE
+)
+# "call her now": someone, but nobody in particular.
+_ONLY_A_PRONOUN = re.compile(
+    r"^(?:text|ring|call|phone|message|ask|tell|check on|see)\s+(?:him|her|them)\b", re.IGNORECASE
 )
 _FAMILY = {"mum": "mum", "dad": "dad", "tom": "tom"}
 # Words that say how much he means it, not what it is.
@@ -185,6 +195,8 @@ def intended(thought: str) -> str | None:
         first = rest.split(" ", 1)[0].casefold() if rest else ""
         if first in _NOT_DOING:
             continue  # "see one like that soon", "remember why I bought it": not a to-do
+        if _ONLY_A_PRONOUN.search(rest):
+            continue  # "call her now", with no her: nobody to call
         if len(_content(rest)) >= 2 and len(rest) <= 90:
             return rest[0].lower() + rest[1:]
     return None
@@ -302,6 +314,8 @@ def open_loop_events(
         except (KeyError, ValueError):
             continue
         title, place = titles.get(str(stopped.payload.get("schedule_id")), ("", ""))
+        if str(stopped.payload.get("schedule_id", "")).startswith("doing-"):
+            continue  # a cup of tea cut short isn't something left to finish
         if title and not title.casefold().startswith("shift"):
             form(
                 f"finish {title[0].lower()}{title[1:]}", stopped, "interrupted", 0.5, place_id=place
@@ -532,6 +546,20 @@ def _done_by(history: Sequence[DomainEvent], loop: Loop) -> DomainEvent | None:
     """Something he did (or firmly planned) since forming it that takes it off his mind."""
     words = _content(loop.text)
     contacting = bool(_CONTACTING.search(loop.text))
+    in_person = bool(_WITH_THEM.search(loop.text))
+    # Time with them in person ("show Ellis what they can do with that part"): he could.
+    if loop.person_id and (contacting or in_person):
+        for event in reversed(events_of(history, "scene.started")[-20:]):
+            try:
+                if _when(event) <= loop.formed_at:
+                    break
+            except (KeyError, ValueError):
+                continue
+            if loop.person_id in {
+                event.payload.get("initiator_id"),
+                event.payload.get("partner_id"),
+            }:
+                return event
     # He chose to do it because he'd meant to (``everyday``).
     for event in events_of(history, "everyday.chosen")[-12:]:
         if event.payload.get("meant_to_id") == loop.intention_id:

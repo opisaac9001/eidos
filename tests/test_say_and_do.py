@@ -157,3 +157,39 @@ def test_seeing_the_person_he_meant_to_ask_lets_him_ask_and_ticks_it_off() -> No
     )
     after = hour(history, AT + timedelta(hours=3))
     assert [e.kind for e in after] == [DONE]
+
+
+def test_feelings_and_nobody_in_particular_are_not_to_dos() -> None:
+    from eidos.application.open_loops import intended
+
+    assert intended("Should miss her laugh, honestly.") is None
+    assert intended("Need to have energy left for tomorrow.") is None
+    assert intended("Gotta call her now.") is None
+    assert intended("Should finish this section of the docs.") is not None
+    assert intended("Need to ring Mum later.") is not None
+
+
+def test_seeing_them_in_person_is_how_showing_them_gets_done() -> None:
+    from eidos.application.open_loops import DONE
+
+    thought = DomainEvent(
+        "thought.recorded",
+        "pathos",
+        {"text": "Should show Rowan what I did with that lamp.", "simulated_at": AT.isoformat()},
+    )
+    history = [thought]
+    history += hour(history, AT + timedelta(minutes=5))
+    [loop] = open_loops(history)
+    assert loop.person_id == "rowan"
+    met = DomainEvent(
+        "scene.started",
+        "pathos",
+        {
+            "scene_id": "ordinary-x",
+            "initiator_id": "pathos",
+            "partner_id": "rowan",
+            "simulated_at": (AT + timedelta(hours=2)).isoformat(),
+        },
+    )
+    history.append(met)
+    assert any(e.kind == DONE for e in hour(history, AT + timedelta(hours=3)))

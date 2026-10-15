@@ -1551,9 +1551,13 @@ class InnerStream:
         # Judged against the thoughts it was shown, not ones it never saw.
         # And never nearly the same thought as one of the last dozen, however long ago.
         earlier = [thought.text for thought in self.store.recent(12)]
+        opening = " ".join(text.split()[:2]).strip(".,!?").casefold()
         if (
             near_repeat(text, recent_texts[-3:])
             or said_before(text, earlier)
+            # An opening he's leaned on three times in a dozen ("Why does...", 136 times in
+            # a week): told to avoid it, a small model doesn't, so it's turned away.
+            or (worn_opening is not None and len(text.split()) >= 3 and opening == worn_opening)
             or rutted(text, earlier, known_names(snapshot)) is not None
         ):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)

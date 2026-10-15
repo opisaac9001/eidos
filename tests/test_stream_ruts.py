@@ -155,3 +155,36 @@ def test_the_same_image_all_morning_is_a_rut_even_with_gaps() -> None:
     ]
     assert rutted("Ellis's hands, warm and steady.", morning, {"Ellis"}) == "hand"
     assert rutted("The lamp flex is cracked too.", morning, {"Ellis"}) is None
+
+
+def test_an_opening_he_keeps_leaning_on_is_turned_away(tmp_path) -> None:
+    import json
+
+    from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+    from eidos.application.inner_stream import InnerStream
+    from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
+
+    class Asking(ModelGateway):
+        model = "tiny"
+
+        def __init__(self) -> None:
+            self.lines = iter(
+                [
+                    "Why does the kettle take so long?",
+                    "Why does the radiator tick at night?",
+                    "Why does it always rain on market day?",
+                    "Why does the bus never come on time?",
+                ]
+            )
+
+        async def generate(self, request: ModelRequest) -> ModelResponse:
+            return ModelResponse(json.dumps({"text": next(self.lines)}), "tiny", "t", "stop")
+
+    world = {
+        "time": "2026-09-04T10:20:00+00:00",
+        "pathos": {"location": "The flat", "location_id": "home", "awake": True},
+        "people": [],
+    }
+    stream = InnerStream(SQLiteInnerStream(tmp_path / "w.sqlite3"), Asking(), lambda: (world, True))
+    kept = [stream.step() for _ in range(4)]
+    assert all(kept[:3]) and stream.rejected
