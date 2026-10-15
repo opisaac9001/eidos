@@ -851,10 +851,26 @@ _PLAIN_WORDS = frozenset("with from into some home have just make take bit".spli
 
 
 def _everyday(event: DomainEvent) -> bool:
+    """Not a cause for deliberating: a cup of tea finished, or a thought with no want in it.
+
+    An image passing through his mind ("Cold windowpane", "Ellis's laugh") doesn't make a
+    person decide anything; wanting something does. 114 of 200 deliberations had been set
+    off by thoughts like that, nearly all ending in carrying on as he was.
+    """
+    if event.kind == "thought.recorded" and not _WANTS.search(str(event.payload.get("text"))):
+        return True
     return any(
         str(event.payload.get(key, "")).startswith(EVERYDAY_PREFIX)
         for key in ("schedule_id", "intention_id")
     )
+
+
+_WANTS = re.compile(
+    r"\b(should|need to|want to|wanna|might|could|gonna|going to|ought|must|have to|"
+    r"got to|gotta|i'?ll|let'?s|maybe i|time to|tempted|fancy|feel like|could do with|"
+    r"dying for|ought to|hungry|starving|peckish|bored|restless|itching to)\b",
+    re.IGNORECASE,
+)
 
 
 def _deliberation_schema(choice_field: Mapping[str, object]) -> dict[str, object]:

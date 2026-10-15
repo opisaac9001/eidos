@@ -83,3 +83,20 @@ def test_nobody_in_alderwick_calls_him_pathos() -> None:
         )
     )
     assert text == "Sure, Patrick. See you at 11."
+
+
+def test_his_own_project_is_something_people_can_ask_about() -> None:
+    from eidos.application.talking_points import his_projects
+
+    goal = DomainEvent(
+        "goal.activated",
+        "pathos",
+        {
+            "goal_id": "pathos-project-atlas",
+            "title": "Make a small atlas of neighbourhood sounds",
+            "simulated_at": AT.isoformat(),
+        },
+    )
+    assert his_projects([goal]) == ["his own project: Make a small atlas of neighbourhood sounds"]
+    points = dict(talking_points([goal], AT, "mara", "Mara", "cafe"))
+    assert "his-project-0" in points

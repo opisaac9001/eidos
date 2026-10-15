@@ -20,7 +20,7 @@ from eidos.application.shared_past import (
     invents_shared_past,
     invents_shared_thing,
 )
-from eidos.application.talking_points import setting, talking_points
+from eidos.application.talking_points import his_projects, setting, talking_points
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -322,7 +322,12 @@ async def _advance_scene(
             if text is not None and near_repeat(text, their_lines):
                 text = None
         grounded = (
-            " ".join(str(asked.get(key, "")) for key in ("scene_topic", "setting", "his_news"))
+            " ".join(
+                [
+                    *(str(asked.get(key, "")) for key in ("scene_topic", "setting", "his_news")),
+                    *his_projects(combined),
+                ]
+            )
             if asked
             else ""
         )

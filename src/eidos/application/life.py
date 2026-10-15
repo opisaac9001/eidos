@@ -229,6 +229,7 @@ from eidos.application.social_calendar import social_calendar_events
 from eidos.application.social_preferences import social_preference_events
 from eidos.application.spending import spending_events
 from eidos.application.surfacing import surfacing_events
+from eidos.application.talking_points import his_projects
 from eidos.application.talking_points import setting as encounter_setting
 from eidos.application.time_budget import personal_time_budget
 from eidos.application.time_feel import time_feel_events
@@ -3584,6 +3585,7 @@ class Life(LifeConversation):
                 _what_he_means_to_say(history, person),
                 news.text if news else "",
                 _how_they_are(history, npc, person, now),
+                *his_projects(history),
             )
         )
         if invents_shared_thing(text, grounded):

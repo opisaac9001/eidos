@@ -76,10 +76,21 @@ def talking_points(
         points.append(
             (f"heard-{heard.claim_id}", f"something {partner_name} has heard: {heard.text}")
         )
+    for index, project in enumerate(his_projects(history)[:1]):
+        points.append((f"his-project-{index}", project))
     weather = latest_weather(list(history[-400:]))
     if weather:
         points.append(("the-weather", f"the weather today ({weather.lower()})"))
     return points
+
+
+def his_projects(history: Sequence[DomainEvent]) -> list[str]:
+    """His own projects on the go (an atlas of town sounds), which people may ask about."""
+    return [
+        f"his own project: {goal.title}"
+        for goal in project_planning(history).goals.values()
+        if goal.status == "active" and goal.goal_id.startswith("pathos-project-")
+    ][:2]
 
 
 def setting(

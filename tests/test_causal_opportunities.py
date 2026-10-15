@@ -96,7 +96,7 @@ def test_private_deliberation_can_stop_before_the_scheduling_model_runs():
     thought = DomainEvent(
         "thought.recorded",
         "pathos",
-        {"text": "Maybe later.", "simulated_at": NOW.isoformat()},
+        {"text": "Might do something about it later.", "simulated_at": NOW.isoformat()},
     )
     gateway = NoPlanGateway()
     events = agency([thought], gateway, current_location_id="home")
@@ -268,3 +268,17 @@ def test_default_life_has_no_authored_itinerary_or_automatic_opening_bookings(tm
         event.kind == "memory.recorded" and event.payload.get("source") == "authored-routine"
         for event in history
     )
+
+
+def test_a_passing_image_is_not_an_occasion_to_decide_anything():
+    class Counting(QuietGateway):
+        async def generate(self, request):
+            raise AssertionError("No deliberation for a thought with no want in it")
+
+    image = DomainEvent(
+        "thought.recorded",
+        "pathos",
+        {"text": "Cold windowpane, rain on the glass.", "simulated_at": NOW.isoformat()},
+    )
+    events = agency([image], Counting(), current_location_id="home")
+    assert not any(event.kind == "agency.deliberation_requested" for event in events)
