@@ -13,7 +13,13 @@ from eidos.application.gossip import they_remember
 from eidos.application.inner_stream import near_repeat
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
-from eidos.application.shared_past import REVISION, invents_past_talk, invents_shared_past
+from eidos.application.shared_past import (
+    REVISION,
+    THING_REVISION,
+    invents_past_talk,
+    invents_shared_past,
+    invents_shared_thing,
+)
 from eidos.application.talking_points import setting, talking_points
 from eidos.domain.character_history import eligible_character_fact
 from eidos.domain.events import DomainEvent
@@ -314,6 +320,22 @@ async def _advance_scene(
                 output,
             )
             if text is not None and near_repeat(text, their_lines):
+                text = None
+        grounded = (
+            " ".join(str(asked.get(key, "")) for key in ("scene_topic", "setting", "his_news"))
+            if asked
+            else ""
+        )
+        if text is not None and asked is not None and invents_shared_thing(text, grounded):
+            # "Have you talked to Ellis about that old project yet?": there is no project.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": THING_REVISION},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and invents_shared_thing(text, grounded):
                 text = None
         if (
             text is not None

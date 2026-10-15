@@ -219,6 +219,7 @@ from eidos.application.selfhood import (
 )
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.setbacks import setback_events
+from eidos.application.shared_past import invents_shared_thing
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.sleep_trouble import HOUR as SLEEP_TROUBLE_HOUR
 from eidos.application.sleep_trouble import sleep_trouble_events
@@ -1627,9 +1628,9 @@ class Life(LifeConversation):
         remembered_description = beat.description
         if meal_claim and meal_event is None:
             remembered_description = (
-                "The usual meal could not happen because there was no food available."
+                "Nothing in to eat, so that meal didn't happen."
                 if unavailable
-                else "The usual meal was delayed while the hour remained occupied."
+                else "Hadn't got round to a proper meal yet."
             )
         if (
             not self.authored_scenario
@@ -1645,6 +1646,7 @@ class Life(LifeConversation):
             beat.location_id,
             current,
             beat.activity,
+            reflective=self.authored_scenario,
         )
         pending.append(
             DomainEvent(
@@ -3574,6 +3576,18 @@ class Life(LifeConversation):
             return
         if near_repeat(text, recent_encounters):
             # The same moment told again ("Ellis waves... the blueprint", 10:00 and 13:00).
+            return
+        grounded = " ".join(
+            str(part or "")
+            for part in (
+                doing,
+                _what_he_means_to_say(history, person),
+                news.text if news else "",
+                _how_they_are(history, npc, person, now),
+            )
+        )
+        if invents_shared_thing(text, grounded):
+            # Mara asking whether he's talked to Rowan "about the project": there is none.
             return
         encounter = DomainEvent(
             "npc.encountered",

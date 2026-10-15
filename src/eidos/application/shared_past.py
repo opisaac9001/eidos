@@ -50,6 +50,38 @@ def invents_past_talk(text: str, remembered: Sequence[str]) -> bool:
     return not any(len(said & set(_WORD.findall(memory.casefold()))) >= 2 for memory in remembered)
 
 
+# "that project", "the report": something spoken of as already shared. (Not plans or ideas:
+# "what are your plans this weekend?" is an ordinary question.)
+_SHARED_THING = re.compile(
+    r"\b(?:that|the|your|our|this) (?:old |big |new )?"
+    r"(projects?|reports?|proposals?|schemes?|ventures?)\b",
+    re.IGNORECASE,
+)
+
+
+def invents_shared_thing(text: str, grounded: str) -> str | None:
+    """A thing spoken of as already known between them that nothing true supplies.
+
+    One made-up line ("that old project") went into a resident's memory of him, and from
+    there into every later conversation as something they both knew about: Stuart, Mara
+    and Ellis all asked after a project that never existed. Only what's true for this
+    conversation (its topic, its setting, his real news) can ground it, not what they
+    remember, which is how the made-up thing spread.
+    """
+    known = grounded.casefold()
+    for match in _SHARED_THING.finditer(text):
+        thing = match.group(1).casefold().rstrip("s") or match.group(1).casefold()
+        if thing not in known:
+            return match.group(0)
+    return None
+
+
+THING_REVISION = (
+    "Say it again without that: nothing like it is going on between you. Talk about "
+    "scene_topic as it is."
+)
+
+
 REVISION = (
     "Say it again without any shared past between you: you have only known each other "
     "since he came to the town in January, and nothing from before is shared. Your own past "

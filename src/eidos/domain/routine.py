@@ -288,9 +288,13 @@ def routine_for_day(day: date) -> tuple[RoutineBeat, ...]:
 
 
 def lived_moment_description(
-    description: str, location_id: str, at: datetime, activity: str
+    description: str, location_id: str, at: datetime, activity: str, *, reflective: bool = True
 ) -> str:
-    """Give consequence-shaped routine memories distinct, replay-stable lived texture."""
+    """Give consequence-shaped routine memories distinct, replay-stable lived texture.
+
+    ``reflective`` adds a line about the moment itself ("Attention settled there and then
+    drifted."); a lived life keeps only the concrete detail, which is what people recall.
+    """
     clean = description.strip()
     if not clean:
         raise ValueError("Lived moment description must not be empty")
@@ -306,6 +310,8 @@ def lived_moment_description(
     # identical hourly experience does not repeat for more than a month.
     sequence = (at.date().toordinal() * 13 + at.hour * 7 + salt) % 35
     place_texture = place_options[sequence % len(place_options)]
+    if not reflective:
+        return f"{clean} {place_texture}"
     moment_texture = _MOMENT_TEXTURE[(sequence // len(place_options)) % len(_MOMENT_TEXTURE)]
     return f"{clean} {place_texture} {moment_texture}"
 

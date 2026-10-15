@@ -101,3 +101,17 @@ def test_they_remember_what_he_said_to_them() -> None:
         "yesterday, in conversation: Patrick said: “I'm going freelance.”"
     ]
     assert they_remember([said], "ellis", at) == []
+
+
+def test_a_made_up_project_isnt_something_they_both_know_about() -> None:
+    from eidos.application.shared_past import invents_shared_thing
+
+    assert invents_shared_thing(
+        "Have you had a chance to talk to Ellis about that old project yet?", "the weather"
+    )
+    # Real when something true supplies it: his own writing project, say.
+    assert not invents_shared_thing(
+        "How's that project of yours going?", "his own project: an atlas of town sounds"
+    )
+    # An ordinary question about plans isn't a made-up shared thing.
+    assert not invents_shared_thing("What are your plans this weekend?", "the weather")
