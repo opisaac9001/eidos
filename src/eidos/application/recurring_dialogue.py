@@ -14,8 +14,10 @@ from eidos.application.inner_stream import near_repeat
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
 from eidos.application.shared_past import (
+    NOT_YOURS,
     REVISION,
     THING_REVISION,
+    claims_his_project,
     invents_past_talk,
     invents_shared_past,
     invents_shared_thing,
@@ -341,6 +343,22 @@ async def _advance_scene(
                 output,
             )
             if text is not None and invents_shared_thing(text, grounded, projects):
+                text = None
+        if (
+            text is not None
+            and asked is not None
+            and speaker_id != "pathos"
+            and claims_his_project(text, projects)
+        ):
+            # Ellis: "I've been working on this small atlas of neighbourhood sounds". It's his.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": NOT_YOURS},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and claims_his_project(text, projects):
                 text = None
         if (
             text is not None

@@ -123,3 +123,18 @@ def test_his_project_is_the_one_meant_not_any_project() -> None:
     mine = ["his own project: Make a small atlas of neighbourhood sounds"]
     assert not invents_shared_thing("Started your atlas project yet?", "the weather", mine)
     assert invents_shared_thing("How's the project with Rowan coming along?", "the weather", mine)
+
+
+def test_nobody_else_claims_his_project() -> None:
+    from eidos.application.shared_past import claims_his_project
+
+    mine = [
+        "Patrick's own project (his, nobody else's): Make a small atlas of neighbourhood sounds"
+    ]
+    assert claims_his_project(
+        "Patrick, I've been working on this small atlas of neighbourhood sounds. Any tips?", mine
+    )
+    assert not claims_his_project(
+        "How's your atlas of neighbourhood sounds coming on? Added any recordings?", mine
+    )
+    assert not claims_his_project("I've been working on that old clock all morning.", mine)

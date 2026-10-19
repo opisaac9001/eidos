@@ -12,6 +12,7 @@ The rules are code; the models only voice it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
@@ -278,6 +279,48 @@ def patrick_heard(
             person_id=teller_id,
         ),
     ]
+
+
+def heard_in_conversation(
+    history: Sequence[DomainEvent], at: datetime, names: Mapping[str, str]
+) -> list[DomainEvent]:
+    """News someone passed on to him in conversation this past hour.
+
+    Hannah asked at lunch whether he'd heard about the new record shop: whatever the scene,
+    a resident's line that brings up news they hold and he doesn't means he's now heard it.
+    """
+    from eidos.application.town_story import TOWN
+    from eidos.application.town_story import mentioned as town_mentioned
+
+    claims = held(history)
+    his = {claim_id for claim_id, holder in claims if holder == PATRICK}
+    output: list[DomainEvent] = []
+    for turn in events_of(history, "scene.turn_taken")[-30:]:
+        speaker = str(turn.payload.get("actor_id") or "")
+        if speaker in {PATRICK, "user", ""} or turn.payload.get("audience_id") != PATRICK:
+            continue
+        try:
+            when = _at(turn)
+        except (KeyError, ValueError):
+            continue
+        if not timedelta(0) <= at - when <= timedelta(minutes=75):
+            continue
+        text = str(turn.payload.get("text", ""))
+        for (claim_id, holder), claim in claims.items():
+            if holder != speaker or claim_id in his:
+                continue
+            if claim.subject_id == TOWN:
+                said = town_mentioned(claim.story, text)
+            else:
+                subject = names.get(claim.subject_id, "").split()
+                said = (
+                    bool(subject) and re.search(rf"\b{re.escape(subject[0])}\b", text) is not None
+                )
+            if said:
+                teller = names.get(speaker, speaker).split()[0]
+                output += patrick_heard(claim, speaker, teller, when, turn)
+                his.add(claim_id)
+    return output
 
 
 def they_remember(

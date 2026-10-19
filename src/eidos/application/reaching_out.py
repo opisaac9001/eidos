@@ -130,6 +130,48 @@ def _said_already(history: Sequence[DomainEvent], person_id: str, text: str, at:
     return False
 
 
+_PLAIN = frozenset(
+    "they their them with about from been going some what when will would could things "
+    "still know feel feeling honestly actually though thanks soon week weeks next "
+    "today tomorrow".split()
+)
+
+
+def _news_words(text: str, name: str) -> set[str]:
+    first = name.split()[0].casefold() if name else ""
+    return {
+        word.removesuffix("'s")
+        for word in _SAME_WORD.findall(text.casefold())
+        if word not in _FILLER and word not in _PLAIN
+    } - {first, f"{first}'s"}
+
+
+def _about(text: str, news: Sequence[str], name: str) -> bool:
+    """Whether this text is about any of these pieces of their news."""
+    said = _news_words(text, name)
+    return any(said & _news_words(item, name) for item in news)
+
+
+def _told_them_about(
+    history: Sequence[DomainEvent],
+    person_id: str,
+    name: str,
+    news: Sequence[str],
+    at: datetime,
+) -> list[str]:
+    """The pieces of their news he's already texted them about in the last fortnight."""
+    told: list[str] = []
+    for event in reversed(events_of(history, REACHED)[-60:]):
+        when = _at(event)
+        if when is None or at - when > timedelta(days=14):
+            break
+        if event.payload.get("person_id") != person_id:
+            continue
+        sent = str(event.payload.get("text", ""))
+        told += [item for item in news if item not in told and _about(sent, [item], name)]
+    return told
+
+
 def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
     """Whether he's been with them in person in the last few hours."""
     if person_id == EMPLOYER_ID:
@@ -203,17 +245,28 @@ async def reach_out_events(
                 person_id=person_id,
             ),
         ]
+    their_news = [
+        str(item["what"])
+        for item in friends_lives_context(history, at, {person_id: person_name})
+        if item["who"] == person_name
+    ]
+    told = _told_them_about(
+        history,
+        person_id,
+        person_name,
+        # What's happening in their life, not what they last texted him.
+        [news for news in their_news if not news.startswith("told me lately")],
+        at,
+    )
     context = {
         "task": "call" if calling else "text",
         "time": at.isoformat(),
         "to": person_name,
         "who_they_are": who_they_are,
         "why_hes_getting_in_touch": [str(thought) for thought in on_his_mind][-3:],
-        "what_he_knows_of_their_life": [
-            item["what"]
-            for item in friends_lives_context(history, at, {person_id: person_name})
-            if item["who"] == person_name
-        ][:3],
+        # Less what he's already said his piece about: Beth heard "gutted you're moving to
+        # Bristol" five days running when her move stayed at the top of this list.
+        "what_he_knows_of_their_life": [news for news in their_news if news not in told][:3],
         "mood": mood,
         "permission": (
             f"Patrick rings {person_name} and they pick up. Write what he says first: one or "
@@ -245,7 +298,7 @@ async def reach_out_events(
         words = len(text.split())
         if not 2 <= words <= 60 or re.search(r"\b(as an ai|language model)\b", text, re.I):
             raise ProposalRejected("not_a_text", "That isn't a text he'd send")
-        if _said_already(history, person_id, text, at):
+        if _said_already(history, person_id, text, at) or _about(text, told, person_name):
             # "Gutted you're leaving but proper pleased for you", to Beth, four days running.
             raise ProposalRejected("said_already", "He's already said as much to them")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError) as error:

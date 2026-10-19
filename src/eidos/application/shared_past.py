@@ -76,10 +76,41 @@ def invents_shared_thing(text: str, grounded: str, projects: Sequence[str] = ())
             continue
         # His own project only counts if it's the one meant ("your atlas project"), not
         # any project at all ("the project with Rowan", which never existed).
-        if any(said & (set(_WORD.findall(p.casefold())) - {"project", "own"}) for p in projects):
+        if any(said & _title_words(p) for p in projects):
             continue
         return match.group(0)
     return None
+
+
+def _title_words(project: str) -> set[str]:
+    """The words of the project's own title: "atlas", "sounds", not "his" or "Patrick"."""
+    title = project.split(":", 1)[-1].casefold()
+    return set(_WORD.findall(title)) - {"project", "own", "make", "small", "the", "of", "a"}
+
+
+_MINE = re.compile(
+    r"\b(?:i've been|i have been|i'm|i am|i've started|i started)\s+(?:\w+\s+){0,2}?"
+    r"(?:working on|making|doing|recording|putting together)\b|\bmy (?:own )?(?:project|atlas|map)\b",
+    re.IGNORECASE,
+)
+
+
+def claims_his_project(text: str, projects: Sequence[str]) -> bool:
+    """Someone else talking about Patrick's project as theirs ("I've been working on this
+    small atlas of neighbourhood sounds", said by Ellis)."""
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if not _MINE.search(sentence):
+            continue
+        said = set(_WORD.findall(sentence.casefold()))
+        if any(len(said & _title_words(p)) >= 2 for p in projects):
+            return True
+    return False
+
+
+NOT_YOURS = (
+    "That project is Patrick's, not yours. Say it again: ask him about it, or talk about "
+    "something of your own."
+)
 
 
 THING_REVISION = (

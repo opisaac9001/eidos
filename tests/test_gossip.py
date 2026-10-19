@@ -228,3 +228,49 @@ def test_a_resident_has_a_state_of_their_own_when_he_meets_them() -> None:
     )
     fine = SimpleNamespace(energy=0.8, connection=0.6)
     assert _how_they_are([], fine, rowan, AT) is None
+
+
+def test_news_passed_on_in_any_conversation_counts_as_heard() -> None:
+    from eidos.application.gossip import heard_in_conversation, held
+
+    at = datetime(2026, 9, 8, 13, 5, tzinfo=timezone.utc)
+    hannah_knows = DomainEvent(
+        "gossip.heard",
+        "pathos",
+        {
+            "claim_id": "town:record_shop-2026-09-08",
+            "story": "town:record_shop",
+            "subject_id": "town",
+            "holder_id": "hannah",
+            "teller_id": "",
+            "text": "Someone's opening a secondhand record shop in the old bank.",
+            "version": 0,
+            "strength": 1.0,
+            "simulated_at": (at - timedelta(hours=2)).isoformat(),
+        },
+    )
+    said = DomainEvent(
+        "scene.turn_taken",
+        "pathos",
+        {
+            "scene_id": "lunch",
+            "actor_id": "hannah",
+            "audience_id": "pathos",
+            "text": "Patrick, did you hear about the new record shop opening up?",
+            "simulated_at": at.isoformat(),
+        },
+    )
+    names = {"hannah": "Hannah Fenwick"}
+    found = heard_in_conversation([hannah_knows, said], at, names)
+    assert ("town:record_shop-2026-09-08", "pathos") in held([hannah_knows, *found])
+    memory = next(e for e in found if e.kind == "memory.recorded")
+    assert memory.payload["text"].startswith("Hannah told me")
+    # Once he has it, nobody's telling him again.
+    assert heard_in_conversation([hannah_knows, said, *found], at, names) == []
+    # Talking about something else isn't passing it on.
+    other = DomainEvent(
+        "scene.turn_taken",
+        "pathos",
+        {**said.payload, "text": "Lovely day for it, isn't it?"},
+    )
+    assert heard_in_conversation([hannah_knows, other], at, names) == []

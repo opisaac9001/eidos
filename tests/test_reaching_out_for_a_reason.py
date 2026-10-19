@@ -256,3 +256,26 @@ def test_a_friend_doesnt_send_the_same_reply_twice(tmp_path) -> None:
     assert not any(
         event.kind == REPLIED and event.payload.get("contact_id") == "c-new" for event in events
     )
+
+
+def test_once_hes_said_his_piece_about_their_news_he_doesnt_again() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from eidos.application.reaching_out import _about, _told_them_about
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 9, 8, 11, tzinfo=timezone.utc)
+    news = ["Beth's moving to Bristol. A job they couldn't turn down. I'm gutted, honestly."]
+    sent = DomainEvent(
+        "contact.reached_out",
+        "pathos",
+        {
+            "person_id": "beth",
+            "text": "Proper gutted you're leaving us for Bristol, but pleased for you.",
+            "simulated_at": (at - timedelta(days=3)).isoformat(),
+        },
+    )
+    told = _told_them_about([sent], "beth", "Beth Pritchard", news, at)
+    assert told == news
+    assert _about("Still feeling flat knowing you're moving to Bristol.", told, "Beth Pritchard")
+    assert not _about("How did the market go today?", told, "Beth Pritchard")

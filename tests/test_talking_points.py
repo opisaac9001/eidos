@@ -97,6 +97,27 @@ def test_his_own_project_is_something_people_can_ask_about() -> None:
             "simulated_at": AT.isoformat(),
         },
     )
-    assert his_projects([goal]) == ["his own project: Make a small atlas of neighbourhood sounds"]
+    assert his_projects([goal]) == [
+        "Patrick's own project (his, nobody else's): Make a small atlas of neighbourhood sounds"
+    ]
     points = dict(talking_points([goal], AT, "mara", "Mara", "cafe"))
     assert "his-project-0" in points
+
+
+def test_dropping_in_at_the_workshop_is_visiting_ellis() -> None:
+    at = datetime(2026, 9, 8, 15, tzinfo=timezone.utc)
+    booked = DomainEvent(
+        "schedule.created",
+        "pathos",
+        {
+            "schedule_id": "workshop-drop-in-2026-09-08",
+            "title": "Drop in at the workshop to give Ellis a hand",
+            "starts_at": (at - timedelta(hours=1)).isoformat(),
+            "ends_at": (at + timedelta(hours=1)).isoformat(),
+            "location_id": "workshop",
+            "actor_id": "pathos",
+            "simulated_at": at.isoformat(),
+        },
+    )
+    said = setting([booked], at, "The workshop", "Ellis")
+    assert "Ellis's repair workshop" in said and "Ellis runs it" in said

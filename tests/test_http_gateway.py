@@ -527,3 +527,13 @@ class GatewayTests(unittest.TestCase):
     def test_endpoint_credentials_rejected(self):
         with self.assertRaises(ValueError):
             HTTPModelGateway("http://user:secret@example.com/v1", "model")
+
+
+def test_a_line_that_names_the_simulation_is_turned_away() -> None:
+    import pytest
+
+    from eidos.adapters.http_gateway import _refuse_other_script
+
+    with pytest.raises(ValueError):
+        _refuse_other_script('{"text": "Let\'s capture the sounds of Eidos."}')
+    _refuse_other_script('{"text": "Let\'s capture the sounds of the market."}')

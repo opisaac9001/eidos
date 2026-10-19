@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from eidos.application.freelance import STARTED, TOLD, leaving_day
+from eidos.application.freelance import DROP_IN_PREFIX, STARTED, TOLD, leaving_day
 from eidos.application.gossip import worth_mentioning
 from eidos.application.life_context import latest_weather
 from eidos.application.repair_jobs import bench_view
@@ -90,7 +90,7 @@ def talking_points(
 def his_projects(history: Sequence[DomainEvent]) -> list[str]:
     """His own projects on the go (an atlas of town sounds), which people may ask about."""
     return [
-        f"his own project: {goal.title}"
+        f"Patrick's own project (his, nobody else's): {goal.title}"
         for goal in project_planning(history).goals.values()
         if goal.status == "active" and goal.goal_id.startswith("pathos-project-")
     ][:2]
@@ -109,5 +109,13 @@ def setting(
         if starts <= at < ends:
             if entry.schedule_id.startswith("work-rota-"):
                 return f"Patrick is at work, on his shift at the bench alongside {partner_name}"
+            if entry.schedule_id.startswith(DROP_IN_PREFIX):
+                return (
+                    "Patrick has dropped in at Ellis's repair workshop to give Ellis a hand at "
+                    "the bench. It's Ellis's workshop and Ellis runs it; Patrick used to work "
+                    "there and is a freelance writer now, visiting as a friend"
+                )
             return f"Patrick is at {place_name} for this: {entry.title}"
+    if place_name.casefold().endswith("workshop") and events_of(history, STARTED):
+        return "Patrick is visiting Ellis's repair workshop, where he used to work; it's Ellis's"
     return f"Patrick is at {place_name}"

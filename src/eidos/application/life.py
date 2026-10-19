@@ -88,6 +88,7 @@ from eidos.application.friends_lives import (
 from eidos.application.friendship import friendships
 from eidos.application.gossip import (
     gossip_events,
+    heard_in_conversation,
     patrick_heard,
     they_remember,
     worth_mentioning,
@@ -220,7 +221,7 @@ from eidos.application.selfhood import (
 )
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.setbacks import setback_events
-from eidos.application.shared_past import invents_shared_thing
+from eidos.application.shared_past import claims_his_project, invents_shared_thing
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.sleep_trouble import HOUR as SLEEP_TROUBLE_HOUR
 from eidos.application.sleep_trouble import sleep_trouble_events
@@ -3284,6 +3285,13 @@ class Life(LifeConversation):
                 )
             )
             pending.extend(
+                heard_in_conversation(
+                    history + pending,
+                    current,
+                    {pid: person.name for pid, person in town.people.items()},
+                )
+            )
+            pending.extend(
                 opinion_events(
                     history + pending,
                     current,
@@ -3686,6 +3694,9 @@ class Life(LifeConversation):
         )
         if invents_shared_thing(text, grounded, his_projects(history)):
             # Mara asking whether he's talked to Rowan "about the project": there is none.
+            return
+        if claims_his_project(text, his_projects(history)):
+            # Ellis telling him about "this small atlas of neighbourhood sounds" of theirs.
             return
         encounter = DomainEvent(
             "npc.encountered",
