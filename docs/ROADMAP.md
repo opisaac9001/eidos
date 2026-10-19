@@ -3,11 +3,11 @@
 Updated September 6, 2026. This is a design and delivery plan, not a claim that
 the planned behavior exists. Milestones are dependency-driven, not dated promises.
 
-September 8 implementation follow-up: [Lived-day integration and verified results](LIVED_DAY_2026_09_08.md).
+September 8 implementation follow-up: [Lived-day integration and verified results](reports/LIVED_DAY_2026_09_08.md).
 This records the new activity, journey, interruption, relationship, UI and model-test
 work, along with the remaining gaps; it does not mark this entire roadmap complete.
 
-September 9 implementation follow-up: [Bounded volition and lived consequences](VOLITION_2026_09_09.md).
+September 9 implementation follow-up: [Bounded volition and lived consequences](reports/VOLITION_2026_09_09.md).
 This records the limited-attention choice field, explicit inaction, uncertain effort,
 missed notifications, physical meal integration, UI inspection and real-model trial.
 
@@ -163,7 +163,7 @@ memory copies and unmarked dreams are rejected. This is not semantic validation.
 ## Delivery sequence
 
 The current natural-life workstream is tracked in
-[Natural life next](NATURAL_LIFE_NEXT.md), including flexible preparation around fixed
+[Natural life next](reports/NATURAL_LIFE_NEXT.md), including flexible preparation around fixed
 commitments, interruption-aware effort and the remaining eight-area behavioural gates.
 Its status supersedes older authored-routine descriptions in this roadmap; it is not
 a claim that all natural-world systems are finished.
@@ -566,7 +566,7 @@ boundaries and must not rely on emotional coercion.
 
 ## Immediate implementation queue
 
-Latest local follow-up: [Flexible mornings and actual consequences](FLEXIBLE_MORNINGS_2026_09_08.md).
+Latest local follow-up: [Flexible mornings and actual consequences](reports/FLEXIBLE_MORNINGS_2026_09_08.md).
 The dated reports track implementation and evidence; the older queue below remains
 historical context rather than a current server-status report.
 

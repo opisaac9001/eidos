@@ -1,0 +1,40 @@
+name: Life report
+description: Something in his life that a real person wouldn't do, think or know.
+labels: [realism]
+body:
+  - type: markdown
+    attributes:
+      value: The question behind every part of Eidos is "would a real person do, think or know this?" If you saw something that fails it, a strange thought, a contradiction, a repeat, or him knowing something he couldn't, tell us here.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of thing?
+      options:
+        - A thought (the inner stream)
+        - Something he said or texted
+        - Something someone else said
+        - What he did or chose
+        - Something he knew but couldn't have
+        - A memory or how he remembered something
+        - Something repeating
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Quote it if you can, with his time and day.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why isn't it how a real person would be?
+    validations:
+      required: true
+  - type: input
+    id: models
+    attributes:
+      label: Which models were running?
+      placeholder: "stand-ins, or the models for his voice and inner stream"

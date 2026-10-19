@@ -182,7 +182,7 @@ const labels = {
   "object.ownership_changed": "OBJECT OWNERSHIP CHANGED",
   "object.opportunity_evaluated": "A USEFUL OBJECT CONSIDERED",
   "object.used": "AN OBJECT USED",
-  "object.collaboration_decided": "A NEIGHBOR DECIDED WHETHER TO JOIN",
+  "object.collaboration_decided": "A NEIGHBOUR DECIDED WHETHER TO JOIN",
   "object.shared_use": "A SHARED PRACTICAL MOMENT",
   "object.maintenance_required": "AN OBJECT NEEDS MAINTENANCE",
   "object.maintenance_decided": "A MAINTENANCE CHOICE",
@@ -512,14 +512,66 @@ async function mutate(path, body, paceFrom) {
   }
 }
 
+// A real town centre packs nine places into a few streets, so pins and labels piled on
+// top of each other. Spread the map out from the middle (a gentle fisheye, keeping each
+// place's direction), then nudge apart any pins that still overlap.
+function spreadOut(places) {
+  if (places.length < 3) return places;
+  const mid = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const cx = mid(places.map((p) => p.x));
+  const cy = mid(places.map((p) => p.y));
+  const far = Math.max(...places.map((p) => Math.hypot(p.x - cx, p.y - cy)), 1);
+  const points = places.map((place) => {
+    const dx = place.x - cx;
+    const dy = place.y - cy;
+    const d = Math.hypot(dx, dy);
+    const k = d ? (Math.pow(d / far, 0.5) * 44) / d : 0;
+    return { ...place, x: 50 + dx * k, y: 50 + dy * k };
+  });
+  // Use the whole panel, edge to edge.
+  const fit = (key, low, high) => {
+    const values = points.map((p) => p[key]);
+    const min = Math.min(...values);
+    const span = Math.max(...values) - min || 1;
+    for (const p of points) p[key] = low + ((p[key] - min) / span) * (high - low);
+  };
+  fit("x", 9, 81);
+  fit("y", 10, 84);
+  for (let pass = 0; pass < 80; pass += 1) {
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const a = points[i];
+        const b = points[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 0.01;
+        if (d < 16) {
+          const push = (16 - d) / 2;
+          a.x -= (dx / d) * push;
+          a.y -= (dy / d) * push;
+          b.x += (dx / d) * push;
+          b.y += (dy / d) * push;
+        }
+      }
+    }
+    for (const p of points) {
+      p.x = Math.min(81, Math.max(9, p.x));
+      p.y = Math.min(86, Math.max(10, p.y));
+    }
+  }
+  return points.map((p) => ({ ...p, x: Number(p.x.toFixed(1)), y: Number(p.y.toFixed(1)) }));
+}
+
 function mapMarkup(large) {
   const icons = { home: "⌂", cafe: "◒", workshop: "◇", park: "✳" };
   // He only knows the places he has been or noticed; the operator sees the whole town.
   const undiscovered = (id) => state.city_map?.places?.[id]?.experience === "undiscovered";
   // Somewhere a train ride away (his parents') isn't part of the town map.
   const farAway = (id) => Boolean(state.city_map?.places?.[id]?.far_away);
-  const shown = state.locations.filter(
-    (place) => !farAway(place.id) && (operatorMode || !undiscovered(place.id)),
+  const shown = spreadOut(
+    state.locations.filter(
+      (place) => !farAway(place.id) && (operatorMode || !undiscovered(place.id)),
+    ),
   );
   const routes = (state.city_map?.routes || []).map((route) => {
     const a = shown.find(p => p.id === route.from);
@@ -565,7 +617,7 @@ function renderPlace() {
   const others = Number(ambient?.estimated_people || 0);
   const objects = state.objects.filter((item) => pathosHere && item.location_id === place.id);
   $("place-detail").innerHTML =
-    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><p class="context-note">${esc(state.city_map?.places?.[place.id]?.visits || 0)} recorded arrivals · ${esc({ known_not_visited: "Known, not yet visited", undiscovered: "He hasn't noticed this place yet" }[state.city_map?.places?.[place.id]?.experience] || "Part of his lived world")}</p><div class="eyebrow">WHAT HE CAN SEE</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>Pathos cannot see who is here right now.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbors have their own homes; they do not share Pathos’s apartment.</p>' : ""}`;
+    `<div class="panel-kicker">A PLACE IN FIRMAMENT <span class="muted">0${state.locations.indexOf(place) + 1}</span></div><h2>${esc(place.name)}</h2><p>${esc(place.description)}</p><p class="context-note">${esc(state.city_map?.places?.[place.id]?.visits || 0)} recorded arrivals · ${esc({ known_not_visited: "Known, not yet visited", undiscovered: "He hasn't noticed this place yet" }[state.city_map?.places?.[place.id]?.experience] || "Part of his lived world")}</p><div class="eyebrow">WHAT HE CAN SEE</div>${pathosHere ? '<div class="occupant"><span class="avatar">P</span><span>Pathos</span></div>' : ""}${people.map((p) => `<div class="occupant"><span class="avatar">${esc(p.name[0])}</span><span>${esc(p.name)}</span></div>`).join("")}${others ? `<p class="context-note">About ${others} other ${others === 1 ? "person is" : "people are"} around. ${esc(ambient.activity)}. The place feels ${esc(ambient.pace)}.</p>` : ""}${!pathosHere && !people.length && !others ? "<p>Pathos cannot see who is here right now.</p>" : ""}${objects.length ? `<div class="eyebrow">OBJECTS</div>${objects.map((item) => `<div class="occupant"><span class="avatar">◇</span><span>${esc(item.name)} · ${esc(item.condition)}${item.quantity == null ? "" : ` · ${esc(item.quantity)} ${esc(item.unit)}`}<small>owner ${esc(item.owner_id)} · held by ${esc(item.custodian_id)}</small></span></div>`).join("")}` : ""}${place.id === "home" ? '<p class="context-note">Neighbours have their own homes; they don’t share his flat.</p>' : ""}`;
 }
 
 function feedMarkup(items, full = false) {
@@ -1861,7 +1913,7 @@ function render(next) {
     ? `<div><span class="eyebrow">AGREED COMMITMENT</span><strong>${esc(commitment.title)}</strong><small>${esc(commitment.status)} · ${socialRequest ? `${socialRequest.rounds} negotiation round${socialRequest.rounds === 1 ? "" : "s"} · ` : ""}due ${esc(date(commitment.due_at))} ${esc(time(commitment.due_at))}</small></div><div><span class="eyebrow">OWNED INTENTION</span><strong>${esc(intention ? `${intention.action} ${object.name}` : appointment.title)}</strong><small>${esc(intention?.status || appointment.status)} · ${esc(intention?.motivation || "scheduled")} · ${esc(date(appointment.starts_at))} ${esc(time(appointment.starts_at))}</small></div><div><span class="eyebrow">OBJECT STATE</span><strong>${esc(object.name)}</strong><small>${esc(object.condition)} · at ${esc(state.locations.find((place) => place.id === object.location_id)?.name || object.location_id)}</small></div>`
     : '<p class="muted">No active commitments yet.</p>';
   $("neighborhood-status").textContent =
-    `${state.people.length} neighbors · ${state.locations.length} places`;
+    `${state.people.length} neighbours · ${state.locations.length} places`;
   $("event-count").textContent = state.counts.events.toLocaleString();
   $("memory-count").textContent = state.counts.memories.toLocaleString();
   $("day-count").textContent = state.day;

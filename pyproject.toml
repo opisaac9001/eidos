@@ -1,14 +1,35 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "eidos"
 version = "0.1.0"
-description = "A local-first persistent digital person simulation"
+description = "A persistent simulated person whose life goes on whether or not you're talking to him"
+readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE.md", "NOTICE.md", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.12"
 authors = [{ name = "Isaac Lamb" }]
+keywords = ["simulation", "generative-agents", "artificial-life", "local-first", "llm", "event-sourcing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Games/Entertainment :: Simulation",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/opisaac9001/eidos"
+Documentation = "https://github.com/opisaac9001/eidos/tree/main/docs"
+Issues = "https://github.com/opisaac9001/eidos/issues"
+Changelog = "https://github.com/opisaac9001/eidos/blob/main/CHANGELOG.md"
 
 [project.scripts]
 eidos = "eidos.cli:main"

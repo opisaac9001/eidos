@@ -169,7 +169,7 @@ accepted result.
 ## Next connection
 
 The HTTP adapter is implemented and tested against the small lab server; see
-[local models](LOCAL_MODELS.md). State reads use a cached committed snapshot
+[local models](../LOCAL_MODELS.md). State reads use a cached committed snapshot
 during generation, while writes remain serialized. Durable jobs, cancellation,
 and per-role model selection remain follow-ups. Keep the stand-in adapter as a
 fast test backend. No model is granted world-editing authority by the transport.

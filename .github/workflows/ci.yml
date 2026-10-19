@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, evolve/true-self]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: mypy src
+      - run: python -m pytest -q
+      - name: Live a simulated day
+        run: |
+          eidos --database /tmp/eidos-smoke.sqlite3 advance --hours 24
+          eidos --database /tmp/eidos-smoke.sqlite3 status

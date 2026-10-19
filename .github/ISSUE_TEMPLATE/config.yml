@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and early ideas
+    url: https://github.com/opisaac9001/eidos/discussions
+    about: Ask in Discussions before opening an issue.
+  - name: Security vulnerability
+    url: https://github.com/opisaac9001/eidos/blob/main/SECURITY.md
+    about: Report privately as described in SECURITY.md; please don't open a public issue.

@@ -1,7 +1,7 @@
 # Dell T630 inference host
 
 Latest checked code deployment: `natural20260908a`, September 8, 2026.
-See [deployment and recovery record](../../docs/DEPLOYMENT_2026_09_08.md).
+See [deployment and recovery record](../../docs/reports/DEPLOYMENT_2026_09_08.md).
 The service is running, but Pathos's simulation clock remains paused.
 
 This directory contains the systemd configuration for the commissioned Ubuntu

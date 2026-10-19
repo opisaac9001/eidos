@@ -1,0 +1,49 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting. Please don't include model keys, tokens or anything personal from your conversations with him. For security problems, use the Security tab instead.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where did it happen?
+      options:
+        - The Observatory (web interface)
+        - Operator view
+        - CLI
+        - Model setup or a provider
+        - Home-server deployment (infra/)
+        - The simulation itself
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "git rev-parse --short HEAD"
+  - type: input
+    id: setup
+    attributes:
+      label: Python version, OS and models
+      placeholder: "Python 3.12, macOS 26, stand-ins / Ollama qwen3:14b…"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error messages
+      render: text

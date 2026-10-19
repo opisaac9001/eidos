@@ -1,0 +1,23 @@
+name: Feature request
+description: An idea that would make his life more real or Eidos more useful.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like him to do, or Eidos to do?
+      description: Describe the moment or the problem, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits the principles
+      options:
+        - label: Works offline, without an account or a cloud service
+        - label: Rules decide what's true; models only word it or propose
+        - label: He'd only know what his life has given him
