@@ -126,8 +126,7 @@ def scheduled_social_events(
                 consequence(
                     "memory.recorded",
                     {
-                        "text": "I showed up for my planned time with "
-                        f"{target_id.replace('-', ' ').title()}.",
+                        "text": _kept_plan(entry.title, target_id),
                         "owner": "pathos",
                         "category": "encounter",
                         "source": "deterministic-consequence",
@@ -143,3 +142,13 @@ def scheduled_social_events(
             )
         )
     return output
+
+
+def _kept_plan(title: str, target_id: str) -> str:
+    """How he'd remember keeping a plan with someone, by their name, not an id."""
+    if title.startswith("Spend time with "):
+        name = title.removeprefix("Spend time with ").split()[0]
+        return f"Met up with {name} as we'd arranged."
+    if target_id.startswith("townsfolk-"):
+        return f"Kept to our plan: {title[0].lower()}{title[1:]}."
+    return f"Met up with {target_id.replace('-', ' ').title().split()[0]} as we'd arranged."

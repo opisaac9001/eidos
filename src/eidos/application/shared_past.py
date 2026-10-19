@@ -59,7 +59,7 @@ _SHARED_THING = re.compile(
 )
 
 
-def invents_shared_thing(text: str, grounded: str) -> str | None:
+def invents_shared_thing(text: str, grounded: str, projects: Sequence[str] = ()) -> str | None:
     """A thing spoken of as already known between them that nothing true supplies.
 
     One made-up line ("that old project") went into a resident's memory of him, and from
@@ -69,10 +69,16 @@ def invents_shared_thing(text: str, grounded: str) -> str | None:
     remember, which is how the made-up thing spread.
     """
     known = grounded.casefold()
+    said = set(_WORD.findall(text.casefold())) - {"project", "projects"}
     for match in _SHARED_THING.finditer(text):
         thing = match.group(1).casefold().rstrip("s") or match.group(1).casefold()
-        if thing not in known:
-            return match.group(0)
+        if thing in known:
+            continue
+        # His own project only counts if it's the one meant ("your atlas project"), not
+        # any project at all ("the project with Rowan", which never existed).
+        if any(said & (set(_WORD.findall(p.casefold())) - {"project", "own"}) for p in projects):
+            continue
+        return match.group(0)
     return None
 
 

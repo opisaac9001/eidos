@@ -106,6 +106,30 @@ ALREADY_SAID = (
 )
 
 
+_SAME_WORD = re.compile(r"[a-z']{4,}")
+_FILLER = frozenset(
+    "just been thinking about wanted that this with your you're really proper cheers "
+    "hope have hey".split()
+)
+
+
+def _said_already(history: Sequence[DomainEvent], person_id: str, text: str, at: datetime) -> bool:
+    """Whether he's texted them much the same thing in the last week."""
+    words = set(_SAME_WORD.findall(text.casefold())) - _FILLER
+    if len(words) < 3:
+        return False
+    for event in reversed(events_of(history, REACHED)[-40:]):
+        when = _at(event)
+        if when is None or at - when > timedelta(days=7):
+            break
+        if event.payload.get("person_id") != person_id:
+            continue
+        before = set(_SAME_WORD.findall(str(event.payload.get("text", "")).casefold())) - _FILLER
+        if before and len(words & before) / len(words | before) >= 0.2:
+            return True
+    return False
+
+
 def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
     """Whether he's been with them in person in the last few hours."""
     if person_id == EMPLOYER_ID:
@@ -221,6 +245,9 @@ async def reach_out_events(
         words = len(text.split())
         if not 2 <= words <= 60 or re.search(r"\b(as an ai|language model)\b", text, re.I):
             raise ProposalRejected("not_a_text", "That isn't a text he'd send")
+        if _said_already(history, person_id, text, at):
+            # "Gutted you're leaving but proper pleased for you", to Beth, four days running.
+            raise ProposalRejected("said_already", "He's already said as much to them")
     except (OSError, TimeoutError, TypeError, ValueError, AttributeError) as error:
         code = error.code if isinstance(error, ProposalRejected) else "proposal_failed"
         return [_trace("failed", at, started, None, gateway, code)]

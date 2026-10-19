@@ -144,14 +144,10 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
             )
             person = project_npcs([*history, *output], now).people[actor_id]
 
-        meeting = next(
-            (
-                item
-                for item in appointments.get(actor_id, ())
-                if item[1] - timedelta(hours=2) < now < item[2]
-            ),
-            None,
-        )
+        # The meeting that's on now comes first, then the next one: with a market wander
+        # at eleven and a coffee at one, Beth walked home from the market at 11:02 because
+        # the coffee was looked at first and it was too early to set off for it.
+        meeting = current_meeting(appointments.get(actor_id, ()), now)
         if meeting is not None and person.location_id != "in-transit":
             schedule_id, starts, ends, place = meeting
             # Someone who agreed to meet him turns up, and stays until the time is over.
@@ -173,6 +169,10 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
                         "reason": "meeting Pathos as agreed",
                     },
                 )
+                continue
+            if person.location_id not in {"home", place}:
+                # Somewhere else with a while to go before meeting him: they stay put rather
+                # than heading home in between.
                 continue
 
         workday = workdays.get((actor_id, now.date().isoformat()))
@@ -476,6 +476,17 @@ def _employer_workdays(
 _CLOSED = frozenset(
     {"schedule.cancelled", "schedule.failed", "schedule.completed", "schedule.interrupted"}
 )
+
+
+def current_meeting(
+    appointments: Sequence[tuple[str, datetime, datetime, str]], now: datetime
+) -> tuple[str, datetime, datetime, str] | None:
+    """The meeting with him that matters now: one under way, else the next one soon."""
+    return min(
+        (item for item in appointments if item[1] - timedelta(hours=2) < now < item[2]),
+        key=lambda item: (not item[1] <= now < item[2], item[1]),
+        default=None,
+    )
 
 
 def _appointments_with_pathos(

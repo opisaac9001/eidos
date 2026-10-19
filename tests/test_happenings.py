@@ -79,3 +79,28 @@ def test_no_more_than_a_couple_a_day_and_none_while_asleep() -> None:
         )
     assert len([e for e in history if e.kind == HAPPENED]) <= 2
     assert happen([went_out(MORNING)], MORNING, weather="Light rain", awake=False) == []
+
+
+def test_the_phone_doesnt_die_every_evening() -> None:
+    history: list[DomainEvent] = []
+    died = []
+    for day in range(14):
+        evening = MORNING.replace(hour=20) + timedelta(days=day)
+        # A chatty day: plenty of messages.
+        history += [
+            DomainEvent(
+                "chat.message", "pathos", {"text": "hi", "simulated_at": evening.isoformat()}
+            )
+            for _ in range(9)
+        ]
+        for hour in range(19, 23):
+            at = evening.replace(hour=hour)
+            out = happening_events(
+                history, at, awake=True, location_id="home", weather="Cloudy",
+                alertness=0.8, at_work=False, next_commitment=None,
+            )  # fmt: skip
+            history += out
+            died += [at for e in out if e.kind == HAPPENED and e.payload["kind"] == "phone_died"]
+    assert 0 < len(died) <= 2
+    if len(died) == 2:
+        assert died[1] - died[0] >= timedelta(days=10)

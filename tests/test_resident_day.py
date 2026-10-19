@@ -53,3 +53,28 @@ def test_nobody_stays_in_the_cafe_after_it_shuts() -> None:
             ):
                 if place == "cafe":
                     assert 7 <= start and end <= 18
+
+
+def test_she_stays_for_the_market_wander_before_the_coffee_at_one() -> None:
+    from eidos.application.npc_movement import current_meeting
+
+    saturday = SATURDAY.replace(hour=11, minute=2)
+    market = (
+        "market",
+        saturday.replace(hour=11, minute=0),
+        saturday.replace(hour=12),
+        "market-hall",
+    )
+    coffee = ("coffee", saturday.replace(hour=13, minute=0), saturday.replace(hour=14), "cafe")
+    # The coffee was agreed first and listed first; the wander is the one on now.
+    assert current_meeting([coffee, market], saturday) == market
+    assert current_meeting([coffee, market], saturday.replace(hour=12, minute=10)) == coffee
+
+
+def test_a_kept_plan_is_remembered_by_name() -> None:
+    from eidos.application.social_activity import _kept_plan
+
+    assert _kept_plan("Spend time with Beth Pritchard", "townsfolk-8103") == (
+        "Met up with Beth as we'd arranged."
+    )
+    assert "Townsfolk" not in _kept_plan("A wander round the market", "townsfolk-8103")

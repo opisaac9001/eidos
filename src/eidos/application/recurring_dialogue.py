@@ -322,16 +322,16 @@ async def _advance_scene(
             if text is not None and near_repeat(text, their_lines):
                 text = None
         grounded = (
-            " ".join(
-                [
-                    *(str(asked.get(key, "")) for key in ("scene_topic", "setting", "his_news")),
-                    *his_projects(combined),
-                ]
-            )
+            " ".join(str(asked.get(key, "")) for key in ("scene_topic", "setting", "his_news"))
             if asked
             else ""
         )
-        if text is not None and asked is not None and invents_shared_thing(text, grounded):
+        projects = his_projects(combined)
+        if (
+            text is not None
+            and asked is not None
+            and invents_shared_thing(text, grounded, projects)
+        ):
             # "Have you talked to Ellis about that old project yet?": there is no project.
             text = await perform(
                 gateway,
@@ -340,7 +340,7 @@ async def _advance_scene(
                 simulated_at.isoformat(),
                 output,
             )
-            if text is not None and invents_shared_thing(text, grounded):
+            if text is not None and invents_shared_thing(text, grounded, projects):
                 text = None
         if (
             text is not None

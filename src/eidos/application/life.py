@@ -700,8 +700,12 @@ class Life(LifeConversation):
         if kind == "family" and not 9 <= at.hour <= 21:
             return "later: too late or too early to ring"
         if kind == "contact":
-            # Why he wants to get in touch, not every passing mention of their name.
-            thoughts = [text for text in thoughts if contact_reasons(text)] or thoughts
+            # Why he wants to get in touch, not every passing mention of their name. With
+            # no reason at all ("Ellis's hands, steady"), there's nothing to text about:
+            # "Hope your hands are resting easy" went to Ellis from exactly that.
+            thoughts = [text for text in thoughts if contact_reasons(text)]
+            if not thoughts:
+                return "let go"
             not_now = why_not(history, at, str(impulse.get("target", "")))
             if not_now in {"too late or too early to text", "just been in touch with someone"}:
                 return f"later: {not_now}"
@@ -3585,10 +3589,9 @@ class Life(LifeConversation):
                 _what_he_means_to_say(history, person),
                 news.text if news else "",
                 _how_they_are(history, npc, person, now),
-                *his_projects(history),
             )
         )
-        if invents_shared_thing(text, grounded):
+        if invents_shared_thing(text, grounded, his_projects(history)):
             # Mara asking whether he's talked to Rowan "about the project": there is none.
             return
         encounter = DomainEvent(

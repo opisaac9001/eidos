@@ -399,3 +399,26 @@ def test_after_a_shift_at_the_bench_he_doesnt_text_ellis() -> None:
     )
     assert why_not([shift], at, "ellis") == "just seen them"
     assert why_not([shift], at, "rowan") is None
+
+
+def test_he_doesnt_text_the_same_thing_twice_in_a_week() -> None:
+    from eidos.application.reaching_out import _said_already
+
+    at = datetime(2026, 9, 6, 15, 0, tzinfo=timezone.utc)
+    before = DomainEvent(
+        REACHED,
+        "pathos",
+        {
+            "person_id": "beth",
+            "text": "Hey Beth, been thinking about you. Just wanted to say I'm really gutted "
+            "you're moving but proper pleased for you about the new job",
+            "simulated_at": (at - timedelta(days=1)).isoformat(),
+        },
+    )
+    again = (
+        "Hey Beth, just been thinking about you and wanted to say I'm proper gutted you're "
+        "leaving us. Hope the market sales go well"
+    )
+    assert _said_already([before], "beth", again, at)
+    assert not _said_already([before], "beth", "How was the market? Did the jugs sell?", at)
+    assert not _said_already([before], "beth", again, at + timedelta(days=9))

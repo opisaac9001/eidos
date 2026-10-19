@@ -44,6 +44,18 @@ def phone_dead(history: Sequence[DomainEvent], at: datetime) -> bool:
     return False
 
 
+# Days before the same small thing can happen again.
+_GAP_DAYS = {
+    "phone_died": 10,
+    "knock_at_door": 21,
+    "parcel_next_door": 7,
+    "lost_keys": 6,
+    "nicked_thumb": 10,
+    "cutting_it_fine": 3,
+    "caught_in_rain": 2,
+}
+
+
 def happening_events(
     history: Sequence[DomainEvent],
     at: datetime,
@@ -142,8 +154,17 @@ def happening_events(
                 {},
             )
         )
+    last_time: dict[str, datetime] = {}
+    for event in events_of(history, HAPPENED)[-200:]:
+        if (when := _at(event)) is not None:
+            last_time[str(event.payload.get("kind"))] = when
     for kind, chance, text, tone, extra in candidates:
         if kind in kinds_today or _roll(kind, hour) >= chance:
+            continue
+        since = last_time.get(kind)
+        if since is not None and at - since < timedelta(days=_GAP_DAYS.get(kind, 3)):
+            # The phone dies now and then, not every evening; the church roof collectors
+            # don't knock twice in a week.
             continue
         happened = DomainEvent(
             HAPPENED,

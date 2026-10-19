@@ -115,3 +115,11 @@ def test_a_made_up_project_isnt_something_they_both_know_about() -> None:
     )
     # An ordinary question about plans isn't a made-up shared thing.
     assert not invents_shared_thing("What are your plans this weekend?", "the weather")
+
+
+def test_his_project_is_the_one_meant_not_any_project() -> None:
+    from eidos.application.shared_past import invents_shared_thing
+
+    mine = ["his own project: Make a small atlas of neighbourhood sounds"]
+    assert not invents_shared_thing("Started your atlas project yet?", "the weather", mine)
+    assert invents_shared_thing("How's the project with Rowan coming along?", "the weather", mine)

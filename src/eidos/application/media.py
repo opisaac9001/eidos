@@ -411,7 +411,7 @@ def _progress(
         },
         correlation_id=f"media-{work.media_id}",
     )
-    feeling = liking(work)
+    feeling = _as_it_went(history, work)
     # Something he really isn't getting on with gets dropped, a third of the way in.
     if kind != "album" and feeling <= -0.3 and done >= work.units // 3:
         return [progressed, *_ended(work, at, feeling, gave_up=True)]
@@ -422,6 +422,33 @@ def _progress(
             *_taste(history, work, feeling, at),
         ]
     return [progressed]
+
+
+def _as_it_went(history: Sequence[DomainEvent], work: Work) -> float:
+    """What he made of it: his leaning, and how the sittings with it actually felt.
+
+    He enjoyed reading Stoner session after session and then "didn't really get on with
+    it": the verdict ignored the reading. The time spent with it now has the larger say.
+    """
+    started = next(
+        (
+            _time(event)
+            for event in reversed(events_of(history, "media.started"))
+            if event.payload.get("media_id") == work.media_id
+        ),
+        None,
+    )
+    kinds = {kind for kind, media in _DOING_KIND.items() if media == work.kind}
+    felt = [
+        float(event.payload["enjoyment"])
+        for event in events_of(history, "experience.felt")[-300:]
+        if event.payload.get("activity_type") in kinds
+        and isinstance(event.payload.get("enjoyment"), (int, float))
+        and (started is None or _time(event) >= started)
+    ]
+    if len(felt) < 2:
+        return liking(work)
+    return round(max(-1.0, min(1.0, 0.4 * liking(work) + 0.6 * sum(felt) / len(felt))), 2)
 
 
 def _ended(work: Work, at: datetime, feeling: float, *, gave_up: bool) -> list[DomainEvent]:

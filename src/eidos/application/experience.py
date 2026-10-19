@@ -11,6 +11,7 @@ mind. None of it is known to him in advance or scripted by a model: his tastes a
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from hashlib import sha256
 from statistics import fmean
@@ -91,6 +92,10 @@ def place_category(place_id: str, action: str | None = None) -> str:
         if place_id in members:
             return category
     return "culture" if action == "learn" else "public"
+
+
+# Everyday habits too small to become a taste ("found something I love: the kettle").
+_TOO_SMALL_TO_LOVE = frozenset({"kettle_tea", "scroll_phone", "sofa", "shower", "window"})
 
 
 def experience_events(
@@ -205,9 +210,10 @@ def experience_events(
     )
     output = [felt]
     first_visit = any(text == "it was somewhere new" for _, text, _ in parts)
-    doing = _gerund(title)
+    # His own memory: "writing in my notebook", not "in his notebook".
+    doing = re.sub(r"\bhis\b", "my", _gerund(title))
     # A cup of tea is only remembered when it was more than a cup of tea.
-    if abs(enjoyment) >= (0.55 if everyday else 0.3) or first_visit:
+    if abs(enjoyment) >= (0.7 if everyday else 0.3) or first_visit:
         sentence = f"{doing}: {_verdict(enjoyment)}."
         if reasons:
             joined = " and ".join(reasons)
@@ -215,7 +221,8 @@ def experience_events(
         output.append(_memory(felt, sentence, at, importance=0.3 + 0.3 * abs(enjoyment)))
     subjects = (
         []
-        if activity_type in GENERIC_OUTINGS
+        # Nobody finds out they love putting the kettle on.
+        if activity_type in GENERIC_OUTINGS or activity_type in _TOO_SMALL_TO_LOVE
         else [(f"activity:{activity_type}", doing[0].lower() + doing[1:], value_id)]
     )
     if place_id != "home" and place_id in catalog.places:
