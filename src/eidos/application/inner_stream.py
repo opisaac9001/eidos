@@ -48,7 +48,8 @@ ON_TASK = frozenset({"here", "doing", "next", "person", "body"})
 CUE_WEIGHTS: dict[str, float] = {
     "here": 1.2,
     "doing": 1.4,
-    "next": 1.0,
+    # Looking ahead is about a third of what minds do.
+    "next": 1.5,
     "body": 0.8,
     "feeling": 1.0,
     "person": 1.2,
@@ -398,7 +399,8 @@ FORMS: Mapping[str, tuple[str, float]] = {
               "remembered or imagined, not where he is now; a few words, not a sentence about "
               "it", 0.1),
     "feeling": ("how he feels just now, in a few words, and what about if he knows", 0.12),
-    "question": ("one real question he asks himself, and nothing after it", 0.08),
+    "question": ("one real question he asks himself, about what to do or what's coming, "
+                 "and nothing after it; not starting 'Why'", 0.08),
     "plan": ("what he'll do next or later, in the bare way he'd tell himself", 0.12),
     "memory": ("a flash of something that happened, a glimpse or a line someone said", 0.1),
     "judgement": ("a quick opinion about something in front of him, a few words", 0.08),
@@ -410,12 +412,12 @@ _FORMS_FOR: Mapping[str, tuple[str, ...]] = {
     "next": ("plan", "speech"),
     "memory": ("memory", "image"),
     "someone": ("image", "memory", "question"),
-    "concern": ("feeling", "question", "plan"),
+    "concern": ("plan", "feeling", "question"),
     "here": ("sensing", "judgement", "image"),
     "doing": ("speech", "plan", "judgement"),
     "stirring": ("sensing", "speech", "image"),
     "feeling": ("feeling", "image", "speech"),
-    "loop": ("plan", "speech", "question"),
+    "loop": ("plan", "speech"),
     "phone": ("speech", "judgement", "question"),
 }
 
@@ -477,7 +479,7 @@ def choose_cue(
     on_task = [i for i, cue in enumerate(pool) if cue.kind in ON_TASK]
     if on_task and len(on_task) < len(pool):
         engaged = any(pool[i].kind in {"doing", "person"} for i in on_task)
-        target = 0.55 if engaged else 0.4
+        target = 0.6 if engaged else 0.5
         on_sum = sum(weights[i] for i in on_task)
         off_sum = sum(weights) - on_sum
         if on_sum > 0 and off_sum > 0:
@@ -903,14 +905,29 @@ _COMMON = frozenset(
 )
 
 
+def _first_word(text: str) -> str:
+    """The word a thought opens with, without its possessive: "Ellis's" is "ellis"."""
+    words = text.split()
+    return words[0].strip(".,!?'").casefold().removesuffix("'s") if words else ""
+
+
 def rutted_people(recent: Sequence[str], people: Collection[str]) -> list[str]:
     """Someone his last few thoughts keep coming back to: Rowan in eleven thoughts running
     one evening. Words to avoid leave names alone, so a person needs setting aside too."""
-    counts: Counter[str] = Counter()
-    for text in list(recent)[-5:]:
-        said = {w.removesuffix("'s") for w in re.findall(r"[A-Za-z']+", text)}
-        counts.update(name for name in people if name in said)
-    return [name for name, count in counts.most_common(2) if count >= 3]
+
+    def named(texts: Sequence[str]) -> Counter[str]:
+        counts: Counter[str] = Counter()
+        for text in texts:
+            # "Ellis's", "Ellis'll" and "Ellis" are all Ellis.
+            counts.update(name for name in people if re.search(rf"\b{re.escape(name)}\b", text))
+        return counts
+
+    short, long = named(list(recent)[-5:]), named(list(recent)[-8:])
+    # Three of the last five, or four of the last eight ("Ellis's hands" all morning).
+    return sorted(
+        {name for name, count in short.items() if count >= 3}
+        | {name for name, count in long.items() if count >= 4}
+    )[:3]
 
 
 def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> str | None:
@@ -1443,7 +1460,7 @@ class InnerStream:
         now = self.wall_clock()
         thread = [
             thought
-            for thought in self.store.recent(6)
+            for thought in self.store.recent(8)
             if now - thought.wall_at <= THREAD_MINUTES * 60
         ]
         recent_texts = [thought.text for thought in reversed(thread)]
@@ -1499,9 +1516,7 @@ class InnerStream:
         # The same first word in other clothes is the same tic ("AC rattles", "AC screaming",
         # "AC still screaming": half an evening's thoughts).
         first_words = Counter(
-            thought.text.split()[0].strip(".,!?'").casefold()
-            for thought in self.store.recent(8)
-            if thought.text.split()
+            _first_word(thought.text) for thought in self.store.recent(8) if thought.text.split()
         )
         worn_first = next(
             (word for word, count in first_words.most_common(1) if count >= 3 and word != "i"),
@@ -1558,6 +1573,14 @@ class InnerStream:
             # An opening he's leaned on three times in a dozen ("Why does...", 136 times in
             # a week): told to avoid it, a small model doesn't, so it's turned away.
             or (worn_opening is not None and len(text.split()) >= 3 and opening == worn_opening)
+            # The same first word, in other clothes ("Ellis's hands", "Ellis's laugh"...).
+            or (worn_first is not None and _first_word(text) == worn_first)
+            # Someone he's been thinking about over and over, when his mind went elsewhere.
+            or any(
+                re.search(rf"\b{re.escape(name)}\b", text)
+                and not (cue is not None and name in cue.text)
+                for name in set_aside
+            )
             or rutted(text, earlier, known_names(snapshot)) is not None
         ):
             self._turn_away(f"repeated itself, skipped: {text[:80]}", text)

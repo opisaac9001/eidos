@@ -92,8 +92,8 @@ def test_never_while_asleep_or_two_things_at_once(two_days) -> None:
     cut = {
         str(event.payload["schedule_id"])
         for event in two_days
-        if event.kind == "schedule.cancelled"
-        and str(event.payload["reason"]).startswith("Put it down")
+        if event.kind in {"schedule.cancelled", "schedule.interrupted"}
+        and str(event.payload["reason"]).startswith(("Put it down", "Stopped to"))
     }
     doings = [
         (
@@ -482,3 +482,32 @@ def test_an_idea_while_hes_nearly_done_waits_until_hes_finished() -> None:
     assert near_the_end + timedelta(hours=waited.starts_in_hours) >= AT + timedelta(minutes=40)
     # Early on, the idea can win.
     assert _after_whats_nearly_done(idea, planning, AT + timedelta(minutes=5)) == idea
+
+
+def test_a_walk_runs_until_its_time_to_go_back_for_work() -> None:
+    from eidos.application.everyday import make_way
+    from eidos.domain.planning import CalendarEntry, PlanningState
+
+    walk = CalendarEntry(
+        "doing-walk-schedule",
+        "Take the film camera out and look for a photograph",
+        AT.isoformat(),
+        "park",
+        ends_at=(AT + timedelta(minutes=75)).isoformat(),
+        actor_id="pathos",
+    )
+    docs = CalendarEntry(
+        "freelance-docs",
+        "Work on the developer docs",
+        (AT + timedelta(hours=1)).isoformat(),
+        "home",
+        ends_at=(AT + timedelta(hours=3)).isoformat(),
+        actor_id="pathos",
+    )
+    planning = PlanningState(calendar={e.schedule_id: e for e in (walk, docs)})
+    # Booked while he's out: he carries on for now.
+    assert make_way(planning, AT + timedelta(minutes=15)) == []
+    # Then stops in time to get back.
+    [stopped] = make_way(planning, AT + timedelta(minutes=55))
+    assert stopped.kind == "schedule.interrupted"
+    assert stopped.payload["reason"] == "Stopped to get on with work on the developer docs."

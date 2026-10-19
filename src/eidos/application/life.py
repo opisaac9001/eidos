@@ -1564,7 +1564,13 @@ class Life(LifeConversation):
         """Cut short any small doing that something he's since planned lands on."""
         history, pending = tick.history, tick.pending
         self._extend_warmed(
-            tick, make_way(self._planning(history + pending), tick.current), self._planning
+            tick,
+            make_way(
+                self._planning(history + pending),
+                tick.current,
+                self._world_catalog(history + pending),
+            ),
+            self._planning,
         )
 
     def _phase_routine_beat(self, tick: _Tick) -> None:

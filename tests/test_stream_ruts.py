@@ -171,9 +171,9 @@ def test_an_opening_he_keeps_leaning_on_is_turned_away(tmp_path) -> None:
             self.lines = iter(
                 [
                     "Why does the kettle take so long?",
-                    "Why does the radiator tick at night?",
+                    "Why does every radiator tick at night?",
                     "Why does it always rain on market day?",
-                    "Why does the bus never come on time?",
+                    "Why does Juniper shut so early?",
                 ]
             )
 
@@ -186,5 +186,50 @@ def test_an_opening_he_keeps_leaning_on_is_turned_away(tmp_path) -> None:
         "people": [],
     }
     stream = InnerStream(SQLiteInnerStream(tmp_path / "w.sqlite3"), Asking(), lambda: (world, True))
-    kept = [stream.step() for _ in range(4)]
-    assert all(kept[:3]) and stream.rejected
+    for _ in range(4):
+        stream.step()
+    kept = [thought.text for thought in stream.store.recent(10)]
+    assert len(kept) == 3 and "Why does Juniper shut so early?" not in kept
+
+
+def test_someone_he_keeps_thinking_about_isnt_in_every_thought(tmp_path) -> None:
+    import json
+
+    from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+    from eidos.application.inner_stream import InnerStream, rutted_people
+    from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
+
+    assert rutted_people(
+        ["Ellis's hands.", "Kettle on.", "Ellis's laugh.", "Rain.", "Ellis'll fix it.",
+         "Cold.", "Ellis again.", "Docs."],
+        {"Ellis"},
+    ) == ["Ellis"]  # fmt: skip
+
+    class Fixated(ModelGateway):
+        model = "tiny"
+
+        def __init__(self) -> None:
+            self.lines = iter(
+                [
+                    "Ellis's hands on the bench.",
+                    "Ellis's laugh carries.",
+                    "Ellis's tea's gone cold.",
+                    "Ellis's apron by the door.",
+                ]
+            )
+
+        async def generate(self, request: ModelRequest) -> ModelResponse:
+            return ModelResponse(json.dumps({"text": next(self.lines)}), "tiny", "t", "stop")
+
+    world = {
+        "time": "2026-09-08T10:20:00+00:00",
+        "pathos": {"location": "The flat", "location_id": "home", "awake": True},
+        "people": [{"name": "Ellis", "location_id": "workshop"}],
+    }
+    stream = InnerStream(
+        SQLiteInnerStream(tmp_path / "w.sqlite3"), Fixated(), lambda: (world, True)
+    )
+    for _ in range(4):
+        stream.step()
+    kept = [thought.text for thought in stream.store.recent(10)]
+    assert len(kept) < 4 and all("Ellis" in text for text in kept)

@@ -503,8 +503,15 @@ def everyday_events(
     return []
 
 
-def make_way(planning: PlanningState, at: datetime) -> list[DomainEvent]:
-    """A doing that something he planned now lands on top of is cut short for it."""
+def make_way(
+    planning: PlanningState, at: datetime, catalog: WorldCatalog | None = None
+) -> list[DomainEvent]:
+    """A doing that something he's planned lands on gives way to it.
+
+    If the plan is later, he carries on until it's time to go and then stops short (a
+    walk cut short to be back for a writing session); only something on now, or a doing
+    not yet begun, is put down at once.
+    """
     plans = [
         entry
         for entry in planning.calendar.values()
@@ -514,16 +521,13 @@ def make_way(planning: PlanningState, at: datetime) -> list[DomainEvent]:
     ]
     cut = []
     for doing in planning.calendar.values():
-        if not doing.schedule_id.startswith(PREFIX) or doing.status not in {
-            "scheduled",
-            "interrupted",
-        }:
+        if not doing.schedule_id.startswith(PREFIX) or doing.status != "scheduled":
             continue
         starts = datetime.fromisoformat(doing.starts_at)
         ends = datetime.fromisoformat(doing.ends_at or doing.starts_at)
         if ends <= at:
             continue
-        clash = next(
+        clash = min(
             (
                 plan
                 for plan in plans
@@ -531,22 +535,35 @@ def make_way(planning: PlanningState, at: datetime) -> list[DomainEvent]:
                 and datetime.fromisoformat(plan.starts_at) < ends
                 and starts < datetime.fromisoformat(plan.ends_at or plan.starts_at)
             ),
-            None,
+            key=lambda plan: plan.starts_at,
+            default=None,
         )
-        if clash is not None:
-            cut.append(
-                DomainEvent(
-                    "schedule.cancelled",
-                    "pathos",
-                    {
-                        "schedule_id": doing.schedule_id,
-                        "reason": f"Put it down to get on with {clash.title[:1].lower()}"
-                        f"{clash.title[1:]}.",
-                        "simulated_at": at.isoformat(),
-                    },
-                    correlation_id=doing.source_proposal_id or doing.schedule_id,
-                )
+        if clash is None:
+            continue
+        travel = (
+            _travel_minutes(doing.location_id, clash.location_id, catalog) or 0
+            if catalog is not None
+            else 0
+        )
+        leave_by = datetime.fromisoformat(clash.starts_at) - timedelta(minutes=travel + 5)
+        begun = starts <= at
+        if begun and at < leave_by:
+            continue  # time yet: he carries on, and stops when he has to go
+        what = f"{clash.title[:1].lower()}{clash.title[1:]}"
+        cut.append(
+            DomainEvent(
+                "schedule.interrupted" if begun else "schedule.cancelled",
+                "pathos",
+                {
+                    "schedule_id": doing.schedule_id,
+                    "reason": f"Stopped to get on with {what}."
+                    if begun
+                    else f"Put it down to get on with {what}.",
+                    "simulated_at": at.isoformat(),
+                },
+                correlation_id=doing.source_proposal_id or doing.schedule_id,
             )
+        )
     return cut
 
 
