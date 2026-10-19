@@ -88,6 +88,8 @@ FIRST_JOB = "old-team-docs"
 FIRST_PITCH = "repair-feature"
 MOST_HOURS_A_DAY = 6
 CRUNCH_HOURS_A_DAY = 9
+DEADLINE_WEEK_HOURS_A_DAY = 8
+SLACK_HOURS_A_DAY = 4
 TOO_MUCH_ON = 35.0  # hours of work he already has before he turns things down
 WRITING = frozenset({"feature", "essay", "review", "column"})
 
@@ -314,13 +316,54 @@ def _note(cause: DomainEvent, text: str, at: datetime, importance: float, **wher
     )  # fmt: skip
 
 
-def _weekday_hours(at: datetime, crunch: bool) -> bool:
+def _weekday_hours(at: datetime, crunch: bool, week: str = "ordinary") -> bool:
     """When he'd sit down to work: from mid-morning (later some days), to about six, or
-    into the evening with a deadline on top of him; weekends only in a crunch."""
+    into the evening with a deadline on top of him; weekends only in a crunch.
+
+    A deadline week stretches it: a couple of hours after tea, and Saturday morning. A
+    slack week shrinks it: a slow start and done by five.
+    """
     starts = hour_today("freelance-start", at.date(), 10, 1, 1)
+    if week == "slack":
+        starts += 1
     if at.weekday() >= 5:
-        return crunch and 10 <= at.hour <= 18
-    return starts <= at.hour < (22 if crunch else 18)
+        if crunch:
+            return 10 <= at.hour <= 18
+        return week == "deadline" and at.weekday() == 5 and 10 <= at.hour < 13
+    until = 22 if crunch else 21 if week == "deadline" else 17 if week == "slack" else 18
+    return starts <= at.hour < until
+
+
+# Hours due within the week before it counts as a deadline week.
+DEADLINE_WEEK_HOURS = 8.0
+
+
+def week_of_work(everything: Sequence[Job], at: datetime) -> str:
+    """'deadline', 'ordinary' or 'slack': how this week's work stands.
+
+    Freelance weeks aren't all alike: some have two pieces due on top of each other and
+    every evening goes on them; some have nothing due for a fortnight.
+    """
+    active = [j for j in everything if j.status == "active"]
+    due_within = [
+        j for j in active if j.deadline is not None and j.deadline - at <= timedelta(days=7)
+    ]
+    hours_due = sum(max(0.0, j.needed - j.worked) for j in due_within)
+    pressing = any(
+        j.deadline - at <= timedelta(days=4) and j.needed - j.worked >= 3
+        for j in due_within
+        if j.deadline is not None
+    )
+    if hours_due >= DEADLINE_WEEK_HOURS or pressing:
+        return "deadline"
+    soon = any(j.deadline is not None and j.deadline - at <= timedelta(days=10) for j in active)
+    if _on(everything) < 4 and not soon:
+        return "slack"
+    return "ordinary"
+
+
+def week_of_work_now(history: Sequence[DomainEvent], at: datetime) -> str:
+    return week_of_work(jobs(history), at) if freelancing(history) else "ordinary"
 
 
 def _worked_today(history: Sequence[DomainEvent], at: datetime) -> float:
@@ -469,7 +512,46 @@ def freelance_events(
             [*history, *sat_down], jobs([*history, *sat_down]), at,
             (str(booked.payload["schedule_id"]), location_id), energy, hour,
         )  # fmt: skip
-    return sat_down or _maybe_drop_in(history, at, planning, places)
+    return (sat_down or _maybe_drop_in(history, at, planning, places)) + _week_ahead(
+        history, everything, at
+    )
+
+
+WEEK_AHEAD = "freelance.week_ahead"
+
+
+def _week_ahead(
+    history: Sequence[DomainEvent], everything: Sequence[Job], at: datetime
+) -> list[DomainEvent]:
+    """Monday morning: a look at the week, the way you do with a coffee and the diary."""
+    if at.weekday() != 0 or not 8 <= at.hour <= 12 or not self_employed(history):
+        return []
+    monday = at.date().isoformat()
+    if any(str(e.payload.get("week_of")) == monday for e in events_of(history, WEEK_AHEAD)[-3:]):
+        return []
+    week = week_of_work(everything, at)
+    due = sorted(
+        (j for j in everything if j.status == "active" and j.deadline is not None
+         and j.deadline - at <= timedelta(days=7)),
+        key=lambda j: j.deadline or at,
+    )  # fmt: skip
+    if week == "deadline":
+        items = " and ".join(f"{j.brief.short} due {j.deadline:%A}" for j in due[:2])
+        text = (
+            f"Looked at the week: {items}. Heads down. Evenings too, probably."
+            if items
+            else "Looked at the week. A lot on. Heads down."
+        )
+    elif week == "slack":
+        text = (
+            "Looked at the week: nothing due. Lovely, and slightly worrying. Should pitch "
+            "something."
+        )
+    else:
+        items = ", ".join(f"{j.brief.short} by {j.deadline:%A}" for j in due[:1])
+        text = f"Looked at the week: {items}. Manageable." if items else "Ordinary week ahead."
+    looked = _event(WEEK_AHEAD, at, week_of=monday, week=week)
+    return [looked, _note(looked, text, at, 0.3)]
 
 
 # -- the change --------------------------------------------------------------------------
@@ -760,7 +842,11 @@ def _pitch(
         return []
     # The first one, the week he starts: the piece the workshop gave him.
     first = not last
-    if not first and _roll("pitch", hour) >= 0.3:
+    # A slack week is when pitches get written; a deadline week, never.
+    week = week_of_work(everything, at)
+    if week == "deadline" and not first:
+        return []
+    if not first and _roll("pitch", hour) >= (0.5 if week == "slack" else 0.3):
         return []
     used = {j.brief.key for j in everything}
     ideas = [b for b in PITCHES if b.key not in used]
@@ -952,12 +1038,29 @@ def _maybe_sit_down(
     job = workable[0]
     left = job.deadline - at if job.deadline else timedelta(days=30)
     crunch = left <= timedelta(days=2)
+    week = week_of_work(everything, at)
     morning = hour_today("freelance-start", at.date(), 10, 1, 1)
-    planning_ahead = at.weekday() < 5 and at.hour in {morning - 1, 13}
-    if not planning_ahead and (location_id not in WORK_PLACES or not _weekday_hours(at, crunch)):
+    # A deadline week: after tea he plans a couple more hours.
+    planning_ahead = at.weekday() < 5 and at.hour in {
+        morning - 1,
+        13,
+        *({18} if week == "deadline" else ()),
+    }
+    if not planning_ahead and (
+        location_id not in WORK_PLACES or not _weekday_hours(at, crunch, week)
+    ):
         return []
     worked = _worked_today(history, at)
-    if worked >= (CRUNCH_HOURS_A_DAY if crunch else MOST_HOURS_A_DAY):
+    most = (
+        CRUNCH_HOURS_A_DAY
+        if crunch
+        else DEADLINE_WEEK_HOURS_A_DAY
+        if week == "deadline"
+        else SLACK_HOURS_A_DAY
+        if week == "slack"
+        else MOST_HOURS_A_DAY
+    )
+    if worked >= most:
         return []
     # Parkinson's law, and how he is: far-off deadlines get put off, near ones don't.
     pull = 0.5 * (1.8 if crunch else 1.5 if left <= timedelta(days=5) else 0.65
@@ -965,7 +1068,11 @@ def _maybe_sit_down(
     pull *= 0.45 if energy < 0.35 else 0.8 if energy < 0.5 else 1.0
     pull *= 0.7 if valence < -0.2 else 1.0
     pull *= 0.85 if comfortable else 1.0  # no rent riding on it
-    if planning_ahead:
+    pull *= 1.3 if week == "deadline" else 0.6 if week == "slack" else 1.0
+    after_tea = planning_ahead and at.hour == 18
+    if after_tea:
+        pull = 0.55 * (0.45 if energy < 0.4 else 1.0) * (0.7 if valence < -0.2 else 1.0)
+    elif planning_ahead:
         afternoon = 0.85 if left <= timedelta(days=5) else 0.6
         pull = max(
             pull,
@@ -974,6 +1081,8 @@ def _maybe_sit_down(
     if _roll("sit-down", hour) >= min(0.92, pull):
         return []
     hours = (2 if planning_ahead else 1) + int(_roll("how-long", hour) * (3 if crunch else 2))
+    if after_tea:
+        hours = 2
     starts = at + timedelta(hours=1) if planning_ahead else at
     # Where: here if he can work here; otherwise home, or now and then Juniper for a change
     # of scene (a coffee there costs money).
@@ -1001,7 +1110,8 @@ def _maybe_sit_down(
             decided, f"{SESSION_PREFIX}{job.job_id}-{hour}", f"{verb} {job.brief.short}{where}",
             starts, hours, place, at, activity="freelance_work",
             motivation=("It's due " + (f"{job.deadline:%A}" if job.deadline else "soon")
-                        + "." if crunch else "Mornings are for writing, in theory."
+                        + "." if crunch else "Deadline week: a couple more hours after tea."
+                        if after_tea else "Mornings are for writing, in theory."
                         if planning_ahead else "Might as well get some of it done."),
         ),
     ]  # fmt: skip
@@ -1352,6 +1462,12 @@ def _the_change_in_his_words(history: Sequence[DomainEvent], at: datetime) -> li
 def work_view(history: Sequence[DomainEvent], at: datetime) -> list[str]:
     """His work as he'd think of it: what's on, how it's going, what's owed."""
     found: list[str] = _the_change_in_his_words(history, at)
+    if self_employed(history):
+        week = week_of_work(jobs(history), at)
+        if week == "deadline":
+            found.append("this week: a deadline week, heads down, evenings too")
+        elif week == "slack":
+            found.append("this week: a quiet one, nothing due; should be pitching")
     for job in jobs(history):
         if job.status in {"declined", "quiet", "paid"}:
             continue

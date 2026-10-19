@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### His life
+- **He makes his own plans.** When he's been on his own a few days or a friend is on his mind, he texts someone ("Pint tonight? The Listening Room, half seven?"). They answer from their own day: working, tired, busy, "Thursday instead?", or yes. A yes books it. This replaces follow-ups that booked "Spend time with X" at one the next afternoon.
+- **Weeks have a rhythm.** Deadline weeks run into the evenings and a Saturday morning with no weeknight plans; slack weeks start late, finish at five and are when he pitches. He looks at the week on Monday morning.
+
+### His world
+- **The town has a story.** A storyteller paces it: quiet weeks, then something that matters. A burst main shuts the café (Mara's at home), the river floods the path, the power goes, the chip shop burns, Dennis from the hardware shop dies. Residents hear and talk about it; he hears it by being there, on the town's Facebook group, in a queue, over the fence or from a friend, or not at all.
+
 ## 0.1.0 (2026-10-19)
 
 The first release of the rebuilt Eidos: a persistent simulated person, Patrick "Pathos" Shaw, living minute by minute in a small English market town, with his whole life kept as a replayable event history.

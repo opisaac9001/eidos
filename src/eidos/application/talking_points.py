@@ -16,6 +16,7 @@ from eidos.application.freelance import STARTED, TOLD, leaving_day
 from eidos.application.gossip import worth_mentioning
 from eidos.application.life_context import latest_weather
 from eidos.application.repair_jobs import bench_view
+from eidos.application.town_story import both_know
 from eidos.application.work_rota import EMPLOYER_ID
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
@@ -71,6 +72,8 @@ def talking_points(
                 )
             )
             break
+    for claim_id, text in both_know(history, at, partner_id):
+        points.append((claim_id, f"what's happened in town, which they've both heard: {text}"))
     heard = worth_mentioning(history, partner_id, at)
     if heard is not None:
         points.append(

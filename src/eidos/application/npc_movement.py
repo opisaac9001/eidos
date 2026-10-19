@@ -1,12 +1,13 @@
 """Elapsed-time NPC movement and work: their own plans, their employer's hours, and their
 ordinary day (work by day, home at night) when nothing else has them."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from hashlib import sha256
 from typing import Callable, Hashable, Sequence
 
 from eidos.application.friends_lives import away_people
 from eidos.application.resident_day import Hours, day_off, outing_now
+from eidos.application.town_story import as_today, closed_places
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import (
     IRREGULAR,
@@ -40,7 +41,8 @@ def npc_movement_events(history: Sequence[DomainEvent], now: datetime) -> list[D
     # Everyone starts at home; their own day takes them from there on the next step.
     starting = bool(output)
     state = project_npcs([*history, *output] if output else history, now)
-    catalog = project_world_catalog(history)
+    # A place shut for the day (the café after the burst main) has nobody in it.
+    catalog = as_today(project_world_catalog(history), closed_places(history, now))
     workdays = _employer_workdays(history)
     appointments = _appointments_with_pathos(history)
     own_events = _OWN_EVENTS(history)
@@ -374,6 +376,8 @@ def their_place_now(
     # than work and home: lunch out, a walk after work, the market on Saturday.
     if day_off(actor_id, now) and place not in {"home", "park"}:
         place = "home"
+    if hours is not None and hours.get(place) == (time(0), time(0)):
+        place = "home"  # the café's shut while it dries out: Mara's at home
     return outing_now(actor_id, usual_location_id, now, hours) or place
 
 

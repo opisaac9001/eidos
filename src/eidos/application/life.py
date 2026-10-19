@@ -76,7 +76,7 @@ from eidos.application.far_friends import far_friend_events
 from eidos.application.feelings import feeling_events, mood_from_feelings
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
-from eidos.application.freelance import freelance_events, self_employed
+from eidos.application.freelance import freelance_events, self_employed, week_of_work_now
 from eidos.application.freelance import working_now as freelance_working_now
 from eidos.application.friends_lives import (
     away_people,
@@ -140,6 +140,7 @@ from eidos.application.life_conversation import LifeConversation
 from eidos.application.life_lately import life_lately_events
 from eidos.application.life_snapshot import build_snapshot
 from eidos.application.lived_activity_window import lived_activity_window
+from eidos.application.making_plans import plan_making_events
 from eidos.application.media import media_events
 from eidos.application.memory import (
     RecalledMemory,
@@ -242,6 +243,8 @@ from eidos.application.town_signals import (
     real_weather,
     town_signal_events,
 )
+from eidos.application.town_story import TOWN, as_today, closed_places, power_out, town_story_events
+from eidos.application.town_story import mentioned as town_story_mentioned
 from eidos.application.townsfolk import (
     latent_person,
     townsfolk_events,
@@ -834,7 +837,9 @@ class Life(LifeConversation):
                     history + pending,
                     at,
                     planning=planning,
-                    catalog=self._world_catalog(history + pending),
+                    catalog=as_today(
+                        self._world_catalog(history + pending), closed_places(history + pending, at)
+                    ),
                     location_id=state.location_id,
                     needs={
                         "rest": state.rest,
@@ -847,6 +852,8 @@ class Life(LifeConversation):
                     busy=False,
                     phone_dead=phone_dead(history, at),
                     weather=latest_weather(history),
+                    closed=closed_places(history + pending, at),
+                    no_power=power_out(history + pending, at),
                     actual_revision=len(history) + len(pending),
                 )
             )
@@ -862,7 +869,9 @@ class Life(LifeConversation):
                     len(agency_history),
                     self.gateway,
                     planning=self._planning(agency_history),
-                    catalog=self._world_catalog(agency_history),
+                    catalog=as_today(
+                        self._world_catalog(agency_history), closed_places(agency_history, at)
+                    ),
                     needs={
                         "rest": state.rest,
                         "connection": state.connection,
@@ -1076,6 +1085,7 @@ class Life(LifeConversation):
             await self._guarded(tick, self._phase_in_jokes)
             await self._guarded(tick, self._phase_surfacing)
             await self._guarded(tick, self._phase_town_issues)
+            await self._guarded(tick, self._phase_town_story)
             await self._guarded(tick, self._phase_small_touches)
             await self._guarded(tick, self._phase_media)
             await self._guarded(tick, self._phase_seasons)
@@ -1496,7 +1506,9 @@ class Life(LifeConversation):
                 len(agency_history),
                 self.gateway,
                 planning=self._planning(agency_history),
-                catalog=self._world_catalog(agency_history),
+                catalog=as_today(
+                    self._world_catalog(agency_history), closed_places(agency_history, current)
+                ),
                 needs=_felt_needs(tick, self._finances(agency_history).balance_pence),
                 emotion=_emotion_brief(current_emotion),
                 values=agency_identity.values,
@@ -1542,7 +1554,10 @@ class Life(LifeConversation):
                 history + pending,
                 current,
                 planning=planning,
-                catalog=self._world_catalog(history + pending),
+                catalog=as_today(
+                    self._world_catalog(history + pending),
+                    closed_places(history + pending, current),
+                ),
                 location_id=state.location_id,
                 needs={
                     "rest": state.rest,
@@ -1555,6 +1570,8 @@ class Life(LifeConversation):
                 busy=busy,
                 phone_dead=phone_dead(history + pending, current),
                 weather=latest_weather(history + pending),
+                closed=closed_places(history + pending, current),
+                no_power=power_out(history + pending, current),
                 actual_revision=len(history) + len(pending),
             ),
             self._planning,
@@ -2369,6 +2386,70 @@ class Life(LifeConversation):
             self._planning,
         )
 
+    def _making_plans(self, tick: _Tick) -> None:
+        """Texting a friend to meet up when he wants company, and their answer coming back."""
+        history, pending, current = tick.history, tick.pending, tick.current
+        visible = history + pending
+        catalog = self._world_catalog(visible)
+        known = friendships(visible, current)
+        state = tick.state
+        self._extend_warmed(
+            tick,
+            plan_making_events(
+                visible,
+                current,
+                len(visible),
+                awake=state.awake,
+                phone_dead=phone_dead(visible, current),
+                connection=state.connection,
+                energy=tick.effective_energy,
+                valence=state.valence,
+                sociability=float(project_traits(visible).levels.get("sociability", 0.5)),
+                friends={pid: f.depth for pid, f in known.items() if pid != "user"},
+                last_seen={pid: f.last_shared for pid, f in known.items()},
+                names={pid: person.name for pid, person in catalog.people.items()},
+                npc_people=project_npcs(visible, current).people,
+                unavailable=busy_people(visible, current),
+                planning=self._planning(visible),
+                catalog=as_today(catalog, closed_places(visible, current)),
+                weather=latest_weather(visible),
+                # A deadline week: weeknights go on the work, not the pub.
+                evenings_free=week_of_work_now(visible, current) != "deadline",
+            ),
+            self._planning,
+        )
+
+    def _phase_town_story(self, tick: _Tick) -> None:
+        """Quiet weeks, then something that matters: the town's own story, and his hearing it."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        visible = history + pending
+        catalog = self._world_catalog(visible)
+        planning = self._planning(visible)
+        doing = doing_now(planning, current) or ""
+        texting = any(
+            current - datetime.fromisoformat(str(e.payload.get("simulated_at")))
+            <= timedelta(hours=1)
+            for e in events_of(visible, "chat.message", "contact.reached_out")[-6:]
+            if e.payload.get("simulated_at")
+        )
+        self._extend_warmed(
+            tick,
+            town_story_events(
+                visible,
+                current,
+                catalog=catalog,
+                residents=frozenset(pid for pid in catalog.people if pid != "pathos"),
+                locations=_npc_locations(visible, current),
+                location_id=tick.state.location_id,
+                awake=tick.state.awake,
+                on_phone=("phone" in doing.casefold() or texting)
+                and not phone_dead(visible, current),
+            ),
+            self._planning,
+        )
+
     def _phase_town_issues(self, tick: _Tick) -> None:
         """The town's rows: hearing about one, a view, the meeting, and the council's say."""
         if self.authored_scenario or tick.current.hour not in TOWN_ISSUE_HOURS:
@@ -2996,8 +3077,14 @@ class Life(LifeConversation):
         pending.extend(follow_up_events(history + pending, current))
         invitation_bias = _planning_bias(project_emotion(history + pending))
         invitation_catalog = self._world_catalog(history + pending)
+        if not self.authored_scenario:
+            self._making_plans(tick)
         pending.extend(
-            follow_up_invitation_events(
+            []
+            if not self.authored_scenario
+            # His friendships are his to keep up: he texts someone when he wants company
+            # (``making_plans``), not on a follow-up falling due at one the next afternoon.
+            else follow_up_invitation_events(
                 history + pending,
                 current,
                 len(history) + len(pending),
@@ -3614,7 +3701,10 @@ class Life(LifeConversation):
         )
         pending.append(encounter)
         subject = catalog.people.get(news.subject_id) if news else None
-        if news and subject and subject.name.split()[0] in text:
+        if news and (
+            (subject and subject.name.split()[0] in text)
+            or (news.subject_id == TOWN and town_story_mentioned(news.story, text))
+        ):
             # They passed it on: now he's heard it, from them.
             pending.extend(
                 patrick_heard(news, person.person_id, person.name.split()[0], now, encounter)

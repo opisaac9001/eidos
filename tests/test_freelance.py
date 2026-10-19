@@ -221,3 +221,61 @@ def test_ellis_lets_him_off_the_rest_of_his_notice(lived) -> None:
     ]
     assert later_shifts == []
     assert any(e.kind == STARTED for e in history)
+
+
+def _active_job(job_id: str, needed: float, worked: float, due_in_days: float, at: datetime):
+    from eidos.application.freelance import BRIEFS, Job
+
+    return Job(
+        job_id,
+        BRIEFS["column"],
+        "a magazine",
+        None,
+        "active",
+        at,
+        needed=needed,
+        worked=worked,
+        deadline=at + timedelta(days=due_in_days),
+    )
+
+
+def test_some_weeks_are_deadline_weeks_and_some_are_slack() -> None:
+    from eidos.application.freelance import week_of_work
+
+    monday = datetime(2026, 10, 12, 9, 0, tzinfo=timezone.utc)
+    # Two pieces due on top of each other.
+    assert week_of_work(
+        [_active_job("a", 6, 1, 3, monday), _active_job("b", 5, 0, 5, monday)], monday
+    ) == ("deadline")
+    # One piece with plenty of time.
+    assert week_of_work([_active_job("a", 6, 1, 9, monday)], monday) == "ordinary"
+    # Nothing due for a fortnight and little on.
+    assert week_of_work([_active_job("a", 3, 0, 16, monday)], monday) == "slack"
+    assert week_of_work([], monday) == "slack"
+
+
+def test_a_deadline_week_runs_into_the_evening_and_a_slack_week_ends_early() -> None:
+    from eidos.application.freelance import _weekday_hours
+
+    tuesday_evening = datetime(2026, 10, 13, 19, 0, tzinfo=timezone.utc)
+    saturday_morning = datetime(2026, 10, 17, 11, 0, tzinfo=timezone.utc)
+    half_five = datetime(2026, 10, 13, 17, 30, tzinfo=timezone.utc)
+    assert _weekday_hours(tuesday_evening, False, "deadline")
+    assert not _weekday_hours(tuesday_evening, False, "ordinary")
+    assert _weekday_hours(saturday_morning, False, "deadline")
+    assert not _weekday_hours(saturday_morning, False, "ordinary")
+    assert _weekday_hours(half_five, False, "ordinary")
+    assert not _weekday_hours(half_five, False, "slack")
+
+
+def test_he_looks_at_the_week_on_a_monday(lived) -> None:
+    looked = [e for e in lived if e.kind == "freelance.week_ahead"]
+    assert looked
+    assert all(_at(e).weekday() == 0 for e in looked)
+    assert len({e.payload["week_of"] for e in looked}) == len(looked)
+    ids = {str(e.event_id) for e in looked}
+    notes = [
+        e for e in lived if e.kind == "memory.recorded" and e.payload.get("source_event_id") in ids
+    ]
+    assert len(notes) == len(looked)
+    assert {e.payload["week"] for e in looked} <= {"deadline", "ordinary", "slack"}

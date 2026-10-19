@@ -284,6 +284,34 @@ His friends' lives go on without him, and change his weeks.
 
 Each plan (`calendar.plan`) causes its booking, and he remembers the evening if he was there.
 
+## Making plans (`application/making_plans.py`)
+
+He doesn't wait to be asked. When he's been on his own a few days, or a friend has been on
+his mind, he texts someone: "Pint tonight? The Listening Room, half seven?"
+
+- **Whether:** how starved of company he is (connection), how long since a proper evening
+  with someone, how sociable he is, and a friend on his mind (a `contact` pull from his
+  stream). Low moods make him withdraw. Filing a piece makes him want a pint. Not if a plan
+  with a friend is already coming up in the next two days, or he asked someone in the last
+  day and a half.
+- **Who:** a friend of level 2.5 or more, not someone he saw today, has moved away, has a
+  newborn or a worry, or turned him down this week. Closeness counts, and so does how long
+  it's been; he asks someone different from last time.
+- **What and when:** a drink or the cinema in the evening, a walk on a weekend afternoon (or
+  a summer evening), a coffee on a Saturday or Sunday morning. Never a walk in the rain,
+  nothing he hasn't the energy for, and never a time he knows they're at work (Mara works
+  Saturdays). In a deadline week his weeknights go on the work.
+- **Their answer** comes 15 to 100 minutes later, from their own day: whether they're working
+  then, their energy, how much they want company themselves, how close they are, and how
+  short the notice is. It's yes; no (tired, busy, not up to it); or "can't tonight, Thursday?",
+  and Thursday it is.
+- **A yes is the agreement:** `invitation.made` (source `his-idea`), an accepted
+  `social.request_*`, then the booking, the same chain as any agreed plan. The texts are on
+  his phone (`contact.reached_out`/`contact.reply_received` with `purpose` `plan`).
+
+This replaced the old follow-up invitations, which booked "Spend time with X" at one the
+next afternoon whenever a follow-up fell due.
+
 ## Friends far away (`application/far_friends.py`)
 
 - **Calls:** friends who've moved away ring or get rung on Sunday evenings
@@ -420,6 +448,36 @@ Ordinary local rows that he has a view on.
 - **Where it shows:** `views_on_the_town` in his self-context lists the live issue and
   those decided in the last six months, with his view in his own words. The stand-in
   answers questions about the town, the council or a named issue from it.
+
+## What happens in town (`application/town_story.py`)
+
+A storyteller paces the town: quiet weeks, and then something that matters. Rules decide what,
+when and what it changes.
+
+- **Pacing:** after a story the town stays quiet for 3 days (small), 6 (notable) or 12 (big),
+  plus a few. Then each day's chance of something grows from 14% by 6% a day. Big things
+  are at least five weeks apart. After bad news, a kinder story is two and a half times
+  likelier. About one story every week or so, with codas.
+- **What:** a burst main that shuts Juniper for two or three days; a power cut up Westfield
+  Hill; the river over the path after a wet spell; a fire at the chip shop; Dennis from the
+  hardware shop dying, and his funeral; break-ins up the road, then an arrest; a tree down in
+  Willow Square after a windy night; the bakery changing hands; Biscuit the terrier lost and
+  found; gold in South West in Bloom; a record shop opening; a crash on the bypass; the
+  school's playground fund. Some need a season or weather.
+- **What it changes:**
+  - A shut place keeps no hours (`as_today`): nobody plans to go, Mara is at home while the
+    café dries out, and his free time goes elsewhere.
+  - In a power cut there's no kettle, record player, laptop or shower.
+  - Residents hear within a day or so, each their own way (`gossip.heard`), so it's what
+    people talk about (`talking_points`), and someone may tell him.
+- **How he hears:** being there (the sign on the door; police knocking up the road); the
+  Alderwick Facebook group when he's on his phone; people in a queue when he's out; next
+  door over the fence; or a friend who mentions it. A small thing he may never hear about.
+  A closure he missed stays missed, and a coda only reaches him if he knew the first part.
+- **Effects:** news moves his mood a little, sad news brings a feeling (sad about Dennis,
+  worried about the break-ins), and it's remembered in his words, with how he heard it.
+- **Where it shows:** `heard_round_town_lately` in his self-context; "Round town" in the
+  Observatory.
 
 ## Small touches of home and habit (`application/small_touches.py`)
 

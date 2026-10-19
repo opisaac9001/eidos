@@ -270,6 +270,15 @@ with models only wording what the rules decide:
   to, paid on publication; a monthly column offer; technical and local writing through
   enquiries and quotes. `freelance.paid` is income in the economy. `my_work` is his work as
   he'd say it.
+  `week_of_work` makes each week a deadline, ordinary or slack week, which sets his working
+  hours and pull, pitching, and whether his weeknights are free (`freelance.week_ahead` on
+  Mondays).
+- `application/town_story.py`: the town's storyteller. It paces stories (quiet after each,
+  growing likelier, big ones rare, kinder after bad), carries out their consequences
+  (closures through `as_today`, power cuts, residents hearing as `gossip.heard`), and lets
+  him hear by being there, his phone, a queue, next door or a friend.
+- `application/making_plans.py`: him texting a friend to meet when he wants company; their
+  answer from their own day; a yes books it through the usual agreement chain.
 - `application/wealth.py`: his money beyond the current account (savings, a tax pot, an ISA,
   a general investment account), folded from `finance.*` events; transfers to and from his
   current account and tax set aside are ledger transactions; tax return and bill in January;

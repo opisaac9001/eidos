@@ -302,8 +302,8 @@ async def reply_events(
     output: list[DomainEvent] = []
     for sent in events_of(history, REACHED)[-12:]:
         contact_id = str(sent.payload.get("contact_id"))
-        if contact_id in settled:
-            continue
+        if contact_id in settled or sent.payload.get("purpose") == "plan":
+            continue  # a plan he's suggested is answered by ``making_plans``
         sent_at = _at(sent)
         due_raw = str(sent.payload.get("reply_due_at") or "")
         name = str(sent.payload.get("person_name", "They"))

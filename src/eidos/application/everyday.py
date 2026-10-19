@@ -21,13 +21,14 @@ import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Mapping, Sequence
+from typing import Collection, Mapping, Sequence
 
 from eidos.application.experience import activity_tastes
 from eidos.application.family import FAMILY_HOME
 from eidos.application.media import current as media_now
 from eidos.application.open_loops import open_loops
 from eidos.application.place_discovery import known_place_ids
+from eidos.application.town_story import NEEDS_POWER
 from eidos.domain.actions import ActionKind
 from eidos.domain.agency import (
     STAY,
@@ -384,6 +385,8 @@ def everyday_events(
     busy: bool,
     phone_dead: bool = False,
     weather: str = "",
+    closed: Collection[str] = (),
+    no_power: bool = False,
     actual_revision: int,
 ) -> list[DomainEvent]:
     """If he's free and between things, what he does next, booked as his own choice.
@@ -401,7 +404,12 @@ def everyday_events(
     if any(entry.schedule_id.startswith(decision_id) for entry in planning.calendar.values()):
         return []
     known = known_place_ids(history, catalog)
-    options = _options(history, at, location_id, known, catalog, phone_dead)
+    options = [
+        (doing, where, title)
+        for doing, where, title in _options(history, at, location_id, known, catalog, phone_dead)
+        # The café's shut after the burst main; no kettle in a power cut.
+        if where not in closed and not (no_power and where == "home" and doing.kind in NEEDS_POWER)
+    ]
     if not options:
         return []
     done_today, recent, previous, last = _lately(planning, at)

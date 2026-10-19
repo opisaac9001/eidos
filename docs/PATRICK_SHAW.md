@@ -116,7 +116,11 @@ from his own life and interests (the first is the right to repair, from the work
 tech magazine's features desk, a long-read site, a paper's opinion desk, a philosophy
 magazine, a design quarterly. Many editors never reply, some pass, some commission with a
 word count, fee and deadline. Features mean a call with a source. He writes in sessions he
-plans himself (a morning block, often an afternoon one, more as a deadline nears), files,
+plans himself (a morning block, often an afternoon one, more as a deadline nears). His weeks
+have a rhythm: a deadline week (eight hours or more due within seven days, or a piece due in
+four with three hours still to do) runs into the evenings and a Saturday morning, with no
+pitching and no weeknight plans; a slack week starts later, stops at five and is when
+pitches get written. On Monday morning he looks at the week. He files,
 gets edits, sends the final version, and a week or so later it's out; people react (his dad,
 his mum, Tom in the family chat, a stranger's email, someone cross online). Publications pay
 on publication, thirty to sixty days later and sometimes late. An editor who has run two of

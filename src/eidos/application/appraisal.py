@@ -736,6 +736,12 @@ def _effect(
         if isinstance(tone, (int, float)) and not isinstance(tone, bool) and tone:
             return ("affect", 0.0, max(-0.3, min(0.3, float(tone))), 0.35, 0.5)
         return None
+    if event.kind == "gossip.heard" and event.payload.get("holder_id") == "pathos":
+        # News from round town: the chip shop fire, Dennis from the hardware shop.
+        tone = event.payload.get("tone")
+        if isinstance(tone, (int, float)) and not isinstance(tone, bool) and tone:
+            return ("affect", 0.0, max(-0.3, min(0.3, float(tone))), 0.3, 0.5)
+        return None
     if event.kind == "time.felt":
         tone = event.payload.get("tone")
         if isinstance(tone, (int, float)) and not isinstance(tone, bool):

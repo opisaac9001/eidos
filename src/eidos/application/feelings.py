@@ -54,6 +54,15 @@ _HAPPENED = {
     "parcel_next_door": "the parcel going next door",
 }
 
+# What he feels about news from round town (``town_story``): kind, about, intensity.
+_TOWN_FELT = {
+    "town:fixture_died": ("sadness", "Dennis from the hardware shop", 0.35),
+    "town:chip_shop_fire": ("sadness", "the family above the chip shop", 0.3),
+    "town:break_ins": ("worry", "the break-ins up the road", 0.3),
+    "town:bypass_crash": ("worry", "whoever was in that crash", 0.2),
+    "town:record_shop": ("excitement", "the new record shop", 0.35),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class Feeling:
@@ -330,6 +339,11 @@ def _sources(
             if subject in names and p.get("story") == "family_worry":
                 found.append(
                     (f"worry:{subject}", "worry", _first(names[subject]), 0.45, True, event)
+                )
+            elif (felt := _TOWN_FELT.get(str(p.get("story")))) is not None:
+                # News from round town; the hearing itself already moved his mood.
+                found.append(
+                    (f"{felt[0]}:{p.get('story')}", felt[0], felt[1], felt[2], False, event)
                 )
     return found
 

@@ -1257,6 +1257,10 @@ function renderSelf() {
       (item) =>
         `<div class="moment"><span class="moment-mark" aria-hidden="true">?</span><span class="moment-text">${esc(item.issue)}<small>${esc(item.his_view || "")}</small></span></div>`,
     ),
+    ...(self.heard_round_town_lately || []).map(
+      (text) =>
+        `<div class="moment"><span class="moment-mark" aria-hidden="true">◇</span><span class="moment-text">Round town: ${esc(text)}</span></div>`,
+    ),
     ...(self.running_jokes || []).slice(-4).map(
       (item) =>
         `<div class="moment toward"><span class="moment-mark" aria-hidden="true">☺</span><span class="moment-text">Running joke with ${esc(item.with)}: ${esc(item.joke)}</span></div>`,

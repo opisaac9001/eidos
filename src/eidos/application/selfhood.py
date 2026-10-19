@@ -34,6 +34,7 @@ from eidos.application.small_touches import at_home_context, usual_context
 from eidos.application.spending import money_context
 from eidos.application.surfacing import lately_on_his_mind
 from eidos.application.town_issues import town_issues_context
+from eidos.application.town_story import heard_lately
 from eidos.application.user_notes import user_knowledge_context
 from eidos.application.work_arc import work_context
 from eidos.application.world_news import news_on_his_mind
@@ -891,6 +892,7 @@ def selfhood_context(history: Sequence[DomainEvent], simulated_at: datetime) -> 
         "holiday": holiday_context(history, simulated_at),
         "body": body_context(history, simulated_at),
         "views_on_the_town": town_issues_context(history, simulated_at),
+        "heard_round_town_lately": heard_lately(history, simulated_at),
         "at_home": at_home_context(history),
         "his_usual": usual_context(history, simulated_at),
         "love_life": _love_life(history),
@@ -1116,6 +1118,7 @@ def selfhood_view(history: Sequence[DomainEvent], simulated_at: datetime) -> dic
         "whats_going_on_with_his_friends": _friends_news(history, simulated_at),
         "fallings_out": _fallings_out(history),
         "views_on_the_town": town_issues_context(history, simulated_at),
+        "heard_round_town_lately": heard_lately(history, simulated_at),
         "running_jokes": _running_jokes(history),
         "came_back_to_him_lately": lately_on_his_mind(history, simulated_at),
         "patterns_he_would_like_to_change": [
