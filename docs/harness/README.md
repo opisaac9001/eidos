@@ -24,6 +24,46 @@ behaves better, and write down what was learned.
 - **A clear win only.** `adopt` needs a fifth fewer lines turned away and at least five
   points, with no kind of problem noticeably worse.
 
+## What it measures
+
+- **Turned away**, with a 95% range (Wilson), so a narrow win on 20 moments isn't
+  over-trusted.
+- **Held out:** the moments are split in two, and `adopt` needs the change to be no worse
+  on either half, so it isn't tuned to a few moments.
+- **Quality,** beyond not being turned away: how varied the openings and phrasing are,
+  how long and how spread out the lengths are, and how much each line is about the moment
+  (shares a word with what it was given). A change that makes him much more alike
+  (openings under 60% as varied) is not adopted, and its trade-offs are listed.
+- **Roles judged:** firmament (encounters and conversations), pathos_text (his texts:
+  emoji, signing off), murmur (his thoughts: the third person, his nickname), and for
+  every role a name brought in from nowhere, a leaked record id, an AI slip, running long.
+
+## Modes
+
+| Mode | What it does | Models? |
+| --- | --- | --- |
+| `harness-probe --role R` | Measures the current way and shows what's turned away | yes |
+| `--variant file.json` | The current way against your change, on the same moments | yes |
+| `--propose N` | An editor model (the 35B, role `harness_editor`) reads the failures, what each check means and `LESSONS.md`, and suggests N changes; each is probed | yes |
+| `--models a,b,c` | The same moments through each configured model | yes |
+| `--audit` | Today's checks on answers already given: what they'd catch or wrongly block | no |
+
+The first editor proposals read "someone claimed his project" as "the project is made up"
+and suggested banning his sound atlas. The probe rejected all three. Since then the editor
+is told what each check means and the gist of each failed moment.
+
+## Each night
+
+While he sleeps (between 1 and 5 in the morning, on the Dell's clock), the live server
+measures encounters, his texts and his thoughts on the day's moments, audits the answers
+already given, and for the worst role over 20% asks the editor for three changes and
+probes them. Results go beside the database in `harness/` (`night-*.json`,
+`history.jsonl`, `LESSONS.md`); the Models page shows each role's rate, its range, a
+fortnight's trend and any suggestion. **Nothing is adopted automatically:** a suggestion is
+confirmed on a larger set with `--variant`, then put into `adapters/http_gateway.py` by
+hand. A trial prompt applies only to the probe's own calls (a context variable), never to
+the calls his life makes meanwhile.
+
 ## Running it
 
 On the Dell, on a copy of the live database, at low priority (it uses the same models his

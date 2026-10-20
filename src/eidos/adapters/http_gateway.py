@@ -310,6 +310,16 @@ ROLE_PROMPTS["firmament"] += (
     "nothing is supplied, talk about the moment itself."
 )
 
+# Proposed by the editor model on the first nightly probe, confirmed on 30 more moments
+# asked twice (docs/harness/LESSONS.md): turned away 30% to 20%, people left out of
+# encounters 8 to 2; openings a little less varied.
+ROLE_PROMPTS["firmament"] += (
+    " "
+    "Keep all dialogue grounded strictly in the supplied scene_topic and setting. Do not "
+    "introduce new projects, plans, or past events unless they appear in the provided "
+    "context; if a topic is missing, refer only to the immediate activity."
+)
+
 for _role in ("pathos_deliberation", "pathos_agency", "pathos_project"):
     ROLE_PROMPTS[_role] += POSSIBLE_SELVES_NOTE
 

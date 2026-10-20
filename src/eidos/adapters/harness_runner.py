@@ -23,6 +23,8 @@ from eidos.application.harness_probe import (
     rate,
     record_lesson,
     report,
+    trade_offs,
+    variety,
     verdict,
 )
 from eidos.domain.world_catalog import project_world_catalog
@@ -264,7 +266,7 @@ async def _improve(
     for variant in variants:
         with asked_as(variant):
             tried = await probe(contexts, role, _asker(gateway, role, {}), repeats, names)
-        said = verdict(current, tried)
+        said = verdict(current, tried, variety(current, tried, contexts))
         entry = {
             "name": variant.name,
             "why": variant.why,
@@ -274,6 +276,7 @@ async def _improve(
             "problems": counts(tried),
             "quality": quality(tried, contexts),
             "verdict": said,
+            "trade_offs": trade_offs(current, tried, contexts),
         }
         result["candidates"].append(entry)
         if lessons is not None:

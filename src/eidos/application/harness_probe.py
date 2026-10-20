@@ -255,7 +255,9 @@ def holds_up(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> bool:
     )
 
 
-def verdict(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> str:
+def verdict(
+    current: Sequence[Outcome], candidate: Sequence[Outcome], alike: float | None = None
+) -> str:
     """Adopt only a clear improvement: a fifth fewer turned away and at least five points,
     and no kind of problem that got noticeably worse."""
     before, after = rate(current), rate(candidate)
@@ -267,12 +269,42 @@ def verdict(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> str:
     if worse:
         return f"keep current: more {', '.join(worse)}"
     if before - after >= 0.05 and after <= before * 0.8:
-        return (
-            "adopt" if holds_up(current, candidate) else "keep current: only better on some moments"
-        )
+        if not holds_up(current, candidate):
+            return "keep current: only better on some moments"
+        if alike is not None and alike < 0.6:
+            # Fewer lines turned away, but he'd sound much more the same every time.
+            return "keep current: much more alike"
+        return "adopt"
     if after - before >= 0.05:
         return "keep current: worse"
     return "keep current: no clear difference"
+
+
+def variety(
+    current: Sequence[Outcome], candidate: Sequence[Outcome], contexts: Sequence[Mapping[str, Any]]
+) -> float | None:
+    """How varied the candidate's openings are, as a share of the current's."""
+    before = quality(current, contexts).get("distinct_openings")
+    after = quality(candidate, contexts).get("distinct_openings")
+    return round(after / before, 3) if before and after is not None else None
+
+
+def trade_offs(
+    current: Sequence[Outcome], candidate: Sequence[Outcome], contexts: Sequence[Mapping[str, Any]]
+) -> list[str]:
+    """What a change costs that the turned-away rate doesn't show."""
+    before, after = quality(current, contexts), quality(candidate, contexts)
+    found = []
+    if before and after:
+        if after["distinct_openings"] < 0.85 * before["distinct_openings"]:
+            found.append("openings less varied")
+        if after["about_the_moment"] < before["about_the_moment"] - 0.1:
+            found.append("less about the moment")
+        if after["mean_words"] < 0.7 * before["mean_words"]:
+            found.append("much shorter")
+        if after["mean_words"] > 1.4 * before["mean_words"]:
+            found.append("much longer")
+    return found
 
 
 async def probe(
@@ -329,7 +361,8 @@ def report(
         "problems": counts(candidate),
         "quality": quality(candidate, samples),
     }
-    result["verdict"] = verdict(current, candidate)
+    result["verdict"] = verdict(current, candidate, variety(current, candidate, samples))
+    result["trade_offs"] = trade_offs(current, candidate, samples)
     pairs = []
     for before, after in zip(current, candidate):
         if bool(before.problems) != bool(after.problems):

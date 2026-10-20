@@ -270,3 +270,22 @@ def test_a_night_measures_each_role_and_keeps_the_trend(tmp_path: Path) -> None:
     seen = latest_nights(folder)
     assert seen["last"]["when"] == "2026-09-09T02:00:00+00:00"
     assert seen["trend"][-1]["suggested"] == "proposed-first-names"
+
+
+def test_a_change_that_makes_him_much_more_alike_is_not_adopted() -> None:
+    from eidos.application.harness_probe import trade_offs, variety
+
+    contexts = [ENCOUNTER] * 10
+    current = [
+        Outcome(i, f"Stuart {w} from the stall.", ("missing_actor",) if i < 5 else ())
+        for i, w in enumerate(
+            "waves grins nods laughs calls shouts beams points smiles winks".split()
+        )
+    ]
+    samey = [Outcome(i, "Stuart waves from the stall.", ()) for i in range(10)]
+    assert variety(current, samey, contexts) < 0.6
+    assert (
+        verdict(current, samey, variety(current, samey, contexts))
+        == "keep current: much more alike"
+    )
+    assert "openings less varied" in trade_offs(current, samey, contexts)
