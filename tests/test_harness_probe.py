@@ -353,3 +353,5 @@ def test_a_thought_that_says_its_cue_back_is_turned_away() -> None:
         "parroted its cue"
     )
     assert turned_away_for("Beth sounds stretched thin.", {}, judge) is None
+    short = StreamJudge(cue_text="a tune stuck in his head")
+    assert turned_away_for("Without trying, a tune stuck in my head again.", {}, short) is None
