@@ -309,9 +309,16 @@ class Runtime:
             try:
                 with self.lock:
                     history = self.life.history()
-                added = self.meaning.embed_missing(history, limit=256)
-                if added:
-                    logger.info("Embedded %d memories (%d in all)", added, len(self.meaning))
+                # A whole life the first time, a batch at a time so a tick is never held up;
+                # after that, the hour's few.
+                total = 0
+                for _ in range(40):
+                    added = self.meaning.embed_missing(history, limit=256)
+                    total += added
+                    if added < 256 or self.stop.is_set():
+                        break
+                if total:
+                    logger.info("Embedded %d memories (%d in all)", total, len(self.meaning))
             except Exception:
                 logger.exception("Embedding memories failed")
             finally:
