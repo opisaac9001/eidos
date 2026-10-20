@@ -26,34 +26,70 @@ from eidos.application.harness_probe import (
     verdict,
 )
 from eidos.domain.world_catalog import project_world_catalog
-from eidos.ports.model_gateway import ModelGateway
+from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
 
 def load_samples(
     database: Path, role: str, limit: int, grep: str | None = None
 ) -> list[dict[str, Any]]:
-    """The most recent distinct contexts this role was asked with, read-only."""
+    """The most recent distinct contexts this role was asked with, read-only.
+
+    How each was asked (schema, length, temperature) is kept with it, so the probe asks
+    again exactly as his life did: texts have their own schema, not the generic one.
+    """
     connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     try:
+        columns = {row[1] for row in connection.execute("pragma table_info(cognition_jobs)")}
+        how = [c for c in ("task_version", "max_output_tokens", "temperature",
+                           "output_schema_json") if c in columns]  # fmt: skip
         rows = connection.execute(
-            "select context_json from cognition_jobs where capability = ? "
-            "order by rowid desc limit 4000",
+            f"select context_json{''.join(', ' + c for c in how)} from cognition_jobs "
+            "where capability = ? order by rowid desc limit 4000",
             (role,),
         ).fetchall()
     finally:
         connection.close()
+    # Only the moments about to be probed: an id can be reused once a moment's gone.
+    _ASKED_HOW.clear()
     seen: set[str] = set()
     found: list[dict[str, Any]] = []
-    for (raw,) in rows:
+    for raw, *rest in rows:
         if not raw or raw in seen or (grep and grep.casefold() not in raw.casefold()):
             continue
         seen.add(raw)
         value = json.loads(raw)
         if isinstance(value, dict):
+            asked = dict(zip(how, rest, strict=True))
+            if asked:
+                _ASKED_HOW[id(value)] = asked
             found.append(value)
         if len(found) >= limit:
             break
     return found
+
+
+# How each loaded moment was asked, by the moment's identity (kept out of its context).
+_ASKED_HOW: dict[int, dict[str, Any]] = {}
+
+
+def _number(value: Any, default: float) -> float:
+    return (
+        float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    )
+
+
+def _request(role: str, context: Mapping[str, Any], asked: Mapping[str, Any] | None) -> Any:
+    if not asked:
+        return request_for(role, context)
+    schema = asked.get("output_schema_json")
+    return ModelRequest(
+        capability=role,
+        task_version=str(asked.get("task_version") or "1"),
+        max_output_tokens=int(asked.get("max_output_tokens") or 300),
+        temperature=_number(asked.get("temperature"), 0.7),
+        output_schema=json.loads(schema) if schema else None,
+        messages=(ModelMessage("user", json.dumps(context)),),
+    )
 
 
 def load_recorded(database: Path, role: str, limit: int) -> list[tuple[dict[str, Any], str]]:
@@ -172,7 +208,8 @@ def _asker(
     gateway: ModelGateway, role: str, extra: Mapping[str, Any]
 ) -> Callable[[Mapping[str, Any]], Awaitable[str]]:
     async def ask(context: Mapping[str, Any]) -> str:
-        response = await gateway.generate(request_for(role, {**context, **extra}))
+        asked = _ASKED_HOW.get(id(context))
+        response = await gateway.generate(_request(role, {**context, **extra}, asked))
         return response.content
 
     return ask
