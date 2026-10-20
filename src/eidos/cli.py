@@ -152,6 +152,17 @@ def main() -> None:
     )
     models.add_argument("action", choices=("status", "test", "remote"))
     models.add_argument("target", nargs="?", help="a model id (test) or provider id (remote)")
+    harness = commands.add_parser(
+        "harness-probe",
+        help="Try a change to how a model role is asked on real recorded moments",
+    )
+    harness.add_argument("--role", required=True)
+    harness.add_argument("--variant", type=Path, help="JSON file describing the change")
+    harness.add_argument("--samples", type=int, default=30)
+    harness.add_argument("--repeats", type=int, default=1)
+    harness.add_argument("--grep", help="Only moments whose context mentions this")
+    harness.add_argument("--out", type=Path, help="Directory for the full report")
+    harness.add_argument("--record", type=Path, help="Lessons file to append the outcome to")
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument(
@@ -308,6 +319,24 @@ def main() -> None:
             print(json.dumps(result, indent=2))
             if not result["passed"]:
                 raise SystemExit(1)
+            return
+        if args.command == "harness-probe":
+            if mode == "stand-in":
+                raise ValueError("harness-probe needs real models to compare")
+            from eidos.adapters.harness_runner import run as probe_harness
+
+            result = probe_harness(
+                gateway,
+                args.database,
+                args.role,
+                variant_path=args.variant,
+                samples=args.samples,
+                repeats=args.repeats,
+                grep=args.grep,
+                out=args.out,
+                lessons=args.record,
+            )
+            print(json.dumps(result, indent=2))
             return
         if args.command == "benchmark-model":
             if mode == "stand-in":
