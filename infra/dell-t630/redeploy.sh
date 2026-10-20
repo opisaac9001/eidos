@@ -27,10 +27,12 @@ CHECKS="test_folding test_web test_always_on_stream test_body test_providers tes
   test_mood_label test_timed_todos test_failure_isolation test_stream_ruts test_opinions
   test_life_story test_wealth test_shared_past test_character_history test_pronouns test_real_town test_world_catalog test_travel test_everyday test_causal_opportunities test_talking_points test_recurring_dialogue test_resident_day test_town_story test_making_plans"
 FILES=$(for name in $CHECKS; do printf 'tests/%s.py ' "$name"; done)
-RESULT=$($SSH "cd /srv/eidos && PYTHONPATH=src nice -n 10 .venv/bin/python -m pytest -q -p no:cacheprovider $FILES 2>&1 | tail -1")
+OUTPUT=$($SSH "cd /srv/eidos && PYTHONPATH=src nice -n 10 .venv/bin/python -m pytest -q -p no:cacheprovider -rf $FILES 2>&1 | grep -E '^(FAILED|ERROR) |passed|failed|error' | tail -12")
+RESULT=$(printf '%s\n' "$OUTPUT" | tail -1)
 echo "$RESULT"
 case "$RESULT" in
-  *failed*|*error*) echo "checks failed on the Dell; not restarting"; exit 1 ;;
+  *failed*|*error*) printf '%s\n' "$OUTPUT" | grep -E '^(FAILED|ERROR) ' || true
+    echo "checks failed on the Dell; not restarting"; exit 1 ;;
   *passed*) ;;
   *) echo "checks did not report; not restarting"; exit 1 ;;
 esac
