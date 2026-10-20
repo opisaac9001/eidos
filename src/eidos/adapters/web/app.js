@@ -2659,5 +2659,15 @@ async function loadHarness() {
   const suggestion = best
     ? `<div class="harness-suggestion"><strong>Suggested for ${esc(HARNESS_ROLES[last.suggestions.role] || last.suggestions.role)}: ${esc(best.name)}</strong><p>${esc(best.why)}</p><blockquote>${esc(best.prompt_append)}</blockquote><small>${percent(last.suggestions.current.turned_away)} turned away now, ${percent(best.turned_away)} with it. Adopt it by hand once you've read it.</small></div>`
     : "";
-  $("harness-body").innerHTML = `<p class="context-note">Last measured ${esc(date(last.when))}.</p>${rows.join("")}${suggestion}`;
+  const human = Object.entries(last.lifelike || {}).map(([key, item]) => {
+    const values = trend
+      .map((night) => (night.lifelike || {})[key])
+      .filter((v) => v !== undefined);
+    const shown = key === "days_alike" ? item.value.toFixed(2) : percent(item.value);
+    return `<div class="harness-row"><span class="harness-role">${esc(item.label)}<small>people: ${esc(item.people || "")} · ${esc(item.verdict || "")}</small></span><span class="harness-rate">${esc(shown)}</span>${sparkline(values)}</div>`;
+  });
+  const lifelike = human.length
+    ? `<div class="panel-kicker harness-sub">HOW HUMAN HE'S BEEN, THIS WEEK</div>${human.join("")}`
+    : "";
+  $("harness-body").innerHTML = `<p class="context-note">Last measured ${esc(date(last.when))}.</p>${rows.join("")}${suggestion}${lifelike}`;
 }

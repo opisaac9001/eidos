@@ -1974,3 +1974,4 @@ input[type="checkbox"] { accent-color: var(--amber); }
   .harness-row { grid-template-columns: minmax(0, 1fr) auto; }
   .sparkline { display: none; }
 }
+.harness-sub { margin-top: 1rem; }

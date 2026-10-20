@@ -391,12 +391,15 @@ def nightly(
     *,
     names: list[str] | None = None,
     when: str = "",
+    lifelike: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """While he sleeps: how each role is doing on today's moments, the checks on recorded
     answers, and, for the worst role, changes the editor suggests (suggested, not adopted)."""
     names = names if names is not None else names_from(database)
     lessons = folder / "LESSONS.md"
     night: dict[str, Any] = {"when": when, "roles": {}}
+    if lifelike:
+        night["lifelike"] = _lifelike(lifelike)
 
     async def go() -> None:
         worst: tuple[float, str, list[dict[str, Any]], list[Outcome]] | None = None
@@ -432,6 +435,11 @@ def nightly(
                 {
                     "when": when,
                     "roles": {r: v["turned_away"] for r, v in night["roles"].items()},
+                    "lifelike": {
+                        key: value["value"]
+                        for key, value in (night.get("lifelike") or {}).items()
+                        if isinstance(value, Mapping) and isinstance(value.get("value"), float)
+                    },
                     "suggested": (night.get("suggestions") or {}).get("best", {})
                     and night["suggestions"]["best"]["name"],
                 }
@@ -439,6 +447,36 @@ def nightly(
             + "\n"
         )
     return night
+
+
+# From ``believability_report``: the measures with a human range to sit in.
+_LIFELIKE = {
+    "mind_wandering": "Mind-wandering",
+    "thinking_ahead": "Thinking ahead",
+    "days_alike": "Days alike",
+}
+
+
+def _lifelike(report: Mapping[str, Any]) -> dict[str, Any]:
+    found: dict[str, Any] = {}
+    for key, label in _LIFELIKE.items():
+        item = report.get(key)
+        if isinstance(item, Mapping) and isinstance(item.get("value"), (int, float)):
+            found[key] = {
+                "label": label,
+                "value": float(item["value"]),
+                "verdict": item.get("verdict"),
+                "people": item.get("people") or item.get("aim"),
+            }
+    slips = report.get("intentions")
+    if isinstance(slips, Mapping) and isinstance(slips.get("slip_rate"), (int, float)):
+        found["slip_rate"] = {
+            "label": "Intentions that slipped",
+            "value": float(slips["slip_rate"]),
+            "verdict": slips.get("verdict"),
+            "people": slips.get("people"),
+        }
+    return found
 
 
 def _best_name(night: Mapping[str, Any]) -> str | None:

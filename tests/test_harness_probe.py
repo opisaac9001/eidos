@@ -262,7 +262,15 @@ def test_a_night_measures_each_role_and_keeps_the_trend(tmp_path: Path) -> None:
     contexts = [{**ENCOUNTER, "time": f"2026-09-08T1{n}:00:00+00:00"} for n in range(6)]
     db = _database(tmp_path, contexts)
     folder = tmp_path / "harness"
-    night = nightly(_Editor(), db, folder, names=[], when="2026-09-09T02:00:00+00:00")
+    lifelike = {
+        "mind_wandering": {"value": 0.52, "people": 0.47, "verdict": "in the human range"},
+        "intentions": {"slip_rate": 0.12, "people": "about 0.10 to 0.15", "verdict": "ok"},
+    }
+    night = nightly(
+        _Editor(), db, folder, names=[], when="2026-09-09T02:00:00+00:00", lifelike=lifelike
+    )
+    assert night["lifelike"]["mind_wandering"]["value"] == 0.52
+    assert night["lifelike"]["slip_rate"]["value"] == 0.12
     assert night["roles"]["firmament"]["turned_away"] == 1.0
     # The worst role got suggestions; none is adopted by the night itself.
     assert night["suggestions"]["best"]["name"] == "proposed-first-names"
@@ -270,6 +278,7 @@ def test_a_night_measures_each_role_and_keeps_the_trend(tmp_path: Path) -> None:
     seen = latest_nights(folder)
     assert seen["last"]["when"] == "2026-09-09T02:00:00+00:00"
     assert seen["trend"][-1]["suggested"] == "proposed-first-names"
+    assert seen["trend"][-1]["lifelike"] == {"mind_wandering": 0.52, "slip_rate": 0.12}
 
 
 def test_a_change_that_makes_him_much_more_alike_is_not_adopted() -> None:

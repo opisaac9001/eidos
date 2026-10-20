@@ -295,6 +295,26 @@ class Runtime:
         path = getattr(getattr(self.life, "store", None), "path", None)
         return Path(path).with_name("harness") if path else None
 
+    def _lifelike(self) -> dict[str, Any] | None:
+        """The week's believability measures, for the nightly record."""
+        try:
+            with self.lock:
+                history = self.life.history()
+                at = datetime.fromisoformat(self.life.snapshot()["time"])
+            stream = self.stream
+            thoughts = (
+                [
+                    (thought.cue_kind, thought.text)
+                    for thought in stream.store.since(stream.wall_clock() - 7 * 86400)
+                ]
+                if stream is not None
+                else []
+            )
+            return dict(believability_report(history, at, thoughts=thoughts, days=7))
+        except Exception:
+            logger.exception("Believability for the nightly record failed")
+            return None
+
     def _maybe_tune(self, config: Mapping[str, Any]) -> None:
         """Once a night, while he's asleep, probe his model roles on the day's moments."""
         if not config.get("running") or self._tuning or self.models is None:
@@ -325,7 +345,7 @@ class Runtime:
             from eidos.adapters.harness_runner import nightly
 
             try:
-                nightly(self.models, Path(store_path), folder, when=when)
+                nightly(self.models, Path(store_path), folder, when=when, lifelike=self._lifelike())
             except Exception:
                 self._tune_failed_at = wall_time()
                 logger.exception("Nightly harness probe failed")
