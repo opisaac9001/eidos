@@ -289,3 +289,31 @@ def test_a_change_that_makes_him_much_more_alike_is_not_adopted() -> None:
         == "keep current: much more alike"
     )
     assert "openings less varied" in trade_offs(current, samey, contexts)
+
+
+def test_a_thought_is_judged_by_the_probe_exactly_as_the_stream_judges_it() -> None:
+    from eidos.application.inner_stream import JUDGE_KEY, StreamJudge, turned_away_for
+
+    judge = StreamJudge(
+        recent=("Kettle's taking ages.",),
+        earlier=("Kettle's taking ages.", "Rain on the skylight."),
+        names=("Mara", "Ellis"),
+        cue_text="the kettle",
+    )
+    context = {"location": "at home", "cue": "the kettle", JUDGE_KEY: judge.payload()}
+    assert StreamJudge.from_payload(judge.payload()) == judge
+    for text, kind in (
+        ("Kettle's taking ages.", "repeat"),
+        ("Mara would laugh at this kettle.", "stray_name"),
+        ("Pathos needs a new kettle.", "third_person"),
+    ):
+        said = json.dumps({"text": text})
+        assert turned_away_for(text, context, judge) is not None
+        assert kind in judge_kinds(said, context)
+    fine = "Steam on the window. Nearly there."
+    assert turned_away_for(fine, context, judge) is None
+    assert judge_kinds(json.dumps({"text": fine}), context) == []
+
+
+def judge_kinds(content: str, context: dict) -> list[str]:
+    return judge("murmur", context, content)

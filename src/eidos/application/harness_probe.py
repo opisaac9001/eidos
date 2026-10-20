@@ -29,7 +29,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-from eidos.application.inner_stream import near_repeat
+from eidos.application.inner_stream import (
+    JUDGE_KEY,
+    StreamJudge,
+    near_repeat,
+    turned_away_for,
+)
 from eidos.application.shared_past import (
     claims_his_project,
     gives_away_his_project,
@@ -105,9 +110,14 @@ _SIGNED = re.compile(r"(?:^|[\s,.!-])(?:cheers|love|thanks|ta|x+)?[\s,]*[-—]?\
                      re.IGNORECASE)  # fmt: skip
 
 
+def _moment(context: Mapping[str, Any]) -> dict[str, Any]:
+    """What the model was given, without what was kept only for judging its answer."""
+    return {key: value for key, value in context.items() if key != JUDGE_KEY}
+
+
 def stray_name(text: str, context: Mapping[str, Any], names: Sequence[str]) -> str | None:
     """Someone he knows, named in the answer, whom nothing in the moment brought up."""
-    given = json.dumps(context, ensure_ascii=False)
+    given = json.dumps(_moment(context), ensure_ascii=False)
     for name in names:
         first = name.split()[0] if name.split() else ""
         if len(first) < 3 or first in {"Patrick", "Pathos"}:
@@ -171,8 +181,14 @@ def judge(
         if _SIGNED.search(text.strip()):
             problems.append("signed_off")
     elif role == "murmur":
-        # His own thoughts, in the first person: not "Patrick wonders...".
-        if re.search(r"\b(?:Patrick|Pathos)\b", text):
+        recorded = context.get(JUDGE_KEY)
+        if isinstance(recorded, Mapping):
+            # Judged exactly as the stream judges it, with where his mind had been.
+            why = turned_away_for(text, context, StreamJudge.from_payload(recorded))
+            if why is not None:
+                problems.append(_stream_kind(why))
+        elif re.search(r"\b(?:Patrick|Pathos)\b", text):
+            # His own thoughts, in the first person: not "Patrick wonders...".
             problems.append("third_person")
     return problems
 
@@ -225,7 +241,9 @@ def quality(outcomes: Sequence[Outcome], contexts: Sequence[Mapping[str, Any]]) 
     for outcome, said in zip(outcomes, words, strict=False):
         given = {
             w.casefold()
-            for w in _WORDS.findall(json.dumps(contexts[outcome.sample], ensure_ascii=False))
+            for w in _WORDS.findall(
+                json.dumps(_moment(contexts[outcome.sample]), ensure_ascii=False)
+            )
             if len(w) >= 5
         }
         specific += bool(given & {w for w in said if len(w) >= 5})
@@ -422,7 +440,27 @@ CHECKS = {
     "emoji": "A text had an emoji, which he doesn't use.",
     "signed_off": "A text was signed off with his name.",
     "failed_call": "The model gave no usable answer.",
+    "invented_happening": "A thought reported a call, text, visit or remark from someone that "
+    "nothing he remembers or was told backs up.",
+    "placed_with_him": "A thought put someone in the room with him when he's alone.",
+    "somewhere_else": "A thought put him somewhere other than where he is.",
 }
+
+
+def _stream_kind(why: str) -> str:
+    """'brought in Ellis from nowhere' -> 'stray_name': the stream's reasons as kinds."""
+    for start, kind in (
+        ("thought of himself", "third_person"),
+        ("used a record id", "leak"),
+        ("repeated itself", "repeat"),
+        ("brought in", "stray_name"),
+        ("made up something", "invented_happening"),
+        ("put him", "somewhere_else"),
+        ("put ", "placed_with_him"),
+    ):
+        if why.startswith(start):
+            return kind
+    return "stream_check"
 
 
 def _kinds(outcomes: Sequence[Outcome]) -> list[str]:

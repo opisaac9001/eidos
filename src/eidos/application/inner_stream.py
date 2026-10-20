@@ -503,6 +503,122 @@ def choose_cue(
     return rng.choices(pool, weights=weights, k=1)[0]
 
 
+JUDGE_KEY = "_judge"
+
+
+@dataclass(frozen=True, slots=True)
+class StreamJudge:
+    """What the stream's checks need to know about where his mind has been."""
+
+    recent: tuple[str, ...] = ()
+    earlier: tuple[str, ...] = ()
+    worn_opening: str | None = None
+    worn_first: str | None = None
+    set_aside: tuple[str, ...] = ()
+    names: tuple[str, ...] = ()
+    grounding: tuple[str, ...] = ()
+    lately: tuple[str, ...] = ()
+    cue_text: str = ""
+    about_now: bool = False
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "recent": list(self.recent),
+            "earlier": list(self.earlier),
+            "worn_opening": self.worn_opening,
+            "worn_first": self.worn_first,
+            "set_aside": list(self.set_aside),
+            "names": list(self.names),
+            "grounding": list(self.grounding),
+            "lately": list(self.lately),
+            "cue_text": self.cue_text,
+            "about_now": self.about_now,
+        }
+
+    @classmethod
+    def from_payload(cls, raw: Mapping[str, Any]) -> StreamJudge:
+        def strings(key: str) -> tuple[str, ...]:
+            value = raw.get(key)
+            return tuple(str(v) for v in value) if isinstance(value, list) else ()
+
+        def text_or_none(key: str) -> str | None:
+            value = raw.get(key)
+            return str(value) if isinstance(value, str) and value else None
+
+        return cls(
+            recent=strings("recent"),
+            earlier=strings("earlier"),
+            worn_opening=text_or_none("worn_opening"),
+            worn_first=text_or_none("worn_first"),
+            set_aside=strings("set_aside"),
+            names=strings("names"),
+            grounding=strings("grounding"),
+            lately=strings("lately"),
+            cue_text=str(raw.get("cue_text") or ""),
+            about_now=bool(raw.get("about_now")),
+        )
+
+
+def turned_away_for(text: str, context: Mapping[str, Any], judge: StreamJudge) -> str | None:
+    """Why the stream would turn this thought away, or None if it would keep it.
+
+    The one place the stream's checks live, so his life and a harness probe judge a thought
+    the same way.
+    """
+    if re.search(r"\bPathos\b", text) or re.search(
+        r"\bPatrick\b", re.sub(r"[\"“'‘][^\"”'’]*[\"”'’]", "", text)
+    ):
+        # His own thoughts, in his own head: not "Pathos project. Start now."
+        return "thought of himself by name"
+    if re.search(r"\b[Tt]ownsfolk[ -]?\d+", text):
+        # An id from an old record, said back: nobody thinks of a friend as a number.
+        return "used a record id"
+    names = set(judge.names)
+    # Judged against the thoughts it was shown, and never nearly the same thought as one of
+    # the last dozen, however long ago.
+    opening = " ".join(text.split()[:2]).strip(".,!?").casefold()
+    if (
+        near_repeat(text, list(judge.recent))
+        or said_before(text, list(judge.earlier))
+        # An opening he's leaned on three times in a dozen ("Why does...", 136 times in a
+        # week): told to avoid it, a small model doesn't, so it's turned away.
+        or (
+            judge.worn_opening is not None
+            and len(text.split()) >= 3
+            and opening == judge.worn_opening
+        )
+        # The same first word, in other clothes ("Ellis's hands", "Ellis's laugh"...).
+        or (judge.worn_first is not None and _first_word(text) == judge.worn_first)
+        # Someone he's been thinking about over and over, when his mind went elsewhere.
+        or any(
+            re.search(rf"\b{re.escape(name)}\b", text) and name not in judge.cue_text
+            for name in judge.set_aside
+        )
+        or rutted(text, list(judge.earlier), names) is not None
+    ):
+        return "repeated itself"
+    # Where his mind was pointed in the last few minutes is still on it.
+    stray = stray_name(text, {**context, "lately_on_his_mind": list(judge.lately)}, names)
+    if stray is not None:
+        return f"brought in {stray} from nowhere"
+    with_him = context.get("with_him")
+    invented = invented_happening(
+        text,
+        names,
+        list(judge.grounding),
+        [str(name) for name in with_him] if isinstance(with_him, list) else [],
+    )
+    if invented is not None:
+        return f"made up something from {invented}"
+    present = placed_with_him(text, context, names)
+    if present is not None:
+        return f"put {present} with him when he's alone"
+    elsewhere = somewhere_else(text, str(context.get("location") or ""), about_now=judge.about_now)
+    if elsewhere is not None:
+        return f"put him {elsewhere}"
+    return None
+
+
 def stream_context(
     snapshot: Mapping[str, Any], recent: Sequence[str], cue: Cue | None
 ) -> dict[str, object]:
@@ -682,7 +798,7 @@ def stray_name(text: str, context: Mapping[str, object], names: set[str]) -> str
     given.pop("recent_inner_stream", None)
     # Who's who explains names; it doesn't put anyone in front of his mind. Nor do thoughts
     # already turned away, or the mind's background layers.
-    for key in ("who_is_who", "not_again", "mind_layers"):
+    for key in ("who_is_who", "not_again", "mind_layers", JUDGE_KEY):
         given.pop(key, None)
     allowed = json.dumps(given, ensure_ascii=False)
     for name in names:
@@ -1553,6 +1669,21 @@ class InnerStream:
             context["worn_out"] = tired
         if set_aside and not (cue is not None and any(n in cue.text for n in set_aside)):
             context["leave_aside"] = set_aside
+        judge = StreamJudge(
+            recent=tuple(recent_texts[-3:]),
+            earlier=tuple(thought.text for thought in self.store.recent(12)),
+            worn_opening=worn_opening,
+            worn_first=worn_first,
+            set_aside=tuple(set_aside),
+            names=tuple(sorted(known_names(snapshot))),
+            grounding=tuple(grounding(snapshot)),
+            lately=tuple(list(self._tried)[-3:]),
+            cue_text=cue.text if cue is not None else "",
+            about_now=bool(cue and cue.kind in {"here", "body", "stirring"}),
+        )
+        # Kept with the request (no model sees it), so a harness probe can judge a thought
+        # asked again exactly as this one is judged now.
+        context[JUDGE_KEY] = judge.payload()
         text = await perform(self.gateway, "murmur", context, at, pending)
         trace = next(
             (
@@ -1566,70 +1697,9 @@ class InnerStream:
             failure = next((event for event in pending if event.kind == "role.failed"), None)
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
-        if re.search(r"\bPathos\b", text) or re.search(
-            r"\bPatrick\b", re.sub(r"[\"“'‘][^\"”'’]*[\"”'’]", "", text)
-        ):
-            # His own thoughts, in his own head: not "Pathos project. Start now."
-            self._turn_away(f"thought of himself by name, skipped: {text[:80]}", text)
-            return None
-        if re.search(r"\b[Tt]ownsfolk[ -]?\d+", text):
-            # An id from an old record, said back: nobody thinks of a friend as a number.
-            self._turn_away(f"used a record id, skipped: {text[:80]}", text)
-            return None
-        # Judged against the thoughts it was shown, not ones it never saw.
-        # And never nearly the same thought as one of the last dozen, however long ago.
-        earlier = [thought.text for thought in self.store.recent(12)]
-        opening = " ".join(text.split()[:2]).strip(".,!?").casefold()
-        if (
-            near_repeat(text, recent_texts[-3:])
-            or said_before(text, earlier)
-            # An opening he's leaned on three times in a dozen ("Why does...", 136 times in
-            # a week): told to avoid it, a small model doesn't, so it's turned away.
-            or (worn_opening is not None and len(text.split()) >= 3 and opening == worn_opening)
-            # The same first word, in other clothes ("Ellis's hands", "Ellis's laugh"...).
-            or (worn_first is not None and _first_word(text) == worn_first)
-            # Someone he's been thinking about over and over, when his mind went elsewhere.
-            or any(
-                re.search(rf"\b{re.escape(name)}\b", text)
-                and not (cue is not None and name in cue.text)
-                for name in set_aside
-            )
-            or rutted(text, earlier, known_names(snapshot)) is not None
-        ):
-            self._turn_away(f"repeated itself, skipped: {text[:80]}", text)
-            return None
-        # Where his mind was pointed in the last several thoughts is still on it.
-        stray = stray_name(
-            # Where his mind was in the last few minutes, not the last half hour.
-            text,
-            {**context, "lately_on_his_mind": list(self._tried)[-3:]},
-            known_names(snapshot),
-        )
-        if stray is not None:
-            self._turn_away(f"brought in {stray} from nowhere, skipped: {text[:80]}", text)
-            return None
-        names = known_names(snapshot)
-        with_him = context.get("with_him")
-        invented = invented_happening(
-            text,
-            names,
-            grounding(snapshot),
-            [str(name) for name in with_him] if isinstance(with_him, list) else [],
-        )
-        if invented is not None:
-            self._turn_away(f"made up something from {invented}, skipped: {text[:80]}", text)
-            return None
-        present = placed_with_him(text, context, names)
-        if present is not None:
-            self._turn_away(f"put {present} with him when he's alone, skipped: {text[:80]}", text)
-            return None
-        elsewhere = somewhere_else(
-            text,
-            str(context.get("location") or ""),
-            about_now=bool(cue and cue.kind in {"here", "body", "stirring"}),
-        )
-        if elsewhere is not None:
-            self._turn_away(f"put him {elsewhere}, skipped: {text[:80]}", text)
+        why = turned_away_for(text, context, judge)
+        if why is not None:
+            self._turn_away(f"{why}, skipped: {text[:80]}", text)
             return None
         with self._lock:
             kept = self.store.add(
