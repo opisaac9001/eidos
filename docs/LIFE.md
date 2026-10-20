@@ -211,7 +211,7 @@ he can reach, and how clearly, changes.
   what it's about, not only what shares its words: with a small local embedding model
   (`nomic-embed-text` on the Dell's Ollama) each memory has a vector, a cue is compared
   with them, and the memory that comes up most strongly primes the ones near it
-  (spreading activation). Vectors are derived and kept beside his history, never in it;
+  (spreading activation). Vectors are derived and kept in their own file beside his history, never in it;
   without the model, recall goes on by words alone. `EIDOS_EMBED_URL`,
   `EIDOS_EMBED_MODEL` and `EIDOS_EMBEDDINGS=off` configure it.
 - **Measured:** `eidos believability` reports how much of an ordinary month a month ago

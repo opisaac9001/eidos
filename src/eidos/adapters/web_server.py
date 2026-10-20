@@ -936,7 +936,10 @@ def _meaning_index(database: Path) -> Any:
         os.environ.get("EIDOS_EMBED_URL", DEFAULT_URL),
         os.environ.get("EIDOS_EMBED_MODEL", DEFAULT_MODEL),
     )
-    index = MeaningIndex(embedder, SQLiteMemoryVectors(database))
+    # Their own file beside his history: derived data, and a big batch of vectors must
+    # never hold up, or be held up by, the writer of his life.
+    vectors = database.with_name(f"{database.stem}.vectors.sqlite3")
+    index = MeaningIndex(embedder, SQLiteMemoryVectors(vectors))
     set_meaning_index(index)
     return index
 
