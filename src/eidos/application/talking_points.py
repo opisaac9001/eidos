@@ -15,6 +15,7 @@ from typing import Sequence
 from eidos.application.freelance import DROP_IN_PREFIX, STARTED, TOLD, leaving_day
 from eidos.application.gossip import told_him_again, worth_mentioning
 from eidos.application.life_context import latest_weather
+from eidos.application.memory import recall
 from eidos.application.repair_jobs import bench_view
 from eidos.application.town_story import both_know
 from eidos.application.work_rota import EMPLOYER_ID
@@ -90,10 +91,45 @@ def talking_points(
         )
     for index, project in enumerate(his_projects(history)[:1]):
         points.append((f"his-project-{index}", project))
+    for memory_id, remembered in shared_memory(history, at, partner_id, partner_name):
+        points.append(
+            (
+                f"remember-{memory_id}",
+                f"something they went through together that he might bring up, as it comes "
+                f"back to him: {remembered}",
+            )
+        )
     weather = latest_weather(list(history[-400:]))
     if weather:
         points.append(("the-weather", f"the weather today ({weather.lower()})"))
     return points
+
+
+def shared_memory(
+    history: Sequence[DomainEvent], at: datetime, partner_id: str, partner_name: str
+) -> list[tuple[str, str]]:
+    """A memory of theirs together he might bring up: friends reminisce.
+
+    Clear or partial, a couple of days old at least, worth remembering, and not one he's
+    told them in the last month.
+    """
+    told_lately = {
+        str(e.payload.get("memory_id"))
+        for e in events_of(history, "memory.told")[-300:]
+        if e.payload.get("to") == partner_id
+        and at - datetime.fromisoformat(str(e.payload.get("simulated_at"))) <= timedelta(days=30)
+    }
+    for item in recall(list(history), partner_name, at, 6, relationship_ids={partner_id}):
+        if item.remembered_person_id != partner_id or item.detail_level == "vague":
+            continue
+        memory_id = str(item.event.event_id)
+        importance = float(item.event.payload.get("importance", 0.5) or 0.5)
+        if memory_id in told_lately or importance < 0.45:
+            continue
+        if at - item.remembered_at < timedelta(days=2):
+            continue
+        return [(memory_id, item.recalled_text)]
+    return []
 
 
 def his_projects(history: Sequence[DomainEvent]) -> list[str]:

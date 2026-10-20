@@ -320,6 +320,12 @@ ROLE_PROMPTS["firmament"] += (
     "context; if a topic is missing, refer only to the immediate activity."
 )
 
+ROLE_PROMPTS["pathos"] += (
+    " what_he_can_recall says how much really comes back about what was asked. When nothing "
+    'or only a hazy sense comes back, he says so ("I don\'t really remember, honestly") and '
+    "invents nothing; people know what they've forgotten."
+)
+
 for _role in ("pathos_deliberation", "pathos_agency", "pathos_project"):
     ROLE_PROMPTS[_role] += POSSIBLE_SELVES_NOTE
 
@@ -339,6 +345,7 @@ ROLE_FIELDS = {
         "source_memory",
         "who_is_who",
         "recent_dialogue",
+        "what_he_can_recall",
         "memories",
         "memory_recollections",
         "semantic_expectations",

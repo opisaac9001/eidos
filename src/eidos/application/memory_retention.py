@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.application.memory_curve import accessibility_of
+from eidos.application.memory_weighing import importance_of, weighed_importance
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of, payload_candidates
 
@@ -49,6 +50,7 @@ def memory_retention_events(
         return []
 
     archived = archived_memory_ids(history)
+    weighed = weighed_importance(history)
     stayed = {
         str(event.payload.get("memory_id"))
         for event in events_of(history, "memory.became_formative")
@@ -77,7 +79,7 @@ def memory_retention_events(
         memory_id = str(event.event_id)
         recorded_at = _time(event)
         age = simulated_at - recorded_at
-        importance = float(event.payload.get("importance", 0.5))
+        importance = importance_of(event, weighed)
         # Going back to it lately keeps it; never having gone back to it doesn't.
         recently_accessed = (
             memory_id in last_access and simulated_at - last_access[memory_id] < RECENT_ACCESS

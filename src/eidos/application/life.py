@@ -164,6 +164,7 @@ from eidos.application.memory_life import (
     routine_merge_events,
 )
 from eidos.application.memory_retention import memory_retention_events
+from eidos.application.memory_weighing import weigh_events
 from eidos.application.mental_layers import mental_layer_events, mind_context
 from eidos.application.messaging import communication_availability
 from eidos.application.nourishment import (
@@ -4078,6 +4079,7 @@ class Life(LifeConversation):
             # Overnight: routine runs together, and what he keeps going back to stays.
             tick.pending.extend(routine_merge_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(gist_merge_events(tick.history + tick.pending, tick.current))
+            tick.pending.extend(weigh_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(formative_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(
                 await daydream_events(

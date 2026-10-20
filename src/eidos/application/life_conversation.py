@@ -1,6 +1,7 @@
 """Talking with Pathos: inbox messages, live visits and his replies."""
 
 import asyncio
+import re
 from datetime import datetime, timedelta
 from typing import Callable, Mapping, Sequence
 
@@ -713,6 +714,7 @@ class LifeConversation(LifeProjections):
                 "selfhood": selfhood_context(history, state.simulated_at),
             },
             "memories": [item.recalled_text for item in selected],
+            "what_he_can_recall": what_he_can_recall(text, selected),
             "memory_recollections": [
                 {
                     "text": item.recalled_text,
@@ -780,6 +782,7 @@ class LifeConversation(LifeProjections):
             **self._his_mind_just_now(history, state.simulated_at),
         }
         pending.extend(_memory_access_events(selected, at))
+        pending.extend(_memory_told_events(selected, "user", at))
         pending.extend(reconsolidation_events(history + pending, selected, state.simulated_at))
         from eidos.application.bonds import current_bonds
 
@@ -1051,6 +1054,51 @@ def _reminder_event(
         causation_id=incoming.event_id,
         correlation_id=incoming.correlation_id or request_id,
     )
+
+
+_ASKS_ABOUT_THE_PAST = re.compile(
+    r"\b(?:remember|recall|forgot|forgotten|last (?:week|time|night|month)|the other (?:day|night)|"
+    r"did you|when (?:you|we)|that time|what happened|how (?:did|was|were)|what (?:did|was|were))\b",
+    re.IGNORECASE,
+)
+
+
+def what_he_can_recall(text: str, selected: list[RecalledMemory]) -> str:
+    """How much really comes back about what was asked, so he can say "I don't really
+    remember" instead of filling it in: people know what they've forgotten."""
+    cued = [item for item in selected if item.matched_terms or item.matched_entities]
+    clear = [item for item in cued if item.detail_level == "clear"]
+    hazy = [item for item in cued if item.detail_level in {"partial", "vague"}]
+    asked = bool(_ASKS_ABOUT_THE_PAST.search(text))
+    if not asked and (clear or not hazy):
+        return "nothing in particular is being asked of his memory"
+    if clear:
+        return "it comes back clearly enough to speak from"
+    if hazy:
+        return (
+            "only a hazy sense of it comes back (the memories marked partial or vague): he "
+            "says so, keeps to what he has, and doesn't fill in the details"
+        )
+    return (
+        "nothing comes back about that: he says he doesn't really remember, or asks, and "
+        "invents nothing"
+    )
+
+
+def _memory_told_events(selected: list[RecalledMemory], to: str, at: str) -> list[DomainEvent]:
+    """The memories he actually drew on were told to this person: he won't tell them the
+    same story next week as if new."""
+    return [
+        DomainEvent(
+            "memory.told",
+            "pathos",
+            {"memory_id": str(item.event.event_id), "to": to, "simulated_at": at},
+            correlation_id=f"told-{item.event.event_id}",
+        )
+        for item in selected
+        if item.detail_level in {"clear", "partial"}
+        and (item.matched_terms or item.matched_entities)
+    ]
 
 
 def _memory_access_events(selected: list[RecalledMemory], at: str) -> list[DomainEvent]:

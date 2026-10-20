@@ -196,8 +196,10 @@ def _month_old_memories(history: Sequence[DomainEvent], at: datetime) -> dict[st
     """
     from eidos.application.memory_curve import accessibility_of, detail_of
     from eidos.application.memory_retention import archived_memory_ids
+    from eidos.application.memory_weighing import importance_of, weighed_importance
 
     archived = archived_memory_ids(history)
+    weighed = weighed_importance(history)
     rehearsals: dict[str, int] = {}
     for access in events_of(history, "memory.accessed"):
         memory_id = str(access.payload.get("memory_id"))
@@ -210,7 +212,7 @@ def _month_old_memories(history: Sequence[DomainEvent], at: datetime) -> dict[st
         when = _at(memory)
         if when is None or not timedelta(days=30) <= at - when <= timedelta(days=90):
             continue
-        importance = float(memory.payload.get("importance", 0.5) or 0.5)
+        importance = importance_of(memory, weighed)
         memory_id = str(memory.event_id)
         bucket = mattered if importance >= 0.7 else ordinary
         if memory_id in archived:

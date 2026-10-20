@@ -161,6 +161,51 @@ _NOT_EVOCATIVE = re.compile(
 )
 
 
+def _cued_memories(snapshot: Mapping[str, Any], cue: Cue) -> list[str]:
+    """What this place or this person brings back: a cue pulls a memory, as a smell does.
+
+    Where he is ("here") brings back something that happened here, not today; someone with
+    him brings back a moment with them. One, so it's a thread his mind may follow, not a
+    list of names to wander into.
+    """
+    pathos = snapshot.get("pathos") or {}
+    today = str(snapshot.get("time", ""))[:10]
+    if cue.kind == "here":
+        wanted = {"location_id": pathos.get("location_id")}
+    elif cue.kind == "person":
+        name = cue.text.removesuffix(" is here").strip()
+        person = next(
+            (
+                p
+                for p in snapshot.get("people") or []
+                if isinstance(p, Mapping) and str(p.get("name", "")).split()[:1] == name.split()[:1]
+            ),
+            None,
+        )
+        if person is None:
+            return []
+        wanted = {"person_id": person.get("id")}
+    else:
+        return []
+    key, value = next(iter(wanted.items()))
+    if not value:
+        return []
+    found = [
+        memory
+        for memory in _his_memories(snapshot)
+        if isinstance(memory, Mapping)
+        and memory.get(key) == value
+        and str(memory.get("simulated_at", ""))[:10] != today
+        and memory.get("detail_level") != "vague"
+        and not memory.get("archived")
+    ]
+    if not found:
+        return []
+    best = max(found, key=lambda m: float(m.get("importance", 0.3) or 0.3))
+    text = _text_of(best)
+    return [_short(text, 200)] if text else []
+
+
 def _his_memories(snapshot: Mapping[str, Any]) -> list[object]:
     """His own memories worth drifting to; the snapshot's list also carries residents'."""
     return [
@@ -645,7 +690,7 @@ def stream_context(
     # With somewhere for his mind to go, that is the focus; extra memories only give a small
     # model names and scenes to wander into.
     memories = (
-        []
+        _cued_memories(snapshot, cue)
         if cue is not None
         else [
             text

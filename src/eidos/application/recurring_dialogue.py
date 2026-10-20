@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
 
@@ -449,6 +450,30 @@ async def _advance_scene(
         output.extend(turn.events)
         if not turn.accepted:
             break
+        if speaker_id == "pathos" and topic_id.startswith("remember-"):
+            # He brought up something they went through together: told, so not again as new.
+            spoken_line = next((e for e in turn.events if e.kind == "scene.turn_taken"), None)
+            memory_id = topic_id.removeprefix("remember-")
+            about = set(_WORDS_OF.findall(str(topic_words.get(topic_id, "")).casefold()))
+            said = (
+                set(_WORDS_OF.findall(str(spoken_line.payload.get("text", "")).casefold()))
+                if spoken_line is not None
+                else set()
+            )
+            if spoken_line is not None and len(about & said) >= 2:
+                output.append(
+                    DomainEvent(
+                        "memory.told",
+                        "pathos",
+                        {
+                            "memory_id": memory_id,
+                            "to": partner_id,
+                            "simulated_at": simulated_at.isoformat(),
+                        },
+                        causation_id=spoken_line.event_id,
+                        correlation_id=f"told-{memory_id}",
+                    )
+                )
         if disclosure is not None:
             spoken = next(event for event in turn.events if event.kind == "scene.turn_taken")
             output.append(
@@ -508,6 +533,8 @@ async def _advance_scene(
         )
     return output
 
+
+_WORDS_OF = re.compile(r"[a-z']{4,}")
 
 SAID_IT_ALREADY = (
     "That repeats what this speaker already said in this conversation. Answer the other "

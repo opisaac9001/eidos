@@ -193,6 +193,20 @@ he can reach, and how clearly, changes.
   his mind only if it was made days ago, nothing's in his phone, it hasn't crossed his
   mind in two days, and it's a tired or busy day: rare, but then someone is let down, with
   everything that follows. His everyday doings, shifts and work sessions never slip.
+- **What he keeps is weighed by how it felt** (`memory_weighing.py`). Every part of his
+  life records memories with an importance of its own choosing; each night the previous
+  day's are weighed again from the appraisal of the moment (how good or bad, how novel),
+  how many much-alike memories he already has from the last month, and whether he brooded
+  on it or told someone. The adjustment is bounded (never more than a third), the source
+  record is never changed, and recall, archiving and the measures read the weighed figure.
+- **He knows what he can't recall.** When you ask about the past, his reply is told how much
+  really comes back (clear, hazy, or nothing), so he says "I don't really remember" or
+  asks, instead of filling it in.
+- **Memories feed his talk and his thoughts.** A memory of something he went through with
+  a friend is a talking point with them (friends reminisce), once: told, it isn't brought
+  up as new for a month (`memory.told`, also for what he's told you). In his stream, where
+  he is brings back something that happened there, and someone with him a moment with
+  them, so a memory can start a thought.
 - **Measured:** `eidos believability` reports how much of an ordinary month a month ago
   he can still recall clearly; people keep little of it.
 

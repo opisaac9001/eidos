@@ -17,6 +17,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Sequence
 
+from eidos.application.memory_weighing import importance_of, weighed_importance
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
 
@@ -220,6 +221,7 @@ def gist_merge_events(history: Sequence[DomainEvent], at: datetime) -> list[Doma
     ):
         return []
     stayed = {str(e.payload.get("memory_id")) for e in events_of(history, FORMATIVE)}
+    weighed = weighed_importance(history)
     accessed: set[str] = set()
     for access in events_of(history, "memory.accessed")[-2000:]:
         when = _at(access)
@@ -233,7 +235,7 @@ def gist_merge_events(history: Sequence[DomainEvent], at: datetime) -> list[Doma
         memory_id = str(memory.event_id)
         if memory_id in stayed or memory_id in accessed:
             continue
-        if float(memory.payload.get("importance", 0.3) or 0.3) >= 0.7:
+        if importance_of(memory, weighed) >= 0.7:
             continue
         if memory.payload.get("source") in {"merged-routine", "merged-gist"}:
             continue

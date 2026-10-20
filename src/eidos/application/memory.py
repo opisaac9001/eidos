@@ -12,6 +12,7 @@ from uuid import UUID
 
 from eidos.application.memory_curve import accessibility_of, detail_of
 from eidos.application.memory_retention import archived_memory_ids
+from eidos.application.memory_weighing import weighed_importance
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, PersistentMap, events_of, kind_index
 from eidos.domain.recollections import Recollection, project_recollections
@@ -379,13 +380,25 @@ class MemoryIndex:
         }
 
 
+_TIMES: dict[UUID, datetime] = {}
+
+
 def _simulated_time(event: DomainEvent) -> datetime:
+    # Parsed once per event: recall over thousands of memories parsed each time afresh.
+    cached = _TIMES.get(event.event_id)
+    if cached is not None:
+        return cached
     value = event.payload.get("simulated_at")
     if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        return datetime.fromisoformat(value)
-    return event.occurred_at
+        when = value
+    elif isinstance(value, str):
+        when = datetime.fromisoformat(value)
+    else:
+        when = event.occurred_at
+    if len(_TIMES) >= 250_000:
+        _TIMES.clear()
+    _TIMES[event.event_id] = when
+    return when
 
 
 def _metadata(event: DomainEvent) -> tuple[float, float]:
@@ -465,6 +478,7 @@ def recall(
         raise ValueError("Memory index revision does not match supplied history")
     ranked: list[_Ranked] = []
     archived = archived_memory_ids(history)
+    weighed = weighed_importance(history)
     recollections = project_recollections(history).latest
     current_affect, emotional_tones, emotional_tags = _affective_context(
         history, now, recollections
@@ -473,7 +487,7 @@ def recall(
         facts = _facts(event)
         memory_id, importance, source_confidence = (
             facts.memory_id,
-            facts.importance,
+            weighed.get(facts.memory_id, facts.importance),
             facts.source_confidence,
         )
         subjective = recollections.get(memory_id)
