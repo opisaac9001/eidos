@@ -141,7 +141,11 @@ from eidos.application.life_conversation import LifeConversation
 from eidos.application.life_lately import life_lately_events
 from eidos.application.life_snapshot import build_snapshot
 from eidos.application.lived_activity_window import lived_activity_window
-from eidos.application.making_plans import plan_making_events
+from eidos.application.making_plans import (
+    friend_invitation_events,
+    his_replies,
+    plan_making_events,
+)
 from eidos.application.media import media_events
 from eidos.application.memory import (
     RecalledMemory,
@@ -2447,6 +2451,10 @@ class Life(LifeConversation):
                 awake=tick.state.awake,
                 on_phone=("phone" in doing.casefold() or texting)
                 and not phone_dead(visible, current),
+                values=project_identity(visible).values,
+                planning=planning,
+                # The workshop's errands took him into the hardware shop most weeks.
+                knew_dennis=bool(events_of(visible, "work.agreement_accepted")),
             ),
             self._planning,
         )
@@ -3065,16 +3073,35 @@ class Life(LifeConversation):
         """Invitations made and answered, follow-ups, and plans renegotiated or moved."""
         history, pending, current = tick.history, tick.pending, tick.current
         resident_invitation_catalog = self._world_catalog(history + pending)
-        pending.extend(
-            resident_invitation_events(
-                history + pending,
-                current,
-                known_person_ids=pathos_known_person_ids(history + pending)
-                - busy_people(history + pending, current),
-                npc_people=project_npcs(history + pending, current).people,
-                catalog=resident_invitation_catalog,
+        if self.authored_scenario:
+            pending.extend(
+                resident_invitation_events(
+                    history + pending,
+                    current,
+                    known_person_ids=pathos_known_person_ids(history + pending)
+                    - busy_people(history + pending, current),
+                    npc_people=project_npcs(history + pending, current).people,
+                    catalog=resident_invitation_catalog,
+                )
             )
-        )
+        else:
+            # A friend texts him to meet, at the hours people text, for their own reasons.
+            visible = history + pending
+            known = friendships(visible, current)
+            pending.extend(
+                friend_invitation_events(
+                    visible,
+                    current,
+                    friends={pid: f.depth for pid, f in known.items() if pid != "user"},
+                    last_seen={pid: f.last_shared for pid, f in known.items()},
+                    names={pid: p.name for pid, p in resident_invitation_catalog.people.items()},
+                    npc_people=project_npcs(visible, current).people,
+                    unavailable=busy_people(visible, current),
+                    planning=self._planning(visible),
+                    catalog=as_today(resident_invitation_catalog, closed_places(visible, current)),
+                    weather=latest_weather(visible),
+                )
+            )
         pending.extend(follow_up_events(history + pending, current))
         invitation_bias = _planning_bias(project_emotion(history + pending))
         invitation_catalog = self._world_catalog(history + pending)
@@ -3120,7 +3147,9 @@ class Life(LifeConversation):
             sustained_low_hours=inbound_emotion.sustained_low_hours,
             planning=self._planning(history + pending),
             catalog=resident_invitation_catalog,
+            weeknights_taken=week_of_work_now(history + pending, current) == "deadline",
         )
+        inbound_response += his_replies(history + pending, inbound_response)
         self._extend_warmed(tick, inbound_response, self._planning)
         negotiation_catalog = self._world_catalog(history + pending)
         reflective_reschedules = (

@@ -309,6 +309,20 @@ REPERTOIRE: tuple[Doing, ...] = (
         cues=("cafe", "juniper", "flat white"),
         action=ActionKind.ATTEND,
     ),
+    # Only once it's open and he knows of it: the record shop in the old bank.
+    Doing(
+        "record_shop",
+        "Flick through the crates at Second Spin",
+        ("record-shop",),
+        (25, 50),
+        (("curiosity", 0.05), ("rest", 0.01)),
+        effort=0.25,
+        hours=(10, 17),
+        daily=1,
+        comfort=0.3,
+        cues=("record", "vinyl", "crate", "second spin", "album"),
+        action=ActionKind.ATTEND,
+    ),
     # At his parents' in Wye: they're there, and that's half of why he goes.
     Doing(
         "kitchen_with_mum",

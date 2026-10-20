@@ -724,3 +724,218 @@ def _agreed(
     )
     output.extend(plan.events)
     return output
+
+
+# -- them asking him -------------------------------------------------------------------
+
+# When people text to make plans: over lunch, or once they're done for the day.
+THEY_ASK_AT = frozenset({12, 13, 17, 18, 19, 20})
+# Asked out once, he isn't asked again for a few days; the same friend, not for longer.
+ASKED_OUT_GAP = timedelta(days=4)
+SAME_FRIEND_GAP = timedelta(days=10)
+_THEIR_TITLES = {
+    "drink": "A drink with {name} at {place}",
+    "coffee": "Coffee with {name} at {place}",
+    "walk": "A walk by the river with {name}",
+    "film": "The cinema with {name}",
+}
+
+
+def _invites_to_him(history: Sequence[DomainEvent]) -> list[DomainEvent]:
+    return [
+        e
+        for e in events_of(history, "invitation.made")[-40:]
+        if e.payload.get("invitee_id") == "pathos"
+    ]
+
+
+def friend_invitation_events(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    *,
+    friends: Mapping[str, float],
+    last_seen: Mapping[str, datetime],
+    names: Mapping[str, str],
+    npc_people: Mapping[str, NPCState],
+    unavailable: Collection[str],
+    planning: PlanningState,
+    catalog: WorldCatalog,
+    weather: str,
+) -> list[DomainEvent]:
+    """A friend texting him to meet: their idea, from their own day and their own want.
+
+    They don't know his diary; he answers from it (``inbound_invitations``).
+    """
+    if at.hour not in THEY_ASK_AT:
+        return []
+    asked = _invites_to_him(history)
+    if asked and (when := _at(asked[-1])) is not None and at - when < ASKED_OUT_GAP:
+        return []
+    recent_inviters = {
+        str(e.payload.get("inviter_id"))
+        for e in asked
+        if (when := _at(e)) is not None and at - when < SAME_FRIEND_GAP
+    }
+    planned_with = {
+        entry.companion_id
+        for entry in planning.calendar.values()
+        if entry.status == "scheduled"
+        and entry.companion_id
+        and datetime.fromisoformat(entry.starts_at) >= at
+    }
+    wet = "rain" in weather.casefold()
+    for person_id in sorted(friends):
+        depth = friends[person_id]
+        person = npc_people.get(person_id)
+        if (
+            depth < 3.0
+            or person is None
+            or person_id in unavailable
+            or person_id in recent_inviters
+            or person_id in planned_with
+            or person_id not in catalog.people
+        ):
+            continue
+        seen = last_seen.get(person_id)
+        if seen is not None and at - seen < timedelta(hours=20):
+            continue
+        if _working(person_id, person.usual_location_id, at, at + timedelta(minutes=30)):
+            if at.hour not in {12, 13}:
+                continue  # texting from work only on their lunch break
+        # Their own want: lonely, with energy for it, and fond enough of him.
+        want = (0.3 + (1.0 - person.connection)) * (0.5 + 0.5 * person.energy)
+        chance = 0.03 * want * min(1.0, depth / 6.0)
+        if _roll("they-ask", person_id, at.isoformat()[:13]) >= chance:
+            continue
+        for kind in sorted(OUTINGS, key=lambda k: _roll("their-what", person_id, k, at.date())):
+            outing = OUTINGS[kind]
+            if outing.place not in catalog.places or (outing.outdoors and wet):
+                continue
+            if kind == "coffee" and person_id == "mara":
+                continue
+            for start in _when_for(kind, at, evenings_free=True):
+                end = start + timedelta(hours=outing.hours)
+                if not _open(catalog, outing.place, start, end):
+                    continue
+                if _working(person_id, person.usual_location_id, start, end):
+                    continue
+                return _they_ask(at, person_id, names.get(person_id, person_id), outing, start,
+                                 end, catalog)  # fmt: skip
+    return []
+
+
+def _they_ask(
+    at: datetime,
+    person_id: str,
+    name: str,
+    outing: Outing,
+    start: datetime,
+    end: datetime,
+    catalog: WorldCatalog,
+) -> list[DomainEvent]:
+    invitation_id = f"their-plan-{person_id}-{at.strftime('%Y%m%dT%H')}"
+    request_id = f"request-{invitation_id}"
+    place = catalog.places[outing.place].name
+    template = outing.asks[int(_roll("their-asks", invitation_id) * len(outing.asks))]
+    text = template.format(when=_when_words(start, at), place=place, clock=_clock(start))
+    title = _THEIR_TITLES.get(outing.kind, "Meeting {name}").format(name=_first(name), place=place)
+    # When he sees it: he's not glued to his phone.
+    seen_at = at + timedelta(minutes=10 + int(_roll("seen", invitation_id) * 50))
+    invitation = DomainEvent(
+        "invitation.made",
+        "pathos",
+        {
+            "invitation_id": invitation_id,
+            "request_id": request_id,
+            "inviter_id": person_id,
+            "invitee_id": "pathos",
+            "person_id": person_id,
+            "location_id": outing.place,
+            "starts_at": start.isoformat(),
+            "response_due_at": seen_at.isoformat(),
+            "source": "their-text",
+            "person_name": name,
+            "kind": outing.kind,
+            "text": text,
+            "simulated_at": at.isoformat(),
+        },
+        correlation_id=invitation_id,
+    )
+    opened = DomainEvent(
+        "social.request_opened",
+        "pathos",
+        {
+            "request_id": request_id,
+            "requester_id": person_id,
+            "responder_id": "pathos",
+            "action": "talk",
+            "target_id": person_id,
+            "title": title,
+            "due_at": end.isoformat(),
+            "earliest_start": start.isoformat(),
+            "location_id": outing.place,
+            "duration_hours": round((end - start).total_seconds() / 3600, 2),
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=invitation.event_id,
+        correlation_id=invitation_id,
+    )
+    return [
+        invitation,
+        opened,
+        remember(
+            invitation,
+            f"{_first(name)} texted: “{text}”",
+            at,
+            0.45,
+            origin="lived-making-plans",
+            person_id=person_id,
+        ),
+    ]
+
+
+_HIS_YES = ("Go on then. See you there.", "Yes! Perfect.", "Sounds good, I'm in.", "Ooh, yes.")
+_HIS_NO = (
+    "Can't, sorry. Another time?",
+    "Ah, can't do then. Soon though?",
+    "Not this time, sorry. Next week?",
+)
+_HIS_DEADLINE_NO = ("Can't, got a deadline. After Friday?",)
+
+
+def his_replies(
+    history: Sequence[DomainEvent], answered: Sequence[DomainEvent]
+) -> list[DomainEvent]:
+    """What he texted back to a friend's invitation, remembered."""
+    made = {
+        str(e.payload.get("invitation_id")): e
+        for e in _invites_to_him(history)
+        if e.payload.get("source") == "their-text"
+    }
+    output = []
+    for event in answered:
+        if event.kind not in {"invitation.accepted", "invitation.declined"}:
+            continue
+        invitation = made.get(str(event.payload.get("invitation_id")))
+        if invitation is None:
+            continue
+        at = _at(event) or datetime.fromisoformat(str(invitation.payload["simulated_at"]))
+        key = str(event.payload.get("invitation_id"))
+        if event.kind == "invitation.accepted":
+            words = _HIS_YES[int(_roll("his-yes", key) * len(_HIS_YES))]
+        elif "deadline" in str(event.payload.get("reason", "")):
+            words = _HIS_DEADLINE_NO[0]
+        else:
+            words = _HIS_NO[int(_roll("his-no", key) * len(_HIS_NO))]
+        output.append(
+            remember(
+                event,
+                f"Texted {_first(str(invitation.payload.get('person_name') or '')) or 'them'} "
+                f"back: “{words}”",
+                at,
+                0.35,
+                origin="lived-making-plans",
+                person_id=str(invitation.payload.get("inviter_id")),
+            )
+        )
+    return output

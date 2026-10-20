@@ -232,3 +232,128 @@ def test_the_river_only_floods_after_a_wet_spell() -> None:
     wet = [_weather(at - timedelta(hours=6 * i), "Light rain") for i in range(12)]
     assert not town_story._conditions_met(river, dry, at)
     assert town_story._conditions_met(river, wet, at)
+
+
+def _he_holds(claim: str, kind: str, at: datetime) -> DomainEvent:
+    return DomainEvent(
+        "gossip.heard",
+        "pathos",
+        {
+            "claim_id": claim,
+            "story": f"town:{kind}",
+            "subject_id": "town",
+            "holder_id": "pathos",
+            "teller_id": "",
+            "text": "…",
+            "version": 0,
+            "strength": 1.0,
+            "simulated_at": at.isoformat(),
+        },
+    )
+
+
+def _hour(history, at, location_id="home", **extra):
+    return town_story_events(
+        history,
+        at,
+        catalog=project_world_catalog(history),
+        residents=RESIDENTS,
+        locations={},
+        location_id=location_id,
+        awake=True,
+        on_phone=False,
+        **extra,
+    )
+
+
+def test_the_record_shop_opens_and_hearing_so_is_how_he_finds_it() -> None:
+    at = datetime(2026, 9, 8, 11, 0, tzinfo=timezone.utc)
+    opened = at + timedelta(days=5)
+    history = [*_begun(), _happened("record_shop", at)]
+    coda = _hour(history, opened)
+    history += coda
+    assert any(e.kind == "world.place_registered" for e in coda)
+    assert "record-shop" in project_world_catalog(history).places
+    assert not any(e.kind == "place.discovered" for e in coda)
+    history += [
+        _he_holds("town:record_shop-2026-09-08", "record_shop", at),
+        _he_holds("town:record_shop-2026-09-08:after", "record_shop", opened),
+    ]
+    later = _hour(history, opened + timedelta(hours=1))
+    found = [e for e in later if e.kind == "place.discovered"]
+    assert found and found[0].payload["place_id"] == "record-shop"
+    from eidos.application.everyday import REPERTOIRE
+
+    assert any(doing.places == ("record-shop",) for doing in REPERTOIRE)
+
+
+def test_he_decides_about_dennis_s_funeral_and_the_decision_books_it() -> None:
+    from eidos.domain.planning import project_planning
+
+    at = datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc)
+    history = [
+        *_begun(),
+        _happened("fixture_died", at),
+        _he_holds("town:fixture_died-2026-09-11", "fixture_died", at),
+    ]
+    out = _hour(
+        history,
+        at + timedelta(hours=1),
+        values={"care": 0.95},
+        planning=project_planning(history),
+        knew_dennis=True,
+    )
+    decision = next(e for e in out if e.kind == "town.story_decided")
+    memory = next(e for e in out if e.kind == "memory.recorded")
+    assert "Dennis's funeral" in memory.payload["text"]
+    assert decision.payload["decision"] == "go"
+    if True:
+        booked = next(e for e in out if e.kind == "schedule.created")
+        assert booked.causation_id == decision.event_id
+        assert booked.payload["location_id"] == "st-johns"
+        assert (
+            datetime.fromisoformat(booked.payload["starts_at"]).date()
+            == (at + timedelta(days=9)).date()
+        )
+        assert "st-johns" in project_world_catalog([*history, *out]).places
+    # He only decides once; and not at all about someone he never knew.
+    assert not any(
+        e.kind == "town.story_decided"
+        for e in _hour([*history, *out], at + timedelta(hours=2), knew_dennis=True,
+                       planning=project_planning([*history, *out]))
+    )  # fmt: skip
+    assert not any(
+        e.kind == "town.story_decided"
+        for e in _hour(history, at + timedelta(hours=1), planning=project_planning(history))
+    )
+
+
+def test_a_fiver_in_the_jar_next_time_hes_in_town() -> None:
+    at = datetime(2026, 9, 10, 6, 0, tzinfo=timezone.utc)
+    coda_at = at + timedelta(days=10)
+    coda = DomainEvent(
+        KIND,
+        "pathos",
+        {
+            "story_id": "chip_shop_fire-2026-09-10",
+            "story_kind": "chip_shop_fire",
+            "stage": "after",
+            "weight": 1,
+            "text": "There's a collection going round.",
+            "simulated_at": coda_at.isoformat(),
+        },
+    )
+    history = [
+        *_begun(),
+        _happened("chip_shop_fire", at),
+        coda,
+        _he_holds("town:chip_shop_fire-2026-09-10:after", "chip_shop_fire", coda_at),
+    ]
+    assert not any(e.kind == "spending.made" for e in _hour(history, coda_at + timedelta(hours=2)))
+    out = _hour(history, coda_at + timedelta(hours=3), location_id="cafe")
+    spent = [e for e in out if e.kind == "spending.made"]
+    assert spent and spent[0].payload["cost_pence"] == 500
+    assert not any(
+        e.kind == "spending.made"
+        for e in _hour([*history, *out], coda_at + timedelta(hours=4), location_id="cafe")
+    )

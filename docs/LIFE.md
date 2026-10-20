@@ -309,8 +309,16 @@ his mind, he texts someone: "Pint tonight? The Listening Room, half seven?"
   `social.request_*`, then the booking, the same chain as any agreed plan. The texts are on
   his phone (`contact.reached_out`/`contact.reply_received` with `purpose` `plan`).
 
+**Friends ask him too.** Over lunch or after work (12–13, 17–20), a friend who's lonely and has
+the energy may text him: their own idea, for a time they're free, evenings and weekends.
+After one invitation he isn't asked again for four days, and the same friend not for ten.
+He answers from his own state when he sees it (10 to 60 minutes later): his energy, mood and
+diary, and in a deadline week he turns down weeknights. His reply is remembered as a text
+back.
+
 This replaced the old follow-up invitations, which booked "Spend time with X" at one the
-next afternoon whenever a follow-up fell due.
+next afternoon whenever a follow-up fell due, and residents' invitations decided at eleven
+for two days later.
 
 ## Friends far away (`application/far_friends.py`)
 
@@ -474,6 +482,15 @@ when and what it changes.
   Alderwick Facebook group when he's on his phone; people in a queue when he's out; next
   door over the fence; or a friend who mentions it. A small thing he may never hear about.
   A closure he missed stays missed, and a coda only reaches him if he knew the first part.
+- **Where it leads:**
+  - The record shop opens five days later as Second Spin, on the map from then; hearing
+    it's open is how he finds it, and then he can flick through the crates there (and
+    sometimes buys a record).
+  - He knew Dennis from the workshop's errands, so he decides whether to go to the funeral
+    at St John's nine days on (caring makes it likelier; a clash rules it out). Going is
+    booked on that decision, and it isn't rated like an outing.
+  - When he hears about the collection for the chip shop family, he puts a fiver in the
+    jar the next time he's in town.
 - **Effects:** news moves his mood a little, sad news brings a feeling (sad about Dennis,
   worried about the break-ins), and it's remembered in his words, with how he heard it.
 - **Where it shows:** `heard_round_town_lately` in his self-context; "Round town" in the

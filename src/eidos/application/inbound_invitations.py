@@ -150,8 +150,12 @@ def pathos_invitation_response_events(
     sustained_low_hours: int,
     planning: PlanningState,
     catalog: WorldCatalog,
+    weeknights_taken: bool = False,
 ) -> list[DomainEvent]:
-    """Let Pathos answer one due resident invitation from his own present capacity."""
+    """Let Pathos answer one due resident invitation from his own present capacity.
+
+    ``weeknights_taken``: a deadline week, when his weeknight evenings go on the work.
+    """
     if not pathos_awake or not pathos_available:
         return []
     social = project_social(history)
@@ -185,6 +189,21 @@ def pathos_invitation_response_events(
         sustained_low_hours=sustained_low_hours,
         expected_revision=actual_revision,
     )
+    starts = datetime.fromisoformat(request.earliest_start)
+    if (
+        choice.move is SocialMove.ACCEPT
+        and weeknights_taken
+        and starts.weekday() < 4
+        and starts.hour >= 17
+    ):
+        choice = SocialMoveProposal(
+            choice.proposal_id,
+            choice.request_id,
+            choice.actor_id,
+            SocialMove.DECLINE,
+            "It's a deadline week; my evenings are going on the work.",
+            choice.expected_revision,
+        )
     if choice.move is SocialMove.ACCEPT:
         feasibility = plan_accepted_work(
             replace(request, status="accepted"),

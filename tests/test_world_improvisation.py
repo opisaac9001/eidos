@@ -211,3 +211,24 @@ class WorldImprovisationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_model_is_asked_now_and_then_not_every_hour() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from eidos.application.world_improvisation import _paced_out
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 9, 8, 14, tzinfo=timezone.utc)
+    asked = DomainEvent(
+        "world_event.generation_requested",
+        "pathos",
+        {"simulated_at": (at - timedelta(hours=2)).isoformat()},
+    )
+    assert _paced_out([asked], at)
+    assert not _paced_out([asked], at + timedelta(hours=5))
+    story = DomainEvent(
+        "town.story", "pathos", {"simulated_at": (at - timedelta(days=1)).isoformat()}
+    )
+    assert _paced_out([story], at)
+    assert not _paced_out([], at)

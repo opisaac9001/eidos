@@ -202,3 +202,74 @@ def test_nobody_else_answers_his_plan_texts() -> None:
         },
     )
     assert asyncio.run(reply_events([sent], WEDNESDAY, StandInGateway())) == []
+
+
+def _friends_ask(at: datetime, hours: int, **overrides):
+    from eidos.application.making_plans import friend_invitation_events
+
+    history: list[DomainEvent] = []
+    people = {pid: NPCState(pid, energy=0.8, connection=0.1) for pid in NAMES}
+    args = dict(
+        friends={"mara": 7.0, "ellis": 8.0, "rowan": 6.0},
+        last_seen={pid: at - timedelta(days=4) for pid in NAMES},
+        names=NAMES,
+        npc_people=people,
+        unavailable=frozenset(),
+        catalog=_catalog(),
+        weather="Cloudy",
+    )
+    args.update(overrides)
+    for step in range(hours):
+        now = at + timedelta(hours=step)
+        history += friend_invitation_events(
+            history, now, planning=project_planning(history), **args
+        )
+    return history
+
+
+def test_friends_text_him_at_the_hours_people_text() -> None:
+    from eidos.application.making_plans import ASKED_OUT_GAP, THEY_ASK_AT
+
+    history = _friends_ask(WEDNESDAY, 20 * 24)
+    asked = [e for e in history if e.kind == "invitation.made"]
+    assert asked, "three lonely friends and nobody asked him out in three weeks"
+    times = [datetime.fromisoformat(e.payload["simulated_at"]) for e in asked]
+    assert all(t.hour in THEY_ASK_AT for t in times)
+    assert all(b - a >= ASKED_OUT_GAP for a, b in zip(times, times[1:]))
+    for event in asked:
+        start = datetime.fromisoformat(event.payload["starts_at"])
+        # Evenings and weekends, not "two days later at eleven".
+        assert start.hour >= 17 or start.weekday() >= 5
+        assert event.payload["text"]
+    memories = [e for e in history if e.kind == "memory.recorded"]
+    assert all(" texted: “" in e.payload["text"] for e in memories)
+
+
+def test_he_answers_from_his_own_week() -> None:
+    from eidos.application.inbound_invitations import pathos_invitation_response_events
+    from eidos.application.making_plans import his_replies
+
+    history = _friends_ask(WEDNESDAY, 20 * 24)
+    first = next(e for e in history if e.kind == "invitation.made")
+    asked = history[: history.index(first) + 3]
+    due = datetime.fromisoformat(first.payload["response_due_at"]) + timedelta(minutes=1)
+    starts = datetime.fromisoformat(first.payload["starts_at"])
+
+    def answer(**extra):
+        out = pathos_invitation_response_events(
+            asked, due, len(asked), pathos_awake=True, pathos_available=True, energy=0.8,
+            rest=0.8, mastery=0.7, values={"care": 0.8, "curiosity": 0.8}, affect_valence=0.2, affect_arousal=0.3,
+            sustained_low_hours=0, planning=project_planning(asked), catalog=_catalog(),
+            **extra,
+        )  # fmt: skip
+        return out + his_replies(asked, out)
+
+    yes = answer()
+    assert any(e.kind == "invitation.accepted" for e in yes)
+    assert any(e.kind == "schedule.created" for e in yes)
+    reply = next(e for e in yes if e.kind == "memory.recorded")
+    assert reply.payload["text"].startswith("Texted ") and "back:" in reply.payload["text"]
+    if starts.weekday() < 4 and starts.hour >= 17:
+        busy = answer(weeknights_taken=True)
+        assert any(e.kind == "invitation.declined" for e in busy)
+        assert not any(e.kind == "schedule.created" for e in busy)

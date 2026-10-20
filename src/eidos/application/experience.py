@@ -74,6 +74,8 @@ CATEGORY_VALUE = {
 }
 # Outing types that only mean "go there": the taste belongs to the place, not the outing.
 GENERIC_OUTINGS = frozenset({"look_around", "return_visit", "public_happening"})
+# Not for rating, or for forming a taste for.
+SOLEMN = frozenset({"funeral"})
 LOVE_AT_ONCE = 0.65
 SETTLED = 0.35
 CHANGE_OF_HEART = 0.3
@@ -122,6 +124,9 @@ def experience_events(
     if payload.get("activity_type") in STAYS:
         # A weekend at his parents' isn't an outing to rate ("just not my sort of thing");
         # how it went is in what happened there: Mum's roast, Isla, the walk with Dad.
+        return []
+    if payload.get("activity_type") in SOLEMN:
+        # A funeral isn't something he "loved" or found "not his sort of thing".
         return []
     at = datetime.fromisoformat(str(payload["simulated_at"]))
     place_id = str(payload.get("location_id") or "home")

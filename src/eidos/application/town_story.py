@@ -26,13 +26,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from hashlib import sha256
 from typing import Collection, Mapping, Sequence
 
-from eidos.application.bookings import remember
+from eidos.application.bookings import book, remember
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import events_of
+from eidos.domain.planning import PlanningState
 from eidos.domain.seasons import season_for
 from eidos.domain.world_catalog import WorldCatalog
 
@@ -153,7 +154,7 @@ STORIES: tuple[Story, ...] = (
         -0.2,
         12,
         (
-            "Dennis from the hardware shop on Mill Street has died. Forty years "
+            "Dennis from Foundry Hardware on Mill Street has died. Forty years "
             "behind that counter. The shop's got a note in the window.",
             "Old Dennis from the hardware shop's died. Everyone's saying the same thing: he "
             "always knew which screw you needed.",
@@ -251,7 +252,10 @@ STORIES: tuple[Story, ...] = (
             "Someone's opening a little secondhand record shop in the old bank on the Market "
             "Place. Boxes of vinyl through the window already.",
         ),
-        ("record shop", "vinyl", "old bank"),
+        ("record shop", "vinyl", "old bank", "second spin"),
+        after_days=5,
+        after="The record shop in the old bank's open: Second Spin. Crates of secondhand vinyl "
+        "and a turntable by the till to try things on.",
         gap_days=10_000,
     ),
     Story(
@@ -472,8 +476,15 @@ def town_story_events(
     location_id: str,
     awake: bool,
     on_phone: bool,
+    values: Mapping[str, float] | None = None,
+    planning: PlanningState | None = None,
+    knew_dennis: bool = False,
 ) -> list[DomainEvent]:
-    """This hour in the town's story: something happening, word going round, his hearing."""
+    """This hour in the town's story: something happening, word going round, his hearing.
+
+    ``knew_dennis``: he did the workshop's errands at the hardware shop, so he knew him.
+    """
+    values = values or {}
     output: list[DomainEvent] = []
     story = _todays_story(history, at.date(), at, catalog)
     if story is not None and at.hour == story.hour:
@@ -482,8 +493,255 @@ def town_story_events(
     output += _codas(visible, at)
     visible = [*history, *output]
     output += _word_goes_round(visible, at, residents, locations)
+    output += _follow_ons(
+        [*history, *output],
+        at,
+        catalog=catalog,
+        location_id=location_id,
+        awake=awake,
+        values=values,
+        planning=planning,
+        knew_dennis=knew_dennis,
+    )
+    visible = [*history, *output]
     if awake:
         output += _he_hears(visible, at, location_id, on_phone)
+    return output
+
+
+# Where the shop and the church are, when they're needed on the map: just off the Market
+# Place, and up the hill from it.
+RECORD_SHOP = {
+    "entity_id": "record-shop",
+    "name": "Second Spin",
+    "label": "Records",
+    "description": "A secondhand record shop in the old bank on the Market Place.",
+    "x": 52,
+    "y": 69,
+    "opens_hour": 10,
+    "closes_hour": 18,
+    "connected_to_id": "cafe",
+    "travel_minutes": 3,
+}
+CHURCH = {
+    "entity_id": "st-johns",
+    "name": "St John's",
+    "label": "Church",
+    "description": "The parish church at the top of the town, with the cobbled path up to it.",
+    "x": 44,
+    "y": 62,
+    "opens_hour": 8,
+    "closes_hour": 18,
+    "connected_to_id": "cafe",
+    "travel_minutes": 6,
+}
+FUNERAL_AFTER_DAYS = 9
+
+
+def _registered(history: Sequence[DomainEvent], place_id: str) -> bool:
+    return any(
+        e.payload.get("entity_id") == place_id for e in events_of(history, "world.place_registered")
+    )
+
+
+def _register(place: Mapping[str, object], at: datetime, cause: DomainEvent) -> DomainEvent:
+    return DomainEvent(
+        "world.place_registered",
+        PATRICK,
+        {**place, "source": "town-story", "simulated_at": at.isoformat()},
+        causation_id=cause.event_id,
+        correlation_id=f"place-{place['entity_id']}",
+    )
+
+
+def _follow_ons(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    *,
+    catalog: WorldCatalog,
+    location_id: str,
+    awake: bool,
+    values: Mapping[str, float],
+    planning: PlanningState | None,
+    knew_dennis: bool,
+) -> list[DomainEvent]:
+    """Where the news leads: the shop opens, the funeral, a fiver in the jar."""
+    output: list[DomainEvent] = []
+    holders = _holders(history)
+    his = {claim for claim, people in holders.items() if PATRICK in people}
+    decided = {str(e.payload.get("story_id")) for e in events_of(history, DECIDED)}
+    for event in events_of(history, KIND)[-12:]:
+        story = story_of(event)
+        if story is None:
+            continue
+        story_id = str(event.payload.get("story_id"))
+        stage = event.payload.get("stage")
+        claim = f"town:{story_id}" + (":after" if stage == "after" else "")
+        if story.kind == "record_shop" and stage == "after":
+            # Open now, so it's on the map; he knows of it once he's heard.
+            if not _registered(history, "record-shop") and "cafe" in catalog.places:
+                output.append(_register(RECORD_SHOP, at, event))
+            known = any(
+                e.payload.get("place_id") == "record-shop"
+                for e in events_of(history, "place.discovered")
+            )
+            if claim in his and not known and (_registered(history, "record-shop") or output):
+                output.append(
+                    DomainEvent(
+                        "place.discovered",
+                        PATRICK,
+                        {
+                            "place_id": "record-shop",
+                            "how": "heard it had opened",
+                            "simulated_at": at.isoformat(),
+                        },
+                        causation_id=event.event_id,
+                        correlation_id="discover-record-shop",
+                    )
+                )
+        elif (
+            story.kind == "fixture_died"
+            and stage == "happened"
+            and claim in his
+            and knew_dennis
+            and awake
+            and story_id not in decided
+            and planning is not None
+        ):
+            output += _the_funeral(event, story_id, at, values, planning, catalog)
+        elif story.kind == "fixture_died" and stage == "after" and claim not in his:
+            booked = planning is not None and any(
+                entry.schedule_id == f"town-funeral-{story_id}"
+                and entry.status in {"scheduled", "active", "completed"}
+                for entry in planning.calendar.values()
+            )
+            if booked:
+                heard = _after_heard_by(PATRICK, claim, event, story, at, "there")
+                output += [
+                    heard,
+                    remember(
+                        heard,
+                        "Dennis's funeral at St John's. Standing room only; half of Mill "
+                        "Street must have shut for the morning. Someone read out a list of "
+                        "things he'd mended for people for nothing.",
+                        at,
+                        0.6,
+                        origin="lived-town-story",
+                        category="world-event",
+                    ),
+                ]
+        elif (
+            story.kind == "chip_shop_fire"
+            and stage == "after"
+            and claim in his
+            and awake
+            and location_id not in {"home", "in_transit", "in-transit"}
+            and 9 <= at.hour <= 18
+            and at - _at(event) <= timedelta(days=7)
+            and not any(
+                e.payload.get("spend_id") == f"jar-{story_id}"
+                for e in events_of(history, "spending.made")[-40:]
+            )
+        ):
+            # Next time he's in town, a fiver in the jar on the counter.
+            spent = DomainEvent(
+                "spending.made",
+                PATRICK,
+                {
+                    "spend_id": f"jar-{story_id}",
+                    "category": "gifts",
+                    "cost_pence": 500,
+                    "text": "A fiver in the jar for the family from above the chip shop",
+                    "simulated_at": at.isoformat(),
+                    "owner": PATRICK,
+                },
+                causation_id=event.event_id,
+                correlation_id=f"spend:jar-{story_id}",
+            )
+            output += [
+                spent,
+                remember(
+                    spent,
+                    "Put a fiver in the jar on the counter for the family from above the "
+                    "chip shop. The jar was nearly full.",
+                    at,
+                    0.35,
+                    origin="lived-town-story",
+                    category="experience",
+                ),
+            ]
+    return output
+
+
+DECIDED = "town.story_decided"
+
+
+def _the_funeral(
+    event: DomainEvent,
+    story_id: str,
+    at: datetime,
+    values: Mapping[str, float],
+    planning: PlanningState,
+    catalog: WorldCatalog,
+) -> list[DomainEvent]:
+    """Whether he goes to Dennis's funeral: he knew him from the workshop's errands."""
+    day = _at(event).date() + timedelta(days=FUNERAL_AFTER_DAYS)
+    starts = datetime.combine(day, time(10, 30), at.tzinfo)
+    ends = starts + timedelta(hours=1, minutes=30)
+    clashes = any(
+        entry.status == "scheduled"
+        and not entry.schedule_id.startswith("doing-")
+        and datetime.fromisoformat(entry.starts_at) < ends
+        and starts < datetime.fromisoformat(entry.ends_at or entry.starts_at)
+        for entry in planning.calendar.values()
+    )
+    care = float(values.get("care", 0.7))
+    going = not clashes and _roll("funeral", story_id) < 0.3 + 0.5 * care
+    schedule_id = f"town-funeral-{story_id}"
+    decision = DomainEvent(
+        DECIDED,
+        PATRICK,
+        {
+            "story_id": story_id,
+            "decision": "go" if going else "stay away",
+            "why": "knew him from the workshop"
+            if going
+            else ("something else on that morning" if clashes else "didn't know him well enough"),
+            "schedule_id": schedule_id if going else "",
+            "simulated_at": at.isoformat(),
+        },
+        causation_id=event.event_id,
+        correlation_id=f"town-story-{story_id}",
+    )
+    text = (
+        f"Dennis's funeral is {day:%A} at St John's. I'll go. He sold me half the screws in "
+        "that workshop, and always asked what they were for."
+        if going
+        else f"Dennis's funeral is {day:%A}. "
+        + (
+            "I've got something on that morning. Sad, though."
+            if clashes
+            else "Didn't know him well enough to go, really. Sad, though."
+        )
+    )
+    output = [decision, remember(decision, text, at, 0.45, origin="lived-town-story",
+                                 category="world-event")]  # fmt: skip
+    if going:
+        if "st-johns" not in catalog.places:
+            output.append(_register(CHURCH, at, decision))
+        output += book(
+            decision,
+            schedule_id=schedule_id,
+            title="Dennis's funeral at St John's",
+            starts=starts,
+            ends=ends,
+            place_id="st-johns",
+            activity_type="funeral",
+            source="town-story",
+            motivation="To pay my respects to Dennis from the hardware shop.",
+            at=at,
+            priority=0.9,
+        )
     return output
 
 

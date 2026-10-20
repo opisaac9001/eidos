@@ -64,6 +64,7 @@ PLACES: dict[str, tuple[int, float, str]] = {
     "bike-repair": (1_200, 0.3, "A part from Bridge Cycles"),
     "barber": (HAIRCUT_PENCE, 1.0, "A haircut at Lane's"),
     "mill-museum": (300, 0.5, "A donation at the Mill Rooms"),
+    "record-shop": (1_100, 0.55, "A secondhand record from Second Spin"),
 }
 
 BITS = (

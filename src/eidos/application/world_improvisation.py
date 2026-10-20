@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Mapping, Sequence
 from uuid import uuid4
@@ -20,6 +20,30 @@ from eidos.domain.folding import events_of, payload_candidates
 from eidos.domain.proposals import ProposalRejected
 from eidos.domain.world_events import WorldEventKind, WorldEventProposal, resolve_world_event
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
+
+# The town's pace is the storyteller's (``town_story``): small improvised moments now and
+# then, not a model asked every hour (830 times, nearly always "nothing happens").
+ASK_EVERY = timedelta(hours=6)
+AFTER_A_STORY = timedelta(days=2)
+
+
+def _paced_out(history: Sequence[DomainEvent], at: datetime) -> bool:
+    for event in reversed(events_of(history, "world_event.generation_requested")[-3:]):
+        try:
+            when = datetime.fromisoformat(str(event.payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if timedelta(0) <= at - when < ASK_EVERY:
+            return True
+        break
+    for event in reversed(events_of(history, "town.story")[-3:]):
+        try:
+            when = datetime.fromisoformat(str(event.payload.get("simulated_at")))
+        except ValueError:
+            continue
+        if timedelta(0) <= at - when < AFTER_A_STORY:
+            return True
+    return False
 
 
 def public_world_cause(cause: DomainEvent, location_id: str) -> dict[str, object]:
@@ -65,7 +89,7 @@ async def improvised_world_events(
             }
         ),
     )
-    if cause is None:
+    if cause is None or _paced_out(history, simulated_at):
         return []
     proposal_id = f"moira-open-world-cause-{cause.event_id}"
     if any(
