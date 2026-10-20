@@ -343,3 +343,13 @@ def test_the_probe_replays_the_stream_s_own_record(tmp_path: Path) -> None:
     samples = load_samples(db, "murmur", 5)
     assert [s["cue"] for s in samples] == ["rain", "the kettle"]
     assert [text for _, text in load_recorded(db, "murmur", 5)] == ["Mara again.", "Kettle."]
+
+
+def test_a_thought_that_says_its_cue_back_is_turned_away() -> None:
+    from eidos.application.inner_stream import StreamJudge, turned_away_for
+
+    judge = StreamJudge(cue_text="Beth: told me lately: “Thanks, cheers. I'm just busy as usual.”")
+    assert turned_away_for("Thanks, cheers. I'm just busy as usual.", {}, judge) == (
+        "parroted its cue"
+    )
+    assert turned_away_for("Beth sounds stretched thin.", {}, judge) is None

@@ -273,3 +273,49 @@ def test_he_answers_from_his_own_week() -> None:
         busy = answer(weeknights_taken=True)
         assert any(e.kind == "invitation.declined" for e in busy)
         assert not any(e.kind == "schedule.created" for e in busy)
+
+
+def test_a_friend_calls_off_an_old_one_o_clock_plan_they_d_be_at_work_for() -> None:
+    from eidos.application.making_plans import called_off_events
+    from eidos.application.planner import overdue_plan_events
+
+    morning = datetime(2026, 9, 9, 9, 0, tzinfo=timezone.utc)  # a Wednesday
+    starts = morning.replace(hour=13)
+    sid = "reconnect-follow-up-abc-schedule"
+    booked = [
+        DomainEvent("commitment.created", "pathos", {
+            "commitment_id": "c1", "title": "Spend time with Ellis", "debtor_id": "pathos",
+            "creditor_id": "ellis", "due_at": (starts + timedelta(hours=1)).isoformat(),
+            "simulated_at": morning.isoformat()}),
+        DomainEvent("schedule.created", "pathos", {
+            "schedule_id": sid, "title": "Spend time with Ellis",
+            "starts_at": starts.isoformat(), "ends_at": (starts + timedelta(hours=1)).isoformat(),
+            "location_id": "park", "actor_id": "pathos", "companion_id": "ellis",
+            "commitment_id": "c1", "simulated_at": morning.isoformat()}),
+    ]  # fmt: skip
+    people = {"ellis": NPCState("ellis", "workshop", "workshop")}
+    out = called_off_events(
+        booked, morning, planning=project_planning(booked), npc_people=people, names=NAMES
+    )
+    kinds = [e.kind for e in out]
+    assert "schedule.cancelled" in kinds and "commitment.released" in kinds
+    memory = next(e for e in out if e.kind == "memory.recorded")
+    assert memory.payload["text"].startswith("Ellis texted:")
+    after = project_planning([*booked, *out])
+    assert after.calendar[sid].status == "cancelled"
+    assert after.commitments["c1"].status == "released"
+    # Nobody's let down: the deadline passing doesn't make it a missed commitment.
+    assert overdue_plan_events(after, starts + timedelta(hours=3)) == []
+    # A plan for when they're free stands.
+    evening = [
+        DomainEvent(e.kind, "pathos", {**e.payload, "starts_at": starts.replace(hour=19).isoformat(),
+                                       "ends_at": starts.replace(hour=20).isoformat()})
+        if e.kind == "schedule.created" else e
+        for e in booked
+    ]  # fmt: skip
+    assert (
+        called_off_events(
+            evening, morning, planning=project_planning(evening), npc_people=people, names=NAMES
+        )
+        == []
+    )

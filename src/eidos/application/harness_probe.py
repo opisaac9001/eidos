@@ -443,6 +443,7 @@ CHECKS = {
     "invented_happening": "A thought reported a call, text, visit or remark from someone that "
     "nothing he remembers or was told backs up.",
     "placed_with_him": "A thought put someone in the room with him when he's alone.",
+    "parroted_cue": "A thought said its cue back word for word instead of thinking about it.",
     "somewhere_else": "A thought put him somewhere other than where he is.",
 }
 
@@ -451,6 +452,7 @@ def _stream_kind(why: str) -> str:
     """'brought in Ellis from nowhere' -> 'stray_name': the stream's reasons as kinds."""
     for start, kind in (
         ("thought of himself", "third_person"),
+        ("parroted", "parroted_cue"),
         ("used a record id", "leak"),
         ("repeated itself", "repeat"),
         ("brought in", "stray_name"),

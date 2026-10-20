@@ -242,6 +242,15 @@ class PlanningState:
                 if missed_at <= datetime.fromisoformat(commitment.due_at):
                     raise ValueError("A commitment cannot be missed before its deadline")
                 commitments[commitment.commitment_id] = replace(commitment, status="missed")
+            case "commitment.released":
+                # The person owed lets him off it ("can't do one today, I'm at the bench"):
+                # nobody's let down, so it isn't missed.
+                commitment = _existing(commitments, payload, "commitment_id")
+                if commitment.status != "active":
+                    raise ValueError("Only active commitments can be released")
+                if _required(payload, "actor_id") != commitment.creditor_id:
+                    raise ValueError("Only the person owed can release a commitment")
+                commitments[commitment.commitment_id] = replace(commitment, status="released")
             case "commitment.renegotiated":
                 commitment = _existing(commitments, payload, "commitment_id")
                 if commitment.status != "active":

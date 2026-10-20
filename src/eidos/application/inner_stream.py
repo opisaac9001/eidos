@@ -274,6 +274,11 @@ def cues(snapshot: Mapping[str, Any]) -> list[Cue]:
         for key in ("whats_going_on_with_his_friends", "came_back_to_him_lately", "running_jokes"):
             for item in (selfhood.get(key) or [])[:3]:
                 text = _text_of(item)
+                who = item.get("who") if isinstance(item, Mapping) else None
+                if text and key.startswith("whats") and isinstance(who, str) and who:
+                    # Whose news it is: "told me lately: ..." alone was copied back as his
+                    # own thought, a friend's text in his head with nobody's name on it.
+                    text = f"{who}: {text}"
                 if text:
                     found.append(
                         Cue("someone" if key.startswith("whats") else "memory", _short(text))
@@ -577,6 +582,10 @@ def turned_away_for(text: str, context: Mapping[str, Any], judge: StreamJudge) -
         # An id from an old record, said back: nobody thinks of a friend as a number.
         return "used a record id"
     names = set(judge.names)
+    if judge.cue_text and len(text.split()) >= 4 and near_repeat(text, [judge.cue_text]):
+        # The cue said back word for word ("Thanks, cheers. I am, just busy as usual."):
+        # a friend's text isn't a thought of his.
+        return "parroted its cue"
     # Judged against the thoughts it was shown, and never nearly the same thought as one of
     # the last dozen, however long ago.
     opening = " ".join(text.split()[:2]).strip(".,!?").casefold()

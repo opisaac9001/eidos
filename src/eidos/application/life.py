@@ -142,6 +142,7 @@ from eidos.application.life_lately import life_lately_events
 from eidos.application.life_snapshot import build_snapshot
 from eidos.application.lived_activity_window import lived_activity_window
 from eidos.application.making_plans import (
+    called_off_events,
     friend_invitation_events,
     his_replies,
     plan_making_events,
@@ -2399,6 +2400,18 @@ class Life(LifeConversation):
         history, pending, current = tick.history, tick.pending, tick.current
         visible = history + pending
         catalog = self._world_catalog(visible)
+        self._extend_warmed(
+            tick,
+            called_off_events(
+                visible,
+                current,
+                planning=self._planning(visible),
+                npc_people=project_npcs(visible, current).people,
+                names={pid: person.name for pid, person in catalog.people.items()},
+            ),
+            self._planning,
+        )
+        visible = history + pending
         known = friendships(visible, current)
         state = tick.state
         self._extend_warmed(

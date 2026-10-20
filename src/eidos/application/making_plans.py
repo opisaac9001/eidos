@@ -957,3 +957,111 @@ def his_replies(
             )
         )
     return output
+
+
+# -- plans the old way, that a friend can't keep -----------------------------------------
+
+LEGACY_PREFIX = "reconnect-follow-up-"
+
+
+def called_off_events(
+    history: Sequence[DomainEvent],
+    at: datetime,
+    *,
+    planning: PlanningState,
+    npc_people: Mapping[str, NPCState],
+    names: Mapping[str, str],
+) -> list[DomainEvent]:
+    """A friend texting to call off a plan they'd be at work for.
+
+    The follow-ups that booked "Spend time with X" at one the next afternoon booked Ellis
+    into the park on a Wednesday, when he's at the bench. A friend in that spot texts the
+    morning of (or the evening before) and lets him off; the agreement is released, so
+    nobody's let down and nothing is missed.
+    """
+    if not 8 <= at.hour <= 20:
+        return []
+    for entry in sorted(planning.calendar.values(), key=lambda e: e.starts_at):
+        if entry.status != "scheduled" or not entry.schedule_id.startswith(LEGACY_PREFIX):
+            continue
+        person_id = entry.companion_id
+        if not person_id:
+            continue
+        starts = datetime.fromisoformat(entry.starts_at)
+        ends = datetime.fromisoformat(entry.ends_at) if entry.ends_at else starts
+        if not timedelta(hours=1) <= starts - at <= timedelta(hours=30):
+            continue
+        person = npc_people.get(person_id)
+        usual = person.usual_location_id if person is not None else "home"
+        if not _working(person_id, usual, starts, ends):
+            continue
+        name = _first(names.get(person_id, person_id))
+        when = _when_words(starts, at)
+        where = "at the bench all day" if person_id == "ellis" else "working"
+        text = f"Can't do {when}, sorry, I'm {where}. Another time?"
+        called = DomainEvent(
+            "plan.called_off",
+            "pathos",
+            {
+                "schedule_id": entry.schedule_id,
+                "person_id": person_id,
+                "reason": f"{name} is at work then",
+                "text": text,
+                "simulated_at": at.isoformat(),
+            },
+            correlation_id=entry.schedule_id,
+        )
+        output = [
+            called,
+            remember(
+                called,
+                f"{name} texted: “{text}”",
+                at,
+                0.35,
+                origin="lived-making-plans",
+                person_id=person_id,
+            ),  # fmt: skip
+            DomainEvent(
+                "schedule.cancelled",
+                "pathos",
+                {
+                    "schedule_id": entry.schedule_id,
+                    "reason": f"{name} can't: at work then.",
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=called.event_id,
+                correlation_id=entry.schedule_id,
+            ),
+        ]
+        if entry.intention_id and entry.intention_id in planning.intentions:
+            output.append(
+                DomainEvent(
+                    "intention.abandoned",
+                    "pathos",
+                    {
+                        "intention_id": entry.intention_id,
+                        "reason": f"{name} called it off.",
+                        "simulated_at": at.isoformat(),
+                    },
+                    causation_id=called.event_id,
+                    correlation_id=entry.schedule_id,
+                )
+            )
+        commitment = planning.commitments.get(entry.commitment_id or "")
+        if commitment is not None and commitment.status == "active":
+            output.append(
+                DomainEvent(
+                    "commitment.released",
+                    "pathos",
+                    {
+                        "commitment_id": commitment.commitment_id,
+                        "actor_id": commitment.creditor_id,
+                        "reason": f"{name} called it off.",
+                        "simulated_at": at.isoformat(),
+                    },
+                    causation_id=called.event_id,
+                    correlation_id=entry.schedule_id,
+                )
+            )
+        return output
+    return []
