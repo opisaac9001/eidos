@@ -5,6 +5,7 @@ import re
 from typing import Mapping
 
 STRUCTURED_CAPABILITIES = {
+    "harness_editor",
     "firmament_townsfolk",
     "pathos_user_notes",
     "pathos_advice_heard",

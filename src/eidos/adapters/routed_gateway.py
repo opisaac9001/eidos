@@ -11,6 +11,7 @@ from eidos.adapters.http_gateway import HTTPModelGateway
 from eidos.ports.model_gateway import ModelGateway, ModelRequest, ModelResponse
 
 CAPABILITIES = {
+    "harness_editor",
     "pathos",
     "murmur",
     "firmament",
@@ -40,6 +41,7 @@ CAPABILITIES = {
 # Newer capabilities fall back to the family they grew out of, so an existing routing file
 # keeps working after an upgrade without naming them.
 FALLBACKS = {
+    "harness_editor": "reflection",
     "firmament_townsfolk": "firmament",
     "pathos_selfhood": "reflection",
     "pathos_user_notes": "reflection",

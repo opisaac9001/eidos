@@ -347,7 +347,10 @@ function showView(view, focusHeading = false) {
   if (view === "conversation")
     $("messages").scrollTop = $("messages").scrollHeight;
   updateUnread(true);
-  if (view === "models") loadModels();
+  if (view === "models") {
+    loadModels();
+    loadHarness();
+  }
   if (view === "memories") {
     selectArchiveTab(archiveTab);
     if (archiveTab === "memories") loadMemoryArchive(true);
@@ -2607,3 +2610,54 @@ $("models-save")?.addEventListener("click", async () => {
   await saveModels();
 });
 
+
+// -- How the roles are doing: the nightly probe of each model role ---------------------
+
+const HARNESS_ROLES = {
+  firmament: "Encounters and conversations",
+  pathos_text: "His texts",
+  murmur: "His passing thoughts",
+};
+
+function sparkline(values) {
+  if (values.length < 2) return "";
+  const w = 120;
+  const h = 28;
+  const step = w / (values.length - 1);
+  const points = values
+    .map((v, i) => `${(i * step).toFixed(1)},${(h - 2 - v * (h - 4)).toFixed(1)}`)
+    .join(" ");
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>`;
+}
+
+function percent(value) {
+  return `${Math.round((value || 0) * 100)}%`;
+}
+
+async function loadHarness() {
+  let data;
+  try {
+    data = await request("/api/harness");
+  } catch (error) {
+    $("harness-body").innerHTML = `<p class="context-note">${esc(error.message)}</p>`;
+    return;
+  }
+  const last = data.last;
+  if (!last || !last.roles || !Object.keys(last.roles).length) return;
+  const trend = data.trend || [];
+  const rows = Object.entries(last.roles).map(([role, result]) => {
+    const values = trend.map((night) => (night.roles || {})[role]).filter((v) => v !== undefined);
+    const problems = Object.entries(result.problems || {})
+      .slice(0, 3)
+      .map(([kind, n]) => `${kind.replaceAll("_", " ")} ${n}`)
+      .join(" · ");
+    const range = result.range || [0, 0];
+    const recorded = result.recorded ? ` · answers already given: ${percent(result.recorded.would_be_turned_away)}` : "";
+    return `<div class="harness-row"><span class="harness-role">${esc(HARNESS_ROLES[role] || role)}<small>${esc(problems || "nothing turned away")}${esc(recorded)}</small></span><span class="harness-rate">${percent(result.turned_away)}<small>${percent(range[0])}–${percent(range[1])} · ${esc(result.samples)} moments</small></span>${sparkline(values)}</div>`;
+  });
+  const best = last.suggestions && last.suggestions.best;
+  const suggestion = best
+    ? `<div class="harness-suggestion"><strong>Suggested for ${esc(HARNESS_ROLES[last.suggestions.role] || last.suggestions.role)}: ${esc(best.name)}</strong><p>${esc(best.why)}</p><blockquote>${esc(best.prompt_append)}</blockquote><small>${percent(last.suggestions.current.turned_away)} turned away now, ${percent(best.turned_away)} with it. Adopt it by hand once you've read it.</small></div>`
+    : "";
+  $("harness-body").innerHTML = `<p class="context-note">Last measured ${esc(date(last.when))}.</p>${rows.join("")}${suggestion}`;
+}

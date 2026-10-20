@@ -1948,3 +1948,29 @@ input[type="checkbox"] { accent-color: var(--amber); }
   .roles-row { grid-template-columns: 1fr; }
 }
 
+
+/* How the roles are doing (Models page) */
+.harness-panel { margin-bottom: 1.25rem; }
+.harness-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line, rgba(127, 127, 127, 0.2));
+}
+.harness-role small,
+.harness-rate small { display: block; opacity: 0.7; font-size: 0.8em; }
+.harness-rate { text-align: right; font-variant-numeric: tabular-nums; font-size: 1.1em; }
+.sparkline { color: var(--accent, currentColor); }
+.harness-suggestion {
+  margin-top: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--soft, rgba(127, 127, 127, 0.08));
+}
+.harness-suggestion blockquote { margin: 0.5rem 0; font-style: italic; }
+@media (max-width: 560px) {
+  .harness-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sparkline { display: none; }
+}

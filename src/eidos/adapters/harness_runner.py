@@ -11,7 +11,21 @@ from typing import Any, Awaitable, Callable, Iterator, Mapping
 
 from eidos.adapters import http_gateway
 from eidos.application.cognition import request_for
-from eidos.application.harness_probe import Variant, probe, record_lesson, report
+from eidos.application.harness_probe import (
+    Outcome,
+    Variant,
+    audit,
+    counts,
+    interval,
+    probe,
+    propose,
+    quality,
+    rate,
+    record_lesson,
+    report,
+    verdict,
+)
+from eidos.domain.world_catalog import project_world_catalog
 from eidos.ports.model_gateway import ModelGateway
 
 
@@ -42,28 +56,73 @@ def load_samples(
     return found
 
 
+def load_recorded(database: Path, role: str, limit: int) -> list[tuple[dict[str, Any], str]]:
+    """Answers the role actually gave, with what it was asked: for checking the checks."""
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    try:
+        rows = connection.execute(
+            "select context_json, result from cognition_jobs where capability = ? "
+            "and status = 'completed' and result is not null order by rowid desc limit ?",
+            (role, limit),
+        ).fetchall()
+    finally:
+        connection.close()
+    found = []
+    for raw, result in rows:
+        try:
+            context = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(context, dict) and result:
+            found.append((context, str(result)))
+    return found
+
+
+def names_from(database: Path) -> list[str]:
+    """The people he knows of, for spotting a name brought in from nowhere."""
+    names = [person.name for person in project_world_catalog([]).people.values()]
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    try:
+        rows = connection.execute(
+            "select payload from events where kind = 'world.person_registered'"
+        ).fetchall()
+    except sqlite3.Error:
+        rows = []
+    finally:
+        connection.close()
+    for (payload,) in rows:
+        try:
+            name = json.loads(payload).get("name")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(name, str) and name and name not in names:
+            names.append(name)
+    return names
+
+
 @contextmanager
 def asked_as(variant: Variant | None) -> Iterator[None]:
-    """The gateway's prompt and fields for this role, changed for the length of a probe."""
+    """This role asked the proposed way, for the probe's own calls only.
+
+    Set on a context variable, not the shared tables, so his life's calls in the same
+    process (the nightly run happens inside the live server) are asked as they always are.
+    """
     if variant is None:
         yield
         return
     role = variant.role
-    prompts, compact = http_gateway.ROLE_PROMPTS, http_gateway.COMPACT_PROMPTS
-    fields = http_gateway.ROLE_FIELDS
-    saved = (prompts.get(role), compact.get(role), fields.get(role))
+    override: dict[str, Any] = {}
+    if role in http_gateway.ROLE_PROMPTS:
+        override["prompt"] = variant.prompt(http_gateway.ROLE_PROMPTS[role])
+    if role in http_gateway.COMPACT_PROMPTS:
+        override["compact_prompt"] = variant.prompt(http_gateway.COMPACT_PROMPTS[role])
+    if role in http_gateway.ROLE_FIELDS:
+        override["fields"] = variant.fields(tuple(http_gateway.ROLE_FIELDS[role]))
+    token = http_gateway.ASKED_AS.set({**http_gateway.ASKED_AS.get(), role: override})
     try:
-        if role in prompts:
-            prompts[role] = variant.prompt(prompts[role])
-        if role in compact:
-            compact[role] = variant.prompt(compact[role])
-        if role in fields:
-            fields[role] = variant.fields(tuple(fields[role]))
         yield
     finally:
-        for table, value in zip((prompts, compact, fields), saved, strict=True):
-            if value is not None:
-                table[role] = value  # type: ignore[index]
+        http_gateway.ASKED_AS.reset(token)
 
 
 def run(
@@ -85,20 +144,17 @@ def run(
     if not contexts:
         raise ValueError(f"No recorded {role} contexts to probe with")
 
-    def ask_with(extra: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], Awaitable[str]]:
-        async def ask(context: Mapping[str, Any]) -> str:
-            response = await gateway.generate(request_for(role, {**context, **extra}))
-            return response.content
-
-        return ask
+    names = names_from(database)
 
     async def both() -> tuple[list[Any], list[Any] | None]:
         with asked_as(None):
-            current = await probe(contexts, role, ask_with({}), repeats)
+            current = await probe(contexts, role, _asker(gateway, role, {}), repeats, names)
         if variant is None:
             return current, None
         with asked_as(variant):
-            candidate = await probe(contexts, role, ask_with(variant.context), repeats)
+            candidate = await probe(
+                contexts, role, _asker(gateway, role, variant.context), repeats, names
+            )
         return current, candidate
 
     current, candidate = asyncio.run(both())
@@ -110,3 +166,262 @@ def run(
     if lessons is not None and variant is not None:
         record_lesson(lessons, result)
     return result
+
+
+def _asker(
+    gateway: ModelGateway, role: str, extra: Mapping[str, Any]
+) -> Callable[[Mapping[str, Any]], Awaitable[str]]:
+    async def ask(context: Mapping[str, Any]) -> str:
+        response = await gateway.generate(request_for(role, {**context, **extra}))
+        return response.content
+
+    return ask
+
+
+def _lessons_text(lessons: Path | None) -> str:
+    try:
+        return lessons.read_text() if lessons is not None and lessons.exists() else ""
+    except OSError:
+        return ""
+
+
+async def _improve(
+    gateway: ModelGateway,
+    role: str,
+    contexts: list[dict[str, Any]],
+    names: list[str],
+    *,
+    repeats: int,
+    proposals: int,
+    lessons: Path | None,
+    current: list[Outcome] | None = None,
+) -> dict[str, Any]:
+    """Measure, ask the editor for changes, probe each, and say which (if any) to adopt."""
+    if current is None:
+        current = await probe(contexts, role, _asker(gateway, role, {}), repeats, names)
+    failures = [o for o in current if o.problems]
+    result: dict[str, Any] = {
+        "role": role,
+        "samples": len(contexts),
+        "current": {
+            "turned_away": rate(current),
+            "range": interval(current),
+            "problems": counts(current),
+            "quality": quality(current, contexts),
+        },
+        "candidates": [],
+    }
+    if not failures:
+        result["best"] = None
+        return result
+    variants = await propose(
+        gateway,
+        role,
+        http_gateway.ROLE_PROMPTS.get(role, ""),
+        failures,
+        _lessons_text(lessons),
+        proposals,
+    )
+    best: tuple[float, dict[str, Any]] | None = None
+    for variant in variants:
+        with asked_as(variant):
+            tried = await probe(contexts, role, _asker(gateway, role, {}), repeats, names)
+        said = verdict(current, tried)
+        entry = {
+            "name": variant.name,
+            "why": variant.why,
+            "prompt_append": variant.prompt_append,
+            "turned_away": rate(tried),
+            "range": interval(tried),
+            "problems": counts(tried),
+            "quality": quality(tried, contexts),
+            "verdict": said,
+        }
+        result["candidates"].append(entry)
+        if lessons is not None:
+            record_lesson(
+                lessons,
+                {
+                    "role": role,
+                    "samples": len(contexts),
+                    "variant": {"name": variant.name, "why": variant.why},
+                    "current": result["current"],
+                    "candidate": {"turned_away": rate(tried), "problems": counts(tried)},
+                    "verdict": said,
+                },
+            )
+        if said == "adopt" and (best is None or rate(tried) < best[0]):
+            best = (rate(tried), entry)
+    result["best"] = best[1] if best else None
+    return result
+
+
+def improve(
+    gateway: ModelGateway,
+    database: Path,
+    role: str,
+    *,
+    samples: int,
+    repeats: int,
+    proposals: int,
+    grep: str | None,
+    out: Path | None,
+    lessons: Path | None,
+) -> dict[str, Any]:
+    contexts = load_samples(database, role, samples, grep)
+    if not contexts:
+        raise ValueError(f"No recorded {role} contexts to probe with")
+    result = asyncio.run(
+        _improve(gateway, role, contexts, names_from(database), repeats=repeats,
+                 proposals=proposals, lessons=lessons)
+    )  # fmt: skip
+    if out is not None:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / f"{role}-improve.json").write_text(json.dumps(result, indent=2))
+        if result["best"] is not None:
+            best = result["best"]
+            (out / f"{role}-{best['name']}.json").write_text(
+                json.dumps(
+                    {"role": role, "name": best["name"], "why": best["why"],
+                     "prompt_append": best["prompt_append"]},
+                    indent=2,
+                )
+            )  # fmt: skip
+    return result
+
+
+def compare_models(
+    configured: Any,
+    database: Path,
+    role: str,
+    model_ids: list[str],
+    *,
+    samples: int,
+    repeats: int,
+    grep: str | None,
+) -> dict[str, Any]:
+    """The same moments through each model: which suits this role."""
+    entries = configured.entries()
+    unknown = [m for m in model_ids if m not in entries]
+    if unknown:
+        raise ValueError(f"Unknown models: {', '.join(unknown)} (have {', '.join(entries)})")
+    contexts = load_samples(database, role, samples, grep)
+    if not contexts:
+        raise ValueError(f"No recorded {role} contexts to probe with")
+    names = names_from(database)
+
+    async def each() -> dict[str, list[Outcome]]:
+        found = {}
+        for model_id in model_ids:
+            found[model_id] = await probe(
+                contexts, role, _asker(entries[model_id].gateway, role, {}), repeats, names
+            )
+        return found
+
+    results = asyncio.run(each())
+    return {
+        "role": role,
+        "samples": len(contexts),
+        "now_tries": configured.chain(role),
+        "models": {
+            model_id: {
+                "turned_away": rate(outcomes),
+                "range": interval(outcomes),
+                "problems": counts(outcomes),
+                "quality": quality(outcomes, contexts),
+            }
+            for model_id, outcomes in results.items()
+        },
+    }
+
+
+def audit_role(database: Path, role: str, limit: int) -> dict[str, Any]:
+    return audit(role, load_recorded(database, role, limit), names_from(database))
+
+
+# The roles he's heard in most, checked each night, and how many moments each.
+NIGHTLY = {"firmament": 16, "pathos_text": 10, "murmur": 12}
+
+
+def nightly(
+    gateway: ModelGateway,
+    database: Path,
+    folder: Path,
+    *,
+    names: list[str] | None = None,
+    when: str = "",
+) -> dict[str, Any]:
+    """While he sleeps: how each role is doing on today's moments, the checks on recorded
+    answers, and, for the worst role, changes the editor suggests (suggested, not adopted)."""
+    names = names if names is not None else names_from(database)
+    lessons = folder / "LESSONS.md"
+    night: dict[str, Any] = {"when": when, "roles": {}}
+
+    async def go() -> None:
+        worst: tuple[float, str, list[dict[str, Any]], list[Outcome]] | None = None
+        for role, samples in NIGHTLY.items():
+            contexts = load_samples(database, role, samples)
+            if not contexts:
+                continue
+            current = await probe(contexts, role, _asker(gateway, role, {}), 1, names)
+            night["roles"][role] = {
+                "samples": len(contexts),
+                "turned_away": rate(current),
+                "range": interval(current),
+                "problems": counts(current),
+                "quality": quality(current, contexts),
+                "recorded": audit(role, load_recorded(database, role, 60), names),
+            }
+            if worst is None or rate(current) > worst[0]:
+                worst = (rate(current), role, contexts, current)
+        if worst is not None and worst[0] >= 0.2:
+            _, role, contexts, current = worst
+            night["suggestions"] = await _improve(
+                gateway, role, contexts, names, repeats=1, proposals=3, lessons=lessons,
+                current=current,
+            )  # fmt: skip
+
+    asyncio.run(go())
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = when[:10] or "latest"
+    (folder / f"night-{stamp}.json").write_text(json.dumps(night, indent=1))
+    with (folder / "history.jsonl").open("a") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "when": when,
+                    "roles": {r: v["turned_away"] for r, v in night["roles"].items()},
+                    "suggested": (night.get("suggestions") or {}).get("best", {})
+                    and night["suggestions"]["best"]["name"],
+                }
+            )
+            + "\n"
+        )
+    return night
+
+
+def _best_name(night: Mapping[str, Any]) -> str | None:
+    best = (night.get("suggestions") or {}).get("best")
+    return str(best["name"]) if isinstance(best, Mapping) else None
+
+
+def latest_nights(folder: Path, limit: int = 14) -> dict[str, Any]:
+    """The last night in full, and the trend over the last fortnight."""
+    history: list[dict[str, Any]] = []
+    try:
+        lines = (folder / "history.jsonl").read_text().splitlines()
+    except OSError:
+        lines = []
+    for line in lines[-limit:]:
+        try:
+            history.append(json.loads(line))
+        except ValueError:
+            continue
+    nights = sorted(folder.glob("night-*.json")) if folder.exists() else []
+    last: dict[str, Any] | None = None
+    if nights:
+        try:
+            last = json.loads(nights[-1].read_text())
+        except (OSError, ValueError):
+            last = None
+    return {"trend": history, "last": last}

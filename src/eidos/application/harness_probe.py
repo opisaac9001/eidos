@@ -22,6 +22,7 @@ A variant is a small JSON file::
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,7 +36,12 @@ from eidos.application.shared_past import (
     invents_shared_past,
     invents_shared_thing,
 )
-from eidos.domain.proposals import ProposalRejected, validate_completion
+from eidos.domain.proposals import (
+    STRUCTURED_CAPABILITIES,
+    ProposalRejected,
+    validate_completion,
+)
+from eidos.ports.model_gateway import ModelGateway
 
 _LEAKS = re.compile(r"\beidos\b|\bthe simulation\b|\b[Tt]ownsfolk[ -]?\d+\b", re.IGNORECASE)
 _WORDS = re.compile(r"[\w']+")
@@ -93,7 +99,29 @@ def _strings(value: Any) -> list[str]:
     return []
 
 
-def judge(role: str, context: Mapping[str, Any], content: str) -> list[str]:
+_AI = re.compile(r"\bas an ai\b|\blanguage model\b|\bi'm an ai\b", re.IGNORECASE)
+_EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf]")
+_SIGNED = re.compile(r"(?:^|[\s,.!-])(?:cheers|love|thanks|ta|x+)?[\s,]*[-—]?\s*(?:patrick|pat)\W*$",
+                     re.IGNORECASE)  # fmt: skip
+
+
+def stray_name(text: str, context: Mapping[str, Any], names: Sequence[str]) -> str | None:
+    """Someone he knows, named in the answer, whom nothing in the moment brought up."""
+    given = json.dumps(context, ensure_ascii=False)
+    for name in names:
+        first = name.split()[0] if name.split() else ""
+        if len(first) < 3 or first in {"Patrick", "Pathos"}:
+            continue
+        if re.search(rf"\b{re.escape(first)}\b", text) and not re.search(
+            rf"\b{re.escape(first)}\b", given
+        ):
+            return first
+    return None
+
+
+def judge(
+    role: str, context: Mapping[str, Any], content: str, names: Sequence[str] = ()
+) -> list[str]:
     """What our checks would turn this answer away for; empty if it would stand."""
     try:
         text = validate_completion(role, content, "stop", context)
@@ -101,11 +129,20 @@ def judge(role: str, context: Mapping[str, Any], content: str) -> list[str]:
         return [rejected.code]
     except (ValueError, TypeError):
         return ["invalid"]
+    if role in STRUCTURED_CAPABILITIES:
+        try:
+            text = str(json.loads(text).get("text", text))
+        except (ValueError, AttributeError):
+            pass
     problems: list[str] = []
     if _LEAKS.search(text):
         problems.append("leak")
+    if _AI.search(text):
+        problems.append("ai_slip")
     if len(_WORDS.findall(text)) > _MOST_WORDS.get(role, 60):
         problems.append("too_long")
+    if stray_name(text, context, names) is not None:
+        problems.append("stray_name")
     if role == "firmament":
         grounded = " ".join(
             _strings({key: context.get(key) for key in ("scene_topic", "setting", "his_news",
@@ -128,6 +165,15 @@ def judge(role: str, context: Mapping[str, Any], content: str) -> list[str]:
         ]
         if prior and near_repeat(text, prior):
             problems.append("repeat")
+    elif role == "pathos_text":
+        if _EMOJI.search(text):
+            problems.append("emoji")
+        if _SIGNED.search(text.strip()):
+            problems.append("signed_off")
+    elif role == "murmur":
+        # His own thoughts, in the first person: not "Patrick wonders...".
+        if re.search(r"\b(?:Patrick|Pathos)\b", text):
+            problems.append("third_person")
     return problems
 
 
@@ -150,6 +196,65 @@ def counts(outcomes: Sequence[Outcome]) -> dict[str, int]:
     return dict(sorted(found.items(), key=lambda item: -item[1]))
 
 
+def interval(outcomes: Sequence[Outcome]) -> tuple[float, float]:
+    """A 95% range for the turned-away rate (Wilson), so a narrow win isn't over-trusted."""
+    n = len(outcomes)
+    if not n:
+        return (0.0, 0.0)
+    p = sum(bool(o.problems) for o in outcomes) / n
+    z = 1.96
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    spread = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return (round(max(0.0, centre - spread), 3), round(min(1.0, centre + spread), 3))
+
+
+def quality(outcomes: Sequence[Outcome], contexts: Sequence[Mapping[str, Any]]) -> dict[str, float]:
+    """Beyond not being turned away: how varied, how long, how much about the moment.
+
+    A line can pass every check and still be bland; these show whether a change makes him
+    sound more alike (fewer distinct openings) or less tied to what's in front of him.
+    """
+    texts = [o.text for o in outcomes if not o.text.startswith("(no answer")]
+    if not texts:
+        return {}
+    words = [[w.casefold() for w in _WORDS.findall(t)] for t in texts]
+    openings = {" ".join(w[:2]) for w in words if w}
+    bigrams = [tuple(w[i : i + 2]) for w in words for i in range(len(w) - 1)]
+    lengths = [len(w) for w in words]
+    specific = 0
+    for outcome, said in zip(outcomes, words, strict=False):
+        given = {
+            w.casefold()
+            for w in _WORDS.findall(json.dumps(contexts[outcome.sample], ensure_ascii=False))
+            if len(w) >= 5
+        }
+        specific += bool(given & {w for w in said if len(w) >= 5})
+    mean = sum(lengths) / len(lengths)
+    return {
+        "distinct_openings": round(len(openings) / len(texts), 3),
+        "distinct_bigrams": round(len(set(bigrams)) / max(1, len(bigrams)), 3),
+        "mean_words": round(mean, 1),
+        "words_spread": round(math.sqrt(sum((n - mean) ** 2 for n in lengths) / len(lengths)), 1),
+        "about_the_moment": round(specific / len(texts), 3),
+    }
+
+
+def halves(outcomes: Sequence[Outcome]) -> tuple[list[Outcome], list[Outcome]]:
+    """Two sets of moments, so a change tuned on one can be confirmed on the other."""
+    return (
+        [o for o in outcomes if o.sample % 2 == 0],
+        [o for o in outcomes if o.sample % 2 == 1],
+    )
+
+
+def holds_up(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> bool:
+    """Better on both sets of moments, not just on the whole."""
+    return all(
+        rate(after) <= rate(before)
+        for before, after in zip(halves(current), halves(candidate), strict=True)
+    )
+
+
 def verdict(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> str:
     """Adopt only a clear improvement: a fifth fewer turned away and at least five points,
     and no kind of problem that got noticeably worse."""
@@ -162,7 +267,9 @@ def verdict(current: Sequence[Outcome], candidate: Sequence[Outcome]) -> str:
     if worse:
         return f"keep current: more {', '.join(worse)}"
     if before - after >= 0.05 and after <= before * 0.8:
-        return "adopt"
+        return (
+            "adopt" if holds_up(current, candidate) else "keep current: only better on some moments"
+        )
     if after - before >= 0.05:
         return "keep current: worse"
     return "keep current: no clear difference"
@@ -173,6 +280,7 @@ async def probe(
     role: str,
     ask: Callable[[Mapping[str, Any]], Any],
     repeats: int = 1,
+    names: Sequence[str] = (),
 ) -> list[Outcome]:
     """Ask each recorded context ``repeats`` times; judge every answer."""
     outcomes: list[Outcome] = []
@@ -187,7 +295,7 @@ async def probe(
                 text = str(json.loads(content).get("text", content))
             except (ValueError, AttributeError):
                 text = content
-            outcomes.append(Outcome(index, text, tuple(judge(role, context, content))))
+            outcomes.append(Outcome(index, text, tuple(judge(role, context, content, names))))
     return outcomes
 
 
@@ -202,7 +310,12 @@ def report(
     result: dict[str, Any] = {
         "role": role,
         "samples": len(samples),
-        "current": {"turned_away": rate(current), "problems": counts(current)},
+        "current": {
+            "turned_away": rate(current),
+            "range": interval(current),
+            "problems": counts(current),
+            "quality": quality(current, samples),
+        },
     }
     if variant is None or candidate is None:
         result["examples"] = [
@@ -210,7 +323,12 @@ def report(
         ][:shown]
         return result
     result["variant"] = {"name": variant.name, "why": variant.why}
-    result["candidate"] = {"turned_away": rate(candidate), "problems": counts(candidate)}
+    result["candidate"] = {
+        "turned_away": rate(candidate),
+        "range": interval(candidate),
+        "problems": counts(candidate),
+        "quality": quality(candidate, samples),
+    }
     result["verdict"] = verdict(current, candidate)
     pairs = []
     for before, after in zip(current, candidate):
@@ -250,3 +368,111 @@ def record_lesson(path: Path, result: Mapping[str, Any]) -> None:
         )
     with path.open("a") as handle:
         handle.write("\n".join(lines) + "\n")
+
+
+EDITOR_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["variants"],
+    "properties": {
+        "variants": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["name", "why", "prompt_append"],
+                "properties": {
+                    "name": {"type": "string", "maxLength": 40},
+                    "why": {"type": "string", "maxLength": 300},
+                    "prompt_append": {"type": "string", "maxLength": 600},
+                },
+            },
+        }
+    },
+}
+
+
+async def propose(
+    gateway: ModelGateway,
+    role: str,
+    current_prompt: str,
+    failures: Sequence[Outcome],
+    lessons: str,
+    n: int = 3,
+) -> list[Variant]:
+    """A stronger model reads what went wrong and what's been learned, and suggests changes.
+
+    Its suggestions are only suggestions: each is probed like any other, and nothing it says
+    reaches his life without a probe's verdict and a person's say-so.
+    """
+    from eidos.ports.model_gateway import ModelMessage, ModelRequest
+
+    asked = {
+        "role": role,
+        "current_prompt": current_prompt[-3500:],
+        "failures": [
+            {"line": o.text[:300], "turned_away_for": list(o.problems)} for o in failures[:12]
+        ],
+        "lessons": lessons[-3500:],
+        "asked_for": f"{n} distinct changes",
+    }
+    response = await gateway.generate(
+        ModelRequest(
+            capability="harness_editor",
+            task_version="1",
+            temperature=0.7,
+            max_output_tokens=1200,
+            output_schema=EDITOR_SCHEMA,
+            messages=(ModelMessage("user", json.dumps(asked)),),
+        )
+    )
+    raw = json.loads(response.content)
+    found: list[Variant] = []
+    seen: set[str] = set()
+    for item in raw.get("variants", [])[:n]:
+        name = re.sub(r"[^a-z0-9]+", "-", str(item.get("name", "")).casefold()).strip("-")[:40]
+        addition = " ".join(str(item.get("prompt_append", "")).split())
+        if not name or not addition or name in seen or len(addition.split()) > 90:
+            continue
+        seen.add(name)
+        found.append(
+            Variant(
+                role, f"proposed-{name}", str(item.get("why", ""))[:300], prompt_append=addition
+            )
+        )
+    return found
+
+
+def audit(
+    role: str, recorded: Sequence[tuple[Mapping[str, Any], str]], names: Sequence[str] = ()
+) -> dict[str, Any]:
+    """What today's checks say about answers already given, no model needed.
+
+    Run before and after changing a check: what it newly catches, and what it would have
+    thrown away. The full-name check that discarded nearly every meeting with Stuart would
+    have shown here as half of all encounters turned away.
+    """
+    outcomes: list[Outcome] = []
+    for index, (context, result) in enumerate(recorded):
+        try:
+            parsed = json.loads(result)
+            content = result if isinstance(parsed, dict) else json.dumps({"text": result})
+        except (ValueError, TypeError):
+            content = json.dumps({"text": result})
+        try:
+            text = str(json.loads(content).get("text", content))
+        except (ValueError, AttributeError):
+            text = content
+        outcomes.append(Outcome(index, text, tuple(judge(role, context, content, names))))
+    return {
+        "role": role,
+        "answers": len(outcomes),
+        "would_be_turned_away": rate(outcomes),
+        "range": interval(outcomes),
+        "problems": counts(outcomes),
+        "examples": [
+            {"text": o.text, "problems": list(o.problems)} for o in outcomes if o.problems
+        ][:8],
+    }

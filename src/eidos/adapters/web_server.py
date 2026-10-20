@@ -10,7 +10,7 @@ import secrets
 import threading
 import urllib.request
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from time import monotonic, sleep
@@ -59,6 +59,8 @@ class Runtime:
         self.lock = threading.RLock()
         self._interviewing = False
         self._interview_failed_at = 0.0
+        self._tuning = False
+        self._tune_failed_at = 0.0
         self.stop = threading.Event()
         self.error: str | None = None
         self.ticks = 0
@@ -251,6 +253,7 @@ class Runtime:
                 finally:
                     self.working = False
             self._maybe_interview(config)
+            self._maybe_tune(config)
 
     INTERVIEW_EVERY_SECONDS = 7 * 86400
 
@@ -284,6 +287,52 @@ class Runtime:
                 self._interviewing = False
 
         threading.Thread(target=ask, name="self-interview", daemon=True).start()
+
+    # While he sleeps, between one and five in the morning: how the model roles are doing.
+    TUNE_EVERY_SECONDS = 20 * 3600
+
+    def harness_folder(self) -> Path | None:
+        path = getattr(getattr(self.life, "store", None), "path", None)
+        return Path(path).with_name("harness") if path else None
+
+    def _maybe_tune(self, config: Mapping[str, Any]) -> None:
+        """Once a night, while he's asleep, probe his model roles on the day's moments."""
+        if not config.get("running") or self._tuning or self.models is None:
+            return
+        configured = getattr(self.models, "configured", None)
+        if configured is None or not configured.configured():
+            return
+        if wall_time() - self._tune_failed_at < 6 * 3600:
+            return
+        if not 1 <= datetime.now(timezone.utc).hour <= 5:
+            return
+        if (self.cached or {}).get("pathos", {}).get("awake", True):
+            return
+        folder = self.harness_folder()
+        store_path = getattr(getattr(self.life, "store", None), "path", None)
+        if folder is None or store_path is None:
+            return
+        try:
+            history = folder / "history.jsonl"
+            if history.exists() and wall_time() - history.stat().st_mtime < self.TUNE_EVERY_SECONDS:
+                return
+        except OSError:
+            return
+        self._tuning = True
+        when = str((self.cached or {}).get("time", ""))
+
+        def tune() -> None:
+            from eidos.adapters.harness_runner import nightly
+
+            try:
+                nightly(self.models, Path(store_path), folder, when=when)
+            except Exception:
+                self._tune_failed_at = wall_time()
+                logger.exception("Nightly harness probe failed")
+            finally:
+                self._tuning = False
+
+        threading.Thread(target=tune, name="harness-nightly", daemon=True).start()
 
     def close(self) -> None:
         self.stop.set()
@@ -611,6 +660,15 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
                 if interview is not None:
                     report["self_interview"] = interview
                 self.respond(200, report)
+            elif path == "/api/harness":
+                # How each model role did on last night's probe, and the fortnight's trend.
+                from eidos.adapters.harness_runner import latest_nights
+
+                folder = runtime.harness_folder()
+                self.respond(
+                    200,
+                    latest_nights(folder) if folder is not None else {"trend": [], "last": None},
+                )
             elif path == "/api/export":
                 with runtime.lock:
                     events = [event_json(event) for event in runtime.life.history()]
@@ -743,7 +801,7 @@ def make_handler(runtime: Runtime) -> type[BaseHTTPRequestHandler]:
 
 
 OPERATOR_GET_PATHS = frozenset(
-    {"/api/events", "/api/export", "/api/catch-up/preview", "/api/models"}
+    {"/api/events", "/api/export", "/api/catch-up/preview", "/api/models", "/api/harness"}
 )
 OPERATOR_POST_PATHS = frozenset(
     {

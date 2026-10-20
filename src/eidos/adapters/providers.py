@@ -109,6 +109,8 @@ ROLE_GROUPS: dict[str, tuple[str, ...]] = {
         "pathos_user_notes",
         "pathos_advice_heard",
         "pathos_news_take",
+        # Proposing changes to how the roles are asked (``eidos harness-probe``).
+        "harness_editor",
     ),
     "world": (
         "moira",

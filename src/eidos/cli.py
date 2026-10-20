@@ -163,6 +163,13 @@ def main() -> None:
     harness.add_argument("--grep", help="Only moments whose context mentions this")
     harness.add_argument("--out", type=Path, help="Directory for the full report")
     harness.add_argument("--record", type=Path, help="Lessons file to append the outcome to")
+    harness.add_argument(
+        "--propose", type=int, default=0, help="Ask the editor model for this many changes"
+    )
+    harness.add_argument("--models", help="Compare these configured model ids, comma-separated")
+    harness.add_argument(
+        "--audit", action="store_true", help="Judge answers already given; no model calls"
+    )
     web = commands.add_parser("serve", help="Open the local observatory and run simulation loops")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument(
@@ -278,6 +285,12 @@ def main() -> None:
             )
             print(json.dumps(asdict(pack_result), indent=2, default=str))
             return
+        if args.command == "harness-probe" and args.audit:
+            # Judging answers already given needs no models at all.
+            from eidos.adapters.harness_runner import audit_role
+
+            print(json.dumps(audit_role(args.database, args.role, 200), indent=2))
+            return
         gateway: ModelGateway = StandInGateway()
         mode = "stand-in"
         if args.command == "models":
@@ -323,8 +336,38 @@ def main() -> None:
         if args.command == "harness-probe":
             if mode == "stand-in":
                 raise ValueError("harness-probe needs real models to compare")
+            from eidos.adapters import harness_runner
             from eidos.adapters.harness_runner import run as probe_harness
 
+            if args.models:
+                configured = getattr(gateway, "configured", None)
+                if configured is None:
+                    raise ValueError("--models needs the configured models file")
+                result = harness_runner.compare_models(
+                    configured,
+                    args.database,
+                    args.role,
+                    [m.strip() for m in args.models.split(",") if m.strip()],
+                    samples=args.samples,
+                    repeats=args.repeats,
+                    grep=args.grep,
+                )
+                print(json.dumps(result, indent=2))
+                return
+            if args.propose:
+                result = harness_runner.improve(
+                    gateway,
+                    args.database,
+                    args.role,
+                    samples=args.samples,
+                    repeats=args.repeats,
+                    proposals=args.propose,
+                    grep=args.grep,
+                    out=args.out,
+                    lessons=args.record,
+                )
+                print(json.dumps(result, indent=2))
+                return
             result = probe_harness(
                 gateway,
                 args.database,

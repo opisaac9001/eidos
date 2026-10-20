@@ -861,6 +861,23 @@ class StandInGateway(ModelGateway):
                 backend="deterministic",
                 finish_reason="stop",
             )
+        elif role == "harness_editor":
+            return ModelResponse(
+                content=json.dumps(
+                    {
+                        "variants": [
+                            {
+                                "name": "name-the-person",
+                                "why": "Encounters left the person out.",
+                                "prompt_append": "Always name the person by first name.",
+                            }
+                        ]
+                    }
+                ),
+                resolved_model="authored-stand-in-v1",
+                backend="deterministic",
+                finish_reason="stop",
+            )
         elif role == "pathos_life_summary":
             weighing = [str(item) for item in context.get("weighing_on_me") or []][:2]
             day = [str(item) for item in context.get("the_day_just_gone") or []][:2]
