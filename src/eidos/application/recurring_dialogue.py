@@ -17,12 +17,14 @@ from eidos.application.shared_past import (
     ITS_HIS,
     NOT_YOURS,
     REVISION,
+    SAY_IT,
     THING_REVISION,
     claims_his_project,
     gives_away_his_project,
     invents_past_talk,
     invents_shared_past,
     invents_shared_thing,
+    narrates_the_speaker,
 )
 from eidos.application.talking_points import his_projects, setting, talking_points
 from eidos.domain.character_history import eligible_character_fact
@@ -345,6 +347,18 @@ async def _advance_scene(
                 output,
             )
             if text is not None and invents_shared_thing(text, grounded, projects):
+                text = None
+        speaker_name = "Patrick" if speaker_id == "pathos" else name
+        if text is not None and asked is not None and narrates_the_speaker(text, speaker_name):
+            # "Mara waves over to Rowan and asks...", given as Mara's own words.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": SAY_IT},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and narrates_the_speaker(text, speaker_name):
                 text = None
         if (
             text is not None

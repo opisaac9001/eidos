@@ -150,3 +150,12 @@ def test_his_project_stays_his_when_he_talks_about_it() -> None:
     assert gives_away_his_project("Your atlas of sounds needs the market at dawn.", mine)
     assert not gives_away_his_project("I've got a few mics for my atlas of sounds.", mine)
     assert not gives_away_his_project("How's your week been?", mine)
+
+
+def test_a_spoken_line_isnt_narration_about_the_speaker() -> None:
+    from eidos.application.shared_past import narrates_the_speaker
+
+    assert narrates_the_speaker("Mara waves over to Rowan and asks how it's going.", "Mara Bell")
+    assert narrates_the_speaker("Ellis quietly sets down the mug.", "Ellis")
+    assert not narrates_the_speaker("Mara, have you seen Rowan?", "Mara")
+    assert not narrates_the_speaker("Morning, Rowan. Coffee?", "Mara")

@@ -125,6 +125,21 @@ def gives_away_his_project(text: str, projects: Sequence[str]) -> bool:
     return False
 
 
+def narrates_the_speaker(text: str, speaker_name: str) -> bool:
+    """A line meant to be spoken, written as narration about the speaker ("Mara waves over
+    to Rowan and asks if...", given as Mara's words)."""
+    first = speaker_name.split()[0] if speaker_name.split() else ""
+    if not first:
+        return False
+    return bool(re.match(rf"\s*{re.escape(first)}(?:'s)?\s+(?:\w+ly\s+)?[a-z]+s\b", text))
+
+
+SAY_IT = (
+    "That describes the speaker instead of being what they say. Give only the words they "
+    "speak aloud, in the first person."
+)
+
+
 ITS_HIS = (
     "That project is yours (Patrick's), not theirs. Say it again as your own: 'my atlas', "
     "not 'your project'."
