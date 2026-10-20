@@ -207,6 +207,13 @@ he can reach, and how clearly, changes.
   up as new for a month (`memory.told`, also for what he's told you). In his stream, where
   he is brings back something that happened there, and someone with him a moment with
   them, so a memory can start a thought.
+- **Recall by meaning** (`memory_meaning.py`, `adapters/embeddings.py`). A cue brings back
+  what it's about, not only what shares its words: with a small local embedding model
+  (`nomic-embed-text` on the Dell's Ollama) each memory has a vector, a cue is compared
+  with them, and the memory that comes up most strongly primes the ones near it
+  (spreading activation). Vectors are derived and kept beside his history, never in it;
+  without the model, recall goes on by words alone. `EIDOS_EMBED_URL`,
+  `EIDOS_EMBED_MODEL` and `EIDOS_EMBEDDINGS=off` configure it.
 - **Measured:** `eidos believability` reports how much of an ordinary month a month ago
   he can still recall clearly; people keep little of it.
 

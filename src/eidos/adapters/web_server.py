@@ -61,6 +61,9 @@ class Runtime:
         self._interview_failed_at = 0.0
         self._tuning = False
         self._tune_failed_at = 0.0
+        # Recall by meaning, when the server has an embedding model.
+        self.meaning: Any = None
+        self._embedding = False
         self.stop = threading.Event()
         self.error: str | None = None
         self.ticks = 0
@@ -254,6 +257,7 @@ class Runtime:
                     self.working = False
             self._maybe_interview(config)
             self._maybe_tune(config)
+            self._embed_new_memories()
 
     INTERVIEW_EVERY_SECONDS = 7 * 86400
 
@@ -294,6 +298,26 @@ class Runtime:
     def harness_folder(self) -> Path | None:
         path = getattr(getattr(self.life, "store", None), "path", None)
         return Path(path).with_name("harness") if path else None
+
+    def _embed_new_memories(self) -> None:
+        """Vectors for memories that have none yet, a batch at a time, off the tick."""
+        if self.meaning is None or self._embedding:
+            return
+        self._embedding = True
+
+        def work() -> None:
+            try:
+                with self.lock:
+                    history = self.life.history()
+                added = self.meaning.embed_missing(history, limit=256)
+                if added:
+                    logger.info("Embedded %d memories (%d in all)", added, len(self.meaning))
+            except Exception:
+                logger.exception("Embedding memories failed")
+            finally:
+                self._embedding = False
+
+        threading.Thread(target=work, name="memory-meaning", daemon=True).start()
 
     def _lifelike(self) -> dict[str, Any] | None:
         """The week's believability measures, for the nightly record."""
@@ -891,6 +915,25 @@ def _models_action(runtime: Any, path: str, body: dict[str, Any]) -> dict[str, A
         return {"models": [], "error": str(error)[:200]}
 
 
+def _meaning_index(database: Path) -> Any:
+    """Recall by meaning, on a local embedding model; without one, recall goes by words."""
+    import os
+
+    from eidos.adapters.embeddings import DEFAULT_MODEL, DEFAULT_URL, OllamaEmbedder
+    from eidos.adapters.sqlite_memory_vectors import SQLiteMemoryVectors
+    from eidos.application.memory_meaning import MeaningIndex, set_meaning_index
+
+    if os.environ.get("EIDOS_EMBEDDINGS", "on").casefold() in {"off", "0", "no"}:
+        return None
+    embedder = OllamaEmbedder(
+        os.environ.get("EIDOS_EMBED_URL", DEFAULT_URL),
+        os.environ.get("EIDOS_EMBED_MODEL", DEFAULT_MODEL),
+    )
+    index = MeaningIndex(embedder, SQLiteMemoryVectors(database))
+    set_meaning_index(index)
+    return index
+
+
 def _inner_stream(database: Path, gateway: ModelGateway, runtime: Runtime) -> Any:
     """His inner monologue, running in the background on the models' inner-life role."""
     from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
@@ -999,6 +1042,7 @@ def serve(
     runtime.models = inner if isinstance(inner, SwitchingGateway) else None
     if stream:
         runtime.stream = _inner_stream(database, inner, runtime)
+    runtime.meaning = _meaning_index(database)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runtime))
     runtime.start()
     print(f"Eidos is ready at http://127.0.0.1:{port} — {mode} mode", flush=True)

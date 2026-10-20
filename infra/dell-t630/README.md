@@ -115,3 +115,11 @@ can appear in it; local inventory reports are ignored by Git. Review the report
 before any disk, firmware, BIOS, boot, RAID, or operating-system change. If the
 certificate cannot be validated, fix trust or replace the iDRAC certificate—the
 tool deliberately has no insecure TLS switch.
+
+## Recall by meaning
+
+The server embeds his memories with `nomic-embed-text` on the cognition Ollama instance
+(`http://127.0.0.1:11436`, already pulled) and keeps the vectors in the database beside his
+history. `EIDOS_EMBED_URL` and `EIDOS_EMBED_MODEL` change where and what; `EIDOS_EMBEDDINGS=off`
+turns it off, and recall goes by words alone. The first start embeds the whole history in
+batches in the background (a few minutes); after that, new memories as they come.

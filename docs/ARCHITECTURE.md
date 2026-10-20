@@ -278,6 +278,11 @@ with models only wording what the rules decide:
   nightly archiving (`memory_retention.py`, by fade rather than age) and the gist merge in
   `memory_life.py`. `reminders.py`: plans crossing his mind and the reminders he sets;
   `scheduled_activity.prospective_memory_lapse` lets an unrehearsed plan with someone slip.
+- `application/memory_weighing.py`: nightly, yesterday's memories weighed by how they felt
+  (their appraisal), how unusual they were and whether he brooded on them; recall and
+  archiving read the weighed importance. `memory_meaning.py` with
+  `adapters/embeddings.py` and `adapters/sqlite_memory_vectors.py`: recall by meaning on a
+  local embedding model, with spreading activation; vectors live beside his history.
 - `application/town_story.py`: the town's storyteller. It paces stories (quiet after each,
   growing likelier, big ones rare, kinder after bad), carries out their consequences
   (closures through `as_today`, power cuts, residents hearing as `gossip.heard`), and lets

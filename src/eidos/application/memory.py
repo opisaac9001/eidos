@@ -11,6 +11,7 @@ from typing import Any, Mapping, NamedTuple
 from uuid import UUID
 
 from eidos.application.memory_curve import accessibility_of, detail_of
+from eidos.application.memory_meaning import meaning_index
 from eidos.application.memory_retention import archived_memory_ids
 from eidos.application.memory_weighing import weighed_importance
 from eidos.domain.events import DomainEvent
@@ -479,6 +480,13 @@ def recall(
     ranked: list[_Ranked] = []
     archived = archived_memory_ids(history)
     weighed = weighed_importance(history)
+    # By meaning as well as by words, when the embedding model is there.
+    meaning = meaning_index()
+    closeness = (
+        meaning.similarities(query, [str(e.event_id) for e in index.memories])
+        if meaning is not None and len(query_terms) >= 2
+        else {}
+    )
     recollections = project_recollections(history).latest
     current_affect, emotional_tones, emotional_tags = _affective_context(
         history, now, recollections
@@ -552,6 +560,7 @@ def recall(
         if is_archived and not include_archived and not has_direct_cue and importance < 0.75:
             continue
         components = {
+            "meaning": 0.2 * closeness.get(memory_id, 0.0),
             "lexical": 0.27 * relevance,
             "entity": 0.14 * entity_relevance,
             "goal": 0.15 * goal_relevance,
@@ -587,6 +596,19 @@ def recall(
                 remembered_location_id,
             )
         )
+    # What comes up most strongly by meaning primes the memories near it.
+    if meaning is not None and closeness:
+        strongest = max(closeness, key=lambda k: closeness[k])
+        if closeness[strongest] >= 0.5:
+            primed = meaning.between(strongest, [item.memory_id for item in ranked])
+            for position, item in enumerate(ranked):
+                near = primed.get(item.memory_id, 0.0)
+                if near >= 0.6:
+                    spread = round(0.05 * (near - 0.6) / 0.4, 4)
+                    ranked[position] = item._replace(
+                        score=round(item.score + spread, 4),
+                        components={**item.components, "spread": spread},
+                    )
     # Only the memories returned are rendered; ranking needs just the scores.
     ranked.sort(key=lambda item: (item.score, item.remembered_at, item.memory_id), reverse=True)
     chosen = _diversify(ranked, limit) if diverse else ranked[:limit]

@@ -1113,6 +1113,7 @@ def _memory_access_events(selected: list[RecalledMemory], at: str) -> list[Domai
                 "reason": item.reason,
                 "score": item.score,
                 "lexical_score": item.components["lexical"],
+                "meaning_score": item.components.get("meaning", 0.0),
                 "entity_score": item.components["entity"],
                 "goal_score": item.components["goal"],
                 "relationship_score": item.components["relationship"],
