@@ -39,6 +39,10 @@ def load_samples(
     How each was asked (schema, length, temperature) is kept with it, so the probe asks
     again exactly as his life did: texts have their own schema, not the generic one.
     """
+    if role == "murmur" and _has_table(database, "stream_asks"):
+        # His stream's own thoughts, recorded by the stream itself with what it was asked.
+        _ASKED_HOW.clear()
+        return list(_stream_asks(database, limit, grep))
     connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     try:
         columns = {row[1] for row in connection.execute("pragma table_info(cognition_jobs)")}
@@ -70,6 +74,46 @@ def load_samples(
     return found
 
 
+def _has_table(database: Path, name: str) -> bool:
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    try:
+        found = connection.execute(
+            "select count(*) from sqlite_master where type = 'table' and name = ?", (name,)
+        ).fetchone()
+        if not (found and found[0]):
+            return False
+        return bool(connection.execute(f"select count(*) from {name}").fetchone()[0])
+    finally:
+        connection.close()
+
+
+def _stream_asks(
+    database: Path, limit: int, grep: str | None = None, *, with_text: bool = False
+) -> list[Any]:
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    try:
+        rows = connection.execute(
+            "select context_json, text, outcome from stream_asks order by id desc limit 4000"
+        ).fetchall()
+    finally:
+        connection.close()
+    seen: set[str] = set()
+    found: list[Any] = []
+    for raw, text, outcome in rows:
+        if raw in seen or (grep and grep.casefold() not in raw.casefold()):
+            continue
+        seen.add(raw)
+        try:
+            context = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(context, dict):
+            found.append((context, str(text), str(outcome)) if with_text else context)
+        if len(found) >= limit:
+            break
+    return found
+
+
 # How each loaded moment was asked, by the moment's identity (kept out of its context).
 _ASKED_HOW: dict[int, dict[str, Any]] = {}
 
@@ -96,6 +140,8 @@ def _request(role: str, context: Mapping[str, Any], asked: Mapping[str, Any] | N
 
 def load_recorded(database: Path, role: str, limit: int) -> list[tuple[dict[str, Any], str]]:
     """Answers the role actually gave, with what it was asked: for checking the checks."""
+    if role == "murmur" and _has_table(database, "stream_asks"):
+        return [(c, text) for c, text, _ in _stream_asks(database, limit, with_text=True)]
     connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     try:
         rows = connection.execute(

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import re
 import threading
@@ -43,6 +44,8 @@ KEEP = 5000
 # A thought only counts as following on from the ones before it for this long.
 THREAD_MINUTES = 30
 # Thinking about what's in front of him rather than wandering off.
+logger = logging.getLogger(__name__)
+
 ON_TASK = frozenset({"here", "doing", "next", "person", "body"})
 # Cues and how often his mind drifts to each, roughly.
 CUE_WEIGHTS: dict[str, float] = {
@@ -1569,6 +1572,16 @@ class InnerStream:
         self.state = "resting"
         return gap
 
+    def _record_ask(self, at: str, context: Mapping[str, Any], text: str, outcome: str) -> None:
+        """What this thought was asked with and what came of it, for the harness probe."""
+        record = getattr(self.store, "record_ask", None)
+        if record is None:
+            return
+        try:
+            record(self.wall_clock(), at, json.dumps(context, default=str), text, outcome)
+        except Exception:  # diagnostics must never stop a thought
+            logger.exception("Couldn't record a stream ask")
+
     def _turn_away(self, why: str, text: str) -> None:
         self.last_error = why
         self.turned_away_why[why.split(",")[0].split(" from ")[0].split(" with ")[0]] += 1
@@ -1698,6 +1711,7 @@ class InnerStream:
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
         why = turned_away_for(text, context, judge)
+        self._record_ask(at, context, text, why or "kept")
         if why is not None:
             self._turn_away(f"{why}, skipped: {text[:80]}", text)
             return None

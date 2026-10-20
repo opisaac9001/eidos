@@ -326,3 +326,20 @@ def test_a_thought_is_judged_by_the_probe_exactly_as_the_stream_judges_it() -> N
 
 def judge_kinds(content: str, context: dict) -> list[str]:
     return judge("murmur", context, content)
+
+
+def test_the_probe_replays_the_stream_s_own_record(tmp_path: Path) -> None:
+    from eidos.adapters.harness_runner import load_recorded
+    from eidos.adapters.sqlite_inner_stream import SQLiteInnerStream
+
+    db = tmp_path / "stream.sqlite3"
+    store = SQLiteInnerStream(db)
+    asked = {"location": "at home", "cue": "the kettle"}
+    store.record_ask(1.0, "2026-09-09T08:00:00+00:00", json.dumps(asked), "Kettle.", "kept")
+    store.record_ask(
+        2.0, "2026-09-09T08:01:00+00:00", json.dumps({**asked, "cue": "rain"}),
+        "Mara again.", "brought in Mara from nowhere",
+    )  # fmt: skip
+    samples = load_samples(db, "murmur", 5)
+    assert [s["cue"] for s in samples] == ["rain", "the kettle"]
+    assert [text for _, text in load_recorded(db, "murmur", 5)] == ["Mara again.", "Kettle."]

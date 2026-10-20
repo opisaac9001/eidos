@@ -31,6 +31,18 @@ class SQLiteInnerStream:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS inner_stream_wall ON inner_stream (wall_at)"
             )
+            # What each thought was asked with and what came of it (kept, or why it was
+            # turned away), for ``eidos harness-probe``. Not his life: diagnostics, pruned.
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS stream_asks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wall_at REAL NOT NULL,
+                    simulated_at TEXT NOT NULL,
+                    context_json TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    outcome TEXT NOT NULL
+                )
+            """)
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -55,6 +67,23 @@ class SQLiteInnerStream:
             id=row["id"],
             promoted=bool(row["promoted"]),
         )
+
+    ASKS_KEPT = 3000
+
+    def record_ask(
+        self, wall_at: float, simulated_at: str, context: str, text: str, outcome: str
+    ) -> None:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "INSERT INTO stream_asks (wall_at, simulated_at, context_json, text, outcome)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (wall_at, simulated_at, context, text, outcome),
+            )
+            if cursor.lastrowid and cursor.lastrowid % 200 == 0:
+                connection.execute(
+                    "DELETE FROM stream_asks WHERE id <= ?",
+                    (cursor.lastrowid - self.ASKS_KEPT,),
+                )
 
     def add(self, thought: StreamThought) -> StreamThought:
         with self._connect() as connection:
