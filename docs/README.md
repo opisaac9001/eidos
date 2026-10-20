@@ -20,6 +20,7 @@
 | [SYSTEM_INTERACTIONS.md](SYSTEM_INTERACTIONS.md) | How the systems of his life affect each other |
 | [MODELS.md](MODELS.md) | Adding providers and models, roles, backups and budgets |
 | [LOCAL_MODELS.md](LOCAL_MODELS.md) | One endpoint or a routing file; model trials; the Raspberry Pi |
+| [harness/](harness/README.md) | Trying a change to how a model role is asked on real moments first (`eidos harness-probe`), and the lessons kept |
 | [UPGRADE_EVOLVE_TRUE_SELF.md](UPGRADE_EVOLVE_TRUE_SELF.md) | Upgrade notes and rollback limits |
 | [ROADMAP.md](ROADMAP.md), [FEATURES.md](FEATURES.md) | What's built, partial and planned |
 | [adr/0001](adr/0001-model-host-boundary.md), [adr/0002](adr/0002-local-persistence.md) | Decisions: the model-host boundary, and SQLite for persistence |

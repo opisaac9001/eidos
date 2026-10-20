@@ -138,3 +138,15 @@ def test_nobody_else_claims_his_project() -> None:
         "How's your atlas of neighbourhood sounds coming on? Added any recordings?", mine
     )
     assert not claims_his_project("I've been working on that old clock all morning.", mine)
+
+
+def test_his_project_stays_his_when_he_talks_about_it() -> None:
+    from eidos.application.shared_past import gives_away_his_project
+
+    mine = [
+        "Patrick's own project (his, nobody else's): Make a small atlas of neighbourhood sounds"
+    ]
+    assert gives_away_his_project("I've got a few mics that'd suit your project perfectly.", mine)
+    assert gives_away_his_project("Your atlas of sounds needs the market at dawn.", mine)
+    assert not gives_away_his_project("I've got a few mics for my atlas of sounds.", mine)
+    assert not gives_away_his_project("How's your week been?", mine)

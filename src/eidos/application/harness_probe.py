@@ -31,6 +31,7 @@ from typing import Any, Callable, Mapping, Sequence
 from eidos.application.inner_stream import near_repeat
 from eidos.application.shared_past import (
     claims_his_project,
+    gives_away_his_project,
     invents_shared_past,
     invents_shared_thing,
 )
@@ -116,6 +117,8 @@ def judge(role: str, context: Mapping[str, Any], content: str) -> list[str]:
             problems.append("invented_thing")
         if speaker != "pathos" and claims_his_project(text, projects):
             problems.append("claims_his_project")
+        if speaker == "pathos" and gives_away_his_project(text, projects):
+            problems.append("gives_away_his_project")
         if invents_shared_past(text):
             problems.append("shared_past")
         prior = [

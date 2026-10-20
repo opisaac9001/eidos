@@ -1,0 +1,6 @@
+{
+  "role": "firmament",
+  "name": "narrate-and-ground",
+  "why": "On 20 live moments 55% of lines were turned away: encounters written as a bare line of dialogue without the person in them, and people asking after 'that project Ellis mentioned', which doesn't exist.",
+  "prompt_append": "When there is no scene_speaker, narrate: one or two sentences in the third person that name the person by first name, for example 'Stuart waves from the cheese stall and asks how the writing is going.' Never bring up a project, plan, scheme or job unless scene_topic, setting, what_they_are_doing or they_might_mention names it; if nothing is supplied, talk about the moment itself."
+}

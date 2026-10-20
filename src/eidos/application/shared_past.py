@@ -107,6 +107,30 @@ def claims_his_project(text: str, projects: Sequence[str]) -> bool:
     return False
 
 
+_YOURS = re.compile(r"\byour (?:own )?(?:\w+ )?(?:project|atlas|map|recordings)\b", re.IGNORECASE)
+
+
+def gives_away_his_project(text: str, projects: Sequence[str]) -> bool:
+    """Patrick calling his own project the other person's ("mics that'd suit your project",
+    to Ellis, about his own atlas of sounds)."""
+    if not projects:
+        return False
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        match = _YOURS.search(sentence)
+        if match is None:
+            continue
+        said = set(_WORD.findall(sentence.casefold()))
+        if "project" in match.group(0).casefold() or any(said & _title_words(p) for p in projects):
+            return True
+    return False
+
+
+ITS_HIS = (
+    "That project is yours (Patrick's), not theirs. Say it again as your own: 'my atlas', "
+    "not 'your project'."
+)
+
+
 NOT_YOURS = (
     "That project is Patrick's, not yours. Say it again: ask him about it, or talk about "
     "something of your own."

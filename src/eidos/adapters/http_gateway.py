@@ -284,6 +284,18 @@ ROLE_PROMPTS["firmament"] += (
     " personal_relationship_context belongs ONLY to scene_speaker, about scene_audience. A let-down is not proof a book was lost, damaged, or deliberately withheld. Do not invent a cause. If they returned your book, do not reverse the loan and say you borrowed theirs. Your own caution can lead to a refusal or a condition; you do not need to say yes. An offered apology is not proof of forgiveness."
 )
 
+# Measured with ``eidos harness-probe`` on 20 live moments (docs/harness/LESSONS.md):
+# lines turned away fell from 57% to 20%, mostly encounters without the person in them and
+# people asking after projects that don't exist.
+ROLE_PROMPTS["firmament"] += (
+    " "
+    "When there is no scene_speaker, narrate: one or two sentences in the third person "
+    "that name the person by first name, for example 'Stuart waves from the cheese stall "
+    "and asks how the writing is going.' Never bring up a project, plan, scheme or job "
+    "unless scene_topic, setting, what_they_are_doing or they_might_mention names it; if "
+    "nothing is supplied, talk about the moment itself."
+)
+
 for _role in ("pathos_deliberation", "pathos_agency", "pathos_project"):
     ROLE_PROMPTS[_role] += POSSIBLE_SELVES_NOTE
 

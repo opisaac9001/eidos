@@ -6,6 +6,9 @@
 - **He makes his own plans.** When he's been on his own a few days or a friend is on his mind, he texts someone ("Pint tonight? The Listening Room, half seven?"). They answer from their own day: working, tired, busy, "Thursday instead?", or yes. A yes books it. This replaces follow-ups that booked "Spend time with X" at one the next afternoon. Friends text him too, at lunch or after work, for evenings and weekends, and he answers from his own week.
 - **Weeks have a rhythm.** Deadline weeks run into the evenings and a Saturday morning with no weeknight plans; slack weeks start late, finish at five and are when he pitches. He looks at the week on Monday morning.
 
+### Running it
+- **`eidos harness-probe`** tries a change to how a model role is asked on real recorded moments, the current way and the new way on the same models, judged by the checks his life already uses, and keeps the lesson (after Harness²). Its first run cut encounter and conversation lines turned away from 57% to 20%.
+
 ### His world
 - **The town has a story.** A storyteller paces it: quiet weeks, then something that matters. A burst main shuts the café (Mara's at home), the river floods the path, the power goes, the chip shop burns, Dennis from the hardware shop dies. Residents hear and talk about it; he hears it by being there, on the town's Facebook group, in a queue, over the fence or from a friend, or not at all. News leads somewhere: the record shop opens and he can go, he decides about Dennis's funeral, and puts a fiver in the jar for the family from the chip shop.
 - **His local.** The Crown & Anchor is on the Market Place, three minutes from Juniper: drinks, birthdays, leaving dos and New Year go there, and so do residents of an evening.

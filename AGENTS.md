@@ -32,6 +32,7 @@ Eidos simulates one person, Patrick "Pathos" Shaw, as close to how a real person
 - **Context keys reach real models only if listed** in that role's `ROLE_FIELDS` in `src/eidos/adapters/http_gateway.py`. The stand-in sees everything, so tests pass either way: add a field-membership test.
 - **A new model role** needs `STRUCTURED_CAPABILITIES`, the routed gateway's `CAPABILITIES` and `FALLBACKS`, provider `ROLE_GROUPS`, persona `PERSONAL_ROLES`, `ROLE_PROMPTS` and `ROLE_FIELDS`, and a stand-in branch.
 - **Small models ignore instructions.** Prefer a check in code (turn the output away, ask once more) to another line in a prompt.
+- **Measure a prompt change before shipping it.** `eidos harness-probe` replays real recorded moments the current way and your way and says which would be turned away less (see [docs/harness](docs/harness/README.md)). Record the outcome in `docs/harness/LESSONS.md`.
 - **Everyday doings** (`doing-` calendar entries from `application/everyday.py`) are exempt from forgetting, "samey" judgements, visit blocking and agency causes. Keep them that way.
 - **No secrets.** Model keys and operator tokens never go in the repository, the event log or the UI.
 
