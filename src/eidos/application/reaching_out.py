@@ -173,6 +173,55 @@ def _told_them_about(
     return told
 
 
+# Kinds of get-together a text can speak of as arranged, and what in his diary would be one.
+_GATHERINGS = {
+    "drink": (r"\b(?:pub|pint|pints|drinks?|the crown|a bottle)\b", ("crown-anchor", "music-room"),
+              ("drink", "pint", "pub")),
+    "film": (r"\b(?:cinema|film|movie|the regent)\b", ("cinema",), ("cinema", "film")),
+    "walk": (r"\b(?:walk|ramble)\b", ("riverside", "park"), ("walk",)),
+    "meal": (r"\b(?:dinner|tea at|lunch|curry|takeaway|bbq|barbecue)\b", (), ("dinner", "lunch")),
+    "do": (r"\b(?:party|leaving do|the do|gig|quiz)\b", (), ("do", "party", "gig", "quiz")),
+}  # fmt: skip
+
+
+def invents_a_plan(
+    history: Sequence[DomainEvent], person_id: str, text: str, at: datetime
+) -> str | None:
+    """A get-together spoken of as arranged that his diary with them doesn't have.
+
+    Patrick texted Stuart about "a plan beyond the pub" on Friday, and Stuart's reply went
+    along with it; their only plan was the old one at the workshop at one. A text may
+    suggest something new ("fancy a pint?"); it may not treat as settled what isn't.
+    """
+    from eidos.domain.planning import project_planning
+
+    lowered = text.casefold()
+    if "?" in text and re.search(r"\b(?:fancy|want to|up for|how about|shall we)\b", lowered):
+        return None  # asking, not assuming
+    shared = [
+        entry
+        for entry in project_planning(history).calendar.values()
+        if entry.status in {"scheduled", "active"}
+        and entry.companion_id == person_id
+        and timedelta(0) <= datetime.fromisoformat(entry.starts_at) - at <= timedelta(days=14)
+    ]
+    for kind, (pattern, places, words) in _GATHERINGS.items():
+        if not re.search(pattern, lowered):
+            continue
+        if not any(
+            entry.location_id in places or any(w in entry.title.casefold() for w in words)
+            for entry in shared
+        ):
+            return kind
+    return None
+
+
+INVENTED_PLAN = (
+    "That speaks of a get-together as arranged that isn't: there's no such plan between "
+    "you. Say it again without one; you may suggest something, as a question."
+)
+
+
 def _just_seen(history: Sequence[DomainEvent], at: datetime, person_id: str) -> bool:
     """Whether he's been with them in person in the last few hours."""
     if person_id == EMPLOYER_ID:
@@ -301,6 +350,8 @@ async def reach_out_events(
         words = len(text.split())
         if not 2 <= words <= 60 or re.search(r"\b(as an ai|language model)\b", text, re.I):
             raise ProposalRejected("not_a_text", "That isn't a text he'd send")
+        if invents_a_plan(history, person_id, text, at) is not None:
+            raise ProposalRejected("invented_plan", "He spoke of a plan they don't have")
         if _said_already(history, person_id, text, at) or _about(text, told, person_name):
             # "Gutted you're leaving but proper pleased for you", to Beth, four days running.
             raise ProposalRejected("said_already", "He's already said as much to them")
@@ -426,6 +477,17 @@ async def reply_events(
             for e in events_of(history, REPLIED)[-40:]
             if e.payload.get("person_id") == sent.payload.get("person_id")
         ]
+        if reply is not None and invents_a_plan(history, person_id, reply, at) is not None:
+            # Stuart: "No plan beyond the pub, so bring a bottle", of a plan nobody made.
+            reply = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": INVENTED_PLAN},
+                at.isoformat(),
+                pending,
+            )
+            if reply is not None and invents_a_plan(history, person_id, reply, at) is not None:
+                reply = None
         if reply is not None and near_repeat(reply, before):
             # Word for word what they texted last week ("Cheers, feeling much better
             # now..."): asked once for a reply to what he actually said this time.

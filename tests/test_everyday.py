@@ -88,6 +88,16 @@ def test_never_while_asleep_or_two_things_at_once(two_days) -> None:
         and event.payload.get("actor_id") in {None, "pathos"}
         and event.payload.get("ends_at")
     )
+    # Which booking each span is, so a clash says what clashed (it has happened, rarely).
+    titled = {
+        (
+            datetime.fromisoformat(str(event.payload["starts_at"])),
+            datetime.fromisoformat(str(event.payload["ends_at"])),
+        ): f"{event.payload['schedule_id']} ({event.payload.get('title')}, made "
+        f"{event.payload.get('simulated_at')})"
+        for event in two_days
+        if event.kind == "schedule.created" and event.payload.get("ends_at")
+    }
     # Something he planned since can land on a doing; then the doing is cut short for it.
     cut = {
         str(event.payload["schedule_id"])
@@ -107,7 +117,7 @@ def test_never_while_asleep_or_two_things_at_once(two_days) -> None:
     ]
     for start, end in doings:
         overlapping = [span for span in spans if span[0] < end and start < span[1]]
-        assert overlapping == [(start, end)]
+        assert overlapping == [(start, end)], [titled.get(span) for span in overlapping]
 
 
 def test_what_he_just_chose_cannot_slip_his_mind(two_days) -> None:

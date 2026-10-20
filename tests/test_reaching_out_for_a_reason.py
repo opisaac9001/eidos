@@ -279,3 +279,37 @@ def test_once_hes_said_his_piece_about_their_news_he_doesnt_again() -> None:
     assert told == news
     assert _about("Still feeling flat knowing you're moving to Bristol.", told, "Beth Pritchard")
     assert not _about("How did the market go today?", told, "Beth Pritchard")
+
+
+def test_a_text_doesnt_treat_as_arranged_what_isnt() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from eidos.application.reaching_out import invents_a_plan
+    from eidos.domain.events import DomainEvent
+
+    at = datetime(2026, 9, 9, 10, tzinfo=timezone.utc)
+    workshop = DomainEvent(
+        "schedule.created",
+        "pathos",
+        {
+            "schedule_id": "s1", "title": "Spend time with Stuart Hart",
+            "starts_at": (at + timedelta(days=2)).isoformat(),
+            "ends_at": (at + timedelta(days=2, hours=1)).isoformat(),
+            "location_id": "workshop", "actor_id": "pathos", "companion_id": "stuart",
+            "simulated_at": at.isoformat(),
+        },
+    )  # fmt: skip
+    history = [workshop]
+    said = "Just checking if there's a plan beyond the pub yet, or should I bring a bottle?"
+    assert invents_a_plan(history, "stuart", said, at) == "drink"
+    assert invents_a_plan(history, "stuart", "No plan beyond the pub, bring a bottle.", at)
+    # Suggesting one is fine; so is one that's really in the diary.
+    assert invents_a_plan(history, "stuart", "Fancy a pint at the Crown on Friday?", at) is None
+    pint = DomainEvent(
+        "schedule.created",
+        "pathos",
+        {**workshop.payload, "schedule_id": "s2", "title": "A drink with Stuart at the Crown",
+         "location_id": "crown-anchor"},
+    )  # fmt: skip
+    assert invents_a_plan([workshop, pint], "stuart", said, at) is None
+    assert invents_a_plan(history, "stuart", "How's the week going?", at) is None
