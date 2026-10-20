@@ -370,6 +370,39 @@ def record_lesson(path: Path, result: Mapping[str, Any]) -> None:
         handle.write("\n".join(lines) + "\n")
 
 
+# What each check turns a line away for, in words an editor model can act on.
+CHECKS = {
+    "missing_actor": "An encounter was narrated without naming the person it's with.",
+    "empty_scene": "The answer was an unfinished fragment.",
+    "invented_thing": "A project, plan, report or scheme was spoken of as known between them "
+    "when nothing in the moment (topic, setting, news, what they're doing) supplies it.",
+    "claims_his_project": "Someone other than Patrick spoke of Patrick's own project as theirs. "
+    "The project is real (it's in the moment, marked as his); only its owner was wrong.",
+    "gives_away_his_project": "Patrick called his own project the other person's ('your "
+    "project'). It's his: 'my atlas'.",
+    "shared_past": "A shared past from before Patrick came to the town was invented.",
+    "repeat": "The speaker said much the same as they already had in this conversation.",
+    "stray_name": "Someone he knows was named whom nothing in the moment brought up.",
+    "leak": "The answer named the simulation itself, or a record id, inside the world.",
+    "too_long": "The answer ran far longer than a spoken line or a passing thought.",
+    "third_person": "A private thought was in the third person or used his nickname.",
+    "emoji": "A text had an emoji, which he doesn't use.",
+    "signed_off": "A text was signed off with his name.",
+    "failed_call": "The model gave no usable answer.",
+}
+
+
+def _kinds(outcomes: Sequence[Outcome]) -> list[str]:
+    return sorted({kind for o in outcomes for kind in o.problems})
+
+
+def _gist(context: Mapping[str, Any]) -> dict[str, Any]:
+    """What a failed moment was about, briefly: enough to see what the model was given."""
+    keys = ("person", "scene_speaker", "scene_topic", "setting", "his_news",
+            "what_they_are_doing", "they_might_mention", "to", "cue")  # fmt: skip
+    return {key: str(context[key])[:200] for key in keys if context.get(key)}
+
+
 EDITOR_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -401,6 +434,7 @@ async def propose(
     failures: Sequence[Outcome],
     lessons: str,
     n: int = 3,
+    contexts: Sequence[Mapping[str, Any]] = (),
 ) -> list[Variant]:
     """A stronger model reads what went wrong and what's been learned, and suggests changes.
 
@@ -413,8 +447,16 @@ async def propose(
         "role": role,
         "current_prompt": current_prompt[-3500:],
         "failures": [
-            {"line": o.text[:300], "turned_away_for": list(o.problems)} for o in failures[:12]
+            {
+                "line": o.text[:300],
+                "turned_away_for": list(o.problems),
+                **({"moment": _gist(contexts[o.sample])} if contexts else {}),
+            }
+            for o in failures[:12]
         ],
+        # The editor read "claims_his_project" as "the atlas is made up" and proposed
+        # banning Patrick's real project; what each check means has to be said.
+        "what_the_checks_mean": {kind: CHECKS[kind] for kind in _kinds(failures) if kind in CHECKS},
         "lessons": lessons[-3500:],
         "asked_for": f"{n} distinct changes",
     }

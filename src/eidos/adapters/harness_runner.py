@@ -221,6 +221,7 @@ async def _improve(
         failures,
         _lessons_text(lessons),
         proposals,
+        contexts,
     )
     best: tuple[float, dict[str, Any]] | None = None
     for variant in variants:

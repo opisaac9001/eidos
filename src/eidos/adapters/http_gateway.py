@@ -176,7 +176,9 @@ ROLE_PROMPTS["pathos_text"] = (
 ROLE_PROMPTS["harness_editor"] = (
     "You improve how one model role in this simulation is asked. You are given the role, "
     "its current_prompt, failures (lines from real moments that the simulation's checks turned "
-    "away, with why), and lessons from earlier attempts. Propose distinct, small changes that "
+    "away, with why, and the moment each was asked about), what_the_checks_mean (read it: "
+    "it says what was wrong, which may not be what it looks like), and lessons from earlier "
+    "attempts. Propose distinct, small changes that "
     "would stop those failures without causing others: each a short addition to the end of "
     "the prompt (prompt_append, under 60 words, plain and concrete, with a tiny example if it "
     "helps). Small models follow short, specific instructions and examples better than long "
@@ -535,7 +537,14 @@ ROLE_FIELDS = {
     "pathos_advice_heard": ("task", "time", "question", "messages_since", "permission"),
     "pathos_news_take": ("task", "time", "stories", "who_he_is", "permission"),
     "pathos_daydream": ("task", "one_thing", "another_thing", "permission"),
-    "harness_editor": ("role", "current_prompt", "failures", "lessons", "asked_for"),
+    "harness_editor": (
+        "role",
+        "current_prompt",
+        "failures",
+        "what_the_checks_mean",
+        "lessons",
+        "asked_for",
+    ),
     "pathos_life_summary": (
         "task",
         "time",

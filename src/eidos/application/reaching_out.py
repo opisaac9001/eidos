@@ -37,6 +37,7 @@ from eidos.domain.folding import events_of
 from eidos.domain.proposals import ProposalRejected
 from eidos.ports.model_gateway import ModelGateway, ModelMessage, ModelRequest
 
+_EMOJI = re.compile("[\U0001f300-\U0001faff\u2600-\u27bf\ufe0f]")
 REACHED = "contact.reached_out"
 REPLIED = "contact.reply_received"
 UNANSWERED = "contact.went_unanswered"
@@ -295,6 +296,8 @@ async def reach_out_events(
             raise ProposalRejected("incomplete", "The text was cut off")
         raw = json.loads(response.content)
         text = british(" ".join(str(raw.get("text", "")).split()) if isinstance(raw, dict) else "")
+        # He doesn't use emoji; told not to, a small model now and then adds one anyway.
+        text = " ".join(_EMOJI.sub("", text).split())
         words = len(text.split())
         if not 2 <= words <= 60 or re.search(r"\b(as an ai|language model)\b", text, re.I):
             raise ProposalRejected("not_a_text", "That isn't a text he'd send")

@@ -1566,6 +1566,12 @@ class InnerStream:
             failure = next((event for event in pending if event.kind == "role.failed"), None)
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
             return None
+        if re.search(r"\bPathos\b", text) or re.search(
+            r"\bPatrick\b", re.sub(r"[\"“'‘][^\"”'’]*[\"”'’]", "", text)
+        ):
+            # His own thoughts, in his own head: not "Pathos project. Start now."
+            self._turn_away(f"thought of himself by name, skipped: {text[:80]}", text)
+            return None
         if re.search(r"\b[Tt]ownsfolk[ -]?\d+", text):
             # An id from an old record, said back: nobody thinks of a friend as a number.
             self._turn_away(f"used a record id, skipped: {text[:80]}", text)
