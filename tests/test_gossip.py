@@ -117,8 +117,9 @@ def test_residents_remember_their_recent_moments_with_him() -> None:
             "simulated_at": (AT - timedelta(days=2)).isoformat(),
         },
     )
-    assert they_remember([met], "ellis", AT) == [
-        "2 days ago: Ellis asks Pathos whether the hinge ever got oiled."
+    remembered = they_remember([met], "ellis", AT)
+    assert remembered == [
+        f"on {(AT - timedelta(days=2)):%A}: Ellis asks Pathos whether the hinge ever got oiled."
     ]
     assert they_remember([met], "mara", AT) == []
 

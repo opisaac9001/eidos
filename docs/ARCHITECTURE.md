@@ -273,6 +273,11 @@ with models only wording what the rules decide:
   `week_of_work` makes each week a deadline, ordinary or slack week, which sets his working
   hours and pull, pitching, and whether his weeknights are free (`freelance.week_ahead` on
   Mondays).
+- `application/memory_curve.py`: how memories fade (half-life by importance, slowed by
+  rehearsal), what detail is left, and when a thing was in his words; shared by recall,
+  nightly archiving (`memory_retention.py`, by fade rather than age) and the gist merge in
+  `memory_life.py`. `reminders.py`: plans crossing his mind and the reminders he sets;
+  `scheduled_activity.prospective_memory_lapse` lets an unrehearsed plan with someone slip.
 - `application/town_story.py`: the town's storyteller. It paces stories (quiet after each,
   growing likelier, big ones rare, kinder after bad), carries out their consequences
   (closures through `as_today`, power cuts, residents hearing as `gossip.heard`), and lets

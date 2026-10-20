@@ -202,3 +202,99 @@ def formative_events(history: Sequence[DomainEvent], at: datetime) -> list[Domai
 
 def stayed_with_me(history: Sequence[DomainEvent], limit: int = 3) -> list[str]:
     return [str(e.payload.get("text")) for e in events_of(history, FORMATIVE)[-limit:]]
+
+
+def gist_merge_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
+    """Overnight, a fortnight of the same ordinary thing becomes one memory of it.
+
+    Six separate "sat in Juniper with a coffee" moments aren't six memories to anyone a
+    month on; they're "been in Juniper most mornings lately". The gist is kept as a memory
+    of its own (the most recent one's importance), the originals archived, never deleted.
+    """
+    if at.hour != MERGE_HOUR:
+        return []
+    review_id = f"gist-merge-{at.date().isoformat()}"
+    if any(
+        e.payload.get("review_id") == review_id
+        for e in events_of(history, "memory.archived")[-600:]
+    ):
+        return []
+    stayed = {str(e.payload.get("memory_id")) for e in events_of(history, FORMATIVE)}
+    accessed: set[str] = set()
+    for access in events_of(history, "memory.accessed")[-2000:]:
+        when = _at(access)
+        if when is not None and at - when <= timedelta(days=14):
+            accessed.add(str(access.payload.get("memory_id")))
+    groups: dict[str, list[DomainEvent]] = {}
+    for memory in _his(history, 1500):
+        when = _at(memory)
+        if when is None or not timedelta(days=2) <= at - when <= timedelta(days=14):
+            continue
+        memory_id = str(memory.event_id)
+        if memory_id in stayed or memory_id in accessed:
+            continue
+        if float(memory.payload.get("importance", 0.3) or 0.3) >= 0.7:
+            continue
+        if memory.payload.get("source") in {"merged-routine", "merged-gist"}:
+            continue
+        gist = _gist_of(str(memory.payload.get("text", "")))
+        if gist:
+            groups.setdefault(gist, []).append(memory)
+    output: list[DomainEvent] = []
+    for gist, memories in sorted(groups.items()):
+        if len(memories) < 4:
+            continue
+        latest = max(memories, key=lambda m: str(m.payload.get("simulated_at", "")))
+        importance = max(float(m.payload.get("importance", 0.3) or 0.3) for m in memories)
+        merged = DomainEvent(
+            "memory.recorded",
+            "pathos",
+            {
+                "text": f"Lately, most days: {gist}. It's run together a bit.",
+                "simulated_at": at.isoformat(),
+                "category": "experience",
+                "source": "merged-gist",
+                "source_event_id": str(latest.event_id),
+                "owner": "pathos",
+                "importance": round(importance, 2),
+                "confidence": 0.9,
+                **(
+                    {"location_id": str(latest.payload["location_id"])}
+                    if isinstance(latest.payload.get("location_id"), str)
+                    else {}
+                ),
+            },
+            causation_id=latest.event_id,
+        )
+        output.append(merged)
+        output.extend(
+            DomainEvent(
+                "memory.archived",
+                "pathos",
+                {
+                    "review_id": review_id,
+                    "memory_id": str(memory.event_id),
+                    "age_days": max(0, (at - (_at(memory) or at)).days),
+                    "reason": "merged_into_gist",
+                    "merged_into": str(merged.event_id),
+                    "source_retained": True,
+                    "simulated_at": at.isoformat(),
+                },
+                causation_id=merged.event_id,
+            )
+            for memory in memories
+        )
+        if len(output) >= 40:
+            break  # a few a night; this is tidying, not a purge
+    return output
+
+
+def _gist_of(text: str) -> str:
+    """The first clause, plain and lower-cased: what the memory is of."""
+    first = re.split(r"[.!?;:]", text, maxsplit=1)[0].strip()
+    first = re.sub(r"^(?:made a start:|done:|i remember)\s*", "", first, flags=re.IGNORECASE)
+    first = re.sub(r"\s+", " ", first).strip(" ,").casefold()
+    words = first.split()
+    if not 3 <= len(words) <= 14:
+        return ""
+    return first

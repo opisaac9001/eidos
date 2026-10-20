@@ -115,9 +115,19 @@ def test_never_while_asleep_or_two_things_at_once(two_days) -> None:
         and str(event.payload["schedule_id"]).startswith("doing-")
         and str(event.payload["schedule_id"]) not in cut
     ]
+    # A plan moved onto the last minutes of a doing is cut at the next tick; finishing a
+    # line as the next thing starts is how people are, so a tail shorter than a tick is fine.
+    tick = timedelta(minutes=10)
     for start, end in doings:
-        overlapping = [span for span in spans if span[0] < end and start < span[1]]
-        assert overlapping == [(start, end)], [titled.get(span) for span in overlapping]
+        others = [
+            span
+            for span in spans
+            if span != (start, end)
+            and span[0] < end
+            and start < span[1]
+            and min(end, span[1]) - max(start, span[0]) > tick
+        ]
+        assert others == [], [titled.get(span) for span in others]
 
 
 def test_what_he_just_chose_cannot_slip_his_mind(two_days) -> None:

@@ -7,7 +7,7 @@ from eidos.domain.events import DomainEvent
 
 
 class MemoryRetentionTests(unittest.TestCase):
-    now = datetime(2026, 8, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 1, 3, tzinfo=timezone.utc)
 
     def memory(self, text, when, importance=0.3):
         return DomainEvent(
@@ -70,8 +70,8 @@ class MemoryRetentionTests(unittest.TestCase):
         history = list(source_memories)
         for year in (2026, 2027, 2028):
             for month in range(1, 13):
-                review_at = datetime(year, month, 1, 1, tzinfo=timezone.utc)
-                if start < review_at <= datetime(2028, 1, 1, 1, tzinfo=timezone.utc):
+                review_at = datetime(year, month, 1, 3, tzinfo=timezone.utc)
+                if start < review_at <= datetime(2028, 1, 1, 3, tzinfo=timezone.utc):
                     generated = memory_retention_events(history, review_at)
                     self.assertLessEqual(
                         sum(event.kind == "memory.archived" for event in generated), 200

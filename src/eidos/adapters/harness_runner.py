@@ -514,6 +514,14 @@ def _lifelike(report: Mapping[str, Any]) -> dict[str, Any]:
                 "verdict": item.get("verdict"),
                 "people": item.get("people") or item.get("aim"),
             }
+    month = report.get("memories_a_month_old")
+    if isinstance(month, Mapping) and isinstance(month.get("ordinary_still_clear"), (int, float)):
+        found["ordinary_still_clear"] = {
+            "label": "An ordinary month ago, still clear",
+            "value": float(month["ordinary_still_clear"]),
+            "verdict": month.get("verdict"),
+            "people": month.get("people"),
+        }
     slips = report.get("intentions")
     if isinstance(slips, Mapping) and isinstance(slips.get("slip_rate"), (int, float)):
         found["slip_rate"] = {

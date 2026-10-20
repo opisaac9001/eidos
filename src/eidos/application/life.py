@@ -91,6 +91,7 @@ from eidos.application.gossip import (
     heard_in_conversation,
     patrick_heard,
     they_remember,
+    told_him_again,
     worth_mentioning,
 )
 from eidos.application.group_chat import GROUP_FROM_LEVEL, group_chat_events, his_to_share
@@ -154,9 +155,11 @@ from eidos.application.memory import (
     recall,
     terms,
 )
+from eidos.application.memory_curve import when_words
 from eidos.application.memory_life import (
     brooded_access,
     formative_events,
+    gist_merge_events,
     is_routine_note,
     routine_merge_events,
 )
@@ -198,11 +201,13 @@ from eidos.application.reaching_out import reach_out_events, reply_events, why_n
 from eidos.application.real_town import local_pub_events, real_town_events
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
+from eidos.application.reconsolidation import reconsolidation_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
 from eidos.application.reflection_followups import reflection_reconsideration_events
 from eidos.application.relational_arc import relational_arc_events
 from eidos.application.relationship_dates import relationship_date_events
 from eidos.application.relationship_repairs import relationship_repair_events
+from eidos.application.reminders import reminder_events
 from eidos.application.renegotiations import (
     reflective_renegotiation_offer_events,
     renegotiation_response_events,
@@ -1092,6 +1097,7 @@ class Life(LifeConversation):
             await self._guarded(tick, self._phase_surfacing)
             await self._guarded(tick, self._phase_town_issues)
             await self._guarded(tick, self._phase_town_story)
+            await self._guarded(tick, self._phase_reminders)
             await self._guarded(tick, self._phase_small_touches)
             await self._guarded(tick, self._phase_media)
             await self._guarded(tick, self._phase_seasons)
@@ -1457,7 +1463,7 @@ class Life(LifeConversation):
                     "detail_level": item.detail_level,
                     "remembered_person_id": item.remembered_person_id,
                     "remembered_location_id": item.remembered_location_id,
-                    "remembered_at": item.remembered_at.isoformat(),
+                    "remembered_at": _remembered_when(item, current),
                 }
                 for item in recall(
                     project_history,
@@ -2440,6 +2446,34 @@ class Life(LifeConversation):
             self._planning,
         )
 
+    def _phase_reminders(self, tick: _Tick) -> None:
+        """Plans crossing his mind, and the reminders he sets and his phone fires."""
+        if self.authored_scenario:
+            return
+        history, pending, current = tick.history, tick.pending, tick.current
+        visible = history + pending
+        planning = self._planning(visible)
+        scrolling = any(
+            entry.activity_type == "scroll_phone"
+            and entry.status in {"scheduled", "active"}
+            and entry.starts_at <= current.isoformat()
+            and (entry.ends_at or entry.starts_at) > current.isoformat()
+            for entry in planning.calendar.values()
+        )
+        self._extend_warmed(
+            tick,
+            reminder_events(
+                visible,
+                current,
+                planning=planning,
+                follow_through=float(project_traits(visible).levels.get("follow_through", 0.6)),
+                awake=tick.state.awake,
+                phone_dead=phone_dead(visible, current),
+                scrolling=scrolling,
+            ),
+            self._planning,
+        )
+
     def _phase_town_story(self, tick: _Tick) -> None:
         """Quiet weeks, then something that matters: the town's own story, and his hearing it."""
         if self.authored_scenario:
@@ -3404,6 +3438,35 @@ class Life(LifeConversation):
             index=self._memory_index(history + pending),
         )
         memories = [item.recalled_text for item in selected_context]
+        if tick.state.awake and selected_context:
+            # What came to mind this hour was used: that's a rehearsal, and a hazy memory
+            # used is one that can drift (``reconsolidation``). The freshest two are always
+            # clear, so the first hazy one that came up counts as used as well.
+            used = list(selected_context[:2])
+            hazy = next(
+                (
+                    item
+                    for item in selected_context[2:]
+                    if item.detail_level in {"partial", "vague"}
+                ),
+                None,
+            )
+            if hazy is not None:
+                used.append(hazy)
+            for item in used:
+                pending.append(
+                    DomainEvent(
+                        "memory.accessed",
+                        "pathos",
+                        {
+                            "memory_id": str(item.event.event_id),
+                            "simulated_at": current.isoformat(),
+                            "reason": "came to mind this hour",
+                            "query_source": "hour",
+                        },
+                    )
+                )
+            pending.extend(reconsolidation_events(history + pending, selected_context, current))
         identity_now = project_identity(history + pending)
         traits_now = project_traits(history + pending)
         development_now = project_development(history + pending)
@@ -3429,7 +3492,7 @@ class Life(LifeConversation):
                     "emotional_tone": item.emotional_label,
                     "remembered_person_id": item.remembered_person_id,
                     "remembered_location_id": item.remembered_location_id,
-                    "remembered_at": item.remembered_at.isoformat(),
+                    "remembered_at": _remembered_when(item, current),
                 }
                 for item in selected_context
             ],
@@ -3719,6 +3782,14 @@ class Life(LifeConversation):
                     if news
                     else {}
                 ),
+                **(
+                    {
+                        "they_might_mention_again": f"{again.text} (they told him this "
+                        "days ago and have forgotten they did; he may say so)"
+                    }
+                    if (again := told_him_again([*history, *pending], person.person_id, now))
+                    else {}
+                ),
             },
             at,
             pending,
@@ -3838,6 +3909,9 @@ class Life(LifeConversation):
             actor_locations=_npc_locations(history + pending, current),
             cognitive_history=history + pending,
             cognitive_capacity=min(tick.effective_energy, tick.state.rest),
+            follow_through=float(
+                project_traits(history + pending).levels.get("follow_through", 0.6)
+            ),
             require_execution_evidence=not self.authored_scenario,
             actor_state=tick.state,
             available_pence=self._finances(history + pending).balance_pence,
@@ -4003,6 +4077,7 @@ class Life(LifeConversation):
         if not self.authored_scenario:
             # Overnight: routine runs together, and what he keeps going back to stays.
             tick.pending.extend(routine_merge_events(tick.history + tick.pending, tick.current))
+            tick.pending.extend(gist_merge_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(formative_events(tick.history + tick.pending, tick.current))
             tick.pending.extend(
                 await daydream_events(
@@ -4293,6 +4368,9 @@ class Life(LifeConversation):
             actor_locations=_npc_locations(history + pending, target),
             cognitive_history=history + pending,
             cognitive_capacity=min(tick.state.energy, tick.state.rest),
+            follow_through=float(
+                project_traits(history + pending).levels.get("follow_through", 0.6)
+            ),
             require_execution_evidence=True,
             actor_state=tick.state,
             available_pence=self._finances(history + pending).balance_pence,
@@ -4538,6 +4616,13 @@ def _their_whereabouts(
         return found
 
     return lookup
+
+
+def _remembered_when(item: RecalledMemory, now: datetime) -> str:
+    """When a memory was, as exactly as it's still clear: hazy memories carry a hazy time."""
+    if item.detail_level == "clear":
+        return item.remembered_at.isoformat()
+    return when_words(item.remembered_at, now, item.detail_level)
 
 
 def _npc_locations(history: Sequence[DomainEvent], now: datetime) -> dict[str, str]:

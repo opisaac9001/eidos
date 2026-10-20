@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Sequence
 
 from eidos.application.freelance import DROP_IN_PREFIX, STARTED, TOLD, leaving_day
-from eidos.application.gossip import worth_mentioning
+from eidos.application.gossip import told_him_again, worth_mentioning
 from eidos.application.life_context import latest_weather
 from eidos.application.repair_jobs import bench_view
 from eidos.application.town_story import both_know
@@ -78,6 +78,15 @@ def talking_points(
     if heard is not None:
         points.append(
             (f"heard-{heard.claim_id}", f"something {partner_name} has heard: {heard.text}")
+        )
+    again = told_him_again(history, partner_id, at)
+    if again is not None:
+        points.append(
+            (
+                f"again-{again.claim_id}",
+                f"something {partner_name} told him days ago and has forgotten they did, so "
+                f"they say it again (he may say 'you said'): {again.text}",
+            )
         )
     for index, project in enumerate(his_projects(history)[:1]):
         points.append((f"his-project-{index}", project))

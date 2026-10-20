@@ -157,6 +157,45 @@ passing faces): at most one a day and two a week, and the same one not again for
 year, preferring ones that haven't come back before. The self-context shows what's come
 back to him in the last few days (`came_back_to_him_lately`).
 
+## Forgetting (`application/memory_curve.py`, `memory_retention.py`, `memory_life.py`, `reminders.py`)
+
+He forgets the way people do. Nothing is deleted (the record stays, and replays), but what
+he can reach, and how clearly, changes.
+
+- **The curve.** Each memory fades along a half-life set steeply by how much it mattered:
+  about three days for trivia, seven weeks for an ordinary moment, six months for a good
+  evening, two years for the things that mattered most. Going back to a memory slows its
+  fading (the spacing effect); being reminded of it, more so. What's left at each stage:
+  clear, then partial ("I remember the first bit, though some details are hazy"), then
+  vague ("a faint memory connected to Mara"). What mattered keeps its gist however long
+  ago, never vague; nothing stays sharp on importance alone.
+- **Hazy times.** A hazy memory carries a hazy time ("a week or two back"), and old ones
+  feel nearer than they were, as people's do.
+- **Drift.** A hazy memory he actually uses (it came to mind this hour, he brooded on it,
+  it came up talking to you) can be rewritten as he now has it: details lost, the gist
+  only, or blended with a similar memory so the wrong person or place sticks; sometimes
+  it feels clearer than it should because it's familiar. Each rewrite cites its sources,
+  at most one an hour, and not the same memory again within a month.
+- **Tidying.** Nightly at three, what has faded past reach is archived (out of ordinary
+  recall, still there to a direct cue), unless it mattered, stayed with him, or he's been
+  back to it lately. A fortnight of the same ordinary thing becomes one memory of it
+  ("Lately, most days: sat in Juniper with a coffee"), the originals archived.
+- **Other people are no better.** A resident keeps the last couple of days with him
+  clearly, a week or more as gist with a rough sense of when, and the odd moment not at
+  all; a close friend keeps about six weeks, someone he's only chatted with, ten days. Now
+  and then a friend tells him news they already told him, having forgotten they did, and
+  he may say "you said".
+- **Plans.** A plan comes back to mind on its own: the day coming round, scrolling his
+  phone, his own mind running ahead to it (`plan.noticed`). For a plan that matters and
+  is days off (with someone, a funeral, a class) he puts a reminder in his phone, more
+  reliably the more organised he is (`reminder.set`); it buzzes two hours before
+  (`reminder.fired`), unless his phone's dead or he's asleep. A plan with someone can slip
+  his mind only if it was made days ago, nothing's in his phone, it hasn't crossed his
+  mind in two days, and it's a tired or busy day: rare, but then someone is let down, with
+  everything that follows. His everyday doings, shifts and work sessions never slip.
+- **Measured:** `eidos believability` reports how much of an ordinary month a month ago
+  he can still recall clearly; people keep little of it.
+
 ## "Fine, yeah" (`application/masking.py`)
 
 When you ask how he is and something's weighing on him, he doesn't always say. That could

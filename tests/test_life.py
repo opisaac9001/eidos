@@ -196,7 +196,7 @@ class LifeTests(unittest.TestCase):
         )
         self.assertFalse({"person_id", "name", "identity"} & set(surroundings))
 
-    def test_monthly_retention_is_integrated_and_visible(self):
+    def test_nightly_retention_is_integrated_and_visible(self):
         store = SQLiteEventStore(self.path)
         old = DomainEvent(
             "memory.recorded",
@@ -222,7 +222,7 @@ class LifeTests(unittest.TestCase):
             0,
         )
         life = Life(store, StandInGateway(), authored_scenario=True)
-        life.advance(1)
+        life.advance(4)  # past the nightly review at three
         snapshot = life.snapshot()
         self.assertEqual(snapshot["counts"]["archived_memories"], 1)
         self.assertEqual(snapshot["archived_memories"][0]["id"], str(old.event_id))

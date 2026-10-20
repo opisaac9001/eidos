@@ -326,7 +326,18 @@ def heard_in_conversation(
 def they_remember(
     history: Sequence[DomainEvent], person_id: str, at: datetime, limit: int = 3
 ) -> list[str]:
-    """What this resident remembers of their recent moments with Patrick."""
+    """What this resident remembers of their recent moments with Patrick, as people do.
+
+    A close friend keeps the last six weeks or so; someone he's only chatted with, ten
+    days. The last couple of days are clear; after a week it's the gist, with a hazy sense
+    of when; and now and then a moment has simply gone, or feels more recent than it was.
+    """
+    from eidos.application.friendship import friendships
+    from eidos.application.memory_curve import when_words
+
+    bond = friendships(history, at).get(person_id)
+    depth = bond.depth if bond is not None else 0.0
+    window = timedelta(days=45 if depth >= 6 else 21 if depth >= 4 else 10)
     found: list[str] = []
     for event in reversed(
         events_of(history, "npc.encountered", "contact.reached_out", "memory.recorded")[-500:]
@@ -342,19 +353,65 @@ def they_remember(
         elif event.payload.get("person_id") != person_id:
             continue
         try:
-            days = (at - _at(event)).days
+            since = at - _at(event)
         except (KeyError, ValueError):
             continue
-        if days > 21:
+        if since > window:
             break
-        when = "earlier today" if days == 0 else "yesterday" if days == 1 else f"{days} days ago"
+        days = since.days
+        # Gone: the odd ordinary moment doesn't stick, sooner for someone he barely knows.
+        gone_by = 0.04 if depth >= 6 else 0.08 if depth >= 4 else 0.15
+        if days >= 3 and _roll("gone", event.event_id) < gone_by * min(3.0, days / 4):
+            continue
+        text = str(event.payload.get("text", ""))
+        telescoped = days >= 7 and _roll("when", event.event_id) < 0.2
+        when = when_words(
+            _at(event) + (timedelta(days=days // 2) if telescoped else timedelta(0)),
+            at,
+            "clear" if days < 3 else "partial" if days < 21 else "vague",
+        )
+        if days >= 7:
+            text = _gist(text)
         if event.kind == "contact.reached_out":
             if event.payload.get("text"):
-                found.append(f"{when}, he texted them: {event.payload['text']}")
+                found.append(
+                    f"{when}, he texted them: {event.payload['text']}"
+                    if days < 7
+                    else f"{when}, he texted them, something about {text}"
+                )
         elif event.kind == "memory.recorded":
-            found.append(f"{when}, in conversation: {event.payload.get('text')}")
+            found.append(
+                f"{when}, in conversation: {text}"
+                if days < 7
+                else f"{when}, in conversation, something about {text}"
+            )
         else:
-            found.append(f"{when}: {event.payload.get('text')}")
+            found.append(f"{when}: {text}" if days < 7 else f"{when}, roughly: {text}")
         if len(found) >= limit:
             break
     return found
+
+
+def _gist(text: str) -> str:
+    """The first clause, plainly: what they'd still have of it after a week."""
+    first = text.split(". ")[0].strip().rstrip(".")
+    first = first[0].lower() + first[1:] if first else first
+    return first[:90]
+
+
+def told_him_again(history: Sequence[DomainEvent], person_id: str, at: datetime) -> Claim | None:
+    """News this resident told him days ago and has forgotten they did, so they tell him
+    again; people do, and he may say "you said"."""
+    claims = held(history)
+    for (claim_id, holder), claim in claims.items():
+        if holder != PATRICK or claim.teller_id != person_id:
+            continue
+        days = (at - claim.heard_at).days
+        if not 5 <= days <= 21 or claim.strength < FADES_BELOW:
+            continue
+        theirs = claims.get((claim_id, person_id))
+        if theirs is None:
+            continue
+        if _roll("again", claim_id, person_id, at.date().isoformat()) < 0.15:
+            return theirs
+    return None

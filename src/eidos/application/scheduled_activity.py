@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Mapping, Sequence
 from uuid import UUID
@@ -29,6 +29,7 @@ def scheduled_activity_events(
     actor_locations: Mapping[str, str] | None = None,
     cognitive_history: Sequence[DomainEvent] = (),
     cognitive_capacity: float = 1.0,
+    follow_through: float = 0.6,
     require_execution_evidence: bool = False,
     actor_state: PathosState | None = None,
     available_pence: int | None = None,
@@ -109,6 +110,8 @@ def scheduled_activity_events(
             intention.priority,
             cognitive_history,
             cognitive_capacity=cognitive_capacity,
+            now=simulated_at,
+            follow_through=follow_through,
         ):
             lapse = DomainEvent(
                 "prospective_memory.lapsed",
@@ -116,7 +119,12 @@ def scheduled_activity_events(
                 {
                     "schedule_id": entry.schedule_id,
                     "intention_id": intention.intention_id,
-                    "reason": "A low-priority personal plan slipped Pathos's mind.",
+                    "reason": (
+                        f"It slipped his mind: {entry.title}. Made days ago, nothing in his "
+                        "phone, and it hadn't crossed his mind since."
+                        if entry.companion_id or entry.commitment_id
+                        else "A low-priority personal plan slipped Pathos's mind."
+                    ),
                     "simulated_at": simulated_at.isoformat(),
                 },
                 correlation_id=entry.source_proposal_id or entry.schedule_id,
@@ -506,17 +514,26 @@ def prospective_memory_lapse(
     history: Sequence[DomainEvent],
     *,
     cognitive_capacity: float = 1.0,
+    now: datetime | None = None,
+    follow_through: float = 0.6,
 ) -> bool:
-    """Replay-stably miss only a low-stakes, self-chosen, one-off personal plan."""
+    """Replay-stably miss a plan the way people do.
+
+    A low-stakes, self-chosen, one-off plan can slip on its own. A plan with someone can
+    slip too, rarely: made days ago, no reminder in his phone, not crossed his mind in two
+    days, and a tired or busy day (``reminders``). Then someone's let down, as happens.
+    """
     if not 0 <= intention_priority <= 1 or not 0 <= cognitive_capacity <= 1:
         raise ValueError("Prospective memory inputs must be between zero and one")
+    if entry.companion_id is not None or entry.commitment_id is not None:
+        return now is not None and _forgot_the_plan(
+            entry, history, now, cognitive_capacity, follow_through
+        )
     if (
         entry.source_proposal_id is None
         or entry.activity_type is None
         or entry.activity_type == "plan_reconsideration"
         or entry.goal_id is not None
-        or entry.commitment_id is not None
-        or entry.companion_id is not None
         or intention_priority >= 0.6
     ):
         return False
@@ -537,6 +554,30 @@ def prospective_memory_lapse(
     lapse_risk = max(0.03, 0.2 - 0.18 * strength)
     sample = int(sha256(f"prospective-lapse:{entry.schedule_id}".encode()).hexdigest()[:8], 16)
     return sample / 0xFFFFFFFF < lapse_risk
+
+
+def _forgot_the_plan(
+    entry: CalendarEntry,
+    history: Sequence[DomainEvent],
+    now: datetime,
+    cognitive_capacity: float,
+    follow_through: float,
+) -> bool:
+    from eidos.application.reminders import made_at, rehearsed_lately, reminded
+
+    if entry.schedule_id.startswith(("work-rota-", "freelance-", "doing-", "town-")):
+        return False
+    made = made_at(history, entry.schedule_id)
+    starts = datetime.fromisoformat(entry.starts_at)
+    if made is None or starts - made < timedelta(days=4):
+        return False
+    if reminded(history, entry.schedule_id) or rehearsed_lately(history, entry.schedule_id, now):
+        return False
+    if cognitive_capacity >= 0.6:
+        return False
+    risk = (0.05 if cognitive_capacity < 0.4 else 0.025) * max(0.3, 1.3 - follow_through)
+    sample = int(sha256(f"forgot-plan:{entry.schedule_id}".encode()).hexdigest()[:8], 16)
+    return sample / 0xFFFFFFFF < risk
 
 
 def _failed_open_plan_events(

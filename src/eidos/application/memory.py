@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, NamedTuple
 from uuid import UUID
 
+from eidos.application.memory_curve import accessibility_of, detail_of
 from eidos.application.memory_retention import archived_memory_ids
 from eidos.domain.events import DomainEvent
 from eidos.domain.folding import IncrementalFold, PersistentMap, events_of, kind_index
@@ -493,18 +494,18 @@ def recall(
             else _simulated_time(event)
         )
         age_days = max(0.0, (now - remembered_at).total_seconds() / 86400)
-        half_life = 2.0 + 28.0 * importance
-        base_access = 0.5 ** (age_days / half_life)
         rehearsals = min(5, index.access_counts.get(event.event_id, 0))
         reminders = min(3, index.reminder_counts.get(event.event_id, 0))
+        base_access = accessibility_of(importance, age_days, rehearsals, reminders)
         reactivation = 0.0
         if subjective is not None:
             subjective_age = max(0.0, (now - subjective.changed_at).total_seconds() / 86400)
             reactivation = 0.55 * (0.5 ** (subjective_age / 14.0))
-        reinforcement = min(0.32, rehearsals * 0.04 + reminders * 0.08)
-        accessibility = min(1.0, base_access + reinforcement + reactivation)
+        accessibility = min(1.0, base_access + reactivation)
+        # A cue reaches the trace even when his own telling of it has decayed: "the blue
+        # cup beside Mara" still finds the memory he now has only as "something about a cup".
         subjective_terms = (
-            _recollection_terms(subjective.text)
+            index.terms_by_memory[event.event_id] | _recollection_terms(subjective.text)
             if subjective is not None
             else index.terms_by_memory[event.event_id]
         )
@@ -671,13 +672,7 @@ def _render_recollection(
     category = str(event.payload.get("category", "experience"))
     if category == "dream":
         return f"I remember this as a dream: {text}", "dream"
-    accessible_detail = (
-        "clear"
-        if accessibility >= 0.55 or importance >= 0.75
-        else "partial"
-        if accessibility >= 0.2
-        else "vague"
-    )
+    accessible_detail = detail_of(accessibility, importance)
     detail_level = (
         max((subjective.detail_level, accessible_detail), key=_detail_rank)
         if subjective is not None

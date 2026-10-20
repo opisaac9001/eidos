@@ -118,6 +118,8 @@ def believability_report(
             "let_slip": broken,
             "aim": "most kept; some slip, as with anyone",
         }
+    report["memories_a_month_old"] = _month_old_memories(history, at)
+
     by_day: dict[str, set[str]] = {}
     for event in _within(events_of(history, "schedule.created"), since):
         when = _at(event)
@@ -184,3 +186,50 @@ def believability_report(
     report["happenings"] = len(_within(events_of(history, "happening.occurred"), since))
     report["body_noticed"] = len(_within(events_of(history, "body.sensed"), since))
     return report
+
+
+def _month_old_memories(history: Sequence[DomainEvent], at: datetime) -> dict[str, Any]:
+    """Of what happened one to three months ago, how much is still clear.
+
+    People keep the gist of what mattered and lose the ordinary days almost whole; a
+    person who recalls most of an ordinary month clearly isn't remembering like one.
+    """
+    from eidos.application.memory_curve import accessibility_of, detail_of
+    from eidos.application.memory_retention import archived_memory_ids
+
+    archived = archived_memory_ids(history)
+    rehearsals: dict[str, int] = {}
+    for access in events_of(history, "memory.accessed"):
+        memory_id = str(access.payload.get("memory_id"))
+        rehearsals[memory_id] = rehearsals.get(memory_id, 0) + 1
+    ordinary: dict[str, int] = {"clear": 0, "partial": 0, "vague": 0, "gone": 0}
+    mattered: dict[str, int] = {"clear": 0, "partial": 0, "vague": 0, "gone": 0}
+    for memory in events_of(history, "memory.recorded"):
+        if memory.payload.get("owner", "pathos") != "pathos":
+            continue
+        when = _at(memory)
+        if when is None or not timedelta(days=30) <= at - when <= timedelta(days=90):
+            continue
+        importance = float(memory.payload.get("importance", 0.5) or 0.5)
+        memory_id = str(memory.event_id)
+        bucket = mattered if importance >= 0.7 else ordinary
+        if memory_id in archived:
+            bucket["gone"] += 1
+            continue
+        reach = accessibility_of(
+            importance, (at - when).total_seconds() / 86400, rehearsals.get(memory_id, 0)
+        )
+        bucket[detail_of(reach, importance)] += 1
+    total_ordinary = sum(ordinary.values())
+    if total_ordinary < 20:
+        return {"verdict": "not enough yet", "ordinary": ordinary, "mattered": mattered}
+    clear_share = round(ordinary["clear"] / total_ordinary, 2)
+    return {
+        "ordinary_still_clear": clear_share,
+        "ordinary": ordinary,
+        "mattered": mattered,
+        "people": "most ordinary days gone or hazy; what mattered kept, at least in outline",
+        "verdict": (
+            "fading like anyone's" if clear_share <= 0.3 else "remembers an ordinary month too well"
+        ),
+    }

@@ -182,10 +182,12 @@ def test_some_things_slip_and_some_are_remembered_too_late() -> None:
         start = AT + timedelta(days=n)
         history = [thought(f"Should sort the bins out, number {n}.", start)]
         history += hour(history, start + timedelta(minutes=10))
-        night = (start + timedelta(days=2)).replace(hour=4)
-        history += hour(history, night, awake=False)
+        # Three nights for it to slip in: a few in sixty do, most don't.
+        for days in (2, 3, 4):
+            night = (start + timedelta(days=days)).replace(hour=4)
+            history += hour(history, night, awake=False)
         slipped += any(e.kind == SLIPPED for e in history)
-    assert 1 <= slipped <= 20  # most things aren't truly forgotten
+    assert 1 <= slipped <= 25  # most things aren't truly forgotten
     history = [thought("Need to ring Nina tonight.", AT)]
     history += hour(history, AT + timedelta(minutes=10))
     loop = open_loops(history)[0]
