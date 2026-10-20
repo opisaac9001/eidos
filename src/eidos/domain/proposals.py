@@ -87,7 +87,12 @@ def validate_proposal(role: str, content: str, context: Mapping[str, object]) ->
             return text
         person_value = context.get("person")
         person = person_value if isinstance(person_value, str) else None
-        if person and not re.search(r"\b" + re.escape(person) + r"\b", text, re.IGNORECASE):
+        # By first name is how anyone tells it: "Stuart waved", not "Stuart Hart waved".
+        # Asking for the full name threw away nearly every meeting with someone who has one.
+        if person and not any(
+            re.search(r"\b" + re.escape(name) + r"\b", text, re.IGNORECASE)
+            for name in {person, person.split()[0]}
+        ):
             raise ProposalRejected("missing_actor", "Encounter omitted its scheduled neighbor")
     if role == "oneiros" and not text.lower().startswith("in a dream"):
         raise ProposalRejected("unmarked_dream", "Dream must explicitly identify itself as a dream")

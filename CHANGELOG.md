@@ -8,6 +8,10 @@
 
 ### His world
 - **The town has a story.** A storyteller paces it: quiet weeks, then something that matters. A burst main shuts the café (Mara's at home), the river floods the path, the power goes, the chip shop burns, Dennis from the hardware shop dies. Residents hear and talk about it; he hears it by being there, on the town's Facebook group, in a queue, over the fence or from a friend, or not at all. News leads somewhere: the record shop opens and he can go, he decides about Dennis's funeral, and puts a fiver in the jar for the family from the chip shop.
+- **His local.** The Crown & Anchor is on the Market Place, three minutes from Juniper: drinks, birthdays, leaving dos and New Year go there, and so do residents of an evening.
+- Chance meetings with anyone who has a surname (Stuart, Beth, Hannah) were thrown away for not using their full name, and retried every quarter-hour; now a first name will do.
+- His thoughts: less wandering (it ran at 0.64 against about half for people), a little more looking ahead, and old record ids reach the models as names.
+- He forgot 28% of what he meant to do; the nightly chance of something slipping is lower, so it's nearer one in eight.
 - The model is asked for improvised town moments now and then (at most every six hours, none for two days after a story), not every hour.
 
 ## 0.1.0 (2026-10-19)

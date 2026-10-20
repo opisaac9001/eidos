@@ -26,3 +26,12 @@ def test_his_words_use_their_pronouns() -> None:
         assert in_his_words("Beth says they're moving.", she) == "Beth says she's moving."
     assert in_his_words("Rowan says they're tired.", "rowan") == "Rowan says they're tired."
     assert "he'd" in in_his_words("Ellis said they'd half seen it coming.", "ellis")
+
+
+def test_an_old_record_id_reaches_a_model_as_a_name() -> None:
+    from eidos.application.pronouns import know_names, with_names
+
+    know_names({"townsfolk-1855": "Hannah Fenwick"})
+    assert with_names("Spend time with Townsfolk 1855") == "Spend time with Hannah"
+    assert with_names("met townsfolk-1855 at the market") == "met Hannah at the market"
+    assert with_names("Townsfolk 99999 waved") == "someone waved"

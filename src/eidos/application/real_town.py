@@ -72,3 +72,47 @@ def real_town_events(
         )
     )
     return output
+
+
+# His local, on the Market Place a few doors from Juniper: birthday drinks, leaving dos and
+# New Year are at the Crown, and so is "pint tonight?".
+LOCAL = {
+    "entity_id": "crown-anchor",
+    "name": "The Crown & Anchor",
+    "label": "Crown",
+    "description": "An old pub on the Market Place with a fire in winter, a quiz on Tuesdays "
+    "and slow lunches.",
+    "x": 48,
+    "y": 67,
+    "opens_hour": 12,
+    "closes_hour": 23,
+    "connected_to_id": "cafe",
+    "travel_minutes": 3,
+}
+
+
+def local_pub_events(
+    history: Sequence[DomainEvent], at: datetime, catalog: WorldCatalog
+) -> list[DomainEvent]:
+    """The Crown, once, in a town laid on Frome's streets; he's lived here long enough to
+    know his local."""
+    if LOCAL["entity_id"] in catalog.places or "cafe" not in catalog.places:
+        return []
+    if not any(e.payload.get("plan_id") == PLAN_ID for e in events_of(history, "world.routes_set")):
+        return []
+    registered = DomainEvent(
+        "world.place_registered",
+        "pathos",
+        {**LOCAL, "source": "his-local", "simulated_at": at.isoformat()},
+        correlation_id="place-crown-anchor",
+    )
+    return [
+        registered,
+        DomainEvent(
+            "place.discovered",
+            "pathos",
+            {"place_id": "crown-anchor", "how": "his local", "simulated_at": at.isoformat()},
+            causation_id=registered.event_id,
+            correlation_id="discover-crown-anchor",
+        ),
+    ]

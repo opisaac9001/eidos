@@ -194,7 +194,7 @@ from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
 from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.reaching_out import reach_out_events, reply_events, why_not
-from eidos.application.real_town import real_town_events
+from eidos.application.real_town import local_pub_events, real_town_events
 from eidos.application.recollection_correction import recollection_correction_events
 from eidos.application.reconsideration_decisions import reconsideration_decision_events
 from eidos.application.recurring_dialogue import recurring_dialogue_events
@@ -1250,6 +1250,9 @@ class Life(LifeConversation):
             # Alderwick on Frome's real streets, once, for a world with the whole town.
             pending.extend(
                 real_town_events(history + pending, current, self._world_catalog(history + pending))
+            )
+            pending.extend(
+                local_pub_events(history + pending, current, self._world_catalog(history + pending))
             )
         if not self.authored_scenario and (
             current.hour == 6

@@ -49,12 +49,12 @@ CUE_WEIGHTS: dict[str, float] = {
     "here": 1.2,
     "doing": 1.4,
     # Looking ahead is about a third of what minds do.
-    "next": 1.5,
+    "next": 1.8,
     "body": 0.8,
     "feeling": 1.0,
     "person": 1.2,
     "memory": 1.2,
-    "someone": 0.8,
+    "someone": 0.6,
     "news": 0.5,
     "money": 0.4,
     "wanting": 0.6,
@@ -479,7 +479,10 @@ def choose_cue(
     on_task = [i for i, cue in enumerate(pool) if cue.kind in ON_TASK]
     if on_task and len(on_task) < len(pool):
         engaged = any(pool[i].kind in {"doing", "person"} for i in on_task)
-        target = 0.6 if engaged else 0.5
+        # A little above where it should end up: thoughts about the moment are the ones
+        # most often turned away as repeats ("Laptop screen's glow"), and the retry
+        # drifts. Aimed at 0.6/0.5, he wandered 0.64 of the time; people, about half.
+        target = 0.7 if engaged else 0.6
         on_sum = sum(weights[i] for i in on_task)
         off_sum = sum(weights) - on_sum
         if on_sum > 0 and off_sum > 0:
@@ -1562,6 +1565,10 @@ class InnerStream:
         if text is None:
             failure = next((event for event in pending if event.kind == "role.failed"), None)
             self.last_error = str(failure.payload.get("text")) if failure else "no thought"
+            return None
+        if re.search(r"\b[Tt]ownsfolk[ -]?\d+", text):
+            # An id from an old record, said back: nobody thinks of a friend as a number.
+            self._turn_away(f"used a record id, skipped: {text[:80]}", text)
             return None
         # Judged against the thoughts it was shown, not ones it never saw.
         # And never nearly the same thought as one of the last dozen, however long ago.

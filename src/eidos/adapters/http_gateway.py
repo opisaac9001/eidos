@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from eidos.application.pronouns import with_names
 from eidos.domain.identity import NAME_CONTEXT
 from eidos.domain.persona import PERSONA_DIRECTIVE, PERSONAL_ROLES, calendar_identity
 from eidos.domain.proposals import STRUCTURED_CAPABILITIES
@@ -923,7 +924,9 @@ class HTTPModelGateway(ModelGateway):
         system += " " + NAME_CONTEXT
         if request.capability in PERSONAL_ROLES:
             system += " " + PERSONA_DIRECTIVE
-        context = json.loads(request.messages[-1].content)
+        # Old records carry ids where names belong ("Spend time with Townsfolk 8103"); a
+        # model shown one says it back ("Townsfolk 1855 at the market").
+        context = json.loads(with_names(request.messages[-1].content))
         if request.capability in {"pathos", "murmur", "pathos_deliberation", "pathos_agency"}:
             system += (
                 " Let actual time pressure and unfinished activity influence attention, brevity and choices, "

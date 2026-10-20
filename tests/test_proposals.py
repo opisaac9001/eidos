@@ -37,6 +37,19 @@ class ProposalTests(unittest.TestCase):
         text = "In a dream, the sky becomes a clock."
         self.assertEqual(validate_proposal("oneiros", json.dumps({"text": text}), {}), text)
 
+    def test_an_encounter_may_name_someone_by_first_name(self):
+        text = "Stuart waved from across the market and came over."
+        self.assertEqual(
+            validate_proposal("firmament", json.dumps({"text": text}), {"person": "Stuart Hart"}),
+            text,
+        )
+        with self.assertRaises(ProposalRejected):
+            validate_proposal(
+                "firmament",
+                json.dumps({"text": "Someone waved from across the market."}),
+                {"person": "Stuart Hart"},
+            )
+
 
 class JsonDebrisTests(unittest.TestCase):
     def test_a_brace_left_inside_the_text_is_dropped(self):

@@ -69,6 +69,19 @@ def name_of(person_id: str) -> str:
     return name.split()[0] if name.split() else person_id.replace("-", " ").title()
 
 
+_RECORD_ID = re.compile(r"\b[Tt]ownsfolk[ -](\d+)\b")
+
+
+def with_names(text: str) -> str:
+    """'Townsfolk 1855' (an id from an old record) as the name he knows them by."""
+    return _RECORD_ID.sub(
+        lambda m: (
+            name_of(f"townsfolk-{m.group(1)}") if f"townsfolk-{m.group(1)}" in _NAMES else "someone"
+        ),
+        text,
+    )
+
+
 def pronoun_of(person_id: str) -> str:
     return chosen(person_id, _NAMES.get(person_id, ""))
 

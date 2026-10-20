@@ -21,7 +21,7 @@ texts are real texts on his phone (``contact.reached_out``/``contact.reply_recei
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
 from hashlib import sha256
 from typing import Collection, Mapping, Sequence
@@ -63,20 +63,27 @@ class Outing:
     asks: tuple[str, ...]
     energy: float = 0.35
     outdoors: bool = False
+    instead: str = ""  # where, if the town hasn't the first place
+
+    def where(self, catalog: WorldCatalog) -> str:
+        if self.place in catalog.places or not self.instead:
+            return self.place
+        return self.instead
 
 
 OUTINGS: Mapping[str, Outing] = {
     "drink": Outing(
         "drink",
-        "music-room",
+        "crown-anchor",
         2.0,
         (
-            "Pint {when}? {place}, {clock}?",
+            "Pint {when}? The Crown, {clock}?",
             "Fancy a drink {when}? {place}, about {clock}.",
             "Drink {when}? I could do with getting out. {place}, {clock}?",
             "You about {when}? {place} for one, {clock}?",
         ),
         energy=0.4,
+        instead="music-room",
     ),
     "coffee": Outing(
         "coffee",
@@ -110,6 +117,17 @@ OUTINGS: Mapping[str, Outing] = {
         energy=0.25,
     ),
 }
+
+
+def _in_this_town(outing: Outing, catalog: WorldCatalog) -> Outing:
+    """The outing where this town has it: a drink at the Crown, or the music room."""
+    place = outing.where(catalog)
+    if place == outing.place:
+        return outing
+    asks = tuple(ask for ask in outing.asks if "The Crown" not in ask) or outing.asks
+    return replace(outing, place=place, asks=asks)
+
+
 _TITLES = {
     "drink": "A drink with {name} at {place}",
     "coffee": "Coffee with {name} at {place}",
@@ -412,7 +430,7 @@ def plan_making_events(
     name = names.get(person_id, person_id)
     wet = "rain" in weather.casefold()
     for kind in sorted(OUTINGS, key=lambda k: _roll("what", person_id, k, at.date().isoformat())):
-        outing = OUTINGS[kind]
+        outing = _in_this_town(OUTINGS[kind], catalog)
         if outing.place not in catalog.places or energy < outing.energy:
             continue
         if outing.outdoors and wet:
@@ -808,7 +826,7 @@ def friend_invitation_events(
         if _roll("they-ask", person_id, at.isoformat()[:13]) >= chance:
             continue
         for kind in sorted(OUTINGS, key=lambda k: _roll("their-what", person_id, k, at.date())):
-            outing = OUTINGS[kind]
+            outing = _in_this_town(OUTINGS[kind], catalog)
             if outing.place not in catalog.places or (outing.outdoors and wet):
                 continue
             if kind == "coffee" and person_id == "mara":

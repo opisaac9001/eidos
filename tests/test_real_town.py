@@ -55,3 +55,31 @@ def test_the_whole_town_is_laid_on_real_streets_once() -> None:
 
 def test_a_smaller_world_keeps_its_layout() -> None:
     assert real_town_events([], AT, project_world_catalog([])) == []
+
+
+def test_his_local_is_on_the_market_place_and_he_knows_it() -> None:
+    from datetime import datetime, timezone
+
+    from eidos.application.place_discovery import known_place_ids
+    from eidos.application.real_town import PLAN_ID, local_pub_events
+    from eidos.domain.events import DomainEvent
+    from eidos.domain.travel import route_duration
+    from eidos.domain.world_catalog import project_world_catalog
+
+    at = datetime(2026, 9, 9, 6, tzinfo=timezone.utc)
+    catalog = project_world_catalog([])
+    # Not in a small world that isn't laid on Frome's streets.
+    assert local_pub_events([], at, catalog) == []
+    laid = [
+        DomainEvent(
+            "world.routes_set",
+            "pathos",
+            {"plan_id": PLAN_ID, "places": "cafe,park", "routes": "cafe|park|25"},
+        )
+    ]
+    history = [*laid, *local_pub_events(laid, at, catalog)]
+    town = project_world_catalog(history)
+    assert town.places["crown-anchor"].name == "The Crown & Anchor"
+    assert route_duration("crown-anchor", "cafe", town.route_minutes).total_seconds() == 180
+    assert "crown-anchor" in known_place_ids(history, town)
+    assert local_pub_events(history, at, town) == []

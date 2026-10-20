@@ -59,7 +59,7 @@ _NOT_DOING = frozenset(
     "see remember think wonder know feel be stop keep wait hope learn accept relax "
     "believe trust forget mind admit "
     # Feelings and states, not things to do: "miss her laugh", "have energy left".
-    "miss love like enjoy hate have stick sleep smile laugh cry calm".split()
+    "miss love like enjoy hate have stick sleep smile laugh cry calm skip avoid".split()
 )
 # Things done with someone in person, which seeing them gives him the chance to do.
 _WITH_THEM = re.compile(
@@ -444,7 +444,9 @@ def open_loop_events(
             and not loop.slipped
             and at - loop.formed_at >= timedelta(hours=20)
             and (loop.last_recalled_at is None or at - loop.last_recalled_at >= timedelta(hours=36))
-            and _roll(loop.intention_id, at.date().isoformat()) < 0.12 * (1.5 - loop.importance)
+            # A chance each night adds up over a fortnight: at 0.12 he forgot 28% of what
+            # he meant to do; people forget about one in eight.
+            and _roll(loop.intention_id, at.date().isoformat()) < 0.05 * (1.5 - loop.importance)
         ):
             output.append(_event(SLIPPED, loop, at, None))
     return output

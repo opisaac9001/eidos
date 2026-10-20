@@ -19,7 +19,7 @@ Hours = Mapping[str, tuple[time, time]]
 # Places people go out to, with the hours they'd be there (start, end) and when.
 _LUNCH = ("cafe",)
 _AFTER_WORK = ("park", "riverside", "cafe", "market-hall", "secondhand", "library")
-_EVENING = ("community-hall", "cinema", "music-room", "sports-ground")
+_EVENING = ("community-hall", "cinema", "music-room", "sports-ground", "crown-anchor")
 _WEEKEND_MORNING = ("market-hall", "cafe", "secondhand", "library")
 _WEEKEND_AFTERNOON = ("park", "riverside", "library", "secondhand", "cafe")
 # Who works weekends: the café's open on Saturdays.
