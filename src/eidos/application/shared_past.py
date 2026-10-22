@@ -19,7 +19,8 @@ _LONG_AGO = re.compile(
 _UNFINISHED = re.compile(
     r"\b(?:that|the|our) (?:old )?(?:project|plan|idea|scheme|venture|thing|job) "
     r"(?:we|you and (?:i|me))\b|\bwe never (?:finished|got round|followed|did)\b"
-    r"|\bremember when (?:we|you)\b|\bfell through\b",
+    r"|\bremember when (?:we|you)\b|\bfell through\b"
+    r"|\bthat time (?:we|you and (?:i|me)|the two of us)\b|\blike (?:we|you and i) used to\b",
     re.IGNORECASE,
 )
 
@@ -123,6 +124,30 @@ def gives_away_his_project(text: str, projects: Sequence[str]) -> bool:
         if "project" in match.group(0).casefold() or any(said & _title_words(p) for p in projects):
             return True
     return False
+
+
+_HOSTING = re.compile(
+    r"\b(?:thanks|cheers|thank you|glad you(?:'re| are)|good of you)\b[^.!?]{0,20}"
+    r"\b(?:for (?:coming|stopping|popping|dropping|fitting)|here)\b|\bcome (?:on )?in\b",
+    re.IGNORECASE,
+)
+
+
+def narrated_to_the_person(text: str, person_name: str) -> bool:
+    """An encounter told to the person instead of about them ("Mara, Patrick spots you at
+    the café and waves you over"): narration is in the third person."""
+    first = person_name.split()[0] if person_name.split() else ""
+    if first and re.match(rf"\s*{re.escape(first)},", text):
+        return True
+    return bool(re.search(r"\b(?:you|your|yours)\b", text, re.IGNORECASE))
+
+
+def plays_host(text: str, location_id: str) -> bool:
+    """Patrick thanking someone for coming by, or welcoming them in, somewhere that isn't
+    his: in a café or the park nobody is dropping in on him."""
+    if location_id in {"home", "wye-home"}:
+        return False
+    return bool(_HOSTING.search(text))
 
 
 def narrates_the_speaker(text: str, speaker_name: str) -> bool:

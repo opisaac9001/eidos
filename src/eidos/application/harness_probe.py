@@ -40,7 +40,9 @@ from eidos.application.shared_past import (
     gives_away_his_project,
     invents_shared_past,
     invents_shared_thing,
+    narrated_to_the_person,
     narrates_the_speaker,
+    plays_host,
 )
 from eidos.domain.proposals import (
     STRUCTURED_CAPABILITIES,
@@ -169,6 +171,11 @@ def judge(
             problems.append("gives_away_his_project")
         if invents_shared_past(text):
             problems.append("shared_past")
+        if context.get("scene_mode") is not True:
+            if narrated_to_the_person(text, str(context.get("person") or "")):
+                problems.append("second_person")
+            if plays_host(text, str(context.get("location") or "")):
+                problems.append("plays_host")
         if context.get("scene_mode") is True:
             who = context.get("who_is_who") or {}
             speaker_name = (
@@ -457,6 +464,10 @@ CHECKS = {
     "placed_with_him": "A thought put someone in the room with him when he's alone.",
     "narrated_not_said": "A line to be spoken was written as narration about the speaker "
     "('Mara waves and asks...') instead of their own words.",
+    "second_person": "An encounter was told to the person ('Mara, Patrick spots you...') "
+    "instead of narrated about them in the third person.",
+    "plays_host": "Patrick thanked someone for coming by, or welcomed them in, somewhere "
+    "that isn't his home.",
     "parroted_cue": "A thought said its cue back word for word instead of thinking about it.",
     "somewhere_else": "A thought put him somewhere other than where he is.",
 }

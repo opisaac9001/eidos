@@ -232,7 +232,12 @@ from eidos.application.selfhood import (
 )
 from eidos.application.semantic_memory import semantic_expectation_events
 from eidos.application.setbacks import setback_events
-from eidos.application.shared_past import claims_his_project, invents_shared_thing
+from eidos.application.shared_past import (
+    claims_his_project,
+    invents_shared_thing,
+    narrated_to_the_person,
+    plays_host,
+)
 from eidos.application.sleep_schedule import sleep_window_events
 from eidos.application.sleep_trouble import HOUR as SLEEP_TROUBLE_HOUR
 from eidos.application.sleep_trouble import sleep_trouble_events
@@ -3814,6 +3819,10 @@ class Life(LifeConversation):
             return
         if claims_his_project(text, his_projects(history)):
             # Ellis telling him about "this small atlas of neighbourhood sounds" of theirs.
+            return
+        if narrated_to_the_person(text, person.name) or plays_host(text, location_id):
+            # "Mara, Patrick spots you..." is told to Mara, not about her; and "cheers for
+            # coming by" in a café has him hosting a place that isn't his.
             return
         encounter = DomainEvent(
             "npc.encountered",

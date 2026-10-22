@@ -219,7 +219,7 @@ def experience_events(
     doing = re.sub(r"\bhis\b", "my", _gerund(title))
     # A cup of tea is only remembered when it was more than a cup of tea.
     if abs(enjoyment) >= (0.7 if everyday else 0.3) or first_visit:
-        sentence = f"{doing}: {_verdict(enjoyment)}."
+        sentence = f"{doing}: {_verdict(enjoyment, source_id)}."
         if reasons:
             joined = " and ".join(reasons)
             sentence += f" {joined[0].upper()}{joined[1:]}."
@@ -339,16 +339,22 @@ def _arrivals(history: Sequence[DomainEvent], place_id: str, *, before: datetime
     )
 
 
-def _verdict(enjoyment: float) -> str:
-    if enjoyment >= 0.6:
-        return "loved it, honestly"
-    if enjoyment >= 0.25:
-        return "enjoyed it"
-    if enjoyment > -0.25:
-        return "fine, nothing special"
-    if enjoyment > -0.6:
-        return "didn't really enjoy it"
-    return "not for me, I don't think"
+_VERDICTS = (
+    (0.6, ("loved it, honestly", "that was a good one", "really glad I did that", "lovely, that")),
+    (0.25, ("enjoyed it", "good, that", "nice, actually", "glad I went")),
+    (-0.25, ("fine, nothing special", "alright", "it was fine", "so-so")),
+    (-0.6, ("didn't really enjoy it", "not great, honestly", "a bit of a slog", "meh")),
+)
+
+
+def _verdict(enjoyment: float, key: str = "") -> str:
+    """How it was, in his words: the same feeling said different ways on different days."""
+    for floor, words in _VERDICTS:
+        if enjoyment >= floor if floor >= 0 else enjoyment > floor:
+            return words[int(_roll(f"verdict:{key}") * len(words))]
+    return ("not for me, I don't think", "not my thing", "won't be doing that again")[
+        int(_roll(f"verdict:{key}") * 3)
+    ]
 
 
 _SECOND_VERBS = frozenset(

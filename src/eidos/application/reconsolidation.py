@@ -124,6 +124,21 @@ def reconsolidation_events(
     return output
 
 
+def _mid_sentence(clause: str) -> str:
+    first, _, rest = clause.partition(" ")
+    if first == "I" or first.startswith("I'"):
+        return clause
+    if first[:1].isupper() and first[1:].islower() and rest and not re.match(r"[A-Z]", rest):
+        return first.lower() + " " + rest if first.lower() in _COMMON_STARTS else clause
+    return clause
+
+
+_COMMON_STARTS = frozenset(
+    "the a an my our his her their this that these those some it there we you he she they "
+    "mara ellis rowan".split()
+) - {"mara", "ellis", "rowan"}
+
+
 def _drift_text(
     text: str,
     detail_level: str,
@@ -134,17 +149,19 @@ def _drift_text(
 ) -> str:
     clause = re.split(r"[,;.!?]", text, maxsplit=1)[0].strip()
     clause = re.sub(r"^I remember\s+", "", clause, flags=re.IGNORECASE).strip()
+    # Mid-sentence: lower the first word, but "I" stays "I" and names stay names.
+    clause = _mid_sentence(clause)
     if detail_level == "vague":
-        drifted = f"Something about {clause.lower()} still feels familiar, but I cannot place it."
+        drifted = f"Something about {clause} still feels familiar, but I cannot place it."
     elif revision % 2:
-        drifted = f"I mostly remember {clause.lower()}, though I may be missing the context."
+        drifted = f"I mostly remember {clause}, though I may be missing the context."
     else:
-        drifted = f"I think {clause.lower()}, but the surrounding details no longer feel reliable."
+        drifted = f"I think {clause}, but the surrounding details no longer feel reliable."
     if blended_text is not None:
         blended_clause = re.split(r"[,;.!?]", blended_text, maxsplit=1)[0].strip().lower()
         blended_clause = re.sub(r"^i (?:mostly )?(?:remember|think)\s+", "", blended_clause)
         if confidently_misattributed:
-            drifted = f"I remember {clause.lower()}, and {blended_clause} was part of it."
+            drifted = f"I remember {clause}, and {blended_clause} was part of it."
         else:
             drifted = f"{drifted} I also picture {blended_clause} as part of it."
     if affective_bias <= -0.25:

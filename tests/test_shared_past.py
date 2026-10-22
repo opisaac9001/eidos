@@ -159,3 +159,18 @@ def test_a_spoken_line_isnt_narration_about_the_speaker() -> None:
     assert narrates_the_speaker("Ellis quietly sets down the mug.", "Ellis")
     assert not narrates_the_speaker("Mara, have you seen Rowan?", "Mara")
     assert not narrates_the_speaker("Morning, Rowan. Coffee?", "Mara")
+
+
+def test_an_encounter_is_about_the_person_not_to_them_and_he_hosts_only_at_home() -> None:
+    from eidos.application.shared_past import narrated_to_the_person, plays_host
+
+    assert narrated_to_the_person(
+        "Mara, Patrick spots you at the café and waves you over.", "Mara Bell"
+    )
+    assert not narrated_to_the_person(
+        "Mara waves from the counter and asks after the lamp.", "Mara"
+    )
+    assert plays_host("Cheers for coming by, Ellis. I've got a few things to show you.", "cafe")
+    assert plays_host("Hey Rowan, cheers for stopping by.", "park")
+    assert not plays_host("Cheers for coming by, Ellis.", "home")
+    assert not plays_host("Ellis cheers when the vice finally turns.", "workshop")

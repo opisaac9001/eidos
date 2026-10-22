@@ -507,10 +507,17 @@ def choose_cue(
     rng: random.Random,
     recently_tried: Sequence[str] = (),
     set_aside: Sequence[str] = (),
+    kept_kinds: Sequence[str] = (),
 ) -> Cue | None:
     """Drift somewhere, but not back to the same kind of thing twice running, not
     straight back to something just tried, and mostly not back to someone he's been
-    thinking about over and over."""
+    thinking about over and over.
+
+    ``kept_kinds`` are the kinds of his last few dozen kept thoughts: thoughts about the
+    moment are the ones most often turned away as repeats, so what's kept drifts off-task
+    however the cues are weighted; the weighting leans back towards the moment by how far
+    the kept share has drifted (people are on it about half the time).
+    """
     if not available:
         return None
     last = recent_kinds[-1] if recent_kinds else None
@@ -536,6 +543,10 @@ def choose_cue(
         # most often turned away as repeats ("Laptop screen's glow"), and the retry
         # drifts. Aimed at 0.6/0.5, he wandered 0.64 of the time; people, about half.
         target = 0.7 if engaged else 0.6
+        if len(kept_kinds) >= 20:
+            kept_on = sum(kind in ON_TASK for kind in kept_kinds) / len(kept_kinds)
+            # Kept share below half: lean further towards the moment; above: ease off.
+            target = max(0.4, min(0.9, target + (0.5 - kept_on)))
         on_sum = sum(weights[i] for i in on_task)
         off_sum = sum(weights) - on_sum
         if on_sum > 0 and off_sum > 0:
@@ -1671,6 +1682,7 @@ class InnerStream:
                 self.rng,
                 list(self._tried),
                 set_aside,
+                [thought.cue_kind for thought in self.store.recent(40)],
             )
         )
         if cue is not None:
