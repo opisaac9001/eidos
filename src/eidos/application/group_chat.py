@@ -56,6 +56,32 @@ _PLANS = (
 )
 PLAN_PREFIX = "chat-plan-"
 _QUESTION = re.compile(r"\?|\b(anyone|who's|fancy|are you|you lot)\b", re.IGNORECASE)
+_OPENING_NAME = re.compile(
+    r"^(?:thanks|cheers|ta|same here|same|yeah|yep|yes|no|true|agreed|fair enough|nice one|"
+    r"good shout|sounds good|haha|lol)[,!]?\s+([A-Z][a-z]+)[,!.?]",
+    re.IGNORECASE,
+)
+
+
+def addresses_absent(
+    line: str, speaker_name: str, recent: Sequence[DomainEvent], members: Mapping[str, str]
+) -> str | None:
+    """A reply to someone by name who hasn't said anything lately ("Thanks, Nina" when it
+    was Ellis; "Same here, Rowan" before Rowan had posted): a name picked from the list,
+    not a reply. The name, or None."""
+    match = _OPENING_NAME.match(line.strip())
+    if match is None:
+        return None
+    name = match.group(1)
+    firsts = {n.split()[0] for n in members.values()} | {"Patrick"}
+    if name not in firsts:
+        return None
+    if name == speaker_name.split()[0]:
+        return name
+    spoke = {str(e.payload.get("speaker_name") or "").split()[0] for e in recent[-3:]}
+    return None if name in spoke else name
+
+
 _SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -363,37 +389,51 @@ async def _speak(
         if item["who"] == name
     ][:2]
     pending: list[DomainEvent] = []
-    line = await perform(
-        gateway,
-        "firmament",
-        {
-            "time": at.isoformat(),
-            "location": "the friends' group chat, on their phones",
-            "person": name,
-            "scene_mode": True,
-            "scene_speaker": name,
-            "scene_audience": "the group chat (Patrick and their other close friends)",
-            "scene_topic": topic,
-            "prior_turns": [
-                {"speaker": str(e.payload.get("speaker_name")), "text": str(e.payload.get("text"))}
-                for e in recent[-5:]
-            ],
-            "personal_relationship_context": {
-                "owner": name,
-                "about": "the group chat (Patrick and their other close friends)",
-                "what_is_going_on_in_their_life": their_life,
-                "right_now": dict(whereabouts(speaker)) if whereabouts else {},
-                "instruction": (
-                    f"Write one message {name} posts to the group chat: casual, short, like "
-                    "a real group chat between old friends. Only what's true of their life "
-                    "and where they are; no invented news, plans already made, or promises."
+    context: dict[str, object] = {
+        "time": at.isoformat(),
+        "location": "the friends' group chat, on their phones",
+        "person": name,
+        "scene_mode": True,
+        "scene_speaker": name,
+        "scene_audience": "the group chat (Patrick and their other close friends)",
+        "scene_topic": topic,
+        "prior_turns": [
+            {"speaker": str(e.payload.get("speaker_name")), "text": str(e.payload.get("text"))}
+            for e in recent[-5:]
+        ],
+        "personal_relationship_context": {
+            "owner": name,
+            "about": "the group chat (Patrick and their other close friends)",
+            "what_is_going_on_in_their_life": their_life,
+            "right_now": dict(whereabouts(speaker)) if whereabouts else {},
+            "instruction": (
+                f"Write one message {name} posts to the group chat: casual, short, like "
+                "a real group chat between old friends. Only what's true of their life "
+                "and where they are; no invented news, plans already made, or promises."
+            ),
+        },
+    }
+    line = await perform(gateway, "firmament", context, at.isoformat(), pending)
+    output.extend(event for event in pending if event.kind == "role.completed")
+    if line and (absent := addresses_absent(line, name, recent, members)) is not None:
+        # "Thanks, Nina", answering Ellis: asked once for a reply to whoever did post.
+        pending = []
+        line = await perform(
+            gateway,
+            "firmament",
+            {
+                **context,
+                "revision_instruction": (
+                    f"{absent} hasn't posted just now. Reply to who did, or to the group, "
+                    "without addressing anyone by a name that isn't in the recent messages."
                 ),
             },
-        },
-        at.isoformat(),
-        pending,
-    )
-    output.extend(event for event in pending if event.kind == "role.completed")
+            at.isoformat(),
+            pending,
+        )
+        output.extend(event for event in pending if event.kind == "role.completed")
+        if line and addresses_absent(line, name, recent, members) is not None:
+            line = None
     if not line:
         return False
     output.append(
@@ -534,6 +574,9 @@ async def _his_reply(
         return
     # Discretion: a post that gives away a friend's private trouble isn't sent.
     if members and _tells_on(text, history, members) is not None:
+        return
+    # "Thanks, Nina" when it was Ellis who posted: not sent; he'll read it again later.
+    if addresses_absent(text, "Patrick", thread, members or {}) is not None:
         return
     posted = DomainEvent(
         MESSAGE,

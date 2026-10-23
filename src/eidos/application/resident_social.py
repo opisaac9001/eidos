@@ -94,7 +94,7 @@ async def resident_social_events(
             actor_id not in {"pathos", "user"}
             and actor_id in actor_names
             and actor_id not in busy
-            and location_id != "home"
+            and location_id not in {"home", "in-transit", "in_transit"}
         ):
             by_location.setdefault(location_id, []).append(actor_id)
     candidates: list[tuple[str, str, str]] = []

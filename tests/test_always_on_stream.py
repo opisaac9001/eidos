@@ -471,3 +471,29 @@ def test_explaining_who_someone_is_doesnt_put_them_on_his_mind() -> None:
     context = stream_context(world, ["Rowan's quiet lately."], Cue("money", "£420"))
     assert "Rowan" in context["who_is_who"]
     assert stray_name("Rowan's still quiet.", context, known_names(world)) == "Rowan"
+
+
+def test_a_rut_is_kept_from_the_model_but_not_from_the_judge() -> None:
+    from eidos.application.inner_stream import without_rut, worn_out
+
+    recent = [
+        "Rowan's sketchbook, ink smudged, open on the kitchen table.",
+        "Rowan's last sketch. The ink's still wet.",
+        "Start docs soon.",
+    ]
+    tired = worn_out(recent, {"Rowan"})
+    assert "sketch" in tired or "sketchbook" in tired
+    assert without_rut(recent, tired) == ["Start docs soon."]
+    assert without_rut(["Rowan's sketchbooks everywhere."], ["sketch"]) == []
+
+
+def test_an_opening_leaned_on_over_days_is_worn_even_if_never_three_in_a_dozen() -> None:
+    from eidos.application.inner_stream import worn_opening_of
+
+    texts = [f"Number {n} thought, about the day." for n in range(100)]
+    for n in range(0, 100, 14):  # eight times in a hundred, one in every fourteen
+        texts[n] = "Should I ring Mara about it?"
+    assert worn_opening_of(texts) == "should i"
+    texts[14] = texts[28] = texts[42] = "Thought about the day, again."
+    assert worn_opening_of(texts) is None
+    assert worn_opening_of(["Why does it rain?"] * 3 + texts) == "why does"

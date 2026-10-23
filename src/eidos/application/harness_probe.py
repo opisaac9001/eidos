@@ -36,6 +36,7 @@ from eidos.application.inner_stream import (
     turned_away_for,
 )
 from eidos.application.shared_past import (
+    addresses_self,
     claims_his_project,
     gives_away_his_project,
     invents_shared_past,
@@ -187,6 +188,8 @@ def judge(
             )
             if narrates_the_speaker(text, speaker_name):
                 problems.append("narrated_not_said")
+            if addresses_self(text, speaker_name):
+                problems.append("talks_to_self")
         prior = [
             str(turn.get("text", ""))
             for turn in context.get("prior_turns") or []
@@ -464,6 +467,8 @@ CHECKS = {
     "placed_with_him": "A thought put someone in the room with him when he's alone.",
     "narrated_not_said": "A line to be spoken was written as narration about the speaker "
     "('Mara waves and asks...') instead of their own words.",
+    "talks_to_self": "A line addressed its own speaker by name ('Hannah, I remember you "
+    "mentioned...', as Hannah's words): the sides got swapped.",
     "second_person": "An encounter was told to the person ('Mara, Patrick spots you...') "
     "instead of narrated about them in the third person.",
     "plays_host": "Patrick thanked someone for coming by, or welcomed them in, somewhere "

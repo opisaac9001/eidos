@@ -179,7 +179,10 @@ he can reach, and how clearly, changes.
 - **Tidying.** Nightly at three, what has faded past reach is archived (out of ordinary
   recall, still there to a direct cue), unless it mattered, stayed with him, or he's been
   back to it lately. A fortnight of the same ordinary thing becomes one memory of it
-  ("Lately, most days: sat in Juniper with a coffee"), the originals archived.
+  ("Lately, most days: sat in Juniper with a coffee"), the originals archived. What has
+  *stayed with him* is a moment (not a text, a day's summary or a line someone said) he
+  went back to on four or more different days in a month and that weighs enough; his
+  stream cueing a summary seventeen times one evening doesn't count.
 - **Other people are no better.** A resident keeps the last couple of days with him
   clearly, a week or more as gist with a rough sense of when, and the odd moment not at
   all; a close friend keeps about six weeks, someone he's only chatted with, ten days. Now

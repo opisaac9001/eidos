@@ -32,6 +32,7 @@ def visitor_events(
     relationships: Mapping[str, Relationship],
     known_person_ids: AbstractSet[str] | None = None,
     paced: bool = False,
+    actor_names: Mapping[str, str] | None = None,
 ) -> list[DomainEvent]:
     """Advance one visit lifecycle, or reserve one eligible connection goal."""
     completed = _complete_admitted_visit(
@@ -48,6 +49,7 @@ def visitor_events(
         pathos_energy,
         social_openness,
         relationships,
+        actor_names or {},
     )
     if due:
         return due
@@ -118,6 +120,7 @@ def _resolve_due_plan(
     pathos_energy: float,
     social_openness: float,
     relationships: Mapping[str, Relationship],
+    actor_names: Mapping[str, str],
 ) -> list[DomainEvent]:
     resolved = {
         str(event.payload["visit_id"])
@@ -136,6 +139,8 @@ def _resolve_due_plan(
         return []
     visit_id = str(planned.payload["visit_id"])
     visitor_id = str(planned.payload["visitor_id"])
+    # "Townsfolk 1855 stopped by": he knows her as Hannah Fenwick.
+    visitor = actor_names.get(visitor_id) or visitor_id.replace("-", " ").title()
     moved = visitor_id in away_people(history)
     if moved or not pathos_awake or actor_locations.get("pathos") != "home":
         return [
@@ -161,7 +166,7 @@ def _resolve_due_plan(
             "visit_id": visit_id,
             "visitor_id": visitor_id,
             "location_id": "home",
-            "text": f"{visitor_id.replace('-', ' ').title()} came to the door.",
+            "text": f"{visitor} came to the door.",
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=planned.event_id,
@@ -217,7 +222,8 @@ def _resolve_due_plan(
             "visitor_id": visitor_id,
             "location_id": "home",
             "scene_id": user_scene.scene_id if user_scene else None,
-            "text": f"Pathos invited {visitor_id.replace('-', ' ').title()} inside.",
+            "text": f"Pathos invited {visitor} inside.",
+            "visitor_name": visitor,
             "decision_energy": pathos_energy,
             "decision_social_openness": social_openness,
             "decision_familiarity": relationship.familiarity,
@@ -227,7 +233,7 @@ def _resolve_due_plan(
         causation_id=arrived.event_id,
         correlation_id=visit_id,
     )
-    output = [arrived, admitted, _visit_memory(admitted, simulated_at)]
+    output = [arrived, admitted, _visit_memory(admitted, simulated_at, visitor)]
     if user_scene is None:
         output.append(_relationship_effect(admitted, simulated_at))
         return output
@@ -251,7 +257,7 @@ def _resolve_due_plan(
             "pathos",
             {
                 "speaker": "system",
-                "text": f"{visitor_id.replace('-', ' ').title()} arrived; Pathos stepped away to answer the door.",
+                "text": f"{visitor} arrived; Pathos stepped away to answer the door.",
                 "channel": "live_visit",
                 "scene_id": user_scene.scene_id,
                 "simulated_at": simulated_at.isoformat(),
@@ -282,16 +288,17 @@ def _complete_admitted_visit(
     )
     if admitted is None:
         return []
+    visitor = str(
+        admitted.payload.get("visitor_name")
+        or str(admitted.payload["visitor_id"]).replace("-", " ").title()
+    )
     departed_event = DomainEvent(
         "visitor.departed",
         "pathos",
         {
             "visit_id": str(admitted.payload["visit_id"]),
             "visitor_id": str(admitted.payload["visitor_id"]),
-            "text": (
-                f"{str(admitted.payload['visitor_id']).replace('-', ' ').title()} "
-                "said goodbye and left."
-            ),
+            "text": f"{visitor} said goodbye and left.",
             "simulated_at": simulated_at.isoformat(),
         },
         causation_id=admitted.event_id,
@@ -316,13 +323,13 @@ def _complete_admitted_visit(
     return output
 
 
-def _visit_memory(admitted: DomainEvent, simulated_at: datetime) -> DomainEvent:
+def _visit_memory(admitted: DomainEvent, simulated_at: datetime, visitor: str) -> DomainEvent:
     visitor_id = str(admitted.payload["visitor_id"])
     return DomainEvent(
         "memory.recorded",
         "pathos",
         {
-            "text": f"{visitor_id.replace('-', ' ').title()} stopped by for an ordinary visit.",
+            "text": f"{visitor} stopped by for an ordinary visit.",
             "owner": "pathos",
             "category": "encounter",
             "source": "visitor-lifecycle",

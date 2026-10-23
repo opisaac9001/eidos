@@ -67,3 +67,40 @@ def test_a_memory_gone_back_to_again_and_again_stays_with_him() -> None:
     assert [e.kind for e in formed] == [FORMATIVE]
     assert stayed_with_me(formed) == ["Dad said he was proud of me, out of nowhere."]
     assert formative_events([moment, *visits, *formed], NIGHT + timedelta(days=1)) == []
+
+
+def test_texts_summaries_and_one_evenings_cueing_dont_make_a_memory_formative() -> None:
+    from eidos.application.memory_life import is_a_moment
+
+    def accessed(moment: DomainEvent, when: datetime) -> DomainEvent:
+        return DomainEvent(
+            "memory.accessed",
+            "pathos",
+            {"memory_id": str(moment.event_id), "simulated_at": when.isoformat()},
+        )
+
+    text = memory(
+        "I texted Ellis: “Morning. Still on for Saturday?”", NIGHT - timedelta(days=9), 0.8
+    )
+    summary = memory(
+        "Monday: Write down thoughts on the phone. The usual, more or less.",
+        NIGHT - timedelta(days=9),
+        0.8,
+    )
+    quoted = memory(
+        "Stuart Hart said: “Have you talked to Ellis yet?”", NIGHT - timedelta(days=9), 0.8
+    )
+    moment = memory("Dad said he was proud of me, out of nowhere.", NIGHT - timedelta(days=10), 0.8)
+    assert not is_a_moment(text) and not is_a_moment(summary) and not is_a_moment(quoted)
+    assert is_a_moment(moment)
+    spread = [
+        accessed(m, NIGHT - timedelta(days=d)) for m in (text, summary, quoted) for d in range(6)
+    ]
+    assert formative_events([text, summary, quoted, *spread], NIGHT) == []
+    # Seventeen times in one evening is his stream cueing it, not him going back to it.
+    one_evening = [
+        accessed(moment, NIGHT - timedelta(hours=5, minutes=m)) for m in range(0, 170, 10)
+    ]
+    assert formative_events([moment, *one_evening], NIGHT) == []
+    days = [accessed(moment, NIGHT - timedelta(days=d)) for d in range(1, 6)]
+    assert [e.kind for e in formative_events([moment, *days], NIGHT)] == [FORMATIVE]

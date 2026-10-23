@@ -164,24 +164,50 @@ def routine_merge_events(history: Sequence[DomainEvent], at: datetime) -> list[D
     return output
 
 
+_NOT_A_MOMENT = re.compile(
+    r"^(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day: |lately, most days|i texted |"
+    r"i rang |said in the group chat)|\btexted back: |\bon the phone: |\bsaid: [“\"]",
+    re.IGNORECASE,
+)
+
+
+def is_a_moment(memory: DomainEvent) -> bool:
+    """Something that happened to him, not a day's summary, a gist, a text or a line someone
+    said: those are gone over often (every cue brings them back) without having marked him."""
+    text = str(memory.payload.get("text", ""))
+    source = str(memory.payload.get("source") or "")
+    if source in {"merged-gist", "day-summary", "lived-phone"}:
+        return False
+    return not (is_routine_note(text) or _NOT_A_MOMENT.search(text))
+
+
 def formative_events(history: Sequence[DomainEvent], at: datetime) -> list[DomainEvent]:
-    """A memory he's gone back to again and again in the last month has stayed with him."""
+    """A memory he's gone back to on day after day in the last month has stayed with him.
+
+    Gone back to on different days: a Tuesday's summary his stream cued seventeen times
+    one evening hasn't. And a moment, weighed by how it felt: not a text or a quoted line.
+    """
     if at.hour != MERGE_HOUR:
         return []
     already = {str(e.payload.get("memory_id")) for e in events_of(history, FORMATIVE)}
     counts: dict[str, int] = {}
+    days: dict[str, set[str]] = {}
     for access in events_of(history, "memory.accessed")[-3000:]:
         when = _at(access)
         if when is not None and at - when <= timedelta(days=30):
             memory_id = str(access.payload.get("memory_id"))
             counts[memory_id] = counts.get(memory_id, 0) + 1
+            days.setdefault(memory_id, set()).add(when.date().isoformat())
     memories = {str(m.event_id): m for m in _his(history, 2000)}
+    weighed = weighed_importance(history)
     output: list[DomainEvent] = []
     for memory_id, count in sorted(counts.items(), key=lambda item: -item[1]):
         memory = memories.get(memory_id)
         if memory is None or memory_id in already or count < 5:
             continue
-        if float(memory.payload.get("importance", 0.3) or 0.3) < 0.5:
+        if len(days.get(memory_id, ())) < 4 or not is_a_moment(memory):
+            continue
+        if importance_of(memory, weighed) < 0.55:
             continue
         output.append(
             DomainEvent(

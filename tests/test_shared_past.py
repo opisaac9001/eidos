@@ -174,3 +174,12 @@ def test_an_encounter_is_about_the_person_not_to_them_and_he_hosts_only_at_home(
     assert plays_host("Hey Rowan, cheers for stopping by.", "park")
     assert not plays_host("Cheers for coming by, Ellis.", "home")
     assert not plays_host("Ellis cheers when the vice finally turns.", "workshop")
+
+
+def test_a_line_addressed_to_its_own_speaker_is_caught() -> None:
+    from eidos.application.shared_past import addresses_self
+
+    assert addresses_self("Hannah, I remember you mentioned turning down a job.", "Hannah Fenwick")
+    assert addresses_self("Oh Hannah, you did say that.", "Hannah Fenwick")
+    assert not addresses_self("Patrick, I remember you mentioned the atlas.", "Hannah Fenwick")
+    assert not addresses_self("Hannah's the name, and I'd do it again.", "Hannah Fenwick")

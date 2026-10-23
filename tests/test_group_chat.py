@@ -93,3 +93,30 @@ def test_an_unread_message_buzzes_into_his_thoughts() -> None:
     }
     phone = [cue for cue in cues(snapshot) if cue.kind == "phone"]
     assert phone and phone[0].weight > 1 and "in the group chat" in phone[0].text
+
+
+def test_nobody_thanks_someone_who_hasnt_posted() -> None:
+    from eidos.application.group_chat import addresses_absent
+
+    def post(name: str, text: str) -> DomainEvent:
+        return DomainEvent(
+            "chat.message",
+            "pathos",
+            {"speaker_name": name, "text": text, "simulated_at": EVENING.isoformat()},
+        )
+
+    members = {"ellis": "Ellis", "nina-vale": "Nina Vale", "rowan": "Rowan", "beth": "Beth"}
+    thread = [
+        post("Patrick", "See you all at the market."),
+        post("Ellis", "Cheers, Patrick. Looking forward to it."),
+    ]
+    assert (
+        addresses_absent("Thanks, Nina. My week's been up and down.", "Beth", thread, members)
+        == "Nina"
+    )
+    assert addresses_absent("Cheers, Ellis. Same.", "Beth", thread, members) is None
+    assert addresses_absent("Same here, Rowan.", "Nina Vale", thread[:1], members) == "Rowan"
+    assert (
+        addresses_absent("Rowan, how's your mum?", "Beth", thread, members) is None
+    )  # asking, not answering
+    assert addresses_absent("Thanks, Beth!", "Beth", thread, members) == "Beth"  # herself

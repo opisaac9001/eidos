@@ -150,6 +150,19 @@ def plays_host(text: str, location_id: str) -> bool:
     return bool(_HOSTING.search(text))
 
 
+def addresses_self(text: str, speaker_name: str) -> bool:
+    """A line that opens by addressing its own speaker ("Hannah, I remember you mentioned
+    turning down an opportunity", given as Hannah's words): the model has swapped sides."""
+    first = speaker_name.split()[0] if speaker_name.split() else ""
+    return bool(first) and bool(re.match(rf"\s*(?:\w+,?\s+)?{re.escape(first)}[,!]\s", text))
+
+
+NOT_TO_YOURSELF = (
+    "That line addresses the speaker by their own name, as if said to them. Give what the "
+    "speaker says to the other person, in the first person."
+)
+
+
 def narrates_the_speaker(text: str, speaker_name: str) -> bool:
     """A line meant to be spoken, written as narration about the speaker ("Mara waves over
     to Rowan and asks if...", given as Mara's words)."""

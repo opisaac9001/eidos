@@ -688,7 +688,8 @@ COMPACT_PROMPTS = {
         "never someone only in recent_thoughts. recent_thoughts are only things he thought, "
         "not things that happened. "
         "Don't address anyone, don't say his name, don't invent things that "
-        "happened, and don't repeat a recent thought. "
+        "happened, and don't repeat a recent thought. Never reuse an object, place or "
+        "detail from recent_thoughts: ink mentioned once isn't mentioned again. "
         'Reply only with JSON: {"text": "..."}\nThe style, for other situations:\n'
         + "\n".join(
             f'details: {when} -> {{"text": "{said}"}}' for when, said in COMPACT_EXAMPLES["murmur"]

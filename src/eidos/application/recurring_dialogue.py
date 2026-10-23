@@ -16,10 +16,12 @@ from eidos.application.pronouns import SAYING, pronoun_of
 from eidos.application.relationship_experience import personal_relationship_context
 from eidos.application.shared_past import (
     ITS_HIS,
+    NOT_TO_YOURSELF,
     NOT_YOURS,
     REVISION,
     SAY_IT,
     THING_REVISION,
+    addresses_self,
     claims_his_project,
     gives_away_his_project,
     invents_past_talk,
@@ -360,6 +362,18 @@ async def _advance_scene(
                 output,
             )
             if text is not None and narrates_the_speaker(text, speaker_name):
+                text = None
+        if text is not None and asked is not None and addresses_self(text, speaker_name):
+            # Hannah: "Hannah, I remember you mentioned turning down an opportunity...":
+            # Patrick's line, given to her.
+            text = await perform(
+                gateway,
+                "firmament",
+                {**asked, "revision_instruction": NOT_TO_YOURSELF},
+                simulated_at.isoformat(),
+                output,
+            )
+            if text is not None and addresses_self(text, speaker_name):
                 text = None
         if (
             text is not None

@@ -17,6 +17,9 @@
 - His thoughts: less wandering (it ran at 0.64 against about half for people), a little more looking ahead, and old record ids reach the models as names.
 - He forgot 28% of what he meant to do; the nightly chance of something slipping is lower, so it's nearer one in eight.
 - The model is asked for improvised town moments now and then (at most every six hours, none for two days after a story), not every hour.
+- What has stayed with him is a moment he went back to on different days (a Tuesday's summary his stream cued seventeen times one evening hasn't), weighed by how it felt; texts, summaries and lines people said don't qualify.
+- His stream is no longer shown its own rut: thoughts carrying a worn-out word ("Rowan's sketchbook", eleven thoughts one evening) are kept from the model, a word and its compounds count as one rut, and an opening leaned on over days ("Should I...", 54 times in three days) is worn even when never three in a dozen. The murmur prompt line last night's probe found better (42% to 25% turned away) is in.
+- In the group chat nobody thanks someone who hasn't posted ("Thanks, Nina", answering Ellis), a resident doesn't address a line to themself ("Hannah, I remember you mentioned...", as Hannah's words; the probe counts it as `talks_to_self`), residents don't chat mid-journey, and a visitor at the door is Hannah Fenwick, not "Townsfolk 1855".
 
 ## 0.1.0 (2026-10-19)
 

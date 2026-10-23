@@ -1150,6 +1150,40 @@ def rutted(text: str, recent: Sequence[str], people: Collection[str] = ()) -> st
     return worn[0] if worn else None
 
 
+def worn_opening_of(texts: Sequence[str]) -> str | None:
+    """An opening he keeps reaching for: three times in the last dozen thoughts, or, spread
+    thin enough to pass that ("Should I...", 54 times in three days, never three in a
+    dozen), six times in the last hundred. ``texts`` is newest first."""
+
+    def opening(text: str) -> str:
+        return " ".join(text.split()[:2]).strip(".,!?").casefold()
+
+    said = [opening(text) for text in texts if len(text.split()) >= 3]
+    lately = Counter(said[:12])
+    worn = next((o for o, count in lately.most_common(1) if count >= 3), None)
+    if worn is not None:
+        return worn
+    over_days = Counter(said[:100])
+    return next((o for o, count in over_days.most_common(1) if count >= 6), None)
+
+
+def without_rut(texts: Sequence[str], tired: Sequence[str]) -> list[str]:
+    """The thoughts that don't carry a worn-out word. Shown its own rut, a small model keeps
+    to it ("Rowan's sketchbook", eleven thoughts one evening, each told not to): those
+    thoughts are kept from it, and only the judge remembers them."""
+    stems = [w for w in tired if len(w) >= 3]
+
+    def carries(text: str) -> bool:
+        words = {w.removesuffix("'s") for w in _WORDS.findall(text.casefold())}
+        return any(
+            word == stem or (len(stem) >= 4 and word.startswith(stem))
+            for word in words
+            for stem in stems
+        )
+
+    return [text for text in texts if not carries(text)]
+
+
 def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
     """Words his last few thoughts keep coming back to, which a small model can't let go of.
 
@@ -1172,6 +1206,11 @@ def worn_out(recent: Sequence[str], people: Collection[str] = ()) -> list[str]:
         for topic, family in _TOPICS.items():
             if words & family:
                 topics[topic] = topics.get(topic, 0) + 1
+    # "sketch", "sketchbook", "sketches": one rut, counted under the shortest.
+    for word in sorted(counts, key=len):
+        for longer in [w for w in counts if w != word and len(word) >= 5 and w.startswith(word)]:
+            counts[word] += counts.pop(longer)
+    counts.pop("the", None)
     tired = sorted((word for word, count in counts.items() if count >= 2), key=lambda w: -counts[w])
     # The same thing in other words is the same rut: an hour of Ellis's hammer, then his
     # drill, then the noise, never repeated a word twice.
@@ -1708,14 +1747,7 @@ class InnerStream:
         if not_again:
             context["not_again"] = not_again[-3:]
         # An opening he keeps reaching for ("Ellis is...", 45 times in a week) is worn out.
-        openings = Counter(
-            " ".join(thought.text.split()[:2]).strip(".,!?").casefold()
-            for thought in self.store.recent(12)
-            if len(thought.text.split()) >= 3
-        )
-        worn_opening = next(
-            (opening for opening, count in openings.most_common(1) if count >= 3), None
-        )
+        worn_opening = worn_opening_of([thought.text for thought in self.store.recent(100)])
         # The same first word in other clothes is the same tic ("AC rattles", "AC screaming",
         # "AC still screaming": half an evening's thoughts).
         first_words = Counter(
@@ -1751,6 +1783,17 @@ class InnerStream:
         tired = worn_out([*recent_texts, *not_again], known_names(snapshot))
         if tired:
             context["worn_out"] = tired
+        # A word in three or more of what it was shown is a rut it would only deepen; one
+        # repeat turned away is still named, so the next try differs.
+        seen = [*recent_texts[-5:], *not_again]
+        deep = [word for word in tired if len(without_rut(seen, [word])) <= len(seen) - 3]
+        if deep:
+            context["recent_inner_stream"] = without_rut(recent_texts[-3:], deep)
+            shown = without_rut(not_again[-3:], deep)
+            if shown:
+                context["not_again"] = shown
+            else:
+                context.pop("not_again", None)
         if set_aside and not (cue is not None and any(n in cue.text for n in set_aside)):
             context["leave_aside"] = set_aside
         judge = StreamJudge(

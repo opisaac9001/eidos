@@ -3007,6 +3007,10 @@ class Life(LifeConversation):
                 known_person_ids=pathos_known_person_ids(history + pending)
                 - busy_people(history + pending, current),
                 paced=not self.authored_scenario,
+                actor_names={
+                    person.person_id: person.name
+                    for person in self._world_catalog(history + pending).people.values()
+                },
             )
         )
         pending.extend(visit_output)
