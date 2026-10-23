@@ -60,6 +60,7 @@ class Runtime:
         self._interviewing = False
         self._interview_failed_at = 0.0
         self._tuning = False
+        self._apply_adopted()
         self._tune_failed_at = 0.0
         # Recall by meaning, when the server has an embedding model.
         self.meaning: Any = None
@@ -299,6 +300,21 @@ class Runtime:
         path = getattr(getattr(self.life, "store", None), "path", None)
         return Path(path).with_name("harness") if path else None
 
+    def _apply_adopted(self) -> None:
+        """Changes the nightly probe adopted apply to his life's calls, across restarts."""
+        folder = self.harness_folder()
+        if folder is None:
+            return
+        try:
+            from eidos.adapters.harness_runner import apply_adopted
+
+            applied = apply_adopted(folder)
+        except Exception:
+            logger.exception("Couldn't apply adopted prompt changes")
+            return
+        if applied:
+            logger.info("Adopted prompt changes in effect: %s", applied)
+
     def _embed_new_memories(self) -> None:
         """Vectors for memories that have none yet, a batch at a time, off the tick."""
         if self.meaning is None or self._embedding:
@@ -376,7 +392,11 @@ class Runtime:
             from eidos.adapters.harness_runner import nightly
 
             try:
-                nightly(self.models, Path(store_path), folder, when=when, lifelike=self._lifelike())
+                night = nightly(
+                    self.models, Path(store_path), folder, when=when, lifelike=self._lifelike()
+                )
+                if night.get("adopted"):
+                    logger.info("Nightly probe adopted %s", night["adopted"])
             except Exception:
                 self._tune_failed_at = wall_time()
                 logger.exception("Nightly harness probe failed")

@@ -15,6 +15,7 @@ count twice.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
@@ -44,7 +45,19 @@ KINDS: Mapping[str, tuple[float, float, str, str]] = {
     "self_reproach": (-0.3, 6, "act", "annoyed with myself for forgetting to {about}"),
     "guilt": (-0.5, 48, "act", "guilty about letting {about} down"),
     "contentment": (0.35, 6, "savour", "glad of {about}"),
+    "enjoyment": (0.4, 5, "savour", "still buzzing from {about}"),
+    "flatness": (-0.25, 4, "wait", "{about} fell a bit flat"),
+    "sympathy": (-0.2, 24, "act", "feeling for {about}"),
+    "warmth": (0.4, 8, "savour", "warmed by {about}"),
+    "loneliness": (-0.35, 12, "act", "missing people"),
+    "unease": (-0.25, 6, "distract", "uneasy about {about}"),
 }
+# What a friend says in the group chat that he'd feel for them about.
+_TROUBLE = re.compile(
+    r"\b(?:nightmare|rough|awful|not well|unwell|ill|poorly|stressed|exhausted|knackered|"
+    r"shattered|struggling|under the weather|in hospital|worst week)\b",
+    re.IGNORECASE,
+)
 _HAPPENED = {
     "caught_in_rain": "getting soaked",
     "lost_keys": "losing my keys",
@@ -128,6 +141,12 @@ _MOOD = {
     "self_reproach": "annoyed with himself",
     "guilt": "guilty",
     "contentment": "content",
+    "enjoyment": "in good spirits",
+    "flatness": "a bit flat",
+    "sympathy": "feeling for a friend",
+    "warmth": "cheered",
+    "loneliness": "a bit lonely",
+    "unease": "uneasy",
 }
 
 
@@ -139,6 +158,14 @@ def mood_from_feelings(
     if not live or live[0].now(at) < threshold:
         return None
     return _MOOD.get(live[0].kind)
+
+
+def strongest_feeling(history: Sequence[DomainEvent], at: datetime) -> tuple[str | None, float]:
+    """What his strongest feeling makes him, and how strongly: "a bit lonely", 0.4."""
+    live = live_feelings(history, at)
+    if not live:
+        return None, 0.0
+    return _MOOD.get(live[0].kind), live[0].now(at)
 
 
 def live_feelings(history: Sequence[DomainEvent], at: datetime) -> list[Feeling]:
@@ -202,8 +229,18 @@ def _sources(
         "freelance.deadline_moved",
         "freelance.published",
         "freelance.column_offered",
+        "experience.felt",
+        "imperfection.noticed",
+        "visitor.departed",
+        "phone.call_completed",
+        "chat.message",
+        "needs.changed",
     )
-    for event in events_of(history, *kinds)[-40:]:
+    titles = {
+        str(e.payload.get("schedule_id")): str(e.payload.get("title", ""))
+        for e in events_of(history, "schedule.created")[-60:]
+    }
+    for event in events_of(history, *kinds)[-160:]:
         try:
             if _when(event) < since or _when(event) > at:
                 continue
@@ -334,6 +371,43 @@ def _sources(
         elif event.kind == "freelance.deadline_moved":
             found.append((f"self_reproach:{p.get('job_id')}", "self_reproach",
                           f"finish {p.get('short')} on time", 0.35, True, event))  # fmt: skip
+        elif event.kind == "experience.felt":
+            # An outing that was more than its name, or fell flat: the hour already moved
+            # his mood by the same measure, so the feeling only says what it was about.
+            enjoyment = float(p.get("enjoyment", 0.0) or 0.0)
+            title = titles.get(str(p.get("schedule_id")), "").rstrip(".")
+            if title and enjoyment >= 0.6:
+                found.append((f"enjoyment:{p.get('schedule_id')}", "enjoyment",
+                              _plainly(title[0].lower() + title[1:]), 0.45, False, event))  # fmt: skip
+            elif title and enjoyment <= -0.1:
+                found.append((f"flatness:{p.get('schedule_id')}", "flatness",
+                              _plainly(title[0].lower() + title[1:]), 0.3, False, event))  # fmt: skip
+        elif event.kind == "imperfection.noticed" and p.get("pattern") == "put_off":
+            put_off = re.search(r"'([^']+)'", str(p.get("text", "")))
+            if put_off:
+                title = put_off.group(1)
+                found.append((f"self_reproach:{p.get('schedule_id') or title}", "self_reproach",
+                              "get round to " + title[0].lower() + title[1:], 0.3, True, event))  # fmt: skip
+        elif event.kind == "visitor.departed":
+            visitor = str(p.get("visitor_id") or "")
+            if visitor in names:
+                found.append((f"warmth:visit-{visitor}", "warmth",
+                              f"{_first(names[visitor])} calling round", 0.4, True, event))  # fmt: skip
+        elif event.kind == "phone.call_completed":
+            caller = str(p.get("caller_id") or "")
+            if caller in names:
+                found.append((f"warmth:call-{caller}", "warmth",
+                              f"{_first(names[caller])} ringing", 0.35, True, event))  # fmt: skip
+        elif event.kind == "chat.message":
+            speaker = str(p.get("speaker_id") or "")
+            if speaker in names and speaker != "pathos" and _TROUBLE.search(str(p.get("text", ""))):
+                found.append((f"sympathy:{speaker}", "sympathy", _first(names[speaker]),
+                              0.3, True, event))  # fmt: skip
+        elif event.kind == "needs.changed":
+            # A day with nobody in it: once, not every hour it stays low.
+            if float(p.get("connection", 1.0) or 1.0) <= 0.3:
+                found.append((f"loneliness:{_when(event).date().isoformat()}", "loneliness",
+                              "people", 0.4, True, event))  # fmt: skip
         elif event.kind == "gossip.heard" and p.get("holder_id") == "pathos":
             subject = str(p.get("subject_id"))
             if subject in names and p.get("story") == "family_worry":
@@ -355,9 +429,11 @@ def feeling_events(
     output: list[DomainEvent] = []
     live = _LIVE(history)
     used = {str(e.payload.get("source_event_id")) for e in events_of(history, AROSE, RENEWED)[-80:]}
+    this_hour: set[str] = set()
     for feeling_id, kind, about, intensity, moves, source in _sources(history, at, names):
-        if str(source.event_id) in used:
+        if str(source.event_id) in used or feeling_id in this_hour:
             continue
+        this_hour.add(feeling_id)
         existing = live.get(feeling_id)
         if existing is not None and existing.now(at) >= FADED_BELOW:
             strength = min(1.0, max(existing.now(at), intensity) + 0.1)
@@ -458,6 +534,10 @@ def coping_thoughts(history: Sequence[DomainEvent], at: datetime) -> list[str]:
             found.append(f"I'm {feeling.phrase()}. Should check in on {feeling.about}.")
         elif feeling.coping == "act" and feeling.kind == "self_reproach":
             found.append(f"Need to {feeling.about}, properly this time.")
+        elif feeling.coping == "act" and feeling.kind == "sympathy":
+            found.append(f"{feeling.about}'s having a rough time of it. Should say something.")
+        elif feeling.coping == "act" and feeling.kind == "loneliness":
+            found.append("Haven't seen anyone properly in days. Should text someone.")
         elif feeling.coping == "distract":
             found.append(f"Bit {feeling.phrase()}. Should get out for a walk, clear my head.")
     return found

@@ -128,3 +128,35 @@ def test_looking_forward_to_a_coffee_not_to_a_capital_a() -> None:
     )  # fmt: skip
     arose = feeling_events([opened], at, names={})
     assert arose and arose[0].payload["about"] == "a coffee at Juniper with Ellis"
+
+
+def test_outings_visits_calls_and_a_friends_rough_week_are_felt() -> None:
+    when = (AT - timedelta(minutes=20)).isoformat()
+    scheduled = DomainEvent(
+        "schedule.created",
+        "pathos",
+        {"schedule_id": "s1", "title": "A wander round the market", "simulated_at": when},
+    )
+    history = [
+        scheduled,
+        DomainEvent("experience.felt", "pathos", {"schedule_id": "s1", "enjoyment": 0.7, "simulated_at": when}),
+        DomainEvent("visitor.departed", "pathos", {"visitor_id": "beth", "simulated_at": when}),
+        DomainEvent("phone.call_completed", "pathos", {"caller_id": "rowan", "simulated_at": when}),
+        DomainEvent("chat.message", "pathos", {"speaker_id": "rowan", "speaker_name": "Rowan",
+                                               "text": "Work's been a nightmare this week.", "simulated_at": when}),
+        DomainEvent("needs.changed", "pathos", {"connection": 0.2, "simulated_at": when}),
+        DomainEvent("needs.changed", "pathos", {"connection": 0.25, "simulated_at": AT.isoformat()}),
+    ]  # fmt: skip
+    arose = {
+        e.payload["kind"]: e.payload["about"]
+        for e in feeling_events(history, AT, names=NAMES)
+        if e.kind == AROSE
+    }
+    assert arose["enjoyment"] == "a wander round the market"
+    assert arose["warmth"] in {"Beth calling round", "Rowan ringing"}
+    assert arose["sympathy"] == "Rowan"
+    assert arose["loneliness"] == "people"
+    ids = [
+        e.payload["feeling_id"] for e in feeling_events(history, AT, names=NAMES) if e.kind == AROSE
+    ]
+    assert ids.count("loneliness:2026-08-26") == 1  # once a day, not every hour it stays low

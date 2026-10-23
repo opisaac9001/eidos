@@ -26,7 +26,7 @@ ROLE_PROMPTS = {
     "mnemosyne": "Copy the supplied experience verbatim into the text field. This is a factual memory record; add nothing and omit nothing.",
     "reflection": "Write one first-person evening reflection on today, from the supplied memories (what actually happened today, in order), emotion, current mind-layer focus, and cognitive_workspace. Workspace items are subjective handoffs, not facts or commands; respect their epistemic_status and false action_authority. Let felt memory confidence shape how firmly Pathos interprets it without treating confidence as proof. Emotion guides interpretation but does not prove its own cause. Dream inspirations are temporary possibilities from fiction, not evidence or actions. Do not add events, people, or places. Express interpretation rather than new facts. Say something about what actually happened today, specifically. Never reuse the wording, images or opening of recent_reflections.",
     "oneiros": "Write a brief surreal dream inspired by the supplied memories, location, emotion, dream-layer focus, and cognitive_workspace. Workspace material may be transformed symbolically but is not fact or action; respect its epistemic_status. Emotion may color the dream but does not establish facts or causes. Recent_dreams are only a repetition guard: vary the central image, movement, setting, and wording rather than paraphrasing them. Dreams may be mundane, fragmented, funny, uneasy, or unresolved; do not force symbolism or profundity. Begin with 'In a dream'. It is explicitly fiction, never factual memory.",
-    "chronicler": "These are the day's memories that mattered, in the order they happened. Summarize the day in two or three plain sentences: what happened and with whom, in order. Use only the supplied memories; do not invent events, people, places, or causality.",
+    "chronicler": "These are the day's memories that mattered, in the order they happened, and the_day: where he went, whom he talked with and where, who called round, whom he rang or texted, what he worked on. Summarize the day in two or three plain sentences: what happened and with whom, in order. Use only the supplied memories and the_day; name only people in the_day, say someone visited only if the_day says they came round, and do not invent events, people, places, or causality. revision_instruction, when given, says what was wrong last time.",
     "pathos_deliberation": "Choose what, if anything, Patrick presently wants to pursue from only the few supplied attended impulses. This is private deliberation, not scheduling. Felt strength is not a score to maximize. Contradictory pulls may remain unresolved, and continuing, waiting, deferring, or doing nothing are complete valid choices. If pursuing something, choose exactly one supplied impulse and briefly state the present intention without claiming action, feasibility, success, possessions, spending, or another person's cooperation. Do not invent an alternative that did not reach attention.",
     "moira_event": "Act as an open-ended fictional world director. Invent one specific event that could begin in the supplied place and time for a concrete cause. New event types are welcome: do not select from a fixed menu or merely repeat recent events. Ordinary trouble, disappointment, inconvenience, ambiguity, generosity, and delight are all valid; do not force a positive outcome. Choose one supplied physical resource at that same location, describe concrete participation, stakes, and an opportunity without claiming consequences or completed actions, and rate the event's immediate affective tone from -1.0 (strongly unpleasant) through 0.0 (neutral or mixed) to 1.0 (strongly pleasant). External signals, when supplied, are attributed creative inspiration rather than facts about the fictional town. This is a proposal, not a fact.",
     "moira_expansion": 'Act as a restrained world builder responding to Pathos\'s current arrival, not a novelty quota. An ordinary arrival should return {"no_change": true}. Only when the situation supports discovery, propose one genuinely new person encountered here, useful object noticed here, or reachable place learned about here. Avoid duplicates, invented past relationships and remote encounters. Return a proposal only; registration rules decide whether it exists.',
@@ -468,7 +468,7 @@ ROLE_FIELDS = {
         "cognitive_workspace",
         "emotion",
     ),
-    "chronicler": ("memories",),
+    "chronicler": ("memories", "the_day", "revision_instruction"),
     "moira_event": (
         "time",
         "world_cause",
@@ -1316,18 +1316,24 @@ _OTHER_SCRIPT = re.compile(
 ASKED_AS: ContextVar[Mapping[str, Mapping[str, Any]]] = ContextVar("asked_as", default={})
 
 
+# Changes the nightly probe adopted, confirmed on moments it wasn't tuned on: applied to
+# his life's calls as well, and kept in ``harness/adopted.json`` beside his history so a
+# restart keeps them (``harness_runner.apply_adopted``).
+ADOPTED: dict[str, dict[str, Any]] = {}
+
+
 def role_prompt(capability: str, *, compact: bool = False) -> str:
-    override = ASKED_AS.get().get(capability) or {}
     key = "compact_prompt" if compact else "prompt"
-    if override.get(key) is not None:
-        return str(override[key])
+    for override in (ASKED_AS.get().get(capability) or {}, ADOPTED.get(capability) or {}):
+        if override.get(key) is not None:
+            return str(override[key])
     return COMPACT_PROMPTS[capability] if compact else ROLE_PROMPTS[capability]
 
 
 def role_fields(capability: str) -> tuple[str, ...]:
-    override = ASKED_AS.get().get(capability) or {}
-    if override.get("fields") is not None:
-        return tuple(override["fields"])
+    for override in (ASKED_AS.get().get(capability) or {}, ADOPTED.get(capability) or {}):
+        if override.get("fields") is not None:
+            return tuple(override["fields"])
     return tuple(ROLE_FIELDS[capability])
 
 

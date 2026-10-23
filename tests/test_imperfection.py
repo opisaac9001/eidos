@@ -66,6 +66,16 @@ def test_a_put_off_plan_is_cancelled_and_felt_as_a_lapse() -> None:
         if output:
             assert [e.kind for e in output[:2]] == ["imperfection.noticed", "schedule.cancelled"]
             assert value_evidence(output[0])[0][:2] == ("reliability", -1)
+            # Something he only just put on the calendar isn't put off the same hour.
+            just_made = DomainEvent(
+                "schedule.created",
+                "pathos",
+                {"schedule_id": entry.schedule_id, "title": entry.title,
+                 "simulated_at": (at - timedelta(minutes=30)).isoformat()},
+            )  # fmt: skip
+            assert (
+                run([just_made], at, flat, PlanningState(calendar={entry.schedule_id: entry})) == []
+            )
             return
     raise AssertionError("never put anything off, even on the flattest days")
 

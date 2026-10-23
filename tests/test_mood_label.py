@@ -40,3 +40,27 @@ def test_a_neutral_mood_takes_its_name_from_what_hes_feeling() -> None:
 def test_a_real_mood_keeps_its_own_name() -> None:
     assert label([worry(0.6)], -0.4, 0.3) == "sadness"
     assert label([worry(0.6)], 0.2) == "contentment"
+
+
+def test_a_strong_feeling_names_the_day_over_mild_contentment() -> None:
+    from eidos.application.feelings import strongest_feeling
+
+    lonely = DomainEvent(
+        AROSE,
+        "pathos",
+        {
+            "feeling_id": "loneliness:2026-08-26",
+            "kind": "loneliness",
+            "about": "people",
+            "intensity": 0.5,
+            "simulated_at": AT.isoformat(),
+        },
+    )
+    felt, strength = strongest_feeling([lonely], AT)
+    assert felt == "a bit lonely" and strength >= 0.4
+    state = PathosState(simulated_at=AT, awake=True, valence=0.12, arousal=0.35)
+    sampled = emotion_sample_events([lonely], state, AT, felt=felt, felt_strength=strength)
+    assert sampled[0].payload["label"] == "a bit lonely"
+    # Faint, it doesn't: mild contentment is what it is.
+    faint = emotion_sample_events([lonely], state, AT, felt=felt, felt_strength=0.2)
+    assert faint[0].payload["label"] == "contentment"

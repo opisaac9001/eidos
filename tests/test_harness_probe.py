@@ -272,12 +272,14 @@ def test_a_night_measures_each_role_and_keeps_the_trend(tmp_path: Path) -> None:
     assert night["lifelike"]["mind_wandering"]["value"] == 0.52
     assert night["lifelike"]["slip_rate"]["value"] == 0.12
     assert night["roles"]["firmament"]["turned_away"] == 1.0
-    # The worst role got suggestions; none is adopted by the night itself.
+    # The worst role got suggestions; with no held-out moments to confirm on, none is adopted.
     assert night["suggestions"]["best"]["name"] == "proposed-first-names"
+    assert night["suggestions"]["confirmed"]["verdict"].startswith("keep current: too few")
     assert not http_gateway.role_prompt("firmament").endswith("Use first names.")
     seen = latest_nights(folder)
     assert seen["last"]["when"] == "2026-09-09T02:00:00+00:00"
     assert seen["trend"][-1]["suggested"] == "proposed-first-names"
+    assert seen["trend"][-1]["adopted"] is None
     assert seen["trend"][-1]["lifelike"] == {"mind_wandering": 0.52, "slip_rate": 0.12}
 
 
@@ -355,3 +357,34 @@ def test_a_thought_that_says_its_cue_back_is_turned_away() -> None:
     assert turned_away_for("Beth sounds stretched thin.", {}, judge) is None
     short = StreamJudge(cue_text="a tune stuck in his head")
     assert turned_away_for("Without trying, a tune stuck in my head again.", {}, short) is None
+
+
+def test_a_winner_confirmed_on_held_out_moments_is_adopted_and_kept(tmp_path: Path) -> None:
+    from eidos.adapters.harness_runner import apply_adopted, asked_as, nightly
+
+    # Enough moments for a tuning set and as many older ones to confirm on.
+    contexts = [
+        {**ENCOUNTER, "time": f"2026-09-0{1 + n // 10}T1{n % 10}:00:00+00:00"} for n in range(32)
+    ]
+    db = _database(tmp_path, contexts)
+    folder = tmp_path / "harness"
+    before = http_gateway.role_prompt("firmament")
+    try:
+        night = nightly(_Editor(), db, folder, names=[], when="2026-09-09T02:00:00+00:00")
+        assert night["suggestions"]["confirmed"]["verdict"] == "adopt"
+        assert night["adopted"] == "proposed-first-names"
+        # In effect for his life's calls, and kept beside his history.
+        assert http_gateway.role_prompt("firmament").endswith("Use first names.")
+        assert http_gateway.role_fields("firmament") == tuple(http_gateway.ROLE_FIELDS["firmament"])
+        kept = json.loads((folder / "adopted.json").read_text())
+        assert [v["name"] for v in kept["firmament"]] == ["proposed-first-names"]
+        assert "adopted" in (folder / "LESSONS.md").read_text()
+        # A later trial stacks on what's adopted; a restart reapplies it.
+        http_gateway.ADOPTED.clear()
+        assert http_gateway.role_prompt("firmament") == before
+        assert apply_adopted(folder) == {"firmament": ["proposed-first-names"]}
+        assert http_gateway.role_prompt("firmament").endswith("Use first names.")
+        with asked_as(Variant("firmament", "more", prompt_append="Be brief.")):
+            assert http_gateway.role_prompt("firmament").endswith("Use first names. Be brief.")
+    finally:
+        http_gateway.ADOPTED.clear()

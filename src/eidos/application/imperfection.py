@@ -63,6 +63,10 @@ def imperfection_context(history: Sequence[DomainEvent], at: datetime) -> list[s
 # -- putting things off ----------------------------------------------------------------
 
 
+def _when(event: DomainEvent) -> datetime:
+    return datetime.fromisoformat(str(event.payload["simulated_at"]))
+
+
 def _put_off(
     history: Sequence[DomainEvent],
     at: datetime,
@@ -83,6 +87,18 @@ def _put_off(
         starts = datetime.fromisoformat(entry.starts_at)
         # Decided in the hour before, not once it has already begun.
         if not timedelta(0) < starts - at <= timedelta(hours=1):
+            continue
+        # And not something he only just decided on: it was put on and taken off the
+        # calendar in the same hour ("Couldn't face 'Wait ten minutes with camera...'").
+        made = next(
+            (
+                _when(e)
+                for e in reversed(events_of(history, "schedule.created"))
+                if e.payload.get("schedule_id") == entry.schedule_id
+            ),
+            None,
+        )
+        if made is not None and at - made < timedelta(hours=2):
             continue
         follow_through = float(traits.get("follow_through", 0.64))
         chance = (

@@ -59,10 +59,13 @@ measures encounters, his texts and his thoughts on the day's moments, audits the
 already given, and for the worst role over 20% asks the editor for three changes and
 probes them. Results go beside the database in `harness/` (`night-*.json`,
 `history.jsonl`, `LESSONS.md`); the Models page shows each role's rate, its range, a
-fortnight's trend and any suggestion. **Nothing is adopted automatically:** a suggestion is
-confirmed on a larger set with `--variant`, then put into `adapters/http_gateway.py` by
-hand. A trial prompt applies only to the probe's own calls (a context variable), never to
-the calls his life makes meanwhile.
+fortnight's trend and any suggestion. A winner on the night's moments is tried again on
+as many older moments it wasn't tuned on; if it wins there too (the same `adopt` bar) it is
+**adopted**: kept in `harness/adopted.json`, applied to his life's calls at once and on
+every restart, and noted in `LESSONS.md` and the trend. A trial prompt applies only to the
+probe's own calls (a context variable), never to the calls his life makes meanwhile, and a
+later trial stacks on what's adopted. To undo one, remove it from `adopted.json` and
+restart.
 
 ## Running it
 
@@ -95,5 +98,6 @@ Without `--variant` it measures the current harness and shows what would be turn
 ```
 
 Kept variants are in [variants/](variants); what was tried and how it went is in
-[LESSONS.md](LESSONS.md). An adopted change goes into `adapters/http_gateway.py` by hand,
-with a comment pointing at its lesson.
+[LESSONS.md](LESSONS.md). A change adopted by the night lives in `harness/adopted.json`;
+one worth keeping for good goes into `adapters/http_gateway.py` by hand, with a comment
+pointing at its lesson, and comes out of `adopted.json`.

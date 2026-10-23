@@ -194,19 +194,87 @@ def asked_as(variant: Variant | None) -> Iterator[None]:
     if variant is None:
         yield
         return
-    role = variant.role
-    override: dict[str, Any] = {}
-    if role in http_gateway.ROLE_PROMPTS:
-        override["prompt"] = variant.prompt(http_gateway.ROLE_PROMPTS[role])
-    if role in http_gateway.COMPACT_PROMPTS:
-        override["compact_prompt"] = variant.prompt(http_gateway.COMPACT_PROMPTS[role])
-    if role in http_gateway.ROLE_FIELDS:
-        override["fields"] = variant.fields(tuple(http_gateway.ROLE_FIELDS[role]))
-    token = http_gateway.ASKED_AS.set({**http_gateway.ASKED_AS.get(), role: override})
+    token = http_gateway.ASKED_AS.set(
+        {**http_gateway.ASKED_AS.get(), variant.role: _override(variant)}
+    )
     try:
         yield
     finally:
         http_gateway.ASKED_AS.reset(token)
+
+
+def _override(variant: Variant) -> dict[str, Any]:
+    """The role asked this way, on top of whatever is already adopted for it."""
+    role = variant.role
+    override: dict[str, Any] = {}
+    if role in http_gateway.ROLE_PROMPTS:
+        override["prompt"] = variant.prompt(http_gateway.role_prompt(role))
+    if role in http_gateway.COMPACT_PROMPTS:
+        override["compact_prompt"] = variant.prompt(http_gateway.role_prompt(role, compact=True))
+    if role in http_gateway.ROLE_FIELDS:
+        override["fields"] = variant.fields(http_gateway.role_fields(role))
+    return override
+
+
+def _as_json(variant: Variant) -> dict[str, Any]:
+    return {
+        "role": variant.role,
+        "name": variant.name,
+        "why": variant.why,
+        "prompt_append": variant.prompt_append,
+        "prompt_replace": list(variant.prompt_replace) if variant.prompt_replace else None,
+        "fields_add": list(variant.fields_add),
+        "fields_drop": list(variant.fields_drop),
+        "context": dict(variant.context),
+    }
+
+
+def _from_json(raw: Mapping[str, Any]) -> Variant:
+    replace = raw.get("prompt_replace")
+    return Variant(
+        role=str(raw["role"]),
+        name=str(raw.get("name", "")),
+        why=str(raw.get("why", "")),
+        prompt_append=str(raw.get("prompt_append", "")),
+        prompt_replace=(str(replace[0]), str(replace[1])) if replace else None,
+        fields_add=tuple(raw.get("fields_add", ())),
+        fields_drop=tuple(raw.get("fields_drop", ())),
+        context=dict(raw.get("context", {})),
+    )
+
+
+def apply_adopted(folder: Path) -> dict[str, list[str]]:
+    """Put the adopted changes in ``folder/adopted.json`` into effect for his life's calls,
+    oldest first for each role; the names applied, by role."""
+    path = folder / "adopted.json"
+    try:
+        kept = json.loads(path.read_text()) if path.exists() else {}
+    except (OSError, ValueError):
+        kept = {}
+    http_gateway.ADOPTED.clear()
+    applied: dict[str, list[str]] = {}
+    for role, specs in kept.items():
+        for spec in specs if isinstance(specs, list) else []:
+            try:
+                variant = _from_json(spec)
+                http_gateway.ADOPTED[role] = _override(variant)
+            except (KeyError, ValueError, TypeError):
+                continue
+            applied.setdefault(role, []).append(variant.name)
+    return applied
+
+
+def adopt(folder: Path, variant: Variant, when: str) -> None:
+    """Keep an adopted change and put it into effect."""
+    path = folder / "adopted.json"
+    try:
+        kept = json.loads(path.read_text()) if path.exists() else {}
+    except (OSError, ValueError):
+        kept = {}
+    kept.setdefault(variant.role, []).append({**_as_json(variant), "when": when})
+    folder.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(kept, indent=1))
+    apply_adopted(folder)
 
 
 def run(
@@ -339,6 +407,7 @@ async def _improve(
             )
         if said == "adopt" and (best is None or rate(tried) < best[0]):
             best = (rate(tried), entry)
+            result["best_variant"] = variant
     result["best"] = best[1] if best else None
     return result
 
@@ -362,6 +431,7 @@ def improve(
         _improve(gateway, role, contexts, names_from(database), repeats=repeats,
                  proposals=proposals, lessons=lessons)
     )  # fmt: skip
+    result.pop("best_variant", None)
     if out is not None:
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{role}-improve.json").write_text(json.dumps(result, indent=2))
@@ -440,7 +510,9 @@ def nightly(
     lifelike: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """While he sleeps: how each role is doing on today's moments, the checks on recorded
-    answers, and, for the worst role, changes the editor suggests (suggested, not adopted)."""
+    answers, and, for the worst role, changes the editor suggests. A winner is tried again
+    on as many older moments it wasn't tuned on; if it wins there too it's adopted, for his
+    life's calls as well, and kept in ``adopted.json``."""
     names = names if names is not None else names_from(database)
     lessons = folder / "LESSONS.md"
     night: dict[str, Any] = {"when": when, "roles": {}}
@@ -470,6 +542,50 @@ def nightly(
                 gateway, role, contexts, names, repeats=1, proposals=3, lessons=lessons,
                 current=current,
             )  # fmt: skip
+            winner = night["suggestions"].pop("best_variant", None)
+            if winner is not None:
+                night["suggestions"]["confirmed"] = await _confirm(
+                    gateway, role, winner, names, len(contexts)
+                )
+                if night["suggestions"]["confirmed"].get("verdict") == "adopt":
+                    adopt(folder, winner, when)
+                    night["adopted"] = winner.name
+                    if lessons is not None:
+                        record_lesson(
+                            lessons,
+                            {
+                                "role": role,
+                                "samples": night["suggestions"]["confirmed"]["samples"],
+                                "variant": {"name": winner.name, "why": "confirmed on held-out moments, adopted"},
+                                "current": {
+                                    "turned_away": night["suggestions"]["confirmed"]["current"],
+                                    "problems": night["suggestions"]["confirmed"]["current_problems"],
+                                },
+                                "candidate": {
+                                    "turned_away": night["suggestions"]["confirmed"]["turned_away"],
+                                    "problems": night["suggestions"]["confirmed"]["problems"],
+                                },
+                                "verdict": "adopt",
+                            },
+                        )  # fmt: skip
+
+    async def _confirm(
+        gateway: ModelGateway, role: str, winner: Variant, names: list[str], tuned_on: int
+    ) -> dict[str, Any]:
+        held_out = load_samples(database, role, tuned_on * 2)[tuned_on:]
+        if len(held_out) < max(6, tuned_on // 2):
+            return {"samples": len(held_out), "verdict": "keep current: too few held-out moments"}
+        current = await probe(held_out, role, _asker(gateway, role, {}), 1, names)
+        with asked_as(winner):
+            tried = await probe(held_out, role, _asker(gateway, role, {}), 1, names)
+        return {
+            "samples": len(held_out),
+            "current": rate(current),
+            "current_problems": counts(current),
+            "turned_away": rate(tried),
+            "problems": counts(tried),
+            "verdict": verdict(current, tried, variety(current, tried, held_out)),
+        }
 
     asyncio.run(go())
     folder.mkdir(parents=True, exist_ok=True)
@@ -488,6 +604,7 @@ def nightly(
                     },
                     "suggested": (night.get("suggestions") or {}).get("best", {})
                     and night["suggestions"]["best"]["name"],
+                    "adopted": night.get("adopted"),
                 }
             )
             + "\n"

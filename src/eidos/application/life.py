@@ -43,6 +43,7 @@ from eidos.application.cognition import perform, request_for
 from eidos.application.cognitive_workspace import cognitive_workspace, recent_inner_stream
 from eidos.application.concerns import concern_lifecycle_events
 from eidos.application.consolidation import consolidation_events
+from eidos.application.day_outline import day_outline, plain_summary, summary_holds
 from eidos.application.day_rhythm import hour_today
 from eidos.application.daydreams import daydream_events
 from eidos.application.deliveries import delivery_events
@@ -73,7 +74,7 @@ from eidos.application.family import FAMILY_HOME, christmas_events, family_event
 from eidos.application.family_stories import family_storyline_events
 from eidos.application.family_visits import family_visit_events
 from eidos.application.far_friends import far_friend_events
-from eidos.application.feelings import feeling_events, mood_from_feelings
+from eidos.application.feelings import feeling_events, strongest_feeling
 from eidos.application.first_story import story_events
 from eidos.application.followups import follow_up_events
 from eidos.application.freelance import freelance_events, self_employed, week_of_work_now
@@ -194,6 +195,7 @@ from eidos.application.outreach import outreach_events
 from eidos.application.personal_journeys import journey_context
 from eidos.application.personal_project import personal_project_events
 from eidos.application.phone_calls import phone_call_events
+from eidos.application.phone_talk import call_talk_events
 from eidos.application.place_discovery import known_place_ids, place_discovery_events
 from eidos.application.planner import overdue_plan_events
 from eidos.application.preference_development import preference_development_events
@@ -606,6 +608,16 @@ class Life(LifeConversation):
                     _their_whereabouts(history, state, catalog),
                 )
             )
+            # A call he answered, or one he made, gets its words.
+            pending.extend(
+                await call_talk_events(
+                    history + pending,
+                    state.simulated_at,
+                    self.gateway,
+                    names={p.person_id: p.name for p in catalog.people.values()},
+                    whereabouts=_their_whereabouts(history, state, catalog),
+                )
+            )
         await self._notice_arrivals(history, state, pending)
         # How this quarter hour felt (his thoughts, any reply) moves his feelings now, not on
         # the hour.
@@ -617,13 +629,15 @@ class Life(LifeConversation):
         pending.extend(episodes)
         if episodes:
             # ...and he knows it: the named emotion follows, not an hour later.
+            felt_mood, felt_strength = strongest_feeling(history + pending, state.simulated_at)
             pending.extend(
                 emotion_sample_events(
                     history + pending,
                     felt_state,
                     state.simulated_at,
                     whole_hour=False,
-                    felt=mood_from_feelings(history + pending, state.simulated_at),
+                    felt=felt_mood,
+                    felt_strength=felt_strength,
                 )  # fmt: skip
             )
         self.store.append("pathos", pending, len(history))
@@ -4188,11 +4202,36 @@ class Life(LifeConversation):
                     if item.event.payload.get("category") != "dream"
                 ]
             )
+            catalog = self._world_catalog(history + pending)
+            outline = day_outline(
+                history + pending,
+                current,
+                names={p.person_id: p.name for p in catalog.people.values()},
+                places={place_id: place.name for place_id, place in catalog.places.items()},
+            )
             role_context = {
                 **mind.context,
                 "memories": [item.recalled_text for item in role_sources],
+                "the_day": outline["lines"],
             }
         text = await perform(self.gateway, role, role_context, at, pending)
+        if role == "chronicler":
+            names = {p.person_id: p.name for p in catalog.people.values()}
+            wrong = summary_holds(text, outline, names) if text else None
+            if wrong is not None:
+                # "Hannah Fenwick visited", of a chat in the café: asked once more, then
+                # the day in the outline's own words.
+                text = await perform(
+                    self.gateway,
+                    role,
+                    {**role_context, "revision_instruction": f"{wrong}. Keep to the_day."},
+                    at,
+                    pending,
+                )
+                if text and summary_holds(text, outline, names) is not None:
+                    text = None
+            if not text:
+                text = plain_summary(outline)
         if not text:
             return
         if role == "oneiros":
@@ -4339,12 +4378,14 @@ class Life(LifeConversation):
         pending.extend(appraisals)
         episodes, tick.state = affect_episode_events(history + pending, tick.state, current)
         pending.extend(episodes)
+        felt_mood, felt_strength = strongest_feeling(history + pending, current)
         pending.extend(
             emotion_sample_events(
                 history + pending,
                 tick.state,
                 current,
-                felt=mood_from_feelings(history + pending, current),
+                felt=felt_mood,
+                felt_strength=felt_strength,
             )
         )
         regulation_events, tick.state = emotional_regulation_events(

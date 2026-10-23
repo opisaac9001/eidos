@@ -165,12 +165,16 @@ def emotion_sample_events(
     *,
     whole_hour: bool = True,
     felt: str | None = None,
+    felt_strength: float = 0.0,
 ) -> list[DomainEvent]:
     """Name how he feels now. Between hours (``whole_hour`` False) the sample keeps his
     feelings current without counting another hour towards how long he has been low.
 
     ``felt`` is what his strongest feeling about something makes him (worried, pleased):
-    when the overall mood is only neutral, that's how he'd say he is."""
+    when the overall mood is only neutral, that's how he'd say he is; and when it's only
+    mild contentment but the feeling is strong (``felt_strength``), the feeling wins: a
+    quiet afternoon's "contentment" sat on him for 91 hours of three days while he was
+    feeling for Rowan and missing Beth."""
     if at.utcoffset() is None:
         raise ValueError("Emotion sampling time must be timezone-aware")
     sample_id = f"emotion:{at.isoformat()}" + ("" if whole_hour else ":felt")
@@ -184,7 +188,9 @@ def emotion_sample_events(
         previous.sustained_low_hours + (1 if whole_hour else 0) if state.valence <= -0.35 else 0
     )
     label = classify_emotion(state.valence, state.arousal, low_hours)
-    if felt and label in _NEUTRAL:
+    if felt and (
+        label in _NEUTRAL or (label == "contentment" and felt_strength >= 0.4 and felt != "content")
+    ):
         label = felt
     intensity = _clamp(max(abs(state.valence), abs(state.arousal - 0.35) * 1.25))
     pattern = "prolonged" if low_hours >= 72 else "sustained" if low_hours >= 24 else "transient"
