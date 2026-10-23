@@ -38,7 +38,7 @@ eidos = "eidos.cli:main"
 dev = [
   "mypy>=1.11",
   "pytest>=8.3",
-  "ruff==0.16.6",
+  "ruff==0.17.1",
 ]
 
 [tool.hatch.build.targets.wheel]
